@@ -162,6 +162,12 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       <div class="placeholder-card">
         <p class="placeholder-card__label">Run seam</p>
         <strong>{{ shell.runStateLabel }}</strong>
+        <p v-if="shell.primaryActiveRun" class="region-copy">
+          {{ shell.primaryActiveRun.detail }}
+        </p>
+        <p v-else-if="shell.runsLoadState === 'error'" class="region-copy">
+          {{ shell.runsError }}
+        </p>
       </div>
 
       <div class="placeholder-card">

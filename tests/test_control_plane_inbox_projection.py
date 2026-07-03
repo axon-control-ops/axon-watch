@@ -22,6 +22,9 @@ from app.main import app  # noqa: E402
 
 class ControlPlaneInboxProjectionTests(unittest.TestCase):
     def setUp(self) -> None:
+        from app.persistence import run_store
+
+        run_store.reset_store()
         self.client = TestClient(app)
 
     def test_project_watch_inbox_preserves_consistency_fields(self) -> None:

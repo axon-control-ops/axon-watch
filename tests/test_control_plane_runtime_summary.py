@@ -30,6 +30,9 @@ _CANONICAL_TOP_LEVEL_KEYS = {
 
 class ControlPlaneRuntimeSummaryTests(unittest.TestCase):
     def setUp(self) -> None:
+        from app.persistence import run_store
+
+        run_store.reset_store()
         self.client = TestClient(app)
 
     def test_runtime_summary_endpoint_returns_assembled_canonical_shape(self) -> None:

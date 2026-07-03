@@ -34,6 +34,11 @@ def _disconnected_probe() -> tuple[bool, str, str | None, str]:
 
 
 class RuntimeSummaryAssemblerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from app.persistence import run_store
+
+        run_store.reset_store()
+
     def test_assembler_returns_canonical_top_level_shape(self) -> None:
         payload = assemble_runtime_summary(watch_probe=_connected_probe)
 

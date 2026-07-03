@@ -11,6 +11,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from app.adapters.watch_client import fetch_watch_inbox
+from app.runs.service import list_active_runs, to_runtime_summary_active_run
 
 _APP_VERSION = "0.1.0"
 _PROCESS_STARTED_AT = time.monotonic()
@@ -136,7 +137,9 @@ def assemble_runtime_summary(
             "degraded_reason": watch_degraded_reason,
         },
         "runtime_identity": _runtime_identity(),
-        "active_runs": [],
+        "active_runs": [
+            to_runtime_summary_active_run(record) for record in list_active_runs()
+        ],
         "approvals": {
             "pending_count": 0,
             "highest_severity": None,

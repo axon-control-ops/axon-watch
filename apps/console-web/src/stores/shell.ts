@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 
-import { fetchInbox, fetchRuntimeSummary } from '../api/control-plane';
+import { fetchInbox, fetchRuns, fetchRuntimeSummary } from '../api/control-plane';
 import type {
   ApprovalRecord,
   InboxItem,
@@ -15,6 +15,7 @@ import type {
 export type LayoutMode = 'operator' | 'ide';
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type InboxLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+export type RunsLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 type WorkbenchSurface = 'editor' | 'preview';
 
 interface EditorTabDescriptor {
@@ -61,6 +62,9 @@ export const useShellStore = defineStore('shell', () => {
   const runtimeSummaryLoadState = ref<RuntimeSummaryLoadState>('idle');
   const runtimeSummaryError = ref<string | null>(null);
   const activeRun = ref<RunRecord | null>(null);
+  const runs = ref<RunRecord[]>([]);
+  const runsLoadState = ref<RunsLoadState>('idle');
+  const runsError = ref<string | null>(null);
   const approvals = ref<ApprovalRecord[]>([]);
   const inboxItems = ref<InboxItem[]>([]);
   const inboxLoadState = ref<InboxLoadState>('idle');
@@ -103,9 +107,24 @@ export const useShellStore = defineStore('shell', () => {
     return `${identity.provider_name} / ${identity.model_name} · ${activeRunCount} active run(s) · ${watchConnected}`;
   });
 
-  const runStateLabel = computed(() =>
-    activeRun.value ? 'RunRecord attached' : 'Awaiting RunRecord',
-  );
+  const runStateLabel = computed(() => {
+    if (runsLoadState.value === 'loading') {
+      return 'Loading RunRecord';
+    }
+
+    if (runsLoadState.value === 'error') {
+      return 'RunRecord unavailable';
+    }
+
+    if (!activeRun.value) {
+      return 'Awaiting RunRecord';
+    }
+
+    const run = activeRun.value;
+    return `${run.run_id} · ${run.phase} · ${run.status} · ${run.summary}`;
+  });
+
+  const primaryActiveRun = computed(() => activeRun.value);
 
   const inboxStateLabel = computed(() => {
     if (inboxLoadState.value === 'loading') {
@@ -172,8 +191,26 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function loadRuns(): Promise<void> {
+    runsLoadState.value = 'loading';
+    runsError.value = null;
+
+    try {
+      const snapshot = await fetchRuns();
+      runs.value = snapshot.items;
+      activeRun.value =
+        snapshot.items.find((run) => run.phase !== 'completed' && run.phase !== 'failed' && run.phase !== 'cancelled') ??
+        snapshot.items[0] ??
+        null;
+      runsLoadState.value = 'loaded';
+    } catch (error) {
+      runsLoadState.value = 'error';
+      runsError.value = error instanceof Error ? error.message : 'runs request failed';
+    }
+  }
+
   async function loadBootstrapData(): Promise<void> {
-    await Promise.all([loadRuntimeSummary(), loadInbox()]);
+    await Promise.all([loadRuntimeSummary(), loadInbox(), loadRuns()]);
   }
 
   return {
@@ -193,8 +230,13 @@ export const useShellStore = defineStore('shell', () => {
     layoutModeLabel,
     loadBootstrapData,
     loadInbox,
+    loadRuns,
     loadRuntimeSummary,
+    primaryActiveRun,
     primaryInboxItem,
+    runs,
+    runsError,
+    runsLoadState,
     runStateLabel,
     runtimeStateLabel,
     runtimeSummary,
