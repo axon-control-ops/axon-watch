@@ -1,0 +1,11 @@
+{
+  "signal_id": "signal_runtime_summary_degraded",
+  "workspace_id": "workspace_alpha",
+  "title": "Watch summary degraded",
+  "summary": "Watch summary is degraded.",
+  "severity": "high",
+  "status": "open",
+  "source": "watch",
+  "updated_at": "2026-07-03T15:02:00Z",
+  "action_type": "open_dashboard"
+}

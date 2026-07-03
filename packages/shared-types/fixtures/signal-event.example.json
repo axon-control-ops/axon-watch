@@ -1,0 +1,26 @@
+{
+  "event_id": "event_signal_contract_opened",
+  "signal_id": "signal_runtime_summary_degraded",
+  "event_type": "signal_opened",
+  "source": "watch",
+  "workspace_id": "workspace_alpha",
+  "project_id": "project_alpha",
+  "severity": "high",
+  "status": "open",
+  "title": "Watch summary degraded",
+  "body": "The watch summary degraded and needs operator review.",
+  "summary": "Watch summary is degraded.",
+  "created_at": "2026-07-03T15:01:00Z",
+  "updated_at": "2026-07-03T15:02:00Z",
+  "occurred_at": "2026-07-03T15:01:00Z",
+  "dedupe_key": "watch:summary:degraded:workspace_alpha",
+  "action_type": "open_dashboard",
+  "action_payload": {
+    "surface": "runtime-summary"
+  },
+  "correlation_ref": "corr_watch_summary_workspace_alpha",
+  "delivery_state": "pending",
+  "meta": {
+    "signal_family": "watch_summary"
+  }
+}

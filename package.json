@@ -1,0 +1,20 @@
+{
+  "name": "axon-watch",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "./scripts/dev/up.sh",
+    "down": "./scripts/dev/down.sh",
+    "health": "./scripts/dev/check-health.sh",
+    "dev:console-web": "npm run dev -w @axon-watch/console-web -- --host 127.0.0.1 --port ${AXON_WATCH_CONSOLE_WEB_PORT:-4173}",
+    "dev:control-plane": "cd services/control-plane && python3 -m uvicorn app.main:app --host 127.0.0.1 --port ${AXON_WATCH_CONTROL_PLANE_PORT:-8787}",
+    "dev:axon-watch": "cd services/axon-watch && python3 -m uvicorn app.main:app --host 127.0.0.1 --port ${AXON_WATCH_WATCH_SERVICE_PORT:-8788}",
+    "verify:shared-types": "npm run verify -w @contracts/shared-types",
+    "verify:contracts": "npm run verify:shared-types && python3 -m unittest tests.test_shared_contract_fixtures tests.test_runtime_summary_assembler tests.test_control_plane_runtime_summary",
+    "verify": "npm run verify:contracts && python3 scripts/verify/all.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json"
+  }
+}

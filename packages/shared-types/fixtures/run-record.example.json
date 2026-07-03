@@ -1,0 +1,19 @@
+{
+  "run_id": "run_contract_baseline",
+  "workspace_id": "workspace_alpha",
+  "lane_id": "control-plane",
+  "mode": "agent",
+  "status": "running",
+  "phase": "executing",
+  "summary": "Contract baseline run",
+  "detail": "Shared DTO layer is being verified.",
+  "started_at": "2026-07-03T15:00:00Z",
+  "updated_at": "2026-07-03T15:02:00Z",
+  "ended_at": null,
+  "can_stop": true,
+  "can_resume": false,
+  "can_approve": false,
+  "can_review": false,
+  "current_step": "Validate representative payloads",
+  "history_ref": "history/run_contract_baseline"
+}

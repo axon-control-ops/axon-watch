@@ -1,0 +1,100 @@
+{
+  "budgets": {
+    "shell_boot_readiness": {
+      "threshold_ms": 2500,
+      "gate": "nightly",
+      "owner": "console-web",
+      "measurement": "browser automation report"
+    },
+    "runtime_summary_latency": {
+      "threshold_ms": 300,
+      "gate": "ci",
+      "owner": "control-plane",
+      "measurement": "warm route timing"
+    },
+    "watch_summary_latency": {
+      "threshold_ms": 200,
+      "gate": "ci",
+      "owner": "axon-watch",
+      "measurement": "warm route timing"
+    }
+  },
+  "dto_sizes": {
+    "runtime_summary": {
+      "threshold_bytes": 32768,
+      "gate": "ci",
+      "owner": "control-plane"
+    },
+    "watch_summary": {
+      "threshold_bytes": 24576,
+      "gate": "ci",
+      "owner": "axon-watch"
+    }
+  },
+  "dependency_rules": [
+    {
+      "name": "watch-no-ui-dependency",
+      "source_root": "services/axon-watch",
+      "forbidden_roots": [
+        "apps/console-web"
+      ],
+      "forbidden_tokens": [
+        "apps/console-web",
+        "apps.console_web",
+        "@console-web/"
+      ]
+    },
+    {
+      "name": "frontend-no-watch-internals",
+      "source_root": "apps/console-web",
+      "forbidden_roots": [
+        "services/axon-watch"
+      ],
+      "forbidden_tokens": [
+        "services/axon-watch",
+        "services.axon_watch",
+        "@axon-watch/"
+      ]
+    },
+    {
+      "name": "control-domain-no-watch-domain",
+      "source_root": "services/control-plane/app/domain",
+      "forbidden_roots": [
+        "services/axon-watch/app/domain"
+      ],
+      "forbidden_tokens": [
+        "services/axon-watch/app/domain",
+        "services.axon_watch.app.domain",
+        "@watch-domain/"
+      ]
+    },
+    {
+      "name": "watch-domain-no-control-domain",
+      "source_root": "services/axon-watch/app/domain",
+      "forbidden_roots": [
+        "services/control-plane/app/domain"
+      ],
+      "forbidden_tokens": [
+        "services/control-plane/app/domain",
+        "services.control_plane.app.domain",
+        "@control-domain/"
+      ]
+    }
+  ],
+  "adr": {
+    "statuses": [
+      "Proposed",
+      "Accepted",
+      "Superseded"
+    ],
+    "required_sections": [
+      "Status",
+      "Context",
+      "Decision",
+      "Alternatives Considered",
+      "Trade-Offs",
+      "Consequences",
+      "Reevaluation Triggers"
+    ]
+  }
+}

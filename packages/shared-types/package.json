@@ -1,0 +1,13 @@
+{
+  "name": "@contracts/shared-types",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "npm run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "latest"
+  }
+}
