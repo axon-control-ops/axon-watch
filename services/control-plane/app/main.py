@@ -7,6 +7,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.inbox_projection import build_inbox_response
 from app.runtime_summary import build_runtime_summary
 
 
@@ -57,3 +58,8 @@ def readiness() -> dict[str, object]:
 @app.get("/api/runtime/summary")
 def runtime_summary() -> dict[str, object]:
     return build_runtime_summary()
+
+
+@app.get("/api/inbox")
+def inbox() -> dict[str, object]:
+    return build_inbox_response()

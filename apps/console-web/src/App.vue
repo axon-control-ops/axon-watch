@@ -172,6 +172,12 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       <div class="placeholder-card">
         <p class="placeholder-card__label">Signals seam</p>
         <strong>{{ shell.inboxStateLabel }}</strong>
+        <p v-if="shell.primaryInboxItem" class="region-copy">
+          {{ shell.primaryInboxItem.title }} — {{ shell.primaryInboxItem.summary }}
+        </p>
+        <p v-else-if="shell.inboxLoadState === 'error'" class="region-copy">
+          {{ shell.inboxError }}
+        </p>
       </div>
 
       <div class="placeholder-card">

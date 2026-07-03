@@ -10,10 +10,13 @@ from typing import Callable
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from app.adapters.watch_client import fetch_watch_inbox
+
 _APP_VERSION = "0.1.0"
 _PROCESS_STARTED_AT = time.monotonic()
 
 WatchProbe = Callable[[], tuple[bool, str, str | None, str]]
+WatchInboxFetcher = Callable[[], dict[str, object] | None]
 
 
 def _utc_now_iso() -> str:
@@ -69,14 +72,50 @@ def _runtime_identity() -> dict[str, object]:
     }
 
 
+def _signals_summary_from_inbox(
+    watch_inbox: dict[str, object] | None,
+    generated_at: str,
+) -> dict[str, object]:
+    if not watch_inbox:
+        return {
+            "open_count": 0,
+            "critical_count": 0,
+            "high_count": 0,
+            "top_items": [],
+            "last_updated_at": generated_at,
+        }
+
+    items = watch_inbox.get("items", [])
+    if not isinstance(items, list):
+        items = []
+
+    open_count = sum(1 for item in items if isinstance(item, dict) and item.get("status") == "open")
+    critical_count = sum(
+        1 for item in items if isinstance(item, dict) and item.get("severity") == "critical"
+    )
+    high_count = sum(1 for item in items if isinstance(item, dict) and item.get("severity") == "high")
+    top_items = [item for item in items if isinstance(item, dict)][:1]
+
+    return {
+        "open_count": open_count,
+        "critical_count": critical_count,
+        "high_count": high_count,
+        "top_items": top_items,
+        "last_updated_at": str(watch_inbox.get("updated_at", generated_at)),
+    }
+
+
 def assemble_runtime_summary(
     *,
     watch_probe: WatchProbe | None = None,
+    inbox_fetcher: WatchInboxFetcher | None = None,
 ) -> dict[str, object]:
     """Build a boot-safe runtime summary from live control-plane and watch probes."""
     probe = watch_probe or default_watch_probe
+    inbox_loader = inbox_fetcher or fetch_watch_inbox
     generated_at = _utc_now_iso()
     watch_connected, watch_status, watch_degraded_reason, last_summary_at = probe()
+    watch_inbox = inbox_loader() if watch_connected else None
 
     degraded_reasons: list[str] = []
     if not watch_connected and watch_degraded_reason:
@@ -103,13 +142,7 @@ def assemble_runtime_summary(
             "highest_severity": None,
             "latest_approval_at": None,
         },
-        "signals": {
-            "open_count": 0,
-            "critical_count": 0,
-            "high_count": 0,
-            "top_items": [],
-            "last_updated_at": generated_at,
-        },
+        "signals": _signals_summary_from_inbox(watch_inbox, generated_at),
         "capabilities": {
             "editor": True,
             "terminal": True,

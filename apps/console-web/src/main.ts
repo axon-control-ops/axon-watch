@@ -11,6 +11,6 @@ const pinia = createPinia();
 app.use(pinia);
 
 const shell = useShellStore(pinia);
-void shell.loadRuntimeSummary();
+void shell.loadBootstrapData();
 
 app.mount('#app');

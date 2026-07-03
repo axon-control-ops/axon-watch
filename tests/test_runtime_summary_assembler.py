@@ -57,6 +57,30 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
         self.assertFalse(payload["degraded"]["active"])
         self.assertTrue(payload["capabilities"]["watch_connected"])
 
+    def test_assembler_populates_signals_from_watch_inbox(self) -> None:
+        watch_item = {
+            "signal_id": "signal_watch_bootstrap_ready",
+            "workspace_id": "workspace_bootstrap",
+            "title": "Watch bootstrap ready",
+            "summary": "Watch bootstrap signal is available.",
+            "severity": "info",
+            "status": "open",
+            "source": "watch",
+            "updated_at": "2026-07-03T16:00:00Z",
+            "action_type": "open_dashboard",
+        }
+        watch_inbox = {"items": [watch_item], "count": 1, "updated_at": "2026-07-03T16:00:00Z"}
+        payload = assemble_runtime_summary(
+            watch_probe=_connected_probe,
+            inbox_fetcher=lambda: watch_inbox,
+        )
+
+        self.assertEqual(1, payload["signals"]["open_count"])
+        self.assertEqual(watch_item["signal_id"], payload["signals"]["top_items"][0]["signal_id"])
+        self.assertEqual(watch_item["severity"], payload["signals"]["top_items"][0]["severity"])
+        self.assertEqual(watch_item["status"], payload["signals"]["top_items"][0]["status"])
+        self.assertEqual(watch_item["source"], payload["signals"]["top_items"][0]["source"])
+
     def test_assembled_payload_fits_runtime_summary_size_budget(self) -> None:
         payload = assemble_runtime_summary(watch_probe=_connected_probe)
         encoded = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

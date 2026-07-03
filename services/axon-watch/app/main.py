@@ -6,6 +6,8 @@ import os
 
 from fastapi import FastAPI
 
+from app.signals.store import get_inbox_snapshot
+
 
 def _state_dir() -> str:
     return os.environ.get("AXON_WATCH_STATE_DIR", "./.local/state")
@@ -34,6 +36,10 @@ def readiness() -> dict[str, object]:
         "service": "axon-watch",
         "status": "ready",
         "mode": "bootstrap",
-        # Keep readiness limited to owned bootstrap wiring only.
         "state_dir": _state_dir(),
     }
+
+
+@app.get("/internal/watch/inbox")
+def inbox() -> dict[str, object]:
+    return get_inbox_snapshot()

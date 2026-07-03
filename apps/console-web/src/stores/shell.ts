@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 
-import { fetchRuntimeSummary } from '../api/control-plane';
+import { fetchInbox, fetchRuntimeSummary } from '../api/control-plane';
 import type {
   ApprovalRecord,
   InboxItem,
@@ -14,6 +14,7 @@ import type {
 
 export type LayoutMode = 'operator' | 'ide';
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+export type InboxLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 type WorkbenchSurface = 'editor' | 'preview';
 
 interface EditorTabDescriptor {
@@ -62,6 +63,8 @@ export const useShellStore = defineStore('shell', () => {
   const activeRun = ref<RunRecord | null>(null);
   const approvals = ref<ApprovalRecord[]>([]);
   const inboxItems = ref<InboxItem[]>([]);
+  const inboxLoadState = ref<InboxLoadState>('idle');
+  const inboxError = ref<string | null>(null);
   const signalViews = ref<SignalView[]>([]);
   const threadMessages = ref<ThreadMessage[]>([]);
 
@@ -105,12 +108,23 @@ export const useShellStore = defineStore('shell', () => {
   );
 
   const inboxStateLabel = computed(() => {
-    if (inboxItems.value.length > 0 || signalViews.value.length > 0) {
-      return 'InboxItem / SignalView attached';
+    if (inboxLoadState.value === 'loading') {
+      return 'Loading inbox signal';
     }
 
-    return 'Awaiting InboxItem / SignalView';
+    if (inboxLoadState.value === 'error') {
+      return 'Inbox signal unavailable';
+    }
+
+    const primary = inboxItems.value[0];
+    if (!primary) {
+      return 'Awaiting InboxItem / SignalView';
+    }
+
+    return `${primary.signal_id} · ${primary.severity} · ${primary.status} · ${primary.source}`;
   });
+
+  const primaryInboxItem = computed(() => inboxItems.value[0] ?? null);
 
   const approvalStateLabel = computed(() =>
     approvals.value.length > 0 ? 'ApprovalRecord attached' : 'Awaiting ApprovalRecord',
@@ -143,6 +157,25 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function loadInbox(): Promise<void> {
+    inboxLoadState.value = 'loading';
+    inboxError.value = null;
+
+    try {
+      const inbox = await fetchInbox();
+      inboxItems.value = inbox.items;
+      signalViews.value = inbox.items;
+      inboxLoadState.value = 'loaded';
+    } catch (error) {
+      inboxLoadState.value = 'error';
+      inboxError.value = error instanceof Error ? error.message : 'inbox request failed';
+    }
+  }
+
+  async function loadBootstrapData(): Promise<void> {
+    await Promise.all([loadRuntimeSummary(), loadInbox()]);
+  }
+
   return {
     activeEditorTabId,
     activeRun,
@@ -152,11 +185,16 @@ export const useShellStore = defineStore('shell', () => {
     currentWorkspace,
     dockContext,
     editorTabs,
+    inboxError,
     inboxItems,
+    inboxLoadState,
     inboxStateLabel,
     layoutMode,
     layoutModeLabel,
+    loadBootstrapData,
+    loadInbox,
     loadRuntimeSummary,
+    primaryInboxItem,
     runStateLabel,
     runtimeStateLabel,
     runtimeSummary,
