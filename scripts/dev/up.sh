@@ -26,6 +26,11 @@ if [[ -f "${repo_root}/.local/pids/control-plane.pid" ]] || [[ -f "${repo_root}/
   exit 1
 fi
 
+if [[ ! -d "${repo_root}/node_modules" ]]; then
+  echo "Missing root node_modules. Run npm install at the repo root first."
+  exit 1
+fi
+
 (
   cd "${repo_root}/services/axon-watch"
   python3 -m uvicorn app.main:app --host 127.0.0.1 --port "${AXON_WATCH_WATCH_SERVICE_PORT}"
@@ -39,8 +44,8 @@ echo $! >"${repo_root}/.local/pids/axon-watch.pid"
 echo $! >"${repo_root}/.local/pids/control-plane.pid"
 
 (
-  cd "${repo_root}/apps/console-web"
-  pnpm dev --host 127.0.0.1 --port "${AXON_WATCH_CONSOLE_WEB_PORT}"
+  cd "${repo_root}"
+  npm run dev -w @axon-watch/console-web -- --host 127.0.0.1 --port "${AXON_WATCH_CONSOLE_WEB_PORT}"
 ) >"${repo_root}/.local/logs/console-web.log" 2>&1 &
 echo $! >"${repo_root}/.local/pids/console-web.pid"
 

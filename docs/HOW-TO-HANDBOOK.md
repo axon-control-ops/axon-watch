@@ -472,24 +472,19 @@ Avoid:
 Check:
 
 1. Did you run `npm install` at repo root?
-2. Do you have `pnpm` installed?
+2. Are ports `4173`, `8787`, and `8788` free?
 
-Current caveat:
+Current expected path:
 
-- `scripts/dev/up.sh` still uses `pnpm dev` inside `apps/console-web`
-- root verification now uses npm workspaces
+- root install: `npm install`
+- root startup: `./scripts/dev/up.sh`
+- frontend dev server: `npm run dev -w @axon-watch/console-web`
 
-So at the moment there is a tool split:
+If startup fails, inspect:
 
-- root verification prefers npm
-- dev startup script still expects pnpm
-
-If startup fails because `pnpm` is missing, either:
-
-- install `pnpm`, or
-- run the frontend manually with npm in `apps/console-web/`
-
-This split is known and should be normalized in a later slice.
+- `.local/logs/console-web.log`
+- `.local/logs/control-plane.log`
+- `.local/logs/axon-watch.log`
 
 ## Problem: `check-health.sh` fails
 

@@ -30,10 +30,10 @@ tests/                   existing verification harness ownership
 
 ## Local Bootstrap
 
-Lane 1 provides the smallest runnable service scaffold:
+Use npm workspaces from the repo root:
 
-1. install Python dependencies for the service shells
-2. install frontend dependencies for `apps/console-web/`
+1. run `npm install` at the repo root
+2. install Python dependencies for the service shells if needed
 3. copy `.env.example` to `.env` if custom ports or paths are needed
 4. run `./scripts/dev/up.sh`
 5. check service endpoints with `./scripts/dev/check-health.sh`
