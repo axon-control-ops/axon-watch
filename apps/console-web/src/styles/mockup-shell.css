@@ -2570,6 +2570,11 @@ body:has(.console-shell--mockup) {
   border-color: rgba(255, 201, 120, 0.18);
 }
 
+.conversation-seam__item--agent {
+  border-color: rgba(0, 242, 255, 0.28);
+  background: rgba(0, 242, 255, 0.06);
+}
+
 .conversation-seam__meta {
   display: flex;
   justify-content: space-between;

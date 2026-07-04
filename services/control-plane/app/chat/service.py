@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.chat.dispatch import build_command_dispatch_ack, resolve_command_dispatch
+from app.chat.orchestration import build_agent_command_reply, orchestrate_command_run
 from app.persistence import chat_store
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
 
@@ -47,9 +48,15 @@ def post_chat_message(
         content=trimmed,
         run_id=run_id,
     )
+    run_record = orchestrate_command_run(run_record=run_record, dispatched=dispatched)
     ack_content = build_command_dispatch_ack(
         run_id=dispatch_run_id,
         phase=str(run_record["phase"]),
+        dispatched=dispatched,
+    )
+    agent_content = build_agent_command_reply(
+        content=trimmed,
+        run_record=run_record,
         dispatched=dispatched,
     )
 
@@ -89,10 +96,21 @@ def post_chat_message(
             "created_at": created_at,
         }
     )
+    agent_message = chat_store.save_message(
+        {
+            "message_id": _new_message_id("message_agent"),
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": dispatch_run_id,
+            "role": "agent",
+            "content": agent_content,
+            "created_at": created_at,
+        }
+    )
 
     return {
         "thread_id": thread_id,
-        "messages": [operator_message, system_message],
+        "messages": [operator_message, system_message, agent_message],
         "run_id": dispatch_run_id,
         "dispatched": dispatched,
         "run": run_record,

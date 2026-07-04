@@ -105,6 +105,17 @@ describe('operator-thread', () => {
     });
     expect(mapped.role).toBe('operator');
 
+    const agentMapped = mapChatMessageRecord({
+      message_id: 'message_agent_1',
+      thread_id: 'thread_1',
+      run_id: 'run_1',
+      workspace_id: 'workspace_alpha',
+      role: 'agent',
+      content: 'Processing operator command.',
+      created_at: '2026-07-04T10:00:02.000Z',
+    });
+    expect(agentMapped.role).toBe('agent');
+
     const merged = mergeThreadMessages(
       [mapped],
       [

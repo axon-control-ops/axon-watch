@@ -103,12 +103,39 @@ Must not:
 
 ## Blocked Until Explicit Assignment
 
-Do not start these in parallel until coordinator opens the slice:
+Do not start these until coordinator opens the slice:
 
-- KAIRO operator-presence integration (planning exists in axon-local only)
-- cross-repo planning moves out of `axon-local/Plans/Axon-Watch/`
+| Item | Owner | Reason |
+|---|---|---|
+| KAIRO operator-presence integration (ADR-005, JX-1–JX-5) | Coordinator | Cross-cutting persona, voice, watch rules — planning only in `axon-local` |
+| Cross-repo planning migration | Coordinator | `axon-local/Plans/Axon-Watch/` remains frozen planning home |
+| Fitness timing gates | Lane D | `shell_boot_readiness`, latency budgets — PENDING in verify |
+| Shared-contract field changes | Coordinator | `packages/shared-types`, run-state truth surfaces |
 
-**Recently landed (no longer blocked):**
+## Active Queue (resume here)
+
+Work in order. One slice per pass; run the verification gate before the next item.
+
+| # | Lane | Slice | Status |
+|---|---|---|---|
+| **B1** | C (+ B surface) | Chat orchestration hook — agent reply + `review_ready` after dispatch | **done** |
+| **B2** | B | Workspace catalog policy (doc-only) | **done** — `docs/WORKSPACE_CATALOG.md` |
+| **A1** | A | Watch signal depth / degraded bootstrap clarity | **queued** |
+| **C1** | C | Run flow receipts and review polish within frozen transitions | **queued** |
+| **D1** | D | Dev verify / health polish (non-semantics) | **queued** |
+
+Parallel rule: **B1 must finish before A1/C1** if they touch `chat/service.py` or
+run orchestration in the same pass. Lane A and D may run in parallel with B2 only.
+
+## Suggested Next Slices
+
+Superseded by **Active Queue** above. After B1 lands:
+
+1. **Lane A** — watch summary degraded signal clarity in bootstrap dev mode
+2. **Lane C** — run history receipts visible in dock (within frozen transitions)
+3. **Lane B** — UX-4 SSE seam polish (no layout ADR changes)
+
+## Recently Landed
 
 - approval thin slice (`requires_approval`, approve/reject)
 - review-ready entry, completion, and resume-from-review
@@ -132,6 +159,8 @@ Do not start these in parallel until coordinator opens the slice:
 - **operator-facing dock seam titles** via `dock-seam-layout.ts`
 - **silent empty thread lookup** (HTTP 200 + `thread_id: null`)
 - **bootstrap workspace catalog trim** (`mergeMockupWorkspaceCatalog`, `workspace_smoke` default)
+- **chat orchestration hook** — agent transcript reply + dispatch → `review_ready` (`chat/orchestration.py`)
+- **workspace catalog policy** documented in `docs/WORKSPACE_CATALOG.md`
 - lower default terminal dock height (~240px fresh session, 280px cap)
 
 ## Assignment Rules
@@ -150,11 +179,3 @@ python3 -m unittest discover -s tests
 ./scripts/dev/up.sh
 ./scripts/dev/check-health.sh
 ```
-
-## Suggested Next Slices
-
-After the current thin slices (updated 2026-07-04):
-
-1. **Lane B** — agent orchestration hook for chat messages (beyond system ack stub)
-2. **Coordinator** — KAIRO operator-presence integration when explicitly assigned
-3. **Lane B** — unify mockup sidebar workspace IDs with control-plane catalog (or document-only until UX-2)

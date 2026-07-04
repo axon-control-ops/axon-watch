@@ -1,6 +1,6 @@
 import type { ThreadMessage } from '../contracts/canonical';
 
-export type ThreadMessageRole = 'operator' | 'system';
+export type ThreadMessageRole = 'operator' | 'system' | 'agent';
 
 export interface OperatorThreadEntry extends ThreadMessage {
   role: ThreadMessageRole;
@@ -107,7 +107,12 @@ export function mapChatMessageRecord(record: {
     thread_id: record.thread_id,
     run_id: record.run_id,
     workspace_id: record.workspace_id,
-    role: record.role === 'system' ? 'system' : 'operator',
+    role:
+      record.role === 'system'
+        ? 'system'
+        : record.role === 'agent'
+          ? 'agent'
+          : 'operator',
     content: record.content,
     created_at: record.created_at,
   };

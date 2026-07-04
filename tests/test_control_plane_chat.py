@@ -36,14 +36,17 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertTrue(payload["thread_id"].startswith("thread_"))
-        self.assertEqual(2, len(payload["messages"]))
+        self.assertEqual(3, len(payload["messages"]))
         self.assertEqual("operator", payload["messages"][0]["role"])
         self.assertEqual("inspect runtime", payload["messages"][0]["content"])
         self.assertEqual("system", payload["messages"][1]["role"])
+        self.assertEqual("agent", payload["messages"][2]["role"])
         self.assertTrue(payload["run_id"].startswith("run_"))
         self.assertTrue(payload["dispatched"])
         self.assertEqual(payload["run_id"], payload["run"]["run_id"])
         self.assertIn("dispatched", payload["messages"][1]["content"])
+        self.assertEqual("review_ready", payload["run"]["phase"])
+        self.assertIn("inspect runtime", payload["messages"][2]["content"])
         self.assertIsNotNone(run_store.get_run(payload["run_id"]))
 
     def test_post_chat_message_appends_to_existing_thread(self) -> None:
@@ -70,7 +73,7 @@ class ControlPlaneChatTests(unittest.TestCase):
 
         history = self.client.get(f"/api/chat/threads/{thread_id}/history")
         self.assertEqual(200, history.status_code)
-        self.assertEqual(4, history.json()["count"])
+        self.assertEqual(6, history.json()["count"])
 
     def test_get_chat_thread_and_history(self) -> None:
         created = self.client.post(
@@ -92,7 +95,7 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertEqual(200, history.status_code)
         history_payload = history.json()
         self.assertEqual(thread_id, history_payload["thread_id"])
-        self.assertEqual(2, history_payload["count"])
+        self.assertEqual(3, history_payload["count"])
         self.assertEqual(
             {"message_id", "thread_id", "run_id", "workspace_id", "role", "content", "created_at"},
             set(history_payload["items"][0]),
@@ -170,6 +173,9 @@ class ControlPlaneChatTests(unittest.TestCase):
         payload = response.json()
         self.assertFalse(payload["dispatched"])
         self.assertEqual(active_run["run_id"], payload["run_id"])
+        self.assertEqual("executing", payload["run"]["phase"])
+        self.assertEqual(3, len(payload["messages"]))
+        self.assertEqual("agent", payload["messages"][2]["role"])
         self.assertIn("linked", payload["messages"][1]["content"])
 
     def test_post_chat_message_dispatches_new_run_when_existing_run_is_terminal(self) -> None:

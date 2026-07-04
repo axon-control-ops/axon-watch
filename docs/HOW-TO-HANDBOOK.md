@@ -414,6 +414,10 @@ Important limitations:
   after sequential workspace + run load (no parallel race)
 - **Chat rehydration** — scoped per workspace; messages posted under one ID do not appear
   when another workspace is selected; only the latest thread per workspace is returned
+- **Chat orchestration** — `POST /api/chat/messages` returns operator + system + agent
+  messages; new dispatches transition `executing` → `review_ready` via `chat/orchestration.py`
+- **Workspace catalog** — sidebar uses seven mockup IDs; API may expose more — see
+  `docs/WORKSPACE_CATALOG.md`
 - Operator mode renders the right dock as **Run → Approvals → Signals → Conversation →
   Command → KAIRO Briefing** with the briefing card anchored at the bottom of the dock
 - briefing data is projected across the dock rather than shown as one raw DTO
