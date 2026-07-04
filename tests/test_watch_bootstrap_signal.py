@@ -67,6 +67,15 @@ class WatchBootstrapSignalTests(unittest.TestCase):
         for field in CONSISTENCY_FIELDS:
             self.assertEqual(BOOTSTRAP_INBOX_ITEM[field], item[field])
 
+    def test_watch_readiness_documents_expected_bootstrap_degraded_signal(self) -> None:
+        response = self.client.get("/internal/watch/readiness")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        notes = payload["bootstrap_notes"]
+        self.assertTrue(notes["summary_degraded_signal_expected"])
+        self.assertIn("expected", notes["detail"].lower())
+
 
 if __name__ == "__main__":
     unittest.main()

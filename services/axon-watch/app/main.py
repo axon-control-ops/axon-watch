@@ -37,6 +37,13 @@ def readiness() -> dict[str, object]:
         "status": "ready",
         "mode": "bootstrap",
         "state_dir": _state_dir(),
+        "bootstrap_notes": {
+            "summary_degraded_signal_expected": True,
+            "detail": (
+                "Local bootstrap emits a stale runtime-summary signal while watch "
+                "connectivity is healthy; this is expected dev scaffolding."
+            ),
+        },
     }
 
 

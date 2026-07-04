@@ -879,6 +879,9 @@ Current examples:
 
 - runtime summary endpoint is real
 - runtime summary assembly is still bootstrap-thin
+- axon-watch emits `signal_runtime_summary_degraded` with bootstrap-aware copy
+  (`Bootstrap: runtime summary stale`) while watch connectivity is healthy — this
+  is expected local scaffolding, not a production outage
 
 That distinction matters during review.
 

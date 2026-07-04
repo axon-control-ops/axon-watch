@@ -8,6 +8,9 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from tests.support.summary_degraded_signal_fixture import (
+    BOOTSTRAP_SUMMARY_DEGRADED_BODY,
+    BOOTSTRAP_SUMMARY_DEGRADED_SUMMARY,
+    BOOTSTRAP_SUMMARY_DEGRADED_TITLE,
     CONSISTENCY_FIELDS,
     SUMMARY_DEGRADED_INBOX_ITEM,
     SUMMARY_DEGRADED_SIGNAL_EVENT_STATIC,
@@ -47,7 +50,7 @@ def _restore_modules(cached: dict[str, object]) -> None:
     sys.modules.update(cached)
 
 
-_STATIC_EVENT_FIELDS = (
+_IDENTITY_EVENT_FIELDS = (
     "event_id",
     "signal_id",
     "event_type",
@@ -56,15 +59,11 @@ _STATIC_EVENT_FIELDS = (
     "project_id",
     "severity",
     "status",
-    "title",
-    "body",
-    "summary",
     "dedupe_key",
     "action_type",
     "action_payload",
     "correlation_ref",
     "delivery_state",
-    "meta",
 )
 
 
@@ -100,13 +99,33 @@ class WatchSummarySignalTests(unittest.TestCase):
         self.assertEqual(SUMMARY_DEGRADED_INBOX_ITEM["summary"], item["summary"])
         self.assertEqual(SUMMARY_DEGRADED_INBOX_ITEM["action_type"], item["action_type"])
 
-    def test_summary_degraded_event_matches_signal_event_contract_fixture(self) -> None:
+    def test_summary_degraded_event_preserves_contract_identity_fields(self) -> None:
         event = self.summary_degraded_signal_event()
         fixture_event = _load_fixture("signal-event.example.json")
 
-        for field in _STATIC_EVENT_FIELDS:
+        for field in _IDENTITY_EVENT_FIELDS:
             self.assertEqual(fixture_event[field], event[field])
         self.assertEqual(SUMMARY_DEGRADED_SIGNAL_EVENT_STATIC["dedupe_key"], event["dedupe_key"])
+
+    def test_summary_degraded_event_bootstrap_copy_clarifies_dev_expectation(self) -> None:
+        event = self.summary_degraded_signal_event()
+
+        self.assertEqual(BOOTSTRAP_SUMMARY_DEGRADED_TITLE, event["title"])
+        self.assertEqual(BOOTSTRAP_SUMMARY_DEGRADED_SUMMARY, event["summary"])
+        self.assertEqual(BOOTSTRAP_SUMMARY_DEGRADED_BODY, event["body"])
+
+        meta = event["meta"]
+        self.assertIsInstance(meta, dict)
+        self.assertTrue(meta.get("bootstrap_expected"))
+        presentation = meta.get("presentation")
+        self.assertIsInstance(presentation, dict)
+        self.assertEqual("informational", presentation.get("tone"))
+        self.assertEqual("warning", presentation.get("severity_display"))
+
+        watch_rule = event["watch_rule"]
+        self.assertEqual("observe", watch_rule["mode"])
+        self.assertFalse(watch_rule["interrupts"])
+        self.assertEqual("bootstrap_summary_stale", watch_rule["reason"])
 
 
 if __name__ == "__main__":

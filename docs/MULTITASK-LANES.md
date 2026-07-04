@@ -120,7 +120,7 @@ Work in order. One slice per pass; run the verification gate before the next ite
 |---|---|---|---|
 | **B1** | C (+ B surface) | Chat orchestration hook — agent reply + `review_ready` after dispatch | **done** |
 | **B2** | B | Workspace catalog policy (doc-only) | **done** — `docs/WORKSPACE_CATALOG.md` |
-| **A1** | A | Watch signal depth / degraded bootstrap clarity | **queued** |
+| **A1** | A | Watch signal depth / degraded bootstrap clarity | **done** |
 | **C1** | C | Run flow receipts and review polish within frozen transitions | **queued** |
 | **D1** | D | Dev verify / health polish (non-semantics) | **queued** |
 

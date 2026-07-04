@@ -7,11 +7,21 @@ from tests.support.bootstrap_signal_fixture import CONSISTENCY_FIELDS, consisten
 SUMMARY_DEGRADED_SIGNAL_ID = "signal_runtime_summary_degraded"
 SUMMARY_DEGRADED_WORKSPACE_ID = "workspace_alpha"
 
+BOOTSTRAP_SUMMARY_DEGRADED_TITLE = "Bootstrap: runtime summary stale"
+BOOTSTRAP_SUMMARY_DEGRADED_SUMMARY = (
+    "Expected in local bootstrap when watch is connected but summary assembly is still thin."
+)
+BOOTSTRAP_SUMMARY_DEGRADED_BODY = (
+    "In bootstrap dev mode, axon-watch stays connected while runtime summary data "
+    "remains intentionally shallow. This is normal local scaffolding — not a production "
+    "outage. Wire real watch connectors to replace this placeholder signal."
+)
+
 SUMMARY_DEGRADED_INBOX_ITEM = {
     "signal_id": SUMMARY_DEGRADED_SIGNAL_ID,
     "workspace_id": SUMMARY_DEGRADED_WORKSPACE_ID,
-    "title": "Watch summary degraded",
-    "summary": "Watch summary is degraded.",
+    "title": BOOTSTRAP_SUMMARY_DEGRADED_TITLE,
+    "summary": BOOTSTRAP_SUMMARY_DEGRADED_SUMMARY,
     "severity": "high",
     "status": "open",
     "source": "watch",
@@ -29,18 +39,33 @@ SUMMARY_DEGRADED_SIGNAL_EVENT_STATIC = {
     "project_id": "project_alpha",
     "severity": "high",
     "status": "open",
-    "title": "Watch summary degraded",
-    "body": "The watch summary degraded and needs operator review.",
-    "summary": "Watch summary is degraded.",
+    "title": BOOTSTRAP_SUMMARY_DEGRADED_TITLE,
+    "body": BOOTSTRAP_SUMMARY_DEGRADED_BODY,
+    "summary": BOOTSTRAP_SUMMARY_DEGRADED_SUMMARY,
     "dedupe_key": "watch:summary:degraded:workspace_alpha",
     "action_type": "open_dashboard",
     "action_payload": {"surface": "runtime-summary"},
     "correlation_ref": "corr_watch_summary_workspace_alpha",
     "delivery_state": "pending",
-    "meta": {"signal_family": "watch_summary"},
+    "watch_rule": {
+        "mode": "observe",
+        "interrupts": False,
+        "reason": "bootstrap_summary_stale",
+    },
+    "meta": {
+        "signal_family": "watch_summary",
+        "bootstrap_expected": True,
+        "presentation": {
+            "tone": "informational",
+            "severity_display": "warning",
+        },
+    },
 }
 
 __all__ = [
+    "BOOTSTRAP_SUMMARY_DEGRADED_BODY",
+    "BOOTSTRAP_SUMMARY_DEGRADED_SUMMARY",
+    "BOOTSTRAP_SUMMARY_DEGRADED_TITLE",
     "CONSISTENCY_FIELDS",
     "SUMMARY_DEGRADED_INBOX_ITEM",
     "SUMMARY_DEGRADED_SIGNAL_EVENT_STATIC",
