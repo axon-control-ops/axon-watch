@@ -19,6 +19,7 @@ def project_inbox_item(item: dict[str, object]) -> dict[str, object]:
             "title": item.get("title", ""),
             "summary": item.get("summary", ""),
             "updated_at": item.get("updated_at", ""),
+            "created_at": item.get("created_at", item.get("updated_at", "")),
             "action_type": item.get("action_type", "none"),
         }
     )

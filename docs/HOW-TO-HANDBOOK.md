@@ -28,7 +28,7 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **Axon-X** | User-facing product name for the next-generation operator console. |
 | **axon-watch** | Internal repo folder and npm workspace name. Legacy naming; not the product label shown to operators. |
 | **axon-local** | The current production Axon app repo (port **7734**). Planning for Axon-X still lives here under `Plans/Axon-Watch/`. |
-| **Briefing seam** | Backend-only `GET /api/briefing` projection for future KAIRO/operator-presence UI. The shell does **not** consume it yet. See `docs/contracts/BRIEFING-SEAM.md`. |
+| **Briefing seam** | `GET /api/briefing` returns canonical `OperatorBriefing`. The shell loads it at bootstrap and renders `pending_approvals` / `next_safe_actions` in the right-dock briefing panel. Approval mutations stay on the run approval seam. See `docs/contracts/BRIEFING-SEAM.md`. |
 | **Control plane** | FastAPI service on port **8787** that owns run truth, runtime summary, inbox projection, workspaces list, and briefing. |
 | **Console-web / shell** | Vue 3 frontend on port **4173** — the visible Axon-X UI. |
 | **Contract / shared contract** | Canonical TypeScript types and JSON fixtures in `packages/shared-types/`. Frontend and backend must agree here first. |
@@ -38,7 +38,7 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **Frozen planning bundle** | The locked docs under `axon-local/Plans/Axon-Watch/`. Implementation must not silently drift from these. |
 | **KAIRO** | Knowledge-Augmented Intelligence for Response and Oversight — planned operator-presence layer (watching, advising, interrupting, executing with receipts). **Planning only** today; see `Plans/Axon-Watch/KAIRO_MODE.md` and `ADR-005-kairo-as-operator-presence-layer.md` in axon-local. |
 | **Lane A/B/C/D** | Parallel implementation ownership areas defined in `docs/MULTITASK-LANES.md` (watch, shell, control-plane, dev/verify). |
-| **Monaco host** | In-browser code editor surface (`EditorHost.vue`). Currently shows DTO-derived documents, not workspace files on disk. |
+| **Monaco host** | In-browser code editor surface (`EditorHost.vue`). Loads workspace files on disk (README.md, notes.txt) plus read-only DTO overview tabs. |
 | **Parity ledger** | Checklist of behaviors Axon-X must eventually match from current Axon. Lives in frozen planning. |
 | **Run / run record** | Canonical execution unit with `phase`, `status`, capability flags, and transition history. |
 | **Run phase** | High-level lifecycle stage (`queued`, `starting`, `executing`, `awaiting_approval`, `review_ready`, `completed`, etc.). Defined in frozen `run-state.md`. |
@@ -113,8 +113,7 @@ What is already real:
 
 What is still intentionally thin or deferred:
 
-- shell consumption of `/api/briefing` (backend-only; see `docs/contracts/BRIEFING-SEAM.md`)
-- full signal production and deeper ranking
+- full signal production and deeper ranking beyond current inbox rule stack
 - deep watch summary logic
 - performance evidence for all budgets
 
@@ -124,9 +123,9 @@ What is now real in the thin slice (verified 2026-07-04):
 - explicit approval boundary (`requires_approval`, approve/reject)
 - review-ready entry, completion, and follow-up resume path
 - SQLite-backed run persistence (survives control-plane restart)
-- operator briefing API (backend-only; shell not wired)
-- two watch-produced inbox signals with multi-factor ranking (severity, status,
-  action-type, workspace priority, recency)
+- operator briefing loaded at bootstrap and rendered in the right dock (`BriefingPanel.vue`)
+- two watch-produced inbox signals with multi-factor ranking (severity, recency,
+  unresolved duration via `created_at`, status, action-type, workspace priority)
 - workspace list API and shell workspace selector (IDs only)
 - Monaco host bound to canonical DTO documents and **workspace files on disk** (README.md, notes.txt)
 - backend PTY terminal attachment for the selected workspace (real shell I/O via WebSocket)
@@ -339,7 +338,7 @@ Expected endpoints:
 - console web: `http://127.0.0.1:4173`
 - control plane health: `http://127.0.0.1:8787/api/health`
 - watch health: `http://127.0.0.1:8788/internal/watch/health`
-- briefing: `http://127.0.0.1:8787/api/briefing` (backend-only seam)
+- briefing: `http://127.0.0.1:8787/api/briefing` (also loaded by the shell at bootstrap)
 - runtime summary: `http://127.0.0.1:8787/api/runtime/summary`
 - inbox: `http://127.0.0.1:8787/api/inbox`
 - runs: `http://127.0.0.1:8787/api/runs`
@@ -355,24 +354,27 @@ Expected endpoints:
 
 ## What The Current App Does On Boot
 
-Right now, the shell boots and loads three control-plane seams in parallel.
+Right now, the shell boots and loads five control-plane seams in parallel.
 
 That flow looks like this:
 
 1. `apps/console-web/src/main.ts` creates the Vue app
 2. the shell store initializes
 3. `loadBootstrapData()` is called
-4. the frontend fetches `/api/runtime/summary`, `/api/inbox`, `/api/runs`, and `/api/workspaces`
-5. the control plane returns canonical DTO payloads for all four seams
-6. the shell renders runtime identity, active workspace state, active run state, approval state, and top signal state
+4. the frontend fetches `/api/runtime/summary`, `/api/inbox`, `/api/runs`,
+   `/api/workspaces`, and `/api/briefing`
+5. the control plane returns canonical DTO payloads for all five seams
+6. workspace files load for the selected workspace
+7. the shell renders runtime identity, workspace state, run state, briefing
+   guidance, and top signal state
 
 Important limitations:
 
-- the shell still treats `/api/briefing` as backend-only
-- Monaco host is still attached to canonical DTO documents, not workspace files on disk
-- xterm host now attaches to a backend PTY scoped to the selected workspace directory
-- ranking still omits unresolved duration (no `created_at` on inbox items yet)
-  and uses a thin watch-owned workspace priority map
+- the right dock renders `OperatorBriefing.pending_approvals` and `next_safe_actions`; approve/reject mutations stay on the run approval seam
+- Monaco host loads workspace files on disk and read-only DTO overview tabs
+- xterm host attaches to a backend PTY scoped to the selected workspace directory
+- inbox ranking uses severity, recency, unresolved duration (`created_at`), status,
+  action-type, and a thin watch-owned workspace priority map
 
 That is okay for this stage.
 
@@ -802,16 +804,15 @@ A good next slice should:
 - npm workspace dev ergonomics
 - first run lifecycle (create → executing → complete)
 - startup supervision reliability (`scripts/dev/lib/common.sh`)
-- stop/resume, approval, review-ready, SQLite persistence, briefing backend
-- workspace list + backend PTY terminal + DTO-bound Monaco host
-- richer inbox ranking (status, action-type, workspace priority, recency)
+- stop/resume, approval, review-ready, SQLite persistence, briefing shell panel
+- workspace list + backend PTY terminal + file-backed Monaco host
+- richer inbox ranking (severity, recency, unresolved duration, status,
+  action-type, workspace priority)
 
 **Suggested next slices (2026-07-04):**
 
-1. **Lane B** — file-backed Monaco binding to workspace paths on disk
-2. **Lane A** — unresolved-duration ranking once inbox items carry `created_at`
-   (requires coordinator approval for shared contract)
-3. **Lane B + coordinator** — shell wiring for `/api/briefing` (explicit assignment only)
+1. **Lane B** — nested workspace file tree and multi-path editor tabs
+2. **Lane B** — richer briefing panel coverage (`top_signals`, connectivity) if assigned
 
 Bad next slices:
 
@@ -820,6 +821,7 @@ Bad next slices:
 - changing run-state and signal-state in one uncontrolled pass
 - skipping verification because “it is still early”
 - claiming “file editor” when Monaco still shows DTO-derived documents only
+  (file-backed editing for README.md and notes.txt is now landed)
 
 ## Final Guidance
 

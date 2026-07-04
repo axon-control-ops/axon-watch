@@ -70,6 +70,7 @@ const signal: InboxItem = {
   severity: 'high',
   status: 'open',
   source: 'watch',
+  created_at: '2026-07-04T08:00:00Z',
   updated_at: '2026-07-04T08:00:00Z',
   action_type: 'open_dashboard',
 };

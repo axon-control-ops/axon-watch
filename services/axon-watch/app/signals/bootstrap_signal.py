@@ -45,6 +45,7 @@ def bootstrap_inbox_item() -> dict[str, object]:
         "severity": event["severity"],
         "status": event["status"],
         "source": event["source"],
+        "created_at": event["created_at"],
         "updated_at": event["updated_at"],
         "action_type": event["action_type"],
     }

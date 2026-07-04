@@ -97,6 +97,7 @@ export interface SignalView {
   severity: SignalSeverity;
   status: SignalStatus;
   source: SignalSource;
+  created_at: string;
   updated_at: string;
   action_type: SignalActionType;
 }

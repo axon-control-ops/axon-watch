@@ -15,6 +15,7 @@ BOOTSTRAP_INBOX_ITEM = {
     "severity": "info",
     "status": "open",
     "source": "watch",
+    "created_at": "2026-07-03T16:00:00Z",
     "updated_at": "2026-07-03T16:00:00Z",
     "action_type": "open_dashboard",
 }

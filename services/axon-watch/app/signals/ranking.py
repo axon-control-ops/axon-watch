@@ -4,9 +4,10 @@ Ordering follows the frozen planning rule stack in signal-events.md:
 
 1. severity
 2. recency (updated_at)
-3. unresolved / attention state (status proxy)
+3. unresolved duration (created_at)
 4. operator-actionability (action_type)
-5. workspace priority (watch-owned config, not inbox schema)
+5. workspace priority (watch-owned config)
+6. attention state (status proxy)
 """
 
 from __future__ import annotations
@@ -18,7 +19,6 @@ _SEVERITY_RANK = {
     "info": 3,
 }
 
-# Lower rank means the signal still needs operator attention.
 _STATUS_RANK = {
     "open": 0,
     "watching": 1,
@@ -28,7 +28,6 @@ _STATUS_RANK = {
     "resolved": 5,
 }
 
-# Lower rank means the signal suggests a more urgent operator action.
 _ACTION_TYPE_RANK = {
     "open_approvals": 0,
     "review_changes": 1,
@@ -41,7 +40,6 @@ _ACTION_TYPE_RANK = {
     "none": 8,
 }
 
-# Watch-owned workspace priority hints. Does not change inbox item schema.
 _WORKSPACE_PRIORITY = {
     "workspace_bootstrap": 0,
     "workspace_alpha": 1,
@@ -67,6 +65,10 @@ def workspace_priority_rank(workspace_id: str) -> int:
     return _WORKSPACE_PRIORITY.get(workspace_id, _DEFAULT_WORKSPACE_PRIORITY)
 
 
+def unresolved_duration_key(created_at: str) -> str:
+    return created_at or "9999-12-31T23:59:59Z"
+
+
 def _signal_id_tiebreak(item: dict[str, object]) -> str:
     return str(item.get("signal_id", ""))
 
@@ -86,6 +88,10 @@ def rank_inbox_items(items: list[dict[str, object]]) -> list[dict[str, object]]:
     ranked = sorted(
         ranked,
         key=lambda item: action_type_rank(str(item.get("action_type", "none"))),
+    )
+    ranked = sorted(
+        ranked,
+        key=lambda item: unresolved_duration_key(str(item.get("created_at", ""))),
     )
     ranked = sorted(
         ranked,

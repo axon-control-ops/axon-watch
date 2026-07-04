@@ -18,14 +18,23 @@ def _load_ranking_module():
 
     sys.path.insert(0, str(WATCH_ROOT))
     from app.signals.ranking import (
-    action_type_rank,
-    rank_inbox_items,
-    severity_rank,
-    status_rank,
-    workspace_priority_rank,
-)  # noqa: WPS433
+        action_type_rank,
+        rank_inbox_items,
+        severity_rank,
+        status_rank,
+        unresolved_duration_key,
+        workspace_priority_rank,
+    )  # noqa: WPS433
 
-    return rank_inbox_items, severity_rank, status_rank, action_type_rank, workspace_priority_rank, cached
+    return (
+        rank_inbox_items,
+        severity_rank,
+        status_rank,
+        action_type_rank,
+        workspace_priority_rank,
+        unresolved_duration_key,
+        cached,
+    )
 
 
 def _restore_modules(cached: dict[str, object]) -> None:
@@ -43,6 +52,7 @@ class WatchRankingTests(unittest.TestCase):
             self.status_rank,
             self.action_type_rank,
             self.workspace_priority_rank,
+            self.unresolved_duration_key,
             self._cached_modules,
         ) = _load_ranking_module()
 
@@ -158,6 +168,29 @@ class WatchRankingTests(unittest.TestCase):
 
         ranked = self.rank_inbox_items([lower_priority, higher_priority])
         self.assertEqual("signal_bootstrap_workspace", ranked[0]["signal_id"])
+
+    def test_rank_inbox_items_prefers_longer_unresolved_duration_at_same_severity(self) -> None:
+        newer_unresolved = {
+            "signal_id": "signal_newer_unresolved",
+            "severity": "warning",
+            "status": "open",
+            "created_at": "2026-07-03T12:00:00Z",
+            "updated_at": "2026-07-03T16:00:00Z",
+            "action_type": "open_dashboard",
+            "workspace_id": "workspace_alpha",
+        }
+        older_unresolved = {
+            "signal_id": "signal_older_unresolved",
+            "severity": "warning",
+            "status": "open",
+            "created_at": "2026-07-03T08:00:00Z",
+            "updated_at": "2026-07-03T16:00:00Z",
+            "action_type": "open_dashboard",
+            "workspace_id": "workspace_alpha",
+        }
+
+        ranked = self.rank_inbox_items([newer_unresolved, older_unresolved])
+        self.assertEqual("signal_older_unresolved", ranked[0]["signal_id"])
 
 
 if __name__ == "__main__":
