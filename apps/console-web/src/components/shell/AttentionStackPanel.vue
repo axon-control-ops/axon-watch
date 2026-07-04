@@ -95,14 +95,38 @@ function signalCount(): number {
         </li>
       </ul>
       <p v-else class="region-copy">No pending approvals</p>
-      <button
-        v-if="shell.pendingApprovalsCount > 0"
-        type="button"
-        class="run-actions__button run-actions__button--warning"
-        @click="shell.approvePrimaryRun()"
-      >
-        REVIEW APPROVALS
-      </button>
+
+      <div v-if="shell.primaryApprovalRun" class="dock-approval-run">
+        <p class="dock-approval-run__label">Primary approval run</p>
+        <div class="dock-approval-run__header">
+          <strong>{{ shell.primaryApprovalRun.run_id }}</strong>
+          <span class="dock-tag dock-tag--warning">AWAITING</span>
+        </div>
+        <p class="region-copy">{{ shell.primaryApprovalRun.summary }}</p>
+      </div>
+
+      <p v-if="shell.runMutationError" class="dock-seam__error" role="alert">
+        {{ shell.runMutationError }}
+      </p>
+
+      <div v-if="shell.pendingApprovalsCount > 0" class="run-actions run-actions--approval">
+        <button
+          type="button"
+          class="run-actions__button run-actions__button--primary"
+          :disabled="!shell.canApprovePrimaryRun"
+          @click="shell.approvePrimaryRun()"
+        >
+          {{ shell.runMutationState === 'approving' ? 'APPROVING…' : 'APPROVE RUN' }}
+        </button>
+        <button
+          type="button"
+          class="run-actions__button run-actions__button--danger"
+          :disabled="!shell.canRejectPrimaryRun"
+          @click="shell.rejectPrimaryRun()"
+        >
+          {{ shell.runMutationState === 'rejecting' ? 'REJECTING…' : 'REJECT RUN' }}
+        </button>
+      </div>
     </HudSeamCard>
 
     <HudSeamCard

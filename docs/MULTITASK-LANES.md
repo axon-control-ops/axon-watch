@@ -126,6 +126,7 @@ Work landed on `dev` (verified 2026-07-04):
 | UX-4 | B | SSE live refresh + interruptive signals | `GET /api/live/events` |
 | C2 | C (+ B) | Bounded command executor | `command_executor.py` |
 | C3 | C (+ B) | Briefing **Notice/Advise** projection | `operator_briefing_rhythm.py` |
+| C4 | C (+ B) | Attention sidebar **approve/reject** wired to run API | `AttentionStackPanel.vue` |
 | B3 | B | Compact operator responsive CSS | `mockup-shell.css` `@media` |
 | ADR-005 | B | Operator sidebar **Attention** toggle | `LeftSidebar`, `AttentionStackPanel` |
 | ADR-006 | B | Command hero autosize + footer KAIRO CTA | `CommandSeamPanel`, `StatusBar` |
@@ -139,7 +140,7 @@ One slice per pass; run the verification gate before the next item.
 | Priority | ID | Lane | Slice | Status |
 |---|---|---|---|---|
 | **1** | **TEST-0** | All | Manual acceptance on `workspace_smoke`: Command executor, KAIRO Notice/Advise, Attention sidebar, status/radar panel, compact layout | **Ready** |
-| 2 | C4 | C (+ B) | Wire **approve/reject** actions from Attention sidebar to existing API | Ready |
+| 2 | C4 | C (+ B) | Wire **approve/reject** actions from Attention sidebar to existing API | **Done** — `AttentionStackPanel` APPROVE/REJECT → `/api/runs/{id}/approve|reject` |
 | 3 | C5 | C | Expand command executor (`git status`, resume-from-review command) | Ready |
 | 4 | D2 | D | Capture `shell_boot_readiness` + latency timing evidence | Ready (PENDING in verify) |
 | 5 | ADR-007 p3 | B | Terminal promotion OR read-only preview strip (deferred follow-up) | Ready after TEST-0 |

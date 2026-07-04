@@ -3299,7 +3299,8 @@ body:has(.console-shell--mockup) {
 }
 
 .run-actions__button--primary,
-.run-actions__button--warning {
+.run-actions__button--warning,
+.run-actions__button--danger {
   width: 100%;
   margin-top: 0.55rem;
   border-radius: 2px;
@@ -3307,10 +3308,55 @@ body:has(.console-shell--mockup) {
   font-size: 0.68rem;
 }
 
+.run-actions--approval {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.run-actions--approval .run-actions__button {
+  margin-top: 0;
+}
+
 .run-actions__button--warning {
   border-color: rgba(255, 159, 0, 0.55);
   color: #ffe6b5;
   background: rgba(255, 159, 0, 0.12);
+}
+
+.run-actions__button--danger {
+  border-color: rgba(255, 92, 92, 0.55);
+  color: #ffc9c9;
+  background: rgba(255, 92, 92, 0.1);
+}
+
+.dock-approval-run {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(0, 242, 255, 0.12);
+}
+
+.dock-approval-run__label {
+  margin: 0 0 0.35rem;
+  color: rgba(127, 148, 168, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dock-approval-run__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.dock-seam__error {
+  margin: 0.45rem 0 0;
+  color: #ffb4b4;
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .briefing-panel--mockup {
