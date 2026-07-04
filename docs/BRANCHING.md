@@ -31,18 +31,12 @@ This repo ships without a configured `origin`. Suggested layout alongside
 
 ```bash
 cd /home/edp/axon-nvme/repos/axon-watch
-git remote add origin git@github.com:axon-control-ops/axon-watch.git
+git remote add origin git@github.com:axon-control-ops/axon-watch.git  # first time only
 git push -u origin master
 git push -u origin dev
 ```
 
-Use HTTPS if SSH keys are not configured:
-
-```bash
-git remote add origin https://github.com/axon-control-ops/axon-watch.git
-```
-
-Create the empty GitHub repository first, then push both branches.
+Remote: **https://github.com/axon-control-ops/axon-watch** (private). Both `master` and `dev` are pushed.
 
 ## Planning doc relationship
 

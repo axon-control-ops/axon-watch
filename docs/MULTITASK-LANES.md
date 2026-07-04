@@ -125,6 +125,30 @@ Work in order. One slice per pass; run the verification gate before the next ite
 | **D1** | D | Dev verify / health polish (non-semantics) | **done** |
 | **UX-4** | B | SSE live update polish (seam refresh + interruptive signals) | **done** |
 
+## Next Queue (pick from here)
+
+| Priority | ID | Lane | Slice | Blocked? |
+|---|---|---|---|---|
+| **1** | **C2** | C (+ B transcript) | **Bounded command executor** — run real workspace actions from chat (health probe, file read, dir list); agent messages include evidence; then `review_ready` | **Ready** |
+| 2 | C3 | C | Briefing **Notice/Advise** depth from canonical run/signal state (JX-3 thin slice) | Ready |
+| 3 | B3 | B | Responsive **compact operator** layout (CSS only, no voice — not full mobile JX-4) | Ready |
+| — | JX-1–5 | Coordinator | KAIRO presence (watch rules, delivery, voice, persona, mobile) | **Blocked** |
+| — | — | Coordinator | Cross-repo planning migration | **Blocked** |
+
+**Recommendation:** start **C2** — it is the direct successor to B1 stub orchestration and delivers operator-visible “real” execution without LLM or coordinator unlock.
+
+### C2 scope sketch (for assignment)
+
+- NEW `services/control-plane/app/chat/command_executor.py` — classify + run bounded actions
+- Extend `orchestration.py` to call executor while run is `executing`, append agent message with stdout snippet
+- Persist execution receipt on run history before `review_ready`
+- Tests: executor unit tests + chat integration test with mocked workspace root
+- Must not: add LLM, change run-state transitions, bypass approvals
+
+### Parallel helper prompt (after C2 starts)
+
+Lane B companion slice: show executor output in Conversation seam with monospace block styling (read-only).
+
 Parallel rule: **B1 must finish before A1/C1** if they touch `chat/service.py` or
 run orchestration in the same pass. Lane A and D may run in parallel with B2 only.
 
