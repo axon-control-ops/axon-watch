@@ -113,6 +113,7 @@ Do not start these in parallel until coordinator opens the slice:
 - startup supervision reliability slice
 - backend PTY terminal attachment (WebSocket, workspace-scoped)
 - richer inbox ranking (status, action-type, workspace priority, recency)
+- file-backed Monaco editing (workspace README.md / notes.txt with Save)
 
 ## Assignment Rules
 
@@ -135,6 +136,6 @@ python3 -m unittest discover -s tests
 
 After the current thin slices (updated 2026-07-04):
 
-1. **Lane B** — file-backed editor binding (Monaco reads/writes workspace files on disk)
+1. **Lane B + coordinator** — briefing shell wiring (explicitly assigned only)
 2. **Lane A** — unresolved-duration ranking when inbox schema adds `created_at` (coordinator)
-3. **Lane B + coordinator** — briefing shell wiring (explicitly assigned only)
+3. **Lane B** — nested workspace file tree beyond top-level files
