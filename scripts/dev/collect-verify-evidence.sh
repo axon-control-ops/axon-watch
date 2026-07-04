@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Measure warm-route latency samples for verify latency budgets.
+# Measure warm-route latency samples and shell boot readiness for verify gates.
 # Requires the dev stack to be running (./scripts/dev/up.sh).
 
 set -euo pipefail
@@ -46,14 +46,12 @@ measure_url "${runtime_url}" "${request_count}" >"${output_dir}/runtime-summary-
 echo "Collecting ${request_count} watch health samples from ${watch_url}"
 measure_url "${watch_url}" "${request_count}" >"${output_dir}/watch-summary-latency.json"
 
-# Shell boot uses browser automation; store a dev placeholder until nightly harness lands.
-cat >"${output_dir}/shell-boot-report.json" <<EOF
-{
-  "shell_ready_ms": 1800,
-  "source": "dev-placeholder",
-  "note": "Replace with browser automation report for nightly gate."
-}
-EOF
+echo "Measuring shell boot readiness from ${AXON_WATCH_PUBLIC_BASE_URL}"
+python3 "${repo_root}/scripts/dev/measure_shell_boot.py" \
+  --console-base-url "${AXON_WATCH_PUBLIC_BASE_URL}" \
+  --control-plane-base-url "${AXON_WATCH_CONTROL_PLANE_BASE_URL}" \
+  --mode "${AXON_WATCH_SHELL_BOOT_MODE:-auto}" \
+  --output "${output_dir}/shell-boot-report.json"
 
 echo "Wrote verify evidence to ${output_dir}/"
 ls -1 "${output_dir}"

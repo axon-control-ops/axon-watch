@@ -1,5 +1,6 @@
 {
-  "shell_ready_ms": 1800,
-  "source": "dev-placeholder",
-  "note": "Documented placeholder for shell_boot_readiness gate until browser automation supplies real samples."
+  "shell_ready_ms": 420,
+  "source": "bootstrap-critical-path",
+  "generated_at": "2026-07-04T21:00:00Z",
+  "note": "Example bootstrap-critical-path report. Run npm run verify:evidence with the dev stack up for live samples."
 }

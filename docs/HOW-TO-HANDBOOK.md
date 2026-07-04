@@ -581,8 +581,17 @@ npm run verify:nightly
 ```
 
 This writes JSON under `.local/verify/` and passes them to `scripts/verify/all.py`.
-A documented dev placeholder for shell boot lives at
-`scripts/verify/fixtures/shell-boot-report.dev.json` until browser automation lands.
+
+Shell boot measurement:
+
+- `scripts/dev/measure_shell_boot.py` records `shell_ready_ms`
+- `auto` mode uses Playwright Chromium when installed; otherwise it measures the
+  bootstrap critical path (index fetch + parallel `/api/runtime/summary`,
+  `/api/inbox`, `/api/briefing`, `/api/workspaces`, `/api/runs`)
+- optional full browser mode: `pip install playwright && playwright install chromium`
+  then `AXON_WATCH_SHELL_BOOT_MODE=browser npm run verify:evidence`
+
+Example fixture: `scripts/verify/fixtures/shell-boot-report.dev.json`.
 
 `./scripts/dev/check-health.sh` also probes `GET /api/live/events` (SSE).
 
