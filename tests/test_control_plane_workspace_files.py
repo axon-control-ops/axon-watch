@@ -66,6 +66,31 @@ class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
         payload = read_workspace_file("workspace_alpha", "README.md")
         self.assertEqual("# hello from disk\n", payload["content"])
 
+    def test_list_workspace_files_includes_nested_paths(self) -> None:
+        nested = Path(self.workspace_tempdir.name) / "workspace_alpha" / "src" / "notes.md"
+        nested.parent.mkdir(parents=True, exist_ok=True)
+        nested.write_text("# nested\n", encoding="utf-8")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files")
+        self.assertEqual(200, response.status_code)
+        paths = {item["path"] for item in response.json()["items"]}
+        self.assertIn("src/notes.md", paths)
+
+    def test_write_nested_workspace_file_creates_directories(self) -> None:
+        write_response = self.client.put(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt",
+            json={"content": "nested content\n"},
+        )
+        self.assertEqual(200, write_response.status_code)
+
+        read_response = self.client.get("/api/workspaces/workspace_alpha/files/src/deep.txt")
+        self.assertEqual(200, read_response.status_code)
+        self.assertEqual("nested content\n", read_response.json()["content"])
+
+        list_response = self.client.get("/api/workspaces/workspace_alpha/files")
+        paths = {item["path"] for item in list_response.json()["items"]}
+        self.assertIn("src/deep.txt", paths)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,7 +13,7 @@ This working tree currently combines:
   runtime summary, and operator briefing
 - a watch thin slice with two canonical inbox signals and multi-factor ranking
 - a Vue shell that consumes runs, inbox, runtime summary, briefing, workspace
-  files, plus Monaco and xterm host surfaces
+  files with a nested explorer tree, plus Monaco and xterm host surfaces
 - verification and governance scaffolding under `scripts/verify/`, `docs/adr/`,
   and `tests/`
 

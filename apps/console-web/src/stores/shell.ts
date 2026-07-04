@@ -28,18 +28,23 @@ import type {
   WorkspaceRecord,
 } from '../contracts/canonical';
 import {
-  languageForFilePath,
+  filePathFromDocumentId,
   workspaceFileDocumentId,
 } from '../lib/workspace-file-language';
 import {
+  buildOpenedFileDocuments,
+  pickPreferredWorkspaceFilePath,
+  type FileContentLoadState,
+} from '../lib/workspace-file-session';
+import {
   buildWorkspaceDocuments,
-  type EditorDocumentLanguage,
   type WorkspaceDocumentDescriptor,
 } from '../lib/workspace-documents';
 import {
   selectPrimaryApprovalRun,
   selectPrimaryRun,
 } from './shell-run-selection';
+import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
 
 export type LayoutMode = 'operator' | 'ide';
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
@@ -123,6 +128,8 @@ export const useShellStore = defineStore('shell', () => {
   const workspaceFilesError = ref<string | null>(null);
   const fileContents = ref<Record<string, string>>({});
   const fileSavedContents = ref<Record<string, string>>({});
+  const fileContentLoadStates = ref<Record<string, FileContentLoadState>>({});
+  const openedFilePaths = ref<string[]>([]);
   const fileSaveState = ref<'idle' | 'saving'>('idle');
   const fileSaveError = ref<string | null>(null);
 
@@ -135,13 +142,13 @@ export const useShellStore = defineStore('shell', () => {
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
 
   const layoutModeLabel = computed(() =>
-    layoutMode.value === 'operator' ? 'Operator mode emphasis' : 'IDE mode emphasis',
+    layoutMode.value === 'operator' ? 'Operator mode' : 'IDE mode',
   );
 
   const workspaceStateLabel = computed(() =>
     currentWorkspace.value
-      ? `WorkspaceRecord attached · ${currentWorkspace.value.workspace_id}`
-      : 'Awaiting WorkspaceRecord',
+      ? currentWorkspace.value.workspace_id
+      : 'No workspace selected',
   );
 
   const runtimeStateLabel = computed(() => {
@@ -174,11 +181,11 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     if (!activeRun.value) {
-      return 'Awaiting RunRecord';
+      return 'No active run';
     }
 
     const run = activeRun.value;
-    return `${run.run_id} · ${run.phase} · ${run.status} · ${run.summary}`;
+    return `${run.run_id} · ${run.phase} · ${run.summary}`;
   });
 
   const primaryActiveRun = computed(() => activeRun.value);
@@ -203,21 +210,13 @@ export const useShellStore = defineStore('shell', () => {
     }),
   );
   const fileDocuments = computed<WorkspaceDocumentDescriptor[]>(() =>
-    workspaceFileEntries.value.map((entry) => {
-      const content = fileContents.value[entry.path] ?? '';
-      const saved = fileSavedContents.value[entry.path];
-      return {
-        id: workspaceFileDocumentId(entry.path),
-        title: entry.path,
-        language: languageForFilePath(entry.path) as EditorDocumentLanguage,
-        value: content,
-        description: `Workspace file on disk (${entry.size_bytes} bytes). Editable — use Save.`,
-        source: 'file',
-        filePath: entry.path,
-        readOnly: false,
-        dirty: saved !== undefined && saved !== content,
-      };
-    }),
+    buildOpenedFileDocuments(
+      workspaceFileEntries.value,
+      openedFilePaths.value,
+      fileContents.value,
+      fileSavedContents.value,
+      fileContentLoadStates.value,
+    ),
   );
   const editorDocuments = computed<WorkspaceDocumentDescriptor[]>(() => [
     ...fileDocuments.value,
@@ -254,10 +253,10 @@ export const useShellStore = defineStore('shell', () => {
 
     const primary = inboxItems.value[0];
     if (!primary) {
-      return 'Awaiting InboxItem / SignalView';
+      return 'No open signals';
     }
 
-    return `${primary.signal_id} · ${primary.severity} · ${primary.status} · ${primary.source}`;
+    return `${primary.title} · ${primary.severity}`;
   });
 
   const primaryInboxItem = computed(() => inboxItems.value[0] ?? null);
@@ -270,8 +269,50 @@ export const useShellStore = defineStore('shell', () => {
   );
 
   const threadStateLabel = computed(() =>
-    threadMessages.value.length > 0 ? 'ThreadMessage attached' : 'Awaiting ThreadMessage',
+    threadMessages.value.length > 0 ? 'Conversation active' : 'No active conversation',
   );
+
+  const kairoPresenceState = computed<KairoPresenceState>(() => {
+    const summary = runtimeSummary.value;
+    return resolveKairoPresenceState({
+      pendingApprovals:
+        summary?.approvals.pending_count ?? operatorBriefing.value?.pending_approvals.count ?? 0,
+      criticalSignals: summary?.signals.critical_count ?? 0,
+      highSignals: summary?.signals.high_count ?? 0,
+      watchConnected: Boolean(summary?.watch.connected),
+      runtimeLoaded: runtimeSummaryLoadState.value === 'loaded' && Boolean(summary),
+    });
+  });
+
+  const showDevSeams = computed(() => import.meta.env.VITE_DEV_SEAMS === '1');
+
+  const statusBarItems = computed(() => {
+    const items: string[] = [layoutModeLabel.value];
+    if (currentWorkspace.value?.workspace_id) {
+      items.push(currentWorkspace.value.workspace_id);
+    }
+    if (runtimeSummary.value) {
+      items.push(runtimeSummary.value.watch.connected ? 'watch connected' : 'watch offline');
+    }
+    if (activeRun.value) {
+      items.push(`${activeRun.value.run_id} · ${activeRun.value.phase}`);
+    }
+    const pendingApprovals =
+      runtimeSummary.value?.approvals.pending_count ??
+      operatorBriefing.value?.pending_approvals.count ??
+      0;
+    if (pendingApprovals > 0) {
+      items.push(`approvals: ${pendingApprovals}`);
+    }
+    const openSignals = runtimeSummary.value?.signals.open_count ?? 0;
+    if (openSignals > 0) {
+      items.push(`signals: ${openSignals}`);
+    }
+    if (runtimeSummary.value?.degraded.active) {
+      items.push(runtimeSummary.value.degraded.reasons[0] ?? 'degraded');
+    }
+    return items;
+  });
 
   function syncCurrentWorkspace(preferredWorkspaceId?: string | null): void {
     if (workspaces.value.length === 0) {
@@ -294,12 +335,71 @@ export const useShellStore = defineStore('shell', () => {
     layoutMode.value = mode;
   }
 
+  const activeWorkspaceFilePath = computed(() => {
+    const path = filePathFromDocumentId(activeEditorDocumentId.value);
+    return path && openedFilePaths.value.includes(path) ? path : null;
+  });
+
   function setActiveEditorTab(id: string): void {
     activeEditorTabId.value = id;
   }
 
   function setActiveEditorDocument(id: string): void {
     activeEditorDocumentId.value = id;
+    const path = filePathFromDocumentId(id);
+    if (path) {
+      void openWorkspaceFile(path);
+    }
+  }
+
+  async function ensureWorkspaceFileLoaded(path: string): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId || fileContentLoadStates.value[path] === 'loaded') {
+      return;
+    }
+
+    if (fileContentLoadStates.value[path] === 'loading') {
+      return;
+    }
+
+    fileContentLoadStates.value = {
+      ...fileContentLoadStates.value,
+      [path]: 'loading',
+    };
+
+    try {
+      const payload = await fetchWorkspaceFile(workspaceId, path);
+      fileContents.value = {
+        ...fileContents.value,
+        [path]: payload.content,
+      };
+      if (fileSavedContents.value[path] === undefined) {
+        fileSavedContents.value = {
+          ...fileSavedContents.value,
+          [path]: payload.content,
+        };
+      }
+      fileContentLoadStates.value = {
+        ...fileContentLoadStates.value,
+        [path]: 'loaded',
+      };
+    } catch (error) {
+      fileContentLoadStates.value = {
+        ...fileContentLoadStates.value,
+        [path]: 'error',
+      };
+      workspaceFilesError.value =
+        error instanceof Error ? error.message : 'workspace file request failed';
+    }
+  }
+
+  async function openWorkspaceFile(path: string): Promise<void> {
+    if (!openedFilePaths.value.includes(path)) {
+      openedFilePaths.value = [...openedFilePaths.value, path];
+    }
+
+    activeEditorDocumentId.value = workspaceFileDocumentId(path);
+    await ensureWorkspaceFileLoaded(path);
   }
 
   function setCurrentWorkspace(workspaceId: string): void {
@@ -311,8 +411,10 @@ export const useShellStore = defineStore('shell', () => {
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (!workspaceId) {
       workspaceFileEntries.value = [];
+      openedFilePaths.value = [];
       fileContents.value = {};
       fileSavedContents.value = {};
+      fileContentLoadStates.value = {};
       workspaceFilesLoadState.value = 'idle';
       return;
     }
@@ -323,23 +425,16 @@ export const useShellStore = defineStore('shell', () => {
     try {
       const snapshot = await fetchWorkspaceFiles(workspaceId);
       workspaceFileEntries.value = snapshot.items;
-      const nextContents: Record<string, string> = {};
-      const nextSaved: Record<string, string> = {};
-
-      for (const entry of snapshot.items) {
-        const payload = await fetchWorkspaceFile(workspaceId, entry.path);
-        nextContents[entry.path] = payload.content;
-        nextSaved[entry.path] = payload.content;
-      }
-
-      fileContents.value = nextContents;
-      fileSavedContents.value = nextSaved;
+      fileContents.value = {};
+      fileSavedContents.value = {};
+      fileContentLoadStates.value = {};
       workspaceFilesLoadState.value = 'loaded';
 
-      const preferredPath =
-        snapshot.items.find((entry) => entry.path === 'README.md')?.path ?? snapshot.items[0]?.path;
+      const preferredPath = pickPreferredWorkspaceFilePath(snapshot.items);
+      openedFilePaths.value = preferredPath ? [preferredPath] : [];
       if (preferredPath) {
         activeEditorDocumentId.value = workspaceFileDocumentId(preferredPath);
+        await ensureWorkspaceFileLoaded(preferredPath);
       }
     } catch (error) {
       workspaceFilesLoadState.value = 'error';
@@ -597,6 +692,7 @@ export const useShellStore = defineStore('shell', () => {
     activeEditorDocumentId,
     activeRun,
     activeTerminalSessionId,
+    activeWorkspaceFilePath,
     approvePrimaryRun,
     approvals,
     briefingError,
@@ -615,6 +711,7 @@ export const useShellStore = defineStore('shell', () => {
     inboxItems,
     inboxLoadState,
     inboxStateLabel,
+    kairoPresenceState,
     layoutMode,
     layoutModeLabel,
     completePrimaryRun,
@@ -642,6 +739,8 @@ export const useShellStore = defineStore('shell', () => {
     runtimeSummary,
     runtimeSummaryError,
     runtimeSummaryLoadState,
+    showDevSeams,
+    statusBarItems,
     setActiveEditorTab,
     setActiveEditorDocument,
     setCurrentWorkspace,
@@ -654,6 +753,7 @@ export const useShellStore = defineStore('shell', () => {
     fileSaveError,
     fileSaveState,
     loadWorkspaceFiles,
+    openWorkspaceFile,
     saveActiveFileDocument,
     updateActiveFileContent,
     workspaceFileEntries,

@@ -1,24 +1,64 @@
 <script setup lang="ts">
+import { ref } from 'vue';
+
+import BootWakeOverlay from './components/BootWakeOverlay.vue';
 import BriefingPanel from './components/BriefingPanel.vue';
 import EditorHost from './components/EditorHost.vue';
+import HudSeamCard from './components/HudSeamCard.vue';
+import KairoChip from './components/KairoChip.vue';
 import TerminalHost from './components/TerminalHost.vue';
+import WorkspaceFileTree from './components/WorkspaceFileTree.vue';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
 
+const bootComplete = ref(
+  typeof window !== 'undefined' &&
+    (window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      sessionStorage.getItem('axon-x-boot-complete') === '1'),
+);
+
 const workbenchContractLabels = ['WorkspaceRecord', 'RunRecord'];
-const dockContractLabels = ['OperatorBriefing', 'RunRecord', 'ApprovalRecord', 'InboxItem', 'SignalView', 'ThreadMessage'];
-const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
+const dockContractLabels = [
+  'OperatorBriefing',
+  'RunRecord',
+  'ApprovalRecord',
+  'InboxItem',
+  'SignalView',
+  'ThreadMessage',
+];
+
+function completeBoot(): void {
+  sessionStorage.setItem('axon-x-boot-complete', '1');
+  bootComplete.value = true;
+}
 </script>
 
 <template>
-  <div class="console-shell" :data-layout-mode="shell.layoutMode">
+  <BootWakeOverlay v-if="!bootComplete" @complete="completeBoot" />
+
+  <div
+    v-show="bootComplete"
+    class="console-shell"
+    :data-layout-mode="shell.layoutMode"
+  >
     <header class="region region-topbar">
-      <div class="region-header">
-        <div>
-          <p class="eyebrow">Axon-X</p>
+      <div class="topbar-main">
+        <div class="topbar-brand">
+          <p class="eyebrow">AXON-X</p>
           <h1>Operator console</h1>
         </div>
+
+        <div class="topbar-trail">
+          <span class="topbar-trail__label">{{ shell.workspaceStateLabel }}</span>
+        </div>
+
+        <div class="chip-row topbar-chips">
+          <span class="chip chip--runtime">{{ shell.runtimeStateLabel }}</span>
+          <span v-if="shell.primaryActiveRun" class="chip chip--run">{{ shell.runStateLabel }}</span>
+        </div>
+
+        <KairoChip :state="shell.kairoPresenceState" />
 
         <div class="layout-toggle" role="group" aria-label="Layout mode">
           <button
@@ -42,42 +82,26 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         </div>
       </div>
 
-      <div class="chip-row">
-        <span class="chip">{{ shell.layoutModeLabel }}</span>
-        <span class="chip">{{ shell.runtimeStateLabel }}</span>
-        <span class="chip">{{ shell.runStateLabel }}</span>
-      </div>
-
-      <p class="smoke-banner">
-        Smoke test: open a <strong>file tab</strong> (README.md) → edit → <strong>Save</strong> → run
-        <code>pwd</code> / <code>echo hello</code> in the terminal below.
+      <p v-if="shell.showDevSeams" class="smoke-banner dev-scaffold">
+        Smoke test: open a nested file in the <strong>explorer</strong> → edit →
+        <strong>Save</strong> → run <code>pwd</code> / <code>echo hello</code> in the terminal below.
       </p>
     </header>
 
     <aside class="region region-left-sidebar">
-      <div class="region-header dev-scaffold">
+      <div v-if="shell.showDevSeams" class="region-header dev-scaffold">
         <div>
           <p class="eyebrow">Left Sidebar</p>
           <h2>Workspace and explorer seam</h2>
         </div>
       </div>
 
-      <p class="region-copy dev-scaffold">
-        Hosts workspace navigation and explorer ownership without asserting workspace semantics locally.
-      </p>
-
-      <div class="placeholder-card">
-        <p class="placeholder-card__label">Canonical seam</p>
+      <HudSeamCard title="Workspace">
         <strong>{{ shell.workspaceStateLabel }}</strong>
-      </div>
+        <p class="region-copy">
+          {{ shell.workspaces.length }} workspace{{ shell.workspaces.length === 1 ? '' : 's' }} loaded
+        </p>
 
-      <div class="placeholder-card">
-        <p class="placeholder-card__label">Shell state</p>
-        <strong>{{ shell.workspaces.length }} canonical workspace records loaded</strong>
-      </div>
-
-      <div class="placeholder-card">
-        <p class="placeholder-card__label">Workspace navigation</p>
         <div class="workspace-list">
           <button
             v-for="workspace in shell.workspaces"
@@ -91,11 +115,21 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
           </button>
         </div>
         <p v-if="shell.workspacesError" class="region-copy">{{ shell.workspacesError }}</p>
-      </div>
+      </HudSeamCard>
+
+      <HudSeamCard title="Explorer">
+        <WorkspaceFileTree
+          :entries="shell.workspaceFileEntries"
+          :active-path="shell.activeWorkspaceFilePath"
+          :load-state="shell.workspaceFilesLoadState"
+          :error="shell.workspaceFilesError"
+          @open="shell.openWorkspaceFile"
+        />
+      </HudSeamCard>
     </aside>
 
     <main class="region region-center-workbench">
-      <div class="region-header dev-scaffold">
+      <div v-if="shell.showDevSeams" class="region-header dev-scaffold">
         <div>
           <p class="eyebrow">Center Workbench</p>
           <h2>Editor and preview host</h2>
@@ -134,7 +168,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       <div class="workbench-panels workbench-panels--single">
         <section
           v-if="shell.activeEditorTabId === 'editor-shell'"
-          class="placeholder-card placeholder-card--surface placeholder-card--host"
+          class="workbench-surface workbench-surface--host"
         >
           <EditorHost
             v-if="shell.activeEditorDocument"
@@ -151,19 +185,14 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
           <p v-if="shell.workspaceFilesError" class="region-copy">{{ shell.workspaceFilesError }}</p>
         </section>
 
-        <section
-          v-else
-          class="placeholder-card placeholder-card--surface"
-        >
-          <p class="placeholder-card__label">Preview surface</p>
-          <strong>Browser / diff host placeholder</strong>
-          <p class="region-copy">
-            Workbench remains one shell in both layout modes. Only emphasis changes.
-          </p>
+        <section v-else class="workbench-surface">
+          <p class="workbench-surface__label">Preview</p>
+          <strong>Browser / diff host</strong>
+          <p class="region-copy">Preview surfaces share the same shell truth in both layout modes.</p>
         </section>
       </div>
 
-      <div class="contract-row contract-row--dev">
+      <div v-if="shell.showDevSeams" class="contract-row contract-row--dev">
         <span v-for="label in workbenchContractLabels" :key="label" class="contract-pill">
           {{ label }}
         </span>
@@ -171,7 +200,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
     </main>
 
     <section class="region region-bottom-panel">
-      <div class="region-header dev-scaffold">
+      <div v-if="shell.showDevSeams" class="region-header dev-scaffold">
         <div>
           <p class="eyebrow">Bottom Panel</p>
           <h2>Terminal and runtime strip host</h2>
@@ -179,53 +208,98 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       </div>
 
       <div class="bottom-panel-grid">
-        <section class="placeholder-card placeholder-card--host">
-          <p class="placeholder-card__label">Terminal — backend PTY</p>
+        <HudSeamCard title="Terminal" class="bottom-panel-terminal">
           <TerminalHost
             :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
             :run-summary="shell.primaryActiveRun ? `${shell.primaryActiveRun.run_id} · ${shell.primaryActiveRun.phase} · ${shell.primaryActiveRun.status}` : null"
             :primary-signal-id="shell.workspacePrimarySignal?.signal_id ?? null"
             :runtime-connected="Boolean(shell.runtimeSummary?.watch.connected)"
           />
-        </section>
+        </HudSeamCard>
 
-        <div v-if="shell.runtimeSummary" class="placeholder-card">
-          <p class="placeholder-card__label">Runtime summary</p>
+        <HudSeamCard v-if="shell.runtimeSummary" title="Runtime">
           <strong>
             {{ shell.runtimeSummary.runtime_identity.provider_name }} /
             {{ shell.runtimeSummary.runtime_identity.model_name }}
           </strong>
           <p class="region-copy">
             {{ shell.runtimeSummary.active_runs.length }} active run(s),
-            {{ shell.runtimeSummary.signals.open_count }} open signal(s),
-            degraded={{ shell.runtimeSummary.degraded.active }}.
+            {{ shell.runtimeSummary.signals.open_count }} open signal(s).
           </p>
-        </div>
+        </HudSeamCard>
 
-        <div v-else-if="shell.runtimeSummaryLoadState === 'error'" class="placeholder-card">
-          <p class="placeholder-card__label">Runtime summary</p>
+        <HudSeamCard v-else-if="shell.runtimeSummaryLoadState === 'error'" title="Runtime">
           <strong>Unavailable</strong>
           <p class="region-copy">{{ shell.runtimeSummaryError }}</p>
-        </div>
+        </HudSeamCard>
       </div>
     </section>
 
-    <aside class="region region-right-dock">
-      <div class="region-header dev-scaffold">
+    <aside class="region region-right-dock dock-stack">
+      <div v-if="shell.showDevSeams" class="region-header dev-scaffold">
         <div>
           <p class="eyebrow">Right Dock</p>
           <h2>Agent dock and signal summary host</h2>
         </div>
       </div>
 
-      <BriefingPanel
-        :briefing="shell.operatorBriefing"
-        :load-state="shell.briefingLoadState"
-        :error="shell.briefingError"
-      />
+      <HudSeamCard
+        title="KAIRO Briefing"
+        seam-class="dock-seam dock-seam--briefing"
+        :hero="shell.layoutMode === 'operator'"
+      >
+        <BriefingPanel
+          :briefing="shell.operatorBriefing"
+          :load-state="shell.briefingLoadState"
+          :error="shell.briefingError"
+          :hero="shell.layoutMode === 'operator'"
+        />
+      </HudSeamCard>
 
-      <div class="placeholder-card">
-        <p class="placeholder-card__label">Run seam</p>
+      <HudSeamCard title="Approvals" seam-class="dock-seam dock-seam--approvals">
+        <strong v-if="shell.primaryApprovalRun">
+          {{ shell.primaryApprovalRun.run_id }} · {{ shell.primaryApprovalRun.phase }}
+        </strong>
+        <p v-else class="region-copy">No pending approvals</p>
+        <div
+          v-if="shell.primaryApprovalRun?.can_approve || shell.primaryApprovalRun?.phase === 'awaiting_approval'"
+          class="run-actions"
+        >
+          <button
+            v-if="shell.primaryApprovalRun?.can_approve"
+            type="button"
+            class="run-actions__button"
+            :disabled="!shell.canApprovePrimaryRun"
+            @click="shell.approvePrimaryRun()"
+          >
+            {{ shell.runMutationState === 'approving' ? 'Approving…' : 'Approve run' }}
+          </button>
+          <button
+            v-if="shell.primaryApprovalRun?.phase === 'awaiting_approval'"
+            type="button"
+            class="run-actions__button"
+            :disabled="!shell.canRejectPrimaryRun"
+            @click="shell.rejectPrimaryRun()"
+          >
+            {{ shell.runMutationState === 'rejecting' ? 'Rejecting…' : 'Reject run' }}
+          </button>
+        </div>
+        <p v-if="shell.primaryApprovalRun?.can_approve" class="region-copy">
+          This run is blocked on an explicit approval boundary.
+        </p>
+      </HudSeamCard>
+
+      <HudSeamCard title="Signals" seam-class="dock-seam dock-seam--signals">
+        <strong>{{ shell.inboxStateLabel }}</strong>
+        <p v-if="shell.primaryInboxItem" class="region-copy">
+          {{ shell.primaryInboxItem.summary }}
+        </p>
+        <p v-else-if="shell.inboxLoadState === 'error'" class="region-copy">
+          {{ shell.inboxError }}
+        </p>
+      </HudSeamCard>
+
+      <HudSeamCard title="Active Run" seam-class="dock-seam dock-seam--run">
         <strong>{{ shell.runStateLabel }}</strong>
         <div
           v-if="
@@ -246,7 +320,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
             :disabled="!shell.canMarkPrimaryRunReviewReady"
             @click="shell.markPrimaryRunReviewReady()"
           >
-            {{ shell.runMutationState === 'reviewing' ? 'Sending to review...' : 'Ready for review' }}
+            {{ shell.runMutationState === 'reviewing' ? 'Sending to review…' : 'Ready for review' }}
           </button>
           <button
             v-if="shell.primaryActiveRun.can_stop"
@@ -255,7 +329,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
             :disabled="!shell.canStopPrimaryRun"
             @click="shell.stopPrimaryRun()"
           >
-            {{ shell.runMutationState === 'stopping' ? 'Stopping...' : 'Stop run' }}
+            {{ shell.runMutationState === 'stopping' ? 'Stopping…' : 'Stop run' }}
           </button>
           <button
             v-if="shell.primaryActiveRun.can_resume"
@@ -264,7 +338,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
             :disabled="!shell.canResumePrimaryRun"
             @click="shell.resumePrimaryRun()"
           >
-            {{ shell.runMutationState === 'resuming' ? 'Resuming...' : 'Resume run' }}
+            {{ shell.runMutationState === 'resuming' ? 'Resuming…' : 'Resume run' }}
           </button>
           <button
             v-if="shell.primaryActiveRun.phase === 'review_ready'"
@@ -273,14 +347,14 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
             :disabled="!shell.canCompletePrimaryRun"
             @click="shell.completePrimaryRun()"
           >
-            {{ shell.runMutationState === 'completing' ? 'Completing...' : 'Complete run' }}
+            {{ shell.runMutationState === 'completing' ? 'Completing…' : 'Complete run' }}
           </button>
         </div>
         <p v-if="shell.primaryActiveRun" class="region-copy">
           {{ shell.primaryActiveRun.detail }}
         </p>
         <p v-if="shell.primaryActiveRun?.current_step" class="region-copy">
-          step={{ shell.primaryActiveRun.current_step }}
+          {{ shell.primaryActiveRun.current_step }}
         </p>
         <p v-if="shell.runMutationError" class="region-copy">
           {{ shell.runMutationError }}
@@ -288,60 +362,26 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         <p v-else-if="shell.runsLoadState === 'error'" class="region-copy">
           {{ shell.runsError }}
         </p>
-      </div>
+      </HudSeamCard>
 
-      <div class="placeholder-card">
-        <p class="placeholder-card__label">Approval actions</p>
-        <strong v-if="shell.primaryApprovalRun">
-          {{ shell.primaryApprovalRun.run_id }} · {{ shell.primaryApprovalRun.phase }}
-        </strong>
-        <p v-else class="region-copy">No guarded run awaiting approval action.</p>
-        <div
-          v-if="shell.primaryApprovalRun?.can_approve || shell.primaryApprovalRun?.phase === 'awaiting_approval'"
-          class="run-actions"
-        >
-          <button
-            v-if="shell.primaryApprovalRun?.can_approve"
-            type="button"
-            class="run-actions__button"
-            :disabled="!shell.canApprovePrimaryRun"
-            @click="shell.approvePrimaryRun()"
-          >
-            {{ shell.runMutationState === 'approving' ? 'Approving...' : 'Approve run' }}
-          </button>
-          <button
-            v-if="shell.primaryApprovalRun?.phase === 'awaiting_approval'"
-            type="button"
-            class="run-actions__button"
-            :disabled="!shell.canRejectPrimaryRun"
-            @click="shell.rejectPrimaryRun()"
-          >
-            {{ shell.runMutationState === 'rejecting' ? 'Rejecting...' : 'Reject run' }}
-          </button>
-        </div>
-        <p v-if="shell.primaryApprovalRun?.can_approve" class="region-copy">
-          {{ shell.primaryApprovalRun.run_id }} is blocked on an explicit approval boundary.
-        </p>
-      </div>
-
-      <div class="placeholder-card">
-        <p class="placeholder-card__label">Signals seam</p>
-        <strong>{{ shell.inboxStateLabel }}</strong>
-        <p v-if="shell.primaryInboxItem" class="region-copy">
-          {{ shell.primaryInboxItem.title }} — {{ shell.primaryInboxItem.summary }}
-        </p>
-        <p v-else-if="shell.inboxLoadState === 'error'" class="region-copy">
-          {{ shell.inboxError }}
-        </p>
-      </div>
-
-      <div class="placeholder-card">
-        <p class="placeholder-card__label">Thread seam</p>
+      <HudSeamCard title="Conversation" seam-class="dock-seam dock-seam--thread">
         <strong>{{ shell.threadStateLabel }}</strong>
-        <p class="region-copy">One future composer model lives here, but no composer logic is duplicated in this slice.</p>
-      </div>
+        <p class="region-copy">Transcript and composer attach here in a later slice.</p>
+      </HudSeamCard>
 
-      <div class="contract-row contract-row--dev">
+      <HudSeamCard title="Command" seam-class="dock-seam dock-seam--command">
+        <label class="command-field">
+          <span class="command-field__label">Operator command</span>
+          <input
+            class="command-field__input"
+            type="text"
+            placeholder="Direct KAIRO or start a run…"
+            disabled
+          />
+        </label>
+      </HudSeamCard>
+
+      <div v-if="shell.showDevSeams" class="contract-row contract-row--dev">
         <span v-for="label in dockContractLabels" :key="label" class="contract-pill">
           {{ label }}
         </span>
@@ -349,11 +389,13 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
     </aside>
 
     <footer class="region region-status-bar">
-      <span>Status bar shell</span>
-      <span>{{ shell.layoutMode }}</span>
-      <span>{{ shell.dockContext.title }}</span>
-      <span>{{ shell.runtimeStateLabel }}</span>
-      <span v-for="label in statusContractLabels" :key="label" class="status-pill">{{ label }}</span>
+      <span
+        v-for="(item, index) in shell.statusBarItems"
+        :key="`${item}-${index}`"
+        class="status-pill"
+      >
+        {{ item }}
+      </span>
     </footer>
   </div>
 </template>

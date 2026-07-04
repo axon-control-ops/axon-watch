@@ -28,7 +28,7 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **Axon-X** | User-facing product name for the next-generation operator console. |
 | **axon-watch** | Internal repo folder and npm workspace name. Legacy naming; not the product label shown to operators. |
 | **axon-local** | The current production Axon app repo (port **7734**). Planning for Axon-X still lives here under `Plans/Axon-Watch/`. |
-| **Briefing seam** | `GET /api/briefing` returns canonical `OperatorBriefing`. The shell loads it at bootstrap and renders `pending_approvals` / `next_safe_actions` in the right-dock briefing panel. Approval mutations stay on the run approval seam. See `docs/contracts/BRIEFING-SEAM.md`. |
+| **Briefing seam** | `GET /api/briefing` returns canonical `OperatorBriefing`. The shell loads it at bootstrap and renders connectivity, `top_signals`, `pending_approvals`, and `next_safe_actions` in the right-dock briefing panel. Approval mutations stay on the run approval seam. See `docs/contracts/BRIEFING-SEAM.md`. |
 | **Control plane** | FastAPI service on port **8787** that owns run truth, runtime summary, inbox projection, workspaces list, and briefing. |
 | **Console-web / shell** | Vue 3 frontend on port **4173** — the visible Axon-X UI. |
 | **Contract / shared contract** | Canonical TypeScript types and JSON fixtures in `packages/shared-types/`. Frontend and backend must agree here first. |
@@ -127,12 +127,11 @@ What is now real in the thin slice (verified 2026-07-04):
 - two watch-produced inbox signals with multi-factor ranking (severity, recency,
   unresolved duration via `created_at`, status, action-type, workspace priority)
 - workspace list API and shell workspace selector (IDs only)
-- Monaco host bound to canonical DTO documents and **workspace files on disk** (README.md, notes.txt)
+- Monaco host bound to canonical DTO documents and **workspace files on disk** with a nested explorer tree and lazy file loading
 - backend PTY terminal attachment for the selected workspace (real shell I/O via WebSocket)
 
 What is **not** real yet despite similar-sounding names:
 
-- **Full file tree / nested paths** — thin slice lists top-level workspace files only
 - **KAIRO operator presence** — planned in axon-local docs only
 - **Full parity with axon-local** — intentional; see parity ledger for gaps
 
@@ -805,14 +804,15 @@ A good next slice should:
 - first run lifecycle (create → executing → complete)
 - startup supervision reliability (`scripts/dev/lib/common.sh`)
 - stop/resume, approval, review-ready, SQLite persistence, briefing shell panel
-- workspace list + backend PTY terminal + file-backed Monaco host
+- workspace list + backend PTY terminal + file-backed Monaco host + nested explorer tree
 - richer inbox ranking (severity, recency, unresolved duration, status,
   action-type, workspace priority)
+- richer briefing panel (`top_signals`, connectivity)
 
 **Suggested next slices (2026-07-04):**
 
-1. **Lane B** — nested workspace file tree and multi-path editor tabs
-2. **Lane B** — richer briefing panel coverage (`top_signals`, connectivity) if assigned
+1. **Lane B** — nested file creation / rename beyond read-write-open
+2. **Coordinator** — KAIRO operator-presence integration when explicitly assigned
 
 Bad next slices:
 

@@ -54,15 +54,18 @@ def ensure_bootstrap_files(workspace_id: str) -> Path:
 def list_workspace_files(workspace_id: str) -> list[dict[str, object]]:
     root = ensure_bootstrap_files(workspace_id)
     items: list[dict[str, object]] = []
-    for path in sorted(root.iterdir()):
-        if path.is_file():
-            relative = path.relative_to(root).as_posix()
-            items.append(
-                {
-                    "path": relative,
-                    "size_bytes": path.stat().st_size,
-                }
-            )
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if relative.startswith(".") or "/." in relative:
+            continue
+        items.append(
+            {
+                "path": relative,
+                "size_bytes": path.stat().st_size,
+            }
+        )
     return items
 
 

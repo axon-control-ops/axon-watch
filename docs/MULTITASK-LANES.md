@@ -59,7 +59,7 @@ May:
 Must not:
 
 - invent run phases or approval semantics locally
-- wire `/api/briefing` until explicitly assigned
+- add briefing mutation controls inside the display-only briefing panel
 
 ### Lane C — Control-Plane Product Behavior
 
@@ -102,7 +102,6 @@ Must not:
 Do not start these in parallel until coordinator opens the slice:
 
 - KAIRO operator-presence integration (planning exists in axon-local only)
-- shell consumption of `/api/briefing`
 - cross-repo planning moves out of `axon-local/Plans/Axon-Watch/`
 
 **Recently landed (no longer blocked):**
@@ -116,6 +115,8 @@ Do not start these in parallel until coordinator opens the slice:
   action-type, workspace priority)
 - file-backed Monaco editing (workspace README.md / notes.txt with Save)
 - shell consumption of `/api/briefing` in the right dock
+- nested workspace explorer tree with lazy file loading
+- richer briefing panel (`top_signals`, connectivity)
 
 ## Assignment Rules
 
@@ -138,5 +139,5 @@ python3 -m unittest discover -s tests
 
 After the current thin slices (updated 2026-07-04):
 
-1. **Lane B** — nested workspace file tree beyond top-level files
-2. **Lane B** — richer briefing panel coverage (`top_signals`, connectivity) if assigned
+1. **Lane B** — nested file creation / rename beyond read-write-open
+2. **Coordinator** — KAIRO operator-presence integration when explicitly assigned
