@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from tests.support.control_plane_db import isolate_control_plane_db
+
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
@@ -28,8 +30,9 @@ _ACTIVE_RUN_KEYS = {
 
 class RuntimeSummaryActiveRunsTests(unittest.TestCase):
     def setUp(self) -> None:
-        run_store.reset_store()
+        isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
+        self.addCleanup(self.client.close)
 
     def test_runtime_summary_includes_active_run_after_create(self) -> None:
         created = self.client.post(
@@ -77,6 +80,28 @@ class RuntimeSummaryActiveRunsTests(unittest.TestCase):
 
         payload = response.json()
         self.assertEqual([], payload["active_runs"])
+
+    def test_runtime_summary_keeps_review_ready_run_active(self) -> None:
+        created = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "Review-ready summary run",
+            },
+        ).json()
+        self.client.post(f"/api/runs/{created['run_id']}/review-ready")
+
+        with patch(
+            "app.runtime_summary_assembler.default_watch_probe",
+            return_value=(True, "ok", None, "2026-07-03T15:00:00Z"),
+        ):
+            response = self.client.get("/api/runtime/summary")
+
+        payload = response.json()
+        self.assertEqual(1, len(payload["active_runs"]))
+        self.assertEqual("review_ready", payload["active_runs"][0]["phase"])
+        self.assertEqual("review", payload["active_runs"][0]["status"])
 
 
 if __name__ == "__main__":

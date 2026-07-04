@@ -1,0 +1,26 @@
+{
+  "event_id": "event_watch_bootstrap_opened",
+  "signal_id": "signal_watch_bootstrap_ready",
+  "event_type": "signal_opened",
+  "source": "watch",
+  "workspace_id": "workspace_bootstrap",
+  "project_id": "project_bootstrap",
+  "severity": "info",
+  "status": "open",
+  "title": "Watch bootstrap ready",
+  "body": "The watch service emitted the first canonical bootstrap signal.",
+  "summary": "Watch bootstrap signal is available.",
+  "created_at": "2026-07-03T16:00:00Z",
+  "updated_at": "2026-07-03T16:00:00Z",
+  "occurred_at": "2026-07-03T16:00:00Z",
+  "dedupe_key": "watch:bootstrap:ready",
+  "action_type": "open_dashboard",
+  "action_payload": {
+    "surface": "inbox"
+  },
+  "correlation_ref": "corr_watch_bootstrap_ready",
+  "delivery_state": "not_required",
+  "meta": {
+    "signal_family": "watch_bootstrap"
+  }
+}

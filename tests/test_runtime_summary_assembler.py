@@ -5,9 +5,12 @@ import sys
 import unittest
 from pathlib import Path
 
+from tests.support.control_plane_db import isolate_control_plane_db
+
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
+from app.runs.service import create_run  # noqa: E402
 from app.runtime_summary_assembler import assemble_runtime_summary  # noqa: E402
 
 from scripts.verify.common import load_config  # noqa: E402
@@ -37,10 +40,10 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
     def setUp(self) -> None:
         from app.persistence import run_store
 
-        run_store.reset_store()
+        isolate_control_plane_db(self, run_store)
 
     def test_assembler_returns_canonical_top_level_shape(self) -> None:
-        payload = assemble_runtime_summary(watch_probe=_connected_probe)
+        payload = assemble_runtime_summary(watch_probe=_connected_probe, inbox_fetcher=lambda: None)
 
         self.assertEqual(_CANONICAL_TOP_LEVEL_KEYS, set(payload))
         self.assertEqual([], payload["active_runs"])
@@ -48,7 +51,7 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
         self.assertEqual([], payload["signals"]["top_items"])
 
     def test_assembler_marks_degraded_when_watch_probe_fails(self) -> None:
-        payload = assemble_runtime_summary(watch_probe=_disconnected_probe)
+        payload = assemble_runtime_summary(watch_probe=_disconnected_probe, inbox_fetcher=lambda: None)
 
         self.assertFalse(payload["watch"]["connected"])
         self.assertTrue(payload["degraded"]["active"])
@@ -56,7 +59,7 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
         self.assertFalse(payload["capabilities"]["watch_connected"])
 
     def test_assembler_reflects_connected_watch_in_capabilities(self) -> None:
-        payload = assemble_runtime_summary(watch_probe=_connected_probe)
+        payload = assemble_runtime_summary(watch_probe=_connected_probe, inbox_fetcher=lambda: None)
 
         self.assertTrue(payload["watch"]["connected"])
         self.assertFalse(payload["degraded"]["active"])
@@ -86,8 +89,24 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
         self.assertEqual(watch_item["status"], payload["signals"]["top_items"][0]["status"])
         self.assertEqual(watch_item["source"], payload["signals"]["top_items"][0]["source"])
 
+    def test_assembler_projects_pending_approval_count_from_runs(self) -> None:
+        create_run(
+            workspace_id="workspace_alpha",
+            mode="agent",
+            summary="Awaiting approval run",
+            requires_approval=True,
+        )
+
+        payload = assemble_runtime_summary(
+            watch_probe=_connected_probe,
+            inbox_fetcher=lambda: None,
+        )
+
+        self.assertEqual(1, payload["approvals"]["pending_count"])
+        self.assertIsNotNone(payload["approvals"]["latest_approval_at"])
+
     def test_assembled_payload_fits_runtime_summary_size_budget(self) -> None:
-        payload = assemble_runtime_summary(watch_probe=_connected_probe)
+        payload = assemble_runtime_summary(watch_probe=_connected_probe, inbox_fetcher=lambda: None)
         encoded = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         threshold = int(load_config()["dto_sizes"]["runtime_summary"]["threshold_bytes"])
 

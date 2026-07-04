@@ -1,0 +1,67 @@
+{
+  "generated_at": "2026-07-04T07:55:00Z",
+  "top_signals": [
+    {
+      "signal_id": "signal_runtime_summary_degraded",
+      "workspace_id": "workspace_alpha",
+      "title": "Watch summary degraded",
+      "summary": "Watch summary is degraded.",
+      "severity": "high",
+      "status": "open",
+      "source": "watch",
+      "updated_at": "2026-07-04T07:54:30Z",
+      "action_type": "open_dashboard"
+    }
+  ],
+  "pending_approvals": {
+    "count": 1,
+    "items": [
+      {
+        "approval_id": "approval_run_contract_baseline",
+        "run_id": "run_contract_baseline",
+        "workspace_id": "workspace_alpha"
+      }
+    ]
+  },
+  "active_runs": [
+    {
+      "run_id": "run_contract_baseline",
+      "workspace_id": "workspace_alpha",
+      "mode": "agent",
+      "status": "blocked",
+      "phase": "awaiting_approval",
+      "title": "Contract baseline run",
+      "detail": "Guarded work is waiting for explicit approval.",
+      "lane_id": "control-plane",
+      "updated_at": "2026-07-04T07:54:00Z"
+    }
+  ],
+  "next_safe_actions": [
+    {
+      "action_id": "approve_run_contract_baseline",
+      "kind": "approve_run",
+      "title": "Approve guarded run",
+      "detail": "Approve Contract baseline run to continue execution.",
+      "workspace_id": "workspace_alpha",
+      "run_id": "run_contract_baseline",
+      "signal_id": null
+    },
+    {
+      "action_id": "review_signal_runtime_summary_degraded",
+      "kind": "review_signal",
+      "title": "Review top signal",
+      "detail": "Inspect Watch summary degraded.",
+      "workspace_id": "workspace_alpha",
+      "run_id": null,
+      "signal_id": "signal_runtime_summary_degraded"
+    }
+  ],
+  "degraded": {
+    "active": false,
+    "reasons": []
+  },
+  "connectivity": {
+    "control_plane_ready": true,
+    "watch_connected": true
+  }
+}

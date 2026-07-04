@@ -1,5 +1,13 @@
 export type { ApprovalRecord, ThreadMessage, WorkspaceRecord } from './control-plane';
 export type {
+  BriefingAction,
+  BriefingActionKind,
+  OperatorBriefing,
+  OperatorBriefingConnectivity,
+  OperatorBriefingPendingApprovals,
+} from './briefing';
+export { BRIEFING_ACTION_KINDS } from './briefing';
+export type {
   RunMode,
   RunPhase,
   RunRecord,

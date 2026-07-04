@@ -11,7 +11,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from app.adapters.watch_client import fetch_watch_inbox
-from app.runs.service import list_active_runs, to_runtime_summary_active_run
+from app.runs.service import approval_summary, list_active_runs, to_runtime_summary_active_run
 
 _APP_VERSION = "0.1.0"
 _PROCESS_STARTED_AT = time.monotonic()
@@ -65,7 +65,7 @@ def default_watch_probe(timeout_seconds: float = 0.5) -> tuple[bool, str, str | 
 def _runtime_identity() -> dict[str, object]:
     return {
         "provider_family": os.environ.get("AXON_WATCH_PROVIDER_FAMILY", "bootstrap"),
-        "provider_name": os.environ.get("AXON_WATCH_PROVIDER_NAME", "Axon-Watch Bootstrap"),
+        "provider_name": os.environ.get("AXON_WATCH_PROVIDER_NAME", "Axon-X Bootstrap"),
         "model_name": os.environ.get("AXON_WATCH_MODEL_NAME", "bootstrap-model"),
         "mode_default": os.environ.get("AXON_WATCH_MODE_DEFAULT", "agent"),
         "tool_calling_supported": _env_bool("AXON_WATCH_TOOL_CALLING_SUPPORTED", False),
@@ -122,6 +122,8 @@ def assemble_runtime_summary(
     if not watch_connected and watch_degraded_reason:
         degraded_reasons.append(watch_degraded_reason)
 
+    approvals = approval_summary()
+
     return {
         "generated_at": generated_at,
         "control_plane": {
@@ -140,11 +142,7 @@ def assemble_runtime_summary(
         "active_runs": [
             to_runtime_summary_active_run(record) for record in list_active_runs()
         ],
-        "approvals": {
-            "pending_count": 0,
-            "highest_severity": None,
-            "latest_approval_at": None,
-        },
+        "approvals": approvals,
         "signals": _signals_summary_from_inbox(watch_inbox, generated_at),
         "capabilities": {
             "editor": True,

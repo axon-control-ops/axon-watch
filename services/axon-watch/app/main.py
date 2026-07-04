@@ -14,7 +14,7 @@ def _state_dir() -> str:
 
 
 app = FastAPI(
-    title="Axon-Watch Service",
+    title="Axon-X Watch Service",
     version="0.1.0",
     docs_url=None,
     redoc_url=None,

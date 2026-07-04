@@ -12,6 +12,7 @@ from tests.support.bootstrap_signal_fixture import (
     BOOTSTRAP_WATCH_INBOX,
     consistency_tuple,
 )
+from tests.support.summary_degraded_signal_fixture import SUMMARY_DEGRADED_INBOX_ITEM
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -57,6 +58,31 @@ class SignalConsistencyTests(unittest.TestCase):
             summary_item = self.client.get("/api/runtime/summary").json()["signals"]["top_items"][0]
 
         self.assertEqual(consistency_tuple(BOOTSTRAP_INBOX_ITEM), consistency_tuple(inbox_item))
+        self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(summary_item))
+
+    def test_control_plane_inbox_and_runtime_summary_preserve_ranked_top_signal(self) -> None:
+        ranked_watch_inbox = {
+            "items": [SUMMARY_DEGRADED_INBOX_ITEM, BOOTSTRAP_INBOX_ITEM],
+            "count": 2,
+            "updated_at": "2026-07-03T16:00:00Z",
+        }
+        with patch(
+            "app.inbox_projection.fetch_watch_inbox",
+            return_value=ranked_watch_inbox,
+        ), patch(
+            "app.runtime_summary_assembler.fetch_watch_inbox",
+            return_value=ranked_watch_inbox,
+        ), patch(
+            "app.runtime_summary_assembler.default_watch_probe",
+            return_value=(True, "ok", None, "2026-07-03T16:00:00Z"),
+        ):
+            inbox_item = self.client.get("/api/inbox").json()["items"][0]
+            summary_item = self.client.get("/api/runtime/summary").json()["signals"]["top_items"][0]
+
+        self.assertEqual(
+            consistency_tuple(SUMMARY_DEGRADED_INBOX_ITEM),
+            consistency_tuple(inbox_item),
+        )
         self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(summary_item))
 
 

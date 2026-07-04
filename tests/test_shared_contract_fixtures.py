@@ -67,6 +67,7 @@ SIGNAL_ACTION_TYPES = {
     "none",
 }
 DELIVERY_STATES = {"pending", "attempted", "delivered", "failed", "suppressed", "not_required"}
+BRIEFING_ACTION_KINDS = {"approve_run", "resume_run", "review_signal", "inspect_runtime"}
 
 
 def _load_fixture(name: str) -> dict[str, object]:
@@ -237,6 +238,40 @@ class SharedContractFixtureTests(unittest.TestCase):
         self.assertEqual(expected, (runtime_top_item["signal_id"], runtime_top_item["severity"], runtime_top_item["status"]))
         self.assertEqual(expected, (watch_inbox_item["signal_id"], watch_inbox_item["severity"], watch_inbox_item["status"]))
         self.assertEqual(expected, (inbox_item["signal_id"], inbox_item["severity"], inbox_item["status"]))
+
+    def test_operator_briefing_fixture_matches_projection_contract(self) -> None:
+        payload = _load_fixture("operator-briefing.example.json")
+
+        self.assertEqual(
+            {
+                "generated_at",
+                "top_signals",
+                "pending_approvals",
+                "active_runs",
+                "next_safe_actions",
+                "degraded",
+                "connectivity",
+            },
+            set(payload),
+        )
+        self.assertEqual({"count", "items"}, set(payload["pending_approvals"]))
+        self.assertEqual({"active", "reasons"}, set(payload["degraded"]))
+        self.assertEqual({"control_plane_ready", "watch_connected"}, set(payload["connectivity"]))
+
+        action = payload["next_safe_actions"][0]
+        self.assertEqual(
+            {
+                "action_id",
+                "kind",
+                "title",
+                "detail",
+                "workspace_id",
+                "run_id",
+                "signal_id",
+            },
+            set(action),
+        )
+        self.assertIn(action["kind"], BRIEFING_ACTION_KINDS)
 
     def test_runtime_and_watch_fixtures_fit_configured_size_budgets(self) -> None:
         config = load_config()["dto_sizes"]

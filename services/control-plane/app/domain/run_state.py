@@ -32,7 +32,7 @@ STOP_PHASES = {
     "paused",
 }
 
-RESUME_PHASES = {"paused", "awaiting_input", "awaiting_approval", "review_ready"}
+RESUME_PHASES = {"paused", "awaiting_input", "review_ready"}
 
 
 def status_for_phase(phase: str) -> str:

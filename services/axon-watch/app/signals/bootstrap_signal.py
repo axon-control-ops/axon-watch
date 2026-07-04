@@ -2,20 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from app.signals.iso_time import utc_now_iso
 
 BOOTSTRAP_SIGNAL_ID = "signal_watch_bootstrap_ready"
 BOOTSTRAP_WORKSPACE_ID = "workspace_bootstrap"
 BOOTSTRAP_PROJECT_ID = "project_bootstrap"
-
-
-def utc_now_iso() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
 
 
 def bootstrap_signal_event() -> dict[str, object]:

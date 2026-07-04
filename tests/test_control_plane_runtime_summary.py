@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from tests.support.control_plane_db import isolate_control_plane_db
+
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
@@ -32,8 +34,9 @@ class ControlPlaneRuntimeSummaryTests(unittest.TestCase):
     def setUp(self) -> None:
         from app.persistence import run_store
 
-        run_store.reset_store()
+        isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
+        self.addCleanup(self.client.close)
 
     def test_runtime_summary_endpoint_returns_assembled_canonical_shape(self) -> None:
         with patch(
@@ -59,6 +62,27 @@ class ControlPlaneRuntimeSummaryTests(unittest.TestCase):
         payload = response.json()
         self.assertFalse(payload["watch"]["connected"])
         self.assertTrue(payload["degraded"]["active"])
+
+    def test_runtime_summary_endpoint_counts_pending_approvals(self) -> None:
+        self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "Approval summary run",
+                "requires_approval": True,
+            },
+        )
+
+        with patch(
+            "app.runtime_summary_assembler.default_watch_probe",
+            return_value=(True, "ok", None, "2026-07-03T15:00:00Z"),
+        ):
+            response = self.client.get("/api/runtime/summary")
+
+        payload = response.json()
+        self.assertEqual(1, payload["approvals"]["pending_count"])
+        self.assertIsNotNone(payload["approvals"]["latest_approval_at"])
 
     def test_runtime_summary_endpoint_payload_fits_size_budget(self) -> None:
         with patch(

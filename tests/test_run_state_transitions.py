@@ -34,10 +34,40 @@ class RunStateTransitionTests(unittest.TestCase):
         self.assertFalse(flags["can_approve"])
         self.assertFalse(flags["can_review"])
 
+    def test_capability_flags_for_awaiting_approval(self) -> None:
+        flags = capability_flags("awaiting_approval")
+        self.assertTrue(flags["can_stop"])
+        self.assertFalse(flags["can_resume"])
+        self.assertTrue(flags["can_approve"])
+        self.assertFalse(flags["can_review"])
+
+    def test_capability_flags_for_review_ready(self) -> None:
+        flags = capability_flags("review_ready")
+        self.assertFalse(flags["can_stop"])
+        self.assertTrue(flags["can_resume"])
+        self.assertFalse(flags["can_approve"])
+        self.assertTrue(flags["can_review"])
+
     def test_allowed_bootstrap_transitions(self) -> None:
         self.assertTrue(can_transition("queued", "starting"))
         self.assertTrue(can_transition("starting", "executing"))
         self.assertTrue(can_transition("executing", "completed"))
+        self.assertTrue(can_transition("paused", "executing"))
+
+    def test_stop_to_paused_transitions_match_accepted_amendment(self) -> None:
+        for phase in ("queued", "starting", "planning", "executing", "waiting_external"):
+            self.assertTrue(can_transition(phase, "paused"))
+
+    def test_approval_transitions_follow_frozen_contract(self) -> None:
+        self.assertTrue(can_transition("planning", "awaiting_approval"))
+        self.assertTrue(can_transition("executing", "awaiting_approval"))
+        self.assertTrue(can_transition("awaiting_approval", "executing"))
+        self.assertTrue(can_transition("awaiting_approval", "cancelled"))
+
+    def test_review_ready_transitions_follow_frozen_contract(self) -> None:
+        self.assertTrue(can_transition("executing", "review_ready"))
+        self.assertTrue(can_transition("review_ready", "completed"))
+        self.assertTrue(can_transition("review_ready", "executing"))
 
     def test_disallowed_transitions(self) -> None:
         self.assertFalse(can_transition("queued", "executing"))

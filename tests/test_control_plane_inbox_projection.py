@@ -12,6 +12,7 @@ from tests.support.bootstrap_signal_fixture import (
     CONSISTENCY_FIELDS,
     consistency_tuple,
 )
+from tests.support.control_plane_db import isolate_control_plane_db
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -24,8 +25,9 @@ class ControlPlaneInboxProjectionTests(unittest.TestCase):
     def setUp(self) -> None:
         from app.persistence import run_store
 
-        run_store.reset_store()
+        isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
+        self.addCleanup(self.client.close)
 
     def test_project_watch_inbox_preserves_consistency_fields(self) -> None:
         projected = project_watch_inbox(BOOTSTRAP_WATCH_INBOX)
