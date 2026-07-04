@@ -6,7 +6,8 @@
 
 `GET /api/briefing` is implemented in the control-plane and loaded by the
 console shell during bootstrap. The right-dock `BriefingPanel` renders canonical
-`OperatorBriefing` fields for `pending_approvals` and `next_safe_actions`.
+`OperatorBriefing` fields for `top_signals`, `connectivity`, `pending_approvals`,
+and `next_safe_actions`.
 
 Approval execution remains on the dedicated run approval seam (`/api/runs`
 approve/reject actions). The briefing panel is display-only for operator guidance.
@@ -41,8 +42,9 @@ Both projections gate inbox-derived top signals on
 
 ## Display Rules
 
-- Render `pending_approvals.count`, `pending_approvals.items`, and
-  `next_safe_actions` directly from `OperatorBriefing`.
+- Render `connectivity`, `top_signals`, `pending_approvals.count`,
+  `pending_approvals.items`, and `next_safe_actions` directly from
+  `OperatorBriefing`.
 - Do not invent alternate labels for briefing projection fields.
 - Do not add duplicate approve/reject controls in the briefing panel; use the
   existing approval action seam for mutations.

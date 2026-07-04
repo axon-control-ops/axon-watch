@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { OperatorBriefing } from '../contracts/canonical';
 import {
-  briefingHasActions,
+  briefingConnectivityLabels,
+  briefingHasTopSignals,
   briefingIsEmpty,
   briefingPanelHeadline,
 } from './briefing-panel-view';
@@ -42,16 +43,47 @@ const approvalBriefing: OperatorBriefing = {
   ],
 };
 
+const signalBriefing: OperatorBriefing = {
+  ...emptyBriefing,
+  top_signals: [
+    {
+      signal_id: 'signal_bootstrap',
+      workspace_id: 'workspace_alpha',
+      title: 'Bootstrap degraded',
+      summary: 'Watch summary degraded.',
+      severity: 'warning',
+      status: 'open',
+      source: 'watch',
+      created_at: '2026-07-03T16:00:00Z',
+      updated_at: '2026-07-03T16:00:00Z',
+      action_type: 'open_dashboard',
+    },
+  ],
+};
+
 describe('briefing panel view helpers', () => {
-  it('reports empty headline when no pending approvals exist', () => {
-    expect(briefingPanelHeadline(emptyBriefing, 'loaded')).toBe('No pending approvals');
+  it('reports nominal headline when no pending approvals exist', () => {
+    expect(briefingPanelHeadline(emptyBriefing, 'loaded')).toBe('Systems nominal');
     expect(briefingIsEmpty(emptyBriefing)).toBe(true);
-    expect(briefingHasActions(emptyBriefing)).toBe(false);
   });
 
   it('surfaces pending approval count from OperatorBriefing', () => {
     expect(briefingPanelHeadline(approvalBriefing, 'loaded')).toBe('1 pending approval(s)');
     expect(briefingIsEmpty(approvalBriefing)).toBe(false);
-    expect(briefingHasActions(approvalBriefing)).toBe(true);
+  });
+
+  it('surfaces top signal title when no approvals are pending', () => {
+    expect(briefingPanelHeadline(signalBriefing, 'loaded')).toBe('Bootstrap degraded');
+    expect(briefingHasTopSignals(signalBriefing)).toBe(true);
+    expect(briefingIsEmpty(signalBriefing)).toBe(false);
+  });
+
+  it('labels connectivity state for the briefing panel', () => {
+    expect(
+      briefingConnectivityLabels({
+        control_plane_ready: true,
+        watch_connected: false,
+      }),
+    ).toEqual(['Control plane ready', 'Watch disconnected']);
   });
 });

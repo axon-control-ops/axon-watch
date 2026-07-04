@@ -3,7 +3,9 @@ import { computed } from 'vue';
 
 import type { OperatorBriefing } from '../contracts/canonical';
 import {
+  briefingConnectivityLabels,
   briefingHasActions,
+  briefingHasTopSignals,
   briefingIsEmpty,
   briefingPanelHeadline,
   type BriefingPanelLoadState,
@@ -13,6 +15,7 @@ const props = defineProps<{
   briefing: OperatorBriefing | null;
   loadState: BriefingPanelLoadState;
   error: string | null;
+  hero?: boolean;
 }>();
 
 const headline = computed(() => briefingPanelHeadline(props.briefing, props.loadState));
@@ -22,21 +25,61 @@ const showEmptyState = computed(
 const showActions = computed(
   () => props.loadState === 'loaded' && briefingHasActions(props.briefing),
 );
+const showTopSignals = computed(
+  () => props.loadState === 'loaded' && briefingHasTopSignals(props.briefing),
+);
+const connectivityLabels = computed(() =>
+  props.briefing ? briefingConnectivityLabels(props.briefing.connectivity) : [],
+);
 </script>
 
 <template>
-  <div class="placeholder-card briefing-panel">
-    <p class="placeholder-card__label">OperatorBriefing</p>
-    <strong>{{ headline }}</strong>
+  <div class="briefing-panel" :class="{ 'briefing-panel--hero': hero }">
+    <p class="briefing-panel__eyebrow">KAIRO Briefing</p>
+    <strong class="briefing-panel__headline">{{ headline }}</strong>
 
-    <p v-if="loadState === 'error'" class="region-copy">{{ error }}</p>
+    <p v-if="loadState === 'loading'" class="region-copy">Loading operator briefing…</p>
+    <p v-else-if="loadState === 'error'" class="region-copy">{{ error }}</p>
 
-    <p v-else-if="showEmptyState" class="region-copy">
-      No pending approvals or next safe actions in the current briefing projection.
+    <div v-else-if="briefing" class="briefing-panel__section">
+      <p class="briefing-panel__section-label">Connectivity</p>
+      <div class="briefing-panel__chips">
+        <span
+          v-for="label in connectivityLabels"
+          :key="label"
+          class="briefing-panel__chip"
+          :class="{
+            'briefing-panel__chip--ok': label.endsWith('ready') || label.endsWith('connected'),
+            'briefing-panel__chip--warn': label.includes('not ready') || label.includes('disconnected'),
+          }"
+        >
+          {{ label }}
+        </span>
+      </div>
+    </div>
+
+    <p v-if="showEmptyState" class="region-copy">
+      Systems nominal. No pending approvals, top signals, or recommended actions right now.
     </p>
 
+    <div v-if="showTopSignals" class="briefing-panel__section">
+      <p class="briefing-panel__section-label">Top signals</p>
+      <ul class="briefing-panel__list">
+        <li
+          v-for="signal in briefing?.top_signals"
+          :key="signal.signal_id"
+          class="briefing-panel__item"
+        >
+          <span class="briefing-panel__item-title">{{ signal.title }}</span>
+          <span class="region-copy">
+            {{ signal.severity }} · {{ signal.status }} · workspace {{ signal.workspace_id }}
+          </span>
+        </li>
+      </ul>
+    </div>
+
     <div v-if="briefing && briefing.pending_approvals.count > 0" class="briefing-panel__section">
-      <p class="briefing-panel__section-label">pending_approvals</p>
+      <p class="briefing-panel__section-label">Pending approvals</p>
       <ul class="briefing-panel__list">
         <li
           v-for="item in briefing.pending_approvals.items"
@@ -45,14 +88,14 @@ const showActions = computed(
         >
           <span class="briefing-panel__item-title">{{ item.approval_id }}</span>
           <span class="region-copy">
-            run_id={{ item.run_id }} · workspace_id={{ item.workspace_id }}
+            run {{ item.run_id }} · workspace {{ item.workspace_id }}
           </span>
         </li>
       </ul>
     </div>
 
     <div v-if="showActions" class="briefing-panel__section">
-      <p class="briefing-panel__section-label">next_safe_actions</p>
+      <p class="briefing-panel__section-label">Next safe actions</p>
       <ul class="briefing-panel__list">
         <li
           v-for="action in briefing?.next_safe_actions"
@@ -66,8 +109,8 @@ const showActions = computed(
       </ul>
     </div>
 
-    <p v-if="briefing?.degraded.active" class="region-copy">
-      degraded={{ briefing.degraded.active }} · {{ briefing.degraded.reasons.join(', ') }}
+    <p v-if="briefing?.degraded.active" class="region-copy region-copy--degraded">
+      Degraded state · {{ briefing.degraded.reasons.join(', ') }}
     </p>
   </div>
 </template>
