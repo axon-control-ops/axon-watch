@@ -40,7 +40,8 @@ export async function createMonacoEditor(
     theme: 'vs-dark',
     automaticLayout: true,
     minimap: { enabled: false },
-    fontSize: 13,
+    fontSize: 15,
+    lineHeight: 22,
     scrollBeyondLastLine: false,
     padding: { top: 12, bottom: 12 },
   });

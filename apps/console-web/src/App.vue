@@ -16,7 +16,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       <div class="region-header">
         <div>
           <p class="eyebrow">Axon-X</p>
-          <h1>Integrated shell skeleton</h1>
+          <h1>Operator console</h1>
         </div>
 
         <div class="layout-toggle" role="group" aria-label="Layout mode">
@@ -46,17 +46,22 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         <span class="chip">{{ shell.runtimeStateLabel }}</span>
         <span class="chip">{{ shell.runStateLabel }}</span>
       </div>
+
+      <p class="smoke-banner">
+        Smoke test: pick a <strong>workspace</strong> (left) → read the <strong>Workspace Overview</strong>
+        editor (center) → in the terminal below run <code>pwd</code> then <code>echo hello</code>.
+      </p>
     </header>
 
     <aside class="region region-left-sidebar">
-      <div class="region-header">
+      <div class="region-header dev-scaffold">
         <div>
           <p class="eyebrow">Left Sidebar</p>
           <h2>Workspace and explorer seam</h2>
         </div>
       </div>
 
-      <p class="region-copy">
+      <p class="region-copy dev-scaffold">
         Hosts workspace navigation and explorer ownership without asserting workspace semantics locally.
       </p>
 
@@ -89,7 +94,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
     </aside>
 
     <main class="region region-center-workbench">
-      <div class="region-header">
+      <div class="region-header dev-scaffold">
         <div>
           <p class="eyebrow">Center Workbench</p>
           <h2>Editor and preview host</h2>
@@ -127,7 +132,6 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
           v-if="shell.activeEditorTabId === 'editor-shell'"
           class="placeholder-card placeholder-card--surface placeholder-card--host"
         >
-          <p class="placeholder-card__label">Editor surface</p>
           <EditorHost
             v-if="shell.activeEditorDocument"
             :title="shell.activeEditorDocument.title"
@@ -149,7 +153,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         </section>
       </div>
 
-      <div class="contract-row">
+      <div class="contract-row contract-row--dev">
         <span v-for="label in workbenchContractLabels" :key="label" class="contract-pill">
           {{ label }}
         </span>
@@ -157,7 +161,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
     </main>
 
     <section class="region region-bottom-panel">
-      <div class="region-header">
+      <div class="region-header dev-scaffold">
         <div>
           <p class="eyebrow">Bottom Panel</p>
           <h2>Terminal and runtime strip host</h2>
@@ -166,8 +170,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
 
       <div class="bottom-panel-grid">
         <section class="placeholder-card placeholder-card--host">
-          <p class="placeholder-card__label">Terminal session</p>
-          <strong>{{ shell.terminalSessions[0]?.title }}</strong>
+          <p class="placeholder-card__label">Terminal — backend PTY</p>
           <TerminalHost
             :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
             :run-summary="shell.primaryActiveRun ? `${shell.primaryActiveRun.run_id} · ${shell.primaryActiveRun.phase} · ${shell.primaryActiveRun.status}` : null"
@@ -198,7 +201,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
     </section>
 
     <aside class="region region-right-dock">
-      <div class="region-header">
+      <div class="region-header dev-scaffold">
         <div>
           <p class="eyebrow">Right Dock</p>
           <h2>Agent dock and signal summary host</h2>
@@ -319,7 +322,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         <p class="region-copy">One future composer model lives here, but no composer logic is duplicated in this slice.</p>
       </div>
 
-      <div class="contract-row">
+      <div class="contract-row contract-row--dev">
         <span v-for="label in dockContractLabels" :key="label" class="contract-pill">
           {{ label }}
         </span>
