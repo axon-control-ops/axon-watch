@@ -37,4 +37,7 @@ echo "ok $(service_base_url "control-plane")/api/runs"
 echo "Workspaces:"
 curl -fsS "$(service_base_url "control-plane")/api/workspaces" >/dev/null
 echo "ok $(service_base_url "control-plane")/api/workspaces"
+echo "Live events (SSE):"
+curl -fsS --max-time 3 -H 'Accept: text/event-stream' "$(service_base_url "control-plane")/api/live/events" | head -n 2 >/dev/null
+echo "ok $(service_base_url "control-plane")/api/live/events"
 echo

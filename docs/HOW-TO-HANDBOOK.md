@@ -568,6 +568,23 @@ This runs:
 - verify harness checks
 - DTO size checks using representative fixtures
 
+## Latency evidence (D1)
+
+When the dev stack is running, collect warm-route timing samples and re-run verify
+with evidence files:
+
+```bash
+./scripts/dev/up.sh
+npm run verify:evidence
+npm run verify:nightly
+```
+
+This writes JSON under `.local/verify/` and passes them to `scripts/verify/all.py`.
+A documented dev placeholder for shell boot lives at
+`scripts/verify/fixtures/shell-boot-report.dev.json` until browser automation lands.
+
+`./scripts/dev/check-health.sh` also probes `GET /api/live/events` (SSE).
+
 ## Frontend checks
 
 ```bash

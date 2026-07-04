@@ -122,7 +122,7 @@ Work in order. One slice per pass; run the verification gate before the next ite
 | **B2** | B | Workspace catalog policy (doc-only) | **done** — `docs/WORKSPACE_CATALOG.md` |
 | **A1** | A | Watch signal depth / degraded bootstrap clarity | **done** |
 | **C1** | C (+ B surface) | Run history receipts visible in dock | **done** |
-| **D1** | D | Dev verify / health polish (non-semantics) | **queued** |
+| **D1** | D | Dev verify / health polish (non-semantics) | **done** |
 | **UX-4** | B | SSE live update polish (seam refresh + interruptive signals) | **done** |
 
 Parallel rule: **B1 must finish before A1/C1** if they touch `chat/service.py` or
@@ -165,6 +165,8 @@ Superseded by **Active Queue** above. After B1 lands:
 - **workspace catalog policy** documented in `docs/WORKSPACE_CATALOG.md`
 - **run history receipts** — `GET /api/runs/{run_id}/history` + Active Run dock list
 - **bootstrap degraded signal clarity** — Lane A1 copy/metadata (`c464984`)
+- **SSE live refresh** — `GET /api/live/events` + `live-events-session.ts` (UX-4)
+- **verify evidence tooling** — `npm run verify:evidence`, `npm run verify:nightly` (D1)
 - lower default terminal dock height (~240px fresh session, 280px cap)
 
 ## Assignment Rules

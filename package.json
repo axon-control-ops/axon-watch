@@ -10,6 +10,8 @@
     "dev": "./scripts/dev/up.sh",
     "down": "./scripts/dev/down.sh",
     "health": "./scripts/dev/check-health.sh",
+    "verify:evidence": "./scripts/dev/collect-verify-evidence.sh",
+    "verify:nightly": "./scripts/dev/verify-with-evidence.sh",
     "dev:console-web": "npm run dev -w @axon-watch/console-web -- --host 127.0.0.1 --port ${AXON_WATCH_CONSOLE_WEB_PORT:-4173} --strictPort",
     "dev:control-plane": "cd services/control-plane && python3 -m uvicorn app.main:app --host 127.0.0.1 --port ${AXON_WATCH_CONTROL_PLANE_PORT:-8787}",
     "dev:axon-watch": "cd services/axon-watch && python3 -m uvicorn app.main:app --host 127.0.0.1 --port ${AXON_WATCH_WATCH_SERVICE_PORT:-8788}",

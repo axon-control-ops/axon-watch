@@ -1,0 +1,5 @@
+{
+  "shell_ready_ms": 1800,
+  "source": "dev-placeholder",
+  "note": "Documented placeholder for shell_boot_readiness gate until browser automation supplies real samples."
+}
