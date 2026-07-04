@@ -12,6 +12,7 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_CONTROL_PLANE_BASE_URL ?? 'http://127.0.0.1:8787',
         changeOrigin: true,
+        ws: true,
       },
     },
   },

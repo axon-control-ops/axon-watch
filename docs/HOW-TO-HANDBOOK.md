@@ -46,7 +46,7 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **Signal / inbox item** | Watch-produced event surfaced through control-plane `GET /api/inbox`. |
 | **Thin slice** | A small, verifiable vertical increment — one owned behavior with tests, not a broad rewrite. |
 | **Watch service** | FastAPI service on port **8788** that produces canonical signals; control-plane projects them into inbox/runtime summary. |
-| **xterm host** | In-browser terminal surface (`TerminalHost.vue`). Currently a **local shell-state console** (help/context commands), not a backend PTY session. |
+| **xterm host** | In-browser terminal surface (`TerminalHost.vue`) attached to a **backend PTY session** via `WS /api/workspaces/{workspace_id}/terminal`. Runs real shell commands in a workspace-scoped directory under `.local/workspaces/` (override with `AXON_WATCH_WORKSPACE_ROOT`). |
 | **Workspace** | Logical operator context keyed by `workspace_id`. Today the API returns IDs only; rich catalog metadata is deferred. |
 
 ### Two repos, two apps
@@ -125,13 +125,14 @@ What is now real in the thin slice (verified 2026-07-04):
 - review-ready entry, completion, and follow-up resume path
 - SQLite-backed run persistence (survives control-plane restart)
 - operator briefing API (backend-only; shell not wired)
-- two watch-produced inbox signals with severity-then-recency ranking
+- two watch-produced inbox signals with multi-factor ranking (severity, status,
+  action-type, workspace priority, recency)
 - workspace list API and shell workspace selector (IDs only)
-- Monaco and xterm hosts bound to canonical DTOs (not disk files or backend PTY)
+- Monaco host bound to canonical DTO documents (not disk files)
+- backend PTY terminal attachment for the selected workspace (real shell I/O via WebSocket)
 
 What is **not** real yet despite similar-sounding names:
 
-- **Backend terminal attachment** — xterm is a local command loop, not `tmux`/PTY/SSH
 - **File-backed editor** — Monaco shows generated overview/JSON from DTOs, not repo files
 - **KAIRO operator presence** — planned in axon-local docs only
 - **Full parity with axon-local** — intentional; see parity ledger for gaps
@@ -368,9 +369,10 @@ That flow looks like this:
 Important limitations:
 
 - the shell still treats `/api/briefing` as backend-only
-- Monaco and xterm hosts are now attached to canonical workspace/run/signal DTOs,
-  but not yet to real workspace files or backend terminal sessions
-- ranking depth is still thin: current watch ordering is severity + recency only
+- Monaco host is still attached to canonical DTO documents, not workspace files on disk
+- xterm host now attaches to a backend PTY scoped to the selected workspace directory
+- ranking still omits unresolved duration (no `created_at` on inbox items yet)
+  and uses a thin watch-owned workspace priority map
 
 That is okay for this stage.
 
@@ -801,14 +803,15 @@ A good next slice should:
 - first run lifecycle (create → executing → complete)
 - startup supervision reliability (`scripts/dev/lib/common.sh`)
 - stop/resume, approval, review-ready, SQLite persistence, briefing backend
-- workspace list + DTO-bound Monaco/xterm hosts
+- workspace list + backend PTY terminal + DTO-bound Monaco host
+- richer inbox ranking (status, action-type, workspace priority, recency)
 
 **Suggested next slices (2026-07-04):**
 
-1. **Lane B** — backend PTY terminal session attachment (real shell I/O)
-2. **Lane B** — file-backed Monaco binding to workspace paths on disk
-3. **Lane A** — richer inbox ranking beyond severity + recency
-4. **Lane B + coordinator** — shell wiring for `/api/briefing` (explicit assignment only)
+1. **Lane B** — file-backed Monaco binding to workspace paths on disk
+2. **Lane A** — unresolved-duration ranking once inbox items carry `created_at`
+   (requires coordinator approval for shared contract)
+3. **Lane B + coordinator** — shell wiring for `/api/briefing` (explicit assignment only)
 
 Bad next slices:
 
@@ -816,7 +819,7 @@ Bad next slices:
 - expanding multiple semantic families at once
 - changing run-state and signal-state in one uncontrolled pass
 - skipping verification because “it is still early”
-- claiming “real terminal” or “file editor” when only DTO binding exists
+- claiming “file editor” when Monaco still shows DTO-derived documents only
 
 ## Final Guidance
 

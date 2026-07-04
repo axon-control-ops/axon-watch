@@ -109,8 +109,10 @@ Do not start these in parallel until coordinator opens the slice:
 
 - approval thin slice (`requires_approval`, approve/reject)
 - review-ready entry, completion, and resume-from-review
-- workspace list API and DTO-bound Monaco/xterm hosts
+- workspace list API and DTO-bound Monaco hosts
 - startup supervision reliability slice
+- backend PTY terminal attachment (WebSocket, workspace-scoped)
+- richer inbox ranking (status, action-type, workspace priority, recency)
 
 ## Assignment Rules
 
@@ -133,11 +135,6 @@ python3 -m unittest discover -s tests
 
 After the current thin slices (updated 2026-07-04):
 
-1. **Lane B** — backend PTY terminal session attachment (replace local xterm command loop)
-2. **Lane B** — file-backed editor binding (Monaco reads/writes workspace files on disk)
-3. **Lane A** — richer inbox ranking and parity beyond severity + recency
-4. **Lane B + coordinator** — briefing shell wiring (explicitly assigned only)
-
-**Naming discipline:** Do not describe DTO-bound Monaco/xterm hosts as “real terminal
-attachment” or “file-backed editor” — those terms are reserved for backend PTY
-and on-disk file I/O respectively.
+1. **Lane B** — file-backed editor binding (Monaco reads/writes workspace files on disk)
+2. **Lane A** — unresolved-duration ranking when inbox schema adds `created_at` (coordinator)
+3. **Lane B + coordinator** — briefing shell wiring (explicitly assigned only)

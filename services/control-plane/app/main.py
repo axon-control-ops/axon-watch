@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -25,6 +25,7 @@ from app.runs.service import (
     stop_run,
 )
 from app.runtime_summary import build_runtime_summary
+from app.terminal.session_handler import handle_terminal_session
 from app.workspace_catalog import get_workspace_record, list_workspace_records, WorkspaceNotFoundError
 
 
@@ -59,6 +60,11 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+@app.websocket("/api/workspaces/{workspace_id}/terminal")
+async def workspace_terminal(websocket: WebSocket, workspace_id: str) -> None:
+    await handle_terminal_session(websocket, workspace_id)
 
 
 @app.get("/api/health")
