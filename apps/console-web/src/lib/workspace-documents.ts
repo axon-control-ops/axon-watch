@@ -1,11 +1,24 @@
 import type { InboxItem, RunRecord, RuntimeSummary, WorkspaceRecord } from '../contracts/canonical';
 
+export type EditorDocumentLanguage =
+  | 'markdown'
+  | 'json'
+  | 'plaintext'
+  | 'typescript'
+  | 'javascript'
+  | 'python'
+  | 'shell';
+
 export interface WorkspaceDocumentDescriptor {
   id: string;
   title: string;
-  language: 'markdown' | 'json';
+  language: EditorDocumentLanguage;
   value: string;
   description: string;
+  source: 'dto' | 'file';
+  filePath?: string;
+  readOnly?: boolean;
+  dirty?: boolean;
 }
 
 interface BuildWorkspaceDocumentsInput {
@@ -51,6 +64,8 @@ export function buildWorkspaceDocuments({
       language: 'markdown',
       value: `${overview}\n`,
       description: 'Workspace-oriented summary assembled from canonical DTOs.',
+      source: 'dto',
+      readOnly: true,
     },
     {
       id: 'workspace-run-record',
@@ -58,6 +73,8 @@ export function buildWorkspaceDocuments({
       language: 'json',
       value: prettyJson(activeWorkspaceRun ?? { workspace_id: workspaceId, run: null }),
       description: 'The primary run record for the selected workspace.',
+      source: 'dto',
+      readOnly: true,
     },
     {
       id: 'workspace-runtime-summary',
@@ -65,6 +82,8 @@ export function buildWorkspaceDocuments({
       language: 'json',
       value: prettyJson(runtimeSummary ?? { runtime_summary: null }),
       description: 'The boot-safe runtime summary payload currently loaded in the shell.',
+      source: 'dto',
+      readOnly: true,
     },
     {
       id: 'workspace-top-signal',
@@ -72,6 +91,8 @@ export function buildWorkspaceDocuments({
       language: 'json',
       value: prettyJson(primaryInboxItem ?? { signal: null }),
       description: 'The current top-ranked inbox item visible to the shell.',
+      source: 'dto',
+      readOnly: true,
     },
   ];
 }

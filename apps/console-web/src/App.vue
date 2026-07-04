@@ -48,8 +48,8 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       </div>
 
       <p class="smoke-banner">
-        Smoke test: pick a <strong>workspace</strong> (left) → read the <strong>Workspace Overview</strong>
-        editor (center) → in the terminal below run <code>pwd</code> then <code>echo hello</code>.
+        Smoke test: open a <strong>file tab</strong> (README.md) → edit → <strong>Save</strong> → run
+        <code>pwd</code> / <code>echo hello</code> in the terminal below.
       </p>
     </header>
 
@@ -120,7 +120,10 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
           :key="document.id"
           type="button"
           class="tab-strip__tab"
-          :class="{ 'tab-strip__tab--active': shell.activeEditorDocumentId === document.id }"
+          :class="{
+            'tab-strip__tab--active': shell.activeEditorDocumentId === document.id,
+            'tab-strip__tab--file': document.source === 'file',
+          }"
           @click="shell.setActiveEditorDocument(document.id)"
         >
           {{ document.title }}
@@ -138,7 +141,13 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
             :value="shell.activeEditorDocument.value"
             :language="shell.activeEditorDocument.language"
             :description="shell.activeEditorDocument.description"
+            :read-only="shell.activeEditorDocument.readOnly"
+            :dirty="shell.activeEditorDocument.dirty"
+            @value-change="shell.updateActiveFileContent"
+            @save="shell.saveActiveFileDocument"
           />
+          <p v-if="shell.fileSaveError" class="region-copy">{{ shell.fileSaveError }}</p>
+          <p v-if="shell.workspaceFilesError" class="region-copy">{{ shell.workspaceFilesError }}</p>
         </section>
 
         <section

@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from tests.support.control_plane_db import isolate_control_plane_db
+
+CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
+sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+
+from app.main import app  # noqa: E402
+from app.persistence import run_store  # noqa: E402
+from app.workspace_files import read_workspace_file  # noqa: E402
+
+
+class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_control_plane_db(self, run_store)
+        self.workspace_tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workspace_tempdir.cleanup)
+        self.env_patch = patch.dict(
+            os.environ,
+            {"AXON_WATCH_WORKSPACE_ROOT": self.workspace_tempdir.name},
+            clear=False,
+        )
+        self.env_patch.start()
+        self.addCleanup(self.env_patch.stop)
+        self.client = TestClient(app)
+        self.addCleanup(self.client.close)
+
+    def test_list_workspace_files_bootstraps_readme_and_notes(self) -> None:
+        response = self.client.get("/api/workspaces/workspace_alpha/files")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        paths = {item["path"] for item in payload["items"]}
+        self.assertIn("README.md", paths)
+        self.assertIn("notes.txt", paths)
+
+    def test_read_and_write_workspace_file_round_trip(self) -> None:
+        write_response = self.client.put(
+            "/api/workspaces/workspace_alpha/files/notes.txt",
+            json={"content": "saved from test\n"},
+        )
+        self.assertEqual(200, write_response.status_code)
+        self.assertTrue(write_response.json()["saved"])
+
+        read_response = self.client.get("/api/workspaces/workspace_alpha/files/notes.txt")
+        self.assertEqual(200, read_response.status_code)
+        self.assertEqual("saved from test\n", read_response.json()["content"])
+
+    def test_read_rejects_path_traversal(self) -> None:
+        response = self.client.get("/api/workspaces/workspace_alpha/files/../secrets.txt")
+        self.assertEqual(404, response.status_code)
+
+    def test_read_workspace_file_reads_from_disk(self) -> None:
+        on_disk = Path(self.workspace_tempdir.name) / "workspace_alpha" / "README.md"
+        on_disk.parent.mkdir(parents=True, exist_ok=True)
+        on_disk.write_text("# hello from disk\n", encoding="utf-8")
+
+        payload = read_workspace_file("workspace_alpha", "README.md")
+        self.assertEqual("# hello from disk\n", payload["content"])
+
+
+if __name__ == "__main__":
+    unittest.main()

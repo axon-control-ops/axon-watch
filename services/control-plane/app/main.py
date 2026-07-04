@@ -27,6 +27,16 @@ from app.runs.service import (
 from app.runtime_summary import build_runtime_summary
 from app.terminal.session_handler import handle_terminal_session
 from app.workspace_catalog import get_workspace_record, list_workspace_records, WorkspaceNotFoundError
+from app.workspace_files import (
+    WorkspaceFileError,
+    list_workspace_files,
+    read_workspace_file,
+    write_workspace_file,
+)
+
+
+class WriteWorkspaceFileRequest(BaseModel):
+    content: str
 
 
 class CreateRunRequest(BaseModel):
@@ -57,7 +67,7 @@ app.add_middleware(
         "http://127.0.0.1:4173",
         "http://localhost:4173",
     ],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT"],
     allow_headers=["*"],
 )
 
@@ -119,6 +129,41 @@ def workspaces_show(workspace_id: str) -> dict[str, str]:
         return get_workspace_record(workspace_id)
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/workspaces/{workspace_id}/files")
+def workspace_files_index(workspace_id: str) -> dict[str, object]:
+    try:
+        items = list_workspace_files(workspace_id)
+        return {"workspace_id": workspace_id, "items": items, "count": len(items)}
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkspaceFileError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/workspaces/{workspace_id}/files/{file_path:path}")
+def workspace_files_show(workspace_id: str, file_path: str) -> dict[str, object]:
+    try:
+        return read_workspace_file(workspace_id, file_path)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkspaceFileError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.put("/api/workspaces/{workspace_id}/files/{file_path:path}")
+def workspace_files_update(
+    workspace_id: str,
+    file_path: str,
+    body: WriteWorkspaceFileRequest,
+) -> dict[str, object]:
+    try:
+        return write_workspace_file(workspace_id, file_path, body.content)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkspaceFileError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/runs")

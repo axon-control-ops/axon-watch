@@ -420,6 +420,35 @@ button {
   pointer-events: none;
 }
 
+.tab-strip__tab--file {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.surface-host__meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.surface-host__dirty {
+  color: #fbbf24;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.surface-host__save {
+  margin-left: auto;
+  border: 1px solid rgba(74, 222, 128, 0.45);
+  border-radius: 0.45rem;
+  padding: 0.25rem 0.65rem;
+  background: rgba(6, 78, 59, 0.55);
+  color: #ecfdf5;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
 .contract-row--dev {
   display: none;
 }

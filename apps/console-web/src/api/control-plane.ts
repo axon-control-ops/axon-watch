@@ -210,3 +210,85 @@ export async function rejectRun(runId: string): Promise<RunRecord> {
 
   return response.json() as Promise<RunRecord>;
 }
+
+export interface WorkspaceFileEntry {
+  path: string;
+  size_bytes: number;
+}
+
+export interface WorkspaceFileListSnapshot {
+  workspace_id: string;
+  items: WorkspaceFileEntry[];
+  count: number;
+}
+
+export interface WorkspaceFileContent {
+  workspace_id: string;
+  path: string;
+  content: string;
+  size_bytes: number;
+}
+
+export async function fetchWorkspaceFiles(workspaceId: string): Promise<WorkspaceFileListSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encoded = encodeURIComponent(workspaceId);
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encoded}/files`
+    : `/api/workspaces/${encoded}/files`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`workspace files request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<WorkspaceFileListSnapshot>;
+}
+
+export async function fetchWorkspaceFile(
+  workspaceId: string,
+  filePath: string,
+): Promise<WorkspaceFileContent> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspace = encodeURIComponent(workspaceId);
+  const encodedPath = filePath
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encodedWorkspace}/files/${encodedPath}`
+    : `/api/workspaces/${encodedWorkspace}/files/${encodedPath}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`workspace file read failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<WorkspaceFileContent>;
+}
+
+export async function saveWorkspaceFile(
+  workspaceId: string,
+  filePath: string,
+  content: string,
+): Promise<{ saved: boolean; path: string; size_bytes: number }> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspace = encodeURIComponent(workspaceId);
+  const encodedPath = filePath
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encodedWorkspace}/files/${encodedPath}`
+    : `/api/workspaces/${encodedWorkspace}/files/${encodedPath}`;
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`workspace file save failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<{ saved: boolean; path: string; size_bytes: number }>;
+}

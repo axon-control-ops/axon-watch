@@ -128,12 +128,12 @@ What is now real in the thin slice (verified 2026-07-04):
 - two watch-produced inbox signals with multi-factor ranking (severity, status,
   action-type, workspace priority, recency)
 - workspace list API and shell workspace selector (IDs only)
-- Monaco host bound to canonical DTO documents (not disk files)
+- Monaco host bound to canonical DTO documents and **workspace files on disk** (README.md, notes.txt)
 - backend PTY terminal attachment for the selected workspace (real shell I/O via WebSocket)
 
 What is **not** real yet despite similar-sounding names:
 
-- **File-backed editor** — Monaco shows generated overview/JSON from DTOs, not repo files
+- **Full file tree / nested paths** — thin slice lists top-level workspace files only
 - **KAIRO operator presence** — planned in axon-local docs only
 - **Full parity with axon-local** — intentional; see parity ledger for gaps
 

@@ -5,12 +5,16 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 export interface MonacoEditorOptions {
   value: string;
   language: string;
+  readOnly?: boolean;
+  onValueChange?: (value: string) => void;
 }
 
 export interface MonacoEditorController {
   dispose: () => void;
   setLanguage: (language: string) => void;
+  setReadOnly: (readOnly: boolean) => void;
   setValue: (value: string) => void;
+  getValue: () => string;
 }
 
 let monacoPromise: Promise<typeof Monaco> | null = null;
@@ -43,8 +47,15 @@ export async function createMonacoEditor(
     fontSize: 15,
     lineHeight: 22,
     scrollBeyondLastLine: false,
+    readOnly: options.readOnly ?? false,
     padding: { top: 12, bottom: 12 },
   });
+
+  if (options.onValueChange) {
+    editor.onDidChangeModelContent(() => {
+      options.onValueChange?.(model.getValue());
+    });
+  }
 
   return {
     dispose() {
@@ -54,8 +65,14 @@ export async function createMonacoEditor(
     setLanguage(language: string) {
       monaco.editor.setModelLanguage(model, language);
     },
+    setReadOnly(readOnly: boolean) {
+      editor.updateOptions({ readOnly });
+    },
     setValue(value: string) {
       model.setValue(value);
+    },
+    getValue() {
+      return model.getValue();
     },
   };
 }

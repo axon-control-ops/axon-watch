@@ -7,10 +7,13 @@ import {
   fetchInbox,
   fetchRuns,
   fetchRuntimeSummary,
+  fetchWorkspaceFile,
   fetchWorkspaces,
+  fetchWorkspaceFiles,
   markRunReviewReady,
   rejectRun,
   resumeRun,
+  saveWorkspaceFile,
   stopRun,
 } from '../api/control-plane';
 import type {
@@ -23,7 +26,12 @@ import type {
   WorkspaceRecord,
 } from '../contracts/canonical';
 import {
+  languageForFilePath,
+  workspaceFileDocumentId,
+} from '../lib/workspace-file-language';
+import {
   buildWorkspaceDocuments,
+  type EditorDocumentLanguage,
   type WorkspaceDocumentDescriptor,
 } from '../lib/workspace-documents';
 import {
@@ -36,6 +44,7 @@ export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type InboxLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type RunsLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type WorkspacesLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+export type WorkspaceFilesLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type RunMutationState =
   | 'idle'
   | 'stopping'
@@ -103,11 +112,18 @@ export const useShellStore = defineStore('shell', () => {
   const inboxError = ref<string | null>(null);
   const signalViews = ref<SignalView[]>([]);
   const threadMessages = ref<ThreadMessage[]>([]);
+  const workspaceFileEntries = ref<Array<{ path: string; size_bytes: number }>>([]);
+  const workspaceFilesLoadState = ref<WorkspaceFilesLoadState>('idle');
+  const workspaceFilesError = ref<string | null>(null);
+  const fileContents = ref<Record<string, string>>({});
+  const fileSavedContents = ref<Record<string, string>>({});
+  const fileSaveState = ref<'idle' | 'saving'>('idle');
+  const fileSaveError = ref<string | null>(null);
 
   // UI shell scaffolding is local and intentionally placeholder-only.
   const editorTabs = ref<EditorTabDescriptor[]>(DEFAULT_EDITOR_TABS);
   const activeEditorTabId = ref<string>(DEFAULT_EDITOR_TABS[0].id);
-  const activeEditorDocumentId = ref<string>('workspace-overview');
+  const activeEditorDocumentId = ref<string>('file:README.md');
   const terminalSessions = ref<TerminalSessionDescriptor[]>(DEFAULT_TERMINAL_SESSIONS);
   const activeTerminalSessionId = ref<string>(DEFAULT_TERMINAL_SESSIONS[0].id);
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
@@ -172,7 +188,7 @@ export const useShellStore = defineStore('shell', () => {
         primaryInboxItem.value
       : primaryInboxItem.value,
   );
-  const editorDocuments = computed<WorkspaceDocumentDescriptor[]>(() =>
+  const dtoDocuments = computed<WorkspaceDocumentDescriptor[]>(() =>
     buildWorkspaceDocuments({
       workspace: currentWorkspace.value,
       runs: workspaceRuns.value,
@@ -180,6 +196,27 @@ export const useShellStore = defineStore('shell', () => {
       primaryInboxItem: workspacePrimarySignal.value,
     }),
   );
+  const fileDocuments = computed<WorkspaceDocumentDescriptor[]>(() =>
+    workspaceFileEntries.value.map((entry) => {
+      const content = fileContents.value[entry.path] ?? '';
+      const saved = fileSavedContents.value[entry.path];
+      return {
+        id: workspaceFileDocumentId(entry.path),
+        title: entry.path,
+        language: languageForFilePath(entry.path) as EditorDocumentLanguage,
+        value: content,
+        description: `Workspace file on disk (${entry.size_bytes} bytes). Editable — use Save.`,
+        source: 'file',
+        filePath: entry.path,
+        readOnly: false,
+        dirty: saved !== undefined && saved !== content,
+      };
+    }),
+  );
+  const editorDocuments = computed<WorkspaceDocumentDescriptor[]>(() => [
+    ...fileDocuments.value,
+    ...dtoDocuments.value,
+  ]);
   const activeEditorDocument = computed(
     () =>
       editorDocuments.value.find((document) => document.id === activeEditorDocumentId.value) ??
@@ -266,6 +303,84 @@ export const useShellStore = defineStore('shell', () => {
 
   function setCurrentWorkspace(workspaceId: string): void {
     syncCurrentWorkspace(workspaceId);
+    void loadWorkspaceFiles();
+  }
+
+  async function loadWorkspaceFiles(): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      workspaceFileEntries.value = [];
+      fileContents.value = {};
+      fileSavedContents.value = {};
+      workspaceFilesLoadState.value = 'idle';
+      return;
+    }
+
+    workspaceFilesLoadState.value = 'loading';
+    workspaceFilesError.value = null;
+
+    try {
+      const snapshot = await fetchWorkspaceFiles(workspaceId);
+      workspaceFileEntries.value = snapshot.items;
+      const nextContents: Record<string, string> = {};
+      const nextSaved: Record<string, string> = {};
+
+      for (const entry of snapshot.items) {
+        const payload = await fetchWorkspaceFile(workspaceId, entry.path);
+        nextContents[entry.path] = payload.content;
+        nextSaved[entry.path] = payload.content;
+      }
+
+      fileContents.value = nextContents;
+      fileSavedContents.value = nextSaved;
+      workspaceFilesLoadState.value = 'loaded';
+
+      const preferredPath =
+        snapshot.items.find((entry) => entry.path === 'README.md')?.path ?? snapshot.items[0]?.path;
+      if (preferredPath) {
+        activeEditorDocumentId.value = workspaceFileDocumentId(preferredPath);
+      }
+    } catch (error) {
+      workspaceFilesLoadState.value = 'error';
+      workspaceFilesError.value =
+        error instanceof Error ? error.message : 'workspace files request failed';
+    }
+  }
+
+  function updateActiveFileContent(value: string): void {
+    const document = activeEditorDocument.value;
+    if (document?.source !== 'file' || !document.filePath) {
+      return;
+    }
+
+    fileContents.value = {
+      ...fileContents.value,
+      [document.filePath]: value,
+    };
+  }
+
+  async function saveActiveFileDocument(): Promise<void> {
+    const document = activeEditorDocument.value;
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (document?.source !== 'file' || !document.filePath || !workspaceId) {
+      return;
+    }
+
+    fileSaveState.value = 'saving';
+    fileSaveError.value = null;
+
+    try {
+      const content = fileContents.value[document.filePath] ?? '';
+      await saveWorkspaceFile(workspaceId, document.filePath, content);
+      fileSavedContents.value = {
+        ...fileSavedContents.value,
+        [document.filePath]: content,
+      };
+    } catch (error) {
+      fileSaveError.value = error instanceof Error ? error.message : 'workspace file save failed';
+    } finally {
+      fileSaveState.value = 'idle';
+    }
   }
 
   async function loadWorkspaces(): Promise<void> {
@@ -451,6 +566,7 @@ export const useShellStore = defineStore('shell', () => {
 
   async function loadBootstrapData(): Promise<void> {
     await Promise.all([loadRuntimeSummary(), loadInbox(), loadWorkspaces(), loadRuns()]);
+    await loadWorkspaceFiles();
   }
 
   return {
@@ -510,10 +626,18 @@ export const useShellStore = defineStore('shell', () => {
     terminalSessions,
     threadMessages,
     threadStateLabel,
-    workspaces,
+    fileSaveError,
+    fileSaveState,
+    loadWorkspaceFiles,
+    saveActiveFileDocument,
+    updateActiveFileContent,
+    workspaceFileEntries,
+    workspaceFilesError,
+    workspaceFilesLoadState,
     workspacesError,
     workspacesLoadState,
     workspacePrimarySignal,
     workspaceStateLabel,
+    workspaces,
   };
 });
