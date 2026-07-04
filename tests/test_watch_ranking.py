@@ -17,9 +17,15 @@ def _load_ranking_module():
         del sys.modules[name]
 
     sys.path.insert(0, str(WATCH_ROOT))
-    from app.signals.ranking import rank_inbox_items, severity_rank  # noqa: WPS433
+    from app.signals.ranking import (
+    action_type_rank,
+    rank_inbox_items,
+    severity_rank,
+    status_rank,
+    workspace_priority_rank,
+)  # noqa: WPS433
 
-    return rank_inbox_items, severity_rank, cached
+    return rank_inbox_items, severity_rank, status_rank, action_type_rank, workspace_priority_rank, cached
 
 
 def _restore_modules(cached: dict[str, object]) -> None:
@@ -31,7 +37,14 @@ def _restore_modules(cached: dict[str, object]) -> None:
 
 class WatchRankingTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.rank_inbox_items, self.severity_rank, self._cached_modules = _load_ranking_module()
+        (
+            self.rank_inbox_items,
+            self.severity_rank,
+            self.status_rank,
+            self.action_type_rank,
+            self.workspace_priority_rank,
+            self._cached_modules,
+        ) = _load_ranking_module()
 
     def tearDown(self) -> None:
         _restore_modules(self._cached_modules)
@@ -70,6 +83,81 @@ class WatchRankingTests(unittest.TestCase):
         ranked = self.rank_inbox_items([info_newer, high_older])
         self.assertEqual("signal_high_older", ranked[0]["signal_id"])
         self.assertEqual("signal_info_newer", ranked[1]["signal_id"])
+
+    def test_status_rank_prefers_open_over_resolved(self) -> None:
+        self.assertLess(self.status_rank("open"), self.status_rank("resolved"))
+
+    def test_action_type_rank_prefers_approvals_over_dashboard(self) -> None:
+        self.assertLess(self.action_type_rank("open_approvals"), self.action_type_rank("open_dashboard"))
+
+    def test_workspace_priority_rank_prefers_configured_workspace(self) -> None:
+        self.assertLess(
+            self.workspace_priority_rank("workspace_bootstrap"),
+            self.workspace_priority_rank("workspace_unknown"),
+        )
+
+    def test_rank_inbox_items_prefers_open_status_over_resolved_at_same_severity(self) -> None:
+        resolved = {
+            "signal_id": "signal_resolved",
+            "severity": "warning",
+            "status": "resolved",
+            "updated_at": "2026-07-03T16:00:00Z",
+            "action_type": "open_dashboard",
+            "workspace_id": "workspace_alpha",
+        }
+        open_item = {
+            "signal_id": "signal_open",
+            "severity": "warning",
+            "status": "open",
+            "updated_at": "2026-07-03T15:00:00Z",
+            "action_type": "open_dashboard",
+            "workspace_id": "workspace_alpha",
+        }
+
+        ranked = self.rank_inbox_items([resolved, open_item])
+        self.assertEqual("signal_open", ranked[0]["signal_id"])
+
+    def test_rank_inbox_items_prefers_actionable_type_at_same_severity_and_status(self) -> None:
+        passive = {
+            "signal_id": "signal_passive",
+            "severity": "warning",
+            "status": "open",
+            "updated_at": "2026-07-03T16:00:00Z",
+            "action_type": "none",
+            "workspace_id": "workspace_alpha",
+        }
+        actionable = {
+            "signal_id": "signal_actionable",
+            "severity": "warning",
+            "status": "open",
+            "updated_at": "2026-07-03T15:00:00Z",
+            "action_type": "open_approvals",
+            "workspace_id": "workspace_alpha",
+        }
+
+        ranked = self.rank_inbox_items([passive, actionable])
+        self.assertEqual("signal_actionable", ranked[0]["signal_id"])
+
+    def test_rank_inbox_items_prefers_higher_priority_workspace_when_other_keys_match(self) -> None:
+        lower_priority = {
+            "signal_id": "signal_other_workspace",
+            "severity": "warning",
+            "status": "open",
+            "updated_at": "2026-07-03T16:00:00Z",
+            "action_type": "open_dashboard",
+            "workspace_id": "workspace_other",
+        }
+        higher_priority = {
+            "signal_id": "signal_bootstrap_workspace",
+            "severity": "warning",
+            "status": "open",
+            "updated_at": "2026-07-03T15:00:00Z",
+            "action_type": "open_dashboard",
+            "workspace_id": "workspace_bootstrap",
+        }
+
+        ranked = self.rank_inbox_items([lower_priority, higher_priority])
+        self.assertEqual("signal_bootstrap_workspace", ranked[0]["signal_id"])
 
 
 if __name__ == "__main__":
