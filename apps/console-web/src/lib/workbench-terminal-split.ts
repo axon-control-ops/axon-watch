@@ -1,4 +1,5 @@
 export const WORKBENCH_TERMINAL_HEIGHT_KEY = 'axon-x-workbench-terminal-height-v3';
+export const WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY = 'axon-x-workbench-terminal-panel-visible-v1';
 export const DEFAULT_WORKBENCH_TERMINAL_HEIGHT = 240;
 export const DEFAULT_WORKBENCH_TERMINAL_HEIGHT_RATIO = 0.26;
 export const MAX_DEFAULT_WORKBENCH_TERMINAL_HEIGHT = 280;
@@ -46,4 +47,17 @@ export function readStoredWorkbenchTerminalHeight(): number | null {
 
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function readStoredWorkbenchTerminalPanelVisible(): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  const raw = window.sessionStorage.getItem(WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY);
+  if (raw === '0' || raw === 'false') {
+    return false;
+  }
+
+  return true;
 }

@@ -950,6 +950,10 @@ body:has(.console-shell--mockup) {
   cursor: pointer;
 }
 
+.console-shell--mockup .region-center-workbench.center-workbench--ide-terminal-collapsed {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .center-workbench--mockup {
   min-height: 0;
   overflow: hidden;
@@ -1697,7 +1701,8 @@ body:has(.console-shell--mockup) {
 
 .editor-statusbar--mockup {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: 1rem;
   margin-top: auto;
   padding: 0.2rem 0.75rem;
@@ -1707,6 +1712,33 @@ body:has(.console-shell--mockup) {
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.03em;
+}
+
+.editor-statusbar__meta {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-left: auto;
+}
+
+.editor-statusbar__panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.06);
+  color: rgba(0, 242, 255, 0.88);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.editor-statusbar__panel-toggle:hover {
+  border-color: rgba(0, 242, 255, 0.42);
+  background: rgba(0, 242, 255, 0.1);
 }
 
 .surface-host--mockup {

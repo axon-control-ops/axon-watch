@@ -5,6 +5,7 @@ import {
   DEFAULT_WORKBENCH_TERMINAL_HEIGHT,
   MAX_DEFAULT_WORKBENCH_TERMINAL_HEIGHT,
   MIN_WORKBENCH_TERMINAL_HEIGHT,
+  readStoredWorkbenchTerminalPanelVisible,
   resolveDefaultWorkbenchTerminalHeight,
 } from './workbench-terminal-split';
 
@@ -23,5 +24,9 @@ describe('workbench terminal split', () => {
     expect(resolveDefaultWorkbenchTerminalHeight(0)).toBe(240);
     expect(resolveDefaultWorkbenchTerminalHeight(900)).toBe(240);
     expect(resolveDefaultWorkbenchTerminalHeight(1200)).toBe(MAX_DEFAULT_WORKBENCH_TERMINAL_HEIGHT);
+  });
+
+  it('defaults terminal panel visibility to open outside the browser', () => {
+    expect(readStoredWorkbenchTerminalPanelVisible()).toBe(true);
   });
 });

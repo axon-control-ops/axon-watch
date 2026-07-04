@@ -7,8 +7,10 @@ import TerminalHost from '../TerminalHost.vue';
 import {
   clampWorkbenchTerminalHeight,
   readStoredWorkbenchTerminalHeight,
+  readStoredWorkbenchTerminalPanelVisible,
   resolveDefaultWorkbenchTerminalHeight,
   WORKBENCH_TERMINAL_HEIGHT_KEY,
+  WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY,
 } from '../../lib/workbench-terminal-split';
 import {
   computeHeroDockHeight,
@@ -19,6 +21,12 @@ import {
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
+const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
+const isIdeMode = computed(() => shell.layoutMode === 'ide');
+const terminalPanelVisible = ref(true);
+const showTerminalDock = computed(
+  () => !isIdeMode.value || terminalPanelVisible.value,
+);
 const bottomTab = ref<'terminal' | 'problems' | 'output' | 'logs'>('terminal');
 const workbenchRef = ref<HTMLElement | null>(null);
 const terminalHostRef = ref<InstanceType<typeof TerminalHost> | null>(null);
@@ -65,6 +73,32 @@ function syncTerminalHeightToContainer(): void {
 function persistTerminalHeight(): void {
   terminalHeightCustomized.value = true;
   sessionStorage.setItem(WORKBENCH_TERMINAL_HEIGHT_KEY, String(terminalHeight.value));
+}
+
+function persistTerminalPanelVisible(visible: boolean): void {
+  sessionStorage.setItem(WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY, visible ? '1' : '0');
+}
+
+function hideTerminalPanel(): void {
+  if (!isIdeMode.value || !terminalPanelVisible.value) {
+    return;
+  }
+
+  terminalPanelVisible.value = false;
+  persistTerminalPanelVisible(false);
+  requestAnimationFrame(() => runLayoutSync('resize'));
+}
+
+function showTerminalPanel(): void {
+  if (!isIdeMode.value || terminalPanelVisible.value) {
+    return;
+  }
+
+  terminalPanelVisible.value = true;
+  bottomTab.value = 'terminal';
+  persistTerminalPanelVisible(true);
+  syncTerminalHeightToContainer();
+  requestAnimationFrame(() => runLayoutSync('resize'));
 }
 
 function clearTerminalPanel(): void {
@@ -175,6 +209,8 @@ onMounted(() => {
     terminalHeightCustomized.value = true;
   }
 
+  terminalPanelVisible.value = readStoredWorkbenchTerminalPanelVisible();
+
   syncTerminalHeightToContainer();
   runLayoutSync('mount');
   requestAnimationFrame(() => runLayoutSync('mount'));
@@ -198,6 +234,7 @@ onBeforeUnmount(() => {
 watch(
   () => shell.layoutMode,
   () => {
+    syncTerminalHeightToContainer();
     runLayoutSync('resize');
   },
 );
@@ -207,9 +244,15 @@ watch(
   <main
     ref="workbenchRef"
     class="region region-center-workbench center-workbench center-workbench--mockup"
-    :class="{ 'center-workbench--resizing': resizing }"
+    :class="{
+      'center-workbench--resizing': resizing,
+      'center-workbench--ide-terminal-collapsed': isIdeMode && !terminalPanelVisible,
+    }"
   >
-    <section class="center-workbench__editor-stack center-workbench__editor-stack--surface">
+    <section
+      v-if="!hideOperatorEditor"
+      class="center-workbench__editor-stack center-workbench__editor-stack--surface"
+    >
       <div class="editor-tabbar editor-tabbar--mockup">
         <div class="editor-tabbar__tabs">
           <button
@@ -273,16 +316,29 @@ watch(
           @save="shell.saveActiveFileDocument"
         />
         <div class="editor-statusbar editor-statusbar--mockup">
-          <span>Ln 11, Col 22</span>
-          <span>Spaces: 2</span>
-          <span>UTF-8</span>
-          <span>LF</span>
-          <span>Markdown</span>
+          <button
+            v-if="isIdeMode && !terminalPanelVisible"
+            type="button"
+            class="editor-statusbar__panel-toggle"
+            title="Show terminal panel"
+            aria-label="Show terminal panel"
+            @click="showTerminalPanel"
+          >
+            TERMINAL
+          </button>
+          <div class="editor-statusbar__meta">
+            <span>Ln 11, Col 22</span>
+            <span>Spaces: 2</span>
+            <span>UTF-8</span>
+            <span>LF</span>
+            <span>Markdown</span>
+          </div>
         </div>
       </section>
     </section>
 
     <div
+      v-if="showTerminalDock"
       class="center-workbench__bottom-dock center-workbench__bottom-dock--surface"
       :style="{ height: `${terminalHeight}px` }"
     >
@@ -339,7 +395,14 @@ watch(
             >
               <WorkbenchIcon name="trash" class="terminal-tabbar__action" />
             </button>
-            <button type="button" class="terminal-tabbar__action-button" title="Close terminal" aria-label="Close terminal">
+            <button
+              v-if="isIdeMode"
+              type="button"
+              class="terminal-tabbar__action-button"
+              title="Close terminal panel"
+              aria-label="Close terminal panel"
+              @click="hideTerminalPanel"
+            >
               <WorkbenchIcon name="close" class="terminal-tabbar__action" />
             </button>
           </div>

@@ -103,6 +103,20 @@ Workspace catalog currently filters to mockup workspace IDs for presentation par
 
 ## Center Workbench (locked)
 
+Shared region; **content differs by layout mode** (ADR-007).
+
+### Operator mode (ADR-007 — phase 1)
+
+1. **Editor stack hidden** — no tab bar, toolbar, breadcrumb, Monaco, or inline editor status.
+2. **Upper workbench void (ADR-007 — unfilled)** — intentional empty region above the terminal
+   dock until a follow-up slice chooses content (status panel, preview strip, terminal
+   promotion, etc.). Not a layout bug.
+3. **Terminal dock unchanged** — same bottom resizable panel as IDE (`TERMINAL | PROBLEMS | OUTPUT | LOGS`, session-persisted height, resize handle). No close affordance in Operator.
+
+Terminal-first center promotion remains a **future ADR-007 follow-up**, not current behavior.
+
+### IDE mode
+
 Top → bottom inside one region:
 
 1. **Editor stack**
@@ -111,10 +125,12 @@ Top → bottom inside one region:
    - workspace/file breadcrumb
    - Monaco editor (`EditorHost`)
    - inline editor status strip
-2. **Bottom dock** (resizable height, session-persisted)
+2. **Bottom dock** (resizable height, session-persisted; collapsible in IDE)
    - tab bar: `TERMINAL | PROBLEMS | OUTPUT | LOGS`
    - workspace connection label
    - `TerminalHost` (xterm + backend PTY) when Terminal tab active
+   - **Close panel** (IDE only) hides the dock so the editor fills the workbench; **Show terminal**
+     affordance in the editor status bar restores the dock with the last session height
 
 Terminal dock height syncs to KAIRO briefing seam via `--briefing-dock-height` (see right dock).
 
@@ -149,7 +165,7 @@ Footer KAIRO CTA (ADR-006): when briefing attention is active and hero mode is
 **Command**, a glowing **OPEN KAIRO BRIEFING** button renders in the status bar
 **right column** (aligned under the hero), calling `focusKairoBriefing()`.
 
-### IDE mode (ADR-004)
+### IDE mode (ADR-004 + center dock collapse)
 
 Structure:
 
@@ -163,6 +179,10 @@ dock-stack
 └── DOCK HERO (bottom-anchored, fixed height)
     └── Command ↔ KAIRO toggle (`DockHeroPanel`)
 ```
+
+Center workbench (IDE only): bottom terminal panel may be **closed** via tab-bar action;
+editor fills the workbench until the status-bar **TERMINAL** chip restores the panel.
+Right dock stack is unchanged when the center panel is collapsed.
 
 Seam order is **identical in IDE mode**. The bottom hero stays
 **anchored at the bottom** of the dock; the upper seams scroll above it.

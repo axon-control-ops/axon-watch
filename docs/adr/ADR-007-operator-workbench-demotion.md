@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -21,19 +21,26 @@ precedent for mode-specific region contents without changing the grid.
 
 ## Decision
 
-**In Operator mode, demote the center editor stack; make the workbench
-terminal-first with optional read-only file context.**
+**In Operator mode, demote the center editor stack.** Terminal-first center and upper
+workbench content are phased; phase 1 ships editor removal only.
 
 Locked Operator center workbench target:
 
 1. **Hide** Monaco editor stack by default in Operator mode (tab bar, breadcrumb,
-   editor host, inline editor status strip).
-2. **Promote** the bottom terminal dock to primary center surface (existing
-   resizable terminal panel remains).
-3. **Optional thin slice (follow-up within ADR-007):** read-only file preview
+   editor host, inline editor status strip) — **shipped (phase 1)**.
+2. **Upper workbench void (known gap)** — hiding the editor leaves an empty region
+   above the unchanged bottom terminal dock. This void is **intentionally unfilled**
+   until operator review picks the next surface (status/radar, read-only preview,
+   terminal promotion, or other control-plane panel). Do not backfill with Monaco or
+   IDE explorer semantics without revisiting this ADR.
+3. **Promote** the bottom terminal dock to primary center surface — **deferred**; terminal
+   dock stays bottom-resizable until upper workbench content is decided.
+4. **Optional thin slice (follow-up within ADR-007):** read-only file preview
    strip or collapsed editor affordance for situational context — not a full IDE
    editor unless operator explicitly expands to IDE mode.
-4. **IDE mode unchanged** — full editor stack + explorer + existing right dock.
+5. **IDE mode** — full editor stack + explorer + existing right dock; bottom terminal
+   panel is **collapsible** (close restores full editor; status-bar **TERMINAL** chip
+   resurfaces the dock).
 
 Grid geometry, column proportions, and region map remain ADR-004.
 
@@ -51,17 +58,17 @@ Grid geometry, column proportions, and region map remain ADR-004.
   model (Operator = orchestrate, IDE = edit).
 - **Gain:** Conversation and Command hero retain relative prominence without
   shrinking the right dock further.
-- **Cost:** Quick file edits in Operator require IDE toggle or future preview slice.
+- **Cost:** Phase 1 leaves a visible **upper workbench void** in Operator mode until
+  a follow-up slice fills it (see item 2 above).
 - **Cost:** Requires careful height sync so terminal + column layout still align
   with left sidebar and right dock.
 
 ## Consequences
 
-- `CenterWorkbench.vue` branches on `layoutMode === 'operator'`.
-- `UI_LAYOUT_LOCK.md` amends center workbench section for Operator vs IDE.
-- Verification: `npm run verify` + manual smoke on workspace switch, terminal PTY,
-  and layout column height sync after editor removal.
-- Implementation blocked until this ADR moves to **Accepted** after operator sign-off.
+- `CenterWorkbench.vue` hides the editor stack when `layoutMode === 'operator'`.
+- Operator upper workbench void is documented and **must be filled** in a follow-up slice.
+- Terminal dock behavior is unchanged in Operator; IDE adds collapsible bottom panel.
+- `UI_LAYOUT_LOCK.md` amends center workbench and IDE dock sections for Operator vs IDE.
 
 ## Reevaluation Triggers
 
@@ -74,6 +81,7 @@ Reopen if:
 ## Notes
 
 - Does not change ADR-005 sidebar attention or ADR-006 hero/footer contracts.
+- **Operator void:** the empty region above the terminal in Operator mode is not a bug;
+  it is reserved pending operator choice of the next center surface.
 - Frozen planning reference: `axon-local/Plans/Axon-Watch/UI_SPEC.md` Operator
   vs IDE intent.
-- Move to **Accepted** when the thin slice lands and manual acceptance passes.
