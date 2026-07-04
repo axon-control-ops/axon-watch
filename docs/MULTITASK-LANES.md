@@ -127,6 +127,7 @@ Work landed on `dev` (verified 2026-07-04):
 | C2 | C (+ B) | Bounded command executor | `command_executor.py` |
 | C3 | C (+ B) | Briefing **Notice/Advise** projection | `operator_briefing_rhythm.py` |
 | C4 | C (+ B) | Attention sidebar **approve/reject** wired to run API | `AttentionStackPanel.vue` |
+| C5 | C (+ B) | Command executor **git status** + **resume from review** | `command_executor.py`, chat orchestration |
 | B3 | B | Compact operator responsive CSS | `mockup-shell.css` `@media` |
 | ADR-005 | B | Operator sidebar **Attention** toggle | `LeftSidebar`, `AttentionStackPanel` |
 | ADR-006 | B | Command hero autosize + footer KAIRO CTA | `CommandSeamPanel`, `StatusBar` |
@@ -141,7 +142,7 @@ One slice per pass; run the verification gate before the next item.
 |---|---|---|---|---|
 | **1** | **TEST-0** | All | Manual acceptance on `workspace_smoke`: Command executor, KAIRO Notice/Advise, Attention sidebar, status/radar panel, compact layout | **Ready** |
 | 2 | C4 | C (+ B) | Wire **approve/reject** actions from Attention sidebar to existing API | **Done** — `AttentionStackPanel` APPROVE/REJECT → `/api/runs/{id}/approve|reject` |
-| 3 | C5 | C | Expand command executor (`git status`, resume-from-review command) | Ready |
+| 3 | C5 | C (+ B) | Expand command executor (`git status`, resume-from-review command) | **Done** — `git status` + `resume from review` via chat orchestration |
 | 4 | D2 | D | Capture `shell_boot_readiness` + latency timing evidence | Ready (PENDING in verify) |
 | 5 | ADR-007 p3 | B | Terminal promotion OR read-only preview strip (deferred follow-up) | Ready after TEST-0 |
 
@@ -174,6 +175,7 @@ One slice per pass; run the verification gate before the next item.
 - workspace-scoped chat thread rehydration
 - **chat command dispatch** attach vs new run
 - **bounded command executor (C2)** — health/list/read + execution receipts
+- **command executor (C5)** — `git status` in workspace root; `resume from review` resumes primary `review_ready` run
 - **briefing Notice/Advise (C3)** — canonical rhythm strings
 - **SSE live refresh (UX-4)**
 - **verify evidence tooling (D1)**

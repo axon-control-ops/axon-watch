@@ -5,14 +5,22 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 from dataclasses import dataclass
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from app.runs.service import RunLifecycleError, list_pending_review_runs, resume_run
+from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_files import WorkspaceFileError, list_workspace_files, read_workspace_file
 
 MAX_OUTPUT_CHARS = 1500
 _READ_PREFIX = re.compile(r"^(?:read|cat)\s+(.+)$", re.IGNORECASE)
+_GIT_STATUS_PREFIX = re.compile(r"^git\s+status\b", re.IGNORECASE)
+_RESUME_FROM_REVIEW = re.compile(
+    r"^(?:resume(?:\s+from)?(?:\s+review|\s+review-ready)|resume-from-review)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -21,6 +29,7 @@ class CommandExecutionResult:
     success: bool
     output: str
     receipt_summary: str
+    run_id: str | None = None
 
 
 def classify_command(content: str) -> str:
@@ -34,6 +43,14 @@ def classify_command(content: str) -> str:
         return "list_files"
     if _READ_PREFIX.match(content.strip()) or "readme" in lowered:
         return "read_file"
+    if _GIT_STATUS_PREFIX.match(content.strip()) or lowered == "git status":
+        return "git_status"
+    if _RESUME_FROM_REVIEW.match(content.strip()) or lowered in {
+        "resume from review",
+        "resume review",
+        "resume-from-review",
+    }:
+        return "resume_from_review"
     return "unsupported"
 
 
@@ -125,12 +142,101 @@ def execute_read_file(workspace_id: str, content: str) -> CommandExecutionResult
         )
 
 
+def execute_git_status(workspace_id: str) -> CommandExecutionResult:
+    try:
+        root = resolve_workspace_root(workspace_id)
+        completed = subprocess.run(
+            ["git", "status", "--short", "--branch"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        combined = "\n".join(
+            part.strip()
+            for part in (completed.stdout, completed.stderr)
+            if part.strip()
+        )
+        output = combined or "(no output)"
+        success = completed.returncode == 0
+        return CommandExecutionResult(
+            intent="git_status",
+            success=success,
+            output=_truncate_output(output),
+            receipt_summary="Git status succeeded" if success else "Git status failed",
+        )
+    except FileNotFoundError:
+        return CommandExecutionResult(
+            intent="git_status",
+            success=False,
+            output=_truncate_output("git executable not found on PATH"),
+            receipt_summary="Git status failed",
+        )
+    except (WorkspaceRootError, OSError, subprocess.TimeoutExpired) as exc:
+        return CommandExecutionResult(
+            intent="git_status",
+            success=False,
+            output=_truncate_output(str(exc)),
+            receipt_summary="Git status failed",
+        )
+
+
+def _primary_review_ready_run(workspace_id: str) -> dict[str, object] | None:
+    review_runs = [
+        record
+        for record in list_pending_review_runs()
+        if record.get("workspace_id") == workspace_id
+    ]
+    if not review_runs:
+        return None
+    return review_runs[-1]
+
+
+def execute_resume_from_review(workspace_id: str) -> CommandExecutionResult:
+    target = _primary_review_ready_run(workspace_id)
+    if target is None:
+        return CommandExecutionResult(
+            intent="resume_from_review",
+            success=False,
+            output=_truncate_output(
+                f"No review_ready run found for workspace {workspace_id}."
+            ),
+            receipt_summary="Resume from review failed",
+        )
+
+    run_id = str(target["run_id"])
+    try:
+        resumed = resume_run(run_id)
+    except RunLifecycleError as exc:
+        return CommandExecutionResult(
+            intent="resume_from_review",
+            success=False,
+            output=_truncate_output(str(exc)),
+            receipt_summary="Resume from review failed",
+            run_id=run_id,
+        )
+
+    return CommandExecutionResult(
+        intent="resume_from_review",
+        success=True,
+        output=_truncate_output(
+            f"Resumed {run_id} from review_ready to {resumed['phase']}.\n"
+            f"{resumed.get('current_step') or 'Run resumed for follow-up work'}"
+        ),
+        receipt_summary=f"Resumed run {run_id} from review_ready",
+        run_id=run_id,
+    )
+
+
 def execute_unsupported(content: str) -> CommandExecutionResult:
     hints = (
         "Supported commands in this slice:\n"
         "• health / api/health — probe control-plane health\n"
         "• ls / list files — list workspace files\n"
-        "• read README.md / cat notes.txt — read a workspace file"
+        "• read README.md / cat notes.txt — read a workspace file\n"
+        "• git status — show git status in the workspace root\n"
+        "• resume from review — resume the primary review_ready run"
     )
     return CommandExecutionResult(
         intent="unsupported",
@@ -148,4 +254,8 @@ def execute_command(*, workspace_id: str, content: str) -> CommandExecutionResul
         return execute_list_files(workspace_id)
     if intent == "read_file":
         return execute_read_file(workspace_id, content)
+    if intent == "git_status":
+        return execute_git_status(workspace_id)
+    if intent == "resume_from_review":
+        return execute_resume_from_review(workspace_id)
     return execute_unsupported(content)

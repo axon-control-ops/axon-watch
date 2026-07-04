@@ -5,8 +5,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from app.chat.command_executor import classify_command
 from app.chat.dispatch import build_command_dispatch_ack, resolve_command_dispatch
-from app.chat.orchestration import build_agent_command_reply, orchestrate_command_run
+from app.chat.orchestration import (
+    build_agent_command_reply,
+    orchestrate_command_run,
+    orchestrate_resume_from_review,
+)
 from app.persistence import chat_store
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
 
@@ -43,17 +48,23 @@ def post_chat_message(
 
     _validate_workspace(workspace_id)
     created_at = _utc_now()
-    dispatch_run_id, run_record, dispatched = resolve_command_dispatch(
-        workspace_id=workspace_id,
-        content=trimmed,
-        run_id=run_id,
-    )
-    run_record, execution = orchestrate_command_run(
-        workspace_id=workspace_id,
-        content=trimmed,
-        run_record=run_record,
-        dispatched=dispatched,
-    )
+    intent = classify_command(trimmed)
+    if intent == "resume_from_review":
+        run_record, execution = orchestrate_resume_from_review(workspace_id=workspace_id)
+        dispatch_run_id = str(run_record["run_id"])
+        dispatched = False
+    else:
+        dispatch_run_id, run_record, dispatched = resolve_command_dispatch(
+            workspace_id=workspace_id,
+            content=trimmed,
+            run_id=run_id,
+        )
+        run_record, execution = orchestrate_command_run(
+            workspace_id=workspace_id,
+            content=trimmed,
+            run_record=run_record,
+            dispatched=dispatched,
+        )
     ack_content = build_command_dispatch_ack(
         run_id=dispatch_run_id,
         phase=str(run_record["phase"]),

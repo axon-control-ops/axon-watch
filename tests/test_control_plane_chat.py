@@ -70,6 +70,33 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertIn("command_execution", receipt_types)
         self.assertIn("review_ready", receipt_types)
 
+    def test_post_chat_message_resume_from_review_resumes_existing_run(self) -> None:
+        created = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "Awaiting follow-up",
+            },
+        ).json()
+        self.client.post(f"/api/runs/{created['run_id']}/review-ready")
+
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "content": "resume from review",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["dispatched"])
+        self.assertEqual(created["run_id"], payload["run_id"])
+        self.assertEqual("executing", payload["run"]["phase"])
+        self.assertIn("resume_from_review", payload["messages"][2]["content"])
+        self.assertIn("linked to run", payload["messages"][1]["content"])
+
     def test_post_chat_message_appends_to_existing_thread(self) -> None:
         first = self.client.post(
             "/api/chat/messages",

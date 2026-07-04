@@ -56,6 +56,23 @@ class ChatOrchestrationTests(unittest.TestCase):
         self.assertIs(result_record, record)
         self.assertIsNone(execution)
 
+    def test_build_agent_reply_for_resume_from_review_omits_review_prompt(self) -> None:
+        execution = CommandExecutionResult(
+            intent="resume_from_review",
+            success=True,
+            output="Resumed run_test from review_ready to executing.",
+            receipt_summary="Resumed run run_test from review_ready",
+            run_id="run_test",
+        )
+        content = build_agent_command_reply(
+            content="resume from review",
+            run_record={"run_id": "run_test", "phase": "executing", "summary": "Follow-up"},
+            dispatched=False,
+            execution=execution,
+        )
+        self.assertIn("resume_from_review", content)
+        self.assertNotIn("Review when ready.", content)
+
 
 if __name__ == "__main__":
     unittest.main()
