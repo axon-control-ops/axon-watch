@@ -2625,6 +2625,17 @@ body:has(.console-shell--mockup) {
   white-space: pre-wrap;
 }
 
+.conversation-seam__content--agent {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  background: rgba(4, 18, 28, 0.55);
+  border: 1px solid rgba(0, 242, 255, 0.12);
+  border-radius: 2px;
+  padding: 0.45rem 0.55rem;
+  overflow-x: auto;
+}
+
 .command-seam {
   display: flex;
   flex-direction: column;

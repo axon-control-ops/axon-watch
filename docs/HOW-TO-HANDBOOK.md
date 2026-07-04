@@ -415,7 +415,8 @@ Important limitations:
 - **Chat rehydration** — scoped per workspace; messages posted under one ID do not appear
   when another workspace is selected; only the latest thread per workspace is returned
 - **Chat orchestration** — `POST /api/chat/messages` returns operator + system + agent
-  messages; new dispatches transition `executing` → `review_ready` via `chat/orchestration.py`
+  messages; new dispatches run bounded executor (`health` / `list files` / `read …`) then
+  `review_ready` with `command_execution` receipt
 - **Workspace catalog** — sidebar uses seven mockup IDs; API may expose more — see
   `docs/WORKSPACE_CATALOG.md`
 - Operator mode renders the right dock as **Run → Approvals → Signals → Conversation →

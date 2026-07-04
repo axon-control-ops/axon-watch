@@ -46,8 +46,29 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertEqual(payload["run_id"], payload["run"]["run_id"])
         self.assertIn("dispatched", payload["messages"][1]["content"])
         self.assertEqual("review_ready", payload["run"]["phase"])
-        self.assertIn("inspect runtime", payload["messages"][2]["content"])
+        self.assertIn("Executed", payload["messages"][2]["content"])
+        self.assertIn("unsupported", payload["messages"][2]["content"])
         self.assertIsNotNone(run_store.get_run(payload["run_id"]))
+
+    def test_post_chat_message_executes_health_probe_and_records_receipt(self) -> None:
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "content": "curl -s http://127.0.0.1:8787/api/health",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["dispatched"])
+        self.assertIn("health_probe", payload["messages"][2]["content"])
+        self.assertIn("```", payload["messages"][2]["content"])
+
+        history = self.client.get(f"/api/runs/{payload['run_id']}/history").json()
+        receipt_types = [item["receipt"]["type"] for item in history["items"]]
+        self.assertIn("command_execution", receipt_types)
+        self.assertIn("review_ready", receipt_types)
 
     def test_post_chat_message_appends_to_existing_thread(self) -> None:
         first = self.client.post(

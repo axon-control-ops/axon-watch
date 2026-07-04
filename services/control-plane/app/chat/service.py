@@ -48,7 +48,12 @@ def post_chat_message(
         content=trimmed,
         run_id=run_id,
     )
-    run_record = orchestrate_command_run(run_record=run_record, dispatched=dispatched)
+    run_record, execution = orchestrate_command_run(
+        workspace_id=workspace_id,
+        content=trimmed,
+        run_record=run_record,
+        dispatched=dispatched,
+    )
     ack_content = build_command_dispatch_ack(
         run_id=dispatch_run_id,
         phase=str(run_record["phase"]),
@@ -58,6 +63,7 @@ def post_chat_message(
         content=trimmed,
         run_record=run_record,
         dispatched=dispatched,
+        execution=execution,
     )
 
     if thread_id:

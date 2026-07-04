@@ -337,6 +337,40 @@ def get_run_history(run_id: str) -> dict[str, Any]:
     }
 
 
+def append_run_execution_receipt(
+    run_id: str,
+    *,
+    receipt_type: str,
+    receipt_summary: str,
+    actor: str = "command_executor",
+    success: bool = True,
+    intent: str | None = None,
+) -> dict[str, Any]:
+    record = get_run(run_id)
+    now = _utc_now_iso()
+    phase = record["phase"]
+    summary = receipt_summary
+    if intent:
+        summary = f"{receipt_summary} · intent={intent} · success={success}"
+
+    run_store.append_transition(
+        record["history_ref"],
+        {
+            "from_phase": phase,
+            "to_phase": phase,
+            "timestamp": now,
+            "actor": actor,
+            "current_step": record.get("current_step"),
+            "receipt": {
+                "type": receipt_type,
+                "summary": summary,
+            },
+        },
+    )
+    record["updated_at"] = now
+    return run_store.save_run(record)
+
+
 def list_runs() -> list[dict[str, Any]]:
     return run_store.list_runs()
 

@@ -129,7 +129,7 @@ Work in order. One slice per pass; run the verification gate before the next ite
 
 | Priority | ID | Lane | Slice | Blocked? |
 |---|---|---|---|---|
-| **1** | **C2** | C (+ B transcript) | **Bounded command executor** — run real workspace actions from chat (health probe, file read, dir list); agent messages include evidence; then `review_ready` | **Ready** |
+| **1** | **C2** | C (+ B transcript) | **Bounded command executor** — run real workspace actions from chat (health probe, file read, dir list); agent messages include evidence; then `review_ready` | **done** |
 | 2 | C3 | C | Briefing **Notice/Advise** depth from canonical run/signal state (JX-3 thin slice) | Ready |
 | 3 | B3 | B | Responsive **compact operator** layout (CSS only, no voice — not full mobile JX-4) | Ready |
 | — | JX-1–5 | Coordinator | KAIRO presence (watch rules, delivery, voice, persona, mobile) | **Blocked** |
@@ -191,6 +191,7 @@ Superseded by **Active Queue** above. After B1 lands:
 - **bootstrap degraded signal clarity** — Lane A1 copy/metadata (`c464984`)
 - **SSE live refresh** — `GET /api/live/events` + `live-events-session.ts` (UX-4)
 - **verify evidence tooling** — `npm run verify:evidence`, `npm run verify:nightly` (D1)
+- **bounded command executor (C2)** — `command_executor.py` health/list/read + execution receipts
 - lower default terminal dock height (~240px fresh session, 280px cap)
 
 ## Assignment Rules

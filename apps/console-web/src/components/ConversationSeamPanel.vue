@@ -19,7 +19,16 @@ const shell = useShellStore();
             {{ message.created_at }}
           </time>
         </div>
-        <p class="conversation-seam__content">{{ message.content }}</p>
+        <p
+          v-if="message.role !== 'agent'"
+          class="conversation-seam__content"
+        >
+          {{ message.content }}
+        </p>
+        <pre
+          v-else
+          class="conversation-seam__content conversation-seam__content--agent"
+        >{{ message.content }}</pre>
       </li>
     </ul>
     <p v-else class="region-copy">No active conversation</p>
