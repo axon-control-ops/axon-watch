@@ -1,12 +1,21 @@
-# Axon-Watch
+# Axon-X
+
+**Axon-X** is the next-generation Axon product UI and control stack.
+
+The implementation repo folder is still `axon-watch` for now; that is an internal
+path/name, not the product name shown to operators.
 
 `axon-watch` is a new integrated local-first operator and coding environment.
 This working tree currently combines:
 
-- Lane 1 bootstrap scaffolding for the new repo layout and service shells
-- a first real shared contract baseline under `packages/shared-types/`
-- existing verification and governance scaffolding under `scripts/verify/`,
-  `docs/adr/`, and `tests/`
+- a shared contract baseline under `packages/shared-types/`
+- a real control-plane thin slice with persisted runs, approvals, review-ready,
+  runtime summary, and backend-only briefing seams
+- a watch thin slice with two canonical inbox signals and minimal ranking
+- a Vue shell that consumes runs, inbox, and runtime summary, plus thin Monaco
+  and xterm host surfaces
+- verification and governance scaffolding under `scripts/verify/`, `docs/adr/`,
+  and `tests/`
 
 ## Source Of Truth
 
@@ -18,9 +27,9 @@ This working tree currently combines:
 ## Repo Shape
 
 ```text
-apps/console-web/        existing UI shell worktree
-services/control-plane/  FastAPI health/readiness bootstrap stub
-services/axon-watch/     FastAPI health/readiness bootstrap stub
+apps/console-web/        Vue shell, control-plane clients, Monaco/xterm hosts
+services/control-plane/  FastAPI run-state, approvals, briefing, summary
+services/axon-watch/     FastAPI watch inbox with canonical signal producers
 packages/                shared contract package ownership
 docs/                    contract and ADR guidance
 scripts/                 dev/ops bootstrap plus existing verify helpers
@@ -36,14 +45,27 @@ Use npm workspaces from the repo root:
 2. install Python dependencies for the service shells if needed
 3. copy `.env.example` to `.env` if custom ports or paths are needed
 4. run `./scripts/dev/up.sh`
-5. check service endpoints with `./scripts/dev/check-health.sh`
-6. stop local processes with `./scripts/dev/down.sh`
+5. wait for `up.sh` to confirm all three services are ready
+6. check service endpoints with `./scripts/dev/check-health.sh`
+7. stop local processes with `./scripts/dev/down.sh`
+
+Startup contract:
+
+- ports are fixed at `4173`, `8787`, and `8788` unless overridden in `.env`
+- startup fails fast if any configured port is already in use
+- `up.sh` rolls the stack back if a service never becomes ready
+- `down.sh` is safe to re-run and cleans stale pid files plus orphan listeners on the configured ports
 
 Bootstrap URLs:
 
 - console web: `http://127.0.0.1:4173`
 - control plane health: `http://127.0.0.1:8787/api/health`
 - watch health: `http://127.0.0.1:8788/internal/watch/health`
+- runtime summary: `http://127.0.0.1:8787/api/runtime/summary`
+- inbox: `http://127.0.0.1:8787/api/inbox`
+- briefing: `http://127.0.0.1:8787/api/briefing` (backend-only seam; see `docs/contracts/BRIEFING-SEAM.md`)
+- runs: `http://127.0.0.1:8787/api/runs`
+- workspaces: `http://127.0.0.1:8787/api/workspaces`
 
 ## Verification
 
@@ -53,8 +75,12 @@ Reproducible verification from the repo root:
 npm install
 npm run verify:shared-types
 npm run verify:contracts
+npm run verify:console-web
 npm run verify
 python3 -m unittest discover -s tests
+./scripts/dev/down.sh
+./scripts/dev/up.sh
+./scripts/dev/check-health.sh
 ```
 
 Existing verification entrypoints remain in place:
@@ -68,5 +94,7 @@ See `scripts/verify/README.md` for the verification contract.
 
 ## Boundary Note
 
-Service implementations remain bootstrap-thin, but contract ownership now
-exists in `packages/shared-types/` and `docs/contracts/`.
+The product is still intentionally thin, but it is no longer stub-only.
+Contract ownership lives in `packages/shared-types/` and `docs/contracts/`,
+while product semantics still defer to the frozen planning bundle in
+`axon-local/Plans/Axon-Watch/`.

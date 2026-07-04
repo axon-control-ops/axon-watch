@@ -1,4 +1,4 @@
-# Axon-Watch Architecture Spec
+# Axon-X Architecture Spec
 
 ## Topology
 

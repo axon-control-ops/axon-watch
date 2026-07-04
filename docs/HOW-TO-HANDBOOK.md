@@ -1,7 +1,7 @@
-# Axon-Watch How-To Handbook
+# Axon-X How-To Handbook
 
-This handbook is the practical guide for working with the new `axon-watch`
-implementation.
+This handbook is the practical guide for working with **Axon-X**, implemented in
+the `axon-watch` repo.
 
 It is written for operators, reviewers, and developers who need to understand:
 
@@ -15,9 +15,57 @@ It is written for operators, reviewers, and developers who need to understand:
 This is intentionally simple to read, but detailed enough to be useful during
 active implementation.
 
-## What Axon-Watch Is
+**Last verified:** 2026-07-04 — `npm run verify` OK, 82 Python tests OK, stack
+smoke on ports 4173/8787/8788 OK.
 
-`axon-watch` is the new implementation repo for the next Axon product shape.
+## Terminology And Abbreviations
+
+Use this glossary when reading plans, ADRs, code, or agent summaries.
+
+| Term | Meaning |
+| --- | --- |
+| **ADR** | Architecture Decision Record — a numbered, immutable write-up of a significant technical or process choice. Accepted ADRs live in `docs/adr/`. Do not rewrite them; supersede with a new ADR instead. |
+| **Axon-X** | User-facing product name for the next-generation operator console. |
+| **axon-watch** | Internal repo folder and npm workspace name. Legacy naming; not the product label shown to operators. |
+| **axon-local** | The current production Axon app repo (port **7734**). Planning for Axon-X still lives here under `Plans/Axon-Watch/`. |
+| **Briefing seam** | Backend-only `GET /api/briefing` projection for future KAIRO/operator-presence UI. The shell does **not** consume it yet. See `docs/contracts/BRIEFING-SEAM.md`. |
+| **Control plane** | FastAPI service on port **8787** that owns run truth, runtime summary, inbox projection, workspaces list, and briefing. |
+| **Console-web / shell** | Vue 3 frontend on port **4173** — the visible Axon-X UI. |
+| **Contract / shared contract** | Canonical TypeScript types and JSON fixtures in `packages/shared-types/`. Frontend and backend must agree here first. |
+| **Coordinator lane** | Single owner of serial-only semantics during multi-agent work. See `docs/MULTITASK-LANES.md`. |
+| **DTO** | Data Transfer Object — a typed payload shape exchanged between services or UI layers (for example `RuntimeSummary`, `RunRecord`). |
+| **Fitness function** | An automated check that guards architecture or performance (dependency direction, DTO size budgets, latency thresholds). |
+| **Frozen planning bundle** | The locked docs under `axon-local/Plans/Axon-Watch/`. Implementation must not silently drift from these. |
+| **KAIRO** | Knowledge-Augmented Intelligence for Response and Oversight — planned operator-presence layer (watching, advising, interrupting, executing with receipts). **Planning only** today; see `Plans/Axon-Watch/KAIRO_MODE.md` and `ADR-005-kairo-as-operator-presence-layer.md` in axon-local. |
+| **Lane A/B/C/D** | Parallel implementation ownership areas defined in `docs/MULTITASK-LANES.md` (watch, shell, control-plane, dev/verify). |
+| **Monaco host** | In-browser code editor surface (`EditorHost.vue`). Currently shows DTO-derived documents, not workspace files on disk. |
+| **Parity ledger** | Checklist of behaviors Axon-X must eventually match from current Axon. Lives in frozen planning. |
+| **Run / run record** | Canonical execution unit with `phase`, `status`, capability flags, and transition history. |
+| **Run phase** | High-level lifecycle stage (`queued`, `starting`, `executing`, `awaiting_approval`, `review_ready`, `completed`, etc.). Defined in frozen `run-state.md`. |
+| **Runtime summary** | Boot-critical DTO at `GET /api/runtime/summary` — identity, watch connection, active runs, approvals snapshot. |
+| **Signal / inbox item** | Watch-produced event surfaced through control-plane `GET /api/inbox`. |
+| **Thin slice** | A small, verifiable vertical increment — one owned behavior with tests, not a broad rewrite. |
+| **Watch service** | FastAPI service on port **8788** that produces canonical signals; control-plane projects them into inbox/runtime summary. |
+| **xterm host** | In-browser terminal surface (`TerminalHost.vue`). Currently a **local shell-state console** (help/context commands), not a backend PTY session. |
+| **Workspace** | Logical operator context keyed by `workspace_id`. Today the API returns IDs only; rich catalog metadata is deferred. |
+
+### Two repos, two apps
+
+Do not confuse these:
+
+| | **axon-local** (current Axon) | **axon-watch** (Axon-X) |
+| --- | --- | --- |
+| Default URL | `http://127.0.0.1:7734` | `http://127.0.0.1:4173` |
+| Start command | `./start.sh` from axon-local | `./scripts/dev/up.sh` from axon-watch |
+| Status | Mature daily-driver console | Early greenfield rebuild |
+| Relationship | Source of parity targets and frozen plans | Implementation target for modernization |
+
+## What Axon-X Is
+
+**Axon-X** is the next-generation Axon console and operator environment.
+
+The code lives in the `axon-watch` repo folder for now. That folder name is
+legacy/internal; the product name is **Axon-X**.
 
 The target product combines:
 
@@ -58,20 +106,38 @@ What is already real:
 
 - root workspace scripts
 - service startup/shutdown flow
-- `/api/runtime/summary` route in the control plane
+- `/api/runtime/summary`, `/api/inbox`, `/api/runs`, and `/api/briefing` routes in the control plane
 - shared contract types under `packages/shared-types/`
-- shell consumption of a canonical runtime summary
+- shell consumption of canonical runtime summary, inbox, and run DTOs
+- thin Monaco and xterm host surfaces in `console-web`
 
 What is still intentionally thin or deferred:
 
-- full run lifecycle behavior
-- full approval behavior
-- full signal production and ranking
+- shell consumption of `/api/briefing` (backend-only; see `docs/contracts/BRIEFING-SEAM.md`)
+- full signal production and deeper ranking
 - deep watch summary logic
-- full runtime-summary assembly from live probes
 - performance evidence for all budgets
 
-So this repo is not a fake mockup, but it is also not feature-complete.
+What is now real in the thin slice (verified 2026-07-04):
+
+- run create/complete/stop/resume lifecycle
+- explicit approval boundary (`requires_approval`, approve/reject)
+- review-ready entry, completion, and follow-up resume path
+- SQLite-backed run persistence (survives control-plane restart)
+- operator briefing API (backend-only; shell not wired)
+- two watch-produced inbox signals with severity-then-recency ranking
+- workspace list API and shell workspace selector (IDs only)
+- Monaco and xterm hosts bound to canonical DTOs (not disk files or backend PTY)
+
+What is **not** real yet despite similar-sounding names:
+
+- **Backend terminal attachment** — xterm is a local command loop, not `tmux`/PTY/SSH
+- **File-backed editor** — Monaco shows generated overview/JSON from DTOs, not repo files
+- **KAIRO operator presence** — planned in axon-local docs only
+- **Full parity with axon-local** — intentional; see parity ledger for gaps
+
+So this repo is not a fake mockup, but it is also not feature-complete or a
+drop-in replacement for the current Axon UI.
 
 ## Source Of Truth Rules
 
@@ -246,11 +312,20 @@ Then edit `.env` as needed.
 ./scripts/dev/up.sh
 ```
 
+`up.sh` does not report success until all three services are actually reachable.
+
 This starts:
 
 - `console-web`
 - `control-plane`
 - `axon-watch`
+
+Important startup contract:
+
+- ports are fixed by `.env` / `.env.example`
+- startup fails fast if `4173`, `8787`, or `8788` is already in use
+- startup rolls back partial processes if readiness fails
+- services stay detached after the launching shell exits
 
 ## 5. Check health
 
@@ -263,6 +338,13 @@ Expected endpoints:
 - console web: `http://127.0.0.1:4173`
 - control plane health: `http://127.0.0.1:8787/api/health`
 - watch health: `http://127.0.0.1:8788/internal/watch/health`
+- briefing: `http://127.0.0.1:8787/api/briefing` (backend-only seam)
+- runtime summary: `http://127.0.0.1:8787/api/runtime/summary`
+- inbox: `http://127.0.0.1:8787/api/inbox`
+- runs: `http://127.0.0.1:8787/api/runs`
+- workspaces: `http://127.0.0.1:8787/api/workspaces`
+
+`check-health.sh` also probes `/api/workspaces`.
 
 ## 6. Stop the stack
 
@@ -272,21 +354,23 @@ Expected endpoints:
 
 ## What The Current App Does On Boot
 
-Right now, the shell boots and loads a runtime summary from the control plane.
+Right now, the shell boots and loads three control-plane seams in parallel.
 
 That flow looks like this:
 
 1. `apps/console-web/src/main.ts` creates the Vue app
 2. the shell store initializes
-3. `loadRuntimeSummary()` is called
-4. the frontend fetches `/api/runtime/summary`
-5. the control plane returns a canonical runtime summary payload
-6. the shell renders runtime identity, active run count, signal count, and degraded state
+3. `loadBootstrapData()` is called
+4. the frontend fetches `/api/runtime/summary`, `/api/inbox`, `/api/runs`, and `/api/workspaces`
+5. the control plane returns canonical DTO payloads for all four seams
+6. the shell renders runtime identity, active workspace state, active run state, approval state, and top signal state
 
-Important limitation:
+Important limitations:
 
-- this is currently a thin bootstrap runtime summary
-- it is not yet a full live assembler from all real subsystems
+- the shell still treats `/api/briefing` as backend-only
+- Monaco and xterm hosts are now attached to canonical workspace/run/signal DTOs,
+  but not yet to real workspace files or backend terminal sessions
+- ranking depth is still thin: current watch ordering is severity + recency only
 
 That is okay for this stage.
 
@@ -313,7 +397,10 @@ If you need to understand the current implementation quickly, read these first:
 ### Control plane
 
 - `services/control-plane/app/main.py`
-- `services/control-plane/app/runtime_summary.py`
+- `services/control-plane/app/workspace_catalog.py`
+- `services/control-plane/app/runs/service.py`
+- `services/control-plane/app/runtime_summary_assembler.py`
+- `services/control-plane/app/operator_briefing.py`
 
 ### Frontend shell
 
@@ -321,6 +408,9 @@ If you need to understand the current implementation quickly, read these first:
 - `apps/console-web/src/api/control-plane.ts`
 - `apps/console-web/src/stores/shell.ts`
 - `apps/console-web/src/App.vue`
+- `apps/console-web/src/components/EditorHost.vue`
+- `apps/console-web/src/components/TerminalHost.vue`
+- `apps/console-web/src/lib/workspace-documents.ts`
 
 ### Verification
 
@@ -352,7 +442,8 @@ This verifies:
 
 - shared contract package typing
 - shared fixture tests
-- control-plane runtime summary endpoint shape
+- control-plane run/inbox/runtime-summary/briefing behavior
+- watch signal contract alignment
 
 ## Full current verification bundle
 
@@ -363,6 +454,7 @@ npm run verify
 This runs:
 
 - contract verification
+- console-web typecheck, unit test, and production build
 - verify harness checks
 - DTO size checks using representative fixtures
 
@@ -370,13 +462,14 @@ This runs:
 
 ```bash
 npm run typecheck -w @axon-watch/console-web
+npm run test -w @axon-watch/console-web
 npm run build -w @axon-watch/console-web
 ```
 
 ## Python syntax checks
 
 ```bash
-python3 -m py_compile services/control-plane/app/main.py services/control-plane/app/runtime_summary.py
+python3 -m py_compile services/control-plane/app/main.py services/control-plane/app/runs/service.py services/control-plane/app/domain/run_state.py services/control-plane/app/domain/run_transitions.py services/control-plane/app/operator_briefing.py
 ```
 
 ## Service tests
@@ -473,12 +566,13 @@ Check:
 
 1. Did you run `npm install` at repo root?
 2. Are ports `4173`, `8787`, and `8788` free?
+3. Did `up.sh` print a specific port conflict or readiness failure message?
 
 Current expected path:
 
 - root install: `npm install`
 - root startup: `./scripts/dev/up.sh`
-- frontend dev server: `npm run dev -w @axon-watch/console-web`
+- health check: `./scripts/dev/check-health.sh`
 
 If startup fails, inspect:
 
@@ -518,7 +612,7 @@ Steps:
 
 ## Problem: stale pid files block startup
 
-`up.sh` will refuse to start if it finds existing pid files under `.local/pids`.
+`up.sh` now clears stale pid files automatically before it checks for a live stack.
 
 First try:
 
@@ -529,9 +623,12 @@ First try:
 If that is not enough, inspect:
 
 - `.local/pids/`
+- `.local/logs/console-web.log`
+- `.local/logs/control-plane.log`
+- `.local/logs/axon-watch.log`
 
-Only remove stale pid files if you are sure those processes are not actually
-running anymore.
+If `up.sh` still fails, it usually means one of the configured ports is held by
+another live process. Free the port or stop the other process before retrying.
 
 ## Problem: the shell loads but runtime summary is unavailable
 
@@ -696,11 +793,22 @@ A good next slice should:
 - preserve boot simplicity
 - come with verification
 
-Examples:
+**Completed thin slices (do not re-do):**
 
-- deepen runtime summary assembly
-- add first watch-produced signal path
-- add first real shell surface that consumes canonical payloads
+- bootstrap + shared contracts + runtime summary
+- first watch signal path
+- npm workspace dev ergonomics
+- first run lifecycle (create → executing → complete)
+- startup supervision reliability (`scripts/dev/lib/common.sh`)
+- stop/resume, approval, review-ready, SQLite persistence, briefing backend
+- workspace list + DTO-bound Monaco/xterm hosts
+
+**Suggested next slices (2026-07-04):**
+
+1. **Lane B** — backend PTY terminal session attachment (real shell I/O)
+2. **Lane B** — file-backed Monaco binding to workspace paths on disk
+3. **Lane A** — richer inbox ranking beyond severity + recency
+4. **Lane B + coordinator** — shell wiring for `/api/briefing` (explicit assignment only)
 
 Bad next slices:
 
@@ -708,6 +816,7 @@ Bad next slices:
 - expanding multiple semantic families at once
 - changing run-state and signal-state in one uncontrolled pass
 - skipping verification because “it is still early”
+- claiming “real terminal” or “file editor” when only DTO binding exists
 
 ## Final Guidance
 

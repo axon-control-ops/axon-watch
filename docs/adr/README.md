@@ -39,6 +39,11 @@ Every numbered ADR must include:
 - `Consequences`
 - `Reevaluation Triggers`
 
+## Accepted ADRs
+
+- [ADR-001: Vue 3, Pinia, Monaco, and xterm.js stack](ADR-001-vue-monaco-xterm-stack.md)
+- [ADR-002: Control-plane run truth and backend-only briefing](ADR-002-control-plane-run-truth-and-briefing-seam.md)
+
 ## Verification
 
 Use the template in `_TEMPLATE.md`, then run:

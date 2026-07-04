@@ -1,5 +1,6 @@
 export type {
   ApprovalRecord,
+  OperatorBriefing,
   InboxItem,
   RunRecord,
   RuntimeSummary,

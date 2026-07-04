@@ -1,4 +1,10 @@
-import type { InboxItem, RunRecord, RuntimeSummary } from '../contracts/canonical';
+import type {
+  InboxItem,
+  OperatorBriefing,
+  RunRecord,
+  RuntimeSummary,
+  WorkspaceRecord,
+} from '../contracts/canonical';
 
 export interface InboxSnapshot {
   items: InboxItem[];
@@ -11,11 +17,17 @@ export interface RunListSnapshot {
   count: number;
 }
 
+export interface WorkspaceListSnapshot {
+  items: WorkspaceRecord[];
+  count: number;
+}
+
 export interface CreateRunRequest {
   workspace_id: string;
   mode?: RunRecord['mode'];
   summary: string;
   detail?: string;
+  requires_approval?: boolean;
 }
 
 function controlPlaneBaseUrl(): string {
@@ -51,6 +63,18 @@ export async function fetchInbox(): Promise<InboxSnapshot> {
   return response.json() as Promise<InboxSnapshot>;
 }
 
+export async function fetchOperatorBriefing(): Promise<OperatorBriefing> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/briefing` : '/api/briefing';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`operator briefing request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<OperatorBriefing>;
+}
+
 export async function fetchRuns(): Promise<RunListSnapshot> {
   const baseUrl = controlPlaneBaseUrl();
   const url = baseUrl ? `${baseUrl}/api/runs` : '/api/runs';
@@ -61,6 +85,30 @@ export async function fetchRuns(): Promise<RunListSnapshot> {
   }
 
   return response.json() as Promise<RunListSnapshot>;
+}
+
+export async function fetchWorkspaces(): Promise<WorkspaceListSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/workspaces` : '/api/workspaces';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`workspaces request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<WorkspaceListSnapshot>;
+}
+
+export async function fetchWorkspace(workspaceId: string): Promise<WorkspaceRecord> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/workspaces/${workspaceId}` : `/api/workspaces/${workspaceId}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`workspace request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<WorkspaceRecord>;
 }
 
 export async function fetchRun(runId: string): Promise<RunRecord> {
@@ -98,6 +146,66 @@ export async function completeRun(runId: string): Promise<RunRecord> {
 
   if (!response.ok) {
     throw new Error(`complete run request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<RunRecord>;
+}
+
+export async function markRunReviewReady(runId: string): Promise<RunRecord> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/runs/${runId}/review-ready` : `/api/runs/${runId}/review-ready`;
+  const response = await fetch(url, { method: 'POST' });
+
+  if (!response.ok) {
+    throw new Error(`review-ready request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<RunRecord>;
+}
+
+export async function stopRun(runId: string): Promise<RunRecord> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/runs/${runId}/stop` : `/api/runs/${runId}/stop`;
+  const response = await fetch(url, { method: 'POST' });
+
+  if (!response.ok) {
+    throw new Error(`stop run request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<RunRecord>;
+}
+
+export async function resumeRun(runId: string): Promise<RunRecord> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/runs/${runId}/resume` : `/api/runs/${runId}/resume`;
+  const response = await fetch(url, { method: 'POST' });
+
+  if (!response.ok) {
+    throw new Error(`resume run request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<RunRecord>;
+}
+
+export async function approveRun(runId: string): Promise<RunRecord> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/runs/${runId}/approve` : `/api/runs/${runId}/approve`;
+  const response = await fetch(url, { method: 'POST' });
+
+  if (!response.ok) {
+    throw new Error(`approve run request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<RunRecord>;
+}
+
+export async function rejectRun(runId: string): Promise<RunRecord> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/runs/${runId}/reject` : `/api/runs/${runId}/reject`;
+  const response = await fetch(url, { method: 'POST' });
+
+  if (!response.ok) {
+    throw new Error(`reject run request failed with status ${response.status}`);
   }
 
   return response.json() as Promise<RunRecord>;

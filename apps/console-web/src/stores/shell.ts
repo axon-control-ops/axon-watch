@@ -1,7 +1,18 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 
-import { fetchInbox, fetchRuns, fetchRuntimeSummary } from '../api/control-plane';
+import {
+  approveRun,
+  completeRun,
+  fetchInbox,
+  fetchRuns,
+  fetchRuntimeSummary,
+  fetchWorkspaces,
+  markRunReviewReady,
+  rejectRun,
+  resumeRun,
+  stopRun,
+} from '../api/control-plane';
 import type {
   ApprovalRecord,
   InboxItem,
@@ -11,11 +22,28 @@ import type {
   ThreadMessage,
   WorkspaceRecord,
 } from '../contracts/canonical';
+import {
+  buildWorkspaceDocuments,
+  type WorkspaceDocumentDescriptor,
+} from '../lib/workspace-documents';
+import {
+  selectPrimaryApprovalRun,
+  selectPrimaryRun,
+} from './shell-run-selection';
 
 export type LayoutMode = 'operator' | 'ide';
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type InboxLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type RunsLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+export type WorkspacesLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+export type RunMutationState =
+  | 'idle'
+  | 'stopping'
+  | 'resuming'
+  | 'approving'
+  | 'rejecting'
+  | 'reviewing'
+  | 'completing';
 type WorkbenchSurface = 'editor' | 'preview';
 
 interface EditorTabDescriptor {
@@ -58,6 +86,8 @@ export const useShellStore = defineStore('shell', () => {
   // Backend-owned state stays on shared canonical DTO seams.
   const workspaces = ref<WorkspaceRecord[]>([]);
   const currentWorkspace = ref<WorkspaceRecord | null>(null);
+  const workspacesLoadState = ref<WorkspacesLoadState>('idle');
+  const workspacesError = ref<string | null>(null);
   const runtimeSummary = ref<RuntimeSummary | null>(null);
   const runtimeSummaryLoadState = ref<RuntimeSummaryLoadState>('idle');
   const runtimeSummaryError = ref<string | null>(null);
@@ -65,6 +95,8 @@ export const useShellStore = defineStore('shell', () => {
   const runs = ref<RunRecord[]>([]);
   const runsLoadState = ref<RunsLoadState>('idle');
   const runsError = ref<string | null>(null);
+  const runMutationState = ref<RunMutationState>('idle');
+  const runMutationError = ref<string | null>(null);
   const approvals = ref<ApprovalRecord[]>([]);
   const inboxItems = ref<InboxItem[]>([]);
   const inboxLoadState = ref<InboxLoadState>('idle');
@@ -75,6 +107,7 @@ export const useShellStore = defineStore('shell', () => {
   // UI shell scaffolding is local and intentionally placeholder-only.
   const editorTabs = ref<EditorTabDescriptor[]>(DEFAULT_EDITOR_TABS);
   const activeEditorTabId = ref<string>(DEFAULT_EDITOR_TABS[0].id);
+  const activeEditorDocumentId = ref<string>('workspace-overview');
   const terminalSessions = ref<TerminalSessionDescriptor[]>(DEFAULT_TERMINAL_SESSIONS);
   const activeTerminalSessionId = ref<string>(DEFAULT_TERMINAL_SESSIONS[0].id);
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
@@ -84,7 +117,9 @@ export const useShellStore = defineStore('shell', () => {
   );
 
   const workspaceStateLabel = computed(() =>
-    currentWorkspace.value ? 'WorkspaceRecord attached' : 'Awaiting WorkspaceRecord',
+    currentWorkspace.value
+      ? `WorkspaceRecord attached · ${currentWorkspace.value.workspace_id}`
+      : 'Awaiting WorkspaceRecord',
   );
 
   const runtimeStateLabel = computed(() => {
@@ -125,6 +160,45 @@ export const useShellStore = defineStore('shell', () => {
   });
 
   const primaryActiveRun = computed(() => activeRun.value);
+  const primaryApprovalRun = computed(() => selectPrimaryApprovalRun(runs.value));
+  const workspaceRuns = computed(() =>
+    currentWorkspace.value
+      ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
+      : runs.value,
+  );
+  const workspacePrimarySignal = computed(() =>
+    currentWorkspace.value
+      ? inboxItems.value.find((item) => item.workspace_id === currentWorkspace.value?.workspace_id) ??
+        primaryInboxItem.value
+      : primaryInboxItem.value,
+  );
+  const editorDocuments = computed<WorkspaceDocumentDescriptor[]>(() =>
+    buildWorkspaceDocuments({
+      workspace: currentWorkspace.value,
+      runs: workspaceRuns.value,
+      runtimeSummary: runtimeSummary.value,
+      primaryInboxItem: workspacePrimarySignal.value,
+    }),
+  );
+  const activeEditorDocument = computed(
+    () =>
+      editorDocuments.value.find((document) => document.id === activeEditorDocumentId.value) ??
+      editorDocuments.value[0] ??
+      null,
+  );
+  const runMutationPending = computed(() => runMutationState.value !== 'idle');
+  const canStopPrimaryRun = computed(
+    () => Boolean(activeRun.value?.can_stop) && !runMutationPending.value,
+  );
+  const canResumePrimaryRun = computed(
+    () => Boolean(activeRun.value?.can_resume) && !runMutationPending.value,
+  );
+  const canMarkPrimaryRunReviewReady = computed(
+    () => activeRun.value?.phase === 'executing' && !runMutationPending.value,
+  );
+  const canCompletePrimaryRun = computed(
+    () => activeRun.value?.phase === 'review_ready' && !runMutationPending.value,
+  );
 
   const inboxStateLabel = computed(() => {
     if (inboxLoadState.value === 'loading') {
@@ -146,12 +220,37 @@ export const useShellStore = defineStore('shell', () => {
   const primaryInboxItem = computed(() => inboxItems.value[0] ?? null);
 
   const approvalStateLabel = computed(() =>
-    approvals.value.length > 0 ? 'ApprovalRecord attached' : 'Awaiting ApprovalRecord',
+    runtimeSummary.value?.approvals.pending_count
+      ? `${runtimeSummary.value.approvals.pending_count} pending approval(s)`
+      : 'Awaiting ApprovalRecord',
+  );
+  const canApprovePrimaryRun = computed(
+    () => Boolean(primaryApprovalRun.value?.can_approve) && !runMutationPending.value,
+  );
+  const canRejectPrimaryRun = computed(
+    () => primaryApprovalRun.value?.phase === 'awaiting_approval' && !runMutationPending.value,
   );
 
   const threadStateLabel = computed(() =>
     threadMessages.value.length > 0 ? 'ThreadMessage attached' : 'Awaiting ThreadMessage',
   );
+
+  function syncCurrentWorkspace(preferredWorkspaceId?: string | null): void {
+    if (workspaces.value.length === 0) {
+      currentWorkspace.value = null;
+      return;
+    }
+
+    const targetWorkspaceId =
+      preferredWorkspaceId ??
+      currentWorkspace.value?.workspace_id ??
+      activeRun.value?.workspace_id ??
+      workspaces.value[0]?.workspace_id;
+    currentWorkspace.value =
+      workspaces.value.find((workspace) => workspace.workspace_id === targetWorkspaceId) ??
+      workspaces.value[0] ??
+      null;
+  }
 
   function setLayoutMode(mode: LayoutMode): void {
     layoutMode.value = mode;
@@ -159,6 +258,29 @@ export const useShellStore = defineStore('shell', () => {
 
   function setActiveEditorTab(id: string): void {
     activeEditorTabId.value = id;
+  }
+
+  function setActiveEditorDocument(id: string): void {
+    activeEditorDocumentId.value = id;
+  }
+
+  function setCurrentWorkspace(workspaceId: string): void {
+    syncCurrentWorkspace(workspaceId);
+  }
+
+  async function loadWorkspaces(): Promise<void> {
+    workspacesLoadState.value = 'loading';
+    workspacesError.value = null;
+
+    try {
+      const snapshot = await fetchWorkspaces();
+      workspaces.value = snapshot.items;
+      syncCurrentWorkspace();
+      workspacesLoadState.value = 'loaded';
+    } catch (error) {
+      workspacesLoadState.value = 'error';
+      workspacesError.value = error instanceof Error ? error.message : 'workspaces request failed';
+    }
   }
 
   async function loadRuntimeSummary(): Promise<void> {
@@ -198,10 +320,8 @@ export const useShellStore = defineStore('shell', () => {
     try {
       const snapshot = await fetchRuns();
       runs.value = snapshot.items;
-      activeRun.value =
-        snapshot.items.find((run) => run.phase !== 'completed' && run.phase !== 'failed' && run.phase !== 'cancelled') ??
-        snapshot.items[0] ??
-        null;
+      activeRun.value = selectPrimaryRun(snapshot.items);
+      syncCurrentWorkspace(activeRun.value?.workspace_id);
       runsLoadState.value = 'loaded';
     } catch (error) {
       runsLoadState.value = 'error';
@@ -209,17 +329,147 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function refreshRunSurfaces(): Promise<void> {
+    await Promise.all([loadRuns(), loadRuntimeSummary()]);
+  }
+
+  async function stopPrimaryRun(): Promise<void> {
+    const run = activeRun.value;
+    if (!run?.can_stop || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'stopping';
+    runMutationError.value = null;
+
+    try {
+      await stopRun(run.run_id);
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value = error instanceof Error ? error.message : 'stop run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
+  async function resumePrimaryRun(): Promise<void> {
+    const run = activeRun.value;
+    if (!run?.can_resume || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'resuming';
+    runMutationError.value = null;
+
+    try {
+      await resumeRun(run.run_id);
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value = error instanceof Error ? error.message : 'resume run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
+  async function markPrimaryRunReviewReady(): Promise<void> {
+    const run = activeRun.value;
+    if (run?.phase !== 'executing' || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'reviewing';
+    runMutationError.value = null;
+
+    try {
+      await markRunReviewReady(run.run_id);
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value =
+        error instanceof Error ? error.message : 'review-ready request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
+  async function completePrimaryRun(): Promise<void> {
+    const run = activeRun.value;
+    if (run?.phase !== 'review_ready' || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'completing';
+    runMutationError.value = null;
+
+    try {
+      await completeRun(run.run_id);
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value =
+        error instanceof Error ? error.message : 'complete run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
+  async function approvePrimaryRun(): Promise<void> {
+    const run = primaryApprovalRun.value;
+    if (!run?.can_approve || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'approving';
+    runMutationError.value = null;
+
+    try {
+      await approveRun(run.run_id);
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value = error instanceof Error ? error.message : 'approve run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
+  async function rejectPrimaryRun(): Promise<void> {
+    const run = primaryApprovalRun.value;
+    if (run?.phase !== 'awaiting_approval' || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'rejecting';
+    runMutationError.value = null;
+
+    try {
+      await rejectRun(run.run_id);
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value = error instanceof Error ? error.message : 'reject run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
   async function loadBootstrapData(): Promise<void> {
-    await Promise.all([loadRuntimeSummary(), loadInbox(), loadRuns()]);
+    await Promise.all([loadRuntimeSummary(), loadInbox(), loadWorkspaces(), loadRuns()]);
   }
 
   return {
     activeEditorTabId,
+    activeEditorDocument,
+    activeEditorDocumentId,
     activeRun,
     activeTerminalSessionId,
+    approvePrimaryRun,
     approvals,
     approvalStateLabel,
+    canApprovePrimaryRun,
+    canCompletePrimaryRun,
+    canMarkPrimaryRunReviewReady,
+    canRejectPrimaryRun,
     currentWorkspace,
+    editorDocuments,
+    canResumePrimaryRun,
+    canStopPrimaryRun,
     dockContext,
     editorTabs,
     inboxError,
@@ -228,27 +478,42 @@ export const useShellStore = defineStore('shell', () => {
     inboxStateLabel,
     layoutMode,
     layoutModeLabel,
+    completePrimaryRun,
     loadBootstrapData,
     loadInbox,
     loadRuns,
     loadRuntimeSummary,
+    loadWorkspaces,
+    markPrimaryRunReviewReady,
     primaryActiveRun,
+    primaryApprovalRun,
     primaryInboxItem,
+    rejectPrimaryRun,
+    resumePrimaryRun,
     runs,
     runsError,
     runsLoadState,
+    runMutationError,
+    runMutationPending,
+    runMutationState,
     runStateLabel,
     runtimeStateLabel,
     runtimeSummary,
     runtimeSummaryError,
     runtimeSummaryLoadState,
     setActiveEditorTab,
+    setActiveEditorDocument,
+    setCurrentWorkspace,
     setLayoutMode,
     signalViews,
+    stopPrimaryRun,
     terminalSessions,
     threadMessages,
     threadStateLabel,
     workspaces,
+    workspacesError,
+    workspacesLoadState,
+    workspacePrimarySignal,
     workspaceStateLabel,
   };
 });

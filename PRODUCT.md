@@ -1,8 +1,8 @@
-# Axon-Watch Product Spec
+# Axon-X Product Spec
 
 ## Product Thesis
 
-`Axon-Watch` is a new integrated local-first operator and coding environment.
+**Axon-X** is a new integrated local-first operator and coding environment.
 It combines:
 
 - Cursor-style agent workflow and agent dock ergonomics

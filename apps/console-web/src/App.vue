@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import EditorHost from './components/EditorHost.vue';
+import TerminalHost from './components/TerminalHost.vue';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
@@ -13,7 +15,7 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
     <header class="region region-topbar">
       <div class="region-header">
         <div>
-          <p class="eyebrow">Axon-Watch</p>
+          <p class="eyebrow">Axon-X</p>
           <h1>Integrated shell skeleton</h1>
         </div>
 
@@ -67,6 +69,23 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         <p class="placeholder-card__label">Shell state</p>
         <strong>{{ shell.workspaces.length }} canonical workspace records loaded</strong>
       </div>
+
+      <div class="placeholder-card">
+        <p class="placeholder-card__label">Workspace navigation</p>
+        <div class="workspace-list">
+          <button
+            v-for="workspace in shell.workspaces"
+            :key="workspace.workspace_id"
+            type="button"
+            class="workspace-list__button"
+            :class="{ 'workspace-list__button--active': shell.currentWorkspace?.workspace_id === workspace.workspace_id }"
+            @click="shell.setCurrentWorkspace(workspace.workspace_id)"
+          >
+            {{ workspace.workspace_id }}
+          </button>
+        </div>
+        <p v-if="shell.workspacesError" class="region-copy">{{ shell.workspacesError }}</p>
+      </div>
     </aside>
 
     <main class="region region-center-workbench">
@@ -90,16 +109,38 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         </button>
       </div>
 
-      <div class="workbench-panels">
-        <section class="placeholder-card placeholder-card--surface">
+      <div v-if="shell.activeEditorTabId === 'editor-shell'" class="tab-strip tab-strip--documents">
+        <button
+          v-for="document in shell.editorDocuments"
+          :key="document.id"
+          type="button"
+          class="tab-strip__tab"
+          :class="{ 'tab-strip__tab--active': shell.activeEditorDocumentId === document.id }"
+          @click="shell.setActiveEditorDocument(document.id)"
+        >
+          {{ document.title }}
+        </button>
+      </div>
+
+      <div class="workbench-panels workbench-panels--single">
+        <section
+          v-if="shell.activeEditorTabId === 'editor-shell'"
+          class="placeholder-card placeholder-card--surface placeholder-card--host"
+        >
           <p class="placeholder-card__label">Editor surface</p>
-          <strong>Monaco host placeholder</strong>
-          <p class="region-copy">
-            Ready for real editor ownership in a later slice. No editor semantics are defined here.
-          </p>
+          <EditorHost
+            v-if="shell.activeEditorDocument"
+            :title="shell.activeEditorDocument.title"
+            :value="shell.activeEditorDocument.value"
+            :language="shell.activeEditorDocument.language"
+            :description="shell.activeEditorDocument.description"
+          />
         </section>
 
-        <section class="placeholder-card placeholder-card--surface">
+        <section
+          v-else
+          class="placeholder-card placeholder-card--surface"
+        >
           <p class="placeholder-card__label">Preview surface</p>
           <strong>Browser / diff host placeholder</strong>
           <p class="region-copy">
@@ -123,31 +164,36 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         </div>
       </div>
 
-      <div class="placeholder-card">
-        <p class="placeholder-card__label">Terminal session</p>
-        <strong>{{ shell.terminalSessions[0]?.title }}</strong>
-        <p class="region-copy">
-          xterm integration is intentionally deferred. This shell only preserves the region and state slot.
-        </p>
-      </div>
+      <div class="bottom-panel-grid">
+        <section class="placeholder-card placeholder-card--host">
+          <p class="placeholder-card__label">Terminal session</p>
+          <strong>{{ shell.terminalSessions[0]?.title }}</strong>
+          <TerminalHost
+            :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
+            :run-summary="shell.primaryActiveRun ? `${shell.primaryActiveRun.run_id} · ${shell.primaryActiveRun.phase} · ${shell.primaryActiveRun.status}` : null"
+            :primary-signal-id="shell.workspacePrimarySignal?.signal_id ?? null"
+            :runtime-connected="Boolean(shell.runtimeSummary?.watch.connected)"
+          />
+        </section>
 
-      <div v-if="shell.runtimeSummary" class="placeholder-card">
-        <p class="placeholder-card__label">Runtime summary</p>
-        <strong>
-          {{ shell.runtimeSummary.runtime_identity.provider_name }} /
-          {{ shell.runtimeSummary.runtime_identity.model_name }}
-        </strong>
-        <p class="region-copy">
-          {{ shell.runtimeSummary.active_runs.length }} active run(s),
-          {{ shell.runtimeSummary.signals.open_count }} open signal(s),
-          degraded={{ shell.runtimeSummary.degraded.active }}.
-        </p>
-      </div>
+        <div v-if="shell.runtimeSummary" class="placeholder-card">
+          <p class="placeholder-card__label">Runtime summary</p>
+          <strong>
+            {{ shell.runtimeSummary.runtime_identity.provider_name }} /
+            {{ shell.runtimeSummary.runtime_identity.model_name }}
+          </strong>
+          <p class="region-copy">
+            {{ shell.runtimeSummary.active_runs.length }} active run(s),
+            {{ shell.runtimeSummary.signals.open_count }} open signal(s),
+            degraded={{ shell.runtimeSummary.degraded.active }}.
+          </p>
+        </div>
 
-      <div v-else-if="shell.runtimeSummaryLoadState === 'error'" class="placeholder-card">
-        <p class="placeholder-card__label">Runtime summary</p>
-        <strong>Unavailable</strong>
-        <p class="region-copy">{{ shell.runtimeSummaryError }}</p>
+        <div v-else-if="shell.runtimeSummaryLoadState === 'error'" class="placeholder-card">
+          <p class="placeholder-card__label">Runtime summary</p>
+          <strong>Unavailable</strong>
+          <p class="region-copy">{{ shell.runtimeSummaryError }}</p>
+        </div>
       </div>
     </section>
 
@@ -162,8 +208,63 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       <div class="placeholder-card">
         <p class="placeholder-card__label">Run seam</p>
         <strong>{{ shell.runStateLabel }}</strong>
+        <div
+          v-if="
+            shell.primaryActiveRun &&
+            (
+              shell.primaryActiveRun.can_stop ||
+              shell.primaryActiveRun.can_resume ||
+              shell.primaryActiveRun.phase === 'executing' ||
+              shell.primaryActiveRun.phase === 'review_ready'
+            )
+          "
+          class="run-actions"
+        >
+          <button
+            v-if="shell.primaryActiveRun.phase === 'executing'"
+            type="button"
+            class="run-actions__button"
+            :disabled="!shell.canMarkPrimaryRunReviewReady"
+            @click="shell.markPrimaryRunReviewReady()"
+          >
+            {{ shell.runMutationState === 'reviewing' ? 'Sending to review...' : 'Ready for review' }}
+          </button>
+          <button
+            v-if="shell.primaryActiveRun.can_stop"
+            type="button"
+            class="run-actions__button"
+            :disabled="!shell.canStopPrimaryRun"
+            @click="shell.stopPrimaryRun()"
+          >
+            {{ shell.runMutationState === 'stopping' ? 'Stopping...' : 'Stop run' }}
+          </button>
+          <button
+            v-if="shell.primaryActiveRun.can_resume"
+            type="button"
+            class="run-actions__button"
+            :disabled="!shell.canResumePrimaryRun"
+            @click="shell.resumePrimaryRun()"
+          >
+            {{ shell.runMutationState === 'resuming' ? 'Resuming...' : 'Resume run' }}
+          </button>
+          <button
+            v-if="shell.primaryActiveRun.phase === 'review_ready'"
+            type="button"
+            class="run-actions__button"
+            :disabled="!shell.canCompletePrimaryRun"
+            @click="shell.completePrimaryRun()"
+          >
+            {{ shell.runMutationState === 'completing' ? 'Completing...' : 'Complete run' }}
+          </button>
+        </div>
         <p v-if="shell.primaryActiveRun" class="region-copy">
           {{ shell.primaryActiveRun.detail }}
+        </p>
+        <p v-if="shell.primaryActiveRun?.current_step" class="region-copy">
+          step={{ shell.primaryActiveRun.current_step }}
+        </p>
+        <p v-if="shell.runMutationError" class="region-copy">
+          {{ shell.runMutationError }}
         </p>
         <p v-else-if="shell.runsLoadState === 'error'" class="region-copy">
           {{ shell.runsError }}
@@ -173,6 +274,32 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       <div class="placeholder-card">
         <p class="placeholder-card__label">Approvals seam</p>
         <strong>{{ shell.approvalStateLabel }}</strong>
+        <div
+          v-if="shell.primaryApprovalRun?.can_approve || shell.primaryApprovalRun?.phase === 'awaiting_approval'"
+          class="run-actions"
+        >
+          <button
+            v-if="shell.primaryApprovalRun?.can_approve"
+            type="button"
+            class="run-actions__button"
+            :disabled="!shell.canApprovePrimaryRun"
+            @click="shell.approvePrimaryRun()"
+          >
+            {{ shell.runMutationState === 'approving' ? 'Approving...' : 'Approve run' }}
+          </button>
+          <button
+            v-if="shell.primaryApprovalRun?.phase === 'awaiting_approval'"
+            type="button"
+            class="run-actions__button"
+            :disabled="!shell.canRejectPrimaryRun"
+            @click="shell.rejectPrimaryRun()"
+          >
+            {{ shell.runMutationState === 'rejecting' ? 'Rejecting...' : 'Reject run' }}
+          </button>
+        </div>
+        <p v-if="shell.primaryApprovalRun?.can_approve" class="region-copy">
+          {{ shell.primaryApprovalRun.run_id }} is blocked on an explicit approval boundary.
+        </p>
       </div>
 
       <div class="placeholder-card">

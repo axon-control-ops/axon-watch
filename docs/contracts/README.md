@@ -35,7 +35,17 @@ Verify the shared contract package from the repo root:
 ```bash
 npm run verify:shared-types
 npm run verify:contracts
+npm run verify
 ```
+
+## Briefing Seam
+
+`GET /api/briefing` is implemented in control-plane but intentionally not wired
+into the console shell during stabilization. See `docs/contracts/BRIEFING-SEAM.md`.
+
+## Multi-Agent Lanes
+
+After stabilization, parallel work must follow `docs/MULTITASK-LANES.md`.
 
 ## Additive-First Rule
 

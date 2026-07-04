@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@xterm/addon-fit": "latest",
+    "@xterm/xterm": "latest",
+    "monaco-editor": "latest",
     "pinia": "latest",
     "vue": "latest"
   },
@@ -18,6 +22,7 @@
     "@types/node": "latest",
     "typescript": "latest",
     "vite": "latest",
+    "vitest": "latest",
     "vue-tsc": "latest"
   }
 }
