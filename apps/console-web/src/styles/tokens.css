@@ -1,40 +1,54 @@
 :root {
   color-scheme: dark;
 
-  --surface-shell: #0a0e14;
-  --surface-panel: rgba(12, 20, 32, 0.72);
-  --surface-panel-elevated: rgba(14, 24, 38, 0.82);
-  --surface-inset: rgba(6, 10, 16, 0.9);
-  --surface-grid: rgba(72, 196, 255, 0.04);
+  --surface-shell: #050a0f;
+  --surface-panel: rgba(4, 12, 20, 0.94);
+  --surface-panel-elevated: rgba(6, 16, 26, 0.98);
+  --surface-inset: rgba(2, 6, 12, 0.98);
+  --surface-grid: rgba(0, 242, 255, 0.03);
 
-  --glass-blur: 18px;
-  --border-glass: rgba(120, 200, 255, 0.14);
-  --border-hud: rgba(72, 196, 255, 0.42);
-  --glow-hud-soft: 0 0 24px rgba(72, 196, 255, 0.12);
-  --glow-hud-strong: 0 0 32px rgba(72, 196, 255, 0.22);
-  --hud-corner-size: 12px;
+  --glass-blur: 10px;
+  --border-glass: rgba(0, 242, 255, 0.14);
+  --border-hud: rgba(0, 242, 255, 0.48);
+  --glow-hud-soft: 0 0 14px rgba(0, 242, 255, 0.16);
+  --glow-hud-strong: 0 0 24px rgba(0, 242, 255, 0.32);
+  --glow-text-cyan: 0 0 8px rgba(0, 242, 255, 0.28);
+  --hud-corner-size: 10px;
+  --hud-chamfer: 6px;
+  --hud-chamfer-inset: 4px;
+  --hud-frame-border-width: 2px;
+  --hud-frame-border: rgba(0, 242, 255, 0.5);
+  --hud-frame-glow: drop-shadow(0 0 2px rgba(0, 242, 255, 0.22))
+    drop-shadow(0 0 5px rgba(0, 242, 255, 0.08));
+  --hud-frame-glow-alert: drop-shadow(0 0 3px rgba(255, 159, 0, 0.28))
+    drop-shadow(0 0 6px rgba(255, 159, 0, 0.1));
 
-  --text-primary: #e8f4ff;
-  --text-secondary: #b8c9dc;
-  --text-muted: #7f93a8;
-  --text-hud: #7dd8ff;
+  --text-primary: #edf8ff;
+  --text-secondary: #8fa4b8;
+  --text-muted: #5f7388;
+  --text-hud: #00f2ff;
 
-  --accent-brand: #48c4ff;
-  --accent-brand-soft: rgba(72, 196, 255, 0.14);
+  --accent-brand: #00f2ff;
+  --accent-brand-soft: rgba(0, 242, 255, 0.1);
 
-  --state-info: #60a5fa;
-  --state-warning: #fbbf24;
-  --state-high: #fb923c;
-  --state-critical: #f87171;
-  --state-success: #4ade80;
-  --state-degraded: #f59e0b;
+  --state-info: #5ecbff;
+  --state-warning: #ff9d00;
+  --state-high: #ff6b4a;
+  --state-critical: #ff4d4d;
+  --state-success: #00ff88;
+  --state-degraded: #ff9d00;
+
+  --radius-shell: 4px;
+  --topbar-height: 58px;
+  --statusbar-height: 30px;
+  --shell-gutter: 0.85rem;
 
   --motion-fast: 120ms;
   --motion-normal: 180ms;
   --motion-emphasis: 260ms;
 
-  --font-display: "Segoe UI", Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-display: Inter, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 @media (prefers-reduced-motion: reduce) {

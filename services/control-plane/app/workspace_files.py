@@ -94,3 +94,38 @@ def write_workspace_file(workspace_id: str, file_path: str, content: str) -> dic
         "size_bytes": target.stat().st_size,
         "saved": True,
     }
+
+
+def rename_workspace_file(
+    workspace_id: str,
+    old_path: str,
+    new_path: str,
+) -> dict[str, object]:
+    root = resolve_workspace_root(workspace_id)
+    source = _safe_resolve(root, old_path)
+    target = _safe_resolve(root, new_path)
+
+    if not source.is_file():
+        raise WorkspaceFileError(f"file not found: {old_path}")
+
+    if source == target:
+        return {
+            "workspace_id": workspace_id,
+            "old_path": old_path,
+            "path": new_path,
+            "size_bytes": source.stat().st_size,
+            "renamed": True,
+        }
+
+    if target.exists():
+        raise WorkspaceFileError(f"file already exists: {new_path}")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    source.rename(target)
+    return {
+        "workspace_id": workspace_id,
+        "old_path": old_path,
+        "path": new_path,
+        "size_bytes": target.stat().st_size,
+        "renamed": True,
+    }

@@ -1,0 +1,974 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Axon-X How-To Handbook</title>
+  <link rel="stylesheet" href="file:///home/edp/axon-nvme/repos/axon-watch/docs/how-to-handbook-print.css" />
+</head>
+<body>
+  <main class="page">
+    
+<section class="cover-page">
+  <div class="cover-inner">
+    <div class="cover-brand">
+      <div class="cover-logo">AX</div>
+      <div class="cover-brand-text">Axon-X · axon-watch</div>
+    </div>
+    <div class="cover-hero">
+      <h1 class="cover-title">How-To <em>Handbook</em></h1>
+      <p class="cover-subtitle">Your field guide for bootstrapping, verifying, troubleshooting, and shipping thin slices in the next-generation operator console.</p>
+      <div class="cover-pills">
+        <span class="cover-pill">Shell <code>:4173</code></span>
+        <span class="cover-pill">Control plane <code>:8787</code></span>
+        <span class="cover-pill">Watch <code>:8788</code></span>
+      </div>
+    </div>
+    <div class="cover-footer">
+      <div class="cover-meta">
+        <strong>Last verified</strong> · 2026-07-04 — `npm run verify` OK, 82 Python tests OK, stack smoke on ports 4173/8787/8788 OK.<br/>
+        Generated 04 Jul 2026
+      </div>
+      <div class="cover-chips">
+        <span class="cover-chip">console-web</span>
+        <span class="cover-chip">control-plane</span>
+        <span class="cover-chip">shared-types</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+    
+<nav class="toc" id="table-of-contents">
+  <div class="toc-header">
+    <div class="toc-kicker">Field guide</div>
+    <h2>16 chapters</h2>
+  </div>
+  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-final-guidance">Final Guidance</a></li></ol>
+</nav>
+
+    
+<section class="intro-panel">
+  <h2>Read this first</h2>
+  <p>Practical guide for operators, reviewers, and developers working in the <strong>axon-watch</strong> repo — the greenfield home of <strong>Axon-X</strong>.</p>
+  <ul>
+    <li>Plans live in <code>axon-local/Plans/Axon-Watch/</code> — implement here, don't redefine semantics there.</li>
+    <li>Start with <code>./scripts/dev/up.sh</code>, verify with <code>npm run verify</code>.</li>
+    <li>Treat bootstrap-real and feature-real as different things — see parity ledger before assuming parity.</li>
+  </ul>
+</section>
+
+    <article class="doc-body">
+      <section class="chapter" id="chapter-terminology-and-abbreviations"><div class="chapter-header"><span class="chapter-num">01</span><h2 id="terminology-and-abbreviations">Terminology And Abbreviations</h2></div><div class="chapter-body">
+<p>Use this glossary when reading plans, ADRs, code, or agent summaries.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ADR</strong></td>
+<td>Architecture Decision Record — a numbered, immutable write-up of a significant technical or process choice. Accepted ADRs live in <code>docs/adr/</code>. Do not rewrite them; supersede with a new ADR instead.</td>
+</tr>
+<tr>
+<td><strong>Axon-X</strong></td>
+<td>User-facing product name for the next-generation operator console.</td>
+</tr>
+<tr>
+<td><strong>axon-watch</strong></td>
+<td>Internal repo folder and npm workspace name. Legacy naming; not the product label shown to operators.</td>
+</tr>
+<tr>
+<td><strong>axon-local</strong></td>
+<td>The current production Axon app repo (port <strong>7734</strong>). Planning for Axon-X still lives here under <code>Plans/Axon-Watch/</code>.</td>
+</tr>
+<tr>
+<td><strong>Briefing seam</strong></td>
+<td><code>GET /api/briefing</code> returns canonical <code>OperatorBriefing</code>. The shell loads it at bootstrap and projects that data across the right dock: approvals, signals, and the KAIRO briefing card all read from the same briefing/runtime truth. Approval mutations stay on the run approval seam. See <code>docs/contracts/BRIEFING-SEAM.md</code>.</td>
+</tr>
+<tr>
+<td><strong>Control plane</strong></td>
+<td>FastAPI service on port <strong>8787</strong> that owns run truth, runtime summary, inbox projection, workspaces list, and briefing.</td>
+</tr>
+<tr>
+<td><strong>Console-web / shell</strong></td>
+<td>Vue 3 frontend on port <strong>4173</strong> — the visible Axon-X UI.</td>
+</tr>
+<tr>
+<td><strong>Contract / shared contract</strong></td>
+<td>Canonical TypeScript types and JSON fixtures in <code>packages/shared-types/</code>. Frontend and backend must agree here first.</td>
+</tr>
+<tr>
+<td><strong>Coordinator lane</strong></td>
+<td>Single owner of serial-only semantics during multi-agent work. See <code>docs/MULTITASK-LANES.md</code>.</td>
+</tr>
+<tr>
+<td><strong>DTO</strong></td>
+<td>Data Transfer Object — a typed payload shape exchanged between services or UI layers (for example <code>RuntimeSummary</code>, <code>RunRecord</code>).</td>
+</tr>
+<tr>
+<td><strong>Fitness function</strong></td>
+<td>An automated check that guards architecture or performance (dependency direction, DTO size budgets, latency thresholds).</td>
+</tr>
+<tr>
+<td><strong>Frozen planning bundle</strong></td>
+<td>The locked docs under <code>axon-local/Plans/Axon-Watch/</code>. Implementation must not silently drift from these.</td>
+</tr>
+<tr>
+<td><strong>KAIRO</strong></td>
+<td>Knowledge-Augmented Intelligence for Response and Oversight — the planned operator-presence layer (watching, advising, interrupting, executing with receipts). The current shell has KAIRO presentation scaffolding (topbar presence module, briefing card, operator copy), but the full operator-presence system in <code>KAIRO_MODE.md</code> / <code>ADR-005-kairo-as-operator-presence-layer.md</code> is <strong>not</strong> landed yet.</td>
+</tr>
+<tr>
+<td><strong>Lane A/B/C/D</strong></td>
+<td>Parallel implementation ownership areas defined in <code>docs/MULTITASK-LANES.md</code> (watch, shell, control-plane, dev/verify).</td>
+</tr>
+<tr>
+<td><strong>Monaco host</strong></td>
+<td>In-browser code editor surface (<code>EditorHost.vue</code>). Loads workspace files on disk (README.md, notes.txt) plus read-only DTO overview tabs.</td>
+</tr>
+<tr>
+<td><strong>Parity ledger</strong></td>
+<td>Checklist of behaviors Axon-X must eventually match from current Axon. Lives in frozen planning.</td>
+</tr>
+<tr>
+<td><strong>Run / run record</strong></td>
+<td>Canonical execution unit with <code>phase</code>, <code>status</code>, capability flags, and transition history.</td>
+</tr>
+<tr>
+<td><strong>Run phase</strong></td>
+<td>High-level lifecycle stage (<code>queued</code>, <code>starting</code>, <code>executing</code>, <code>awaiting_approval</code>, <code>review_ready</code>, <code>completed</code>, etc.). Defined in frozen <code>run-state.md</code>.</td>
+</tr>
+<tr>
+<td><strong>Runtime summary</strong></td>
+<td>Boot-critical DTO at <code>GET /api/runtime/summary</code> — identity, watch connection, active runs, approvals snapshot.</td>
+</tr>
+<tr>
+<td><strong>Signal / inbox item</strong></td>
+<td>Watch-produced event surfaced through control-plane <code>GET /api/inbox</code>.</td>
+</tr>
+<tr>
+<td><strong>Thin slice</strong></td>
+<td>A small, verifiable vertical increment — one owned behavior with tests, not a broad rewrite.</td>
+</tr>
+<tr>
+<td><strong>Watch service</strong></td>
+<td>FastAPI service on port <strong>8788</strong> that produces canonical signals; control-plane projects them into inbox/runtime summary.</td>
+</tr>
+<tr>
+<td><strong>xterm host</strong></td>
+<td>In-browser terminal surface (<code>TerminalHost.vue</code>) attached to a <strong>backend PTY session</strong> via <code>WS /api/workspaces/{workspace_id}/terminal</code>. Runs real shell commands in a workspace-scoped directory under <code>.local/workspaces/</code> (override with <code>AXON_WATCH_WORKSPACE_ROOT</code>).</td>
+</tr>
+<tr>
+<td><strong>Workspace</strong></td>
+<td>Logical operator context keyed by <code>workspace_id</code>. Today the API returns IDs only; rich catalog metadata is deferred.</td>
+</tr>
+</tbody>
+</table>
+<h3>Two repos, two apps</h3>
+<p>Do not confuse these:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>axon-local</strong> (current Axon)</th>
+<th><strong>axon-watch</strong> (Axon-X)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default URL</td>
+<td><code>http://127.0.0.1:7734</code></td>
+<td><code>http://127.0.0.1:4173</code></td>
+</tr>
+<tr>
+<td>Start command</td>
+<td><code>./start.sh</code> from axon-local</td>
+<td><code>./scripts/dev/up.sh</code> from axon-watch</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Mature daily-driver console</td>
+<td>Early greenfield rebuild</td>
+</tr>
+<tr>
+<td>Relationship</td>
+<td>Source of parity targets and frozen plans</td>
+<td>Implementation target for modernization</td>
+</tr>
+</tbody>
+</table>
+</div></section><section class="chapter" id="chapter-what-axon-x-is"><div class="chapter-header"><span class="chapter-num">02</span><h2 id="what-axon-x-is">What Axon-X Is</h2></div><div class="chapter-body">
+<p><strong>Axon-X</strong> is the next-generation Axon console and operator environment.</p>
+<p>The code lives in the <code>axon-watch</code> repo folder for now. That folder name is<br />
+legacy/internal; the product name is <strong>Axon-X</strong>.</p>
+<p>The target product combines:</p>
+<ul>
+<li>an IDE-style shell</li>
+<li>a control plane</li>
+<li>a dedicated watcher service</li>
+</ul>
+<p>The implementation repo is here:</p>
+<ul>
+<li><code>/home/edp/axon-nvme/repos/axon-watch</code></li>
+</ul>
+<p>The frozen planning source-of-truth still lives here:</p>
+<ul>
+<li><code>/home/edp/axon-nvme/repos/axon-local/Plans/Axon-Watch/</code></li>
+</ul>
+<p>Important rule:</p>
+<ul>
+<li>read plans from <code>axon-local</code></li>
+<li>implement in <code>axon-watch</code></li>
+</ul>
+<p>Do not casually move back and forth inventing new semantics in both places.</p>
+</div></section><section class="chapter" id="chapter-what-state-the-repo-is-in-right-now"><div class="chapter-header"><span class="chapter-num">03</span><h2 id="what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</h2></div><div class="chapter-body">
+<p>The repo is in an early but real bootstrap state.</p>
+<p>What already exists:</p>
+<ul>
+<li>repo scaffold</li>
+<li><code>console-web</code> shell skeleton</li>
+<li><code>control-plane</code> FastAPI bootstrap service</li>
+<li><code>axon-watch</code> FastAPI bootstrap service</li>
+<li>shared contract package</li>
+<li>verification harness</li>
+<li>health and readiness scripts</li>
+</ul>
+<p>What is already real:</p>
+<ul>
+<li>root workspace scripts</li>
+<li>service startup/shutdown flow</li>
+<li><code>/api/runtime/summary</code>, <code>/api/inbox</code>, <code>/api/runs</code>, and <code>/api/briefing</code> routes in the control plane</li>
+<li>shared contract types under <code>packages/shared-types/</code></li>
+<li>shell consumption of canonical runtime summary, inbox, and run DTOs</li>
+<li>thin Monaco and xterm host surfaces in <code>console-web</code></li>
+</ul>
+<p>What is still intentionally thin or deferred:</p>
+<ul>
+<li>full signal production and deeper ranking beyond current inbox rule stack</li>
+<li>deep watch summary logic</li>
+<li>performance evidence for all budgets</li>
+</ul>
+<p>What is now real in the thin slice (verified 2026-07-04):</p>
+<ul>
+<li>run create/complete/stop/resume lifecycle</li>
+<li>explicit approval boundary (<code>requires_approval</code>, approve/reject)</li>
+<li>review-ready entry, completion, and follow-up resume path</li>
+<li>SQLite-backed run persistence (survives control-plane restart)</li>
+<li>operator briefing loaded at bootstrap and rendered in the right dock (<code>BriefingPanel.vue</code>)</li>
+<li>two watch-produced inbox signals with multi-factor ranking (severity, recency,<br />
+unresolved duration via <code>created_at</code>, status, action-type, workspace priority)</li>
+<li>workspace list API and shell workspace selector (IDs only)</li>
+<li>the shell is split into <code>TopBar</code>, <code>LeftSidebar</code>, <code>CenterWorkbench</code>,<br />
+<code>RightDock</code>, and <code>StatusBar</code> regions with mockup-shell chrome</li>
+<li>Monaco host bound to canonical DTO documents and <strong>workspace files on disk</strong><br />
+with a nested explorer tree, lazy file loading, new-file creation, and active-file rename</li>
+<li>backend PTY terminal attachment for the selected workspace (real shell I/O via WebSocket)</li>
+<li>workspace-scoped conversation rehydration: <code>GET /api/workspaces/{workspace_id}/chat/thread</code><br />
+plus existing thread history read reloads the Conversation seam after page refresh</li>
+</ul>
+<p><strong>Workspace IDs (operator vs catalog):</strong></p>
+<ul>
+<li><strong>Operator shell</strong> uses <code>MOCKUP_WORKSPACE_IDS</code> only (<code>workspace_smoke</code>, <code>workspace_recsys</code>,<br />
+…). <code>mergeMockupWorkspaceCatalog()</code> trims API extras so <code>currentWorkspace</code> is always<br />
+sidebar-visible.</li>
+<li><strong>Control-plane catalog</strong> may still list fixture defaults (<code>workspace_alpha</code>,<br />
+<code>workspace_bootstrap</code>) and run/inbox IDs for tests and API consumers; the shell does<br />
+not select those as <code>currentWorkspace</code>.</li>
+<li>Bootstrap picks workspace deterministically: active run workspace (when visible) →<br />
+<code>workspace_smoke</code> default → first mockup workspace.</li>
+</ul>
+<p>Manual acceptance for reload-safe chat (use <strong><code>workspace_smoke</code></strong>):</p>
+<ol>
+<li><code>./scripts/dev/up.sh</code></li>
+<li>Open <code>http://127.0.0.1:4173</code></li>
+<li>Confirm <strong><code>workspace_smoke</code></strong> is selected (or select it)</li>
+<li>Post a command in the Command seam</li>
+<li>Hard reload the page</li>
+<li>Conversation should rehydrate automatically for the same workspace when an active run<br />
+or default bootstrap applies; if needed, re-select <strong><code>workspace_smoke</code></strong></li>
+</ol>
+<p>API-only check (any valid catalog ID):</p>
+<pre><code class="language-bash">curl -s http://127.0.0.1:8787/api/workspaces/workspace_smoke/chat/thread
+curl -s http://127.0.0.1:8787/api/chat/threads/&lt;thread_id&gt;/history
+</code></pre>
+<p>What is <strong>not</strong> real yet despite similar-sounding names:</p>
+<ul>
+<li><strong>Full KAIRO operator presence</strong> — the current shell has visual scaffolding,<br />
+but spoken alerts, persona settings, and richer operator-presence behavior are<br />
+still planned in axon-local docs</li>
+<li><strong>Full parity with axon-local</strong> — intentional; see parity ledger for gaps</li>
+</ul>
+<p>So this repo is not a fake mockup, but it is also not feature-complete or a<br />
+drop-in replacement for the current Axon UI.</p>
+</div></section><section class="chapter" id="chapter-source-of-truth-rules"><div class="chapter-header"><span class="chapter-num">04</span><h2 id="source-of-truth-rules">Source Of Truth Rules</h2></div><div class="chapter-body">
+<p>When you are unsure what something should mean, check the planning bundle.</p>
+<p>The most important frozen planning docs are:</p>
+<ul>
+<li><code>PRODUCT.md</code></li>
+<li><code>ARCHITECTURE.md</code></li>
+<li><code>UI_SPEC.md</code></li>
+<li><code>UI_COMPOSITION_SPEC.md</code></li>
+<li><code>UI_VISUAL_DIRECTION.md</code></li>
+<li><code>UI_REFERENCE_ARCHETYPES.md</code></li>
+<li><code>run-state.md</code></li>
+<li><code>runtime-summary.md</code></li>
+<li><code>signal-events.md</code></li>
+<li><code>watch-api.md</code></li>
+<li><code>control-api.md</code></li>
+<li><code>PARITY_LEDGER.md</code></li>
+<li><code>FITNESS_FUNCTIONS.md</code></li>
+<li><code>TRANSITION_ARCHITECTURE.md</code></li>
+<li><code>CONTRACT_TESTING_SPEC.md</code></li>
+</ul>
+<h3>Things you must not redefine casually</h3>
+<p>These are serial-only semantics and should not drift:</p>
+<ul>
+<li>canonical run phases</li>
+<li>runtime summary vocabulary</li>
+<li>signal identity, severity, and status</li>
+<li>approval semantics</li>
+<li>transition seams and rollback rules</li>
+<li>parity acceptance rules</li>
+</ul>
+<p>If the plan seems wrong or insufficient:</p>
+<ul>
+<li>do not silently change it</li>
+<li>raise a proposed amendment instead</li>
+</ul>
+</div></section><section class="chapter" id="chapter-repo-layout"><div class="chapter-header"><span class="chapter-num">05</span><h2 id="repo-layout">Repo Layout</h2></div><div class="chapter-body">
+<p>Top-level structure:</p>
+<pre><code class="language-text">axon-watch/
+  apps/
+    console-web/
+  services/
+    control-plane/
+    axon-watch/
+  packages/
+    shared-types/
+  docs/
+  scripts/
+    dev/
+    verify/
+  infra/
+  tests/
+</code></pre>
+<h3>What each part owns</h3>
+<h4><code>apps/console-web/</code></h4>
+<p>Owns the integrated shell:</p>
+<ul>
+<li>topbar</li>
+<li>left sidebar</li>
+<li>center workbench (including the embedded terminal dock)</li>
+<li>right dock</li>
+<li>status bar</li>
+</ul>
+<p>It should consume canonical contracts, not invent backend truth.</p>
+<h4><code>services/control-plane/</code></h4>
+<p>Owns interactive backend responsibilities such as:</p>
+<ul>
+<li>UI-facing health/readiness</li>
+<li>runtime summary assembly</li>
+<li>later run-state, approvals, and workspace orchestration</li>
+</ul>
+<h4><code>services/axon-watch/</code></h4>
+<p>Owns watcher responsibilities such as:</p>
+<ul>
+<li>monitoring loops</li>
+<li>watch health/readiness</li>
+<li>later signal production</li>
+<li>later inbox/signal summaries</li>
+</ul>
+<h4><code>packages/shared-types/</code></h4>
+<p>Owns canonical shared contract types.</p>
+<p>This is one of the most important directories in the repo.</p>
+<p>If frontend and backend disagree about what a thing means, the fix should start<br />
+here, not in ad hoc local types.</p>
+<h4><code>scripts/dev/</code></h4>
+<p>Owns local run helpers:</p>
+<ul>
+<li>start</li>
+<li>stop</li>
+<li>health checks</li>
+</ul>
+<h4><code>scripts/verify/</code></h4>
+<p>Owns cheap, repeatable verification:</p>
+<ul>
+<li>dependency direction checks</li>
+<li>DTO size checks</li>
+<li>ADR governance checks</li>
+<li>latency-budget check scaffolding</li>
+</ul>
+</div></section><section class="chapter" id="chapter-the-current-architecture-in-plain-english"><div class="chapter-header"><span class="chapter-num">06</span><h2 id="the-current-architecture-in-plain-english">The Current Architecture In Plain English</h2></div><div class="chapter-body">
+<p>Think of the new app as three cooperating parts:</p>
+<ol>
+<li>the shell the user sees</li>
+<li>the control plane that serves user-facing APIs</li>
+<li>the watcher service that will eventually observe and normalize signals</li>
+</ol>
+<p>The current implementation is following a thin-slice path:</p>
+<ul>
+<li>bootstrap the shell and services first</li>
+<li>land canonical contracts early</li>
+<li>add real endpoints against those contracts</li>
+<li>then deepen behavior</li>
+</ul>
+<p>This is deliberate.</p>
+<p>It avoids:</p>
+<ul>
+<li>giant rewrites</li>
+<li>hidden semantic drift</li>
+<li>UI and backend inventing different meanings</li>
+</ul>
+</div></section><section class="chapter" id="chapter-quick-start"><div class="chapter-header"><span class="chapter-num">07</span><h2 id="quick-start">Quick Start</h2></div><div class="chapter-body">
+<h2>1. Go to the repo</h2>
+<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+</code></pre>
+<h2>2. Install JavaScript dependencies</h2>
+<pre><code class="language-bash">npm install
+</code></pre>
+<p>This is important because root workspace commands now rely on npm workspaces.</p>
+<h2>3. Review environment defaults</h2>
+<p>Default values are provided in:</p>
+<ul>
+<li><code>.env.example</code></li>
+</ul>
+<p>If you need custom ports or local paths:</p>
+<pre><code class="language-bash">cp .env.example .env
+</code></pre>
+<p>Then edit <code>.env</code> as needed.</p>
+<h2>4. Start the local stack</h2>
+<pre><code class="language-bash">./scripts/dev/up.sh
+</code></pre>
+<p><code>up.sh</code> does not report success until all three services are actually reachable.</p>
+<p>This starts:</p>
+<ul>
+<li><code>console-web</code></li>
+<li><code>control-plane</code></li>
+<li><code>axon-watch</code></li>
+</ul>
+<p>Important startup contract:</p>
+<ul>
+<li>ports are fixed by <code>.env</code> / <code>.env.example</code></li>
+<li>startup fails fast if <code>4173</code>, <code>8787</code>, or <code>8788</code> is already in use</li>
+<li>startup rolls back partial processes if readiness fails</li>
+<li>services stay detached after the launching shell exits</li>
+</ul>
+<h2>5. Check health</h2>
+<pre><code class="language-bash">./scripts/dev/check-health.sh
+</code></pre>
+<p>Expected endpoints:</p>
+<ul>
+<li>console web: <code>http://127.0.0.1:4173</code></li>
+<li>control plane health: <code>http://127.0.0.1:8787/api/health</code></li>
+<li>watch health: <code>http://127.0.0.1:8788/internal/watch/health</code></li>
+<li>briefing: <code>http://127.0.0.1:8787/api/briefing</code> (also loaded by the shell at bootstrap)</li>
+<li>runtime summary: <code>http://127.0.0.1:8787/api/runtime/summary</code></li>
+<li>inbox: <code>http://127.0.0.1:8787/api/inbox</code></li>
+<li>runs: <code>http://127.0.0.1:8787/api/runs</code></li>
+<li>workspaces: <code>http://127.0.0.1:8787/api/workspaces</code></li>
+</ul>
+<p><code>check-health.sh</code> also probes <code>/api/workspaces</code>.</p>
+<h2>6. Stop the stack</h2>
+<pre><code class="language-bash">./scripts/dev/down.sh
+</code></pre>
+</div></section><section class="chapter" id="chapter-what-the-current-app-does-on-boot"><div class="chapter-header"><span class="chapter-num">08</span><h2 id="what-the-current-app-does-on-boot">What The Current App Does On Boot</h2></div><div class="chapter-body">
+<p>Right now, the shell boots and loads five control-plane seams in parallel.</p>
+<p>That flow looks like this:</p>
+<ol>
+<li><code>apps/console-web/src/main.ts</code> creates the Vue app</li>
+<li>the shell store initializes</li>
+<li><code>loadBootstrapData()</code> is called</li>
+<li>the frontend fetches <code>/api/runtime/summary</code>, <code>/api/inbox</code>, and <code>/api/briefing</code></li>
+<li>workspaces and runs load sequentially; <code>resolveBootstrapWorkspaceId()</code> sets<br />
+<code>currentWorkspace</code> (active run workspace when sidebar-visible, else <code>workspace_smoke</code>)</li>
+<li>workspace files and chat thread history load for that workspace</li>
+<li>the shell renders topbar context, workspace state, editor/terminal workbench,<br />
+right-dock seams, and status bar truth strips</li>
+</ol>
+<p>Important limitations:</p>
+<ul>
+<li><strong>Operator workspace list</strong> — shell and sidebar share the same <code>MOCKUP_WORKSPACE_IDS</code><br />
+catalog; catalog-only IDs such as <code>workspace_alpha</code> remain API-visible but are not<br />
+selected in the shell</li>
+<li><strong>Bootstrap workspace selection</strong> — deterministic via <code>resolveBootstrapWorkspaceId()</code><br />
+after sequential workspace + run load (no parallel race)</li>
+<li><strong>Chat rehydration</strong> — scoped per workspace; messages posted under one ID do not appear<br />
+when another workspace is selected; only the latest thread per workspace is returned</li>
+<li>Operator mode renders the right dock as <strong>Run → Approvals → Signals → Conversation →<br />
+Command → KAIRO Briefing</strong> with the briefing card anchored at the bottom of the dock</li>
+<li>briefing data is projected across the dock rather than shown as one raw DTO<br />
+dump: approvals stay in the approvals seam, top signals stay in the signals<br />
+seam, and the KAIRO card stays summary/CTA-oriented</li>
+<li>Monaco host loads workspace files on disk and read-only DTO overview tabs</li>
+<li>xterm host attaches to a backend PTY scoped to the selected workspace directory</li>
+<li>inbox ranking uses severity, recency, unresolved duration (<code>created_at</code>), status,<br />
+action-type, and a thin watch-owned workspace priority map</li>
+</ul>
+<p>That is okay for this stage.</p>
+</div></section><section class="chapter" id="chapter-locked-shell-layout"><div class="chapter-header"><span class="chapter-num">09</span><h2 id="locked-shell-layout">Locked Shell Layout</h2></div><div class="chapter-body">
+<p><strong>Locked 2026-07-04</strong> — see <code>docs/UI_LAYOUT_LOCK.md</code> and<br />
+<code>docs/adr/ADR-004-locked-console-shell-layout.md</code>.</p>
+<p>Do not rearrange shell regions or dock seam order without a superseding ADR.<br />
+Frozen planning in <code>axon-local/Plans/Axon-Watch/UI_COMPOSITION_SPEC.md</code> is amended<br />
+to match this geometry.</p>
+<p>Five-region grid:</p>
+<table>
+<thead>
+<tr>
+<th>Region</th>
+<th>Component</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Top bar</td>
+<td><code>TopBar.vue</code></td>
+<td>identity zone + runtime strip + KAIRO module + mode toggle</td>
+</tr>
+<tr>
+<td>Left sidebar</td>
+<td><code>LeftSidebar.vue</code></td>
+<td>workspaces, optional explorer (IDE), status card</td>
+</tr>
+<tr>
+<td>Center workbench</td>
+<td><code>CenterWorkbench.vue</code></td>
+<td>Monaco editor + embedded resizable terminal dock</td>
+</tr>
+<tr>
+<td>Right dock</td>
+<td><code>RightDock.vue</code></td>
+<td>Run → Approvals → Signals (upper stack), KAIRO Briefing bottom hero</td>
+</tr>
+<tr>
+<td>Status bar</td>
+<td><code>StatusBar.vue</code></td>
+<td>HUD runtime strip</td>
+</tr>
+</tbody>
+</table>
+<p>KAIRO Briefing height tracks the workbench terminal dock via <code>--briefing-dock-height</code>.</p>
+</div></section><section class="chapter" id="chapter-current-shell-layout"><div class="chapter-header"><span class="chapter-num">10</span><h2 id="current-shell-layout">Current Shell Layout</h2></div><div class="chapter-body">
+<p>The locked shell matches the mockup/live screenshots:</p>
+<ul>
+<li><code>TopBar</code> — brand frame, mockup breadcrumb/version context panel, DTO runtime<br />
+strip, KAIRO presence module, Operator/IDE toggle, settings action</li>
+<li><code>LeftSidebar</code> — workspace list first, workspace status card second, explorer<br />
+tree only in IDE mode</li>
+<li><code>CenterWorkbench</code> — editor tabbar + breadcrumb + Monaco editor above a<br />
+resizable bottom terminal/log dock</li>
+<li><code>RightDock</code> — run seam, approvals seam, signals seam, KAIRO briefing card</li>
+<li><code>StatusBar</code> — persistent watch / run phase / signals / operator strip</li>
+</ul>
+<p>This is the layout you should compare against the mockup and live screenshots,<br />
+not the older single-file shell description from earlier thin slices.</p>
+</div></section><section class="chapter" id="chapter-mockup-live-parity-notes"><div class="chapter-header"><span class="chapter-num">11</span><h2 id="mockup-live-parity-notes">Mockup / Live Parity Notes</h2></div><div class="chapter-body">
+<p>Parity observations from the current mockup and live screenshots:</p>
+<ul>
+<li>the region geometry now largely matches the mockup: topbar, workspace rail,<br />
+editor-over-terminal workbench, right dock, and bottom status strip</li>
+<li>the <strong>runtime strip</strong>, status bar zones, and workspace status card derive from<br />
+live shell state / <code>RuntimeSummary</code>, but the topbar breadcrumb and runtime<br />
+version chips are still mockup-style presentation helpers</li>
+<li>the sidebar and shell store share the same operator workspace catalog (<code>MOCKUP_WORKSPACE_IDS</code>)</li>
+<li>the dock still uses scaffold seam titles (<code>RUN SEAM</code>, <code>APPROVALS SEAM</code>,<br />
+<code>SIGNALS SEAM</code>) rather than the final operator-facing copy</li>
+<li>Operator mode renders the right dock as <strong>Run → Approvals → Signals → Conversation →<br />
+Command → KAIRO Briefing</strong> with the briefing card anchored at the bottom of the dock</li>
+<li>the workbench terminal dock default height is ~240px (responsive cap 280px) unless the<br />
+operator resizes it; height persists in session storage when customized</li>
+</ul>
+</div></section><section class="chapter" id="chapter-the-most-important-files-right-now"><div class="chapter-header"><span class="chapter-num">12</span><h2 id="the-most-important-files-right-now">The Most Important Files Right Now</h2></div><div class="chapter-body">
+<p>If you need to understand the current implementation quickly, read these first:</p>
+<h3>Shared contracts</h3>
+<ul>
+<li><code>packages/shared-types/src/index.ts</code></li>
+<li><code>packages/shared-types/src/run.ts</code></li>
+<li><code>packages/shared-types/src/runtime.ts</code></li>
+<li><code>packages/shared-types/src/signals.ts</code></li>
+<li><code>packages/shared-types/src/control-plane.ts</code></li>
+<li><code>packages/shared-types/src/watch.ts</code></li>
+</ul>
+<h3>Fixture payloads</h3>
+<ul>
+<li><code>packages/shared-types/fixtures/runtime-summary.example.json</code></li>
+<li><code>packages/shared-types/fixtures/watch-summary.example.json</code></li>
+<li><code>packages/shared-types/fixtures/run-record.example.json</code></li>
+<li><code>packages/shared-types/fixtures/signal-event.example.json</code></li>
+</ul>
+<h3>Control plane</h3>
+<ul>
+<li><code>services/control-plane/app/main.py</code></li>
+<li><code>services/control-plane/app/workspace_catalog.py</code></li>
+<li><code>services/control-plane/app/runs/service.py</code></li>
+<li><code>services/control-plane/app/runtime_summary_assembler.py</code></li>
+<li><code>services/control-plane/app/operator_briefing.py</code></li>
+</ul>
+<h3>Frontend shell</h3>
+<ul>
+<li><code>apps/console-web/src/main.ts</code></li>
+<li><code>apps/console-web/src/api/control-plane.ts</code></li>
+<li><code>apps/console-web/src/stores/shell.ts</code></li>
+<li><code>apps/console-web/src/App.vue</code></li>
+<li><code>apps/console-web/src/components/EditorHost.vue</code></li>
+<li><code>apps/console-web/src/components/TerminalHost.vue</code></li>
+<li><code>apps/console-web/src/lib/workspace-documents.ts</code></li>
+</ul>
+<h3>Verification</h3>
+<ul>
+<li><code>scripts/verify/README.md</code></li>
+<li><code>scripts/verify/verification_config.json</code></li>
+<li><code>tests/test_shared_contract_fixtures.py</code></li>
+<li><code>tests/test_control_plane_runtime_summary.py</code></li>
+<li><code>tests/test_verify_harness.py</code></li>
+</ul>
+</div></section><section class="chapter" id="chapter-verification-commands"><div class="chapter-header"><span class="chapter-num">13</span><h2 id="verification-commands">Verification Commands</h2></div><div class="chapter-body">
+<p>Use these from the repo root:</p>
+<h2>Shared contract verification</h2>
+<pre><code class="language-bash">npm run verify:shared-types
+</code></pre>
+<p>This confirms the shared-types package typechecks.</p>
+<h2>Contract verification</h2>
+<pre><code class="language-bash">npm run verify:contracts
+</code></pre>
+<p>This verifies:</p>
+<ul>
+<li>shared contract package typing</li>
+<li>shared fixture tests</li>
+<li>control-plane run/inbox/runtime-summary/briefing behavior</li>
+<li>watch signal contract alignment</li>
+</ul>
+<h2>Full current verification bundle</h2>
+<pre><code class="language-bash">npm run verify
+</code></pre>
+<p>This runs:</p>
+<ul>
+<li>contract verification</li>
+<li>console-web typecheck, unit test, and production build</li>
+<li>verify harness checks</li>
+<li>DTO size checks using representative fixtures</li>
+</ul>
+<h2>Frontend checks</h2>
+<pre><code class="language-bash">npm run typecheck -w @axon-watch/console-web
+npm run test -w @axon-watch/console-web
+npm run build -w @axon-watch/console-web
+</code></pre>
+<h2>Python syntax checks</h2>
+<pre><code class="language-bash">python3 -m py_compile services/control-plane/app/main.py services/control-plane/app/runs/service.py services/control-plane/app/domain/run_state.py services/control-plane/app/domain/run_transitions.py services/control-plane/app/operator_briefing.py
+</code></pre>
+<h2>Service tests</h2>
+<pre><code class="language-bash">python3 -m unittest discover -s tests
+</code></pre>
+</div></section><section class="chapter" id="chapter-what-pass-pending-fail-mean-in-verification"><div class="chapter-header"><span class="chapter-num">14</span><h2 id="what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</h2></div><div class="chapter-body">
+<p>The verify harness uses explicit states.</p>
+<h3><code>PASS</code></h3>
+<p>The supplied evidence met the rule.</p>
+<p>Examples:</p>
+<ul>
+<li>DTO payload fits its size budget</li>
+<li>dependency direction rule is respected</li>
+</ul>
+<h3><code>PENDING</code></h3>
+<p>The check exists, but the slice does not provide enough real implementation or<br />
+evidence yet.</p>
+<p>Examples:</p>
+<ul>
+<li>shell boot timing evidence not supplied yet</li>
+<li>runtime summary latency budget not yet measured</li>
+<li>no numbered ADR yet exists</li>
+</ul>
+<p><code>PENDING</code> is not automatically bad at this stage.</p>
+<p>It means the governance has been created ahead of the full implementation.</p>
+<h3><code>FAIL</code></h3>
+<p>The rule was violated or the harness itself is broken.</p>
+<p>This is the one that should stop you.</p>
+</div></section><section class="chapter" id="chapter-common-working-patterns"><div class="chapter-header"><span class="chapter-num">15</span><h2 id="common-working-patterns">Common Working Patterns</h2></div><div class="chapter-body">
+<h2>When adding frontend work</h2>
+<p>Use real shared types from <code>packages/shared-types/</code>.</p>
+<p>Do not:</p>
+<ul>
+<li>invent local copies of DTOs</li>
+<li>widen semantics casually in component code</li>
+<li>hide backend meaning in placeholder strings</li>
+</ul>
+<p>Good pattern:</p>
+<ul>
+<li>define or refine contract in shared-types</li>
+<li>use it in store/API layer</li>
+<li>render it in Vue components</li>
+</ul>
+<h2>When adding control-plane work</h2>
+<p>Prefer:</p>
+<ul>
+<li>canonical DTO assembly</li>
+<li>light endpoint handlers</li>
+<li>explicit payload validation</li>
+</ul>
+<p>Avoid:</p>
+<ul>
+<li>stuffing frontend-specific assumptions into the backend</li>
+<li>returning huge boot payloads</li>
+<li>redefining contract shapes inline</li>
+</ul>
+<h2>When adding watch work</h2>
+<p>Prefer:</p>
+<ul>
+<li>narrow, owned summaries</li>
+<li>canonical signal/event identities</li>
+<li>explicit watch responsibilities</li>
+</ul>
+<p>Avoid:</p>
+<ul>
+<li>pulling UI logic into the watch service</li>
+<li>importing control-plane domain semantics directly</li>
+<li>inventing competing signal vocabulary</li>
+</ul>
+</div></section><section class="chapter" id="chapter-troubleshooting"><div class="chapter-header"><span class="chapter-num">16</span><h2 id="troubleshooting">Troubleshooting</h2></div><div class="chapter-body">
+<h2>Problem: <code>./scripts/dev/up.sh</code> fails or the frontend does not start</h2>
+<p>Check:</p>
+<ol>
+<li>Did you run <code>npm install</code> at repo root?</li>
+<li>Are ports <code>4173</code>, <code>8787</code>, and <code>8788</code> free?</li>
+<li>Did <code>up.sh</code> print a specific port conflict or readiness failure message?</li>
+</ol>
+<p>Current expected path:</p>
+<ul>
+<li>root install: <code>npm install</code></li>
+<li>root startup: <code>./scripts/dev/up.sh</code></li>
+<li>health check: <code>./scripts/dev/check-health.sh</code></li>
+</ul>
+<p>If startup fails, inspect:</p>
+<ul>
+<li><code>.local/logs/console-web.log</code></li>
+<li><code>.local/logs/control-plane.log</code></li>
+<li><code>.local/logs/axon-watch.log</code></li>
+</ul>
+<h2>Problem: <code>check-health.sh</code> fails</h2>
+<p>This usually means one or more services never started.</p>
+<p>Steps:</p>
+<ol>
+<li>stop everything:</li>
+</ol>
+<pre><code class="language-bash">./scripts/dev/down.sh
+</code></pre>
+<ol start="2">
+<li>start again:</li>
+</ol>
+<pre><code class="language-bash">./scripts/dev/up.sh
+</code></pre>
+<ol start="3">
+<li>inspect logs:</li>
+</ol>
+<ul>
+<li><code>.local/logs/control-plane.log</code></li>
+<li><code>.local/logs/axon-watch.log</code></li>
+<li><code>.local/logs/console-web.log</code></li>
+</ul>
+<ol start="4">
+<li>re-run:</li>
+</ol>
+<pre><code class="language-bash">./scripts/dev/check-health.sh
+</code></pre>
+<h2>Problem: stale pid files block startup</h2>
+<p><code>up.sh</code> now clears stale pid files automatically before it checks for a live stack.</p>
+<p>First try:</p>
+<pre><code class="language-bash">./scripts/dev/down.sh
+</code></pre>
+<p>If that is not enough, inspect:</p>
+<ul>
+<li><code>.local/pids/</code></li>
+<li><code>.local/logs/console-web.log</code></li>
+<li><code>.local/logs/control-plane.log</code></li>
+<li><code>.local/logs/axon-watch.log</code></li>
+</ul>
+<p>If <code>up.sh</code> still fails, it usually means one of the configured ports is held by<br />
+another live process. Free the port or stop the other process before retrying.</p>
+<h2>Problem: the shell loads but runtime summary is unavailable</h2>
+<p>Check:</p>
+<ol>
+<li>Is control-plane running?</li>
+<li>Does this endpoint work?</li>
+</ol>
+<pre><code class="language-bash">curl -fsS http://127.0.0.1:8787/api/runtime/summary | python3 -m json.tool
+</code></pre>
+<ol start="3">
+<li>If running through Vite dev server, is <code>/api</code> proxied to control-plane?</li>
+</ol>
+<p>Current dev proxy lives in:</p>
+<ul>
+<li><code>apps/console-web/vite.config.ts</code></li>
+</ul>
+<p>You can also override the target with:</p>
+<ul>
+<li><code>VITE_CONTROL_PLANE_BASE_URL</code></li>
+</ul>
+<h2>Problem: <code>npm run verify</code> shows <code>PENDING</code></h2>
+<p>That is often expected at this stage.</p>
+<p>Examples of currently expected pending checks:</p>
+<ul>
+<li>shell boot readiness</li>
+<li>runtime summary latency</li>
+<li>watch summary latency</li>
+<li>numbered ADR presence</li>
+</ul>
+<p>Treat <code>PENDING</code> as:</p>
+<ul>
+<li>“scaffold exists, evidence not landed yet”</li>
+</ul>
+<p>Treat <code>FAIL</code> as:</p>
+<ul>
+<li>“something is wrong right now”</li>
+</ul>
+<h2>Problem: dependency direction checks fail</h2>
+<p>Check for forbidden imports across boundaries.</p>
+<p>The current verify harness guards things like:</p>
+<ul>
+<li>watch service must not depend on UI internals</li>
+<li>frontend must not depend on watch internals</li>
+<li>future domain-layer cross-imports must stay clean</li>
+</ul>
+<p>If a dependency check fails:</p>
+<ol>
+<li>remove the cross-boundary import</li>
+<li>move shared meaning into <code>packages/shared-types/</code> if appropriate</li>
+<li>use an adapter or API boundary instead of direct reach-through</li>
+</ol>
+<h2>Problem: contract tests fail after changing fixtures or DTOs</h2>
+<p>This usually means one of three things:</p>
+<ol>
+<li>you changed a canonical field name</li>
+<li>you widened/narrowed a type without updating the fixture</li>
+<li>you changed semantics without updating the contract layer first</li>
+</ol>
+<p>Fix sequence:</p>
+<ol>
+<li>check the frozen planning doc</li>
+<li>check the shared contract type</li>
+<li>check the fixture</li>
+<li>check the consumer/provider test</li>
+</ol>
+<p>Do not patch the frontend alone and ignore the canonical contract.</p>
+<h2>Problem: you are unsure whether something should become a new ADR</h2>
+<p>Ask:</p>
+<ol>
+<li>Is this a real architecture or process decision?</li>
+<li>Is it broader than one small implementation detail?</li>
+<li>Would future readers need to know why this choice was made?</li>
+</ol>
+<p>If yes, use ADR governance.</p>
+<p>Current ADR process docs live in:</p>
+<ul>
+<li><code>docs/adr/README.md</code></li>
+<li><code>docs/adr/_TEMPLATE.md</code></li>
+</ul>
+<p>Note:</p>
+<ul>
+<li>accepted ADRs should be numbered</li>
+<li>accepted ADRs should not be rewritten materially</li>
+<li>changed decisions should be superseded, not silently edited</li>
+</ul>
+</div></section><section class="chapter" id="chapter-tips-and-tricks"><div class="chapter-header"><span class="chapter-num">17</span><h2 id="tips-and-tricks">Tips And Tricks</h2></div><div class="chapter-body">
+<h2>Tip 1: Read the planning bundle before expanding semantics</h2>
+<p>The planning bundle is not optional context. It is the definition of intended<br />
+meaning.</p>
+<h2>Tip 2: Treat <code>packages/shared-types/</code> as sacred</h2>
+<p>If the frontend and backend disagree, fix it here first.</p>
+<h2>Tip 3: Keep slices narrow</h2>
+<p>The repo is intentionally growing by thin slices.</p>
+<p>If you are touching:</p>
+<ul>
+<li>run-state</li>
+<li>runtime summary</li>
+<li>signals</li>
+<li>approvals</li>
+</ul>
+<p>then keep the slice tightly bounded and verifiable.</p>
+<h2>Tip 4: Prefer fixtures early</h2>
+<p>Fixtures are useful in early slices because they:</p>
+<ul>
+<li>keep contracts concrete</li>
+<li>make DTO size checks easy</li>
+<li>let frontend and backend agree before deeper logic exists</li>
+</ul>
+<h2>Tip 5: Use the verify harness even when it is not strict</h2>
+<p><code>PENDING</code> today becomes <code>PASS</code> or <code>FAIL</code> tomorrow.</p>
+<p>The harness is part of how this repo avoids drifting back into a monolith.</p>
+<h2>Tip 6: Distinguish “bootstrap-real” from “feature-real”</h2>
+<p>Something can be real enough to run and still be intentionally shallow.</p>
+<p>Current examples:</p>
+<ul>
+<li>runtime summary endpoint is real</li>
+<li>runtime summary assembly is still bootstrap-thin</li>
+</ul>
+<p>That distinction matters during review.</p>
+<h2>Tip 7: Do not overreact to incomplete polish</h2>
+<p>At this stage, review should focus on:</p>
+<ul>
+<li>boundaries</li>
+<li>ownership</li>
+<li>contracts</li>
+<li>verification</li>
+</ul>
+<p>Not whether the shell is already pretty or feature-rich.</p>
+</div></section><section class="chapter" id="chapter-what-a-good-next-slice-looks-like"><div class="chapter-header"><span class="chapter-num">18</span><h2 id="what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</h2></div><div class="chapter-body">
+<p>A good next slice should:</p>
+<ul>
+<li>keep shared contract semantics stable</li>
+<li>improve one owned behavior</li>
+<li>preserve boot simplicity</li>
+<li>come with verification</li>
+</ul>
+<p><strong>Completed thin slices (do not re-do):</strong></p>
+<ul>
+<li>bootstrap + shared contracts + runtime summary</li>
+<li>first watch signal path</li>
+<li>npm workspace dev ergonomics</li>
+<li>first run lifecycle (create → executing → complete)</li>
+<li>startup supervision reliability (<code>scripts/dev/lib/common.sh</code>)</li>
+<li>stop/resume, approval, review-ready, SQLite persistence, and briefing-backed<br />
+dock projections</li>
+<li>workspace list + backend PTY terminal + file-backed Monaco host + nested<br />
+explorer tree + new-file creation + active-file rename + resizable bottom terminal dock</li>
+<li>richer inbox ranking (severity, recency, unresolved duration, status,<br />
+action-type, workspace priority)</li>
+<li>split shell regions (<code>TopBar</code>, <code>LeftSidebar</code>, <code>CenterWorkbench</code>, <code>RightDock</code>,<br />
+<code>StatusBar</code>) with mockup-shell HUD chrome</li>
+<li>Conversation and Command dock seams backed by control-plane chat endpoints<br />
+(<code>POST /api/chat/messages</code>, <code>GET /api/workspaces/{workspace_id}/chat/thread</code>,<br />
+<code>GET /api/chat/threads/{thread_id}/history</code>)</li>
+</ul>
+<p><strong>Suggested next slices (2026-07-04):</strong></p>
+<ol>
+<li><strong>Coordinator</strong> — KAIRO operator-presence integration when explicitly assigned</li>
+<li><strong>Lane B</strong> — agent orchestration hook for chat messages (beyond system ack stub)</li>
+</ol>
+<p>Bad next slices:</p>
+<ul>
+<li>broad UI rewrite</li>
+<li>expanding multiple semantic families at once</li>
+<li>changing run-state and signal-state in one uncontrolled pass</li>
+<li>skipping verification because “it is still early”</li>
+<li>claiming full IDE parity when workspace file operations are still intentionally<br />
+thin-slice (open, edit, save, create, rename) rather than a full VS Code clone</li>
+</ul>
+</div></section><section class="chapter" id="chapter-final-guidance"><div class="chapter-header"><span class="chapter-num">19</span><h2 id="final-guidance">Final Guidance</h2></div><div class="chapter-body">
+<p>If you are unsure what to do next, choose the smaller move that:</p>
+<ul>
+<li>preserves ownership</li>
+<li>strengthens verification</li>
+<li>reduces placeholders</li>
+<li>keeps the shell boot-safe</li>
+</ul>
+<p>That is the design center of this repo right now.</p>
+</div></section>
+    </article>
+    <footer class="doc-footer">
+      <span>Axon-X How-To Handbook</span>
+      <span>docs/HOW-TO-HANDBOOK.md</span>
+    </footer>
+  </main>
+</body>
+</html>

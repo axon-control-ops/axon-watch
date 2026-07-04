@@ -3,6 +3,17 @@ import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 
 import { buildTerminalWebSocketUrl } from './terminal-session-api';
+import {
+  mockupTerminalFontOptions,
+  mockupXtermTheme,
+} from './mockup-workbench-theme';
+import { applyTerminalInputChunk, sanitizeTerminalInput } from './terminal-input';
+import { attachTerminalPasteHandler } from './terminal-paste';
+import {
+  migrateTerminalScrollback,
+  persistTerminalScrollback,
+  restoreTerminalScrollback,
+} from './terminal-scrollback';
 
 export interface TerminalContext {
   primarySignalId: string | null;
@@ -11,8 +22,14 @@ export interface TerminalContext {
   workspaceId: string | null;
 }
 
+export interface XtermSessionOptions {
+  variant?: 'default' | 'mockup';
+}
+
 export interface XtermSessionController {
+  clearScreen: () => void;
   dispose: () => void;
+  persistScrollback: () => void;
   setContext: (context: TerminalContext) => void;
 }
 
@@ -22,15 +39,6 @@ interface TerminalServerMessage {
   message?: string;
   workspace_id?: string;
   workspace_root?: string;
-}
-
-function formatContext(context: TerminalContext): string {
-  return [
-    `workspace=${context.workspaceId ?? 'none'}`,
-    `run=${context.runSummary ?? 'none'}`,
-    `signal=${context.primarySignalId ?? 'none'}`,
-    `watch=${context.runtimeConnected ? 'connected' : 'disconnected'}`,
-  ].join(' ');
 }
 
 function sendResize(socket: WebSocket, terminal: Terminal): void {
@@ -47,16 +55,26 @@ function sendResize(socket: WebSocket, terminal: Terminal): void {
   );
 }
 
-export async function createXtermSession(container: HTMLElement): Promise<XtermSessionController> {
+export async function createXtermSession(
+  container: HTMLElement,
+  options: XtermSessionOptions = {},
+): Promise<XtermSessionController> {
+  const useMockupTheme = options.variant === 'mockup';
   const terminal = new Terminal({
-    theme: {
-      background: '#0f172a',
-      foreground: '#dbe4ff',
-      cursor: '#38bdf8',
-    },
-    fontSize: 15,
-    lineHeight: 1.25,
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    theme: useMockupTheme
+      ? mockupXtermTheme
+      : {
+          background: '#050a12',
+          foreground: '#8fa4b8',
+          cursor: '#edf8ff',
+          brightBlack: '#5f7388',
+          brightCyan: '#00f2ff',
+        },
+    fontSize: useMockupTheme ? mockupTerminalFontOptions.fontSize : 15,
+    lineHeight: useMockupTheme ? mockupTerminalFontOptions.lineHeight : 1.25,
+    fontFamily: useMockupTheme
+      ? mockupTerminalFontOptions.fontFamily
+      : 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
     cursorBlink: true,
     convertEol: true,
   });
@@ -65,60 +83,113 @@ export async function createXtermSession(container: HTMLElement): Promise<XtermS
   terminal.open(container);
   fitAddon.fit();
 
-  let currentContext: TerminalContext = {
-    workspaceId: null,
-    runSummary: null,
-    primarySignalId: null,
-    runtimeConnected: false,
-  };
   let attachedWorkspaceId: string | null = null;
   let socket: WebSocket | null = null;
   let inputDisposable: { dispose: () => void } | null = null;
+  let pasteDisposable: (() => void) | null = null;
+  let pendingInputLine = '';
+
+  const clearScreen = (): void => {
+    terminal.clear();
+  };
+
+  const persistAttachedScrollback = (): void => {
+    if (!attachedWorkspaceId) {
+      return;
+    }
+    persistTerminalScrollback(attachedWorkspaceId, terminal);
+  };
 
   const writeStatus = (message: string): void => {
     terminal.writeln('');
     terminal.writeln(message);
   };
 
+  let connectGeneration = 0;
+
   const disposeSocket = (): void => {
     inputDisposable?.dispose();
     inputDisposable = null;
-    if (socket) {
-      socket.onopen = null;
-      socket.onmessage = null;
-      socket.onerror = null;
-      socket.onclose = null;
-      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-        socket.close();
-      }
-    }
-    socket = null;
-  };
-
-  const attachWorkspace = (workspaceId: string | null): void => {
-    disposeSocket();
-    attachedWorkspaceId = workspaceId;
-
-    if (!workspaceId) {
-      writeStatus('[terminal] Select a workspace to attach a backend shell.');
+    pasteDisposable?.();
+    pasteDisposable = null;
+    if (!socket) {
       return;
     }
 
-    writeStatus(`[terminal] Connecting backend PTY for ${workspaceId}...`);
-    socket = new WebSocket(buildTerminalWebSocketUrl(workspaceId));
+    const activeSocket = socket;
+    socket = null;
+    activeSocket.onopen = null;
+    activeSocket.onmessage = null;
+    activeSocket.onerror = null;
+    activeSocket.onclose = null;
 
-    socket.onopen = () => {
+    if (activeSocket.readyState === WebSocket.OPEN) {
+      activeSocket.close();
+    }
+  };
+
+  const attachWorkspace = (workspaceId: string | null): void => {
+    if (
+      workspaceId === attachedWorkspaceId &&
+      socket &&
+      (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)
+    ) {
+      return;
+    }
+
+    const generation = ++connectGeneration;
+    if (attachedWorkspaceId) {
+      persistAttachedScrollback();
+    }
+    disposeSocket();
+    pendingInputLine = '';
+    attachedWorkspaceId = workspaceId;
+
+    if (!workspaceId) {
+      return;
+    }
+
+    migrateTerminalScrollback(workspaceId);
+    restoreTerminalScrollback(workspaceId, terminal);
+
+    const nextSocket = new WebSocket(buildTerminalWebSocketUrl(workspaceId));
+    socket = nextSocket;
+
+    nextSocket.onopen = () => {
+      if (generation !== connectGeneration || socket !== nextSocket) {
+        return;
+      }
+
       fitAddon.fit();
-      sendResize(socket as WebSocket, terminal);
-      inputDisposable = terminal.onData((data) => {
-        if (socket?.readyState !== WebSocket.OPEN) {
+      sendResize(nextSocket, terminal);
+
+      const sendInput = (data: string): void => {
+        if (socket !== nextSocket || nextSocket.readyState !== WebSocket.OPEN) {
           return;
         }
-        socket.send(JSON.stringify({ type: 'input', data }));
+
+        const sanitized = sanitizeTerminalInput(data);
+        const inputResult = applyTerminalInputChunk(pendingInputLine, sanitized);
+        pendingInputLine = inputResult.nextInputLine;
+        if (inputResult.shouldClear) {
+          clearScreen();
+        }
+
+        nextSocket.send(JSON.stringify({ type: 'input', data: sanitized }));
+      };
+
+      pasteDisposable = attachTerminalPasteHandler(container, sendInput);
+
+      inputDisposable = terminal.onData((data) => {
+        sendInput(data);
       });
     };
 
-    socket.onmessage = (event) => {
+    nextSocket.onmessage = (event) => {
+      if (generation !== connectGeneration || socket !== nextSocket) {
+        return;
+      }
+
       let message: TerminalServerMessage;
       try {
         message = JSON.parse(String(event.data)) as TerminalServerMessage;
@@ -133,9 +204,6 @@ export async function createXtermSession(container: HTMLElement): Promise<XtermS
       }
 
       if (message.type === 'ready') {
-        writeStatus(
-          `[attached] workspace=${message.workspace_id ?? workspaceId} root=${message.workspace_root ?? 'unknown'}`,
-        );
         return;
       }
 
@@ -145,17 +213,19 @@ export async function createXtermSession(container: HTMLElement): Promise<XtermS
       }
 
       if (message.type === 'closed') {
-        writeStatus('[terminal] backend session closed.');
+        return;
       }
     };
 
-    socket.onerror = () => {
-      writeStatus('[terminal] backend connection error.');
+    nextSocket.onerror = () => {
+      if (generation !== connectGeneration || socket !== nextSocket) {
+        return;
+      }
     };
 
-    socket.onclose = () => {
-      if (attachedWorkspaceId === workspaceId) {
-        writeStatus('[terminal] disconnected from backend shell.');
+    nextSocket.onclose = () => {
+      if (generation !== connectGeneration || attachedWorkspaceId !== workspaceId) {
+        return;
       }
     };
   };
@@ -173,23 +243,18 @@ export async function createXtermSession(container: HTMLElement): Promise<XtermS
   resizeObserver.observe(container);
 
   return {
+    clearScreen,
     dispose() {
+      persistAttachedScrollback();
       window.removeEventListener('resize', onResize);
       resizeObserver.disconnect();
       disposeSocket();
       terminal.dispose();
     },
+    persistScrollback: persistAttachedScrollback,
     setContext(context: TerminalContext) {
-      const previous = currentContext;
-      currentContext = context;
-
       if (context.workspaceId !== attachedWorkspaceId) {
         attachWorkspace(context.workspaceId);
-        return;
-      }
-
-      if (formatContext(context) !== formatContext(previous)) {
-        writeStatus(`[context] ${formatContext(context)}`);
       }
     },
   };

@@ -91,6 +91,42 @@ class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
         paths = {item["path"] for item in list_response.json()["items"]}
         self.assertIn("src/deep.txt", paths)
 
+    def test_rename_workspace_file_moves_path_and_preserves_content(self) -> None:
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt",
+            json={"content": "nested content\n"},
+        )
+
+        rename_response = self.client.post(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt/rename",
+            json={"new_path": "src/renamed.txt"},
+        )
+        self.assertEqual(200, rename_response.status_code)
+        self.assertEqual("src/renamed.txt", rename_response.json()["path"])
+
+        read_response = self.client.get("/api/workspaces/workspace_alpha/files/src/renamed.txt")
+        self.assertEqual(200, read_response.status_code)
+        self.assertEqual("nested content\n", read_response.json()["content"])
+
+        old_response = self.client.get("/api/workspaces/workspace_alpha/files/src/deep.txt")
+        self.assertEqual(404, old_response.status_code)
+
+    def test_rename_workspace_file_rejects_existing_target(self) -> None:
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt",
+            json={"content": "nested content\n"},
+        )
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/src/existing.txt",
+            json={"content": "existing\n"},
+        )
+
+        rename_response = self.client.post(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt/rename",
+            json={"new_path": "src/existing.txt"},
+        )
+        self.assertEqual(409, rename_response.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()

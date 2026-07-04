@@ -3,10 +3,44 @@ import { languageForFilePath, workspaceFileDocumentId } from './workspace-file-l
 
 export type FileContentLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 
+export function normalizeWorkspaceFilePath(path: string): string {
+  return path.trim().replace(/^\/+/, '').replace(/\/{2,}/g, '/');
+}
+
+export function isSafeWorkspaceFilePath(path: string): boolean {
+  if (!path) {
+    return false;
+  }
+  return !path.split('/').includes('..');
+}
+
 export function pickPreferredWorkspaceFilePath(
   entries: Array<{ path: string }>,
 ): string | null {
   return entries.find((entry) => entry.path === 'README.md')?.path ?? entries[0]?.path ?? null;
+}
+
+export function remapWorkspaceFileRecord<T>(
+  record: Record<string, T>,
+  oldPath: string,
+  newPath: string,
+): Record<string, T> {
+  if (!(oldPath in record)) {
+    return record;
+  }
+
+  const next = { ...record };
+  next[newPath] = next[oldPath] as T;
+  delete next[oldPath];
+  return next;
+}
+
+export function remapWorkspaceFilePaths(
+  paths: string[],
+  oldPath: string,
+  newPath: string,
+): string[] {
+  return paths.map((path) => (path === oldPath ? newPath : path));
 }
 
 export function buildOpenedFileDocuments(

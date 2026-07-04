@@ -28,7 +28,7 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **Axon-X** | User-facing product name for the next-generation operator console. |
 | **axon-watch** | Internal repo folder and npm workspace name. Legacy naming; not the product label shown to operators. |
 | **axon-local** | The current production Axon app repo (port **7734**). Planning for Axon-X still lives here under `Plans/Axon-Watch/`. |
-| **Briefing seam** | `GET /api/briefing` returns canonical `OperatorBriefing`. The shell loads it at bootstrap and renders connectivity, `top_signals`, `pending_approvals`, and `next_safe_actions` in the right-dock briefing panel. Approval mutations stay on the run approval seam. See `docs/contracts/BRIEFING-SEAM.md`. |
+| **Briefing seam** | `GET /api/briefing` returns canonical `OperatorBriefing`. The shell loads it at bootstrap and projects that data across the right dock: approvals, signals, and the KAIRO briefing card all read from the same briefing/runtime truth. Approval mutations stay on the run approval seam. See `docs/contracts/BRIEFING-SEAM.md`. |
 | **Control plane** | FastAPI service on port **8787** that owns run truth, runtime summary, inbox projection, workspaces list, and briefing. |
 | **Console-web / shell** | Vue 3 frontend on port **4173** — the visible Axon-X UI. |
 | **Contract / shared contract** | Canonical TypeScript types and JSON fixtures in `packages/shared-types/`. Frontend and backend must agree here first. |
@@ -36,7 +36,7 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **DTO** | Data Transfer Object — a typed payload shape exchanged between services or UI layers (for example `RuntimeSummary`, `RunRecord`). |
 | **Fitness function** | An automated check that guards architecture or performance (dependency direction, DTO size budgets, latency thresholds). |
 | **Frozen planning bundle** | The locked docs under `axon-local/Plans/Axon-Watch/`. Implementation must not silently drift from these. |
-| **KAIRO** | Knowledge-Augmented Intelligence for Response and Oversight — planned operator-presence layer (watching, advising, interrupting, executing with receipts). **Planning only** today; see `Plans/Axon-Watch/KAIRO_MODE.md` and `ADR-005-kairo-as-operator-presence-layer.md` in axon-local. |
+| **KAIRO** | Knowledge-Augmented Intelligence for Response and Oversight — the planned operator-presence layer (watching, advising, interrupting, executing with receipts). The current shell has KAIRO presentation scaffolding (topbar presence module, briefing card, operator copy), but the full operator-presence system in `KAIRO_MODE.md` / `ADR-005-kairo-as-operator-presence-layer.md` is **not** landed yet. |
 | **Lane A/B/C/D** | Parallel implementation ownership areas defined in `docs/MULTITASK-LANES.md` (watch, shell, control-plane, dev/verify). |
 | **Monaco host** | In-browser code editor surface (`EditorHost.vue`). Loads workspace files on disk (README.md, notes.txt) plus read-only DTO overview tabs. |
 | **Parity ledger** | Checklist of behaviors Axon-X must eventually match from current Axon. Lives in frozen planning. |
@@ -127,12 +127,48 @@ What is now real in the thin slice (verified 2026-07-04):
 - two watch-produced inbox signals with multi-factor ranking (severity, recency,
   unresolved duration via `created_at`, status, action-type, workspace priority)
 - workspace list API and shell workspace selector (IDs only)
-- Monaco host bound to canonical DTO documents and **workspace files on disk** with a nested explorer tree and lazy file loading
+- the shell is split into `TopBar`, `LeftSidebar`, `CenterWorkbench`,
+  `RightDock`, and `StatusBar` regions with mockup-shell chrome
+- Monaco host bound to canonical DTO documents and **workspace files on disk**
+  with a nested explorer tree, lazy file loading, new-file creation, and active-file rename
 - backend PTY terminal attachment for the selected workspace (real shell I/O via WebSocket)
+- workspace-scoped conversation rehydration: `GET /api/workspaces/{workspace_id}/chat/thread`
+  plus existing thread history read reloads the Conversation seam after page refresh.
+  When no thread exists yet, the lookup returns HTTP 200 with null `thread_id` (not 404).
+
+**Workspace IDs (operator vs catalog):**
+
+- **Operator shell** uses `MOCKUP_WORKSPACE_IDS` only (`workspace_smoke`, `workspace_recsys`,
+  …). `mergeMockupWorkspaceCatalog()` trims API extras so `currentWorkspace` is always
+  sidebar-visible.
+- **Control-plane catalog** may still list fixture defaults (`workspace_alpha`,
+  `workspace_bootstrap`) and run/inbox IDs for tests and API consumers; the shell does
+  not select those as `currentWorkspace`.
+- Bootstrap picks workspace deterministically: active run workspace (when visible) →
+  `workspace_smoke` default → first mockup workspace.
+
+Manual acceptance for reload-safe chat (use **`workspace_smoke`**):
+
+1. `./scripts/dev/up.sh`
+2. Open `http://127.0.0.1:4173`
+3. Confirm **`workspace_smoke`** is selected (or select it)
+4. Post a command in the Command seam
+5. Hard reload the page
+6. Conversation should rehydrate automatically for the same workspace when an active run
+   or default bootstrap applies; if needed, re-select **`workspace_smoke`**
+
+API-only check (any valid catalog ID):
+
+```bash
+curl -s http://127.0.0.1:8787/api/workspaces/workspace_smoke/chat/thread
+curl -s http://127.0.0.1:8787/api/chat/threads/<thread_id>/history
+```
 
 What is **not** real yet despite similar-sounding names:
 
-- **KAIRO operator presence** — planned in axon-local docs only
+- **Full KAIRO operator presence** — the current shell has visual scaffolding,
+  but spoken alerts, persona settings, and richer operator-presence behavior are
+  still planned in axon-local docs
 - **Full parity with axon-local** — intentional; see parity ledger for gaps
 
 So this repo is not a fake mockup, but it is also not feature-complete or a
@@ -147,6 +183,9 @@ The most important frozen planning docs are:
 - `PRODUCT.md`
 - `ARCHITECTURE.md`
 - `UI_SPEC.md`
+- `UI_COMPOSITION_SPEC.md`
+- `UI_VISUAL_DIRECTION.md`
+- `UI_REFERENCE_ARCHETYPES.md`
 - `run-state.md`
 - `runtime-summary.md`
 - `signal-events.md`
@@ -202,8 +241,7 @@ Owns the integrated shell:
 
 - topbar
 - left sidebar
-- workbench
-- bottom panel
+- center workbench (including the embedded terminal dock)
 - right dock
 - status bar
 
@@ -360,22 +398,86 @@ That flow looks like this:
 1. `apps/console-web/src/main.ts` creates the Vue app
 2. the shell store initializes
 3. `loadBootstrapData()` is called
-4. the frontend fetches `/api/runtime/summary`, `/api/inbox`, `/api/runs`,
-   `/api/workspaces`, and `/api/briefing`
-5. the control plane returns canonical DTO payloads for all five seams
-6. workspace files load for the selected workspace
-7. the shell renders runtime identity, workspace state, run state, briefing
-   guidance, and top signal state
+4. the frontend fetches `/api/runtime/summary`, `/api/inbox`, and `/api/briefing`
+5. workspaces and runs load sequentially; `resolveBootstrapWorkspaceId()` sets
+   `currentWorkspace` (active run workspace when sidebar-visible, else `workspace_smoke`)
+6. workspace files and chat thread history load for that workspace
+7. the shell renders topbar context, workspace state, editor/terminal workbench,
+   right-dock seams, and status bar truth strips
 
 Important limitations:
 
-- the right dock renders `OperatorBriefing.pending_approvals` and `next_safe_actions`; approve/reject mutations stay on the run approval seam
+- **Operator workspace list** — shell and sidebar share the same `MOCKUP_WORKSPACE_IDS`
+  catalog; catalog-only IDs such as `workspace_alpha` remain API-visible but are not
+  selected in the shell
+- **Bootstrap workspace selection** — deterministic via `resolveBootstrapWorkspaceId()`
+  after sequential workspace + run load (no parallel race)
+- **Chat rehydration** — scoped per workspace; messages posted under one ID do not appear
+  when another workspace is selected; only the latest thread per workspace is returned
+- Operator mode renders the right dock as **Run → Approvals → Signals → Conversation →
+  Command → KAIRO Briefing** with the briefing card anchored at the bottom of the dock
+- briefing data is projected across the dock rather than shown as one raw DTO
+  dump: approvals stay in the approvals seam, top signals stay in the signals
+  seam, and the KAIRO card stays summary/CTA-oriented
 - Monaco host loads workspace files on disk and read-only DTO overview tabs
 - xterm host attaches to a backend PTY scoped to the selected workspace directory
 - inbox ranking uses severity, recency, unresolved duration (`created_at`), status,
   action-type, and a thin watch-owned workspace priority map
 
 That is okay for this stage.
+
+## Locked Shell Layout
+
+**Locked 2026-07-04** — see `docs/UI_LAYOUT_LOCK.md` and
+`docs/adr/ADR-004-locked-console-shell-layout.md`.
+
+Do not rearrange shell regions or dock seam order without a superseding ADR.
+Frozen planning in `axon-local/Plans/Axon-Watch/UI_COMPOSITION_SPEC.md` is amended
+to match this geometry.
+
+Five-region grid:
+
+| Region | Component | Notes |
+|---|---|---|
+| Top bar | `TopBar.vue` | identity zone + runtime strip + KAIRO module + mode toggle |
+| Left sidebar | `LeftSidebar.vue` | workspaces, optional explorer (IDE), status card |
+| Center workbench | `CenterWorkbench.vue` | Monaco editor + embedded resizable terminal dock |
+| Right dock | `RightDock.vue` | Run → Approvals → Signals (upper stack), KAIRO Briefing bottom hero |
+| Status bar | `StatusBar.vue` | HUD runtime strip |
+
+KAIRO Briefing height tracks the workbench terminal dock via `--briefing-dock-height`.
+
+## Current Shell Layout
+
+The locked shell matches the mockup/live screenshots:
+
+- `TopBar` — brand frame, mockup breadcrumb/version context panel, DTO runtime
+  strip, KAIRO presence module, Operator/IDE toggle, settings action
+- `LeftSidebar` — workspace list first, workspace status card second, explorer
+  tree only in IDE mode
+- `CenterWorkbench` — editor tabbar + breadcrumb + Monaco editor above a
+  resizable bottom terminal/log dock
+- `RightDock` — run seam, approvals seam, signals seam, KAIRO briefing card
+- `StatusBar` — persistent watch / run phase / signals / operator strip
+
+This is the layout you should compare against the mockup and live screenshots,
+not the older single-file shell description from earlier thin slices.
+
+## Mockup / Live Parity Notes
+
+Parity observations from the current mockup and live screenshots:
+
+- the region geometry now largely matches the mockup: topbar, workspace rail,
+  editor-over-terminal workbench, right dock, and bottom status strip
+- the **runtime strip**, status bar zones, and workspace status card derive from
+  live shell state / `RuntimeSummary`, but the topbar breadcrumb and runtime
+  version chips are still mockup-style presentation helpers
+- the sidebar and shell store share the same operator workspace catalog (`MOCKUP_WORKSPACE_IDS`)
+- the dock uses operator-facing seam titles (`Active Run`, `Approvals`, `Signals`, `Conversation`) from `dock-seam-layout.ts`
+- Operator mode renders the right dock as **Run → Approvals → Signals → Conversation →
+  Command → KAIRO Briefing** with the briefing card anchored at the bottom of the dock
+- the workbench terminal dock default height is ~240px (responsive cap 280px) unless the
+  operator resizes it; height persists in session storage when customized
 
 ## The Most Important Files Right Now
 
@@ -803,16 +905,22 @@ A good next slice should:
 - npm workspace dev ergonomics
 - first run lifecycle (create → executing → complete)
 - startup supervision reliability (`scripts/dev/lib/common.sh`)
-- stop/resume, approval, review-ready, SQLite persistence, briefing shell panel
-- workspace list + backend PTY terminal + file-backed Monaco host + nested explorer tree
+- stop/resume, approval, review-ready, SQLite persistence, and briefing-backed
+  dock projections
+- workspace list + backend PTY terminal + file-backed Monaco host + nested
+  explorer tree + new-file creation + active-file rename + resizable bottom terminal dock
 - richer inbox ranking (severity, recency, unresolved duration, status,
   action-type, workspace priority)
-- richer briefing panel (`top_signals`, connectivity)
+- split shell regions (`TopBar`, `LeftSidebar`, `CenterWorkbench`, `RightDock`,
+  `StatusBar`) with mockup-shell HUD chrome
+- Conversation and Command dock seams backed by control-plane chat endpoints
+  (`POST /api/chat/messages`, `GET /api/workspaces/{workspace_id}/chat/thread`,
+  `GET /api/chat/threads/{thread_id}/history`)
 
 **Suggested next slices (2026-07-04):**
 
-1. **Lane B** — nested file creation / rename beyond read-write-open
-2. **Coordinator** — KAIRO operator-presence integration when explicitly assigned
+1. **Coordinator** — KAIRO operator-presence integration when explicitly assigned
+2. **Lane B** — agent orchestration hook for chat messages (beyond system ack stub)
 
 Bad next slices:
 
@@ -820,8 +928,8 @@ Bad next slices:
 - expanding multiple semantic families at once
 - changing run-state and signal-state in one uncontrolled pass
 - skipping verification because “it is still early”
-- claiming “file editor” when Monaco still shows DTO-derived documents only
-  (file-backed editing for README.md and notes.txt is now landed)
+- claiming full IDE parity when workspace file operations are still intentionally
+  thin-slice (open, edit, save, create, rename) rather than a full VS Code clone
 
 ## Final Guidance
 

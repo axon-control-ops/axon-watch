@@ -229,6 +229,14 @@ export interface WorkspaceFileContent {
   size_bytes: number;
 }
 
+export interface WorkspaceFileRenameResponse {
+  workspace_id: string;
+  old_path: string;
+  path: string;
+  size_bytes: number;
+  renamed: boolean;
+}
+
 export async function fetchWorkspaceFiles(workspaceId: string): Promise<WorkspaceFileListSnapshot> {
   const baseUrl = controlPlaneBaseUrl();
   const encoded = encodeURIComponent(workspaceId);
@@ -291,4 +299,127 @@ export async function saveWorkspaceFile(
   }
 
   return response.json() as Promise<{ saved: boolean; path: string; size_bytes: number }>;
+}
+
+export async function renameWorkspaceFile(
+  workspaceId: string,
+  filePath: string,
+  newPath: string,
+): Promise<WorkspaceFileRenameResponse> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspace = encodeURIComponent(workspaceId);
+  const encodedPath = filePath
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encodedWorkspace}/files/${encodedPath}/rename`
+    : `/api/workspaces/${encodedWorkspace}/files/${encodedPath}/rename`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ new_path: newPath }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`workspace file rename failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<WorkspaceFileRenameResponse>;
+}
+
+export interface ChatMessageRecord {
+  message_id: string;
+  thread_id: string;
+  run_id: string | null;
+  workspace_id: string | null;
+  role: 'operator' | 'system' | string;
+  content: string;
+  created_at: string;
+}
+
+export interface PostChatMessageRequest {
+  workspace_id: string;
+  content: string;
+  thread_id?: string | null;
+  run_id?: string | null;
+}
+
+export interface PostChatMessageResponse {
+  thread_id: string;
+  messages: ChatMessageRecord[];
+  run_id: string;
+  dispatched: boolean;
+  run: RunRecord;
+}
+
+export interface ThreadHistorySnapshot {
+  thread_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  items: ChatMessageRecord[];
+  count: number;
+}
+
+export interface WorkspaceChatThreadSnapshot {
+  thread_id: string | null;
+  workspace_id: string;
+  run_id: string | null;
+  updated_at: string | null;
+}
+
+export function hasWorkspaceChatThread(
+  snapshot: WorkspaceChatThreadSnapshot,
+): snapshot is WorkspaceChatThreadSnapshot & { thread_id: string } {
+  return snapshot.thread_id !== null;
+}
+
+export async function postChatMessage(
+  body: PostChatMessageRequest,
+): Promise<PostChatMessageResponse> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/chat/messages` : '/api/chat/messages';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`chat message submit failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<PostChatMessageResponse>;
+}
+
+export async function fetchThreadHistory(threadId: string): Promise<ThreadHistorySnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedThreadId = encodeURIComponent(threadId);
+  const url = baseUrl
+    ? `${baseUrl}/api/chat/threads/${encodedThreadId}/history`
+    : `/api/chat/threads/${encodedThreadId}/history`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`thread history fetch failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<ThreadHistorySnapshot>;
+}
+
+export async function fetchWorkspaceChatThread(
+  workspaceId: string,
+): Promise<WorkspaceChatThreadSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encodedWorkspaceId}/chat/thread`
+    : `/api/workspaces/${encodedWorkspaceId}/chat/thread`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`workspace chat thread lookup failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<WorkspaceChatThreadSnapshot>;
 }

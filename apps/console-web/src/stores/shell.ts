@@ -8,11 +8,16 @@ import {
   fetchOperatorBriefing,
   fetchRuns,
   fetchRuntimeSummary,
+  fetchThreadHistory,
+  fetchWorkspaceChatThread,
+  hasWorkspaceChatThread,
   fetchWorkspaceFile,
   fetchWorkspaces,
   fetchWorkspaceFiles,
   markRunReviewReady,
+  postChatMessage,
   rejectRun,
+  renameWorkspaceFile,
   resumeRun,
   saveWorkspaceFile,
   stopRun,
@@ -24,16 +29,28 @@ import type {
   RunRecord,
   RuntimeSummary,
   SignalView,
-  ThreadMessage,
   WorkspaceRecord,
 } from '../contracts/canonical';
+import {
+  appendOperatorCommand,
+  canSubmitOperatorCommand as canSubmitOperatorCommandDraft,
+  commandSeamHint as buildCommandSeamHint,
+  conversationEmptyStateLabel,
+  mapChatMessageRecord,
+  mergeThreadMessages,
+  type OperatorThreadEntry,
+} from '../lib/operator-thread';
 import {
   filePathFromDocumentId,
   workspaceFileDocumentId,
 } from '../lib/workspace-file-language';
 import {
   buildOpenedFileDocuments,
+  isSafeWorkspaceFilePath,
+  normalizeWorkspaceFilePath,
   pickPreferredWorkspaceFilePath,
+  remapWorkspaceFilePaths,
+  remapWorkspaceFileRecord,
   type FileContentLoadState,
 } from '../lib/workspace-file-session';
 import {
@@ -45,6 +62,32 @@ import {
   selectPrimaryRun,
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
+import {
+  buildDockSeamLayout,
+  type DockSeamId,
+} from '../lib/dock-seam-layout';
+import {
+  resolveDefaultDockHeroMode,
+  type DockHeroMode,
+} from '../lib/dock-hero-mode';
+import {
+  briefingAttentionStatusLabel,
+  resolveKairoBriefingAttention,
+  shouldShowBriefingAttentionInCommandMode,
+} from '../lib/kairo-briefing-attention';
+import {
+  buildStatusBarSegments,
+  buildTopbarChips,
+} from '../lib/runtime-strip';
+import {
+  buildBriefingSummaryLine,
+  buildStatusBarZones,
+  buildTopbarBreadcrumb,
+  buildTopbarMetaPills,
+  buildWorkspaceStatusCardRows,
+  mergeMockupWorkspaceCatalog,
+  resolveBootstrapWorkspaceId,
+} from '../lib/mockup-shell-view';
 
 export type LayoutMode = 'operator' | 'ide';
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
@@ -83,12 +126,12 @@ interface DockContextDescriptor {
 }
 
 const DEFAULT_EDITOR_TABS: EditorTabDescriptor[] = [
-  { id: 'editor-shell', title: 'Editor Shell', surface: 'editor', state: 'placeholder' },
-  { id: 'preview-shell', title: 'Preview Shell', surface: 'preview', state: 'placeholder' },
+  { id: 'editor-shell', title: 'Editor', surface: 'editor', state: 'placeholder' },
+  { id: 'preview-shell', title: 'Preview', surface: 'preview', state: 'placeholder' },
 ];
 
 const DEFAULT_TERMINAL_SESSIONS: TerminalSessionDescriptor[] = [
-  { id: 'terminal-primary', title: 'Terminal Shell', state: 'placeholder' },
+  { id: 'terminal-primary', title: 'Terminal', state: 'placeholder' },
 ];
 
 const DEFAULT_DOCK_CONTEXT: DockContextDescriptor = {
@@ -122,7 +165,12 @@ export const useShellStore = defineStore('shell', () => {
   const briefingLoadState = ref<BriefingLoadState>('idle');
   const briefingError = ref<string | null>(null);
   const signalViews = ref<SignalView[]>([]);
-  const threadMessages = ref<ThreadMessage[]>([]);
+  const threadMessages = ref<OperatorThreadEntry[]>([]);
+  const activeThreadId = ref<string | null>(null);
+  const workspaceThreadIds = ref<Record<string, string>>({});
+  const operatorCommandDraft = ref('');
+  const commandMutationState = ref<'idle' | 'submitting' | 'error'>('idle');
+  const commandMutationError = ref<string | null>(null);
   const workspaceFileEntries = ref<Array<{ path: string; size_bytes: number }>>([]);
   const workspaceFilesLoadState = ref<WorkspaceFilesLoadState>('idle');
   const workspaceFilesError = ref<string | null>(null);
@@ -140,10 +188,23 @@ export const useShellStore = defineStore('shell', () => {
   const terminalSessions = ref<TerminalSessionDescriptor[]>(DEFAULT_TERMINAL_SESSIONS);
   const activeTerminalSessionId = ref<string>(DEFAULT_TERMINAL_SESSIONS[0].id);
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
+  const expandedDockSeams = ref<Set<DockSeamId>>(new Set());
+  const briefingSeamEmphasized = ref(false);
+  const dockHeroMode = ref<DockHeroMode>('command');
+  const dockHeroModeTouched = ref(false);
 
   const layoutModeLabel = computed(() =>
     layoutMode.value === 'operator' ? 'Operator mode' : 'IDE mode',
   );
+
+  const workspaceTrailLabel = computed(() => {
+    const workspace = currentWorkspace.value?.workspace_id ?? 'No workspace selected';
+    const identity = runtimeSummary.value?.runtime_identity;
+    if (!identity) {
+      return workspace;
+    }
+    return `${workspace} / ${identity.provider_name}`;
+  });
 
   const workspaceStateLabel = computed(() =>
     currentWorkspace.value
@@ -151,33 +212,51 @@ export const useShellStore = defineStore('shell', () => {
       : 'No workspace selected',
   );
 
-  const runtimeStateLabel = computed(() => {
-    if (runtimeSummaryLoadState.value === 'loading') {
-      return 'Loading RuntimeSummary';
-    }
+  const topbarChips = computed(() =>
+    buildTopbarChips({
+      runtimeSummary: runtimeSummary.value,
+      runtimeSummaryLoadState: runtimeSummaryLoadState.value,
+      primaryActiveRun: activeRun.value,
+    }),
+  );
 
-    if (runtimeSummaryLoadState.value === 'error') {
-      return 'RuntimeSummary unavailable';
-    }
+  const topbarMetaPills = computed(() => buildTopbarMetaPills(runtimeSummary.value));
+  const topbarBreadcrumb = computed(() =>
+    buildTopbarBreadcrumb(runtimeSummary.value, currentWorkspace.value),
+  );
+  const statusBarZones = computed(() =>
+    buildStatusBarZones({
+      runtimeSummary: runtimeSummary.value,
+      runtimeSummaryLoadState: runtimeSummaryLoadState.value,
+      primaryActiveRun: activeRun.value,
+      workspaceId: currentWorkspace.value?.workspace_id ?? null,
+    }),
+  );
 
-    if (!runtimeSummary.value) {
-      return 'Awaiting RuntimeSummary';
-    }
+  const workspaceStatusCardRows = computed(() =>
+    buildWorkspaceStatusCardRows({
+      runtimeSummary: runtimeSummary.value,
+      runtimeSummaryLoadState: runtimeSummaryLoadState.value,
+    }),
+  );
 
-    const identity = runtimeSummary.value.runtime_identity;
-    const watchConnected = runtimeSummary.value.watch.connected ? 'watch connected' : 'watch disconnected';
-    const activeRunCount = runtimeSummary.value.active_runs.length;
+  const briefingSummaryLine = computed(() =>
+    buildBriefingSummaryLine(
+      operatorBriefing.value,
+      runtimeSummary.value,
+      currentWorkspace.value?.workspace_id ?? null,
+    ),
+  );
 
-    return `${identity.provider_name} / ${identity.model_name} · ${activeRunCount} active run(s) · ${watchConnected}`;
-  });
+  const runtimeStateLabel = computed(() => topbarChips.value.map((chip) => chip.label).join(' · '));
 
   const runStateLabel = computed(() => {
     if (runsLoadState.value === 'loading') {
-      return 'Loading RunRecord';
+      return 'Loading active run…';
     }
 
     if (runsLoadState.value === 'error') {
-      return 'RunRecord unavailable';
+      return 'Active run unavailable';
     }
 
     if (!activeRun.value) {
@@ -244,11 +323,11 @@ export const useShellStore = defineStore('shell', () => {
 
   const inboxStateLabel = computed(() => {
     if (inboxLoadState.value === 'loading') {
-      return 'Loading inbox signal';
+      return 'Loading signals…';
     }
 
     if (inboxLoadState.value === 'error') {
-      return 'Inbox signal unavailable';
+      return 'Signals unavailable';
     }
 
     const primary = inboxItems.value[0];
@@ -257,6 +336,17 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     return `${primary.title} · ${primary.severity}`;
+  });
+
+  const approvalsSummaryLabel = computed(() => {
+    const pending =
+      runtimeSummary.value?.approvals.pending_count ??
+      operatorBriefing.value?.pending_approvals.count ??
+      0;
+    if (pending === 0) {
+      return 'No pending approvals';
+    }
+    return `${pending} pending approval${pending === 1 ? '' : 's'}`;
   });
 
   const primaryInboxItem = computed(() => inboxItems.value[0] ?? null);
@@ -269,7 +359,20 @@ export const useShellStore = defineStore('shell', () => {
   );
 
   const threadStateLabel = computed(() =>
-    threadMessages.value.length > 0 ? 'Conversation active' : 'No active conversation',
+    conversationEmptyStateLabel(threadMessages.value.length),
+  );
+
+  const canSubmitOperatorCommand = computed(
+    () =>
+      commandMutationState.value !== 'submitting' &&
+      canSubmitOperatorCommandDraft(
+        operatorCommandDraft.value,
+        currentWorkspace.value?.workspace_id ?? null,
+      ),
+  );
+
+  const commandSeamHint = computed(() =>
+    buildCommandSeamHint(currentWorkspace.value?.workspace_id ?? null),
   );
 
   const kairoPresenceState = computed<KairoPresenceState>(() => {
@@ -284,35 +387,203 @@ export const useShellStore = defineStore('shell', () => {
     });
   });
 
+  const kairoBriefingAttention = computed(() =>
+    resolveKairoBriefingAttention({
+      pendingApprovals: pendingApprovalsCount.value,
+      criticalSignals: runtimeSummary.value?.signals.critical_count ?? 0,
+      highSignals: runtimeSummary.value?.signals.high_count ?? 0,
+      degraded:
+        operatorBriefing.value?.degraded.active ??
+        runtimeSummary.value?.degraded.active ??
+        false,
+      briefingLoaded: briefingLoadState.value === 'loaded',
+    }),
+  );
+
+  const showKairoBriefingAttention = computed(() =>
+    shouldShowBriefingAttentionInCommandMode(dockHeroMode.value, kairoBriefingAttention.value),
+  );
+
+  const kairoBriefingAttentionLabel = computed(() =>
+    briefingAttentionStatusLabel(kairoBriefingAttention.value),
+  );
+
   const showDevSeams = computed(() => import.meta.env.VITE_DEV_SEAMS === '1');
 
-  const statusBarItems = computed(() => {
-    const items: string[] = [layoutModeLabel.value];
-    if (currentWorkspace.value?.workspace_id) {
-      items.push(currentWorkspace.value.workspace_id);
-    }
-    if (runtimeSummary.value) {
-      items.push(runtimeSummary.value.watch.connected ? 'watch connected' : 'watch offline');
-    }
-    if (activeRun.value) {
-      items.push(`${activeRun.value.run_id} · ${activeRun.value.phase}`);
-    }
-    const pendingApprovals =
-      runtimeSummary.value?.approvals.pending_count ??
-      operatorBriefing.value?.pending_approvals.count ??
-      0;
-    if (pendingApprovals > 0) {
-      items.push(`approvals: ${pendingApprovals}`);
-    }
-    const openSignals = runtimeSummary.value?.signals.open_count ?? 0;
-    if (openSignals > 0) {
-      items.push(`signals: ${openSignals}`);
-    }
-    if (runtimeSummary.value?.degraded.active) {
-      items.push(runtimeSummary.value.degraded.reasons[0] ?? 'degraded');
-    }
-    return items;
+  const pendingApprovalsCount = computed(() => {
+    const fromSummary = runtimeSummary.value?.approvals.pending_count ?? 0;
+    const fromBriefing = operatorBriefing.value?.pending_approvals.count ?? 0;
+    return Math.max(fromSummary, fromBriefing);
   });
+
+  const statusBarSegments = computed(() =>
+    buildStatusBarSegments({
+      layoutModeLabel: layoutModeLabel.value,
+      workspaceId: currentWorkspace.value?.workspace_id ?? null,
+      runtimeSummary: runtimeSummary.value,
+      pendingApprovals: pendingApprovalsCount.value,
+    }),
+  );
+
+  const statusBarItems = computed(() => statusBarSegments.value.map((segment) => segment.label));
+
+  const dockSeamLayout = computed(() =>
+    buildDockSeamLayout({
+      layoutMode: layoutMode.value,
+      briefing: operatorBriefing.value,
+      approvalsSummary: approvalsSummaryLabel.value,
+      signalsSummary: inboxStateLabel.value,
+      runSummary: runStateLabel.value,
+      threadSummary: threadStateLabel.value,
+      expandedSeams: expandedDockSeams.value,
+    }),
+  );
+
+  function dockSeamState(id: DockSeamId) {
+    return dockSeamLayout.value.find((seam) => seam.id === id) ?? null;
+  }
+
+  function toggleDockSeam(id: DockSeamId): void {
+    const next = new Set(expandedDockSeams.value);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    expandedDockSeams.value = next;
+  }
+
+  function resetThreadContext(): void {
+    threadMessages.value = [];
+    activeThreadId.value = null;
+    operatorCommandDraft.value = '';
+    commandMutationState.value = 'idle';
+    commandMutationError.value = null;
+  }
+
+  async function loadWorkspaceThread(workspaceId: string): Promise<void> {
+    try {
+      let threadId = workspaceThreadIds.value[workspaceId] ?? null;
+      if (!threadId) {
+        const workspaceThread = await fetchWorkspaceChatThread(workspaceId);
+        if (!hasWorkspaceChatThread(workspaceThread)) {
+          resetThreadContext();
+          return;
+        }
+
+        threadId = workspaceThread.thread_id;
+        workspaceThreadIds.value = {
+          ...workspaceThreadIds.value,
+          [workspaceId]: threadId,
+        };
+      }
+
+      const history = await fetchThreadHistory(threadId);
+      activeThreadId.value = history.thread_id;
+      threadMessages.value = history.items.map((item) => mapChatMessageRecord(item));
+      commandMutationState.value = 'idle';
+      commandMutationError.value = null;
+    } catch (error) {
+      const nextThreadIds = { ...workspaceThreadIds.value };
+      delete nextThreadIds[workspaceId];
+      workspaceThreadIds.value = nextThreadIds;
+      resetThreadContext();
+      commandMutationState.value = 'error';
+      commandMutationError.value =
+        error instanceof Error ? error.message : 'Failed to load conversation history';
+    }
+  }
+
+  async function submitOperatorCommand(): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    const content = operatorCommandDraft.value.trim();
+    if (!canSubmitOperatorCommand.value || !workspaceId || !content) {
+      return;
+    }
+
+    commandMutationState.value = 'submitting';
+    commandMutationError.value = null;
+
+    try {
+      const response = await postChatMessage({
+        workspace_id: workspaceId,
+        content,
+        thread_id: activeThreadId.value,
+        run_id: primaryActiveRun.value?.run_id ?? null,
+      });
+      activeThreadId.value = response.thread_id;
+      workspaceThreadIds.value = {
+        ...workspaceThreadIds.value,
+        [workspaceId]: response.thread_id,
+      };
+      threadMessages.value = mergeThreadMessages(
+        threadMessages.value,
+        response.messages.map((message) => mapChatMessageRecord(message)),
+      );
+      operatorCommandDraft.value = '';
+      commandMutationState.value = 'idle';
+      await refreshRunSurfaces();
+
+      const next = new Set(expandedDockSeams.value);
+      next.add('thread');
+      expandedDockSeams.value = next;
+    } catch (error) {
+      commandMutationState.value = 'error';
+      commandMutationError.value =
+        error instanceof Error ? error.message : 'Failed to submit operator command';
+    }
+  }
+
+  function applyOperatorDockDefaults(): void {
+    if (layoutMode.value !== 'operator') {
+      return;
+    }
+
+    const next = new Set(expandedDockSeams.value);
+    if (pendingApprovalsCount.value > 0) {
+      next.add('approvals');
+    }
+    if (threadMessages.value.length > 0) {
+      next.add('thread');
+    }
+    expandedDockSeams.value = next;
+
+    if (!dockHeroModeTouched.value) {
+      dockHeroMode.value = resolveDefaultDockHeroMode({
+        pendingApprovals: pendingApprovalsCount.value,
+        criticalSignals: runtimeSummary.value?.signals.critical_count ?? 0,
+        highSignals: runtimeSummary.value?.signals.high_count ?? 0,
+      });
+    }
+  }
+
+  function setDockHeroMode(mode: DockHeroMode): void {
+    dockHeroModeTouched.value = true;
+    dockHeroMode.value = mode;
+    if (mode === 'briefing') {
+      briefingSeamEmphasized.value = false;
+    }
+  }
+
+  function toggleDockHeroMode(): void {
+    setDockHeroMode(dockHeroMode.value === 'command' ? 'briefing' : 'command');
+  }
+
+  function focusKairoBriefing(): void {
+    setDockHeroMode('briefing');
+    briefingSeamEmphasized.value = true;
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        document.getElementById('dock-seam-briefing')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+        window.setTimeout(() => {
+          briefingSeamEmphasized.value = false;
+        }, 1200);
+      });
+    }
+  }
 
   function syncCurrentWorkspace(preferredWorkspaceId?: string | null): void {
     if (workspaces.value.length === 0) {
@@ -321,10 +592,10 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     const targetWorkspaceId =
-      preferredWorkspaceId ??
-      currentWorkspace.value?.workspace_id ??
-      activeRun.value?.workspace_id ??
-      workspaces.value[0]?.workspace_id;
+      preferredWorkspaceId !== undefined && preferredWorkspaceId !== null
+        ? preferredWorkspaceId
+        : resolveBootstrapWorkspaceId(workspaces.value, activeRun.value);
+
     currentWorkspace.value =
       workspaces.value.find((workspace) => workspace.workspace_id === targetWorkspaceId) ??
       workspaces.value[0] ??
@@ -333,6 +604,9 @@ export const useShellStore = defineStore('shell', () => {
 
   function setLayoutMode(mode: LayoutMode): void {
     layoutMode.value = mode;
+    expandedDockSeams.value = new Set();
+    dockHeroModeTouched.value = false;
+    applyOperatorDockDefaults();
   }
 
   const activeWorkspaceFilePath = computed(() => {
@@ -350,6 +624,30 @@ export const useShellStore = defineStore('shell', () => {
     if (path) {
       void openWorkspaceFile(path);
     }
+  }
+
+  function promptWorkspaceFilePath(message: string, defaultValue = ''): string | null {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const response = window.prompt(message, defaultValue);
+    if (response === null) {
+      return null;
+    }
+
+    const normalized = normalizeWorkspaceFilePath(response);
+    if (!isSafeWorkspaceFilePath(normalized)) {
+      workspaceFilesError.value = 'Enter a safe relative path inside the workspace.';
+      return null;
+    }
+
+    if (!normalized) {
+      workspaceFilesError.value = 'File path is required.';
+      return null;
+    }
+
+    return normalized;
   }
 
   async function ensureWorkspaceFileLoaded(path: string): Promise<void> {
@@ -402,8 +700,104 @@ export const useShellStore = defineStore('shell', () => {
     await ensureWorkspaceFileLoaded(path);
   }
 
+  async function createWorkspaceFile(): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      workspaceFilesError.value = 'Select a workspace before creating a file.';
+      return;
+    }
+
+    workspaceFilesError.value = null;
+    const path = promptWorkspaceFilePath('New workspace file path', 'src/new-file.txt');
+    if (!path) {
+      return;
+    }
+
+    if (workspaceFileEntries.value.some((entry) => entry.path === path)) {
+      await openWorkspaceFile(path);
+      return;
+    }
+
+    fileSaveState.value = 'saving';
+    fileSaveError.value = null;
+
+    try {
+      const payload = await saveWorkspaceFile(workspaceId, path, '');
+      workspaceFileEntries.value = [...workspaceFileEntries.value, payload].sort((left, right) =>
+        left.path.localeCompare(right.path),
+      );
+      fileContents.value = {
+        ...fileContents.value,
+        [path]: '',
+      };
+      fileSavedContents.value = {
+        ...fileSavedContents.value,
+        [path]: '',
+      };
+      fileContentLoadStates.value = {
+        ...fileContentLoadStates.value,
+        [path]: 'loaded',
+      };
+      await openWorkspaceFile(path);
+    } catch (error) {
+      fileSaveError.value = error instanceof Error ? error.message : 'workspace file create failed';
+    } finally {
+      fileSaveState.value = 'idle';
+    }
+  }
+
+  async function renameActiveWorkspaceFile(): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    const oldPath = activeWorkspaceFilePath.value;
+    if (!workspaceId || !oldPath) {
+      workspaceFilesError.value = 'Open a workspace file before renaming it.';
+      return;
+    }
+
+    workspaceFilesError.value = null;
+    const newPath = promptWorkspaceFilePath('Rename workspace file to', oldPath);
+    if (!newPath || newPath === oldPath) {
+      return;
+    }
+
+    fileSaveState.value = 'saving';
+    fileSaveError.value = null;
+
+    try {
+      const payload = await renameWorkspaceFile(workspaceId, oldPath, newPath);
+      workspaceFileEntries.value = workspaceFileEntries.value
+        .map((entry) =>
+          entry.path === oldPath ? { path: payload.path, size_bytes: payload.size_bytes } : entry,
+        )
+        .sort((left, right) => left.path.localeCompare(right.path));
+      fileContents.value = remapWorkspaceFileRecord(fileContents.value, oldPath, newPath);
+      fileSavedContents.value = remapWorkspaceFileRecord(
+        fileSavedContents.value,
+        oldPath,
+        newPath,
+      );
+      fileContentLoadStates.value = remapWorkspaceFileRecord(
+        fileContentLoadStates.value,
+        oldPath,
+        newPath,
+      );
+      openedFilePaths.value = remapWorkspaceFilePaths(openedFilePaths.value, oldPath, newPath);
+      activeEditorDocumentId.value = workspaceFileDocumentId(newPath);
+      await ensureWorkspaceFileLoaded(newPath);
+    } catch (error) {
+      fileSaveError.value = error instanceof Error ? error.message : 'workspace file rename failed';
+    } finally {
+      fileSaveState.value = 'idle';
+    }
+  }
+
   function setCurrentWorkspace(workspaceId: string): void {
+    const previousWorkspaceId = currentWorkspace.value?.workspace_id ?? null;
     syncCurrentWorkspace(workspaceId);
+    if (previousWorkspaceId !== workspaceId) {
+      resetThreadContext();
+      void loadWorkspaceThread(workspaceId);
+    }
     void loadWorkspaceFiles();
   }
 
@@ -479,14 +873,16 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadWorkspaces(): Promise<void> {
+  async function loadWorkspaces(options: { sync?: boolean } = {}): Promise<void> {
     workspacesLoadState.value = 'loading';
     workspacesError.value = null;
 
     try {
       const snapshot = await fetchWorkspaces();
-      workspaces.value = snapshot.items;
-      syncCurrentWorkspace();
+      workspaces.value = mergeMockupWorkspaceCatalog(snapshot.items);
+      if (options.sync !== false) {
+        syncCurrentWorkspace();
+      }
       workspacesLoadState.value = 'loaded';
     } catch (error) {
       workspacesLoadState.value = 'error';
@@ -532,6 +928,7 @@ export const useShellStore = defineStore('shell', () => {
       operatorBriefing.value = await fetchOperatorBriefing();
       approvals.value = operatorBriefing.value.pending_approvals.items;
       briefingLoadState.value = 'loaded';
+      applyOperatorDockDefaults();
     } catch (error) {
       briefingLoadState.value = 'error';
       briefingError.value =
@@ -539,7 +936,7 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadRuns(): Promise<void> {
+  async function loadRuns(options: { sync?: boolean } = {}): Promise<void> {
     runsLoadState.value = 'loading';
     runsError.value = null;
 
@@ -547,7 +944,9 @@ export const useShellStore = defineStore('shell', () => {
       const snapshot = await fetchRuns();
       runs.value = snapshot.items;
       activeRun.value = selectPrimaryRun(snapshot.items);
-      syncCurrentWorkspace(activeRun.value?.workspace_id);
+      if (options.sync !== false) {
+        syncCurrentWorkspace(activeRun.value?.workspace_id ?? null);
+      }
       runsLoadState.value = 'loaded';
     } catch (error) {
       runsLoadState.value = 'error';
@@ -679,11 +1078,17 @@ export const useShellStore = defineStore('shell', () => {
     await Promise.all([
       loadRuntimeSummary(),
       loadInbox(),
-      loadWorkspaces(),
-      loadRuns(),
       loadOperatorBriefing(),
     ]);
+    await loadWorkspaces({ sync: false });
+    await loadRuns({ sync: false });
+    syncCurrentWorkspace(resolveBootstrapWorkspaceId(workspaces.value, activeRun.value));
     await loadWorkspaceFiles();
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (workspaceId) {
+      await loadWorkspaceThread(workspaceId);
+    }
+    applyOperatorDockDefaults();
   }
 
   return {
@@ -694,9 +1099,12 @@ export const useShellStore = defineStore('shell', () => {
     activeTerminalSessionId,
     activeWorkspaceFilePath,
     approvePrimaryRun,
+    approvalsSummaryLabel,
     approvals,
     briefingError,
     briefingLoadState,
+    briefingSeamEmphasized,
+    briefingSummaryLine,
     canApprovePrimaryRun,
     canCompletePrimaryRun,
     canMarkPrimaryRunReviewReady,
@@ -705,12 +1113,21 @@ export const useShellStore = defineStore('shell', () => {
     editorDocuments,
     canResumePrimaryRun,
     canStopPrimaryRun,
+    canSubmitOperatorCommand,
+    commandMutationError,
+    commandMutationState,
+    commandSeamHint,
     dockContext,
+    dockHeroMode,
+    dockSeamLayout,
+    dockSeamState,
     editorTabs,
     inboxError,
     inboxItems,
     inboxLoadState,
     inboxStateLabel,
+    kairoBriefingAttention,
+    kairoBriefingAttentionLabel,
     kairoPresenceState,
     layoutMode,
     layoutModeLabel,
@@ -723,6 +1140,9 @@ export const useShellStore = defineStore('shell', () => {
     loadWorkspaces,
     markPrimaryRunReviewReady,
     operatorBriefing,
+    operatorCommandDraft,
+    createWorkspaceFile,
+    pendingApprovalsCount,
     primaryActiveRun,
     primaryApprovalRun,
     primaryInboxItem,
@@ -740,18 +1160,30 @@ export const useShellStore = defineStore('shell', () => {
     runtimeSummaryError,
     runtimeSummaryLoadState,
     showDevSeams,
+    showKairoBriefingAttention,
     statusBarItems,
+    statusBarSegments,
+    statusBarZones,
+    renameActiveWorkspaceFile,
     setActiveEditorTab,
     setActiveEditorDocument,
     setCurrentWorkspace,
+    setDockHeroMode,
     setLayoutMode,
     signalViews,
     stopPrimaryRun,
+    submitOperatorCommand,
     terminalSessions,
     threadMessages,
     threadStateLabel,
+    toggleDockSeam,
+    toggleDockHeroMode,
+    topbarBreadcrumb,
+    topbarChips,
+    topbarMetaPills,
     fileSaveError,
     fileSaveState,
+    focusKairoBriefing,
     loadWorkspaceFiles,
     openWorkspaceFile,
     saveActiveFileDocument,
@@ -763,6 +1195,8 @@ export const useShellStore = defineStore('shell', () => {
     workspacesLoadState,
     workspacePrimarySignal,
     workspaceStateLabel,
+    workspaceStatusCardRows,
+    workspaceTrailLabel,
     workspaces,
   };
 });

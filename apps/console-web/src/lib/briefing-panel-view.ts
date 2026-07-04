@@ -8,15 +8,15 @@ export function briefingPanelHeadline(
   loadState: BriefingPanelLoadState,
 ): string {
   if (loadState === 'loading') {
-    return 'Loading OperatorBriefing';
+    return 'Loading briefing…';
   }
 
   if (loadState === 'error') {
-    return 'OperatorBriefing unavailable';
+    return 'Briefing unavailable';
   }
 
   if (!briefing) {
-    return 'Awaiting OperatorBriefing';
+    return 'Awaiting briefing';
   }
 
   if (briefing.pending_approvals.count > 0) {

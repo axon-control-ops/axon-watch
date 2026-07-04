@@ -12,8 +12,10 @@ This working tree currently combines:
 - a real control-plane thin slice with persisted runs, approvals, review-ready,
   runtime summary, and operator briefing
 - a watch thin slice with two canonical inbox signals and multi-factor ranking
-- a Vue shell that consumes runs, inbox, runtime summary, briefing, workspace
-  files with a nested explorer tree, plus Monaco and xterm host surfaces
+- a Vue shell that consumes runs, inbox, runtime summary, briefing, and
+  workspace files through dedicated `TopBar`, `LeftSidebar`,
+  `CenterWorkbench`, `RightDock`, and `StatusBar` regions, plus Monaco and
+  xterm host surfaces, nested file explorer, new-file creation, and active-file rename
 - verification and governance scaffolding under `scripts/verify/`, `docs/adr/`,
   and `tests/`
 
@@ -21,6 +23,10 @@ This working tree currently combines:
 
 - `PRODUCT.md` defines the product thesis and non-goals.
 - `ARCHITECTURE.md` defines service ownership and deployment boundaries.
+- `UI_SPEC.md`, `UI_COMPOSITION_SPEC.md`, and `UI_VISUAL_DIRECTION.md` in the
+  frozen planning bundle define presentation rules inside the locked regions
+- **`docs/UI_LAYOUT_LOCK.md`** and **`docs/adr/ADR-004-locked-console-shell-layout.md`**
+  lock the current five-region shell geometry (authoritative for implementation).
 - the frozen planning bundle in `axon-local/Plans/Axon-Watch/` remains the
   planning-locked source until later migration slices complete
 
@@ -92,7 +98,16 @@ python3 scripts/verify/all.py
 
 See `scripts/verify/README.md` for the verification contract.
 
-## Boundary Note
+## Branching And Remote
+
+Day-to-day work happens on branch **`dev`**. **`master`** holds the last
+known-good bootstrap baseline.
+
+- Branch workflow: `docs/BRANCHING.md`
+- No `origin` remote is configured by default; add one before pushing (see branching doc)
+
+Frozen planning remains in `axon-local/Plans/Axon-Watch/`. Locked layout and
+implementation ADRs live in this repo under `docs/`.
 
 The product is still intentionally thin, but it is no longer stub-only.
 Contract ownership lives in `packages/shared-types/` and `docs/contracts/`,

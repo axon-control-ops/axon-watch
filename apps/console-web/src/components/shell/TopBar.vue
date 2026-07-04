@@ -1,0 +1,101 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+
+import KairoPresenceBar from './KairoPresenceBar.vue';
+import {
+  buildMockupTopbarBreadcrumb,
+  buildTopbarRuntimeVersionChips,
+} from '../../lib/mockup-shell-view';
+import { useShellStore } from '../../stores/shell';
+
+const shell = useShellStore();
+
+const mockupBreadcrumb = computed(() => buildMockupTopbarBreadcrumb());
+const runtimeVersionChips = computed(() =>
+  buildTopbarRuntimeVersionChips(shell.runtimeSummary),
+);
+</script>
+
+<template>
+  <header class="region region-topbar topbar-mockup">
+    <div class="topbar-mockup__grid">
+      <div class="topbar-mockup__identity-zone">
+        <div class="topbar-mockup__brand">
+          <p class="topbar-mockup__logo">AXON-X</p>
+          <p class="topbar-mockup__subtitle">OPERATOR CONSOLE</p>
+        </div>
+
+        <div class="topbar-mockup__context-panel">
+          <div class="topbar-mockup__breadcrumb">
+            <span>{{ mockupBreadcrumb }}</span>
+            <span class="topbar-mockup__external" aria-hidden="true">↗</span>
+          </div>
+          <div class="topbar-mockup__runtime-bar">
+            <span class="topbar-mockup__runtime-label">RUNTIME</span>
+            <div class="topbar-mockup__runtime-chips">
+              <span
+                v-for="chip in runtimeVersionChips"
+                :key="chip.id"
+                class="topbar-runtime-chip"
+              >
+                <span
+                  v-if="chip.icon === 'axon'"
+                  class="topbar-runtime-chip__dot"
+                  aria-hidden="true"
+                />
+                <span
+                  v-else
+                  class="topbar-runtime-chip__icon"
+                  :class="`topbar-runtime-chip__icon--${chip.icon}`"
+                  aria-hidden="true"
+                />
+                <span class="topbar-runtime-chip__label">{{ chip.label }}</span>
+                <span class="topbar-runtime-chip__version">{{ chip.version }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="shell.topbarChips.length" class="topbar-mockup__runtime-strip chip-row">
+        <span
+          v-for="chip in shell.topbarChips"
+          :key="chip.id"
+          class="chip"
+          :class="`chip--${chip.tone}`"
+        >
+          {{ chip.label }}
+        </span>
+      </div>
+
+      <KairoPresenceBar
+        :state="shell.kairoPresenceState"
+        @open-briefing="shell.focusKairoBriefing()"
+      />
+
+      <div class="topbar-mockup__controls">
+        <div class="layout-toggle layout-toggle--mockup" role="group" aria-label="Layout mode">
+          <button
+            type="button"
+            class="layout-toggle__button"
+            :class="{ 'layout-toggle__button--active': shell.layoutMode === 'operator' }"
+            :aria-pressed="shell.layoutMode === 'operator'"
+            @click="shell.setLayoutMode('operator')"
+          >
+            OPERATOR
+          </button>
+          <button
+            type="button"
+            class="layout-toggle__button"
+            :class="{ 'layout-toggle__button--active': shell.layoutMode === 'ide' }"
+            :aria-pressed="shell.layoutMode === 'ide'"
+            @click="shell.setLayoutMode('ide')"
+          >
+            IDE
+          </button>
+        </div>
+        <button type="button" class="topbar-mockup__settings" aria-label="Settings">⚙</button>
+      </div>
+    </div>
+  </header>
+</template>

@@ -4,6 +4,10 @@ function controlPlaneBaseUrl(): string {
     return configured.replace(/\/$/, '');
   }
 
+  if (import.meta.env.DEV) {
+    return 'http://127.0.0.1:8787';
+  }
+
   return '';
 }
 

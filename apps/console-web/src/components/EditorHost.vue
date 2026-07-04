@@ -11,6 +11,7 @@ const props = defineProps<{
   description: string;
   readOnly?: boolean;
   dirty?: boolean;
+  variant?: 'default' | 'mockup';
 }>();
 
 const emit = defineEmits<{
@@ -34,6 +35,7 @@ onMounted(async () => {
       value: props.value,
       language: props.language,
       readOnly: props.readOnly,
+      variant: props.variant,
       onValueChange: (value) => {
         if (suppressChangeEmit) {
           return;
@@ -65,10 +67,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="surface-host">
+  <div class="surface-host" :class="{ 'surface-host--mockup': variant === 'mockup' }">
     <p v-if="loadState === 'loading'" class="surface-host__status">Loading Monaco editor…</p>
     <p v-else-if="loadState === 'error'" class="surface-host__status">Editor host unavailable</p>
-    <div class="surface-host__meta">
+    <div v-if="variant !== 'mockup'" class="surface-host__meta">
       <div class="surface-host__meta-row">
         <strong>{{ props.title }}</strong>
         <span v-if="props.dirty" class="surface-host__dirty">unsaved</span>

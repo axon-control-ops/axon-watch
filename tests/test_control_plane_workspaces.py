@@ -38,6 +38,7 @@ class ControlPlaneWorkspacesTests(unittest.TestCase):
 
         self.assertIn("workspace_alpha", ids)
         self.assertIn("workspace_bootstrap", ids)
+        self.assertIn("workspace_smoke", ids)
         self.assertIn("workspace_gamma", ids)
 
     def test_workspaces_show_returns_known_workspace(self) -> None:

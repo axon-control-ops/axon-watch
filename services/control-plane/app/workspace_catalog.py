@@ -5,6 +5,16 @@ from __future__ import annotations
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.runs.service import list_runs
 
+_OPERATOR_WORKSPACE_IDS = (
+    "workspace_smoke",
+    "workspace_recsys",
+    "workspace_finance",
+    "workspace_nlp",
+    "workspace_cv",
+    "workspace_edge",
+    "workspace_research",
+)
+
 _DEFAULT_WORKSPACE_IDS = ("workspace_alpha", "workspace_bootstrap")
 
 
@@ -25,6 +35,7 @@ def list_workspace_records(
         for record in list_runs()
         if str(record.get("workspace_id", "")).strip()
     }
+    workspace_ids.update(_OPERATOR_WORKSPACE_IDS)
     workspace_ids.update(_DEFAULT_WORKSPACE_IDS)
 
     inbox_snapshot = build_inbox_response(inbox_fetcher=inbox_fetcher)

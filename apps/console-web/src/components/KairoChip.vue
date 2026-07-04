@@ -10,7 +10,18 @@ const props = defineProps<{
   state: KairoPresenceState;
 }>();
 
+const emit = defineEmits<{
+  openBriefing: [];
+}>();
+
 const label = computed(() => kairoPresenceLabel(props.state));
+const showWaveform = computed(
+  () =>
+    props.state === 'observing' ||
+    props.state === 'listening' ||
+    props.state === 'speaking' ||
+    props.state === 'alerting',
+);
 </script>
 
 <template>
@@ -20,8 +31,15 @@ const label = computed(() => kairoPresenceLabel(props.state));
     :class="`kairo-chip--${state}`"
     :aria-label="label"
     title="Open KAIRO briefing"
+    @click="emit('openBriefing')"
   >
     <span class="kairo-chip__pulse" aria-hidden="true" />
+    <span v-if="showWaveform" class="kairo-chip__waveform" aria-hidden="true">
+      <span />
+      <span />
+      <span />
+      <span />
+    </span>
     <span class="kairo-chip__label">{{ label }}</span>
   </button>
 </template>

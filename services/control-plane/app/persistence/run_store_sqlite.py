@@ -58,6 +58,31 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_runs_phase
             ON runs(phase);
 
+        CREATE TABLE IF NOT EXISTS chat_threads (
+            thread_id TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            run_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            message_id TEXT PRIMARY KEY,
+            thread_id TEXT NOT NULL,
+            workspace_id TEXT NOT NULL,
+            run_id TEXT,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(thread_id) REFERENCES chat_threads(thread_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_chat_threads_workspace
+            ON chat_threads(workspace_id, updated_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_thread
+            ON chat_messages(thread_id, created_at ASC, message_id ASC);
+
         CREATE TABLE IF NOT EXISTS run_history (
             history_ref TEXT NOT NULL,
             sequence INTEGER NOT NULL,

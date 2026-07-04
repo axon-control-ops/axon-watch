@@ -51,6 +51,10 @@ Ownership:
 - `apps/console-web/src/**`
 - console-web styles and partial shell layout
 
+**Layout lock:** region geometry and dock seam order are frozen — see
+`docs/UI_LAYOUT_LOCK.md` and ADR-004. Lane B may polish and bind DTOs inside
+regions but must not rearrange the shell without coordinator approval and a new ADR.
+
 May:
 
 - build editor, terminal, preview, and dock surfaces
@@ -111,12 +115,24 @@ Do not start these in parallel until coordinator opens the slice:
 - workspace list API and DTO-bound Monaco hosts
 - startup supervision reliability slice
 - backend PTY terminal attachment (WebSocket, workspace-scoped)
+- **zsh PTY invocation via `ZDOTDIR`** (fixes bash-only `--rcfile` bug; verified 2026-07-04)
+- terminal scrollback persistence, client-side clear, DOM paste handler
 - richer inbox ranking (severity, recency, unresolved duration, status,
   action-type, workspace priority)
 - file-backed Monaco editing (workspace README.md / notes.txt with Save)
 - shell consumption of `/api/briefing` in the right dock
 - nested workspace explorer tree with lazy file loading
-- richer briefing panel (`top_signals`, connectivity)
+- nested workspace file creation and active-file rename
+- split mockup shell regions (`TopBar`, `LeftSidebar`, `CenterWorkbench`,
+  `RightDock`, `StatusBar`) with a resizable bottom terminal dock
+- workspace-scoped chat thread rehydration on boot/workspace select
+  (`GET /api/workspaces/{workspace_id}/chat/thread` + history read)
+- **chat command dispatch** attach vs new run (`POST /api/chat/messages` +
+  `refreshRunSurfaces` on submit)
+- **operator-facing dock seam titles** via `dock-seam-layout.ts`
+- **silent empty thread lookup** (HTTP 200 + `thread_id: null`)
+- **bootstrap workspace catalog trim** (`mergeMockupWorkspaceCatalog`, `workspace_smoke` default)
+- lower default terminal dock height (~240px fresh session, 280px cap)
 
 ## Assignment Rules
 
@@ -139,5 +155,6 @@ python3 -m unittest discover -s tests
 
 After the current thin slices (updated 2026-07-04):
 
-1. **Lane B** — nested file creation / rename beyond read-write-open
+1. **Lane B** — agent orchestration hook for chat messages (beyond system ack stub)
 2. **Coordinator** — KAIRO operator-presence integration when explicitly assigned
+3. **Lane B** — unify mockup sidebar workspace IDs with control-plane catalog (or document-only until UX-2)
