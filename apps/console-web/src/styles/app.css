@@ -453,6 +453,49 @@ button {
   display: none;
 }
 
+.briefing-panel__section {
+  margin-top: 0.85rem;
+}
+
+.briefing-panel__section-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.briefing-panel__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.briefing-panel__item {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 0.55rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.briefing-panel__item-title {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.briefing-panel__kind {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  color: #bae6fd;
+  font-size: 0.72rem;
+}
+
 .console-shell[data-layout-mode="operator"] .region-right-dock {
   border-color: rgba(248, 113, 113, 0.28);
 }

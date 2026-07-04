@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BriefingPanel from './components/BriefingPanel.vue';
 import EditorHost from './components/EditorHost.vue';
 import TerminalHost from './components/TerminalHost.vue';
 import { useShellStore } from './stores/shell';
@@ -6,7 +7,7 @@ import { useShellStore } from './stores/shell';
 const shell = useShellStore();
 
 const workbenchContractLabels = ['WorkspaceRecord', 'RunRecord'];
-const dockContractLabels = ['RunRecord', 'ApprovalRecord', 'InboxItem', 'SignalView', 'ThreadMessage'];
+const dockContractLabels = ['OperatorBriefing', 'RunRecord', 'ApprovalRecord', 'InboxItem', 'SignalView', 'ThreadMessage'];
 const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
 </script>
 
@@ -217,6 +218,12 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
         </div>
       </div>
 
+      <BriefingPanel
+        :briefing="shell.operatorBriefing"
+        :load-state="shell.briefingLoadState"
+        :error="shell.briefingError"
+      />
+
       <div class="placeholder-card">
         <p class="placeholder-card__label">Run seam</p>
         <strong>{{ shell.runStateLabel }}</strong>
@@ -284,8 +291,11 @@ const statusContractLabels = ['RuntimeSummary', 'WorkspaceRecord'];
       </div>
 
       <div class="placeholder-card">
-        <p class="placeholder-card__label">Approvals seam</p>
-        <strong>{{ shell.approvalStateLabel }}</strong>
+        <p class="placeholder-card__label">Approval actions</p>
+        <strong v-if="shell.primaryApprovalRun">
+          {{ shell.primaryApprovalRun.run_id }} · {{ shell.primaryApprovalRun.phase }}
+        </strong>
+        <p v-else class="region-copy">No guarded run awaiting approval action.</p>
         <div
           v-if="shell.primaryApprovalRun?.can_approve || shell.primaryApprovalRun?.phase === 'awaiting_approval'"
           class="run-actions"

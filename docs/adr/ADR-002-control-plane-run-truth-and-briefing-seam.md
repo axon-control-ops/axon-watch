@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted
+Superseded
+
+Superseded by ADR-003 for shell briefing consumption only. Persisted run-truth
+portions of this ADR remain in force. See
+[ADR-003](ADR-003-shell-consumes-operator-briefing.md).
 
 ## Context
 

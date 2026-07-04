@@ -10,10 +10,10 @@ This working tree currently combines:
 
 - a shared contract baseline under `packages/shared-types/`
 - a real control-plane thin slice with persisted runs, approvals, review-ready,
-  runtime summary, and backend-only briefing seams
-- a watch thin slice with two canonical inbox signals and minimal ranking
-- a Vue shell that consumes runs, inbox, and runtime summary, plus thin Monaco
-  and xterm host surfaces
+  runtime summary, and operator briefing
+- a watch thin slice with two canonical inbox signals and multi-factor ranking
+- a Vue shell that consumes runs, inbox, runtime summary, briefing, workspace
+  files, plus Monaco and xterm host surfaces
 - verification and governance scaffolding under `scripts/verify/`, `docs/adr/`,
   and `tests/`
 
@@ -63,7 +63,7 @@ Bootstrap URLs:
 - watch health: `http://127.0.0.1:8788/internal/watch/health`
 - runtime summary: `http://127.0.0.1:8787/api/runtime/summary`
 - inbox: `http://127.0.0.1:8787/api/inbox`
-- briefing: `http://127.0.0.1:8787/api/briefing` (backend-only seam; see `docs/contracts/BRIEFING-SEAM.md`)
+- briefing: `http://127.0.0.1:8787/api/briefing` (loaded by shell; see `docs/contracts/BRIEFING-SEAM.md`)
 - runs: `http://127.0.0.1:8787/api/runs`
 - workspaces: `http://127.0.0.1:8787/api/workspaces`
 

@@ -5,6 +5,7 @@ import {
   approveRun,
   completeRun,
   fetchInbox,
+  fetchOperatorBriefing,
   fetchRuns,
   fetchRuntimeSummary,
   fetchWorkspaceFile,
@@ -19,6 +20,7 @@ import {
 import type {
   ApprovalRecord,
   InboxItem,
+  OperatorBriefing,
   RunRecord,
   RuntimeSummary,
   SignalView,
@@ -44,6 +46,7 @@ export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type InboxLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type RunsLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type WorkspacesLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+export type BriefingLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type WorkspaceFilesLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type RunMutationState =
   | 'idle'
@@ -110,6 +113,9 @@ export const useShellStore = defineStore('shell', () => {
   const inboxItems = ref<InboxItem[]>([]);
   const inboxLoadState = ref<InboxLoadState>('idle');
   const inboxError = ref<string | null>(null);
+  const operatorBriefing = ref<OperatorBriefing | null>(null);
+  const briefingLoadState = ref<BriefingLoadState>('idle');
+  const briefingError = ref<string | null>(null);
   const signalViews = ref<SignalView[]>([]);
   const threadMessages = ref<ThreadMessage[]>([]);
   const workspaceFileEntries = ref<Array<{ path: string; size_bytes: number }>>([]);
@@ -256,11 +262,6 @@ export const useShellStore = defineStore('shell', () => {
 
   const primaryInboxItem = computed(() => inboxItems.value[0] ?? null);
 
-  const approvalStateLabel = computed(() =>
-    runtimeSummary.value?.approvals.pending_count
-      ? `${runtimeSummary.value.approvals.pending_count} pending approval(s)`
-      : 'Awaiting ApprovalRecord',
-  );
   const canApprovePrimaryRun = computed(
     () => Boolean(primaryApprovalRun.value?.can_approve) && !runMutationPending.value,
   );
@@ -428,6 +429,21 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function loadOperatorBriefing(): Promise<void> {
+    briefingLoadState.value = 'loading';
+    briefingError.value = null;
+
+    try {
+      operatorBriefing.value = await fetchOperatorBriefing();
+      approvals.value = operatorBriefing.value.pending_approvals.items;
+      briefingLoadState.value = 'loaded';
+    } catch (error) {
+      briefingLoadState.value = 'error';
+      briefingError.value =
+        error instanceof Error ? error.message : 'operator briefing request failed';
+    }
+  }
+
   async function loadRuns(): Promise<void> {
     runsLoadState.value = 'loading';
     runsError.value = null;
@@ -445,7 +461,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function refreshRunSurfaces(): Promise<void> {
-    await Promise.all([loadRuns(), loadRuntimeSummary()]);
+    await Promise.all([loadRuns(), loadRuntimeSummary(), loadInbox(), loadOperatorBriefing()]);
   }
 
   async function stopPrimaryRun(): Promise<void> {
@@ -565,7 +581,13 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function loadBootstrapData(): Promise<void> {
-    await Promise.all([loadRuntimeSummary(), loadInbox(), loadWorkspaces(), loadRuns()]);
+    await Promise.all([
+      loadRuntimeSummary(),
+      loadInbox(),
+      loadWorkspaces(),
+      loadRuns(),
+      loadOperatorBriefing(),
+    ]);
     await loadWorkspaceFiles();
   }
 
@@ -577,7 +599,8 @@ export const useShellStore = defineStore('shell', () => {
     activeTerminalSessionId,
     approvePrimaryRun,
     approvals,
-    approvalStateLabel,
+    briefingError,
+    briefingLoadState,
     canApprovePrimaryRun,
     canCompletePrimaryRun,
     canMarkPrimaryRunReviewReady,
@@ -597,10 +620,12 @@ export const useShellStore = defineStore('shell', () => {
     completePrimaryRun,
     loadBootstrapData,
     loadInbox,
+    loadOperatorBriefing,
     loadRuns,
     loadRuntimeSummary,
     loadWorkspaces,
     markPrimaryRunReviewReady,
+    operatorBriefing,
     primaryActiveRun,
     primaryApprovalRun,
     primaryInboxItem,

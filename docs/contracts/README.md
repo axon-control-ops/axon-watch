@@ -40,8 +40,9 @@ npm run verify
 
 ## Briefing Seam
 
-`GET /api/briefing` is implemented in control-plane but intentionally not wired
-into the console shell during stabilization. See `docs/contracts/BRIEFING-SEAM.md`.
+`GET /api/briefing` is implemented in control-plane and consumed by the console
+shell during bootstrap and after run mutations. See `docs/contracts/BRIEFING-SEAM.md`
+and `docs/adr/ADR-003-shell-consumes-operator-briefing.md`.
 
 ## Multi-Agent Lanes
 

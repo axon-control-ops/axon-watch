@@ -42,7 +42,8 @@ Every numbered ADR must include:
 ## Accepted ADRs
 
 - [ADR-001: Vue 3, Pinia, Monaco, and xterm.js stack](ADR-001-vue-monaco-xterm-stack.md)
-- [ADR-002: Control-plane run truth and backend-only briefing](ADR-002-control-plane-run-truth-and-briefing-seam.md)
+- [ADR-002: Control-plane run truth and backend-only briefing](ADR-002-control-plane-run-truth-and-briefing-seam.md) — superseded for shell briefing by ADR-003
+- [ADR-003: Shell consumes operator briefing in the right dock](ADR-003-shell-consumes-operator-briefing.md)
 
 ## Verification
 
