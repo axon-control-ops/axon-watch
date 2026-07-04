@@ -17,9 +17,6 @@ const shell = useShellStore();
       'hud-seam--emphasized': shell.briefingSeamEmphasized,
       'dock-hero-panel--command': shell.dockHeroMode === 'command',
       'dock-hero-panel--briefing': shell.dockHeroMode === 'briefing',
-      'dock-hero-panel--attention': shell.showKairoBriefingAttention,
-      [`dock-hero-panel--attention-${shell.kairoBriefingAttention.severity}`]:
-        shell.showKairoBriefingAttention,
     }"
   >
     <span class="hud-seam__corner hud-seam__corner--tl" aria-hidden="true" />
@@ -69,22 +66,11 @@ const shell = useShellStore();
     </div>
 
     <div class="hud-seam__body dock-hero-panel__body">
-      <button
-        v-if="shell.showKairoBriefingAttention"
-        type="button"
-        class="dock-hero-panel__attention-ribbon"
-        :class="`dock-hero-panel__attention-ribbon--${shell.kairoBriefingAttention.severity}`"
-        @click="shell.setDockHeroMode('briefing')"
-      >
-        <span class="dock-hero-panel__attention-pulse" aria-hidden="true" />
-        <span class="dock-hero-panel__attention-copy">
-          <strong>KAIRO briefing waiting</strong>
-          <span>{{ shell.kairoBriefingAttention.message }}</span>
-        </span>
-        <span class="dock-hero-panel__attention-action">Open briefing →</span>
-      </button>
-
-      <CommandSeamPanel v-show="shell.dockHeroMode === 'command'" class="dock-hero-panel__surface" />
+      <CommandSeamPanel
+        v-show="shell.dockHeroMode === 'command'"
+        class="dock-hero-panel__surface"
+        compact
+      />
       <BriefingPanel
         v-show="shell.dockHeroMode === 'briefing'"
         class="dock-hero-panel__surface"

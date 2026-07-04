@@ -77,3 +77,5 @@ Reopen layout only if:
 
 - Seam title copy (`RUN SEAM` vs `Active Run`) is presentation polish, not layout
 - Mockup workspace catalog filtering is presentation data, not geometry
+- **Operator right-dock seam order superseded in part by [ADR-005](ADR-005-operator-sidebar-attention-toggle.md)** (IDE mode retains this ADR's right-dock order)
+- Command hero and footer attention locked by [ADR-006](ADR-006-operator-command-hero-and-footer-attention.md)

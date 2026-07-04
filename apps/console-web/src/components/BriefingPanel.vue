@@ -2,12 +2,13 @@
 import { computed } from 'vue';
 
 import type { OperatorBriefing } from '../contracts/canonical';
-import { buildBriefingHeroSubtitle } from '../lib/mockup-shell-view';
 import {
+  briefingAdvise,
   briefingConnectivityLabels,
   briefingHasActions,
   briefingHasTopSignals,
   briefingIsEmpty,
+  briefingNotice,
   briefingPanelHeadline,
   type BriefingPanelLoadState,
 } from '../lib/briefing-panel-view';
@@ -25,9 +26,8 @@ const emit = defineEmits<{
 }>();
 
 const headline = computed(() => briefingPanelHeadline(props.briefing, props.loadState));
-const heroSubtitle = computed(() =>
-  buildBriefingHeroSubtitle(props.briefing, props.loadState),
-);
+const heroNotice = computed(() => briefingNotice(props.briefing, props.loadState));
+const heroAdvise = computed(() => briefingAdvise(props.briefing, props.loadState));
 const showEmptyState = computed(
   () => props.loadState === 'loaded' && briefingIsEmpty(props.briefing),
 );
@@ -81,14 +81,12 @@ const voiceLine = computed(() => {
 
         <div class="briefing-panel__voice-copy">
           <p class="briefing-panel__kairo-title">KAIRO</p>
-          <p class="briefing-panel__kairo-subtitle">{{ heroSubtitle }}</p>
+          <p class="briefing-panel__section-label briefing-panel__section-label--hero">Notice</p>
+          <p class="briefing-panel__kairo-subtitle">{{ heroNotice }}</p>
+          <p class="briefing-panel__section-label briefing-panel__section-label--hero">Advise</p>
+          <p class="briefing-panel__kairo-advise">{{ heroAdvise }}</p>
         </div>
       </div>
-
-      <button type="button" class="briefing-panel__cta" @click="emit('openChat')">
-        <span class="briefing-panel__cta-icon" aria-hidden="true">◎</span>
-        SWITCH TO COMMAND
-      </button>
     </template>
 
     <template v-else>
@@ -110,23 +108,35 @@ const voiceLine = computed(() => {
         {{ error }}
       </p>
 
-      <div v-else-if="briefing" class="briefing-panel__section">
-        <p class="briefing-panel__section-label">Connectivity</p>
-        <div class="briefing-panel__chips">
-          <span
-            v-for="label in connectivityLabels"
-            :key="label"
-            class="briefing-panel__chip"
-            :class="{
-              'briefing-panel__chip--ok': label.endsWith('ready') || label.endsWith('connected'),
-              'briefing-panel__chip--warn':
-                label.includes('not ready') || label.includes('disconnected'),
-            }"
-          >
-            {{ label }}
-          </span>
+      <template v-else-if="briefing">
+        <div class="briefing-panel__section">
+          <p class="briefing-panel__section-label">Notice</p>
+          <p class="briefing-panel__rhythm-copy">{{ heroNotice }}</p>
         </div>
-      </div>
+
+        <div class="briefing-panel__section">
+          <p class="briefing-panel__section-label">Advise</p>
+          <p class="briefing-panel__rhythm-copy">{{ heroAdvise }}</p>
+        </div>
+
+        <div class="briefing-panel__section">
+          <p class="briefing-panel__section-label">Connectivity</p>
+          <div class="briefing-panel__chips">
+            <span
+              v-for="label in connectivityLabels"
+              :key="label"
+              class="briefing-panel__chip"
+              :class="{
+                'briefing-panel__chip--ok': label.endsWith('ready') || label.endsWith('connected'),
+                'briefing-panel__chip--warn':
+                  label.includes('not ready') || label.includes('disconnected'),
+              }"
+            >
+              {{ label }}
+            </span>
+          </div>
+        </div>
+      </template>
 
       <p v-if="showEmptyState" class="region-copy">
         Systems nominal. No pending approvals, top signals, or recommended actions right now.

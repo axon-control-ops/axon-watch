@@ -68,7 +68,6 @@ import {
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
 import {
-  briefingHasInterruptiveSignals,
   buildDockSeamLayout,
   type DockSeamId,
 } from '../lib/dock-seam-layout';
@@ -76,6 +75,13 @@ import {
   resolveDefaultDockHeroMode,
   type DockHeroMode,
 } from '../lib/dock-hero-mode';
+import {
+  leftSidebarAttentionBadgeCount as computeLeftSidebarAttentionBadgeCount,
+  persistLeftSidebarMode,
+  readStoredLeftSidebarMode,
+  resolveDefaultLeftSidebarMode,
+  type LeftSidebarMode,
+} from '../lib/left-sidebar-mode';
 import {
   briefingAttentionStatusLabel,
   resolveKairoBriefingAttention,
@@ -86,13 +92,17 @@ import {
   buildTopbarChips,
 } from '../lib/runtime-strip';
 import {
+  persistOperatorWorkspaceId,
+  readStoredOperatorWorkspaceId,
+} from '../lib/operator-workspace-selection';
+import {
   buildBriefingSummaryLine,
   buildStatusBarZones,
   buildTopbarBreadcrumb,
   buildTopbarMetaPills,
   buildWorkspaceStatusCardRows,
   mergeMockupWorkspaceCatalog,
-  resolveBootstrapWorkspaceId,
+  resolveOperatorWorkspaceId,
 } from '../lib/mockup-shell-view';
 
 export type LayoutMode = 'operator' | 'ide';
@@ -152,6 +162,7 @@ export const useShellStore = defineStore('shell', () => {
   // Backend-owned state stays on shared canonical DTO seams.
   const workspaces = ref<WorkspaceRecord[]>([]);
   const currentWorkspace = ref<WorkspaceRecord | null>(null);
+  const operatorPinnedWorkspaceId = ref<string | null>(readStoredOperatorWorkspaceId());
   const workspacesLoadState = ref<WorkspacesLoadState>('idle');
   const workspacesError = ref<string | null>(null);
   const runtimeSummary = ref<RuntimeSummary | null>(null);
@@ -200,6 +211,8 @@ export const useShellStore = defineStore('shell', () => {
   const briefingSeamEmphasized = ref(false);
   const dockHeroMode = ref<DockHeroMode>('command');
   const dockHeroModeTouched = ref(false);
+  const leftSidebarMode = ref<LeftSidebarMode>(readStoredLeftSidebarMode() ?? 'workspaces');
+  const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
 
   const layoutModeLabel = computed(() =>
     layoutMode.value === 'operator' ? 'Operator mode' : 'IDE mode',
@@ -425,6 +438,13 @@ export const useShellStore = defineStore('shell', () => {
     return Math.max(fromSummary, fromBriefing);
   });
 
+  const leftSidebarAttentionBadgeCount = computed(() =>
+    computeLeftSidebarAttentionBadgeCount({
+      pendingApprovals: pendingApprovalsCount.value,
+      briefing: operatorBriefing.value,
+    }),
+  );
+
   const statusBarSegments = computed(() =>
     buildStatusBarSegments({
       layoutModeLabel: layoutModeLabel.value,
@@ -549,16 +569,15 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     const next = new Set(expandedDockSeams.value);
-    if (pendingApprovalsCount.value > 0) {
-      next.add('approvals');
-    }
-    if (briefingHasInterruptiveSignals(operatorBriefing.value)) {
-      next.add('signals');
-    }
-    if (threadMessages.value.length > 0) {
-      next.add('thread');
-    }
+    next.add('thread');
     expandedDockSeams.value = next;
+
+    if (!leftSidebarModeTouched.value) {
+      leftSidebarMode.value = resolveDefaultLeftSidebarMode({
+        pendingApprovals: pendingApprovalsCount.value,
+        briefing: operatorBriefing.value,
+      });
+    }
 
     if (!dockHeroModeTouched.value) {
       dockHeroMode.value = resolveDefaultDockHeroMode({
@@ -567,6 +586,12 @@ export const useShellStore = defineStore('shell', () => {
         highSignals: runtimeSummary.value?.signals.high_count ?? 0,
       });
     }
+  }
+
+  function setLeftSidebarMode(mode: LeftSidebarMode): void {
+    leftSidebarModeTouched.value = true;
+    leftSidebarMode.value = mode;
+    persistLeftSidebarMode(mode);
   }
 
   function setDockHeroMode(mode: DockHeroMode): void {
@@ -603,10 +628,15 @@ export const useShellStore = defineStore('shell', () => {
       return;
     }
 
-    const targetWorkspaceId =
-      preferredWorkspaceId !== undefined && preferredWorkspaceId !== null
-        ? preferredWorkspaceId
-        : resolveBootstrapWorkspaceId(workspaces.value, activeRun.value);
+    const targetWorkspaceId = resolveOperatorWorkspaceId({
+      explicitPreferredId:
+        preferredWorkspaceId !== undefined && preferredWorkspaceId !== null
+          ? preferredWorkspaceId
+          : null,
+      pinnedWorkspaceId: operatorPinnedWorkspaceId.value,
+      workspaces: workspaces.value,
+      activeRun: activeRun.value,
+    });
 
     currentWorkspace.value =
       workspaces.value.find((workspace) => workspace.workspace_id === targetWorkspaceId) ??
@@ -614,10 +644,15 @@ export const useShellStore = defineStore('shell', () => {
       null;
   }
 
+  function shouldAutoSyncWorkspaceFromRuns(): boolean {
+    return !operatorPinnedWorkspaceId.value;
+  }
+
   function setLayoutMode(mode: LayoutMode): void {
     layoutMode.value = mode;
     expandedDockSeams.value = new Set();
     dockHeroModeTouched.value = false;
+    leftSidebarModeTouched.value = false;
     applyOperatorDockDefaults();
   }
 
@@ -805,6 +840,8 @@ export const useShellStore = defineStore('shell', () => {
 
   function setCurrentWorkspace(workspaceId: string): void {
     const previousWorkspaceId = currentWorkspace.value?.workspace_id ?? null;
+    operatorPinnedWorkspaceId.value = workspaceId;
+    persistOperatorWorkspaceId(workspaceId);
     syncCurrentWorkspace(workspaceId);
     if (previousWorkspaceId !== workspaceId) {
       resetThreadContext();
@@ -892,7 +929,7 @@ export const useShellStore = defineStore('shell', () => {
     try {
       const snapshot = await fetchWorkspaces();
       workspaces.value = mergeMockupWorkspaceCatalog(snapshot.items);
-      if (options.sync !== false) {
+      if (options.sync !== false && shouldAutoSyncWorkspaceFromRuns()) {
         syncCurrentWorkspace();
       }
       workspacesLoadState.value = 'loaded';
@@ -956,7 +993,7 @@ export const useShellStore = defineStore('shell', () => {
       const snapshot = await fetchRuns();
       runs.value = snapshot.items;
       activeRun.value = selectPrimaryRun(snapshot.items);
-      if (options.sync !== false) {
+      if (options.sync !== false && shouldAutoSyncWorkspaceFromRuns()) {
         syncCurrentWorkspace(activeRun.value?.workspace_id ?? null);
       }
       runsLoadState.value = 'loaded';
@@ -1112,7 +1149,13 @@ export const useShellStore = defineStore('shell', () => {
     ]);
     await loadWorkspaces({ sync: false });
     await loadRuns({ sync: false });
-    syncCurrentWorkspace(resolveBootstrapWorkspaceId(workspaces.value, activeRun.value));
+    syncCurrentWorkspace(
+      resolveOperatorWorkspaceId({
+        pinnedWorkspaceId: operatorPinnedWorkspaceId.value,
+        workspaces: workspaces.value,
+        activeRun: activeRun.value,
+      }),
+    );
     await loadRunHistory(activeRun.value?.run_id ?? null);
     await loadWorkspaceFiles();
     const workspaceId = currentWorkspace.value?.workspace_id;
@@ -1162,6 +1205,8 @@ export const useShellStore = defineStore('shell', () => {
     kairoPresenceState,
     layoutMode,
     layoutModeLabel,
+    leftSidebarAttentionBadgeCount,
+    leftSidebarMode,
     completePrimaryRun,
     loadBootstrapData,
     loadInbox,
@@ -1204,6 +1249,7 @@ export const useShellStore = defineStore('shell', () => {
     setCurrentWorkspace,
     setDockHeroMode,
     setLayoutMode,
+    setLeftSidebarMode,
     signalViews,
     stopPrimaryRun,
     submitOperatorCommand,

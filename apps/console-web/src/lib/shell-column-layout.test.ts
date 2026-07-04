@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computeBriefingDockHeight,
+  computeHeroDockHeight,
   computeShellColumnMinHeight,
   isShellLayoutGeometrySane,
+  OPERATOR_HERO_DOCK_HEIGHT_PX,
   parseCssLengthPx,
 } from './shell-column-layout';
 
@@ -27,9 +29,16 @@ describe('shell column layout helpers', () => {
     expect(isShellLayoutGeometrySane(72, 920, 900)).toBe(true);
   });
 
-  it('scales briefing dock height below terminal dock height', () => {
-    expect(computeBriefingDockHeight(367)).toBe(301);
-    expect(computeBriefingDockHeight(0)).toBe(0);
-    expect(computeBriefingDockHeight(120)).toBe(152);
+  it('uses a fixed compact hero height in operator mode', () => {
+    expect(computeHeroDockHeight(367, 'operator')).toBe(OPERATOR_HERO_DOCK_HEIGHT_PX);
+    expect(computeHeroDockHeight(120, 'operator')).toBe(OPERATOR_HERO_DOCK_HEIGHT_PX);
+  });
+
+  it('scales IDE hero height below terminal dock height with a cap', () => {
+    expect(computeHeroDockHeight(367, 'ide')).toBe(154);
+    expect(computeHeroDockHeight(0, 'ide')).toBe(128);
+    expect(computeHeroDockHeight(120, 'ide')).toBe(128);
+    expect(computeHeroDockHeight(900, 'ide')).toBe(176);
+    expect(computeBriefingDockHeight(367)).toBe(154);
   });
 });

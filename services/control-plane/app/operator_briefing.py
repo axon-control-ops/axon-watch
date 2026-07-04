@@ -8,6 +8,7 @@ from app.runs.service import (
     list_pending_approval_records,
     to_runtime_summary_active_run,
 )
+from app.operator_briefing_rhythm import build_operator_briefing_rhythm
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
 
 
@@ -106,22 +107,34 @@ def build_operator_briefing(
     ][:3]
     active_run_records = list_active_runs()
     pending_approval_records = list_pending_approval_records()
+    active_runs = [
+        to_runtime_summary_active_run(record) for record in active_run_records
+    ]
+    next_safe_actions = _build_next_safe_actions(
+        active_run_records=active_run_records,
+        top_signals=top_signals,
+        degraded_active=bool(runtime_summary["degraded"]["active"]),
+    )
+    rhythm = build_operator_briefing_rhythm(
+        active_runs=active_runs,
+        top_signals=top_signals,
+        pending_approvals_count=int(runtime_summary["approvals"]["pending_count"]),
+        degraded=runtime_summary["degraded"],
+        watch_connected=watch_connected,
+        next_safe_actions=next_safe_actions,
+    )
 
     return {
         "generated_at": runtime_summary["generated_at"],
+        "notice": rhythm["notice"],
+        "advise": rhythm["advise"],
         "top_signals": top_signals,
         "pending_approvals": {
             "count": runtime_summary["approvals"]["pending_count"],
             "items": pending_approval_records,
         },
-        "active_runs": [
-            to_runtime_summary_active_run(record) for record in active_run_records
-        ],
-        "next_safe_actions": _build_next_safe_actions(
-            active_run_records=active_run_records,
-            top_signals=top_signals,
-            degraded_active=bool(runtime_summary["degraded"]["active"]),
-        ),
+        "active_runs": active_runs,
+        "next_safe_actions": next_safe_actions,
         "degraded": runtime_summary["degraded"],
         "connectivity": {
             "control_plane_ready": bool(runtime_summary["control_plane"]["ready"]),

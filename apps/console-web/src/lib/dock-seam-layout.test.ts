@@ -47,7 +47,8 @@ describe('dock seam layout', () => {
     expect(layout.find((seam) => seam.id === 'approvals')?.collapsed).toBe(true);
     expect(layout.find((seam) => seam.id === 'signals')?.collapsed).toBe(true);
     expect(layout.find((seam) => seam.id === 'run')?.collapsed).toBe(true);
-    expect(layout.find((seam) => seam.id === 'thread')?.collapsed).toBe(true);
+    expect(layout.find((seam) => seam.id === 'thread')?.collapsed).toBe(false);
+    expect(layout.find((seam) => seam.id === 'thread')?.hero).toBe(true);
   });
 
   it('allows manual expansion of collapsed seams', () => {

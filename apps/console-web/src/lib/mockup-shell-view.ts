@@ -144,6 +144,10 @@ export function buildBriefingHeroSubtitle(
     return 'Briefing unavailable. Check control-plane connectivity.';
   }
 
+  if (briefing?.notice) {
+    return briefing.notice;
+  }
+
   if (briefing?.pending_approvals.count) {
     return 'Approvals need your review before I can continue.';
   }
@@ -213,6 +217,28 @@ export function mergeMockupWorkspaceCatalog(items: WorkspaceRecord[]): Workspace
   return MOCKUP_WORKSPACE_IDS.map((workspaceId) => {
     return byId.get(workspaceId) ?? { workspace_id: workspaceId };
   });
+}
+
+export function resolveOperatorWorkspaceId(input: {
+  explicitPreferredId?: string | null;
+  pinnedWorkspaceId?: string | null;
+  workspaces: WorkspaceRecord[];
+  activeRun: RunRecord | null;
+}): string | null {
+  if (input.explicitPreferredId) {
+    return input.explicitPreferredId;
+  }
+
+  const pinnedId = input.pinnedWorkspaceId?.trim() ?? null;
+  if (
+    pinnedId &&
+    isOperatorWorkspaceId(pinnedId) &&
+    input.workspaces.some((workspace) => workspace.workspace_id === pinnedId)
+  ) {
+    return pinnedId;
+  }
+
+  return resolveBootstrapWorkspaceId(input.workspaces, input.activeRun);
 }
 
 export function resolveBootstrapWorkspaceId(

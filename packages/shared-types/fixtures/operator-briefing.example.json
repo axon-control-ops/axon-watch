@@ -1,5 +1,7 @@
 {
   "generated_at": "2026-07-04T07:55:00Z",
+  "notice": "1 run awaiting explicit approval.",
+  "advise": "Approve Contract baseline run to continue execution.",
   "top_signals": [
     {
       "signal_id": "signal_runtime_summary_degraded",

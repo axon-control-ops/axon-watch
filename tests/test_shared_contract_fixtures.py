@@ -247,6 +247,8 @@ class SharedContractFixtureTests(unittest.TestCase):
         self.assertEqual(
             {
                 "generated_at",
+                "notice",
+                "advise",
                 "top_signals",
                 "pending_approvals",
                 "active_runs",

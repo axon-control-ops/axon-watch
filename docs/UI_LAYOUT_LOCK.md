@@ -1,11 +1,10 @@
 # Axon-X Console UI Layout Lock
 
 **Status:** Locked — 2026-07-04  
-**Authority:** [ADR-004](adr/ADR-004-locked-console-shell-layout.md)  
+**Authority:** [ADR-004](adr/ADR-004-locked-console-shell-layout.md), [ADR-005](adr/ADR-005-operator-sidebar-attention-toggle.md) (Operator seam ownership), [ADR-006](adr/ADR-006-operator-command-hero-and-footer-attention.md) (Command hero + footer attention)  
 **Implementation:** `apps/console-web/src/App.vue`, `apps/console-web/src/components/shell/*`, `apps/console-web/src/styles/mockup-shell.css`, `apps/console-web/src/styles/tokens.css`
 
-This document records the **current shipped shell geometry and region ownership** as the
-layout contract for all future Axon-X console work.
+**Status:** Locked — 2026-07-04 (Operator shell slice through ADR-006)
 
 ## Lock Rule
 
@@ -83,10 +82,21 @@ Runtime strip source: `buildTopbarChips()` in `runtime-strip.ts`.
 
 ## Left Sidebar (locked)
 
+### Operator mode
+
+Top → bottom:
+
+1. **Primary panel toggle** — `WORKSPACES | ATTENTION` (mirrors dock hero toggle pattern)
+2. **Workspaces view** — filter, workspace list, `+ New Workspace`
+3. **Attention view** — Active Run, Approvals, Signals (`AttentionStackPanel`)
+4. **Workspace status card** — radar widget + four runtime-backed status rows (pinned in both views)
+
+### IDE mode
+
 Top → bottom:
 
 1. **Workspaces panel** — filter, workspace list, `+ New Workspace`
-2. **Explorer** — visible only in `ide` layout mode (`WorkspaceFileTree`)
+2. **Explorer** — `WorkspaceFileTree`
 3. **Workspace status card** — radar widget + four runtime-backed status rows
 
 Workspace catalog currently filters to mockup workspace IDs for presentation parity.
@@ -112,6 +122,35 @@ Column height sync: `shell-column-layout.ts` + `CenterWorkbench` resize observer
 
 ## Right Dock (locked)
 
+### Operator mode (ADR-005 + ADR-006)
+
+Structure:
+
+```text
+dock-stack
+├── dock-stack__upper (conversation-first)
+│   └── Conversation (expanded by default)
+└── DOCK HERO (bottom-anchored)
+    └── Command ↔ KAIRO toggle (`DockHeroPanel`)
+        ├── Command: bottom-anchored autosize composer (`CommandSeamPanel`)
+        └── KAIRO: briefing hero (`BriefingPanel`, min 188px)
+```
+
+Run / Approvals / Signals live in the left sidebar **Attention** view.
+
+Command hero rules (ADR-006):
+
+- Composer auto-grows 2–8 lines via `command-composer-autosize.ts`
+- Hero height grows with composer up to `min(42vh, 22rem)`; min `188px`
+- No in-hero KAIRO attention ribbon in Command mode
+- No **SWITCH TO COMMAND** button in KAIRO hero (toggle only)
+
+Footer KAIRO CTA (ADR-006): when briefing attention is active and hero mode is
+**Command**, a glowing **OPEN KAIRO BRIEFING** button renders in the status bar
+**right column** (aligned under the hero), calling `focusKairoBriefing()`.
+
+### IDE mode (ADR-004)
+
 Structure:
 
 ```text
@@ -125,15 +164,15 @@ dock-stack
     └── Command ↔ KAIRO toggle (`DockHeroPanel`)
 ```
 
-Seam order is **identical in Operator and IDE mode**. The bottom hero stays
-**anchored at the bottom** of the dock; the upper four seams scroll above it.
+Seam order is **identical in IDE mode**. The bottom hero stays
+**anchored at the bottom** of the dock; the upper seams scroll above it.
 Command and KAIRO Briefing **share the hero slot** and interchange via a header toggle.
 
-KAIRO Briefing:
+KAIRO Briefing (IDE + Operator KAIRO tab):
 
 - hero treatment (`.hud-seam--hero`)
-- height tied to center workbench terminal dock through `--briefing-dock-height`
-- `BriefingPanel` inside: KAIRO presence + DTO sections + `OPEN KAIRO CHAT` CTA
+- Operator KAIRO tab: min height `188px`; IDE hero height capped via `computeHeroDockHeight()`
+- `BriefingPanel` hero mode: Notice + Advise + reactor; no bottom switch-to-command CTA
 
 `ConversationSeamPanel` lives in the upper stack. Command and KAIRO share the bottom
 hero via `DockHeroPanel` (header toggle). Chat APIs: `POST /api/chat/messages`, `GET /api/workspaces/{workspace_id}/chat/thread`,
@@ -143,23 +182,31 @@ Seam titles use operator-facing copy from `dock-seam-layout.ts` (`Active Run`, `
 
 ## Status Bar (locked)
 
-Single HUD strip with zones:
+Three-column grid aligned with shell columns (`status-bar-mockup__grid`):
 
-- Left: watch status + watch agent label + control-plane version
-- Center: run phase + open signal count
-- Right: current workspace id
-- Tail: UTC clock + shield mark
+| Column | Content |
+|---|---|
+| Left + center (span 2) | HUD frame: watch chip, run phase, signals, workspace, clock |
+| Right (hero rail) | Optional **OPEN KAIRO BRIEFING** glowing CTA when Command mode + briefing attention active |
 
-Source: `buildStatusBarZones()` in `mockup-shell-view.ts`.
+Source: `buildStatusBarZones()` in `mockup-shell-view.ts`; attention CTA in `StatusBar.vue`.
+
+## Workspace and terminal session (locked)
+
+- Operator workspace pick is **pinned** in session storage (`operator-workspace-selection.ts`);
+  run refresh must not override manual sidebar selection.
+- Terminal attach **clears buffer** before restoring per-workspace scrollback
+  (`create-xterm-session.ts`).
+- Chat thread rehydration is workspace-scoped via `loadWorkspaceThread()`.
 
 ## Layout Modes
 
 | Mode | Geometry | Difference |
 |---|---|---|
-| `operator` | same grid | no explorer tree |
-| `ide` | same grid | explorer tree visible under workspaces |
+| `operator` | same grid | left sidebar `WORKSPACES \| ATTENTION` toggle; right dock conversation-first |
+| `ide` | same grid | explorer tree visible; right dock retains Run → Approvals → Signals → Conversation |
 
-Both modes share regions, DTOs, and dock order.
+Both modes share regions, DTOs, and the bottom Command/KAIRO hero.
 
 ## Visual System
 
@@ -185,4 +232,6 @@ Future optional guard: screenshot/fitness check against this document's region g
 
 - Frozen planning: `axon-local/Plans/Axon-Watch/UI_SPEC.md`, `UI_COMPOSITION_SPEC.md`, `UI_VISUAL_DIRECTION.md`
 - ADR: `docs/adr/ADR-004-locked-console-shell-layout.md`
+- ADR: `docs/adr/ADR-005-operator-sidebar-attention-toggle.md`
+- ADR: `docs/adr/ADR-006-operator-command-hero-and-footer-attention.md`
 - Handbook: `docs/HOW-TO-HANDBOOK.md` → **Locked Shell Layout**

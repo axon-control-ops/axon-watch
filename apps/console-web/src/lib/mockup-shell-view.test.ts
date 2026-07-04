@@ -16,6 +16,7 @@ import {
   kairoPresenceModuleParts,
   mergeMockupWorkspaceCatalog,
   resolveBootstrapWorkspaceId,
+  resolveOperatorWorkspaceId,
   runPhaseProgress,
   runPhaseTag,
   workspaceStatusLine,
@@ -73,12 +74,8 @@ describe('mockup shell view helpers', () => {
   });
 
   it('builds briefing hero subtitle without KAIRO prefix', () => {
-    expect(buildBriefingHeroSubtitle(briefing, 'loaded')).toBe(
-      'Approvals need your review before I can continue.',
-    );
-    expect(buildBriefingHeroSubtitle(briefing, 'loading')).toBe(
-      'Approvals need your review before I can continue.',
-    );
+    expect(buildBriefingHeroSubtitle(briefing, 'loaded')).toBe(briefing.notice);
+    expect(buildBriefingHeroSubtitle(briefing, 'loading')).toBe(briefing.notice);
     expect(buildBriefingHeroSubtitle(null, 'loaded')).toBe(
       "I'm listening. Tell me what to focus on.",
     );
@@ -148,6 +145,33 @@ describe('mockup shell view helpers', () => {
   it('falls back to workspace_smoke when no active run is visible', () => {
     const workspaces = mergeMockupWorkspaceCatalog([]);
     expect(resolveBootstrapWorkspaceId(workspaces, null)).toBe('workspace_smoke');
+  });
+
+  it('keeps operator-pinned workspace over active-run bootstrap default', () => {
+    const workspaces = mergeMockupWorkspaceCatalog([]);
+    expect(
+      resolveOperatorWorkspaceId({
+        pinnedWorkspaceId: 'workspace_recsys',
+        workspaces,
+        activeRun: {
+          run_id: 'run_1',
+          workspace_id: 'workspace_smoke',
+        } as RunRecord,
+      }),
+    ).toBe('workspace_recsys');
+  });
+
+  it('still follows visible active run when operator has not pinned a workspace', () => {
+    const workspaces = mergeMockupWorkspaceCatalog([]);
+    expect(
+      resolveOperatorWorkspaceId({
+        workspaces,
+        activeRun: {
+          run_id: 'run_1',
+          workspace_id: 'workspace_finance',
+        } as RunRecord,
+      }),
+    ).toBe('workspace_finance');
   });
 
   it('prefers visible run workspace over default on bootstrap reload', () => {

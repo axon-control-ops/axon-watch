@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import type { OperatorBriefing } from '../contracts/canonical';
 import {
+  briefingAdvise,
   briefingConnectivityLabels,
   briefingHasTopSignals,
   briefingIsEmpty,
+  briefingNotice,
   briefingPanelHeadline,
 } from './briefing-panel-view';
 
 const emptyBriefing: OperatorBriefing = {
   generated_at: '2026-07-04T08:00:00Z',
+  notice: 'No active runs. Systems nominal.',
+  advise: 'Describe the next operator action in Command.',
   top_signals: [],
   pending_approvals: { count: 0, items: [] },
   active_runs: [],
@@ -20,6 +24,8 @@ const emptyBriefing: OperatorBriefing = {
 
 const approvalBriefing: OperatorBriefing = {
   ...emptyBriefing,
+  notice: '1 run awaiting explicit approval.',
+  advise: 'Approve test run to continue execution.',
   pending_approvals: {
     count: 1,
     items: [
@@ -85,5 +91,18 @@ describe('briefing panel view helpers', () => {
         watch_connected: false,
       }),
     ).toEqual(['Control plane ready', 'Watch disconnected']);
+  });
+
+  it('surfaces notice and advise from the briefing DTO', () => {
+    expect(briefingNotice(approvalBriefing, 'loaded')).toBe(
+      approvalBriefing.notice ?? '1 run awaiting explicit approval.',
+    );
+    expect(briefingAdvise(approvalBriefing, 'loaded')).toBe(
+      'Approve test run to continue execution.',
+    );
+    expect(briefingNotice(emptyBriefing, 'loaded')).toBe('No active runs. Systems nominal.');
+    expect(briefingAdvise(emptyBriefing, 'loaded')).toBe(
+      'Describe the next operator action in Command.',
+    );
   });
 });

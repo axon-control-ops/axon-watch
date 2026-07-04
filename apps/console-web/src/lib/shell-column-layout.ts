@@ -78,17 +78,38 @@ export function isShellLayoutGeometrySane(
   return statusBarTop > columnTop;
 }
 
-/** Briefing seam tracks terminal dock height but stays slightly shorter. */
-export const BRIEFING_DOCK_HEIGHT_RATIO = 0.82;
-export const MIN_BRIEFING_DOCK_HEIGHT_PX = 152;
+/** Operator hero is a fixed compact command strip, not terminal-coupled. */
+export const OPERATOR_HERO_DOCK_HEIGHT_PX = 188;
 
-export function computeBriefingDockHeight(terminalDockHeightPx: number): number {
-  if (!Number.isFinite(terminalDockHeightPx) || terminalDockHeightPx <= 0) {
-    return 0;
+/** IDE hero scales with terminal dock but stays capped. */
+export const IDE_HERO_DOCK_HEIGHT_RATIO = 0.42;
+export const MIN_IDE_HERO_DOCK_HEIGHT_PX = 128;
+export const MAX_IDE_HERO_DOCK_HEIGHT_PX = 176;
+
+export type ShellLayoutMode = 'operator' | 'ide';
+
+export function computeHeroDockHeight(
+  terminalDockHeightPx: number,
+  layoutMode: ShellLayoutMode = 'operator',
+): number {
+  if (layoutMode === 'operator') {
+    return OPERATOR_HERO_DOCK_HEIGHT_PX;
   }
 
-  return Math.max(
-    MIN_BRIEFING_DOCK_HEIGHT_PX,
-    Math.round(terminalDockHeightPx * BRIEFING_DOCK_HEIGHT_RATIO),
+  if (!Number.isFinite(terminalDockHeightPx) || terminalDockHeightPx <= 0) {
+    return MIN_IDE_HERO_DOCK_HEIGHT_PX;
+  }
+
+  return Math.min(
+    MAX_IDE_HERO_DOCK_HEIGHT_PX,
+    Math.max(
+      MIN_IDE_HERO_DOCK_HEIGHT_PX,
+      Math.round(terminalDockHeightPx * IDE_HERO_DOCK_HEIGHT_RATIO),
+    ),
   );
+}
+
+/** @deprecated Use computeHeroDockHeight. */
+export function computeBriefingDockHeight(terminalDockHeightPx: number): number {
+  return computeHeroDockHeight(terminalDockHeightPx, 'ide');
 }

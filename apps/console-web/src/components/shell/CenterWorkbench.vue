@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import EditorHost from '../EditorHost.vue';
@@ -11,7 +11,7 @@ import {
   WORKBENCH_TERMINAL_HEIGHT_KEY,
 } from '../../lib/workbench-terminal-split';
 import {
-  computeBriefingDockHeight,
+  computeHeroDockHeight,
   computeShellColumnMinHeight,
   isShellLayoutGeometrySane,
   readShellFooterGapPx,
@@ -153,9 +153,9 @@ function syncShellColumnHeights(): void {
 
 function syncBriefingDockHeight(bottomDock: Element | null): void {
   const dockHeight = bottomDock?.getBoundingClientRect().height ?? 0;
-  const briefingHeight = computeBriefingDockHeight(dockHeight);
-  if (briefingHeight > 0) {
-    document.documentElement.style.setProperty('--briefing-dock-height', `${briefingHeight}px`);
+  const heroHeight = computeHeroDockHeight(dockHeight, shell.layoutMode);
+  if (heroHeight > 0) {
+    document.documentElement.style.setProperty('--briefing-dock-height', `${heroHeight}px`);
   }
 }
 
@@ -194,6 +194,13 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
 });
+
+watch(
+  () => shell.layoutMode,
+  () => {
+    runLayoutSync('resize');
+  },
+);
 </script>
 
 <template>

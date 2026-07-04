@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
+import AttentionStackPanel from './AttentionStackPanel.vue';
 import WorkspaceFileTree from '../WorkspaceFileTree.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import {
-  MOCKUP_WORKSPACE_IDS,
   workspaceIconKind,
   workspaceStatusLine,
 } from '../../lib/mockup-shell-view';
@@ -42,6 +42,8 @@ const runCountsByWorkspace = computed(() => {
   }
   return counts;
 });
+
+const showSidebarModeToggle = computed(() => shell.layoutMode === 'operator');
 
 function isActiveWorkspace(workspaceId: string): boolean {
   return shell.currentWorkspace?.workspace_id === workspaceId;
@@ -115,14 +117,58 @@ onBeforeUnmount(() => {
     :class="{ 'left-sidebar-mockup--resizing': resizing }"
   >
     <div class="left-sidebar-mockup__workspaces-panel hud-panel-frame">
-      <div class="left-sidebar-mockup__workspaces">
-        <div class="panel-heading">
-          <p class="panel-heading__title">WORKSPACES</p>
-          <button type="button" class="panel-heading__action" aria-label="Add workspace">
-            +
+      <div
+        v-if="showSidebarModeToggle"
+        class="left-sidebar-mockup__mode-header panel-heading panel-heading--toggle"
+      >
+        <div class="shell-mode-toggle" role="tablist" aria-label="Left sidebar mode">
+          <button
+            type="button"
+            role="tab"
+            class="shell-mode-toggle__button"
+            :class="{ 'shell-mode-toggle__button--active': shell.leftSidebarMode === 'workspaces' }"
+            :aria-selected="shell.leftSidebarMode === 'workspaces'"
+            @click="shell.setLeftSidebarMode('workspaces')"
+          >
+            Workspaces
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="shell-mode-toggle__button shell-mode-toggle__button--attention"
+            :class="{
+              'shell-mode-toggle__button--active': shell.leftSidebarMode === 'attention',
+              'shell-mode-toggle__button--attention-hot': shell.leftSidebarAttentionBadgeCount > 0,
+            }"
+            :aria-selected="shell.leftSidebarMode === 'attention'"
+            @click="shell.setLeftSidebarMode('attention')"
+          >
+            <span class="shell-mode-toggle__label">Attention</span>
+            <span
+              v-if="shell.leftSidebarAttentionBadgeCount > 0"
+              class="shell-mode-toggle__badge"
+              aria-hidden="true"
+            >
+              {{ shell.leftSidebarAttentionBadgeCount }}
+            </span>
           </button>
         </div>
+      </div>
 
+      <div
+        v-else
+        class="panel-heading"
+      >
+        <p class="panel-heading__title">WORKSPACES</p>
+        <button type="button" class="panel-heading__action" aria-label="Add workspace">
+          +
+        </button>
+      </div>
+
+      <div
+        v-show="!showSidebarModeToggle || shell.leftSidebarMode === 'workspaces'"
+        class="left-sidebar-mockup__workspaces"
+      >
         <label class="workspace-filter">
           <WorkbenchIcon name="search" :size="13" class="workspace-filter__icon" />
           <input
@@ -175,6 +221,12 @@ onBeforeUnmount(() => {
         <button type="button" class="workspace-new-button">+ New Workspace</button>
         <p v-if="shell.workspacesError" class="region-copy">{{ shell.workspacesError }}</p>
       </div>
+
+      <AttentionStackPanel
+        v-if="showSidebarModeToggle"
+        v-show="shell.leftSidebarMode === 'attention'"
+        variant="sidebar"
+      />
     </div>
 
     <div v-if="shell.layoutMode === 'ide'" class="left-sidebar-mockup__explorer">

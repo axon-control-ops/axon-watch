@@ -59,6 +59,8 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
         self.assertEqual(
             {
                 "generated_at",
+                "notice",
+                "advise",
                 "top_signals",
                 "pending_approvals",
                 "active_runs",
@@ -114,6 +116,8 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
         self.assertEqual(f"approval_{created['run_id']}", payload["pending_approvals"]["items"][0]["approval_id"])
         self.assertEqual("approve_run", payload["next_safe_actions"][0]["kind"])
         self.assertEqual(created["run_id"], payload["next_safe_actions"][0]["run_id"])
+        self.assertIn("approval", payload["notice"])
+        self.assertIn("Approve", payload["advise"])
 
     def test_briefing_omits_top_signals_when_watch_disconnected(self) -> None:
         with patch(

@@ -68,3 +68,41 @@ export function briefingIsEmpty(briefing: OperatorBriefing | null): boolean {
     briefing.connectivity.watch_connected
   );
 }
+
+export function briefingNotice(
+  briefing: OperatorBriefing | null,
+  loadState: BriefingPanelLoadState,
+): string {
+  if (loadState === 'loading') {
+    return 'Standing by while briefing loads.';
+  }
+
+  if (loadState === 'error') {
+    return 'Briefing unavailable. Check control-plane connectivity.';
+  }
+
+  if (briefing?.notice) {
+    return briefing.notice;
+  }
+
+  return 'Awaiting briefing.';
+}
+
+export function briefingAdvise(
+  briefing: OperatorBriefing | null,
+  loadState: BriefingPanelLoadState,
+): string {
+  if (loadState === 'loading') {
+    return 'KAIRO will recommend the next safe action once briefing loads.';
+  }
+
+  if (loadState === 'error') {
+    return 'Review runtime summary and connectivity before continuing.';
+  }
+
+  if (briefing?.advise) {
+    return briefing.advise;
+  }
+
+  return 'Describe the next operator action in Command.';
+}

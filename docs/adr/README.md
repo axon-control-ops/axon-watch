@@ -44,7 +44,10 @@ Every numbered ADR must include:
 - [ADR-001: Vue 3, Pinia, Monaco, and xterm.js stack](ADR-001-vue-monaco-xterm-stack.md)
 - [ADR-002: Control-plane run truth and backend-only briefing](ADR-002-control-plane-run-truth-and-briefing-seam.md) — superseded for shell briefing by ADR-003
 - [ADR-003: Shell consumes operator briefing in the right dock](ADR-003-shell-consumes-operator-briefing.md)
-- [ADR-004: Locked console shell layout](ADR-004-locked-console-shell-layout.md)
+- [ADR-004: Locked console shell layout](ADR-004-locked-console-shell-layout.md) — operator right-dock seam order superseded in part by ADR-005
+- [ADR-005: Operator sidebar attention toggle](ADR-005-operator-sidebar-attention-toggle.md)
+- [ADR-006: Operator command hero and footer attention](ADR-006-operator-command-hero-and-footer-attention.md)
+- [ADR-007: Operator workbench demotion](ADR-007-operator-workbench-demotion.md) — **Proposed** (not yet implemented)
 
 **Planning-only (not yet copied here):**
 

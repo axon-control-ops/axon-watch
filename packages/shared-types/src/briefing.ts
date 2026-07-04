@@ -32,6 +32,8 @@ export interface OperatorBriefingConnectivity {
 
 export interface OperatorBriefing {
   generated_at: string;
+  notice: string;
+  advise: string;
   top_signals: InboxItem[];
   pending_approvals: OperatorBriefingPendingApprovals;
   active_runs: RuntimeSummaryActiveRun[];
