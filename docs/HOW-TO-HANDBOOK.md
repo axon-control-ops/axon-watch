@@ -478,6 +478,7 @@ Parity observations from the current mockup and live screenshots:
   version chips are still mockup-style presentation helpers
 - the sidebar and shell store share the same operator workspace catalog (`MOCKUP_WORKSPACE_IDS`)
 - the dock uses operator-facing seam titles (`Active Run`, `Approvals`, `Signals`, `Conversation`) from `dock-seam-layout.ts`
+- live shell refresh uses `GET /api/live/events` (SSE refresh hints) via `live-events-session.ts`, with visibility-aware polling fallback when EventSource is unavailable
 - Operator mode renders the right dock as **Run → Approvals → Signals → Conversation →
   Command → KAIRO Briefing** with the briefing card anchored at the bottom of the dock
 - the workbench terminal dock default height is ~240px (responsive cap 280px) unless the

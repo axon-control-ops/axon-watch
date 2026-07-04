@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 
 import BootWakeOverlay from './components/BootWakeOverlay.vue';
 import CenterWorkbench from './components/shell/CenterWorkbench.vue';
@@ -8,9 +8,11 @@ import RightDock from './components/shell/RightDock.vue';
 import StatusBar from './components/shell/StatusBar.vue';
 import TopBar from './components/shell/TopBar.vue';
 import ScanHierarchyPreview from './dev/ScanHierarchyPreview.vue';
+import { startLiveEventsSession } from './lib/live-events-session';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
+let liveEventsSession: ReturnType<typeof startLiveEventsSession> | null = null;
 const showScanPreview = ref(
   typeof window !== 'undefined' &&
     import.meta.env.DEV &&
@@ -27,6 +29,26 @@ function completeBoot(): void {
   sessionStorage.setItem('axon-x-boot-complete', '1');
   bootComplete.value = true;
 }
+
+watch(
+  bootComplete,
+  (complete) => {
+    if (!complete || showScanPreview.value) {
+      return;
+    }
+
+    liveEventsSession?.disconnect();
+    liveEventsSession = startLiveEventsSession({
+      onRefresh: () => shell.refreshRunSurfaces(),
+    });
+  },
+  { immediate: true },
+);
+
+onUnmounted(() => {
+  liveEventsSession?.disconnect();
+  liveEventsSession = null;
+});
 </script>
 
 <template>

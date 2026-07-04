@@ -36,6 +36,7 @@ from app.runs.service import (
 from app.runtime_summary import build_runtime_summary
 from app.terminal.session_handler import handle_terminal_session
 from app.workspace_catalog import get_workspace_record, list_workspace_records, WorkspaceNotFoundError
+from app.live_events import live_events_response
 from app.workspace_files import (
     WorkspaceFileError,
     list_workspace_files,
@@ -130,6 +131,11 @@ def inbox() -> dict[str, object]:
 @app.get("/api/briefing")
 def operator_briefing() -> dict[str, object]:
     return build_operator_briefing()
+
+
+@app.get("/api/live/events")
+def live_events():
+    return live_events_response()
 
 
 @app.post("/api/chat/messages")

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { OperatorBriefing, RunRecord, RuntimeSummary } from '../contracts/canonical';
 import exampleBriefing from '../../../../packages/shared-types/fixtures/operator-briefing.example.json';
-import { buildDockSeamLayout } from './dock-seam-layout';
+import {
+  briefingHasInterruptiveSignals,
+  buildDockSeamLayout,
+} from './dock-seam-layout';
 
 const briefing = exampleBriefing as unknown as OperatorBriefing;
 
@@ -98,5 +101,67 @@ describe('dock seam layout', () => {
     expect(layout.find((seam) => seam.id === 'run')?.hero).toBe(true);
     expect(layout.find((seam) => seam.id === 'approvals')?.collapsed).toBe(false);
     expect(layout.find((seam) => seam.id === 'briefing')?.collapsed).toBe(true);
+  });
+
+  it('collapses signals in operator mode only for interruptive severities', () => {
+    const interruptiveBriefing = {
+      ...briefing,
+      top_signals: [
+        {
+          ...briefing.top_signals[0]!,
+          severity: 'high',
+        },
+      ],
+    } as OperatorBriefing;
+
+    const collapsed = buildDockSeamLayout({
+      layoutMode: 'operator',
+      briefing: interruptiveBriefing,
+      approvalsSummary: '0 pending approvals',
+      signalsSummary: 'Watch summary degraded',
+      runSummary: 'No active run',
+      threadSummary: 'No active conversation',
+      expandedSeams: new Set(),
+    });
+
+    expect(briefingHasInterruptiveSignals(interruptiveBriefing)).toBe(true);
+    expect(collapsed.find((seam) => seam.id === 'signals')?.collapsed).toBe(true);
+
+    const expanded = buildDockSeamLayout({
+      layoutMode: 'operator',
+      briefing: interruptiveBriefing,
+      approvalsSummary: '0 pending approvals',
+      signalsSummary: 'Watch summary degraded',
+      runSummary: 'No active run',
+      threadSummary: 'No active conversation',
+      expandedSeams: new Set(['signals']),
+    });
+
+    expect(expanded.find((seam) => seam.id === 'signals')?.collapsed).toBe(false);
+  });
+
+  it('keeps non-interruptive signals expanded in operator mode', () => {
+    const ambientBriefing = {
+      ...briefing,
+      top_signals: [
+        {
+          ...briefing.top_signals[0]!,
+          severity: 'warning',
+        },
+      ],
+    } as OperatorBriefing;
+
+    const layout = buildDockSeamLayout({
+      layoutMode: 'operator',
+      briefing: ambientBriefing,
+      approvalsSummary: '0 pending approvals',
+      signalsSummary: 'Ambient watch note',
+      runSummary: 'No active run',
+      threadSummary: 'No active conversation',
+      expandedSeams: new Set(),
+    });
+
+    expect(briefingHasInterruptiveSignals(ambientBriefing)).toBe(false);
+    expect(layout.find((seam) => seam.id === 'signals')?.collapsed).toBe(false);
   });
 });

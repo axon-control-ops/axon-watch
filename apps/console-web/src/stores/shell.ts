@@ -68,6 +68,7 @@ import {
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
 import {
+  briefingHasInterruptiveSignals,
   buildDockSeamLayout,
   type DockSeamId,
 } from '../lib/dock-seam-layout';
@@ -550,6 +551,9 @@ export const useShellStore = defineStore('shell', () => {
     const next = new Set(expandedDockSeams.value);
     if (pendingApprovalsCount.value > 0) {
       next.add('approvals');
+    }
+    if (briefingHasInterruptiveSignals(operatorBriefing.value)) {
+      next.add('signals');
     }
     if (threadMessages.value.length > 0) {
       next.add('thread');
@@ -1173,6 +1177,7 @@ export const useShellStore = defineStore('shell', () => {
     primaryActiveRun,
     primaryApprovalRun,
     primaryInboxItem,
+    refreshRunSurfaces,
     rejectPrimaryRun,
     resumePrimaryRun,
     runs,

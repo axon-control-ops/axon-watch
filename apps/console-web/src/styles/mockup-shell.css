@@ -3313,7 +3313,14 @@ body:has(.console-shell--mockup) {
 @media (prefers-reduced-motion: reduce) {
   .kairo-presence-module__radar-arc,
   .workspace-status-card__sweep,
-  .kairo-presence-module__waveform span:not(.kairo-presence-module__waveform-axis) {
+  .kairo-presence-module__waveform span:not(.kairo-presence-module__waveform-axis),
+  .dock-hero-panel--attention,
+  .dock-hero-panel__toggle-button--attention-high,
+  .dock-hero-panel__toggle-button--attention-warning,
+  .dock-hero-panel__attention-pulse,
+  .briefing-panel__avatar-ring--pulse,
+  .status-bar-mockup__chip--kairo-briefing,
+  .status-bar-mockup__kairo-pulse {
     animation: none;
   }
 }

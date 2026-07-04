@@ -25,6 +25,14 @@ export function briefingCoversSignals(briefing: OperatorBriefing | null): boolea
   return Boolean(briefing && briefing.top_signals.length > 0);
 }
 
+export function briefingHasInterruptiveSignals(briefing: OperatorBriefing | null): boolean {
+  return Boolean(
+    briefing?.top_signals.some(
+      (signal) => signal.severity === 'high' || signal.severity === 'critical',
+    ),
+  );
+}
+
 export function briefingCoversActiveRun(briefing: OperatorBriefing | null): boolean {
   return Boolean(briefing && briefing.active_runs.length > 0);
 }
@@ -40,7 +48,7 @@ export function buildDockSeamLayout(input: {
 }): DockSeamLayoutState[] {
   const operatorMode = input.layoutMode === 'operator';
   const coversApprovals = briefingCoversApprovals(input.briefing);
-  const coversSignals = briefingCoversSignals(input.briefing);
+  const interruptiveSignals = briefingHasInterruptiveSignals(input.briefing);
   const coversRun = briefingCoversActiveRun(input.briefing);
 
   const seams: DockSeamLayoutState[] = [
@@ -62,7 +70,8 @@ export function buildDockSeamLayout(input: {
       id: 'signals',
       title: 'Signals',
       hero: false,
-      collapsed: operatorMode && coversSignals && !input.expandedSeams.has('signals'),
+      collapsed:
+        operatorMode && interruptiveSignals && !input.expandedSeams.has('signals'),
       compactSummary: input.signalsSummary,
     },
     {

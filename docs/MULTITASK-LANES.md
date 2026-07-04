@@ -123,6 +123,7 @@ Work in order. One slice per pass; run the verification gate before the next ite
 | **A1** | A | Watch signal depth / degraded bootstrap clarity | **done** |
 | **C1** | C (+ B surface) | Run history receipts visible in dock | **done** |
 | **D1** | D | Dev verify / health polish (non-semantics) | **queued** |
+| **UX-4** | B | SSE live update polish (seam refresh + interruptive signals) | **done** |
 
 Parallel rule: **B1 must finish before A1/C1** if they touch `chat/service.py` or
 run orchestration in the same pass. Lane A and D may run in parallel with B2 only.
@@ -133,7 +134,7 @@ Superseded by **Active Queue** above. After B1 lands:
 
 1. **Lane A** — watch summary degraded signal clarity in bootstrap dev mode
 2. **Lane C** — run history receipts visible in dock (within frozen transitions)
-3. **Lane B** — UX-4 SSE seam polish (no layout ADR changes)
+3. **Lane D** — dev verify / health polish (D1)
 
 ## Recently Landed
 
@@ -157,6 +158,7 @@ Superseded by **Active Queue** above. After B1 lands:
 - **chat command dispatch** attach vs new run (`POST /api/chat/messages` +
   `refreshRunSurfaces` on submit)
 - **operator-facing dock seam titles** via `dock-seam-layout.ts`
+- **UX-4 live update polish** — `GET /api/live/events` SSE refresh hints, `live-events-session.ts`, interruptive signal seam promotion, reduced-motion overrides
 - **silent empty thread lookup** (HTTP 200 + `thread_id: null`)
 - **bootstrap workspace catalog trim** (`mergeMockupWorkspaceCatalog`, `workspace_smoke` default)
 - **chat orchestration hook** — agent transcript reply + dispatch → `review_ready` (`chat/orchestration.py`)
