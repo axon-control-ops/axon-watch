@@ -52,8 +52,9 @@ Ownership:
 - console-web styles and partial shell layout
 
 **Layout lock:** region geometry and dock seam order are frozen — see
-`docs/UI_LAYOUT_LOCK.md` and ADR-004. Lane B may polish and bind DTOs inside
-regions but must not rearrange the shell without coordinator approval and a new ADR.
+`docs/UI_LAYOUT_LOCK.md` and ADR-004 through ADR-007. Lane B may polish and bind
+DTOs inside regions but must not rearrange the shell without coordinator approval
+and a new ADR.
 
 May:
 
@@ -107,106 +108,87 @@ Do not start these until coordinator opens the slice:
 
 | Item | Owner | Reason |
 |---|---|---|
-| KAIRO operator-presence integration (ADR-005, JX-1–JX-5) | Coordinator | Cross-cutting persona, voice, watch rules — planning only in `axon-local` |
+| KAIRO operator-presence integration (JX-1–JX-5) | Coordinator | Cross-cutting persona, voice, watch rules — planning only in `axon-local` |
 | Cross-repo planning migration | Coordinator | `axon-local/Plans/Axon-Watch/` remains frozen planning home |
-| Fitness timing gates | Lane D | `shell_boot_readiness`, latency budgets — PENDING in verify |
 | Shared-contract field changes | Coordinator | `packages/shared-types`, run-state truth surfaces |
+
+## Completed Queue
+
+Work landed on `dev` (verified 2026-07-04):
+
+| ID | Lane | Slice | Commit area |
+|---|---|---|---|
+| B1 | C (+ B) | Chat orchestration hook → superseded by C2 | `chat/orchestration.py` |
+| B2 | B | Workspace catalog policy (doc) | `docs/WORKSPACE_CATALOG.md` |
+| A1 | A | Bootstrap degraded signal clarity | watch summary copy |
+| C1 | C (+ B) | Run history receipts in Active Run dock | `GET /api/runs/{id}/history` |
+| D1 | D | Dev verify evidence + nightly gate | `npm run verify:evidence` |
+| UX-4 | B | SSE live refresh + interruptive signals | `GET /api/live/events` |
+| C2 | C (+ B) | Bounded command executor | `command_executor.py` |
+| C3 | C (+ B) | Briefing **Notice/Advise** projection | `operator_briefing_rhythm.py` |
+| B3 | B | Compact operator responsive CSS | `mockup-shell.css` `@media` |
+| ADR-005 | B | Operator sidebar **Attention** toggle | `LeftSidebar`, `AttentionStackPanel` |
+| ADR-006 | B | Command hero autosize + footer KAIRO CTA | `CommandSeamPanel`, `StatusBar` |
+| ADR-007 p1 | B | Hide Monaco in Operator; IDE terminal collapse | `CenterWorkbench.vue` |
+| **B7** | B | **Operator status/radar panel** (ADR-007 phase 2 option A) | `OperatorStatusRadarPanel.vue` |
 
 ## Active Queue (resume here)
 
-Work in order. One slice per pass; run the verification gate before the next item.
+One slice per pass; run the verification gate before the next item.
 
-| # | Lane | Slice | Status |
-|---|---|---|---|
-| **B1** | C (+ B surface) | Chat orchestration hook — agent reply + `review_ready` after dispatch | **done** |
-| **B2** | B | Workspace catalog policy (doc-only) | **done** — `docs/WORKSPACE_CATALOG.md` |
-| **A1** | A | Watch signal depth / degraded bootstrap clarity | **done** |
-| **C1** | C (+ B surface) | Run history receipts visible in dock | **done** |
-| **D1** | D | Dev verify / health polish (non-semantics) | **done** |
-| **UX-4** | B | SSE live update polish (seam refresh + interruptive signals) | **done** |
-
-## Next Queue (pick from here)
-
-| Priority | ID | Lane | Slice | Blocked? |
+| Priority | ID | Lane | Slice | Status |
 |---|---|---|---|---|
-| **1** | **C2** | C (+ B transcript) | **Bounded command executor** — run real workspace actions from chat (health probe, file read, dir list); agent messages include evidence; then `review_ready` | **done** |
-| 2 | C3 | C | Briefing **Notice/Advise** depth from canonical run/signal state (JX-3 thin slice) | Ready |
-| 3 | B3 | B | Responsive **compact operator** layout (CSS only, no voice — not full mobile JX-4) | Ready |
-| — | JX-1–5 | Coordinator | KAIRO presence (watch rules, delivery, voice, persona, mobile) | **Blocked** |
-| — | — | Coordinator | Cross-repo planning migration | **Blocked** |
+| **1** | **TEST-0** | All | Manual acceptance on `workspace_smoke`: Command executor, KAIRO Notice/Advise, Attention sidebar, status/radar panel, compact layout | **Ready** |
+| 2 | C4 | C (+ B) | Wire **approve/reject** actions from Attention sidebar to existing API | Ready |
+| 3 | C5 | C | Expand command executor (`git status`, resume-from-review command) | Ready |
+| 4 | D2 | D | Capture `shell_boot_readiness` + latency timing evidence | Ready (PENDING in verify) |
+| 5 | ADR-007 p3 | B | Terminal promotion OR read-only preview strip (deferred follow-up) | Ready after TEST-0 |
 
-**Recommendation:** start **C2** — it is the direct successor to B1 stub orchestration and delivers operator-visible “real” execution without LLM or coordinator unlock.
+## Blocked / Coordinator-only
 
-### C2 scope sketch (for assignment)
+| ID | Lane | Slice |
+|---|---|---|
+| JX-1–5 | Coordinator | KAIRO watch rules, delivery policy, voice, persona, mobile |
+| — | Coordinator | Cross-repo planning migration |
+| — | Coordinator | `axon-local` ADR-005 (KAIRO presence layer) — **not** the same as repo ADR-005 (sidebar attention) |
 
-- NEW `services/control-plane/app/chat/command_executor.py` — classify + run bounded actions
-- Extend `orchestration.py` to call executor while run is `executing`, append agent message with stdout snippet
-- Persist execution receipt on run history before `review_ready`
-- Tests: executor unit tests + chat integration test with mocked workspace root
-- Must not: add LLM, change run-state transitions, bypass approvals
+## Layout ADR index (implementation repo)
 
-### Parallel helper prompt (after C2 starts)
+| ADR | Topic |
+|---|---|
+| ADR-004 | Five-region shell grid (locked geometry) |
+| ADR-005 | Operator sidebar Workspaces \| Attention toggle |
+| ADR-006 | Command/KAIRO hero autosize + footer briefing CTA |
+| ADR-007 | Operator workbench demotion — phase 1 editor hide, **phase 2 status/radar panel**, phase 3 TBD |
 
-Lane B companion slice: show executor output in Conversation seam with monospace block styling (read-only).
-
-Parallel rule: **B1 must finish before A1/C1** if they touch `chat/service.py` or
-run orchestration in the same pass. Lane A and D may run in parallel with B2 only.
-
-## Suggested Next Slices
-
-Superseded by **Active Queue** above. After B1 lands:
-
-1. **Lane A** — watch summary degraded signal clarity in bootstrap dev mode
-2. **Lane C** — run history receipts visible in dock (within frozen transitions)
-3. **Lane D** — dev verify / health polish (D1)
-
-## Recently Landed
+## Recently Landed (detail)
 
 - approval thin slice (`requires_approval`, approve/reject)
 - review-ready entry, completion, and resume-from-review
 - workspace list API and DTO-bound Monaco hosts
-- startup supervision reliability slice
 - backend PTY terminal attachment (WebSocket, workspace-scoped)
-- **zsh PTY invocation via `ZDOTDIR`** (fixes bash-only `--rcfile` bug; verified 2026-07-04)
-- terminal scrollback persistence, client-side clear, DOM paste handler
-- richer inbox ranking (severity, recency, unresolved duration, status,
-  action-type, workspace priority)
-- file-backed Monaco editing (workspace README.md / notes.txt with Save)
-- shell consumption of `/api/briefing` in the right dock
-- nested workspace explorer tree with lazy file loading
-- nested workspace file creation and active-file rename
-- split mockup shell regions (`TopBar`, `LeftSidebar`, `CenterWorkbench`,
-  `RightDock`, `StatusBar`) with a resizable bottom terminal dock
-- workspace-scoped chat thread rehydration on boot/workspace select
-  (`GET /api/workspaces/{workspace_id}/chat/thread` + history read)
-- **chat command dispatch** attach vs new run (`POST /api/chat/messages` +
-  `refreshRunSurfaces` on submit)
-- **operator-facing dock seam titles** via `dock-seam-layout.ts`
-- **UX-4 live update polish** — `GET /api/live/events` SSE refresh hints, `live-events-session.ts`, interruptive signal seam promotion, reduced-motion overrides
-- **silent empty thread lookup** (HTTP 200 + `thread_id: null`)
-- **bootstrap workspace catalog trim** (`mergeMockupWorkspaceCatalog`, `workspace_smoke` default)
-- **chat orchestration hook** — agent transcript reply + dispatch → `review_ready` (`chat/orchestration.py`)
-- **workspace catalog policy** documented in `docs/WORKSPACE_CATALOG.md`
-- **run history receipts** — `GET /api/runs/{run_id}/history` + Active Run dock list
-- **bootstrap degraded signal clarity** — Lane A1 copy/metadata (`c464984`)
-- **SSE live refresh** — `GET /api/live/events` + `live-events-session.ts` (UX-4)
-- **verify evidence tooling** — `npm run verify:evidence`, `npm run verify:nightly` (D1)
-- **bounded command executor (C2)** — `command_executor.py` health/list/read + execution receipts
-- lower default terminal dock height (~240px fresh session, 280px cap)
+- **zsh PTY via `ZDOTDIR`**
+- file-backed Monaco editing + nested workspace explorer
+- split mockup shell regions + resizable bottom terminal dock
+- workspace-scoped chat thread rehydration
+- **chat command dispatch** attach vs new run
+- **bounded command executor (C2)** — health/list/read + execution receipts
+- **briefing Notice/Advise (C3)** — canonical rhythm strings
+- **SSE live refresh (UX-4)**
+- **verify evidence tooling (D1)**
+- **Operator layout (ADR-005/006)** — conversation-first right dock, Attention sidebar
+- **Workbench demotion (ADR-007 p1)** — editor hidden in Operator
+- **Operator status/radar panel (B7 / ADR-007 p2)** — fills upper workbench void with DTO-backed metrics + radar
 
 ## Assignment Rules
 
 1. One slice, one lane, one verification gate.
 2. No two agents edit the same file in the same pass.
 3. Shared-contract changes require coordinator review before coding starts.
-4. Every slice ends with the stabilization verification gate:
+4. Every slice ends with:
 
 ```bash
-python3 -m py_compile services/control-plane/app/main.py services/control-plane/app/runs/service.py services/control-plane/app/domain/run_state.py services/control-plane/app/domain/run_transitions.py services/control-plane/app/operator_briefing.py
-npm run build -w @axon-watch/console-web
 npm run verify
 python3 -m unittest discover -s tests
-./scripts/dev/down.sh
-./scripts/dev/up.sh
 ./scripts/dev/check-health.sh
 ```

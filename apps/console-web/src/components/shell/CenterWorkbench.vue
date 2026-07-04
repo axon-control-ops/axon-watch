@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import EditorHost from '../EditorHost.vue';
+import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import TerminalHost from '../TerminalHost.vue';
 import {
   clampWorkbenchTerminalHeight,
@@ -246,6 +247,7 @@ watch(
     class="region region-center-workbench center-workbench center-workbench--mockup"
     :class="{
       'center-workbench--resizing': resizing,
+      'center-workbench--operator': hideOperatorEditor,
       'center-workbench--ide-terminal-collapsed': isIdeMode && !terminalPanelVisible,
     }"
   >
@@ -336,6 +338,8 @@ watch(
         </div>
       </section>
     </section>
+
+    <OperatorStatusRadarPanel v-if="hideOperatorEditor" />
 
     <div
       v-if="showTerminalDock"

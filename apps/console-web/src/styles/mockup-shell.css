@@ -260,6 +260,7 @@ body:has(.console-shell--mockup) {
 .dock-stack--mockup .hud-seam,
 .kairo-presence-module,
 .console-shell--mockup .center-workbench__editor-stack,
+.console-shell--mockup .center-workbench__operator-status,
 .console-shell--mockup .center-workbench__bottom-dock {
   position: relative;
   z-index: 0;
@@ -287,6 +288,7 @@ body:has(.console-shell--mockup) {
 .dock-stack--mockup .hud-seam::before,
 .kairo-presence-module::before,
 .console-shell--mockup .center-workbench__editor-stack::before,
+.console-shell--mockup .center-workbench__operator-status::before,
 .console-shell--mockup .center-workbench__bottom-dock::before,
 .topbar-mockup__brand::before {
   content: '';
@@ -314,6 +316,7 @@ body:has(.console-shell--mockup) {
 .dock-stack--mockup .hud-seam::after,
 .kairo-presence-module::after,
 .console-shell--mockup .center-workbench__editor-stack::after,
+.console-shell--mockup .center-workbench__operator-status::after,
 .console-shell--mockup .center-workbench__bottom-dock::after,
 .topbar-mockup__brand::after {
   content: '';
@@ -339,6 +342,7 @@ body:has(.console-shell--mockup) {
 .dock-stack--mockup .hud-seam .hud-seam__compact,
 .hud-panel-frame > *,
 .console-shell--mockup .center-workbench__editor-stack > *,
+.console-shell--mockup .center-workbench__operator-status > *,
 .console-shell--mockup .center-workbench__bottom-dock > * {
   position: relative;
   z-index: 1;
@@ -960,6 +964,7 @@ body:has(.console-shell--mockup) {
 }
 
 .console-shell--mockup .center-workbench__editor-stack,
+.console-shell--mockup .center-workbench__operator-status,
 .console-shell--mockup .center-workbench__bottom-dock {
   --hud-surface-fill: #05111b;
   --hud-surface-border: rgba(0, 242, 255, 0.16);
@@ -1008,6 +1013,19 @@ body:has(.console-shell--mockup) {
   overflow: hidden;
   background: transparent;
   box-shadow: none;
+}
+
+.center-workbench__operator-status {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.center-workbench--operator .center-workbench__operator-status {
+  flex: 1 1 auto;
+  min-height: 8.5rem;
 }
 
 .center-workbench__editor-stack--surface > .editor-tabbar--mockup,
@@ -2594,6 +2612,298 @@ body:has(.console-shell--mockup) {
   font-family: var(--font-mono);
 }
 
+.operator-status-radar-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 0;
+  padding: 0.75rem 0.85rem 0.7rem;
+  --hud-surface-fill: rgba(0, 8, 14, 0.82);
+}
+
+.operator-status-radar-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.operator-status-radar-panel__eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+  color: rgba(0, 242, 255, 0.58);
+}
+
+.operator-status-radar-panel__title {
+  margin: 0.18rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--text-hud);
+}
+
+.operator-status-radar-panel__presence {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.08rem;
+  font-family: var(--font-mono);
+}
+
+.operator-status-radar-panel__presence-title,
+.operator-status-radar-panel__presence-subtitle {
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+}
+
+.operator-status-radar-panel__presence-title {
+  color: rgba(0, 242, 255, 0.82);
+}
+
+.operator-status-radar-panel__presence-subtitle {
+  color: rgba(255, 201, 120, 0.88);
+}
+
+.operator-status-radar-panel__body {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.operator-status-radar-panel__radar-wrap {
+  display: grid;
+  place-items: center;
+  min-height: 7rem;
+}
+
+.operator-status-radar-panel__radar {
+  position: relative;
+  width: 7rem;
+  height: 7rem;
+}
+
+.operator-status-radar-panel__ring,
+.operator-status-radar-panel__crosshair,
+.operator-status-radar-panel__tick,
+.operator-status-radar-panel__sweep,
+.operator-status-radar-panel__core {
+  position: absolute;
+  pointer-events: none;
+}
+
+.operator-status-radar-panel__ring {
+  inset: 0;
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  border-radius: 999px;
+}
+
+.operator-status-radar-panel__ring--mid {
+  inset: 0.85rem;
+}
+
+.operator-status-radar-panel__ring--inner {
+  inset: 1.65rem;
+}
+
+.operator-status-radar-panel__crosshair {
+  background: rgba(0, 242, 255, 0.24);
+}
+
+.operator-status-radar-panel__crosshair--h {
+  top: 50%;
+  left: 0.35rem;
+  right: 0.35rem;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.operator-status-radar-panel__crosshair--v {
+  left: 50%;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.operator-status-radar-panel__tick {
+  background: rgba(0, 242, 255, 0.42);
+}
+
+.operator-status-radar-panel__tick--n {
+  top: 0.2rem;
+  left: 50%;
+  width: 1px;
+  height: 0.45rem;
+  transform: translateX(-50%);
+}
+
+.operator-status-radar-panel__tick--s {
+  bottom: 0.2rem;
+  left: 50%;
+  width: 1px;
+  height: 0.45rem;
+  transform: translateX(-50%);
+}
+
+.operator-status-radar-panel__tick--e {
+  right: 0.2rem;
+  top: 50%;
+  width: 0.45rem;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.operator-status-radar-panel__tick--w {
+  left: 0.2rem;
+  top: 50%;
+  width: 0.45rem;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.operator-status-radar-panel__sweep {
+  inset: 0.35rem;
+  border-radius: 999px;
+  background: conic-gradient(from 0deg, rgba(0, 242, 255, 0.28), rgba(0, 242, 255, 0) 55%);
+  animation: radar-sweep 3.5s linear infinite;
+}
+
+.operator-status-radar-panel__core {
+  inset: 50% auto auto 50%;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%, #e8fdff 0%, #00f2ff 45%, #006a72 100%);
+  box-shadow: 0 0 10px rgba(0, 242, 255, 0.45);
+  transform: translate(-50%, -50%);
+}
+
+.operator-status-radar-panel__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.operator-status-radar-panel__headline {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: rgba(210, 228, 240, 0.96);
+}
+
+.operator-status-radar-panel__advise {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  line-height: 1.45;
+  color: rgba(255, 214, 140, 0.9);
+}
+
+.operator-status-radar-panel__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.42rem 0.65rem;
+  margin: 0.15rem 0 0;
+}
+
+.operator-status-radar-panel__metric {
+  display: grid;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.operator-status-radar-panel__metric dt {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.12em;
+  color: rgba(0, 242, 255, 0.58);
+}
+
+.operator-status-radar-panel__metric dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: rgba(210, 228, 240, 0.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operator-status-radar-panel__metric--ok dd {
+  color: rgba(132, 255, 196, 0.92);
+}
+
+.operator-status-radar-panel__metric--warn dd {
+  color: rgba(255, 201, 120, 0.92);
+}
+
+.operator-status-radar-panel__metric--attention dd {
+  color: rgba(255, 159, 0, 0.96);
+}
+
+.operator-status-radar-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.operator-status-radar-panel__action {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.34rem 0.62rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 0;
+  background: rgba(0, 12, 20, 0.72);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+  color: rgba(210, 228, 240, 0.94);
+  cursor: pointer;
+}
+
+.operator-status-radar-panel__action--kairo {
+  border-color: rgba(255, 159, 0, 0.34);
+  color: rgba(255, 224, 170, 0.96);
+}
+
+.operator-status-radar-panel__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.22rem;
+  border-radius: 999px;
+  background: rgba(255, 159, 0, 0.22);
+  color: #ffe6b5;
+  font-size: 0.48rem;
+}
+
+.operator-status-radar-panel--attention .operator-status-radar-panel__sweep,
+.operator-status-radar-panel--degraded .operator-status-radar-panel__sweep {
+  background: conic-gradient(from 0deg, rgba(255, 159, 0, 0.34), rgba(255, 159, 0, 0) 55%);
+}
+
+.operator-status-radar-panel--degraded .operator-status-radar-panel__core {
+  background: radial-gradient(circle at 35% 35%, #fff0df 0%, #ff9f00 45%, #7a4100 100%);
+  box-shadow: 0 0 10px rgba(255, 159, 0, 0.42);
+}
+
+.operator-status-radar-panel--watch .operator-status-radar-panel__sweep {
+  background: conic-gradient(from 0deg, rgba(255, 201, 120, 0.28), rgba(255, 201, 120, 0) 55%);
+}
+
 .editor-tabbar,
 .terminal-tabbar {
   display: flex;
@@ -3797,6 +4107,19 @@ body:has(.console-shell--mockup) {
     display: none;
   }
 
+  .operator-status-radar-panel__body {
+    grid-template-columns: 1fr;
+  }
+
+  .operator-status-radar-panel__radar-wrap {
+    min-height: 5.5rem;
+  }
+
+  .operator-status-radar-panel__radar {
+    width: 5.5rem;
+    height: 5.5rem;
+  }
+
   .briefing-panel__hero-body {
     gap: 0.55rem;
   }
@@ -3811,6 +4134,7 @@ body:has(.console-shell--mockup) {
 @media (prefers-reduced-motion: reduce) {
   .kairo-presence-module__radar-arc,
   .workspace-status-card__sweep,
+  .operator-status-radar-panel__sweep,
   .kairo-presence-module__waveform span:not(.kairo-presence-module__waveform-axis),
   .dock-hero-panel--attention,
   .dock-hero-panel__toggle-button--attention-high,

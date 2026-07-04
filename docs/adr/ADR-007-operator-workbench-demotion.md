@@ -28,11 +28,10 @@ Locked Operator center workbench target:
 
 1. **Hide** Monaco editor stack by default in Operator mode (tab bar, breadcrumb,
    editor host, inline editor status strip) — **shipped (phase 1)**.
-2. **Upper workbench void (known gap)** — hiding the editor leaves an empty region
-   above the unchanged bottom terminal dock. This void is **intentionally unfilled**
-   until operator review picks the next surface (status/radar, read-only preview,
-   terminal promotion, or other control-plane panel). Do not backfill with Monaco or
-   IDE explorer semantics without revisiting this ADR.
+2. **Upper workbench status / radar panel (shipped — phase 2 option A)** — `OperatorStatusRadarPanel.vue`
+   binds runtime summary, briefing Notice/Advise, active run phase, and connectivity metrics.
+   Includes shortcuts to Attention sidebar and KAIRO briefing. Does not host Monaco or IDE
+   explorer semantics.
 3. **Promote** the bottom terminal dock to primary center surface — **deferred**; terminal
    dock stays bottom-resizable until upper workbench content is decided.
 4. **Optional thin slice (follow-up within ADR-007):** read-only file preview
@@ -66,7 +65,7 @@ Grid geometry, column proportions, and region map remain ADR-004.
 ## Consequences
 
 - `CenterWorkbench.vue` hides the editor stack when `layoutMode === 'operator'`.
-- Operator upper workbench void is documented and **must be filled** in a follow-up slice.
+- `OperatorStatusRadarPanel.vue` fills the upper workbench with DTO-backed status/radar.
 - Terminal dock behavior is unchanged in Operator; IDE adds collapsible bottom panel.
 - `UI_LAYOUT_LOCK.md` amends center workbench and IDE dock sections for Operator vs IDE.
 
@@ -81,7 +80,7 @@ Reopen if:
 ## Notes
 
 - Does not change ADR-005 sidebar attention or ADR-006 hero/footer contracts.
-- **Operator void:** the empty region above the terminal in Operator mode is not a bug;
-  it is reserved pending operator choice of the next center surface.
+- **Operator void:** filled by the status/radar panel (phase 2). Terminal promotion or
+  read-only preview remain optional ADR-007 follow-ups.
 - Frozen planning reference: `axon-local/Plans/Axon-Watch/UI_SPEC.md` Operator
   vs IDE intent.

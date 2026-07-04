@@ -105,15 +105,12 @@ Workspace catalog currently filters to mockup workspace IDs for presentation par
 
 Shared region; **content differs by layout mode** (ADR-007).
 
-### Operator mode (ADR-007 — phase 1)
+### Operator mode (ADR-007)
 
-1. **Editor stack hidden** — no tab bar, toolbar, breadcrumb, Monaco, or inline editor status.
-2. **Upper workbench void (ADR-007 — unfilled)** — intentional empty region above the terminal
-   dock until a follow-up slice chooses content (status panel, preview strip, terminal
-   promotion, etc.). Not a layout bug.
-3. **Terminal dock unchanged** — same bottom resizable panel as IDE (`TERMINAL | PROBLEMS | OUTPUT | LOGS`, session-persisted height, resize handle). No close affordance in Operator.
+1. **Operator status / radar panel** — DTO-backed control-plane summary (`OperatorStatusRadarPanel.vue`): radar widget, briefing Notice/Advise headline, six runtime metrics, shortcuts to Attention sidebar and KAIRO briefing.
+2. **Terminal dock unchanged** — same bottom resizable panel as IDE (`TERMINAL | PROBLEMS | OUTPUT | LOGS`, session-persisted height, resize handle). No close affordance in Operator.
 
-Terminal-first center promotion remains a **future ADR-007 follow-up**, not current behavior.
+Editor stack is hidden in Operator mode. Terminal-first center promotion remains a **future ADR-007 follow-up**, not current behavior.
 
 ### IDE mode
 
