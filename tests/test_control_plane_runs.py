@@ -429,6 +429,30 @@ class ControlPlaneRunsTests(unittest.TestCase):
         self.assertEqual(200, approve_response.status_code)
         self.assertEqual("executing", approve_response.json()["phase"])
 
+    def test_get_run_history_returns_transition_receipts(self) -> None:
+        created = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "History run",
+            },
+        ).json()
+        stopped = self.client.post(f"/api/runs/{created['run_id']}/stop").json()
+
+        response = self.client.get(f"/api/runs/{created['run_id']}/history")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual(created["run_id"], payload["run_id"])
+        self.assertEqual(stopped["history_ref"], payload["history_ref"])
+        self.assertGreaterEqual(payload["count"], 2)
+        self.assertEqual(payload["count"], len(payload["items"]))
+        self.assertEqual("operator_stop", payload["items"][-1]["receipt"]["type"])
+
+    def test_get_run_history_returns_404_for_missing_run(self) -> None:
+        response = self.client.get("/api/runs/run_missing/history")
+        self.assertEqual(404, response.status_code)
+
     def test_show_missing_run_returns_404(self) -> None:
         response = self.client.get("/api/runs/run_missing")
         self.assertEqual(404, response.status_code)

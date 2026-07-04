@@ -2422,6 +2422,27 @@ body:has(.console-shell--mockup) {
   min-height: 6.25rem;
 }
 
+.dock-run-receipts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dock-run-receipts__item {
+  border-left: 2px solid rgba(0, 242, 255, 0.35);
+  padding-left: 0.45rem;
+}
+
+.dock-run-receipts__label {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
 .dock-stack--mockup .dock-seam--signals.hud-seam {
   --hud-surface-border: rgba(0, 242, 255, 0.28);
 }

@@ -26,6 +26,7 @@ from app.runs.service import (
     complete_run,
     create_run,
     get_run,
+    get_run_history,
     list_runs,
     mark_review_ready,
     reject_run,
@@ -257,6 +258,14 @@ def runs_create(body: CreateRunRequest) -> dict[str, Any]:
 def runs_show(run_id: str) -> dict[str, Any]:
     try:
         return get_run(run_id)
+    except RunNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/runs/{run_id}/history")
+def runs_history(run_id: str) -> dict[str, Any]:
+    try:
+        return get_run_history(run_id)
     except RunNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

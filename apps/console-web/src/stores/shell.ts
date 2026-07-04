@@ -6,6 +6,7 @@ import {
   completeRun,
   fetchInbox,
   fetchOperatorBriefing,
+  fetchRunHistory,
   fetchRuns,
   fetchRuntimeSummary,
   fetchThreadHistory,
@@ -31,6 +32,10 @@ import type {
   SignalView,
   WorkspaceRecord,
 } from '../contracts/canonical';
+import {
+  buildRunHistoryRows,
+  type RunHistorySnapshot,
+} from '../lib/run-history-view';
 import {
   appendOperatorCommand,
   canSubmitOperatorCommand as canSubmitOperatorCommandDraft,
@@ -157,6 +162,8 @@ export const useShellStore = defineStore('shell', () => {
   const runsError = ref<string | null>(null);
   const runMutationState = ref<RunMutationState>('idle');
   const runMutationError = ref<string | null>(null);
+  const runHistorySnapshot = ref<RunHistorySnapshot | null>(null);
+  const runHistoryLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const approvals = ref<ApprovalRecord[]>([]);
   const inboxItems = ref<InboxItem[]>([]);
   const inboxLoadState = ref<InboxLoadState>('idle');
@@ -268,6 +275,7 @@ export const useShellStore = defineStore('shell', () => {
   });
 
   const primaryActiveRun = computed(() => activeRun.value);
+  const runHistoryRows = computed(() => buildRunHistoryRows(runHistorySnapshot.value));
   const primaryApprovalRun = computed(() => selectPrimaryApprovalRun(runs.value));
   const workspaceRuns = computed(() =>
     currentWorkspace.value
@@ -954,8 +962,26 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function loadRunHistory(runId: string | null): Promise<void> {
+    if (!runId) {
+      runHistorySnapshot.value = null;
+      runHistoryLoadState.value = 'idle';
+      return;
+    }
+
+    runHistoryLoadState.value = 'loading';
+    try {
+      runHistorySnapshot.value = await fetchRunHistory(runId);
+      runHistoryLoadState.value = 'loaded';
+    } catch {
+      runHistorySnapshot.value = null;
+      runHistoryLoadState.value = 'error';
+    }
+  }
+
   async function refreshRunSurfaces(): Promise<void> {
     await Promise.all([loadRuns(), loadRuntimeSummary(), loadInbox(), loadOperatorBriefing()]);
+    await loadRunHistory(activeRun.value?.run_id ?? null);
   }
 
   async function stopPrimaryRun(): Promise<void> {
@@ -1083,6 +1109,7 @@ export const useShellStore = defineStore('shell', () => {
     await loadWorkspaces({ sync: false });
     await loadRuns({ sync: false });
     syncCurrentWorkspace(resolveBootstrapWorkspaceId(workspaces.value, activeRun.value));
+    await loadRunHistory(activeRun.value?.run_id ?? null);
     await loadWorkspaceFiles();
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
@@ -1152,6 +1179,8 @@ export const useShellStore = defineStore('shell', () => {
     runsError,
     runsLoadState,
     runMutationError,
+    runHistoryRows,
+    runHistoryLoadState,
     runMutationPending,
     runMutationState,
     runStateLabel,

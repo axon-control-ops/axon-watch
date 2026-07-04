@@ -33,6 +33,15 @@ function signalCount(): number {
             />
           </div>
           <p class="region-copy">{{ shell.primaryActiveRun.summary }}</p>
+          <ul v-if="shell.runHistoryRows.length" class="dock-run-receipts" aria-label="Run receipts">
+            <li
+              v-for="row in shell.runHistoryRows"
+              :key="row.id"
+              class="dock-run-receipts__item"
+            >
+              <span class="dock-run-receipts__label">{{ row.label }}</span>
+            </li>
+          </ul>
           <div class="run-actions">
             <button
               v-if="shell.primaryActiveRun.can_stop || shell.primaryActiveRun.phase === 'executing'"

@@ -326,6 +326,17 @@ def get_run(run_id: str) -> dict[str, Any]:
     return record
 
 
+def get_run_history(run_id: str) -> dict[str, Any]:
+    record = get_run(run_id)
+    items = run_store.list_history(record["history_ref"])
+    return {
+        "run_id": record["run_id"],
+        "history_ref": record["history_ref"],
+        "items": items,
+        "count": len(items),
+    }
+
+
 def list_runs() -> list[dict[str, Any]]:
     return run_store.list_runs()
 

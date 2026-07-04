@@ -6,6 +6,8 @@ import type {
   WorkspaceRecord,
 } from '../contracts/canonical';
 
+import type { RunHistorySnapshot } from '../lib/run-history-view';
+
 export interface InboxSnapshot {
   items: InboxItem[];
   count: number;
@@ -121,6 +123,21 @@ export async function fetchRun(runId: string): Promise<RunRecord> {
   }
 
   return response.json() as Promise<RunRecord>;
+}
+
+export async function fetchRunHistory(runId: string): Promise<RunHistorySnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedRunId = encodeURIComponent(runId);
+  const url = baseUrl
+    ? `${baseUrl}/api/runs/${encodedRunId}/history`
+    : `/api/runs/${encodedRunId}/history`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`run history request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<RunHistorySnapshot>;
 }
 
 export async function createRun(body: CreateRunRequest): Promise<RunRecord> {
