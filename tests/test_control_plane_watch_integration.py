@@ -1,0 +1,78 @@
+"""Phase 5 E2E: control-plane calls the watch service through the documented contract."""
+
+from __future__ import annotations
+
+import os
+import sys
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from tests.support.bootstrap_signal_fixture import BOOTSTRAP_SIGNAL_ID, consistency_tuple
+from tests.support.control_plane_db import isolate_control_plane_db
+from tests.support.ephemeral_uvicorn import EphemeralUvicorn
+from tests.support.summary_degraded_signal_fixture import SUMMARY_DEGRADED_SIGNAL_ID
+from tests.support.watch_app_loader import load_watch_app, restore_app_modules
+
+CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
+
+
+class ControlPlaneWatchIntegrationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        watch_app, self._watch_modules = load_watch_app()
+        self._watch_server = EphemeralUvicorn(watch_app)
+        self._watch_server.start("/internal/watch/health")
+        restore_app_modules(self._watch_modules)
+
+        sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+        from app.persistence import run_store  # noqa: WPS433
+        from app.main import app  # noqa: WPS433
+
+        isolate_control_plane_db(self, run_store)
+        self._env_patch = patch.dict(
+            os.environ,
+            {"AXON_WATCH_WATCH_SERVICE_BASE_URL": self._watch_server.base_url},
+            clear=False,
+        )
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
+
+        self.client = TestClient(app)
+        self.addCleanup(self.client.close)
+
+    def tearDown(self) -> None:
+        self._watch_server.stop()
+        restore_app_modules(self._watch_modules)
+
+    def test_inbox_endpoint_fetches_live_watch_inbox(self) -> None:
+        response = self.client.get("/api/inbox")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual(2, payload["count"])
+        signal_ids = {item["signal_id"] for item in payload["items"]}
+        self.assertIn(BOOTSTRAP_SIGNAL_ID, signal_ids)
+        self.assertIn(SUMMARY_DEGRADED_SIGNAL_ID, signal_ids)
+
+    def test_runtime_summary_marks_watch_connected_from_live_probe(self) -> None:
+        response = self.client.get("/api/runtime/summary")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["watch"]["connected"])
+        self.assertFalse(payload["degraded"]["active"])
+        self.assertGreaterEqual(payload["signals"]["open_count"], 1)
+        self.assertTrue(payload["signals"]["top_items"])
+
+    def test_inbox_and_runtime_summary_agree_on_ranked_top_signal(self) -> None:
+        inbox_item = self.client.get("/api/inbox").json()["items"][0]
+        summary_item = self.client.get("/api/runtime/summary").json()["signals"]["top_items"][0]
+
+        self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(summary_item))
+        self.assertEqual(SUMMARY_DEGRADED_SIGNAL_ID, inbox_item["signal_id"])
+
+
+if __name__ == "__main__":
+    unittest.main()
