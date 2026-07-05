@@ -21,15 +21,6 @@ class ParityClosureOrderTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, msg=result.stderr or result.stdout)
 
-    def test_phase_a_complete_and_next_slice_is_p_c3(self) -> None:
-        order = json.loads(
-            (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
-        )
-        phase_a = [entry for entry in order["slices"] if entry.get("phase") == "A"]
-        self.assertEqual(4, len(phase_a))
-        self.assertTrue(all(entry["status"] == "done" for entry in phase_a))
-        self.assertEqual("P-C3", order["next_slice"])
-
     def test_phase_c2_complete_and_rhythm_row_verified(self) -> None:
         order = json.loads(
             (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
@@ -44,8 +35,26 @@ class ParityClosureOrderTests(unittest.TestCase):
             entry for entry in snapshot["behaviors"] if entry["id"] == "executive_operator_rhythm"
         )
         self.assertEqual("verified", row["status"])
-        self.assertEqual(15, snapshot["summary"]["verified_v1"])
-        self.assertEqual(4, snapshot["summary"]["partially_verified"])
+
+    def test_phase_c3_complete_and_mobile_compact_row_verified(self) -> None:
+        order = json.loads(
+            (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
+        )
+        phase_c3 = next(entry for entry in order["slices"] if entry["id"] == "P-C3")
+        self.assertEqual("done", phase_c3["status"])
+        self.assertEqual("P-C4", order["next_slice"])
+
+        snapshot = json.loads(
+            (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
+        )
+        row = next(
+            entry
+            for entry in snapshot["behaviors"]
+            if entry["id"] == "mobile_operator_cockpit_compactness"
+        )
+        self.assertEqual("verified", row["status"])
+        self.assertEqual(16, snapshot["summary"]["verified_v1"])
+        self.assertEqual(3, snapshot["summary"]["partially_verified"])
 
     def test_phase_c1_complete_and_persona_row_verified(self) -> None:
         order = json.loads(

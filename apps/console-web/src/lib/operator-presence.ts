@@ -1,18 +1,18 @@
 import type { OperatorPresence, SpokenAlertEligibility } from '../contracts/canonical';
 
+import {
+  shouldUseMobileCompactLayout as shouldUseMobileCompactLayoutFromViewport,
+} from './viewport-compact';
+
+export { MOBILE_COMPACT_BREAKPOINT, shouldRequestViewportCompactBriefing } from './viewport-compact';
+
 const SPOKEN_ALERT_DEDUPE_KEY = 'axon-x-spoken-alert:last';
 
 export function shouldUseMobileCompactLayout(
   viewportWidth: number,
   presence: OperatorPresence | null | undefined,
 ): boolean {
-  if (!presence?.mobile.foreground_only) {
-    return false;
-  }
-  if (presence.mobile.compact_layout) {
-    return true;
-  }
-  return viewportWidth > 0 && viewportWidth < 768 && presence.settings.mobile_compact_preferred;
+  return shouldUseMobileCompactLayoutFromViewport(viewportWidth, presence);
 }
 
 export function spokenAlertDedupeKey(alert: SpokenAlertEligibility): string {

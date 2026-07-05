@@ -23,12 +23,12 @@ is complete. Do not reorder cutover items here.
 
 | Metric | Value |
 |---|---:|
-| Verified (v1) | 15 |
-| Partially verified | 4 |
+| Verified (v1) | 16 |
+| Partially verified | 3 |
 | Phase A | **Complete** (P-A1–P-A4) |
 | Phase B | **Complete** (P-B1–P-B3) |
-| Phase C | **In progress** (P-C1–P-C2 done) |
-| Next slice | **P-C3** |
+| Phase C | **In progress** (P-C1–P-C3 done) |
+| Next slice | **P-C4** |
 
 Machine-readable order: `config/parity-closure-order.json`
 
@@ -76,7 +76,7 @@ Phase B complete when all three slices are `done` and `next_slice` is **P-C1**.
 |---|---|---|---|
 | **P-C1** | `kairo_persona_operator_copy` | Persisted persona settings; tone without run-truth drift | `npm run verify:parity-c1` |
 | **P-C2** | `executive_operator_rhythm` | Richer Notice/Advise/Decide from canonical state | `npm run verify:parity-c2` |
-| **P-C3** | `mobile_operator_cockpit_compactness` | Viewport resize reactivity + compact refetch | `verify:parity-c3` (TBD) |
+| **P-C3** | `mobile_operator_cockpit_compactness` | Viewport resize reactivity + compact refetch | `npm run verify:parity-c3` |
 | **P-C4** | `spoken_high_value_alerts` | Policy + optional voice-deck hook (browser TTS may remain fallback) | `verify:parity-c4` (TBD) |
 
 ---

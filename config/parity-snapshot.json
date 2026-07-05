@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 15,
-    "partially_verified": 4,
+    "verified_v1": 16,
+    "partially_verified": 3,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -197,13 +197,16 @@
     },
     {
       "id": "mobile_operator_cockpit_compactness",
-      "status": "partially_verified",
-      "evidence_gates": ["TEST-7"],
+      "status": "verified",
+      "evidence_gates": ["TEST-7", "P-C3"],
       "evidence": [
         "viewport_compact on /api/briefing",
-        "console-shell--mobile-compact class"
+        "console-shell--mobile-compact class",
+        "apps/console-web/src/lib/viewport-compact.ts breakpoint + refetch helpers",
+        "shell store resize listener + shouldRequestViewportCompactBriefing refetch",
+        "tests/test_parity_c3_mobile_compact_viewport.py"
       ],
-      "gap": "Foreground-only honest model; compact layout does not react to viewport resize after mount."
+      "gap": "Foreground-only honest model; native mobile shell deferred."
     },
     {
       "id": "watch_connectors_runtime_awareness",

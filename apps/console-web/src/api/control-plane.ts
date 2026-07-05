@@ -70,9 +70,7 @@ export async function fetchOperatorBriefing(options?: {
   viewportCompact?: boolean;
 }): Promise<OperatorBriefing> {
   const baseUrl = controlPlaneBaseUrl();
-  const compact =
-    options?.viewportCompact ??
-    (typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const compact = Boolean(options?.viewportCompact);
   const query = compact ? '?viewport_compact=true' : '';
   const url = baseUrl ? `${baseUrl}/api/briefing${query}` : `/api/briefing${query}`;
   const response = await fetch(url);

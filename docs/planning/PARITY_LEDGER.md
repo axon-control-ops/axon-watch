@@ -55,7 +55,7 @@ Suggested status vocabulary for future use:
 ## Current Verification Snapshot (2026-07-05)
 
 Implementation repo: `axon-watch` on branch `dev`. **Final assessment** after
-TEST-10 + **Phase A–B** + **P-C1–P-C2**: **15 verified (v1 scope)**, **4 partially_verified**, **0 full parity**.
+TEST-10 + **Phase A–B** + **P-C1–P-C3**: **16 verified (v1 scope)**, **3 partially_verified**, **0 full parity**.
 See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 
 | Behavior | Status | Evidence |
@@ -78,7 +78,7 @@ See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 | Spoken high-value alerts | `partially_verified` | **TEST-7 pass**: eligibility + browser TTS hook only |
 | Executive operator rhythm | `verified` | **P-C2 pass** (2026-07-05): full Notice/Advise/Decide/Execute/Verify/Report on `/api/briefing` |
 | KAIRO persona and operator copy | `verified` | **P-C1 pass** (2026-07-05): persisted settings API + UI toggle; neutral copy preserves run/signal truth |
-| Mobile operator cockpit compactness | `partially_verified` | **TEST-7 pass**: compact shell; foreground-only, no resize reactivity |
+| Mobile operator cockpit compactness | `verified` | **P-C3 pass** (2026-07-05): viewport resize reactivity + viewport_compact briefing refetch |
 
 ## Verification Rule
 

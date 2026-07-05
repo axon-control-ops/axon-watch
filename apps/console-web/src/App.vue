@@ -36,8 +36,11 @@ watch(
   bootComplete,
   (complete) => {
     if (!complete || showScanPreview.value) {
+      shell.unbindViewportCompactListener();
       return;
     }
+
+    shell.bindViewportCompactListener();
 
     liveEventsSession?.disconnect();
     liveEventsSession = startLiveEventsSession({
@@ -48,6 +51,7 @@ watch(
 );
 
 onUnmounted(() => {
+  shell.unbindViewportCompactListener();
   liveEventsSession?.disconnect();
   liveEventsSession = null;
 });

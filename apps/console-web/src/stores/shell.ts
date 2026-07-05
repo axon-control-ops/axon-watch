@@ -35,7 +35,12 @@ import type {
   SignalView,
   WorkspaceRecord,
 } from '../contracts/canonical';
-import { maybeSpeakOperatorAlert, shouldUseMobileCompactLayout } from '../lib/operator-presence';
+import { maybeSpeakOperatorAlert } from '../lib/operator-presence';
+import {
+  readViewportWidth,
+  shouldRequestViewportCompactBriefing,
+  shouldUseMobileCompactLayout,
+} from '../lib/viewport-compact';
 import {
   defaultOperatorPresenceSettings,
   normalizeOperatorPresenceSettings,
@@ -207,6 +212,9 @@ export const useShellStore = defineStore('shell', () => {
   );
   const operatorPresenceSettingsOpen = ref(false);
   const operatorPresenceSettingsSaving = ref(false);
+  const viewportWidth = ref(readViewportWidth());
+  let lastViewportCompactRequested: boolean | null = null;
+  let viewportCompactListenerBound = false;
   const briefingLoadState = ref<BriefingLoadState>('idle');
   const briefingError = ref<string | null>(null);
   const signalViews = ref<SignalView[]>([]);
@@ -473,8 +481,9 @@ export const useShellStore = defineStore('shell', () => {
 
   const mobileCompactLayout = computed(() =>
     shouldUseMobileCompactLayout(
-      typeof window !== 'undefined' ? window.innerWidth : 0,
+      viewportWidth.value,
       operatorBriefing.value?.operator_presence ?? null,
+      operatorPresenceSettings.value,
     ),
   );
 
@@ -1103,12 +1112,21 @@ export const useShellStore = defineStore('shell', () => {
       typeof forceOpen === 'boolean' ? forceOpen : !operatorPresenceSettingsOpen.value;
   }
 
-  async function loadOperatorBriefing(): Promise<void> {
+  async function loadOperatorBriefing(options?: { viewportCompact?: boolean }): Promise<void> {
     briefingLoadState.value = 'loading';
     briefingError.value = null;
 
+    const viewportCompact =
+      options?.viewportCompact ??
+      shouldRequestViewportCompactBriefing(
+        viewportWidth.value,
+        operatorBriefing.value?.operator_presence ?? null,
+        operatorPresenceSettings.value,
+      );
+
     try {
-      operatorBriefing.value = await fetchOperatorBriefing();
+      operatorBriefing.value = await fetchOperatorBriefing({ viewportCompact });
+      lastViewportCompactRequested = viewportCompact;
       approvals.value = operatorBriefing.value.pending_approvals.items;
       briefingLoadState.value = 'loaded';
       if (operatorBriefing.value.operator_presence?.spoken_alert) {
@@ -1120,6 +1138,40 @@ export const useShellStore = defineStore('shell', () => {
       briefingError.value =
         error instanceof Error ? error.message : 'operator briefing request failed';
     }
+  }
+
+  function syncViewportCompactFromResize(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    viewportWidth.value = readViewportWidth(window);
+    const shouldRequest = shouldRequestViewportCompactBriefing(
+      viewportWidth.value,
+      operatorBriefing.value?.operator_presence ?? null,
+      operatorPresenceSettings.value,
+    );
+    if (shouldRequest === lastViewportCompactRequested) {
+      return;
+    }
+    void loadOperatorBriefing({ viewportCompact: shouldRequest });
+  }
+
+  function bindViewportCompactListener(): void {
+    if (typeof window === 'undefined' || viewportCompactListenerBound) {
+      return;
+    }
+    viewportWidth.value = readViewportWidth(window);
+    window.addEventListener('resize', syncViewportCompactFromResize);
+    viewportCompactListenerBound = true;
+  }
+
+  function unbindViewportCompactListener(): void {
+    if (typeof window === 'undefined' || !viewportCompactListenerBound) {
+      return;
+    }
+    window.removeEventListener('resize', syncViewportCompactFromResize);
+    viewportCompactListenerBound = false;
   }
 
   async function loadRuns(options: { sync?: boolean } = {}): Promise<void> {
@@ -1351,7 +1403,10 @@ export const useShellStore = defineStore('shell', () => {
     leftSidebarAttentionBadgeCount,
     leftSidebarMode,
     mobileCompactLayout,
+    viewportWidth,
     completePrimaryRun,
+    bindViewportCompactListener,
+    unbindViewportCompactListener,
     loadBootstrapData,
     loadInbox,
     loadOperatorBriefing,

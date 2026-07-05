@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-C3",
+  "next_slice": "P-C4",
   "slices": [
     {
       "id": "P-A1",
@@ -78,9 +78,9 @@
     {
       "id": "P-C3",
       "phase": "C",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["mobile_operator_cockpit_compactness"],
-      "spec": null,
+      "spec": "docs/PARITY_C3_MOBILE_COMPACT_VIEWPORT.md",
       "gate": "npm run verify:parity-c3"
     },
     {
