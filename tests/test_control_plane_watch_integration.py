@@ -82,6 +82,26 @@ class ControlPlaneWatchIntegrationTests(unittest.TestCase):
         self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(summary_item))
         self.assertEqual(SUMMARY_DEGRADED_SIGNAL_ID, inbox_item["signal_id"])
 
+    def test_inbox_signals_acknowledge_clears_active_signals(self) -> None:
+        before = self.client.get("/api/inbox").json()
+        signal_ids = [item["signal_id"] for item in before["items"]]
+        self.assertGreater(len(signal_ids), 0)
+
+        response = self.client.post(
+            "/api/inbox/signals/acknowledge",
+            json={"signal_ids": signal_ids},
+        )
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["accepted"])
+        self.assertEqual(len(signal_ids), payload["count"])
+
+        after = self.client.get("/api/inbox").json()
+        self.assertEqual(0, after["count"])
+
+        summary = self.client.get("/api/runtime/summary").json()
+        self.assertEqual(0, summary["signals"]["open_count"])
+
 
 if __name__ == "__main__":
     unittest.main()

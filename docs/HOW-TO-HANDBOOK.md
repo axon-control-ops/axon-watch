@@ -1,26 +1,257 @@
 # Axon-X How-To Handbook
 
-This handbook is the practical guide for working with **Axon-X**, implemented in
-the `axon-watch` repo.
+**The master operator, teaching, debugging, and upgrade manual for Axon-X.**
 
-It is written for operators, reviewers, and developers who need to understand:
+This handbook is the **single front door** for working with **Axon-X** (`axon-watch`).
+It is written for operators, reviewers, developers, and agents — in plain language first,
+with copy-paste snippets, source pointers, and debugging steps when things go wrong.
 
-- what the new repo is
-- how it currently works
-- how to start it
-- how to verify it
-- what is real vs still stubbed
-- what to do when something goes wrong
+Use it to:
 
-This is intentionally simple to read, but detailed enough to be useful during
-active implementation.
+- **Operate** the console day-to-day (`:4173`)
+- **Teach** someone else how Axon-X works
+- **Understand** the codebase without reading every file
+- **Verify** changes before merge
+- **Upgrade** the stack after pulls or dependency changes
+- **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-05 — `npm run verify` OK, TEST-0 OK (`npm run verify:test0`), stack
-smoke on ports 4173/8787/8788 OK.
+**Last verified:** 2026-07-05 — production operator at `:4173`, `npm run verify:production-operator` OK.
 
-**New operator?** Start with the layered onboarding guide:
-[`docs/AXON-X-STARTER-GUIDE.md`](AXON-X-STARTER-GUIDE.md) ·
-[PDF](AXON-X-STARTER-GUIDE.pdf) · rebuild PDF: `./scripts/docs/build-starter-guide-pdf.sh`
+**Production URL:** http://127.0.0.1:4173 — [`docs/PRODUCTION_OPERATOR_SURFACE.md`](PRODUCTION_OPERATOR_SURFACE.md)
+
+**Layered onboarding (shorter):** [`docs/AXON-X-STARTER-GUIDE.md`](AXON-X-STARTER-GUIDE.md)
+
+---
+
+## Table of Contents
+
+1. [Quick Start](#quick-start) — first 5 minutes
+2. [Handbook map](#handbook-map) — who reads what
+3. [Operator manual](#operator-manual) — daily rituals
+4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
+5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
+6. [Source index](#source-index) — where truth lives
+7. [Snippet cookbook](#snippet-cookbook) — copy-paste commands
+8. [Terminology](#terminology-and-abbreviations)
+9. [Architecture & repo layout](#what-axon-x-is) — structure and ownership
+10. [Detailed setup](#detailed-setup-first-install) — first install
+11. [Boot flow](#what-the-current-app-does-on-boot) — what loads on refresh
+12. [Shell layout](#locked-shell-layout) — regions and modes
+13. [Key files](#the-most-important-files-right-now) — start reading here
+14. [Verification](#verification-commands) — gates and PASS/PENDING/FAIL
+15. [Working patterns](#common-working-patterns) — how to add code safely
+16. [Debugging playbook](#debugging-playbook) — step-by-step fixes
+17. [Tips, hints & tricks](#tips-hints-and-tricks)
+18. [Upgrading & updating](#upgrading-and-updating) — pulls, deps, planning sync
+19. [Next slices](#what-a-good-next-slice-looks-like) — what to build next
+
+---
+
+## Quick Start
+
+This section is the living operator onboarding guide.
+
+### Start the stack
+
+```bash
+cd /home/edp/axon-nvme/repos/axon-watch
+./scripts/dev/up.sh
+./scripts/dev/check-health.sh
+```
+
+Open **http://127.0.0.1:4173** and hard-refresh after upgrades (`Ctrl+Shift+R`).
+
+### Pick a real workspace
+
+The left sidebar should show **axon-watch** and **axon-local** (bound project
+roots). Start with **axon-watch** for Axon-X development, or **axon-local** when
+you need the legacy repo context.
+
+Demo names like `workspace_nlp` are mock catalog entries — they are hidden when
+real project bindings exist.
+
+### Two modes — different jobs
+
+Axon-X has two layout modes (top-right toggle). They are **not** two different apps;
+they are two views over the same workspace, runs, and APIs.
+
+| | **Operator mode** | **IDE mode** |
+| --- | --- | --- |
+| **Purpose** | Run oversight, signals, approvals, command execution | Files, editor, terminal, agent dock |
+| **Center** | Mission control — run phase, live feed, resume/complete | Monaco editor + bottom terminal dock |
+| **Left sidebar** | Workspaces + **Attention** (signals, inbox, receipts) | Explorer / search / git activity bar |
+| **Right dock** | Conversation transcript + Command/KAIRO hero | Resizable agent dock (conversation + composer) |
+| **Best for** | “What is running? What needs me? Run this command.” | “Edit files, use terminal, review code.” |
+| **Input style** | **Exact commands** in the Command seam (see footer **Commands**) | Same command seam in agent dock + full editor/terminal |
+
+**Operator mode** is the default production surface for day-to-day oversight.
+
+**IDE mode** is for hands-on work in the bound repo (real `project_root` on disk).
+
+Switch modes anytime — workspace selection, runs, and conversation thread persist.
+
+### What you can do in Axon-X today (v1)
+
+Real and verified today:
+
+- Select **axon-watch** or **axon-local** workspace
+- View **runtime summary**, **inbox signals**, and **KAIRO briefing** from live APIs
+- Track **run phase** in mission control (stop/resume/review-ready flows)
+- Send **supported commands** (not free-form chat) via the Command seam
+- Run **git status** against the bound repo root
+- **IDE mode**: open workspace files in Monaco, PTY terminal in repo root
+- **Attention sidebar**: connector/signal/delivery visibility
+
+Still thin or deferred (use axon-local `:7734` fallback if needed):
+
+- General conversational chat (“Hi”, “explain this repo”)
+- Full agent tool loop parity with classic Axon
+- Child-project connectors and legacy integration surfaces
+- Packaged desktop app / native notifications
+
+### Supported commands (Operator mode)
+
+The conversation/command seam accepts **exact commands** only. Natural language
+will return “unsupported command”.
+
+| Command | What it does |
+| --- | --- |
+| `health` / `api/health` | Probe control-plane health |
+| `ls` / `list files` | List files in the workspace |
+| `read README.md` / `cat notes.txt` | Read a workspace file |
+| `git status` | Git status in the bound project root |
+| `resume from review` | Resume the primary `review_ready` run |
+
+In the UI: footer **Commands** button (Operator mode) opens the list and can prefill
+the Command seam. Source of truth:
+`apps/console-web/src/lib/operator-supported-commands.ts` (keep in sync with
+`services/control-plane/app/chat/command_executor.py`).
+
+### Typical first session
+
+1. Open `:4173` → wait for boot overlay → shell loads
+2. Left sidebar → select **axon-watch**
+3. Operator mode → right dock → **Command** tab
+4. Type `git status` → send → read agent receipt in **Conversation**
+5. Center mission control shows run phase if a run was created
+6. Toggle **IDE** → open `README.md`, use terminal in the real repo root
+7. Left **Attention** → inspect signals when watch reports degraded summary
+
+### When things look noisy
+
+Dev SQLite may contain old smoke runs (“32 runs ready for review”). Reset if needed:
+
+```bash
+./scripts/dev/down.sh
+rm -f .local/state/control-plane.sqlite3
+./scripts/dev/up.sh
+```
+
+### Verify smoke
+
+```bash
+npm run verify:production-operator
+```
+
+### Understanding runs, review_ready, RESUME, and COMPLETE
+
+**Analogy:** Axon-X is a **supervised assistant**, not a chat bot. When you send a
+command like `read README.md` or `health`, the system starts a **run** (a tracked
+job): do the work → show output in **Conversation** → **pause** at a checkpoint called
+**review_ready**. That pause is intentional — you look at the result before anything
+else happens.
+
+| Button / action | Plain meaning | When to use it |
+| --- | --- | --- |
+| **COMPLETE RUN** | “I’m done — this job succeeded.” | One-shot commands (`read …`, `git status`, `health`) when output looks good |
+| **RESUME RUN** | “I’ve reviewed it — keep this run going.” | Multi-step work, or when KAIRO **ADVISE** says to resume a named run |
+| **Command → `resume from review`** | Same as RESUME for the **primary** paused run | When buttons are unclear; acts on one run at a time |
+| **Left → Attention** | Signal inbox (bootstrap noise, delivery receipts) | When footer shows **SIGNALS: N ACTIVE** — usually informational in dev |
+
+**“Phase is now review_ready. Review when ready.”** — not an error. The command
+finished; Mission Control is asking you to **COMPLETE** (usual) or **RESUME** (if more
+steps expected).
+
+### “2 runs are ready for operator review” — what that means
+
+This is a **count of paused jobs**, not a failure. Each command you ran (`health`,
+`read README.md`, `git status`, …) can leave its own run sitting in **review_ready**
+until you **COMPLETE** or **RESUME** it. **2 runs** = two unfinished checkpoints
+(e.g. one Health run + one Read README run).
+
+**What to do:**
+
+1. **Center → Mission Control** — handles the **primary** (most recent) run via
+   **RESUME RUN** / **COMPLETE RUN**.
+2. **Right → KAIRO Briefing** — see **NOTICE** (the count) and **ADVISE** (suggested
+   next click).
+3. **Clear the backlog** — for each run you’re happy with, click **COMPLETE RUN**.
+   Repeat until the notice says “No active runs” or only one remains.
+4. **Dev reset** (optional) — wipe stale runs from smoke tests:
+
+```bash
+./scripts/dev/down.sh && rm -f .local/state/control-plane.sqlite3 && ./scripts/dev/up.sh
+```
+
+### KAIRO NOTICE / ADVISE / DECIDE — where to go
+
+KAIRO Briefing (right dock → **KAIRO** tab, or footer **Open KAIRO Briefing**) is a
+**short summary**, not a second app. It mirrors the same backend truth as Mission
+Control and Attention.
+
+| Label | Meaning | Where to act |
+| --- | --- | --- |
+| **NOTICE** | Headline (“2 runs are ready…”) | Read only — context |
+| **ADVISE** | Suggested next step (e.g. “Resume Health.”) | Usually → **RESUME RUN** in center, or **COMPLETE RUN** if that job is done |
+| **DECIDE** | What choice is waiting | Center buttons, or Attention for signals |
+| **EXECUTE** | Concrete action phrase | Command tab, or the button ADVISE points to |
+
+**Example:** ADVISE says **“Resume Health.”** → you previously ran `health` and that
+run is paused → go to **Mission Control** → **RESUME RUN** (continues that run) or
+**COMPLETE RUN** (closes it if you only wanted a one-time health check).
+
+**Signals (e.g. “Bootstrap: runtime summary stale”)** in **Attention** are often
+**expected in local dev** — watch/bootstrap scaffolding, not production outage. Review
+them in **Left → Attention**; they do not block **COMPLETE RUN** unless an approval
+gate is open.
+
+### Bootstrap & signals — what to do
+
+**Bootstrap** in Axon-X means the console and services are up, but some runtime
+summary fields are still intentionally thin while watch/control-plane parity grows.
+That is normal in local dev — not the same as “the app is broken.”
+
+| What you see | What it means | What to do |
+| --- | --- | --- |
+| **Bootstrap: runtime summary stale** (Attention → Signals) | Watch is connected; summary assembly is bootstrap-thin | **Ignore**, tap **Details**, or hit **CLEAR** to acknowledge and hide bootstrap noise |
+| **OBSERVE** chip on a signal | KAIRO watch mode: informational only | **No click action.** Read-only label. |
+| **DELIVERED** chip | Delivery receipt was recorded | **No click action.** Read-only label. |
+| **SIGNALS: N ACTIVE** (footer) | N open inbox signals | Open **Attention** or **Open Attention** from Mission Control — review, then return to Command |
+| **IDLE** + bootstrap signal only | Nothing waiting on you | No run action required — optional signal review only |
+
+**When bootstrap noise is OK:** local `./scripts/dev/up.sh`, watch healthy, no pending
+approvals, runs complete normally.
+
+**When to investigate:** approvals stuck open, runs won’t resume/complete, watch
+disconnected in footer, or bootstrap signal persists **after** a production deploy
+with full runtime summary expected.
+
+See also [Tip 6: bootstrap-real vs feature-real](#tip-6-distinguish-bootstrap-real-from-feature-real).
+
+### Run names — what you see in the UI
+
+Every command creates a **run** with two identifiers:
+
+| What you see | Meaning |
+| --- | --- |
+| **Health check**, **Read README.md**, **Git status** | Friendly **task name** (from your command) |
+| **#cdb931** (6 characters) | Short **run ref** — internal tracking only; you rarely need the full `run_…` id |
+
+Old runs stored raw command text (`health`, `git status`); the UI **humanizes** those labels.
+KAIRO **ADVISE** uses the same friendly names (e.g. “Resume Health check.” not “Resume health.”).
+
+When **2+ paused tasks** appear, Mission Control lists each friendly name — click **COMPLETE RUN**
+for the current one, repeat until the queue clears.
 
 ## Terminology And Abbreviations
 
@@ -32,6 +263,7 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **Axon-X** | User-facing product name for the next-generation operator console. |
 | **axon-watch** | Internal repo folder and npm workspace name. Legacy naming; not the product label shown to operators. |
 | **axon-local** | The current production Axon app repo (port **7734**). Planning for Axon-X still lives here under `Plans/Axon-Watch/`. |
+| **Bootstrap** | Early boot / dev scaffolding state — services run, but some DTO fields (runtime summary depth, signal richness) are intentionally thin until parity slices land. Signals like `Bootstrap: runtime summary stale` are **expected locally**, not production outages. |
 | **Briefing seam** | `GET /api/briefing` returns canonical `OperatorBriefing`. The shell loads it at bootstrap and projects that data across the right dock: approvals, signals, and the KAIRO briefing card all read from the same briefing/runtime truth. Approval mutations stay on the run approval seam. See `docs/contracts/BRIEFING-SEAM.md`. |
 | **Control plane** | FastAPI service on port **8787** that owns run truth, runtime summary, inbox projection, workspaces list, and briefing. |
 | **Console-web / shell** | Vue 3 frontend on port **4173** — the visible Axon-X UI. |
@@ -40,7 +272,7 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **DTO** | Data Transfer Object — a typed payload shape exchanged between services or UI layers (for example `RuntimeSummary`, `RunRecord`). |
 | **Fitness function** | An automated check that guards architecture or performance (dependency direction, DTO size budgets, latency thresholds). |
 | **Frozen planning bundle** | The locked docs under `axon-local/Plans/Axon-Watch/`. Implementation must not silently drift from these. |
-| **KAIRO** | Knowledge-Augmented Intelligence for Response and Oversight — the planned operator-presence layer (watching, advising, interrupting, executing with receipts). The current shell has KAIRO presentation scaffolding (topbar presence module, briefing card, operator copy), but the full operator-presence system in `KAIRO_MODE.md` / `ADR-005-kairo-as-operator-presence-layer.md` is **not** landed yet. |
+| **KAIRO** | Knowledge-Augmented Intelligence for Response and Oversight — operator-presence layer (watching, advising, interrupting, executing with receipts). **NOTICE / ADVISE / DECIDE** in the KAIRO Briefing panel are rhythm labels from `GET /api/briefing` — suggested reading, not separate commands. See Quick Start → *KAIRO NOTICE / ADVISE*. |
 | **Lane A/B/C/D** | Parallel implementation ownership areas defined in `docs/MULTITASK-LANES.md` (watch, shell, control-plane, dev/verify). |
 | **Monaco host** | In-browser code editor surface (`EditorHost.vue`). Loads workspace files on disk (README.md, notes.txt) plus read-only DTO overview tabs. |
 | **Parity ledger** | Checklist of behaviors Axon-X must eventually match from current Axon. Lives in frozen planning. |
@@ -59,9 +291,9 @@ Do not confuse these:
 
 | | **axon-local** (current Axon) | **axon-watch** (Axon-X) |
 | --- | --- | --- |
-| Default URL | `http://127.0.0.1:7734` | `http://127.0.0.1:4173` |
+| Default URL | `http://127.0.0.1:7734` (fallback) | `http://127.0.0.1:4173` (**production operator**) |
 | Start command | `./start.sh` from axon-local | `./scripts/dev/up.sh` from axon-watch |
-| Status | Mature daily-driver console | Early greenfield rebuild |
+| Status | Legacy daily-driver / fallback | Primary operator console (v1) |
 | Relationship | Source of parity targets and frozen plans | Implementation target for modernization |
 
 ## What Axon-X Is

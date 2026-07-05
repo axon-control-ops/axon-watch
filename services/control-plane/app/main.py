@@ -17,6 +17,7 @@ from app.chat.service import (
     post_chat_message,
 )
 from app.inbox_projection import build_inbox_response
+from app.inbox_signals import acknowledge_inbox_signals
 from app.adapters.watch_client import (
     fetch_watch_connectors,
     fetch_watch_delivery_receipts,
@@ -95,6 +96,10 @@ class WatchCommandRequest(BaseModel):
     requested_by: str = "operator"
     payload: dict[str, object] | None = None
     requested_at: str | None = None
+
+
+class AcknowledgeInboxSignalsRequest(BaseModel):
+    signal_ids: list[str]
 
 
 class OperatorPresenceSettingsRequest(BaseModel):
@@ -185,6 +190,17 @@ def runtime_summary() -> dict[str, object]:
 @app.get("/api/inbox")
 def inbox() -> dict[str, object]:
     return build_inbox_response()
+
+
+@app.post("/api/inbox/signals/acknowledge")
+def inbox_signals_acknowledge(body: AcknowledgeInboxSignalsRequest) -> dict[str, object]:
+    result = acknowledge_inbox_signals(body.signal_ids)
+    if not result.get("accepted"):
+        raise HTTPException(
+            status_code=503,
+            detail=str(result.get("error", "signal acknowledgement unavailable")),
+        )
+    return result
 
 
 @app.get("/api/connectors")

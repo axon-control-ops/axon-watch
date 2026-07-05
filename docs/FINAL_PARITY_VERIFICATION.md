@@ -78,7 +78,10 @@ Axon-X has **complete v1 must-keep parity** (19/19 verified, 0 partial) within
 documented acceptable degradation.
 
 It does **not** have unlimited axon-local equivalence (`verified_full_parity: 0`).
-Full axon-local retirement remains blocked on **operator sign-off** to switch
-production from port 7734 to Axon-X `:4173`.
+Full axon-local retirement remains blocked on **child-project / legacy connector
+migration** (`verified_full_parity: 0`).
+
+**Production operator surface:** Axon-X `:4173` (declared 2026-07-05).
+axon-local `:7734` is fallback only.
 
 See `docs/CUTOVER_DECISION.md` for the approved operating model.

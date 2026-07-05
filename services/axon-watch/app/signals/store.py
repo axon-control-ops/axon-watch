@@ -8,6 +8,7 @@ from app.signals.connector_signal import connector_inbox_items
 from app.signals.iso_time import utc_now_iso
 from app.signals.ranking import rank_inbox_items
 from app.signals.summary_degraded_signal import summary_degraded_inbox_item
+from app.signals.suppression_store import is_signal_acknowledged
 from app.signals.watch_rule import watch_rule_for_inbox_item
 
 
@@ -26,6 +27,9 @@ def get_inbox_snapshot(
     delivered = enrich_inbox_with_delivery(ranked)
     enriched = []
     for item in delivered:
+        signal_id = str(item.get("signal_id", "")).strip()
+        if signal_id and is_signal_acknowledged(signal_id):
+            continue
         row = dict(item)
         row["watch_rule"] = watch_rule_for_inbox_item(row)
         enriched.append(row)

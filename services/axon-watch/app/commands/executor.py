@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.connectors.catalog import load_watch_connector_definitions
 from app.connectors.probe import probe_connector
+from app.signals.suppression_store import acknowledge_signals
 from app.watch_summary import build_watch_summary
 
 
@@ -40,10 +41,37 @@ def execute_refresh_summary() -> dict[str, object]:
     }
 
 
+def execute_acknowledge_signal(record: dict[str, object]) -> dict[str, object]:
+    payload = record.get("payload") if isinstance(record.get("payload"), dict) else {}
+    signal_ids: list[str] = []
+    raw_ids = payload.get("signal_ids")
+    if isinstance(raw_ids, list):
+        signal_ids = [str(item).strip() for item in raw_ids if str(item).strip()]
+
+    target_id = str(record.get("target_id", "")).strip()
+    if target_id:
+        signal_ids.append(target_id)
+
+    deduped = list(dict.fromkeys(signal_ids))
+    if not deduped:
+        raise WatchCommandError("target_id or payload.signal_ids is required for acknowledge_signal")
+
+    acknowledged = acknowledge_signals(
+        deduped,
+        acknowledged_by=str(record.get("requested_by", "operator")),
+    )
+    return {
+        "acknowledged": acknowledged,
+        "count": len(acknowledged),
+    }
+
+
 def execute_watch_command(record: dict[str, object]) -> dict[str, object]:
     command_type = str(record.get("command_type", "")).strip()
     if command_type == "reprobe_connector":
         return execute_reprobe_connector(connector_id=str(record.get("target_id", "")))
     if command_type == "refresh_summary":
         return execute_refresh_summary()
+    if command_type == "acknowledge_signal":
+        return execute_acknowledge_signal(record)
     raise WatchCommandError(f"unsupported command_type: {command_type}")

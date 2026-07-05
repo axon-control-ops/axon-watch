@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { buildOperatorQuickGuide } from '../../lib/operator-quick-guide';
 import {
   operatorExecutionStage,
   operatorLiveFeed,
@@ -10,6 +11,11 @@ import {
 import { leftSidebarAttentionBadgeCount } from '../../lib/left-sidebar-mode';
 import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
+import {
+  formatRunDisplayName,
+  formatRunIdentityLabel,
+  formatRunShortId,
+} from '../../lib/run-display';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
@@ -114,6 +120,23 @@ const showRunActions = computed(
     shell.pendingApprovalsCount > 0,
 );
 
+const quickGuide = computed(() =>
+  buildOperatorQuickGuide({
+    runPhase: shell.primaryActiveRun?.phase ?? null,
+    hasActiveRun: executionStage.value.hasActiveRun,
+    pendingApprovals: pendingApprovals.value,
+    layoutMode: shell.layoutMode,
+  }),
+);
+
+const reviewReadyRuns = computed(() =>
+  shell.runs.filter(
+    (run) =>
+      run.phase === 'review_ready' &&
+      run.workspace_id === shell.currentWorkspace?.workspace_id,
+  ),
+);
+
 const workspaceTerminalLabel = computed(() => {
   if (!workspaceId.value) {
     return 'No workspace selected';
@@ -131,12 +154,14 @@ function toggleTerminal(): void {
 
 <template>
   <section
+    id="operator-mission-control"
     class="center-workbench__operator-status operator-status-radar-panel hud-panel-frame"
     :class="[
       `operator-status-radar-panel--${radarTone}`,
       {
         'operator-status-radar-panel--idle': !executionStage.hasActiveRun,
         'operator-status-radar-panel--terminal-collapsed': !props.terminalVisible,
+        'operator-status-radar-panel--emphasized': shell.missionControlEmphasized,
       },
     ]"
     aria-label="Operator mission control"
@@ -179,7 +204,8 @@ function toggleTerminal(): void {
         <div class="operator-status-radar-panel__stage-identity">
           <span class="operator-status-radar-panel__phase-tag">{{ executionStage.phase }}</span>
           <span v-if="executionStage.hasActiveRun" class="operator-status-radar-panel__run-id">
-            {{ executionStage.runId }}
+            {{ executionStage.displayName }}
+            <span class="operator-status-radar-panel__run-short-id">#{{ executionStage.shortId }}</span>
           </span>
         </div>
         <span v-if="executionStage.hasActiveRun" class="operator-status-radar-panel__elapsed">
@@ -207,10 +233,47 @@ function toggleTerminal(): void {
         v-if="executionStage.hasActiveRun"
         class="operator-status-radar-panel__stage-summary"
       >
-        {{ executionStage.summary }}
+        Task: {{ executionStage.summary }}
+        <span v-if="executionStage.commandDetail"> · Command: {{ executionStage.commandDetail }}</span>
       </p>
+
+      <section
+        v-if="reviewReadyRuns.length > 1"
+        class="operator-status-radar-panel__run-queue"
+        aria-label="Runs waiting for review"
+      >
+        <p class="operator-status-radar-panel__run-queue-title">
+          {{ reviewReadyRuns.length }} paused tasks — complete each when done
+        </p>
+        <ul class="operator-status-radar-panel__run-queue-list">
+          <li
+            v-for="run in reviewReadyRuns"
+            :key="run.run_id"
+            class="operator-status-radar-panel__run-queue-item"
+            :class="{
+              'operator-status-radar-panel__run-queue-item--primary':
+                run.run_id === shell.primaryActiveRun?.run_id,
+            }"
+          >
+            <span>{{ formatRunDisplayName(run) }}</span>
+            <span>#{{ formatRunShortId(run.run_id) }}</span>
+          </li>
+        </ul>
+      </section>
       <p class="operator-status-radar-panel__stage-notice">{{ executionStage.notice }}</p>
       <p class="operator-status-radar-panel__stage-decide">{{ executionStage.decide }}</p>
+
+      <section
+        v-if="quickGuide"
+        class="operator-status-radar-panel__guide"
+        aria-label="What to do next"
+      >
+        <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
+        <ol class="operator-status-radar-panel__guide-steps">
+          <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
+        </ol>
+      </section>
+
       <p v-if="!executionStage.hasActiveRun" class="operator-status-radar-panel__stage-advise">
         {{ executionStage.advise }}
       </p>
@@ -223,7 +286,7 @@ function toggleTerminal(): void {
     >
       <header class="operator-status-radar-panel__section-header">
         <span>Live execution</span>
-        <span>{{ shell.primaryActiveRun?.run_id ?? shell.threadStateLabel }}</span>
+        <span>{{ shell.primaryActiveRun ? formatRunIdentityLabel(shell.primaryActiveRun) : shell.threadStateLabel }}</span>
       </header>
       <ol class="operator-status-radar-panel__feed-list">
         <li
@@ -299,7 +362,7 @@ function toggleTerminal(): void {
       <button
         type="button"
         class="operator-status-radar-panel__action"
-        @click="shell.setLeftSidebarMode('attention')"
+        @click="shell.focusAttentionSidebar()"
       >
         Open Attention
         <span v-if="attentionBadgeCount > 0" class="operator-status-radar-panel__badge">

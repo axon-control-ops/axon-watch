@@ -98,6 +98,8 @@ describe('operator status radar view', () => {
     });
 
     expect(summary.runId).toBe('run_smoke');
+    expect(summary.displayName).toBe('Smoke run');
+    expect(summary.shortId).toBe('smoke');
     expect(summary.phase).toContain('REVIEW READY');
     expect(summary.workspace).toBe('workspace_smoke');
     expect(summary.watchConnected).toBe(true);
@@ -159,6 +161,8 @@ describe('operator status radar view', () => {
     });
 
     expect(stage.runId).toBe('run_smoke');
+    expect(stage.displayName).toBe('Smoke run');
+    expect(stage.shortId).toBe('smoke');
     expect(stage.phaseProgress).toBeGreaterThan(0);
     expect(stage.currentStep).toBe('Review when ready');
     expect(stage.notice).toBe(briefing.notice);

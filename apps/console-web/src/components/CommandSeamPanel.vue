@@ -11,7 +11,7 @@ const props = withDefaults(
   }>(),
   {
     compact: true,
-    placeholder: 'Describe the next operator action…',
+    placeholder: 'Type a supported command (see footer Commands)…',
   },
 );
 
@@ -42,6 +42,16 @@ watch(
   () => props.compact,
   () => {
     void nextTick(syncComposerHeight);
+  },
+);
+
+watch(
+  () => shell.commandFocusToken,
+  () => {
+    void nextTick(() => {
+      syncComposerHeight();
+      inputRef.value?.focus();
+    });
   },
 );
 

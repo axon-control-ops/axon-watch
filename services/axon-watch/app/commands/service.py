@@ -10,7 +10,7 @@ from app.commands.executor import WatchCommandError, execute_watch_command
 from app.events import store as event_store
 from app.signals.iso_time import utc_now_iso
 
-_SUPPORTED_COMMAND_TYPES = frozenset({"reprobe_connector", "refresh_summary"})
+_SUPPORTED_COMMAND_TYPES = frozenset({"reprobe_connector", "refresh_summary", "acknowledge_signal"})
 
 
 def _normalize_command_id(raw: str | None) -> str:
@@ -71,6 +71,8 @@ def submit_watch_command(body: dict[str, Any]) -> dict[str, object]:
             "connector_reprobed"
             if command_type == "reprobe_connector"
             else "summary_refreshed"
+            if command_type == "refresh_summary"
+            else "operator_acknowledged"
         )
         event_store.append_event(
             event_type=event_type,

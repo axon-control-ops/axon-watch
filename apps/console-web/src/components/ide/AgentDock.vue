@@ -1,115 +1,28 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import ConversationSeamPanel from '../ConversationSeamPanel.vue';
 import { runPhaseTag } from '../../lib/mockup-shell-view';
-import {
-  AGENT_DOCK_COLLAPSED_WIDTH_PX,
-  clampAgentDockWidth,
-  defaultAgentDockWidth,
-  persistAgentDockWidth,
-  readStoredAgentDockWidth,
-} from '../../lib/agent-dock-width';
+import { useRightDockResize } from '../../composables/useRightDockResize';
 import AgentDockComposer from './AgentDockComposer.vue';
 import AgentDockWorkspaceMenu from './AgentDockWorkspaceMenu.vue';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
-const agentDockWidth = ref(
-  readStoredAgentDockWidth() ?? defaultAgentDockWidth(window.innerWidth),
-);
-const resizing = ref(false);
+
+const { resizing, resetDockWidth, startDockResize } = useRightDockResize({
+  dockRef,
+  collapsed: computed(() => shell.agentDockCollapsed),
+});
 
 const signalCount = computed(
   () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
 );
 
-function shellRoot(): HTMLElement | null {
-  return dockRef.value?.closest('.console-shell--mockup') as HTMLElement | null;
-}
-
-function applyAgentDockWidth(width: number): void {
-  const clamped = clampAgentDockWidth(width, window.innerWidth);
-  agentDockWidth.value = clamped;
-  shellRoot()?.style.setProperty('--shell-agent-dock-width', `${clamped}px`);
-}
-
-function applyCollapsedDockWidth(): void {
-  shellRoot()?.style.setProperty(
-    '--shell-agent-dock-width',
-    `${AGENT_DOCK_COLLAPSED_WIDTH_PX}px`,
-  );
-}
-
-function syncDockWidthToShell(): void {
-  if (shell.agentDockCollapsed) {
-    applyCollapsedDockWidth();
-    return;
-  }
-
-  applyAgentDockWidth(agentDockWidth.value);
-}
-
 function collapseDock(): void {
   shell.toggleAgentDock();
 }
-
-function startAgentDockResize(event: MouseEvent): void {
-  if (event.button !== 0 || shell.agentDockCollapsed) {
-    return;
-  }
-
-  event.preventDefault();
-  resizing.value = true;
-
-  const onMove = (moveEvent: MouseEvent): void => {
-    applyAgentDockWidth(window.innerWidth - moveEvent.clientX);
-  };
-
-  const onUp = (): void => {
-    resizing.value = false;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-    persistAgentDockWidth(agentDockWidth.value);
-  };
-
-  document.body.style.cursor = 'col-resize';
-  document.body.style.userSelect = 'none';
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
-}
-
-function resetAgentDockWidth(): void {
-  applyAgentDockWidth(defaultAgentDockWidth(window.innerWidth));
-  persistAgentDockWidth(agentDockWidth.value);
-}
-
-onMounted(() => {
-  syncDockWidthToShell();
-  window.addEventListener('resize', syncDockWidthToShell);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', syncDockWidthToShell);
-  if (resizing.value) {
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }
-});
-
-watch(
-  () => shell.agentDockCollapsed,
-  async () => {
-    await nextTick();
-    syncDockWidthToShell();
-    if (!shell.agentDockCollapsed) {
-      persistAgentDockWidth(agentDockWidth.value);
-    }
-  },
-);
 </script>
 
 <template>
@@ -123,8 +36,8 @@ watch(
       class="agent-dock__resize-handle"
       title="Drag to resize the agent dock. Double-click to reset."
       aria-hidden="true"
-      @mousedown="startAgentDockResize"
-      @dblclick="resetAgentDockWidth"
+      @mousedown="startDockResize"
+      @dblclick="resetDockWidth"
     >
       <span class="agent-dock__resize-grip" />
     </div>

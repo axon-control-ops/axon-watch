@@ -8,6 +8,7 @@ from typing import Any
 
 from app.domain.run_state import capability_flags, is_terminal_phase, status_for_phase
 from app.domain.run_transitions import can_transition
+from app.chat.command_intent import humanize_run_summary
 from app.persistence import run_store
 
 DEFAULT_LANE_ID = "control-plane"
@@ -189,14 +190,16 @@ def complete_run(run_id: str) -> dict[str, Any]:
     if record is None:
         raise RunNotFoundError(f"run not found: {run_id}")
 
-    if record["phase"] not in {"executing", "review_ready"}:
+    if record["phase"] not in {"executing", "review_ready", "paused"}:
         raise RunLifecycleError(
-            f"complete requires executing or review_ready phase, found {record['phase']}",
+            f"complete requires executing, review_ready, or paused phase, found {record['phase']}",
         )
 
     receipt_summary = (
         "Run completed after operator review"
         if record["phase"] == "review_ready"
+        else "Run completed by operator"
+        if record["phase"] == "paused"
         else "Run completed"
     )
     return _transition_record(
@@ -408,7 +411,7 @@ def to_runtime_summary_active_run(record: dict[str, Any]) -> dict[str, Any]:
         "mode": record["mode"],
         "status": record["status"],
         "phase": record["phase"],
-        "title": record["summary"],
+        "title": humanize_run_summary(str(record["summary"])),
         "detail": record["detail"],
         "lane_id": record["lane_id"],
         "updated_at": record["updated_at"],

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from app.chat.command_intent import classify_command
 from app.runs.service import RunLifecycleError, list_pending_review_runs, resume_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_files import WorkspaceFileError, list_workspace_files, read_workspace_file
@@ -31,27 +32,6 @@ class CommandExecutionResult:
     receipt_summary: str
     run_id: str | None = None
 
-
-def classify_command(content: str) -> str:
-    lowered = content.strip().lower()
-    if not lowered:
-        return "unsupported"
-
-    if any(token in lowered for token in ("health", "api/health", "runtime/summary")):
-        return "health_probe"
-    if lowered.startswith("ls") or "list files" in lowered or lowered == "dir":
-        return "list_files"
-    if _READ_PREFIX.match(content.strip()) or "readme" in lowered:
-        return "read_file"
-    if _GIT_STATUS_PREFIX.match(content.strip()) or lowered == "git status":
-        return "git_status"
-    if _RESUME_FROM_REVIEW.match(content.strip()) or lowered in {
-        "resume from review",
-        "resume review",
-        "resume-from-review",
-    }:
-        return "resume_from_review"
-    return "unsupported"
 
 
 def _truncate_output(text: str) -> str:

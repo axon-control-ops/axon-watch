@@ -2,6 +2,13 @@ import type { OperatorBriefing, RunRecord, RuntimeSummary } from '../contracts/c
 import type { RunHistoryRow } from './run-history-view';
 
 import { runPhaseProgress, runPhaseTag } from './mockup-shell-view';
+import {
+  formatRunDisplayName,
+  formatRunIdentityLabel,
+  formatRunShortId,
+  humanizeRunSummary,
+  formatRunCommandDetail,
+} from './run-display';
 
 export type OperatorRadarTone = 'nominal' | 'watch' | 'attention' | 'degraded';
 export type OperatorStatusMetricTone = 'default' | 'ok' | 'warn' | 'attention';
@@ -14,6 +21,9 @@ export interface OperatorStatusMetric {
 
 export interface OperatorMissionSummary {
   runId: string;
+  displayName: string;
+  shortId: string;
+  identityLabel: string;
   phase: string;
   workspace: string;
   status: string;
@@ -42,9 +52,13 @@ export interface OperatorMissionChip {
 
 export interface OperatorExecutionStage {
   runId: string;
+  displayName: string;
+  shortId: string;
+  identityLabel: string;
   phase: string;
   phaseProgress: number;
   summary: string;
+  commandDetail: string | null;
   currentStep: string;
   notice: string;
   advise: string;
@@ -169,11 +183,11 @@ export function operatorStatusHeadline(input: {
   }
 
   if (input.primaryActiveRun?.phase === 'review_ready') {
-    return `${input.primaryActiveRun.summary} is ready for operator review.`;
+    return `${formatRunDisplayName(input.primaryActiveRun)} is ready for operator review.`;
   }
 
   if (input.primaryActiveRun) {
-    return `Active run ${input.primaryActiveRun.run_id} · ${runPhaseTag(input.primaryActiveRun.phase)}`;
+    return `${formatRunIdentityLabel(input.primaryActiveRun)} · ${runPhaseTag(input.primaryActiveRun.phase)}`;
   }
 
   return 'Systems nominal. No active run in this workspace.';
@@ -267,6 +281,9 @@ export function operatorMissionSummary(input: {
   if (!run) {
     return {
       runId: 'No active run',
+      displayName: 'No active run',
+      shortId: '—',
+      identityLabel: 'No active run',
       phase: 'IDLE',
       workspace: input.workspaceId ?? 'none selected',
       status: 'standing by',
@@ -276,13 +293,17 @@ export function operatorMissionSummary(input: {
     };
   }
 
+  const displayName = formatRunDisplayName(run);
   return {
     runId: run.run_id,
+    displayName,
+    shortId: formatRunShortId(run.run_id),
+    identityLabel: formatRunIdentityLabel(run),
     phase: runPhaseTag(run.phase),
     workspace: run.workspace_id,
     status: run.status,
     elapsed: elapsedLabel(run.started_at, run.ended_at, run.updated_at),
-    currentStep: run.current_step ?? run.summary,
+    currentStep: run.current_step ?? displayName,
     watchConnected,
   };
 }
@@ -385,9 +406,13 @@ export function operatorExecutionStage(input: {
 
   return {
     runId: mission.runId,
+    displayName: mission.displayName,
+    shortId: mission.shortId,
+    identityLabel: mission.identityLabel,
     phase: mission.phase,
     phaseProgress: runPhaseProgress(run?.phase ?? null),
-    summary: run?.summary ?? 'Standing by for the next operator command.',
+    summary: run ? humanizeRunSummary(run.summary) : 'Standing by for the next operator command.',
+    commandDetail: run ? formatRunCommandDetail(run) : null,
     currentStep: mission.currentStep,
     notice: operatorStatusHeadline({
       briefing: input.briefing,

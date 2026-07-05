@@ -22,7 +22,7 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "waiting_external": {"executing", "paused", "cancelled"},
     "awaiting_input": {"planning", "cancelled"},
     "awaiting_approval": {"executing", "cancelled"},
-    "paused": {"executing", "cancelled"},
+    "paused": {"executing", "cancelled", "completed"},
     "review_ready": {"completed", "executing"},
     "completed": set(),
     "failed": set(),

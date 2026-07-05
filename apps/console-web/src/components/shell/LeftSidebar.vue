@@ -8,6 +8,9 @@ import AttentionStackPanel from './AttentionStackPanel.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import {
+  workspaceDisplayLabel,
+} from '../../lib/operator-workspace-catalog';
+import {
   workspaceIconKind,
   workspaceStatusLine,
 } from '../../lib/mockup-shell-view';
@@ -25,6 +28,7 @@ const sidebarWidth = ref(readStoredSidebarWidth() ?? 280);
 const resizing = ref(false);
 
 const catalogWorkspaces = computed(() => shell.workspaces);
+const usesProductionCatalog = computed(() => shell.usesProductionWorkspaceCatalog);
 
 const filteredWorkspaces = computed(() => {
   const query = workspaceFilter.value.trim().toLowerCase();
@@ -213,7 +217,13 @@ onBeforeUnmount(() => {
                 :kind="workspaceIconKind(workspace.workspace_id)"
               />
               <span class="workspace-list__copy">
-                <span class="workspace-list__name">{{ workspace.workspace_id }}</span>
+                <span class="workspace-list__name">{{ workspaceDisplayLabel(workspace) }}</span>
+                <span
+                  v-if="workspace.display_name && workspace.display_name !== workspace.workspace_id"
+                  class="workspace-list__meta workspace-list__meta--id"
+                >
+                  {{ workspace.workspace_id }}
+                </span>
                 <span
                   class="workspace-list__meta"
                   :class="{
@@ -234,7 +244,13 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <button type="button" class="workspace-new-button">+ New Workspace</button>
+          <button
+            v-if="!usesProductionCatalog"
+            type="button"
+            class="workspace-new-button"
+          >
+            + New Workspace
+          </button>
           <p v-if="shell.workspacesError" class="region-copy">{{ shell.workspacesError }}</p>
         </div>
 

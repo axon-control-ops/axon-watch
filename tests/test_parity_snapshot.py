@@ -33,6 +33,11 @@ class ParitySnapshotTests(unittest.TestCase):
         self.assertEqual(0, payload["summary"]["partially_verified"])
         self.assertEqual(19, payload["summary"]["verified_v1"])
         self.assertGreaterEqual(len(payload["blockers_for_full_retirement"]), 1)
+        production = payload.get("production_operator")
+        self.assertIsInstance(production, dict)
+        assert isinstance(production, dict)
+        self.assertEqual("axon_x", production.get("status"))
+        self.assertIn(":4173", str(production.get("primary_url", "")))
 
     def test_all_test_gates_listed_through_test9(self) -> None:
         payload = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))

@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { useShellStore } from '../../stores/shell';
+import SupportedCommandsFooter from './SupportedCommandsFooter.vue';
 
 const shell = useShellStore();
 const clockLabel = ref('00:00:00 UTC');
@@ -89,6 +90,8 @@ onUnmounted(() => {
           <span class="status-bar-mockup__icon status-bar-mockup__icon--operator" aria-hidden="true" />
           <span class="status-bar-mockup__chip-label">{{ operatorZone?.label }}</span>
         </div>
+
+        <SupportedCommandsFooter v-if="shell.layoutMode === 'operator'" />
 
         <div class="status-bar-mockup__tail">
           <span class="status-bar-mockup__clock">{{ clockLabel }}</span>

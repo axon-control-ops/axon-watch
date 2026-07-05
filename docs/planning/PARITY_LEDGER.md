@@ -55,8 +55,10 @@ Suggested status vocabulary for future use:
 ## Current Verification Snapshot (2026-07-05)
 
 Implementation repo: `axon-watch` on branch `dev`. **Final assessment** after
-TEST-10 + **Phase A–D** (P-D1–P-D6): **19 verified (v1 scope)**, **0 partially_verified**, **0 full parity**.
-See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
+TEST-10 + **Phase A–D** + **production operator declaration**: **19 verified (v1 scope)**,
+**0 partially_verified**, **production at :4173**, **0 full parity**.
+See `config/parity-snapshot.json`, `docs/CUTOVER_DECISION.md`, and
+`docs/PRODUCTION_OPERATOR_SURFACE.md`.
 
 | Behavior | Status | Evidence |
 |---|---|---|

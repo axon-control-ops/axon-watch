@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 
 import {
   approveRun,
+  acknowledgeInboxSignals,
   completeRun,
   fetchInbox,
   fetchOperatorBriefing,
@@ -36,6 +37,7 @@ import type {
   WorkspaceRecord,
 } from '../contracts/canonical';
 import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
+import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
   readViewportWidth,
   shouldRequestViewportCompactBriefing,
@@ -51,6 +53,8 @@ import {
   buildRunHistoryRows,
   type RunHistorySnapshot,
 } from '../lib/run-history-view';
+import { formatRunIdentityLabel } from '../lib/run-display';
+import { isOperatorCompletablePhase } from '../lib/run-lifecycle-ui';
 import {
   appendOperatorCommand,
   canSubmitOperatorCommand as canSubmitOperatorCommandDraft,
@@ -112,12 +116,16 @@ import {
   readStoredOperatorWorkspaceId,
 } from '../lib/operator-workspace-selection';
 import {
+  defaultOperatorWorkspaceId,
+  mergeOperatorWorkspaceCatalog,
+  workspaceCatalogMode,
+} from '../lib/operator-workspace-catalog';
+import {
   buildBriefingSummaryLine,
   buildStatusBarZones,
   buildTopbarBreadcrumb,
   buildTopbarMetaPills,
   buildWorkspaceStatusCardRows,
-  mergeMockupWorkspaceCatalog,
   resolveOperatorWorkspaceId,
 } from '../lib/mockup-shell-view';
 import {
@@ -200,6 +208,8 @@ export const useShellStore = defineStore('shell', () => {
   const runsError = ref<string | null>(null);
   const runMutationState = ref<RunMutationState>('idle');
   const runMutationError = ref<string | null>(null);
+  const signalClearState = ref<'idle' | 'clearing'>('idle');
+  const signalClearError = ref<string | null>(null);
   const runHistorySnapshot = ref<RunHistorySnapshot | null>(null);
   const runHistoryLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const approvals = ref<ApprovalRecord[]>([]);
@@ -243,8 +253,12 @@ export const useShellStore = defineStore('shell', () => {
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
   const expandedDockSeams = ref<Set<DockSeamId>>(new Set());
   const briefingSeamEmphasized = ref(false);
+  const missionControlEmphasized = ref(false);
+  const signalsSeamEmphasized = ref(false);
+  const highlightedSignalId = ref<string | null>(null);
   const dockHeroMode = ref<DockHeroMode>('command');
   const dockHeroModeTouched = ref(false);
+  const commandFocusToken = ref(0);
   const leftSidebarMode = ref<LeftSidebarMode>(readStoredLeftSidebarMode() ?? 'workspaces');
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
   const ideActivityView = ref<IdeActivityView>('explorer');
@@ -267,10 +281,15 @@ export const useShellStore = defineStore('shell', () => {
     return `${workspace} / ${identity.provider_name}`;
   });
 
-  const workspaceStateLabel = computed(() =>
-    currentWorkspace.value
-      ? currentWorkspace.value.workspace_id
-      : 'No workspace selected',
+  const workspaceStateLabel = computed(() => {
+    if (!currentWorkspace.value) {
+      return 'No workspace selected';
+    }
+    return currentWorkspace.value.display_name?.trim() || currentWorkspace.value.workspace_id;
+  });
+
+  const usesProductionWorkspaceCatalog = computed(
+    () => workspaceCatalogMode(workspaces.value) === 'production',
   );
 
   const topbarChips = computed(() =>
@@ -331,7 +350,7 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     const run = primaryActiveRun.value;
-    return `${run.run_id} · ${run.phase} · ${run.summary}`;
+    return formatRunIdentityLabel(run);
   });
   const runHistoryRows = computed(() => buildRunHistoryRows(runHistorySnapshot.value));
   const primaryApprovalRun = computed(() => selectPrimaryApprovalRun(runs.value));
@@ -387,7 +406,8 @@ export const useShellStore = defineStore('shell', () => {
     () => primaryActiveRun.value?.phase === 'executing' && !runMutationPending.value,
   );
   const canCompletePrimaryRun = computed(
-    () => primaryActiveRun.value?.phase === 'review_ready' && !runMutationPending.value,
+    () =>
+      isOperatorCompletablePhase(primaryActiveRun.value?.phase) && !runMutationPending.value,
   );
 
   const inboxStateLabel = computed(() => {
@@ -661,6 +681,61 @@ export const useShellStore = defineStore('shell', () => {
     setDockHeroMode(dockHeroMode.value === 'command' ? 'briefing' : 'command');
   }
 
+  function focusAttentionSidebar(signalId?: string | null): void {
+    setLeftSidebarMode('attention');
+    if (signalId) {
+      highlightedSignalId.value = signalId;
+    } else {
+      const signals = operatorBriefing.value?.top_signals ?? [];
+      const bootstrap = signals.find((signal) =>
+        isBootstrapSummarySignal(signal.signal_id, signal.title),
+      );
+      highlightedSignalId.value =
+        bootstrap?.signal_id ?? (signals.length === 1 ? signals[0]?.signal_id ?? null : null);
+    }
+    signalsSeamEmphasized.value = true;
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        document.getElementById('dock-seam-signals')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+        window.setTimeout(() => {
+          signalsSeamEmphasized.value = false;
+        }, 1200);
+      });
+    }
+  }
+
+  function toggleSignalDetails(signalId: string): void {
+    highlightedSignalId.value = highlightedSignalId.value === signalId ? null : signalId;
+  }
+
+  function focusMissionControl(): void {
+    missionControlEmphasized.value = true;
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        document.getElementById('operator-mission-control')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+        window.setTimeout(() => {
+          missionControlEmphasized.value = false;
+        }, 1200);
+      });
+    }
+  }
+
+  function afterRunLifecycleMutation(): void {
+    focusMissionControl();
+    if (dockHeroMode.value === 'briefing' && typeof window !== 'undefined') {
+      briefingSeamEmphasized.value = true;
+      window.setTimeout(() => {
+        briefingSeamEmphasized.value = false;
+      }, 1200);
+    }
+  }
+
   function focusKairoBriefing(): void {
     setDockHeroMode('briefing');
     briefingSeamEmphasized.value = true;
@@ -673,6 +748,21 @@ export const useShellStore = defineStore('shell', () => {
         window.setTimeout(() => {
           briefingSeamEmphasized.value = false;
         }, 1200);
+      });
+    }
+  }
+
+  function focusCommandSeam(example: string): void {
+    operatorCommandDraft.value = example;
+    setDockHeroMode('command');
+    commandFocusToken.value += 1;
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        document.getElementById('operator-command-input')?.focus();
+        document.getElementById('dock-seam-briefing')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
       });
     }
   }
@@ -1026,7 +1116,15 @@ export const useShellStore = defineStore('shell', () => {
 
     try {
       const snapshot = await fetchWorkspaces();
-      workspaces.value = mergeMockupWorkspaceCatalog(snapshot.items);
+      workspaces.value = mergeOperatorWorkspaceCatalog(snapshot.items);
+      const visibleIds = new Set(workspaces.value.map((workspace) => workspace.workspace_id));
+      if (
+        operatorPinnedWorkspaceId.value &&
+        !visibleIds.has(operatorPinnedWorkspaceId.value)
+      ) {
+        operatorPinnedWorkspaceId.value = null;
+        persistOperatorWorkspaceId(null);
+      }
       if (options.sync !== false && shouldAutoSyncWorkspaceFromRuns()) {
         syncCurrentWorkspace();
       }
@@ -1226,6 +1324,7 @@ export const useShellStore = defineStore('shell', () => {
     try {
       await stopRun(run.run_id);
       await refreshRunSurfaces();
+      afterRunLifecycleMutation();
     } catch (error) {
       runMutationError.value = error instanceof Error ? error.message : 'stop run request failed';
     } finally {
@@ -1245,6 +1344,7 @@ export const useShellStore = defineStore('shell', () => {
     try {
       await resumeRun(run.run_id);
       await refreshRunSurfaces();
+      afterRunLifecycleMutation();
     } catch (error) {
       runMutationError.value = error instanceof Error ? error.message : 'resume run request failed';
     } finally {
@@ -1274,7 +1374,7 @@ export const useShellStore = defineStore('shell', () => {
 
   async function completePrimaryRun(): Promise<void> {
     const run = primaryActiveRun.value;
-    if (run?.phase !== 'review_ready' || runMutationPending.value) {
+    if (!run || !isOperatorCompletablePhase(run.phase) || runMutationPending.value) {
       return;
     }
 
@@ -1284,6 +1384,7 @@ export const useShellStore = defineStore('shell', () => {
     try {
       await completeRun(run.run_id);
       await refreshRunSurfaces();
+      afterRunLifecycleMutation();
     } catch (error) {
       runMutationError.value =
         error instanceof Error ? error.message : 'complete run request failed';
@@ -1330,6 +1431,29 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function clearActiveSignals(): Promise<void> {
+    const signalIds =
+      operatorBriefing.value?.top_signals.map((signal) => signal.signal_id) ??
+      signalViews.value.map((signal) => signal.signal_id);
+    if (!signalIds.length || signalClearState.value === 'clearing') {
+      return;
+    }
+
+    signalClearState.value = 'clearing';
+    signalClearError.value = null;
+    highlightedSignalId.value = null;
+
+    try {
+      await acknowledgeInboxSignals(signalIds);
+      await Promise.all([loadInbox(), loadOperatorBriefing(), loadRuntimeSummary()]);
+    } catch (error) {
+      signalClearError.value =
+        error instanceof Error ? error.message : 'clear signals request failed';
+    } finally {
+      signalClearState.value = 'idle';
+    }
+  }
+
   async function loadBootstrapData(): Promise<void> {
     await loadOperatorPresenceSettings();
     await Promise.all([
@@ -1340,11 +1464,8 @@ export const useShellStore = defineStore('shell', () => {
     await loadWorkspaces({ sync: false });
     await loadRuns({ sync: false });
     syncCurrentWorkspace(
-      resolveOperatorWorkspaceId({
-        pinnedWorkspaceId: operatorPinnedWorkspaceId.value,
-        workspaces: workspaces.value,
-        activeRun: activeRun.value,
-      }),
+      operatorPinnedWorkspaceId.value ??
+        defaultOperatorWorkspaceId(workspaces.value),
     );
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
     await loadWorkspaceFiles();
@@ -1368,6 +1489,9 @@ export const useShellStore = defineStore('shell', () => {
     briefingError,
     briefingLoadState,
     briefingSeamEmphasized,
+    missionControlEmphasized,
+    signalsSeamEmphasized,
+    highlightedSignalId,
     briefingSummaryLine,
     canApprovePrimaryRun,
     canCompletePrimaryRun,
@@ -1380,6 +1504,7 @@ export const useShellStore = defineStore('shell', () => {
     canSubmitOperatorCommand,
     commandMutationError,
     commandMutationState,
+    commandFocusToken,
     commandSeamHint,
     dockContext,
     dockHeroMode,
@@ -1404,6 +1529,7 @@ export const useShellStore = defineStore('shell', () => {
     leftSidebarMode,
     mobileCompactLayout,
     viewportWidth,
+    clearActiveSignals,
     completePrimaryRun,
     bindViewportCompactListener,
     unbindViewportCompactListener,
@@ -1456,6 +1582,8 @@ export const useShellStore = defineStore('shell', () => {
     setLeftSidebarMode,
     toggleAgentDock,
     toggleIdeExplorer,
+    signalClearError,
+    signalClearState,
     signalViews,
     stopPrimaryRun,
     submitOperatorCommand,
@@ -1465,11 +1593,15 @@ export const useShellStore = defineStore('shell', () => {
     toggleDockSeam,
     toggleDockHeroMode,
     toggleOperatorPresenceSettingsPanel,
+    toggleSignalDetails,
     topbarBreadcrumb,
     topbarChips,
     topbarMetaPills,
     fileSaveError,
     fileSaveState,
+    focusCommandSeam,
+    focusAttentionSidebar,
+    focusMissionControl,
     focusKairoBriefing,
     loadWorkspaceFiles,
     openWorkspaceFile,
@@ -1486,5 +1618,6 @@ export const useShellStore = defineStore('shell', () => {
     workspaceStatusCardRows,
     workspaceTrailLabel,
     workspaces,
+    usesProductionWorkspaceCatalog,
   };
 });

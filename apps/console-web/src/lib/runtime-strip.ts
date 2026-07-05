@@ -1,5 +1,7 @@
 import type { RunRecord, RuntimeSummary } from '../contracts/canonical';
 
+import { formatRunDisplayName, formatRunShortId } from './run-display';
+
 export type RuntimeStripChipTone = 'default' | 'run' | 'success' | 'warning' | 'degraded' | 'muted';
 
 export interface RuntimeStripChip {
@@ -18,18 +20,11 @@ export interface StatusBarSegment {
 
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 
-function truncateRunId(runId: string, maxLength = 14): string {
-  if (runId.length <= maxLength) {
-    return runId;
-  }
-  return `${runId.slice(0, maxLength)}…`;
-}
-
 export function buildActiveRunChipLabel(run: RunRecord | null): string | null {
   if (!run) {
     return null;
   }
-  return `${truncateRunId(run.run_id)} · ${run.phase}`;
+  return `${formatRunDisplayName(run)} · #${formatRunShortId(run.run_id)}`;
 }
 
 export function buildTopbarChips(input: {

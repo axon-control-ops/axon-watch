@@ -126,6 +126,14 @@ def validate_snapshot() -> list[str]:
         if "Final parity verification and cutover decision" not in todo:
             errors.append("cutover todo missing final slice heading")
 
+    production = payload.get("production_operator")
+    if not isinstance(production, dict):
+        errors.append("production_operator block missing or not an object")
+    elif production.get("status") != "axon_x":
+        errors.append(f"production_operator.status must be axon_x, got {production.get('status')!r}")
+    elif ":4173" not in str(production.get("primary_url", "")):
+        errors.append("production_operator.primary_url must target port 4173")
+
     if VERIFICATION_FILE.is_file():
         verification = VERIFICATION_FILE.read_text(encoding="utf-8")
         if "parity-snapshot.json" not in verification:

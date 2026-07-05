@@ -246,15 +246,27 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "axon-local port 7734 remains production operator reference until operator declares switch"
+    "Child-project integration and legacy connector surfaces not yet migrated to Axon-X"
   ],
+  "production_operator": {
+    "status": "axon_x",
+    "declared_on": "2026-07-05",
+    "primary_url": "http://127.0.0.1:4173",
+    "fallback_url": "http://127.0.0.1:7734",
+    "evidence_gates": ["production-operator"],
+    "evidence": [
+      "config/operator-production.json",
+      "docs/PRODUCTION_OPERATOR_SURFACE.md",
+      "scripts/verify/production-operator-smoke.sh"
+    ]
+  },
   "approved_primary_surfaces": [
-    "axon-watch console-web operator and IDE shell development",
+    "Production operator console at http://127.0.0.1:4173 (Axon-X console-web)",
     "axon-watch control-plane and axon-watch service thin slices",
     "Cutover verification and planning on axon-watch/docs/planning/"
   ],
   "axon_local_remains_required_for": [
-    "Production operator workflows on port 7734 until operator declares switch",
+    "Fallback operator surface and legacy connector paths when Axon-X capabilities regress",
     "Child-project integration and legacy connector surfaces not yet migrated"
   ]
 }

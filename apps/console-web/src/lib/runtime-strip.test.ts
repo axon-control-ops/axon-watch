@@ -25,7 +25,7 @@ const activeRun = {
 
 describe('runtime strip helpers', () => {
   it('builds compact run chip labels', () => {
-    expect(buildActiveRunChipLabel(activeRun)).toBe('run_contract_b… · executing');
+    expect(buildActiveRunChipLabel(activeRun)).toBe('Contract baseline run · #contra');
   });
 
   it('limits topbar chips to run, watch, and degraded', () => {
@@ -39,7 +39,7 @@ describe('runtime strip helpers', () => {
         primaryActiveRun: activeRun,
       }),
     ).toEqual([
-      { id: 'run', label: 'run_contract_b… · executing', tone: 'run' },
+      { id: 'run', label: 'Contract baseline run · #contra', tone: 'run' },
       { id: 'watch', label: 'watch connected', tone: 'success' },
     ]);
   });
@@ -55,7 +55,7 @@ describe('runtime strip helpers', () => {
         primaryActiveRun: activeRun,
       }),
     ).toEqual([
-      { id: 'run', label: 'run_contract_b… · executing', tone: 'run' },
+      { id: 'run', label: 'Contract baseline run · #contra', tone: 'run' },
       { id: 'watch', label: 'watch connected', tone: 'success' },
       { id: 'degraded', label: 'degraded · watch summary stale', tone: 'degraded' },
     ]);

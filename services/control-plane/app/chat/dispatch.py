@@ -6,6 +6,7 @@ from typing import Any
 
 from app.domain.run_state import is_terminal_phase
 from app.persistence import run_store
+from app.chat.command_intent import command_display_name
 from app.runs.service import create_run
 
 ATTACH_COMMAND_PHASES = {
@@ -20,10 +21,10 @@ ATTACH_COMMAND_PHASES = {
 
 
 def summarize_command_for_run(content: str, *, max_length: int = 120) -> str:
-    trimmed = content.strip()
-    if len(trimmed) <= max_length:
-        return trimmed
-    return f"{trimmed[: max_length - 3].rstrip()}..."
+    title = command_display_name(content)
+    if len(title) <= max_length:
+        return title
+    return f"{title[: max_length - 3].rstrip()}..."
 
 
 def build_command_dispatch_ack(

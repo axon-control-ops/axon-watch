@@ -25,6 +25,20 @@ function run(overrides: Partial<RunRecord> & Pick<RunRecord, 'run_id' | 'phase'>
 }
 
 describe('shell run selection', () => {
+  it('prefers review_ready over executing for primary run seam', () => {
+    const executing = run({ run_id: 'run_exec', phase: 'executing', status: 'running' });
+    const reviewReady = run({
+      run_id: 'run_review',
+      phase: 'review_ready',
+      status: 'review',
+      can_resume: true,
+      summary: 'Read README.md',
+    });
+
+    expect(selectPrimaryRun([executing, reviewReady])?.run_id).toBe('run_review');
+    expect(selectPrimaryRun([reviewReady, executing])?.run_id).toBe('run_review');
+  });
+
   it('prefers executing run over awaiting_approval for primary run seam', () => {
     const executing = run({ run_id: 'run_exec', phase: 'executing', status: 'running' });
     const approval = run({

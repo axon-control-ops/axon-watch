@@ -13,13 +13,14 @@
   "dependencies": {
     "@xterm/addon-fit": "latest",
     "@xterm/xterm": "latest",
+    "marked": "^18.0.5",
     "monaco-editor": "latest",
     "pinia": "latest",
     "vue": "latest"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "latest",
     "@types/node": "latest",
+    "@vitejs/plugin-vue": "latest",
     "typescript": "latest",
     "vite": "latest",
     "vitest": "latest",

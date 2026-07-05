@@ -6,11 +6,16 @@ export function isActiveRun(run: RunRecord): boolean {
   return !TERMINAL_PHASES.has(run.phase);
 }
 
-/** Prefer the main active run; deprioritize approval-bound runs for the run seam. */
+/** Prefer the run that needs operator action; deprioritize approval-bound runs for the run seam. */
 export function selectPrimaryRun(items: RunRecord[]): RunRecord | null {
   const activeRuns = items.filter(isActiveRun);
   if (activeRuns.length === 0) {
     return items[0] ?? null;
+  }
+
+  const reviewReady = activeRuns.find((run) => run.phase === 'review_ready');
+  if (reviewReady) {
+    return reviewReady;
   }
 
   const nonApprovalRun = activeRuns.find((run) => run.phase !== 'awaiting_approval');

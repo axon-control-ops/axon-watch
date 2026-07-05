@@ -1,15 +1,37 @@
 import type { Terminal } from '@xterm/xterm';
 
-export const TERMINAL_SCROLLBACK_PREFIX = 'axon-xterm-scrollback-v2:';
+export const TERMINAL_SCROLLBACK_PREFIX = 'axon-xterm-scrollback-v3:';
 export const MAX_TERMINAL_SCROLLBACK_CHARS = 256_000;
 
 const SCROLLBACK_SCAFFOLD_LINE =
   /^\[(terminal|attached|context)\]/;
 
+const ANSI_ESCAPE_PATTERN = /\x1b\[[0-9;]*m/g;
+
+const SINGLE_SHELL_PROMPT_LINE = /^[^\s]+@[^\s:]+:.*\$\s*$/;
+
+const CONCATENATED_SHELL_PROMPT_LINE = /^([^\s]+@[^\s:]+:.*\$\s*)+$/;
+
+export function stripAnsi(text: string): string {
+  return text.replace(ANSI_ESCAPE_PATTERN, '');
+}
+
+export function isShellPromptLine(line: string): boolean {
+  const plain = stripAnsi(line).trimEnd();
+  if (!plain) {
+    return false;
+  }
+
+  return (
+    SINGLE_SHELL_PROMPT_LINE.test(plain) || CONCATENATED_SHELL_PROMPT_LINE.test(plain)
+  );
+}
+
 export function sanitizeScrollbackText(text: string): string {
   return text
     .split('\n')
     .filter((line) => !SCROLLBACK_SCAFFOLD_LINE.test(line.trim()))
+    .filter((line) => !isShellPromptLine(line))
     .join('\n')
     .trimEnd();
 }
@@ -20,6 +42,7 @@ export function migrateTerminalScrollback(workspaceId: string): void {
   }
 
   sessionStorage.removeItem(`axon-xterm-scrollback-v1:${workspaceId}`);
+  sessionStorage.removeItem(`axon-xterm-scrollback-v2:${workspaceId}`);
 }
 
 export function scrollbackStorageKey(workspaceId: string): string {
@@ -46,7 +69,13 @@ export function persistTerminalScrollback(workspaceId: string, terminal: Termina
   }
 
   try {
-    sessionStorage.setItem(scrollbackStorageKey(workspaceId), serializeTerminalBuffer(terminal));
+    const serialized = serializeTerminalBuffer(terminal);
+    if (!serialized) {
+      sessionStorage.removeItem(scrollbackStorageKey(workspaceId));
+      return;
+    }
+
+    sessionStorage.setItem(scrollbackStorageKey(workspaceId), serialized);
   } catch {
     // Ignore quota errors; scrollback persistence is best-effort.
   }

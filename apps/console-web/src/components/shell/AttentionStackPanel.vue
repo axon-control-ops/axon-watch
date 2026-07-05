@@ -1,6 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+
 import HudSeamCard from '../HudSeamCard.vue';
+import {
+  formatRunDisplayName,
+  formatRunShortId,
+} from '../../lib/run-display';
 import { runPhaseProgress, runPhaseTag } from '../../lib/mockup-shell-view';
+import {
+  deliveryStateLabel,
+  deliveryStateTooltip,
+  signalOperatorHint,
+  watchRuleLabel,
+  watchRuleTooltip,
+} from '../../lib/operator-signal-hints';
 import { useShellStore } from '../../stores/shell';
 
 withDefaults(
@@ -14,8 +27,61 @@ withDefaults(
 
 const shell = useShellStore();
 
+const activeRun = computed(() => shell.primaryActiveRun);
+
+const recentReceipts = computed(() => shell.runHistoryRows.slice(-3).reverse());
+
+const otherReviewReadyRuns = computed(() =>
+  shell.runs.filter(
+    (run) =>
+      run.phase === 'review_ready' &&
+      run.workspace_id === shell.currentWorkspace?.workspace_id &&
+      run.run_id !== activeRun.value?.run_id,
+  ),
+);
+
+const showStopAction = computed(
+  () =>
+    Boolean(activeRun.value?.can_stop) || activeRun.value?.phase === 'executing',
+);
+
+const showReviewActions = computed(
+  () =>
+    Boolean(activeRun.value?.can_resume) ||
+    shell.canCompletePrimaryRun,
+);
+
 function signalCount(): number {
   return shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0;
+}
+
+function phaseTagClass(phase: string | undefined): string {
+  if (phase === 'review_ready') {
+    return 'dock-tag--review';
+  }
+  if (phase === 'executing') {
+    return 'dock-tag--execute';
+  }
+  if (phase === 'awaiting_approval') {
+    return 'dock-tag--warning';
+  }
+  return '';
+}
+
+function isSignalExpanded(signalId: string): boolean {
+  return shell.highlightedSignalId === signalId;
+}
+
+function signalHint(signal: {
+  signal_id: string;
+  title: string;
+  summary?: string | null;
+}): string {
+  return signalOperatorHint({
+    signalId: signal.signal_id,
+    title: signal.title,
+    summary: signal.summary,
+  });
 }
 </script>
 
@@ -33,40 +99,79 @@ function signalCount(): number {
       seam-class="dock-seam dock-seam--run"
       :show-view-all="variant === 'dock'"
     >
-      <div v-if="shell.primaryActiveRun" class="dock-run-seam">
+      <div
+        v-if="activeRun"
+        class="dock-run-seam"
+        :class="{ 'dock-run-seam--sidebar': variant === 'sidebar' }"
+      >
         <div class="dock-run-seam__header">
-          <strong>{{ shell.primaryActiveRun.run_id }}</strong>
-          <span class="dock-tag">{{ runPhaseTag(shell.primaryActiveRun.phase) }}</span>
+          <div class="dock-run-seam__title-block">
+            <strong>{{ formatRunDisplayName(activeRun) }}</strong>
+            <span class="dock-run-seam__short-id">#{{ formatRunShortId(activeRun.run_id) }}</span>
+          </div>
+          <span class="dock-tag" :class="phaseTagClass(activeRun.phase)">
+            {{ runPhaseTag(activeRun.phase) }}
+          </span>
         </div>
-        <div class="dock-progress">
+
+        <div class="dock-progress" role="progressbar" :aria-valuenow="runPhaseProgress(activeRun.phase)">
           <div
             class="dock-progress__fill"
-            :style="{ width: `${runPhaseProgress(shell.primaryActiveRun.phase)}%` }"
+            :class="{ 'dock-progress__fill--review': activeRun.phase === 'review_ready' }"
+            :style="{ width: `${runPhaseProgress(activeRun.phase)}%` }"
           />
         </div>
-        <p class="region-copy">{{ shell.primaryActiveRun.summary }}</p>
-        <ul v-if="shell.runHistoryRows.length" class="dock-run-receipts" aria-label="Run receipts">
-          <li
-            v-for="row in shell.runHistoryRows"
-            :key="row.id"
-            class="dock-run-receipts__item"
-          >
+
+        <p v-if="activeRun.current_step" class="dock-run-seam__step">
+          {{ activeRun.current_step }}
+        </p>
+
+        <ul v-if="recentReceipts.length" class="dock-run-receipts" aria-label="Recent run receipts">
+          <li v-for="row in recentReceipts" :key="row.id" class="dock-run-receipts__item">
             <span class="dock-run-receipts__label">{{ row.label }}</span>
           </li>
         </ul>
-        <div class="run-actions">
+
+        <div v-if="otherReviewReadyRuns.length" class="dock-run-seam__also-waiting">
+          <span class="dock-run-seam__also-label">Also waiting</span>
+          <ul class="dock-run-seam__also-list">
+            <li v-for="run in otherReviewReadyRuns" :key="run.run_id">
+              {{ formatRunDisplayName(run) }}
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="showReviewActions || showStopAction" class="run-actions run-actions--sidebar">
           <button
-            v-if="shell.primaryActiveRun.can_stop || shell.primaryActiveRun.phase === 'executing'"
+            v-if="activeRun.can_resume"
+            type="button"
+            class="run-actions__button run-actions__button--warning"
+            :disabled="!shell.canResumePrimaryRun"
+            @click="shell.resumePrimaryRun()"
+          >
+            {{ shell.runMutationState === 'resuming' ? 'RESUMING…' : 'RESUME' }}
+          </button>
+          <button
+            v-if="shell.canCompletePrimaryRun"
             type="button"
             class="run-actions__button run-actions__button--primary"
-            :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun.phase !== 'executing'"
+            :disabled="shell.runMutationPending"
+            @click="shell.completePrimaryRun()"
+          >
+            {{ shell.runMutationState === 'completing' ? 'COMPLETING…' : 'COMPLETE' }}
+          </button>
+          <button
+            v-if="showStopAction"
+            type="button"
+            class="run-actions__button run-actions__button--ghost"
+            :disabled="!shell.canStopPrimaryRun && activeRun.phase !== 'executing'"
             @click="shell.stopPrimaryRun()"
           >
-            {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP RUN' }}
+            {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP' }}
           </button>
         </div>
       </div>
-      <p v-else class="region-copy">No active run</p>
+      <p v-else class="region-copy dock-run-seam__empty">No active run — send a command from the right dock.</p>
     </HudSeamCard>
 
     <HudSeamCard
@@ -99,7 +204,7 @@ function signalCount(): number {
       <div v-if="shell.primaryApprovalRun" class="dock-approval-run">
         <p class="dock-approval-run__label">Primary approval run</p>
         <div class="dock-approval-run__header">
-          <strong>{{ shell.primaryApprovalRun.run_id }}</strong>
+          <strong>{{ formatRunDisplayName(shell.primaryApprovalRun) }}</strong>
           <span class="dock-tag dock-tag--warning">AWAITING</span>
         </div>
         <p class="region-copy">{{ shell.primaryApprovalRun.summary }}</p>
@@ -133,45 +238,93 @@ function signalCount(): number {
       seam-id="dock-seam-signals"
       :title="shell.dockSeamState('signals')?.title ?? 'Signals'"
       seam-class="dock-seam dock-seam--signals"
+      :emphasized="shell.signalsSeamEmphasized"
       :show-view-all="variant === 'dock'"
     >
-      <p class="dock-seam__lead dock-seam__lead--neutral">
-        {{ signalCount() }} active signal{{ signalCount() === 1 ? '' : 's' }}
+      <div class="dock-signals__header">
+        <p class="dock-seam__lead dock-seam__lead--neutral">
+          {{ signalCount() }} active signal{{ signalCount() === 1 ? '' : 's' }}
+        </p>
+        <button
+          v-if="signalCount() > 0"
+          type="button"
+          class="dock-signals__clear"
+          :disabled="shell.signalClearState === 'clearing'"
+          @click="shell.clearActiveSignals()"
+        >
+          {{ shell.signalClearState === 'clearing' ? 'CLEARING…' : 'CLEAR' }}
+        </button>
+      </div>
+      <p class="dock-signals__hint">
+        Tap title for details · OBSERVE / DELIVERED = status labels
       </p>
-      <ul v-if="shell.operatorBriefing?.top_signals.length" class="dock-list">
+      <ul v-if="shell.operatorBriefing?.top_signals.length" class="dock-list dock-list--signals">
         <li
           v-for="signal in shell.operatorBriefing.top_signals.slice(0, 3)"
           :key="signal.signal_id"
-          class="dock-list__item"
+          class="dock-list__item dock-signal-row"
+          :class="{ 'dock-signal-row--expanded': isSignalExpanded(signal.signal_id) }"
         >
-          <span class="dock-list__title">{{ signal.title }}</span>
-          <span
-            class="dock-tag"
-            :class="{
-              'dock-tag--high': signal.severity === 'high' || signal.severity === 'critical',
-              'dock-tag--warning': signal.severity === 'warning',
-              'dock-tag--info': signal.severity === 'info',
-            }"
+          <div class="dock-signal-row__main">
+            <button
+              type="button"
+              class="dock-signal-row__toggle"
+              :aria-expanded="isSignalExpanded(signal.signal_id)"
+              @click="shell.toggleSignalDetails(signal.signal_id)"
+            >
+              <span class="dock-list__title">{{ signal.title }}</span>
+              <span class="dock-signal-row__toggle-label">
+                {{ isSignalExpanded(signal.signal_id) ? 'Hide' : 'Details' }}
+              </span>
+            </button>
+            <div class="dock-signal-row__meta" aria-label="Signal status labels">
+              <span
+                class="dock-tag dock-tag--status"
+                :class="{
+                  'dock-tag--high': signal.severity === 'high' || signal.severity === 'critical',
+                  'dock-tag--warning': signal.severity === 'warning',
+                  'dock-tag--info': signal.severity === 'info',
+                }"
+                :title="`${signal.severity} severity (read-only)`"
+              >
+                {{ signal.severity === 'info' ? 'INFO' : signal.severity.toUpperCase() }}
+              </span>
+              <span
+                v-if="signal.watch_rule?.mode"
+                class="dock-tag dock-tag--status dock-tag--kairo"
+                :title="watchRuleTooltip(signal.watch_rule.mode)"
+              >
+                {{ watchRuleLabel(signal.watch_rule.mode).toUpperCase() }}
+              </span>
+              <span
+                v-if="deliveryStateLabel(signal.delivery_state)"
+                class="dock-tag dock-tag--status dock-tag--delivery"
+                :title="deliveryStateTooltip(signal.delivery_state)"
+              >
+                {{ deliveryStateLabel(signal.delivery_state)?.toUpperCase() }}
+              </span>
+            </div>
+          </div>
+          <div
+            v-if="isSignalExpanded(signal.signal_id)"
+            class="dock-signal-row__detail"
+            role="region"
+            :aria-label="`Details for ${signal.title}`"
           >
-            {{ signal.severity === 'info' ? 'INFO' : signal.severity.toUpperCase() }}
-          </span>
-          <span
-            v-if="signal.watch_rule?.mode"
-            class="dock-tag dock-tag--kairo"
-            :title="signal.watch_rule.reason"
-          >
-            {{ signal.watch_rule.mode.toUpperCase() }}
-          </span>
-          <span
-            v-if="signal.delivery_state && signal.delivery_state !== 'not_required'"
-            class="dock-tag dock-tag--delivery"
-            :title="signal.latest_receipt_id ? `Receipt ${signal.latest_receipt_id}` : 'Delivery state'"
-          >
-            {{ signal.delivery_state === 'delivered' ? 'DELIVERED' : signal.delivery_state.toUpperCase() }}
-          </span>
+            <p class="dock-signal-row__detail-copy">{{ signalHint(signal) }}</p>
+            <p v-if="signal.summary && signal.summary !== signalHint(signal)" class="region-copy">
+              {{ signal.summary }}
+            </p>
+            <p v-if="signal.latest_receipt_id" class="region-copy dock-signal-row__receipt">
+              Receipt {{ signal.latest_receipt_id }}
+            </p>
+          </div>
         </li>
       </ul>
       <p v-else class="region-copy">{{ shell.inboxStateLabel }}</p>
+      <p v-if="shell.signalClearError" class="dock-seam__error" role="alert">
+        {{ shell.signalClearError }}
+      </p>
     </HudSeamCard>
   </div>
 </template>

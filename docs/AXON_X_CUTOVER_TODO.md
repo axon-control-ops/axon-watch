@@ -32,9 +32,11 @@ Axon-X is approved for **bounded primary development** on `axon-watch/dev`
 (as of 2026-07-05). See `docs/PARITY_CLOSURE_ROADMAP.md` and
 `npm run verify:phase-d`.
 
-Axon-X is **not approved** for **full axon-local retirement** until the operator
-declares production switch from port **7734** to Axon-X **:4173** (sole remaining
-blocker in `config/parity-snapshot.json`).
+Axon-X is **not approved** for **full axon-local retirement** until child-project
+and legacy connector surfaces are migrated (see `blockers_for_full_retirement`).
+
+**Production operator surface:** http://127.0.0.1:4173 (declared 2026-07-05).
+See `docs/PRODUCTION_OPERATOR_SURFACE.md` and `npm run verify:production-operator`.
 
 ## Already Landed
 
@@ -108,6 +110,13 @@ blocker in `config/parity-snapshot.json`).
 ## Append Log
 
 Append new entries here in reverse-chronological order. Do not rewrite history.
+
+### 2026-07-05 — Production operator surface declared
+
+- **Production operator:** Axon-X console-web at `http://127.0.0.1:4173`.
+  axon-local `:7734` demoted to fallback for legacy connectors.
+- Gate: `npm run verify:production-operator`
+- Docs: `docs/PRODUCTION_OPERATOR_SURFACE.md`, `config/operator-production.json`
 
 ### 2026-07-05 — Phase A–D parity closure
 

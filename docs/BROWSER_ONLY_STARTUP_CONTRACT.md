@@ -17,8 +17,7 @@ desktop slice is scheduled.
 
 - No packaged Electron/Tauri desktop artifact is required for v1 parity
 - Desktop notification adapter (P-D2) uses file-based JSONL under state dir
-- Operator workflows on axon-local port 7734 remain the production reference
-  until explicit operator switch
+- Operator workflows on axon-local port 7734 are **fallback only** (legacy connectors)
 
 ## Verification
 

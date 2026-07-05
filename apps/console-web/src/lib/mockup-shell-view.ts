@@ -232,7 +232,6 @@ export function resolveOperatorWorkspaceId(input: {
   const pinnedId = input.pinnedWorkspaceId?.trim() ?? null;
   if (
     pinnedId &&
-    isOperatorWorkspaceId(pinnedId) &&
     input.workspaces.some((workspace) => workspace.workspace_id === pinnedId)
   ) {
     return pinnedId;
@@ -250,18 +249,18 @@ export function resolveBootstrapWorkspaceId(
   }
 
   const runWorkspaceId = primaryRun?.workspace_id ?? null;
-  if (runWorkspaceId && isOperatorWorkspaceId(runWorkspaceId)) {
+  if (runWorkspaceId) {
     const runWorkspace = workspaces.find((workspace) => workspace.workspace_id === runWorkspaceId);
     if (runWorkspace) {
       return runWorkspace.workspace_id;
     }
   }
 
-  const defaultWorkspace = workspaces.find(
+  const defaultWorkspaceId = workspaces.find(
     (workspace) => workspace.workspace_id === DEFAULT_OPERATOR_WORKSPACE_ID,
-  );
-  if (defaultWorkspace) {
-    return defaultWorkspace.workspace_id;
+  )?.workspace_id;
+  if (defaultWorkspaceId && workspaces.some((workspace) => workspace.workspace_id === defaultWorkspaceId)) {
+    return defaultWorkspaceId;
   }
 
   return workspaces[0]?.workspace_id ?? DEFAULT_OPERATOR_WORKSPACE_ID;

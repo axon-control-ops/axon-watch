@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.chat.command_intent import humanize_run_summary
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.runs.service import (
     list_active_runs,
@@ -25,7 +26,7 @@ def _build_next_safe_actions(
     for run in active_run_records:
         if bool(run.get("can_approve")):
             run_id = str(run.get("run_id", ""))
-            summary = str(run.get("summary", "this run"))
+            summary = humanize_run_summary(str(run.get("summary", "this run")))
             actions.append(
                 {
                     "action_id": f"approve_{run_id}",
@@ -44,7 +45,7 @@ def _build_next_safe_actions(
             if bool(run.get("can_approve")):
                 continue
             run_id = str(run.get("run_id", ""))
-            summary = str(run.get("summary", "this run"))
+            summary = humanize_run_summary(str(run.get("summary", "this run")))
             actions.append(
                 {
                     "action_id": f"resume_{run_id}",

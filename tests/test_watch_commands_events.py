@@ -95,7 +95,7 @@ class WatchCommandsAndEventsTests(unittest.TestCase):
     def test_unsupported_command_type_returns_400(self) -> None:
         response = self.client.post(
             "/internal/watch/commands",
-            json={"command_type": "acknowledge_signal", "target_id": "signal_x"},
+            json={"command_type": "unknown_command", "target_id": "signal_x"},
         )
         self.assertEqual(400, response.status_code)
 

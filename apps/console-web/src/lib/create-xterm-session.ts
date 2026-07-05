@@ -151,7 +151,10 @@ export async function createXtermSession(
 
     migrateTerminalScrollback(workspaceId);
     terminal.clear();
-    restoreTerminalScrollback(workspaceId, terminal);
+    const restoredScrollback = restoreTerminalScrollback(workspaceId, terminal);
+    if (restoredScrollback) {
+      terminal.write('\r\n');
+    }
 
     const nextSocket = new WebSocket(buildTerminalWebSocketUrl(workspaceId));
     socket = nextSocket;

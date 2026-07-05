@@ -71,5 +71,14 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS watch_delivery_dedupe (
             dedupe_key TEXT PRIMARY KEY
         );
+
+        CREATE TABLE IF NOT EXISTS watch_signal_acknowledgements (
+            signal_id TEXT PRIMARY KEY,
+            acknowledged_at TEXT NOT NULL,
+            acknowledged_by TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_watch_signal_acknowledgements_at
+            ON watch_signal_acknowledgements(acknowledged_at DESC);
         """
     )

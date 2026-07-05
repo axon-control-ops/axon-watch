@@ -136,6 +136,23 @@ class ControlPlaneRunsTests(unittest.TestCase):
         history = run_store.list_history(stopped["history_ref"])
         self.assertEqual("operator_stop", history[-1]["receipt"]["type"])
 
+    def test_complete_paused_run_transitions_to_completed(self) -> None:
+        created = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "Paused completable run",
+            },
+        ).json()
+        self.client.post(f"/api/runs/{created['run_id']}/stop")
+
+        complete_response = self.client.post(f"/api/runs/{created['run_id']}/complete")
+        self.assertEqual(200, complete_response.status_code)
+        completed = complete_response.json()
+        self.assertEqual("completed", completed["phase"])
+        self.assertEqual("done", completed["status"])
+
     def test_resume_run_returns_paused_run_to_executing(self) -> None:
         created = self.client.post(
             "/api/runs",

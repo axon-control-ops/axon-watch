@@ -78,7 +78,9 @@ def reset_watch_ephemeral_stores() -> None:
     from app.commands import store as command_store  # noqa: WPS433
     from app.delivery import store as delivery_store  # noqa: WPS433
     from app.events import store as event_store  # noqa: WPS433
+    from app.signals import suppression_store  # noqa: WPS433
 
     command_store.reset_store()
     delivery_store.reset_store()
     event_store.reset_store()
+    suppression_store.reset_store()
