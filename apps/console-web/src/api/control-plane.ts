@@ -1,6 +1,7 @@
 import type {
   InboxItem,
   OperatorBriefing,
+  OperatorPresenceSettings,
   RunRecord,
   RuntimeSummary,
   WorkspaceRecord,
@@ -81,6 +82,45 @@ export async function fetchOperatorBriefing(options?: {
   }
 
   return response.json() as Promise<OperatorBriefing>;
+}
+
+export interface OperatorPresenceSettingsSnapshot {
+  settings: OperatorPresenceSettings;
+  updated_at?: string;
+}
+
+export async function fetchOperatorPresenceSettings(): Promise<OperatorPresenceSettingsSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl
+    ? `${baseUrl}/api/operator-presence/settings`
+    : '/api/operator-presence/settings';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`operator presence settings request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<OperatorPresenceSettingsSnapshot>;
+}
+
+export async function saveOperatorPresenceSettings(
+  patch: Partial<OperatorPresenceSettings>,
+): Promise<OperatorPresenceSettingsSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl
+    ? `${baseUrl}/api/operator-presence/settings`
+    : '/api/operator-presence/settings';
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+
+  if (!response.ok) {
+    throw new Error(`operator presence settings save failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<OperatorPresenceSettingsSnapshot>;
 }
 
 export async function fetchRuns(): Promise<RunListSnapshot> {

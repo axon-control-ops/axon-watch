@@ -9,20 +9,47 @@ def build_persona_voice_line(
     top_signal_title: str,
     degraded_active: bool,
     load_state: str = "loaded",
+    persona_enabled: bool = True,
 ) -> str:
+    prefix = "KAIRO: " if persona_enabled else ""
+
     if load_state == "loading":
-        return "KAIRO: Standing by while briefing loads."
+        return (
+            f"{prefix}Standing by while briefing loads."
+            if persona_enabled
+            else "Standing by while briefing loads."
+        )
     if load_state == "error":
-        return "KAIRO: Briefing unavailable. Check control-plane connectivity."
+        return (
+            f"{prefix}Briefing unavailable. Check control-plane connectivity."
+            if persona_enabled
+            else "Briefing unavailable. Check control-plane connectivity."
+        )
 
     if pending_approvals > 0:
         suffix = "" if pending_approvals == 1 else "s"
-        return f"KAIRO: {pending_approvals} approval{suffix} need your review before I can continue."
+        return (
+            f"{prefix}{pending_approvals} approval{suffix} need your review before I can continue."
+            if persona_enabled
+            else f"{pending_approvals} approval{suffix} need your review before execution can continue."
+        )
 
     if top_signal_title.strip():
-        return "KAIRO: Top signals need review. Tell me which workspace to focus."
+        return (
+            f"{prefix}Top signals need review. Tell me which workspace to focus."
+            if persona_enabled
+            else "Top signals need review. Choose a workspace to focus."
+        )
 
     if degraded_active:
-        return "KAIRO: Runtime is degraded. Review the status strip before continuing."
+        return (
+            f"{prefix}Runtime is degraded. Review the status strip before continuing."
+            if persona_enabled
+            else "Runtime is degraded. Review the status strip before continuing."
+        )
 
-    return "KAIRO: I'm listening. Tell me what to focus on."
+    return (
+        f"{prefix}I'm listening. Tell me what to focus on."
+        if persona_enabled
+        else "Ready. Tell me what to focus on."
+    )

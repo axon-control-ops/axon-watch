@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 13,
-    "partially_verified": 6,
+    "verified_v1": 14,
+    "partially_verified": 5,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -183,12 +183,15 @@
     },
     {
       "id": "kairo_persona_operator_copy",
-      "status": "partially_verified",
-      "evidence_gates": ["TEST-7"],
+      "status": "verified",
+      "evidence_gates": ["P-C1"],
       "evidence": [
-        "kairo_persona.py persona_voice_line on /api/briefing"
+        "GET/PUT /api/operator-presence/settings with SQLite persistence",
+        "tests/test_parity_c1_persona_settings.py tone-without-truth-drift proof",
+        "console-web OperatorPresenceSettingsPanel + localStorage sync",
+        "kairo_persona.py neutral copy when operator_persona_enabled=false"
       ],
-      "gap": "Default settings only; no persisted operator persona UI."
+      "gap": "Single persona toggle only; full JARVIS identity options deferred."
     },
     {
       "id": "mobile_operator_cockpit_compactness",
@@ -222,7 +225,7 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "6 must-keep behaviors remain partially_verified",
+    "5 must-keep behaviors remain partially_verified",
     "axon-local port 7734 remains production operator reference",
     "Real delivery channels (push/desktop/webhook) not implemented",
     "Voice deck / full JARVIS spoken-alert parity not implemented",

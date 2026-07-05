@@ -8,6 +8,7 @@ from app.runs.service import (
     list_pending_approval_records,
     to_runtime_summary_active_run,
 )
+from app.persistence import operator_presence_settings_store
 from app.operator_briefing_rhythm import build_operator_briefing_rhythm
 from app.operator_presence import build_operator_presence
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
@@ -154,5 +155,6 @@ def build_operator_briefing(
                 },
             },
             viewport_compact=viewport_compact,
+            settings=operator_presence_settings_store.load_settings(),
         ),
     }

@@ -6,6 +6,7 @@ import {
   completeRun,
   fetchInbox,
   fetchOperatorBriefing,
+  fetchOperatorPresenceSettings,
   fetchRunHistory,
   fetchRuns,
   fetchRuntimeSummary,
@@ -21,18 +22,26 @@ import {
   renameWorkspaceFile,
   resumeRun,
   saveWorkspaceFile,
+  saveOperatorPresenceSettings,
   stopRun,
 } from '../api/control-plane';
 import type {
   ApprovalRecord,
   InboxItem,
   OperatorBriefing,
+  OperatorPresenceSettings,
   RunRecord,
   RuntimeSummary,
   SignalView,
   WorkspaceRecord,
 } from '../contracts/canonical';
 import { maybeSpeakOperatorAlert, shouldUseMobileCompactLayout } from '../lib/operator-presence';
+import {
+  defaultOperatorPresenceSettings,
+  normalizeOperatorPresenceSettings,
+  persistOperatorPresenceSettings,
+  readPersistedOperatorPresenceSettings,
+} from '../lib/operator-presence-settings';
 import {
   buildRunHistoryRows,
   type RunHistorySnapshot,
@@ -193,6 +202,11 @@ export const useShellStore = defineStore('shell', () => {
   const inboxLoadState = ref<InboxLoadState>('idle');
   const inboxError = ref<string | null>(null);
   const operatorBriefing = ref<OperatorBriefing | null>(null);
+  const operatorPresenceSettings = ref<OperatorPresenceSettings>(
+    readPersistedOperatorPresenceSettings() ?? defaultOperatorPresenceSettings(),
+  );
+  const operatorPresenceSettingsOpen = ref(false);
+  const operatorPresenceSettingsSaving = ref(false);
   const briefingLoadState = ref<BriefingLoadState>('idle');
   const briefingError = ref<string | null>(null);
   const signalViews = ref<SignalView[]>([]);
@@ -1044,6 +1058,51 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function loadOperatorPresenceSettings(): Promise<void> {
+    const cached = readPersistedOperatorPresenceSettings();
+    if (cached) {
+      operatorPresenceSettings.value = cached;
+    }
+
+    try {
+      const snapshot = await fetchOperatorPresenceSettings();
+      operatorPresenceSettings.value = normalizeOperatorPresenceSettings(snapshot.settings);
+      persistOperatorPresenceSettings(operatorPresenceSettings.value);
+    } catch {
+      // Keep cached defaults when settings API is unavailable during bootstrap.
+    }
+  }
+
+  async function saveOperatorPresenceSettingsPatch(
+    patch: Partial<OperatorPresenceSettings>,
+  ): Promise<void> {
+    operatorPresenceSettingsSaving.value = true;
+    const nextSettings = normalizeOperatorPresenceSettings({
+      ...operatorPresenceSettings.value,
+      ...patch,
+    });
+    operatorPresenceSettings.value = nextSettings;
+    persistOperatorPresenceSettings(nextSettings);
+
+    try {
+      const snapshot = await saveOperatorPresenceSettings(patch);
+      operatorPresenceSettings.value = normalizeOperatorPresenceSettings(snapshot.settings);
+      persistOperatorPresenceSettings(operatorPresenceSettings.value);
+      await loadOperatorBriefing();
+    } catch (error) {
+      operatorPresenceSettings.value = nextSettings;
+      briefingError.value =
+        error instanceof Error ? error.message : 'operator presence settings save failed';
+    } finally {
+      operatorPresenceSettingsSaving.value = false;
+    }
+  }
+
+  function toggleOperatorPresenceSettingsPanel(forceOpen?: boolean): void {
+    operatorPresenceSettingsOpen.value =
+      typeof forceOpen === 'boolean' ? forceOpen : !operatorPresenceSettingsOpen.value;
+  }
+
   async function loadOperatorBriefing(): Promise<void> {
     briefingLoadState.value = 'loading';
     briefingError.value = null;
@@ -1220,6 +1279,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function loadBootstrapData(): Promise<void> {
+    await loadOperatorPresenceSettings();
     await Promise.all([
       loadRuntimeSummary(),
       loadInbox(),
@@ -1295,12 +1355,16 @@ export const useShellStore = defineStore('shell', () => {
     loadBootstrapData,
     loadInbox,
     loadOperatorBriefing,
+    loadOperatorPresenceSettings,
     loadRuns,
     loadRuntimeSummary,
     loadWorkspaces,
     markPrimaryRunReviewReady,
     operatorBriefing,
     operatorCommandDraft,
+    operatorPresenceSettings,
+    operatorPresenceSettingsOpen,
+    operatorPresenceSettingsSaving,
     createWorkspaceFile,
     pendingApprovalsCount,
     primaryActiveRun,
@@ -1345,6 +1409,7 @@ export const useShellStore = defineStore('shell', () => {
     threadStateLabel,
     toggleDockSeam,
     toggleDockHeroMode,
+    toggleOperatorPresenceSettingsPanel,
     topbarBreadcrumb,
     topbarChips,
     topbarMetaPills,
@@ -1354,6 +1419,7 @@ export const useShellStore = defineStore('shell', () => {
     loadWorkspaceFiles,
     openWorkspaceFile,
     saveActiveFileDocument,
+    saveOperatorPresenceSettingsPatch,
     updateActiveFileContent,
     workspaceFileEntries,
     workspaceFilesError,

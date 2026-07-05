@@ -94,6 +94,7 @@ def _record_values(record: dict[str, Any]) -> tuple[Any, ...]:
 
 def reset_store() -> None:
     with _managed_connection() as connection:
+        connection.execute("DELETE FROM operator_presence_settings")
         connection.execute("DELETE FROM run_history")
         connection.execute("DELETE FROM runs")
         connection.commit()

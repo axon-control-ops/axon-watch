@@ -2,6 +2,7 @@ export type {
   ApprovalRecord,
   OperatorBriefing,
   OperatorPresence,
+  OperatorPresenceSettings,
   InboxItem,
   RunRecord,
   RuntimeSummary,

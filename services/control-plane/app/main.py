@@ -24,7 +24,7 @@ from app.adapters.watch_client import (
     get_watch_command,
     post_watch_command,
 )
-from app.persistence import chat_store
+from app.persistence import chat_store, operator_presence_settings_store
 from app.operator_briefing import build_operator_briefing
 from app.runs.service import (
     approve_run,
@@ -95,6 +95,13 @@ class WatchCommandRequest(BaseModel):
     requested_by: str = "operator"
     payload: dict[str, object] | None = None
     requested_at: str | None = None
+
+
+class OperatorPresenceSettingsRequest(BaseModel):
+    operator_persona_enabled: bool | None = None
+    spoken_alerts_enabled: bool | None = None
+    privacy_mode: bool | None = None
+    mobile_compact_preferred: bool | None = None
 
 
 def _watch_base_url() -> str:
@@ -215,6 +222,20 @@ def delivery_receipts_index(limit: int = 20, cursor: str = "") -> dict[str, obje
 @app.get("/api/briefing")
 def operator_briefing(viewport_compact: bool = False) -> dict[str, object]:
     return build_operator_briefing(viewport_compact=viewport_compact)
+
+
+@app.get("/api/operator-presence/settings")
+def operator_presence_settings_get() -> dict[str, object]:
+    settings = operator_presence_settings_store.load_settings()
+    return {"settings": settings}
+
+
+@app.put("/api/operator-presence/settings")
+def operator_presence_settings_put(body: OperatorPresenceSettingsRequest) -> dict[str, object]:
+    current = operator_presence_settings_store.load_settings()
+    patch = body.model_dump(exclude_none=True)
+    current.update(patch)
+    return operator_presence_settings_store.save_settings(current)
 
 
 @app.get("/api/live/events")

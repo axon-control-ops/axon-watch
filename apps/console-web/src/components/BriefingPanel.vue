@@ -40,27 +40,43 @@ const showTopSignals = computed(
 const connectivityLabels = computed(() =>
   props.briefing ? briefingConnectivityLabels(props.briefing.connectivity) : [],
 );
+const personaEnabled = computed(
+  () => props.briefing?.operator_presence?.settings?.operator_persona_enabled !== false,
+);
+const personaTitle = computed(() => (personaEnabled.value ? 'KAIRO' : 'Operator'));
 
 const voiceLine = computed(() => {
   if (props.briefing?.operator_presence?.persona_voice_line) {
     return props.briefing.operator_presence.persona_voice_line;
   }
   if (props.loadState === 'loading') {
-    return 'KAIRO: Standing by while briefing loads.';
+    return personaEnabled.value
+      ? 'KAIRO: Standing by while briefing loads.'
+      : 'Standing by while briefing loads.';
   }
   if (props.loadState === 'error') {
-    return 'KAIRO: Briefing unavailable. Check control-plane connectivity.';
+    return personaEnabled.value
+      ? 'KAIRO: Briefing unavailable. Check control-plane connectivity.'
+      : 'Briefing unavailable. Check control-plane connectivity.';
   }
   if (props.briefing?.pending_approvals.count) {
-    return 'KAIRO: Approvals need your review before I can continue.';
+    return personaEnabled.value
+      ? 'KAIRO: Approvals need your review before I can continue.'
+      : 'Approvals need your review before execution can continue.';
   }
   if (props.briefing?.top_signals.length) {
-    return 'KAIRO: Top signals need review. Tell me which workspace to focus.';
+    return personaEnabled.value
+      ? 'KAIRO: Top signals need review. Tell me which workspace to focus.'
+      : 'Top signals need review. Choose a workspace to focus.';
   }
   if (props.briefing?.degraded.active) {
-    return 'KAIRO: Runtime is degraded. Review the status strip before continuing.';
+    return personaEnabled.value
+      ? 'KAIRO: Runtime is degraded. Review the status strip before continuing.'
+      : 'Runtime is degraded. Review the status strip before continuing.';
   }
-  return "KAIRO: I'm listening. Tell me what to focus on.";
+  return personaEnabled.value
+    ? "KAIRO: I'm listening. Tell me what to focus on."
+    : 'Ready. Tell me what to focus on.';
 });
 </script>
 
@@ -83,7 +99,7 @@ const voiceLine = computed(() => {
         </div>
 
         <div class="briefing-panel__voice-copy">
-          <p class="briefing-panel__kairo-title">KAIRO</p>
+          <p class="briefing-panel__kairo-title">{{ personaTitle }}</p>
           <p class="briefing-panel__section-label briefing-panel__section-label--hero">Notice</p>
           <p class="briefing-panel__kairo-subtitle">{{ heroNotice }}</p>
           <p class="briefing-panel__section-label briefing-panel__section-label--hero">Advise</p>

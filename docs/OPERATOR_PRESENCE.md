@@ -20,7 +20,7 @@ without claiming full voice-deck or background mobile listening parity.
 
 - `persona_voice_line` — KAIRO operator copy (does not alter run/signal truth)
 - `presence_state` — `idle` \| `observing` \| `alerting` \| `privacy_blocked`
-- `settings` — persona/spoken/mobile toggles (bootstrap defaults today)
+- `settings` — persona/spoken/mobile toggles (persisted via `/api/operator-presence/settings`)
 - `spoken_alert` — `{ eligible, reason, signal_id, message }`
 - `mobile` — `{ compact_layout, foreground_only: true }`
 
@@ -60,5 +60,5 @@ Verified by **TEST-7**. Next locked item: **Cross-repo planning migration**.
 
 - Full voice command deck / hands-free loop
 - Background mobile listening
-- Persisted operator notification preferences UI
+- Persisted operator notification preferences UI (persona toggle landed in P-C1; spoken/mobile toggles still API-only)
 - `packages/prompt-contracts` extraction (Python owns policy for now)

@@ -76,6 +76,7 @@ def build_operator_presence(
         pending_approvals=pending_approvals,
         top_signal_title=str(top_signal.get("title", "")) if top_signal else "",
         degraded_active=degraded_active,
+        persona_enabled=bool(resolved_settings.get("operator_persona_enabled", True)),
     )
     presence_state = resolve_presence_state(
         settings=resolved_settings,

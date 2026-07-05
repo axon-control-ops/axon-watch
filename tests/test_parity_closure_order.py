@@ -21,14 +21,31 @@ class ParityClosureOrderTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, msg=result.stderr or result.stdout)
 
-    def test_phase_a_complete_and_next_slice_is_p_c1(self) -> None:
+    def test_phase_a_complete_and_next_slice_is_p_c2(self) -> None:
         order = json.loads(
             (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
         )
         phase_a = [entry for entry in order["slices"] if entry.get("phase") == "A"]
         self.assertEqual(4, len(phase_a))
         self.assertTrue(all(entry["status"] == "done" for entry in phase_a))
-        self.assertEqual("P-C1", order["next_slice"])
+        self.assertEqual("P-C2", order["next_slice"])
+
+    def test_phase_c1_complete_and_persona_row_verified(self) -> None:
+        order = json.loads(
+            (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
+        )
+        phase_c1 = next(entry for entry in order["slices"] if entry["id"] == "P-C1")
+        self.assertEqual("done", phase_c1["status"])
+
+        snapshot = json.loads(
+            (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
+        )
+        row = next(
+            entry for entry in snapshot["behaviors"] if entry["id"] == "kairo_persona_operator_copy"
+        )
+        self.assertEqual("verified", row["status"])
+        self.assertEqual(14, snapshot["summary"]["verified_v1"])
+        self.assertEqual(5, snapshot["summary"]["partially_verified"])
 
     def test_phase_b_complete_and_parity_rows_verified(self) -> None:
         order = json.loads(
@@ -48,8 +65,6 @@ class ParityClosureOrderTests(unittest.TestCase):
             row = next(entry for entry in snapshot["behaviors"] if entry["id"] == parity_id)
             with self.subTest(parity_id=parity_id):
                 self.assertEqual("verified", row["status"])
-        self.assertEqual(13, snapshot["summary"]["verified_v1"])
-        self.assertEqual(6, snapshot["summary"]["partially_verified"])
 
     def test_phase_a_parity_rows_verified_in_snapshot(self) -> None:
         snapshot = json.loads(

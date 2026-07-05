@@ -106,5 +106,11 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_workspace_handoffs_target
             ON workspace_handoffs(target_workspace_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS operator_presence_settings (
+            settings_key TEXT PRIMARY KEY,
+            settings_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
         """
     )

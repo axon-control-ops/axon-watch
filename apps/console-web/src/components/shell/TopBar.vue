@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import KairoPresenceBar from './KairoPresenceBar.vue';
+import OperatorPresenceSettingsPanel from './OperatorPresenceSettingsPanel.vue';
 import {
   buildMockupTopbarBreadcrumb,
   buildTopbarRuntimeVersionChips,
@@ -94,8 +95,32 @@ const runtimeVersionChips = computed(() =>
             IDE
           </button>
         </div>
-        <button type="button" class="topbar-mockup__settings" aria-label="Settings">⚙</button>
+        <div class="topbar-mockup__settings-wrap">
+          <button
+            type="button"
+            class="topbar-mockup__settings"
+            aria-label="Settings"
+            aria-haspopup="dialog"
+            :aria-expanded="shell.operatorPresenceSettingsOpen"
+            @click="shell.toggleOperatorPresenceSettingsPanel()"
+          >
+            ⚙
+          </button>
+          <OperatorPresenceSettingsPanel
+            :open="shell.operatorPresenceSettingsOpen"
+            :settings="shell.operatorPresenceSettings"
+            :saving="shell.operatorPresenceSettingsSaving"
+            @close="shell.toggleOperatorPresenceSettingsPanel(false)"
+            @save="shell.saveOperatorPresenceSettingsPatch($event)"
+          />
+        </div>
       </div>
     </div>
   </header>
 </template>
+
+<style scoped>
+.topbar-mockup__settings-wrap {
+  position: relative;
+}
+</style>

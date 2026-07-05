@@ -3,12 +3,19 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from tests.support.control_plane_db import isolate_control_plane_db
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.kairo_persona import build_persona_voice_line  # noqa: E402
+from app.main import app  # noqa: E402
 from app.operator_presence import build_operator_presence, resolve_presence_state  # noqa: E402
+from app.persistence import operator_presence_settings_store, run_store  # noqa: E402
 from app.spoken_alert_policy import resolve_spoken_alert  # noqa: E402
 
 
@@ -73,6 +80,16 @@ class OperatorPresencePolicyTests(unittest.TestCase):
         )
         self.assertIn("degraded", line.lower())
 
+    def test_persona_voice_line_neutral_when_persona_disabled(self) -> None:
+        line = build_persona_voice_line(
+            pending_approvals=2,
+            top_signal_title="",
+            degraded_active=False,
+            persona_enabled=False,
+        )
+        self.assertNotIn("KAIRO", line)
+        self.assertIn("2 approvals", line)
+
     def test_build_operator_presence_includes_mobile_foreground_only(self) -> None:
         payload = build_operator_presence(
             {
@@ -97,6 +114,53 @@ class OperatorPresencePolicyTests(unittest.TestCase):
             briefing_loaded=True,
         )
         self.assertEqual("privacy_blocked", state)
+
+
+class OperatorPresenceSettingsApiTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_control_plane_db(self, run_store)
+        self.client = TestClient(app)
+        self.addCleanup(self.client.close)
+
+    def test_settings_round_trip_and_briefing_reflects_persisted_persona_toggle(self) -> None:
+        with patch(
+            "app.runtime_summary_assembler.default_watch_probe",
+            return_value=(True, "ok", None, "2026-07-05T10:00:00Z"),
+        ):
+            enabled_briefing = self.client.get("/api/briefing").json()
+        self.assertTrue(
+            enabled_briefing["operator_presence"]["settings"]["operator_persona_enabled"]
+        )
+        self.assertTrue(
+            enabled_briefing["operator_presence"]["persona_voice_line"].startswith("KAIRO:")
+        )
+
+        save = self.client.put(
+            "/api/operator-presence/settings",
+            json={"operator_persona_enabled": False},
+        )
+        self.assertEqual(200, save.status_code)
+        self.assertFalse(save.json()["settings"]["operator_persona_enabled"])
+
+        loaded = self.client.get("/api/operator-presence/settings").json()
+        self.assertFalse(loaded["settings"]["operator_persona_enabled"])
+
+        with patch(
+            "app.runtime_summary_assembler.default_watch_probe",
+            return_value=(True, "ok", None, "2026-07-05T10:00:00Z"),
+        ):
+            disabled_briefing = self.client.get("/api/briefing").json()
+
+        voice_line = disabled_briefing["operator_presence"]["persona_voice_line"]
+        self.assertNotIn("KAIRO", voice_line)
+        self.assertEqual(
+            enabled_briefing["pending_approvals"]["count"],
+            disabled_briefing["pending_approvals"]["count"],
+        )
+        self.assertEqual(
+            enabled_briefing["notice"],
+            disabled_briefing["notice"],
+        )
 
 
 if __name__ == "__main__":

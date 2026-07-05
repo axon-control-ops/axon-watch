@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-C1",
+  "next_slice": "P-C2",
   "slices": [
     {
       "id": "P-A1",
@@ -62,9 +62,9 @@
     {
       "id": "P-C1",
       "phase": "C",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["kairo_persona_operator_copy"],
-      "spec": null,
+      "spec": "docs/PARITY_C1_KAIRO_PERSONA.md",
       "gate": "npm run verify:parity-c1"
     },
     {
