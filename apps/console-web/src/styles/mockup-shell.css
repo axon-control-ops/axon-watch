@@ -4912,6 +4912,17 @@ body:has(.console-shell--mockup) {
   background: rgba(0, 242, 255, 0.14);
 }
 
+.supported-commands-footer__action--ghost {
+  border-color: rgba(138, 154, 173, 0.22);
+  background: transparent;
+  color: rgba(138, 154, 173, 0.82);
+}
+
+.supported-commands-footer__action--ghost:hover {
+  border-color: rgba(138, 154, 173, 0.38);
+  background: rgba(138, 154, 173, 0.08);
+}
+
 .status-bar-mockup__chip--kairo-briefing {
   position: relative;
   border-color: rgba(255, 159, 0, 0.42);

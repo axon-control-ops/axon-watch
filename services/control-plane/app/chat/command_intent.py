@@ -10,6 +10,7 @@ _RESUME_FROM_REVIEW = re.compile(
     r"^(?:resume(?:\s+from)?(?:\s+review|\s+review-ready)|resume-from-review)\b",
     re.IGNORECASE,
 )
+_RUN_PREFIX = re.compile(r"^run\s+.+", re.IGNORECASE)
 
 
 def classify_command(content: str) -> str:
@@ -31,6 +32,8 @@ def classify_command(content: str) -> str:
         "resume-from-review",
     }:
         return "resume_from_review"
+    if _RUN_PREFIX.match(content.strip()):
+        return "shell_command"
     return "unsupported"
 
 
@@ -57,6 +60,11 @@ def command_display_name(content: str) -> str:
         return f"Read {_extract_read_path(trimmed)}"
     if intent == "resume_from_review":
         return "Resume from review"
+    if intent == "shell_command":
+        from app.chat.shell_command import extract_shell_command_line
+
+        command_line = extract_shell_command_line(trimmed) or trimmed
+        return f"Run {command_line}"
     if trimmed:
         return trimmed
     return "Operator command"

@@ -62,6 +62,11 @@ function handleEscape(event: KeyboardEvent): void {
   }
 }
 
+async function runExample(example: string): Promise<void> {
+  closePanel();
+  await shell.runOperatorCommand(example);
+}
+
 async function copyExample(example: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(example);
@@ -75,12 +80,6 @@ async function copyExample(example: string): Promise<void> {
   } catch {
     copiedExample.value = null;
   }
-}
-
-function useExample(example: string): void {
-  void copyExample(example);
-  shell.focusCommandSeam(example);
-  closePanel();
 }
 
 function commandLabel(command: OperatorSupportedCommand): string {
@@ -144,7 +143,7 @@ onUnmounted(() => {
           <div>
             <p class="supported-commands-footer__title">Supported commands</p>
             <p class="supported-commands-footer__subtitle">
-              Exact text for the Command tab (right dock). Not free-form chat yet.
+              Run supported commands in the active workspace. Use exact text or click Run.
             </p>
           </div>
           <button type="button" class="supported-commands-footer__close" @click="closePanel">
@@ -168,9 +167,16 @@ onUnmounted(() => {
                 :key="example"
                 type="button"
                 class="supported-commands-footer__action"
-                @click="useExample(example)"
+                @click="runExample(example)"
               >
-                {{ copiedExample === example ? 'Copied' : 'Use' }}
+                {{ shell.commandMutationState === 'submitting' ? 'Running…' : 'Run' }}
+              </button>
+              <button
+                type="button"
+                class="supported-commands-footer__action supported-commands-footer__action--ghost"
+                @click="copyExample(example)"
+              >
+                {{ copiedExample === example ? 'Copied' : 'Copy' }}
               </button>
             </div>
           </li>

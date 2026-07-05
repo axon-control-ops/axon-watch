@@ -31,6 +31,15 @@ export const OPERATOR_SUPPORTED_COMMANDS: OperatorSupportedCommand[] = [
     examples: ['resume from review'],
     description: 'Resume the primary review_ready run',
   },
+  {
+    id: 'shell_command',
+    examples: [
+      'run npm test',
+      'run ./scripts/dev/check-health.sh',
+      'run npm run verify:production-operator',
+    ],
+    description: 'Run a bounded shell command in the workspace project root',
+  },
 ];
 
 export function formatSupportedCommandsHint(): string {

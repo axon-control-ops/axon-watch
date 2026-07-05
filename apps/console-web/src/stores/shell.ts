@@ -638,6 +638,13 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function runOperatorCommand(content: string): Promise<void> {
+    operatorCommandDraft.value = content.trim();
+    setDockHeroMode('command');
+    commandFocusToken.value += 1;
+    await submitOperatorCommand();
+  }
+
   function applyOperatorDockDefaults(): void {
     if (layoutMode.value !== 'operator') {
       return;
@@ -1553,6 +1560,7 @@ export const useShellStore = defineStore('shell', () => {
     primaryInboxItem,
     refreshRunSurfaces,
     rejectPrimaryRun,
+    runOperatorCommand,
     resumePrimaryRun,
     runs,
     runsError,

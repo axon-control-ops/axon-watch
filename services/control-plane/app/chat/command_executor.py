@@ -11,6 +11,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from app.chat.command_intent import classify_command
+from app.chat.shell_command import execute_shell_command
 from app.runs.service import RunLifecycleError, list_pending_review_runs, resume_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_files import WorkspaceFileError, list_workspace_files, read_workspace_file
@@ -209,6 +210,16 @@ def execute_resume_from_review(workspace_id: str) -> CommandExecutionResult:
     )
 
 
+def execute_shell_command_intent(workspace_id: str, content: str) -> CommandExecutionResult:
+    success, output, detail = execute_shell_command(workspace_id=workspace_id, content=content)
+    return CommandExecutionResult(
+        intent="shell_command",
+        success=success,
+        output=_truncate_output(output if output else detail),
+        receipt_summary="Shell command succeeded" if success else f"Shell command failed ({detail})",
+    )
+
+
 def execute_unsupported(content: str) -> CommandExecutionResult:
     hints = (
         "Supported commands in this slice:\n"
@@ -216,7 +227,8 @@ def execute_unsupported(content: str) -> CommandExecutionResult:
         "• ls / list files — list workspace files\n"
         "• read README.md / cat notes.txt — read a workspace file\n"
         "• git status — show git status in the workspace root\n"
-        "• resume from review — resume the primary review_ready run"
+        "• resume from review — resume the primary review_ready run\n"
+        "• run npm test — run a bounded shell command in the workspace root"
     )
     return CommandExecutionResult(
         intent="unsupported",
@@ -238,4 +250,6 @@ def execute_command(*, workspace_id: str, content: str) -> CommandExecutionResul
         return execute_git_status(workspace_id)
     if intent == "resume_from_review":
         return execute_resume_from_review(workspace_id)
+    if intent == "shell_command":
+        return execute_shell_command_intent(workspace_id, content)
     return execute_unsupported(content)
