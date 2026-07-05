@@ -34,6 +34,8 @@ class ControlPlaneHealthEndpointTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual("ready", payload["status"])
         self.assertIn("watch_base_url", payload)
+        self.assertIn("state_dir", payload)
+        self.assertIn("mode", payload)
 
 
 class WatchHealthEndpointTests(unittest.TestCase):

@@ -28,3 +28,115 @@ def fetch_watch_inbox(timeout_seconds: float = 0.5) -> dict[str, object] | None:
     if not isinstance(payload, dict):
         return None
     return payload
+
+
+def fetch_watch_summary(timeout_seconds: float = 0.75) -> dict[str, object] | None:
+    url = f"{watch_base_url()}/internal/watch/summary"
+
+    try:
+        request = Request(url, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def fetch_watch_connectors(timeout_seconds: float = 0.75) -> dict[str, object] | None:
+    url = f"{watch_base_url()}/internal/watch/connectors"
+
+    try:
+        request = Request(url, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def post_watch_command(body: dict[str, object], timeout_seconds: float = 2.0) -> dict[str, object] | None:
+    url = f"{watch_base_url()}/internal/watch/commands"
+    encoded = json.dumps(body).encode("utf-8")
+
+    try:
+        request = Request(
+            url,
+            data=encoded,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def get_watch_command(command_id: str, timeout_seconds: float = 1.0) -> dict[str, object] | None:
+    url = f"{watch_base_url()}/internal/watch/commands/{command_id.strip()}"
+
+    try:
+        request = Request(url, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def fetch_watch_events(
+    *,
+    limit: int = 20,
+    cursor: str = "",
+    timeout_seconds: float = 1.0,
+) -> dict[str, object] | None:
+    query = f"limit={max(1, min(100, int(limit)))}"
+    if cursor.strip():
+        query = f"{query}&cursor={cursor.strip()}"
+    url = f"{watch_base_url()}/internal/watch/events?{query}"
+
+    try:
+        request = Request(url, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def fetch_watch_delivery_receipts(
+    *,
+    limit: int = 20,
+    cursor: str = "",
+    timeout_seconds: float = 1.0,
+) -> dict[str, object] | None:
+    query = f"limit={max(1, min(100, int(limit)))}"
+    if cursor.strip():
+        query = f"{query}&cursor={cursor.strip()}"
+    url = f"{watch_base_url()}/internal/watch/delivery/receipts?{query}"
+
+    try:
+        request = Request(url, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload

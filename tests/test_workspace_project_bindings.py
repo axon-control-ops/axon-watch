@@ -1,0 +1,101 @@
+from __future__ import annotations
+
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
+sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+
+from app.workspace_project_bindings import (  # noqa: E402
+    WorkspaceBindingError,
+    get_workspace_project_binding,
+    load_workspace_project_bindings,
+)
+
+
+class WorkspaceProjectBindingsTests(unittest.TestCase):
+    def test_missing_bindings_file_returns_empty_map(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            missing = Path(tempdir) / "missing-bindings.json"
+            self.assertEqual(load_workspace_project_bindings(missing), {})
+
+    def test_loads_binding_with_relative_project_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "project"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            bindings_file.write_text(
+                json.dumps(
+                    {
+                        "bindings": {
+                            "workspace_demo": {
+                                "project_root": str(project_root),
+                                "display_name": "Demo project",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(tempdir),
+                },
+                clear=False,
+            ):
+                bindings = load_workspace_project_bindings(bindings_file)
+
+            self.assertIn("workspace_demo", bindings)
+            binding = bindings["workspace_demo"]
+            self.assertEqual(binding.project_root.resolve(), project_root.resolve())
+            self.assertEqual(binding.display_name, "Demo project")
+
+    def test_rejects_project_root_outside_allowlist(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "project"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            bindings_file.write_text(
+                json.dumps(
+                    {
+                        "bindings": {
+                            "workspace_blocked": {
+                                "project_root": str(project_root),
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": "/tmp/axon-watch-allowlist-only",
+                },
+                clear=False,
+            ):
+                with self.assertRaises(WorkspaceBindingError):
+                    load_workspace_project_bindings(bindings_file)
+
+    def test_get_workspace_project_binding_returns_none_for_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            bindings_file = Path(tempdir) / "bindings.json"
+            bindings_file.write_text(json.dumps({"bindings": {}}), encoding="utf-8")
+            with patch.dict(
+                os.environ,
+                {"AXON_WATCH_WORKSPACE_BINDINGS_FILE": str(bindings_file)},
+                clear=False,
+            ):
+                self.assertIsNone(get_workspace_project_binding("workspace_missing"))
+
+
+if __name__ == "__main__":
+    unittest.main()

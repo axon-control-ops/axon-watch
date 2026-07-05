@@ -48,4 +48,10 @@ def bootstrap_inbox_item() -> dict[str, object]:
         "created_at": event["created_at"],
         "updated_at": event["updated_at"],
         "action_type": event["action_type"],
+        "delivery_state": event["delivery_state"],
+        "watch_rule": {
+            "mode": "observe",
+            "reason": "bootstrap_ready",
+            "interrupts": False,
+        },
     }

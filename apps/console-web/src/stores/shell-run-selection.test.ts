@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RunRecord } from '../contracts/canonical';
-import { selectPrimaryApprovalRun, selectPrimaryRun } from './shell-run-selection';
+import { selectPrimaryApprovalRun, selectPrimaryRun, selectWorkspacePrimaryRun } from './shell-run-selection';
 
 function run(overrides: Partial<RunRecord> & Pick<RunRecord, 'run_id' | 'phase'>): RunRecord {
   return {
@@ -48,5 +48,33 @@ describe('shell run selection', () => {
 
     expect(selectPrimaryRun([approval])?.run_id).toBe('run_approval');
     expect(selectPrimaryApprovalRun([approval])?.run_id).toBe('run_approval');
+  });
+
+  it('returns null for workspace primary run when only terminal runs exist', () => {
+    const completed = run({
+      run_id: 'run_done',
+      phase: 'completed',
+      status: 'done',
+      can_stop: false,
+    });
+
+    expect(selectWorkspacePrimaryRun([completed])).toBeNull();
+  });
+
+  it('scopes workspace primary run to the provided workspace items only', () => {
+    const executing = run({
+      run_id: 'run_exec',
+      workspace_id: 'workspace_alpha',
+      phase: 'executing',
+    });
+    const otherWorkspace = run({
+      run_id: 'run_other',
+      workspace_id: 'workspace_beta',
+      phase: 'executing',
+    });
+
+    expect(selectWorkspacePrimaryRun([executing])?.run_id).toBe('run_exec');
+    expect(selectWorkspacePrimaryRun([otherWorkspace])?.run_id).toBe('run_other');
+    expect(selectWorkspacePrimaryRun([])).toBeNull();
   });
 });

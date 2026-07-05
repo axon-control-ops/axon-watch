@@ -14,21 +14,28 @@ from tests.support.bootstrap_signal_fixture import BOOTSTRAP_SIGNAL_ID, consiste
 from tests.support.control_plane_db import isolate_control_plane_db
 from tests.support.ephemeral_uvicorn import EphemeralUvicorn
 from tests.support.summary_degraded_signal_fixture import SUMMARY_DEGRADED_SIGNAL_ID
+from tests.support.stable_connector_probe import (
+    patch_stable_connector_probes,
+    reset_watch_ephemeral_stores,
+)
 from tests.support.watch_app_loader import load_watch_app, restore_app_modules
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
+sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+
+from app.main import app  # noqa: E402
+from app.persistence import run_store  # noqa: E402
 
 
 class ControlPlaneWatchIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         watch_app, self._watch_modules = load_watch_app()
+        reset_watch_ephemeral_stores()
+        self._connector_patch = patch_stable_connector_probes()
+        self._connector_patch.start()
+        self.addCleanup(self._connector_patch.stop)
         self._watch_server = EphemeralUvicorn(watch_app)
         self._watch_server.start("/internal/watch/health")
-        restore_app_modules(self._watch_modules)
-
-        sys.path.insert(0, str(CONTROL_PLANE_ROOT))
-        from app.persistence import run_store  # noqa: WPS433
-        from app.main import app  # noqa: WPS433
 
         isolate_control_plane_db(self, run_store)
         self._env_patch = patch.dict(

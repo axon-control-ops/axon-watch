@@ -1,16 +1,28 @@
 <script setup lang="ts">
 import type { IdeActivityView } from '../../lib/ide-layout-prefs';
+import IdeActivityIcon from './IdeActivityIcon.vue';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 
-const items: Array<{ id: IdeActivityView; label: string; glyph: string }> = [
-  { id: 'explorer', label: 'Explorer', glyph: '▤' },
-  { id: 'search', label: 'Search', glyph: '⌕' },
-  { id: 'git', label: 'Source Control', glyph: '⑂' },
-  { id: 'terminal', label: 'Terminal', glyph: '▭' },
-  { id: 'agent', label: 'Agent Dock', glyph: '◎' },
+const items: Array<{ id: IdeActivityView; label: string; title: string }> = [
+  { id: 'explorer', label: 'Explorer', title: 'Explorer (Ctrl/Cmd+B)' },
+  { id: 'search', label: 'Search', title: 'Search' },
+  { id: 'git', label: 'Source Control', title: 'Source Control' },
+  { id: 'run', label: 'Run', title: 'Run' },
+  { id: 'terminal', label: 'Terminal', title: 'Terminal (Ctrl/Cmd+J)' },
+  { id: 'agent', label: 'Agent Dock', title: 'Agent dock (Ctrl/Cmd+\\)' },
 ];
+
+function isActive(item: (typeof items)[number]): boolean {
+  if (item.id === 'agent') {
+    return !shell.agentDockCollapsed;
+  }
+  if (item.id === 'terminal') {
+    return shell.ideActivityView === 'terminal';
+  }
+  return shell.ideActivityView === item.id && !shell.ideExplorerCollapsed;
+}
 
 function selectView(view: IdeActivityView): void {
   shell.setIdeActivityView(view);
@@ -24,12 +36,12 @@ function selectView(view: IdeActivityView): void {
       :key="item.id"
       type="button"
       class="ide-activity-bar__button"
-      :class="{ 'ide-activity-bar__button--active': shell.ideActivityView === item.id }"
+      :class="{ 'ide-activity-bar__button--active': isActive(item) }"
       :aria-label="item.label"
-      :title="item.label"
+      :title="item.title"
       @click="selectView(item.id)"
     >
-      <span aria-hidden="true">{{ item.glyph }}</span>
+      <IdeActivityIcon :name="item.id" class="ide-activity-bar__icon" />
     </button>
   </nav>
 </template>

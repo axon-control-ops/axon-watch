@@ -89,5 +89,22 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             transition_json TEXT NOT NULL,
             PRIMARY KEY(history_ref, sequence)
         );
+
+        CREATE TABLE IF NOT EXISTS workspace_handoffs (
+            handoff_id TEXT PRIMARY KEY,
+            source_workspace_id TEXT NOT NULL,
+            target_workspace_id TEXT NOT NULL,
+            task TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'recorded',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_workspace_handoffs_source
+            ON workspace_handoffs(source_workspace_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_workspace_handoffs_target
+            ON workspace_handoffs(target_workspace_id, created_at DESC);
         """
     )

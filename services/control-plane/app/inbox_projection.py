@@ -21,6 +21,9 @@ def project_inbox_item(item: dict[str, object]) -> dict[str, object]:
             "updated_at": item.get("updated_at", ""),
             "created_at": item.get("created_at", item.get("updated_at", "")),
             "action_type": item.get("action_type", "none"),
+            "delivery_state": item.get("delivery_state", "pending"),
+            "latest_receipt_id": item.get("latest_receipt_id", ""),
+            "watch_rule": item.get("watch_rule", {"mode": "observe", "reason": "ambient_watch_signal", "interrupts": False}),
         }
     )
     return projected

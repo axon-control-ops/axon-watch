@@ -1,0 +1,15 @@
+[Unit]
+Description=Axon-X Watch Service
+After=network.target local-fs.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/axon-watch/deployment.env
+WorkingDirectory=/opt/axon-watch
+ExecStart=/opt/axon-watch/scripts/ops/run-service.sh axon-watch
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

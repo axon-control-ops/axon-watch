@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import time
 import urllib.error
@@ -115,6 +116,33 @@ def measure_browser_boot(
     }
 
 
+def _playwright_usable() -> bool:
+    """Probe Playwright in a subprocess so broken system installs do not leak async noise."""
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        return False
+
+    probe_script = """
+import sys
+try:
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        browser.close()
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", probe_script],
+        capture_output=True,
+        timeout=15,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def measure_shell_boot(
     *,
     console_base_url: str,
@@ -128,15 +156,19 @@ def measure_shell_boot(
             timeout_seconds=timeout_seconds,
         )
     if mode == "auto":
-        try:
-            import playwright  # noqa: F401
-
-            return measure_browser_boot(
-                console_base_url=console_base_url,
-                timeout_seconds=timeout_seconds,
-            )
-        except (ImportError, RuntimeError, OSError, AttributeError):
-            pass
+        if _playwright_usable():
+            try:
+                return measure_browser_boot(
+                    console_base_url=console_base_url,
+                    timeout_seconds=timeout_seconds,
+                )
+            except (ImportError, RuntimeError, OSError, AttributeError):
+                pass
+        return measure_bootstrap_critical_path(
+            console_base_url=console_base_url,
+            control_plane_base_url=control_plane_base_url,
+            timeout_seconds=timeout_seconds,
+        )
     return measure_bootstrap_critical_path(
         console_base_url=console_base_url,
         control_plane_base_url=control_plane_base_url,

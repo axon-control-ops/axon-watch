@@ -51,6 +51,14 @@ const runtimeSummary: RuntimeSummary = {
     top_items: [],
     last_updated_at: '2026-07-04T08:00:00Z',
   },
+  connectors: {
+    configured: 3,
+    ok: 3,
+    degraded: 0,
+    unavailable: 0,
+    required_unavailable: 0,
+    last_updated_at: '2026-07-04T08:00:00Z',
+  },
   capabilities: {
     editor: true,
     terminal: true,

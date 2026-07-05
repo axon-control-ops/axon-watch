@@ -4,7 +4,7 @@ export const LAYOUT_MODE_KEY = 'axon-x-layout-mode-v1';
 export const IDE_EXPLORER_COLLAPSED_KEY = 'axon-x-ide-explorer-collapsed-v1';
 export const AGENT_DOCK_COLLAPSED_KEY = 'axon-x-agent-dock-collapsed-v1';
 
-export type IdeActivityView = 'explorer' | 'search' | 'git' | 'terminal' | 'agent';
+export type IdeActivityView = 'explorer' | 'search' | 'git' | 'run' | 'terminal' | 'agent';
 
 export function readStoredLayoutMode(): LayoutMode | null {
   if (typeof window === 'undefined') {

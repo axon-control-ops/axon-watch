@@ -67,6 +67,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "next_safe_actions",
                 "degraded",
                 "connectivity",
+                "operator_presence",
             },
             set(payload),
         )
@@ -74,6 +75,8 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
         self.assertEqual(0, payload["pending_approvals"]["count"])
         self.assertTrue(payload["connectivity"]["control_plane_ready"])
         self.assertTrue(payload["connectivity"]["watch_connected"])
+        self.assertIn("persona_voice_line", payload["operator_presence"])
+        self.assertIn("spoken_alert", payload["operator_presence"])
 
     def test_briefing_includes_resume_action_for_paused_run(self) -> None:
         created = self.client.post(

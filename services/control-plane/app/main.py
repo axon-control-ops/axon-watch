@@ -17,6 +17,13 @@ from app.chat.service import (
     post_chat_message,
 )
 from app.inbox_projection import build_inbox_response
+from app.adapters.watch_client import (
+    fetch_watch_connectors,
+    fetch_watch_delivery_receipts,
+    fetch_watch_events,
+    get_watch_command,
+    post_watch_command,
+)
 from app.persistence import chat_store
 from app.operator_briefing import build_operator_briefing
 from app.runs.service import (
@@ -36,6 +43,11 @@ from app.runs.service import (
 from app.runtime_summary import build_runtime_summary
 from app.terminal.session_handler import handle_terminal_session
 from app.workspace_catalog import get_workspace_record, list_workspace_records, WorkspaceNotFoundError
+from app.workspace_handoffs import (
+    WorkspaceHandoffError,
+    create_workspace_handoff,
+    list_workspace_handoffs,
+)
 from app.live_events import live_events_response
 from app.workspace_files import (
     WorkspaceFileError,
@@ -69,11 +81,45 @@ class PostChatMessageRequest(BaseModel):
     run_id: str | None = None
 
 
+class CreateWorkspaceHandoffRequest(BaseModel):
+    target_workspace_id: str
+    task: str
+    reason: str = ""
+
+
+class WatchCommandRequest(BaseModel):
+    command_id: str | None = None
+    command_type: str
+    target_type: str = ""
+    target_id: str = ""
+    requested_by: str = "operator"
+    payload: dict[str, object] | None = None
+    requested_at: str | None = None
+
+
 def _watch_base_url() -> str:
     return os.environ.get(
         "AXON_WATCH_WATCH_SERVICE_BASE_URL",
         "http://127.0.0.1:8788",
     )
+
+
+def _deployment_mode() -> str:
+    return os.environ.get("AXON_WATCH_DEPLOYMENT_MODE", "bootstrap").strip() or "bootstrap"
+
+
+def _state_dir() -> str:
+    return os.environ.get("AXON_WATCH_STATE_DIR", "./.local/state")
+
+
+def _cors_origins() -> list[str]:
+    raw = os.environ.get("AXON_WATCH_CORS_ORIGINS", "").strip()
+    if raw:
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return [
+        "http://127.0.0.1:4173",
+        "http://localhost:4173",
+    ]
 
 
 app = FastAPI(
@@ -85,10 +131,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:4173",
-        "http://localhost:4173",
-    ],
+    allow_origins=_cors_origins(),
     allow_methods=["GET", "POST", "PUT"],
     allow_headers=["*"],
 )
@@ -113,8 +156,9 @@ def readiness() -> dict[str, object]:
     return {
         "service": "control-plane",
         "status": "ready",
-        "mode": "bootstrap",
+        "mode": _deployment_mode(),
         "watch_base_url": _watch_base_url(),
+        "state_dir": _state_dir(),
     }
 
 
@@ -128,9 +172,49 @@ def inbox() -> dict[str, object]:
     return build_inbox_response()
 
 
+@app.get("/api/connectors")
+def connectors_index() -> dict[str, object]:
+    payload = fetch_watch_connectors()
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch connectors unavailable")
+    return payload
+
+
+@app.post("/api/watch/commands")
+def watch_commands_create(body: WatchCommandRequest) -> dict[str, object]:
+    payload = post_watch_command(body.model_dump())
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch command submission unavailable")
+    return payload
+
+
+@app.get("/api/watch/commands/{command_id}")
+def watch_commands_show(command_id: str) -> dict[str, object]:
+    payload = get_watch_command(command_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail=f"watch command not found: {command_id}")
+    return payload
+
+
+@app.get("/api/watch/events")
+def watch_events_index(limit: int = 20, cursor: str = "") -> dict[str, object]:
+    payload = fetch_watch_events(limit=limit, cursor=cursor)
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch events unavailable")
+    return payload
+
+
+@app.get("/api/delivery/receipts")
+def delivery_receipts_index(limit: int = 20, cursor: str = "") -> dict[str, object]:
+    payload = fetch_watch_delivery_receipts(limit=limit, cursor=cursor)
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch delivery receipts unavailable")
+    return payload
+
+
 @app.get("/api/briefing")
-def operator_briefing() -> dict[str, object]:
-    return build_operator_briefing()
+def operator_briefing(viewport_compact: bool = False) -> dict[str, object]:
+    return build_operator_briefing(viewport_compact=viewport_compact)
 
 
 @app.get("/api/live/events")
@@ -187,6 +271,33 @@ def workspaces_show(workspace_id: str) -> dict[str, str]:
         return get_workspace_record(workspace_id)
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/workspaces/{workspace_id}/handoffs")
+def workspace_handoffs_create(
+    workspace_id: str,
+    body: CreateWorkspaceHandoffRequest,
+) -> dict[str, object]:
+    try:
+        return create_workspace_handoff(
+            source_workspace_id=workspace_id,
+            target_workspace_id=body.target_workspace_id,
+            task=body.task,
+            reason=body.reason,
+        )
+    except WorkspaceHandoffError as exc:
+        status_code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@app.get("/api/workspaces/{workspace_id}/handoffs")
+def workspace_handoffs_index(workspace_id: str) -> dict[str, object]:
+    try:
+        items = list_workspace_handoffs(workspace_id)
+        return {"workspace_id": workspace_id, "items": items, "count": len(items)}
+    except WorkspaceHandoffError as exc:
+        status_code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 @app.get("/api/workspaces/{workspace_id}/chat/thread")

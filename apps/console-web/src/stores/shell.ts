@@ -32,6 +32,7 @@ import type {
   SignalView,
   WorkspaceRecord,
 } from '../contracts/canonical';
+import { maybeSpeakOperatorAlert, shouldUseMobileCompactLayout } from '../lib/operator-presence';
 import {
   buildRunHistoryRows,
   type RunHistorySnapshot,
@@ -65,6 +66,7 @@ import {
 import {
   selectPrimaryApprovalRun,
   selectPrimaryRun,
+  selectWorkspacePrimaryRun,
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
 import {
@@ -113,7 +115,7 @@ import {
   readStoredIdeExplorerCollapsed,
   readStoredLayoutMode,
 } from '../lib/ide-layout-prefs';
-import { WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY } from '../lib/workbench-terminal-split';
+import { persistWorkbenchTerminalPanelVisible } from '../lib/workbench-terminal-split';
 
 export type LayoutMode = 'operator' | 'ide';
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
@@ -265,7 +267,7 @@ export const useShellStore = defineStore('shell', () => {
     buildStatusBarZones({
       runtimeSummary: runtimeSummary.value,
       runtimeSummaryLoadState: runtimeSummaryLoadState.value,
-      primaryActiveRun: activeRun.value,
+      primaryActiveRun: primaryActiveRun.value,
       workspaceId: currentWorkspace.value?.workspace_id ?? null,
     }),
   );
@@ -287,6 +289,12 @@ export const useShellStore = defineStore('shell', () => {
 
   const runtimeStateLabel = computed(() => topbarChips.value.map((chip) => chip.label).join(' · '));
 
+  const workspaceRuns = computed(() =>
+    currentWorkspace.value
+      ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
+      : runs.value,
+  );
+  const primaryActiveRun = computed(() => selectWorkspacePrimaryRun(workspaceRuns.value));
   const runStateLabel = computed(() => {
     if (runsLoadState.value === 'loading') {
       return 'Loading active run…';
@@ -296,22 +304,15 @@ export const useShellStore = defineStore('shell', () => {
       return 'Active run unavailable';
     }
 
-    if (!activeRun.value) {
+    if (!primaryActiveRun.value) {
       return 'No active run';
     }
 
-    const run = activeRun.value;
+    const run = primaryActiveRun.value;
     return `${run.run_id} · ${run.phase} · ${run.summary}`;
   });
-
-  const primaryActiveRun = computed(() => activeRun.value);
   const runHistoryRows = computed(() => buildRunHistoryRows(runHistorySnapshot.value));
   const primaryApprovalRun = computed(() => selectPrimaryApprovalRun(runs.value));
-  const workspaceRuns = computed(() =>
-    currentWorkspace.value
-      ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
-      : runs.value,
-  );
   const workspacePrimarySignal = computed(() =>
     currentWorkspace.value
       ? inboxItems.value.find((item) => item.workspace_id === currentWorkspace.value?.workspace_id) ??
@@ -339,24 +340,32 @@ export const useShellStore = defineStore('shell', () => {
     ...fileDocuments.value,
     ...dtoDocuments.value,
   ]);
-  const activeEditorDocument = computed(
-    () =>
-      editorDocuments.value.find((document) => document.id === activeEditorDocumentId.value) ??
-      editorDocuments.value[0] ??
-      null,
-  );
+  const activeEditorDocument = computed(() => {
+    const matched = editorDocuments.value.find(
+      (document) => document.id === activeEditorDocumentId.value,
+    );
+    if (matched) {
+      return matched;
+    }
+
+    if (fileDocuments.value.length > 0) {
+      return fileDocuments.value[0];
+    }
+
+    return editorDocuments.value[0] ?? null;
+  });
   const runMutationPending = computed(() => runMutationState.value !== 'idle');
   const canStopPrimaryRun = computed(
-    () => Boolean(activeRun.value?.can_stop) && !runMutationPending.value,
+    () => Boolean(primaryActiveRun.value?.can_stop) && !runMutationPending.value,
   );
   const canResumePrimaryRun = computed(
-    () => Boolean(activeRun.value?.can_resume) && !runMutationPending.value,
+    () => Boolean(primaryActiveRun.value?.can_resume) && !runMutationPending.value,
   );
   const canMarkPrimaryRunReviewReady = computed(
-    () => activeRun.value?.phase === 'executing' && !runMutationPending.value,
+    () => primaryActiveRun.value?.phase === 'executing' && !runMutationPending.value,
   );
   const canCompletePrimaryRun = computed(
-    () => activeRun.value?.phase === 'review_ready' && !runMutationPending.value,
+    () => primaryActiveRun.value?.phase === 'review_ready' && !runMutationPending.value,
   );
 
   const inboxStateLabel = computed(() => {
@@ -447,6 +456,13 @@ export const useShellStore = defineStore('shell', () => {
   );
 
   const showDevSeams = computed(() => import.meta.env.VITE_DEV_SEAMS === '1');
+
+  const mobileCompactLayout = computed(() =>
+    shouldUseMobileCompactLayout(
+      typeof window !== 'undefined' ? window.innerWidth : 0,
+      operatorBriefing.value?.operator_presence ?? null,
+    ),
+  );
 
   const pendingApprovalsCount = computed(() => {
     const fromSummary = runtimeSummary.value?.approvals.pending_count ?? 0;
@@ -674,9 +690,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function revealIdeTerminalPanel(): void {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem(WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY, '1');
-    }
+    persistWorkbenchTerminalPanelVisible('ide', true);
     ideTerminalRevealToken.value += 1;
   }
 
@@ -904,6 +918,9 @@ export const useShellStore = defineStore('shell', () => {
     if (previousWorkspaceId !== workspaceId) {
       resetThreadContext();
       void loadWorkspaceThread(workspaceId);
+      void loadRunHistory(selectWorkspacePrimaryRun(
+        runs.value.filter((run) => run.workspace_id === workspaceId),
+      )?.run_id ?? null);
     }
     void loadWorkspaceFiles();
   }
@@ -1035,6 +1052,9 @@ export const useShellStore = defineStore('shell', () => {
       operatorBriefing.value = await fetchOperatorBriefing();
       approvals.value = operatorBriefing.value.pending_approvals.items;
       briefingLoadState.value = 'loaded';
+      if (operatorBriefing.value.operator_presence?.spoken_alert) {
+        maybeSpeakOperatorAlert(operatorBriefing.value.operator_presence.spoken_alert);
+      }
       applyOperatorDockDefaults();
     } catch (error) {
       briefingLoadState.value = 'error';
@@ -1080,11 +1100,11 @@ export const useShellStore = defineStore('shell', () => {
 
   async function refreshRunSurfaces(): Promise<void> {
     await Promise.all([loadRuns(), loadRuntimeSummary(), loadInbox(), loadOperatorBriefing()]);
-    await loadRunHistory(activeRun.value?.run_id ?? null);
+    await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
   }
 
   async function stopPrimaryRun(): Promise<void> {
-    const run = activeRun.value;
+    const run = primaryActiveRun.value;
     if (!run?.can_stop || runMutationPending.value) {
       return;
     }
@@ -1103,7 +1123,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function resumePrimaryRun(): Promise<void> {
-    const run = activeRun.value;
+    const run = primaryActiveRun.value;
     if (!run?.can_resume || runMutationPending.value) {
       return;
     }
@@ -1122,7 +1142,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function markPrimaryRunReviewReady(): Promise<void> {
-    const run = activeRun.value;
+    const run = primaryActiveRun.value;
     if (run?.phase !== 'executing' || runMutationPending.value) {
       return;
     }
@@ -1142,7 +1162,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function completePrimaryRun(): Promise<void> {
-    const run = activeRun.value;
+    const run = primaryActiveRun.value;
     if (run?.phase !== 'review_ready' || runMutationPending.value) {
       return;
     }
@@ -1214,7 +1234,7 @@ export const useShellStore = defineStore('shell', () => {
         activeRun: activeRun.value,
       }),
     );
-    await loadRunHistory(activeRun.value?.run_id ?? null);
+    await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
     await loadWorkspaceFiles();
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
@@ -1270,6 +1290,7 @@ export const useShellStore = defineStore('shell', () => {
     layoutModeLabel,
     leftSidebarAttentionBadgeCount,
     leftSidebarMode,
+    mobileCompactLayout,
     completePrimaryRun,
     loadBootstrapData,
     loadInbox,

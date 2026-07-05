@@ -9,6 +9,7 @@ from app.runs.service import (
     to_runtime_summary_active_run,
 )
 from app.operator_briefing_rhythm import build_operator_briefing_rhythm
+from app.operator_presence import build_operator_presence
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
 
 
@@ -91,6 +92,7 @@ def build_operator_briefing(
     *,
     watch_probe: WatchProbe | None = None,
     inbox_fetcher: WatchInboxFetcher | None = None,
+    viewport_compact: bool = False,
 ) -> dict[str, object]:
     runtime_summary = assemble_runtime_summary(
         watch_probe=watch_probe,
@@ -140,4 +142,17 @@ def build_operator_briefing(
             "control_plane_ready": bool(runtime_summary["control_plane"]["ready"]),
             "watch_connected": bool(runtime_summary["watch"]["connected"]),
         },
+        "operator_presence": build_operator_presence(
+            {
+                "top_signals": top_signals,
+                "pending_approvals": {
+                    "count": runtime_summary["approvals"]["pending_count"],
+                },
+                "degraded": runtime_summary["degraded"],
+                "connectivity": {
+                    "watch_connected": bool(runtime_summary["watch"]["connected"]),
+                },
+            },
+            viewport_compact=viewport_compact,
+        ),
     }

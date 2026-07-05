@@ -644,9 +644,15 @@ input {
 }
 
 .workspace-file-tree__chevron {
-  width: 0.75rem;
-  flex: 0 0 0.75rem;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
   color: var(--text-muted);
+}
+
+.workspace-file-tree__file-icon {
+  flex: 0 0 auto;
+  opacity: 0.82;
 }
 
 .dock-stack {

@@ -2,7 +2,7 @@ import type { RunRecord } from '../contracts/canonical';
 
 const TERMINAL_PHASES = new Set(['completed', 'failed', 'cancelled']);
 
-function isActiveRun(run: RunRecord): boolean {
+export function isActiveRun(run: RunRecord): boolean {
   return !TERMINAL_PHASES.has(run.phase);
 }
 
@@ -20,4 +20,9 @@ export function selectPrimaryRun(items: RunRecord[]): RunRecord | null {
 /** Dedicated approval target so guarded runs stay visible when another run is active. */
 export function selectPrimaryApprovalRun(items: RunRecord[]): RunRecord | null {
   return items.find((run) => run.phase === 'awaiting_approval') ?? null;
+}
+
+/** Workspace-scoped primary run: only non-terminal runs; null when the workspace is idle. */
+export function selectWorkspacePrimaryRun(items: RunRecord[]): RunRecord | null {
+  return selectPrimaryRun(items.filter(isActiveRun));
 }

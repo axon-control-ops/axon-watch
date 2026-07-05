@@ -10,7 +10,7 @@ from typing import Callable
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from app.adapters.watch_client import fetch_watch_inbox
+from app.adapters.watch_client import fetch_watch_inbox, fetch_watch_summary
 from app.runs.service import approval_summary, list_active_runs, to_runtime_summary_active_run
 
 _APP_VERSION = "0.1.0"
@@ -18,6 +18,7 @@ _PROCESS_STARTED_AT = time.monotonic()
 
 WatchProbe = Callable[[], tuple[bool, str, str | None, str]]
 WatchInboxFetcher = Callable[[], dict[str, object] | None]
+WatchSummaryFetcher = Callable[[], dict[str, object] | None]
 
 
 def _utc_now_iso() -> str:
@@ -106,21 +107,58 @@ def _signals_summary_from_inbox(
     }
 
 
+def _connectors_summary_from_watch(
+    watch_summary: dict[str, object] | None,
+    generated_at: str,
+) -> dict[str, object]:
+    if not watch_summary:
+        return {
+            "configured": 0,
+            "ok": 0,
+            "degraded": 0,
+            "unavailable": 0,
+            "required_unavailable": 0,
+            "last_updated_at": generated_at,
+        }
+
+    connectors = watch_summary.get("connectors")
+    if not isinstance(connectors, dict):
+        connectors = {}
+
+    return {
+        "configured": int(connectors.get("configured", 0)),
+        "ok": int(connectors.get("ok", 0)),
+        "degraded": int(connectors.get("degraded", 0)),
+        "unavailable": int(connectors.get("unavailable", 0)),
+        "required_unavailable": int(connectors.get("required_unavailable", 0)),
+        "last_updated_at": str(watch_summary.get("updated_at", generated_at)),
+    }
+
+
 def assemble_runtime_summary(
     *,
     watch_probe: WatchProbe | None = None,
     inbox_fetcher: WatchInboxFetcher | None = None,
+    watch_summary_fetcher: WatchSummaryFetcher | None = None,
 ) -> dict[str, object]:
     """Build a boot-safe runtime summary from live control-plane and watch probes."""
     probe = watch_probe or default_watch_probe
     inbox_loader = inbox_fetcher or fetch_watch_inbox
+    summary_loader = watch_summary_fetcher or fetch_watch_summary
     generated_at = _utc_now_iso()
     watch_connected, watch_status, watch_degraded_reason, last_summary_at = probe()
     watch_inbox = inbox_loader() if watch_connected else None
+    watch_summary = summary_loader() if watch_connected else None
 
     degraded_reasons: list[str] = []
     if not watch_connected and watch_degraded_reason:
         degraded_reasons.append(watch_degraded_reason)
+
+    connectors = _connectors_summary_from_watch(watch_summary, generated_at)
+    if watch_connected and connectors["required_unavailable"] > 0:
+        degraded_reasons.append(
+            f"{connectors['required_unavailable']} required connector(s) unavailable",
+        )
 
     approvals = approval_summary()
 
@@ -144,6 +182,7 @@ def assemble_runtime_summary(
         ],
         "approvals": approvals,
         "signals": _signals_summary_from_inbox(watch_inbox, generated_at),
+        "connectors": connectors,
         "capabilities": {
             "editor": True,
             "terminal": True,

@@ -21,25 +21,26 @@ precedent for mode-specific region contents without changing the grid.
 
 ## Decision
 
-**In Operator mode, demote the center editor stack.** Terminal-first center and upper
-workbench content are phased; phase 1 ships editor removal only.
+**In Operator mode, demote the center editor stack and replace it with a dedicated
+mission/control surface.**
 
 Locked Operator center workbench target:
 
 1. **Hide** Monaco editor stack by default in Operator mode (tab bar, breadcrumb,
    editor host, inline editor status strip) — **shipped (phase 1)**.
-2. **Upper workbench status / radar panel (shipped — phase 2 option A)** — `OperatorStatusRadarPanel.vue`
-   binds runtime summary, briefing Notice/Advise, active run phase, and connectivity metrics.
-   Includes shortcuts to Attention sidebar and KAIRO briefing. Does not host Monaco or IDE
-   explorer semantics.
-3. **Promote** the bottom terminal dock to primary center surface — **deferred**; terminal
-   dock stays bottom-resizable until upper workbench content is decided.
-4. **Optional thin slice (follow-up within ADR-007):** read-only file preview
-   strip or collapsed editor affordance for situational context — not a full IDE
-   editor unless operator explicitly expands to IDE mode.
-5. **IDE mode** — full editor stack + explorer + existing right dock; bottom terminal
-   panel is **collapsible** (close restores full editor; status-bar **TERMINAL** chip
-   resurfaces the dock).
+2. **Mission control panel v1 (shipped — phases 2 and 3, refined 2026-07-05)** —
+   `OperatorStatusRadarPanel.vue` is an **execution theater**: hero stage (phase,
+   progress, current step, notice), live execution feed, direct run controls, compact
+   status rail, and terminal reopen affordances. Full specification:
+   [`docs/OPERATOR_MISSION_CONTROL_V1.md`](../OPERATOR_MISSION_CONTROL_V1.md).
+3. **Terminal dock stays docked, but is collapsible in Operator and IDE** —
+   Operator default **hidden** on first visit; mode-specific session keys; reopen via
+   header chip + bottom dock strip; close via tab-bar ✕. IDE default visible with
+   status-bar **TERMINAL** chip to restore when collapsed.
+4. **IDE mode** — full editor stack + explorer + agent dock; bottom terminal panel
+   collapsible as above.
+5. **ADR-007 complete** — terminal-first promotion and read-only preview are no
+   longer required outcomes of this ADR. Reopening those ideas requires a new ADR.
 
 Grid geometry, column proportions, and region map remain ADR-004.
 
@@ -50,24 +51,34 @@ Grid geometry, column proportions, and region map remain ADR-004.
 2. **Swap center and right columns** — rejected; larger layout shock than workbench
    demotion; conflicts with locked column roles.
 3. **Third top-level shell mode** — rejected; Operator/IDE toggle is sufficient.
+4. **Dense telemetry dashboard in center (phase 2/3 prototype)** — rejected after
+   operator review; duplicated topbar/status bar/dock truth and violated “evidence
+   surface, not primary status” guidance in `UI_REFERENCE_ARCHETYPES.md`.
 
 ## Trade-Offs
 
-- **Gain:** Operator center focuses on terminal + runtime action; aligns mental
-  model (Operator = orchestrate, IDE = edit).
-- **Gain:** Conversation and Command hero retain relative prominence without
-  shrinking the right dock further.
-- **Cost:** Phase 1 leaves a visible **upper workbench void** in Operator mode until
-  a follow-up slice fills it (see item 2 above).
-- **Cost:** Requires careful height sync so terminal + column layout still align
-  with left sidebar and right dock.
+- **Gain:** Operator center focuses on runtime action and review flow instead of file editing.
+- **Gain:** Terminal can be hidden without switching to IDE; mission control fills the void.
+- **Gain:** Direct run mutations available in center without opening Attention sidebar.
+- **Cost:** Operator still does not offer inline file editing or read-only preview in the center.
+- **Cost:** v1 feed depth is limited to receipt labels until control-plane streams richer steps.
 
 ## Consequences
 
 - `CenterWorkbench.vue` hides the editor stack when `layoutMode === 'operator'`.
-- `OperatorStatusRadarPanel.vue` fills the upper workbench with DTO-backed status/radar.
-- Terminal dock behavior is unchanged in Operator; IDE adds collapsible bottom panel.
-- `UI_LAYOUT_LOCK.md` amends center workbench and IDE dock sections for Operator vs IDE.
+- `OperatorStatusRadarPanel.vue` is the primary Operator mission/control surface.
+- `operator-status-radar-view.ts` owns DTO projections for stage, feed, and rail.
+- `workbench-terminal-split.ts` persists terminal visibility per layout mode.
+- `UI_LAYOUT_LOCK.md` and `OPERATOR_MISSION_CONTROL_V1.md` document Operator center behavior.
+
+## v1 Follow-ups (not ADR-007 blockers)
+
+Documented in `OPERATOR_MISSION_CONTROL_V1.md` § v1 Limitations:
+
+- Rich execution feed (tool args, stdout, diffs) from run-step events
+- Auto terminal peek when active run uses PTY
+- Operator keyboard shortcut for terminal toggle
+- Reduced duplication between status rail and HUD (optional slimming)
 
 ## Reevaluation Triggers
 
@@ -80,7 +91,6 @@ Reopen if:
 ## Notes
 
 - Does not change ADR-005 sidebar attention or ADR-006 hero/footer contracts.
-- **Operator void:** filled by the status/radar panel (phase 2). Terminal promotion or
-  read-only preview remain optional ADR-007 follow-ups.
+- **Operator void:** closed by mission control v1 and terminal collapse parity.
 - Frozen planning reference: `axon-local/Plans/Axon-Watch/UI_SPEC.md` Operator
   vs IDE intent.

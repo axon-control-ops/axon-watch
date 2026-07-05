@@ -1,10 +1,21 @@
-# systemd Skeleton
+# systemd Units
 
-This directory is reserved for future service units for:
+Supervised startup order for dedicated-server deployment:
 
-- `console-web`
-- `control-plane`
-- `axon-watch`
+1. `axon-watch.service`
+2. `control-plane.service` (After=axon-watch)
+3. `console-web.service` (After=control-plane)
 
-Lane 1 keeps this as a placeholder so dedicated-server supervision can be added
-without reshaping the repo.
+Install:
+
+```bash
+sudo cp infra/systemd/*.service /etc/systemd/system/
+sudo cp config/deployment.env.example /etc/axon-watch/deployment.env
+# edit /etc/axon-watch/deployment.env for your host
+sudo systemctl daemon-reload
+sudo systemctl enable --now axon-watch control-plane console-web
+```
+
+Services invoke `scripts/ops/run-service.sh` with `EnvironmentFile=/etc/axon-watch/deployment.env`.
+
+See `docs/DEDICATED_SERVER_READINESS.md`.

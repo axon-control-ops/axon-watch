@@ -7,9 +7,11 @@ import { useShellStore } from '../stores/shell';
 const props = withDefaults(
   defineProps<{
     compact?: boolean;
+    placeholder?: string;
   }>(),
   {
     compact: true,
+    placeholder: 'Describe the next operator action…',
   },
 );
 
@@ -62,7 +64,7 @@ onMounted(() => {
         class="command-seam__input"
         rows="2"
         aria-label="Operator command"
-        placeholder="Describe the next operator action…"
+        :placeholder="props.placeholder"
         :disabled="!shell.currentWorkspace"
         @input="syncComposerHeight"
         @keydown.meta.enter.prevent="shell.submitOperatorCommand()"

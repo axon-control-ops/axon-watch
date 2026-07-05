@@ -18,6 +18,11 @@ from tests.support.summary_degraded_signal_fixture import (
     consistency_tuple,
 )
 
+from tests.support.stable_connector_probe import (
+    patch_stable_connector_probes,
+    reset_watch_ephemeral_stores,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES_DIR = REPO_ROOT / "packages" / "shared-types" / "fixtures"
 WATCH_ROOT = REPO_ROOT / "services" / "axon-watch"
@@ -71,6 +76,10 @@ class WatchSummarySignalTests(unittest.TestCase):
     def setUp(self) -> None:
         self._cached_modules: dict[str, object] = {}
         watch_app, self.summary_degraded_signal_event, self._cached_modules = _load_watch_app()
+        reset_watch_ephemeral_stores()
+        self._connector_patch = patch_stable_connector_probes()
+        self._connector_patch.start()
+        self.addCleanup(self._connector_patch.stop)
         self.client = TestClient(watch_app)
 
     def tearDown(self) -> None:

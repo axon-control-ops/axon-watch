@@ -7,6 +7,7 @@ import {
   MIN_WORKBENCH_TERMINAL_HEIGHT,
   readStoredWorkbenchTerminalPanelVisible,
   resolveDefaultWorkbenchTerminalHeight,
+  workbenchTerminalPanelVisibleStorageKey,
 } from './workbench-terminal-split';
 
 describe('workbench terminal split', () => {
@@ -24,9 +25,16 @@ describe('workbench terminal split', () => {
     expect(resolveDefaultWorkbenchTerminalHeight(0)).toBe(240);
     expect(resolveDefaultWorkbenchTerminalHeight(900)).toBe(240);
     expect(resolveDefaultWorkbenchTerminalHeight(1200)).toBe(MAX_DEFAULT_WORKBENCH_TERMINAL_HEIGHT);
+    expect(resolveDefaultWorkbenchTerminalHeight(1200, 'operator')).toBeLessThanOrEqual(280);
   });
 
-  it('defaults terminal panel visibility to open outside the browser', () => {
-    expect(readStoredWorkbenchTerminalPanelVisible()).toBe(true);
+  it('defaults terminal panel visibility by layout mode outside the browser', () => {
+    expect(readStoredWorkbenchTerminalPanelVisible('ide')).toBe(true);
+    expect(readStoredWorkbenchTerminalPanelVisible('operator')).toBe(false);
+  });
+
+  it('uses mode-specific session keys', () => {
+    expect(workbenchTerminalPanelVisibleStorageKey('operator')).toContain('operator');
+    expect(workbenchTerminalPanelVisibleStorageKey('ide')).toContain('ide');
   });
 });

@@ -43,6 +43,9 @@ class MeasureShellBootTests(unittest.TestCase):
 
     def test_auto_mode_falls_back_without_playwright(self) -> None:
         with patch(
+            "measure_shell_boot._playwright_usable",
+            return_value=False,
+        ), patch(
             "measure_shell_boot.measure_bootstrap_critical_path",
             return_value={"shell_ready_ms": 512.0, "source": "bootstrap-critical-path"},
         ) as bootstrap_mock:

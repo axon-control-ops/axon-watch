@@ -10,7 +10,9 @@ withDefaults(
       | 'book'
       | 'more'
       | 'plus'
-      | 'trash';
+      | 'trash'
+      | 'folder'
+      | 'folder-open';
     size?: number;
   }>(),
   { size: 14 },
@@ -67,6 +69,12 @@ withDefaults(
       <path d="M5.5 4.5V3.5h5v1" />
       <path d="M5 4.5l.5 7.5h5l.5-7.5" />
       <path d="M6.5 7v4M9.5 7v4" />
+    </template>
+    <template v-else-if="name === 'folder'">
+      <path d="M2.5 4.5h4.2l1.4 1.5H13.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1z" />
+    </template>
+    <template v-else-if="name === 'folder-open'">
+      <path d="M2.5 4.5h4.2l1.4 1.5H13.5a1 1 0 0 1 1 1v1.5H3.2a1 1 0 0 0-.98 1.2l.8 3.8a1 1 0 0 0 .98.8h9.5a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1H8.1z" />
     </template>
   </svg>
 </template>

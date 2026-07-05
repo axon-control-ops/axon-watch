@@ -1,3 +1,4 @@
+import type { OperatorPresence } from './presence';
 import type { ApprovalRecord } from './control-plane';
 import type { RuntimeSummaryActiveRun, RuntimeSummaryDegradedState } from './runtime';
 import type { InboxItem } from './signals';
@@ -40,4 +41,5 @@ export interface OperatorBriefing {
   next_safe_actions: BriefingAction[];
   degraded: RuntimeSummaryDegradedState;
   connectivity: OperatorBriefingConnectivity;
+  operator_presence?: OperatorPresence;
 }

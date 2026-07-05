@@ -1,0 +1,20 @@
+# Example dedicated-server reverse proxy.
+# Watch internal API is NOT exposed publicly — control-plane proxies watch routes.
+
+{
+	email ops@example.com
+}
+
+axon.example.com {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	handle {
+		root * /opt/axon-watch/apps/console-web/dist
+		try_files {path} /index.html
+		file_server
+	}
+}

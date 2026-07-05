@@ -42,6 +42,9 @@ const connectivityLabels = computed(() =>
 );
 
 const voiceLine = computed(() => {
+  if (props.briefing?.operator_presence?.persona_voice_line) {
+    return props.briefing.operator_presence.persona_voice_line;
+  }
   if (props.loadState === 'loading') {
     return 'KAIRO: Standing by while briefing loads.';
   }

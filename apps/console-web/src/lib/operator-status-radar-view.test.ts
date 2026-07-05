@@ -5,10 +5,17 @@ import exampleBriefing from '../../../../packages/shared-types/fixtures/operator
 import exampleRuntimeSummary from '../../../../packages/shared-types/fixtures/runtime-summary.example.json';
 
 import {
+  buildOperatorMissionSteps,
+  operatorExecutionStage,
+  operatorLiveFeed,
+  operatorMissionCards,
+  operatorMissionChips,
+  operatorMissionSummary,
   operatorRadarTone,
   operatorStatusAdvise,
   operatorStatusHeadline,
   operatorStatusMetrics,
+  operatorStatusRail,
 } from './operator-status-radar-view';
 
 const briefing = exampleBriefing as unknown as OperatorBriefing;
@@ -81,5 +88,110 @@ describe('operator status radar view', () => {
         loadState: 'loaded',
       }),
     ).toBe(briefing.advise);
+  });
+
+  it('builds a mission summary for the primary run', () => {
+    const summary = operatorMissionSummary({
+      workspaceId: 'workspace_smoke',
+      runtimeSummary,
+      primaryActiveRun: activeRun,
+    });
+
+    expect(summary.runId).toBe('run_smoke');
+    expect(summary.phase).toContain('REVIEW READY');
+    expect(summary.workspace).toBe('workspace_smoke');
+    expect(summary.watchConnected).toBe(true);
+  });
+
+  it('builds a bounded mission timeline from receipts and current step', () => {
+    const steps = buildOperatorMissionSteps({
+      historyRows: [
+        {
+          id: '1',
+          label: 'Run created',
+          timestamp: '2026-07-04T07:00:00Z',
+        },
+        {
+          id: '2',
+          label: 'Command execution recorded',
+          timestamp: '2026-07-04T07:10:00Z',
+        },
+      ],
+      currentStep: 'Review when ready',
+      advise: 'Approve test run to continue execution.',
+    });
+
+    expect(steps).toHaveLength(4);
+    expect(steps[0]?.tone).toBe('done');
+    expect(steps[2]?.tone).toBe('active');
+    expect(steps[3]?.tone).toBe('pending');
+  });
+
+  it('builds mission cards and action chips from runtime state', () => {
+    const cards = operatorMissionCards({
+      runtimeSummary,
+      briefing,
+      pendingApprovals: 1,
+      lastAgentMessage: 'Executed `git_status` (ok) for run run_smoke.',
+    });
+    const chips = operatorMissionChips({
+      lastReceipt: 'Operator approved the run to continue execution',
+      advise: 'Approve test run to continue execution.',
+      runtimeSummary,
+      briefing,
+      pendingApprovals: 1,
+    });
+
+    expect(cards).toHaveLength(4);
+    expect(cards[0]?.value).toContain('git_status');
+    expect(cards[3]?.tone).toBe('attention');
+    expect(chips).toHaveLength(3);
+    expect(chips[2]?.value).toContain('Approval boundary');
+  });
+
+  it('builds an execution stage with a dominant current step', () => {
+    const stage = operatorExecutionStage({
+      workspaceId: 'workspace_smoke',
+      runtimeSummary,
+      briefing,
+      loadState: 'loaded',
+      primaryActiveRun: activeRun,
+    });
+
+    expect(stage.runId).toBe('run_smoke');
+    expect(stage.phaseProgress).toBeGreaterThan(0);
+    expect(stage.currentStep).toBe('Review when ready');
+    expect(stage.notice).toBe(briefing.notice);
+  });
+
+  it('builds a bounded live feed from receipts and agent output', () => {
+    const feed = operatorLiveFeed({
+      historyRows: [
+        { id: '1', label: 'Run created', timestamp: '2026-07-04T07:00:00Z' },
+        { id: '2', label: 'Command execution recorded', timestamp: '2026-07-04T07:10:00Z' },
+      ],
+      currentStep: 'Review when ready',
+      lastAgentMessage: 'Executed `git_status` (ok) for run run_smoke.',
+      advise: 'Approve test run to continue execution.',
+      hasActiveRun: true,
+    });
+
+    expect(feed.length).toBeGreaterThan(0);
+    expect(feed.some((item) => item.tone === 'active')).toBe(true);
+    expect(feed.some((item) => item.tone === 'info')).toBe(true);
+  });
+
+  it('builds a compact status rail for secondary telemetry', () => {
+    const rail = operatorStatusRail({
+      workspaceId: 'workspace_smoke',
+      runtimeSummary,
+      briefing,
+      pendingApprovals: 1,
+    });
+
+    expect(rail).toHaveLength(5);
+    expect(rail[0]?.value).toBe('online');
+    expect(rail[3]?.value).toBe('ready');
+    expect(rail[4]?.value).toBe('workspace_smoke');
   });
 });

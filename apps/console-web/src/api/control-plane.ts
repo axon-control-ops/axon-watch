@@ -65,9 +65,15 @@ export async function fetchInbox(): Promise<InboxSnapshot> {
   return response.json() as Promise<InboxSnapshot>;
 }
 
-export async function fetchOperatorBriefing(): Promise<OperatorBriefing> {
+export async function fetchOperatorBriefing(options?: {
+  viewportCompact?: boolean;
+}): Promise<OperatorBriefing> {
   const baseUrl = controlPlaneBaseUrl();
-  const url = baseUrl ? `${baseUrl}/api/briefing` : '/api/briefing';
+  const compact =
+    options?.viewportCompact ??
+    (typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const query = compact ? '?viewport_compact=true' : '';
+  const url = baseUrl ? `${baseUrl}/api/briefing${query}` : `/api/briefing${query}`;
   const response = await fetch(url);
 
   if (!response.ok) {

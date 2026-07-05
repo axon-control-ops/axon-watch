@@ -7,11 +7,11 @@ import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import TerminalHost from '../TerminalHost.vue';
 import {
   clampWorkbenchTerminalHeight,
+  persistWorkbenchTerminalPanelVisible,
   readStoredWorkbenchTerminalHeight,
   readStoredWorkbenchTerminalPanelVisible,
   resolveDefaultWorkbenchTerminalHeight,
   WORKBENCH_TERMINAL_HEIGHT_KEY,
-  WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY,
 } from '../../lib/workbench-terminal-split';
 import {
   computeHeroDockHeight,
@@ -24,8 +24,11 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
+const workbenchLayoutMode = computed((): 'operator' | 'ide' =>
+  hideOperatorEditor.value ? 'operator' : 'ide',
+);
 const terminalPanelVisible = ref(true);
-const showTerminalDock = computed(() => !isIdeMode.value || terminalPanelVisible.value);
+const showTerminalDock = computed(() => terminalPanelVisible.value);
 type BottomTabId = 'terminal' | 'problems' | 'output' | 'logs';
 const bottomTab = ref<BottomTabId>('terminal');
 const workbenchRef = ref<HTMLElement | null>(null);
@@ -133,7 +136,7 @@ function syncTerminalHeightToContainer(): void {
   const containerHeight = container.getBoundingClientRect().height;
   const preferredHeight = terminalHeightCustomized.value
     ? terminalHeight.value
-    : resolveDefaultWorkbenchTerminalHeight(containerHeight);
+    : resolveDefaultWorkbenchTerminalHeight(containerHeight, workbenchLayoutMode.value);
   terminalHeight.value = clampWorkbenchTerminalHeight(preferredHeight, containerHeight);
 }
 
@@ -143,11 +146,11 @@ function persistTerminalHeight(): void {
 }
 
 function persistTerminalPanelVisible(visible: boolean): void {
-  sessionStorage.setItem(WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY, visible ? '1' : '0');
+  persistWorkbenchTerminalPanelVisible(workbenchLayoutMode.value, visible);
 }
 
 function hideTerminalPanel(): void {
-  if (!isIdeMode.value || !terminalPanelVisible.value) {
+  if (!terminalPanelVisible.value) {
     return;
   }
 
@@ -178,7 +181,7 @@ watch(
 );
 
 function showTerminalPanel(): void {
-  if (!isIdeMode.value || terminalPanelVisible.value) {
+  if (terminalPanelVisible.value) {
     return;
   }
 
@@ -187,6 +190,14 @@ function showTerminalPanel(): void {
   persistTerminalPanelVisible(true);
   syncTerminalHeightToContainer();
   requestAnimationFrame(() => runLayoutSync('resize'));
+}
+
+function toggleTerminalPanel(): void {
+  if (terminalPanelVisible.value) {
+    hideTerminalPanel();
+    return;
+  }
+  showTerminalPanel();
 }
 
 function clearTerminalPanel(): void {
@@ -297,7 +308,7 @@ onMounted(() => {
     terminalHeightCustomized.value = true;
   }
 
-  terminalPanelVisible.value = readStoredWorkbenchTerminalPanelVisible();
+  terminalPanelVisible.value = readStoredWorkbenchTerminalPanelVisible(workbenchLayoutMode.value);
 
   syncTerminalHeightToContainer();
   runLayoutSync('mount');
@@ -322,6 +333,7 @@ onBeforeUnmount(() => {
 watch(
   () => shell.layoutMode,
   () => {
+    terminalPanelVisible.value = readStoredWorkbenchTerminalPanelVisible(workbenchLayoutMode.value);
     syncTerminalHeightToContainer();
     runLayoutSync('resize');
   },
@@ -343,7 +355,7 @@ watch(
     :class="{
       'center-workbench--resizing': resizing,
       'center-workbench--operator': hideOperatorEditor,
-      'center-workbench--ide-terminal-collapsed': isIdeMode && !terminalPanelVisible,
+      'center-workbench--terminal-collapsed': !terminalPanelVisible,
     }"
   >
     <section
@@ -435,7 +447,11 @@ watch(
       </section>
     </section>
 
-    <OperatorStatusRadarPanel v-if="hideOperatorEditor" />
+    <OperatorStatusRadarPanel
+      v-if="hideOperatorEditor"
+      :terminal-visible="terminalPanelVisible"
+      @toggle-terminal="toggleTerminalPanel"
+    />
 
     <div
       v-if="showTerminalDock"
@@ -496,11 +512,10 @@ watch(
               <WorkbenchIcon name="trash" class="terminal-tabbar__action" />
             </button>
             <button
-              v-if="isIdeMode"
               type="button"
               class="terminal-tabbar__action-button"
-              title="Close terminal panel (Ctrl/Cmd+J)"
-              aria-label="Close terminal panel"
+              :title="hideOperatorEditor ? 'Hide terminal panel' : 'Close terminal panel (Ctrl/Cmd+J)'"
+              :aria-label="hideOperatorEditor ? 'Hide terminal panel' : 'Close terminal panel'"
               @click="hideTerminalPanel"
             >
               <WorkbenchIcon name="close" class="terminal-tabbar__action" />

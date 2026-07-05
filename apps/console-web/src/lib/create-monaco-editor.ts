@@ -23,6 +23,7 @@ export interface MonacoEditorController {
   setReadOnly: (readOnly: boolean) => void;
   setValue: (value: string) => void;
   getValue: () => string;
+  focus: () => void;
 }
 
 let monacoPromise: Promise<typeof Monaco> | null = null;
@@ -107,6 +108,9 @@ export async function createMonacoEditor(
     },
     getValue() {
       return model.getValue();
+    },
+    focus() {
+      editor.focus();
     },
   };
 }

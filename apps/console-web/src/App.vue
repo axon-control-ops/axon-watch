@@ -62,7 +62,10 @@ onUnmounted(() => {
     <div
       v-show="bootComplete"
       class="console-shell console-shell--mockup"
-      :class="{ 'dev-seams': shell.showDevSeams }"
+      :class="{
+        'dev-seams': shell.showDevSeams,
+        'console-shell--mobile-compact': shell.mobileCompactLayout,
+      }"
       :data-layout-mode="shell.layoutMode"
     >
       <TopBar />

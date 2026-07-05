@@ -10,6 +10,14 @@ It is intentionally narrow:
 
 ## Commands
 
+Run TEST-0 acceptance (dev stack required):
+
+```bash
+./scripts/verify/test0-workspace-smoke.sh
+# alias:
+npm run verify:test0
+```
+
 Run the full scaffold:
 
 ```bash

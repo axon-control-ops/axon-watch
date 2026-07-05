@@ -8,12 +8,26 @@ export type {
 } from './briefing';
 export { BRIEFING_ACTION_KINDS } from './briefing';
 export type {
+  OperatorPresence,
+  OperatorPresenceMobile,
+  OperatorPresenceSettings,
+  OperatorPresenceState,
+  SpokenAlertEligibility,
+} from './presence';
+export type {
   RunMode,
   RunPhase,
   RunRecord,
   RunStatus,
 } from './run';
 export { RUN_MODES, RUN_PHASES, RUN_STATUSES } from './run';
+export type {
+  DeliveryChannel,
+  DeliveryReceipt,
+  DeliveryReceiptResult,
+  DeliveryReceiptSnapshot,
+} from './delivery';
+export { DELIVERY_CHANNELS, DELIVERY_RECEIPT_RESULTS } from './delivery';
 export type {
   DeliveryState,
   InboxItem,
@@ -24,6 +38,8 @@ export type {
   SignalSource,
   SignalStatus,
   SignalView,
+  WatchRule,
+  WatchRuleMode,
 } from './signals';
 export {
   DELIVERY_STATES,
@@ -33,6 +49,7 @@ export {
   SIGNAL_SOURCES,
   SIGNAL_STATUSES,
 } from './signals';
+export type { WatchRuleMode as KairoWatchRuleMode } from './signals';
 export type {
   RuntimeIdentity,
   RuntimeSummary,

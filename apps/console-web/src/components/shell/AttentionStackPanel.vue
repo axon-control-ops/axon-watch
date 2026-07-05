@@ -155,6 +155,20 @@ function signalCount(): number {
           >
             {{ signal.severity === 'info' ? 'INFO' : signal.severity.toUpperCase() }}
           </span>
+          <span
+            v-if="signal.watch_rule?.mode"
+            class="dock-tag dock-tag--kairo"
+            :title="signal.watch_rule.reason"
+          >
+            {{ signal.watch_rule.mode.toUpperCase() }}
+          </span>
+          <span
+            v-if="signal.delivery_state && signal.delivery_state !== 'not_required'"
+            class="dock-tag dock-tag--delivery"
+            :title="signal.latest_receipt_id ? `Receipt ${signal.latest_receipt_id}` : 'Delivery state'"
+          >
+            {{ signal.delivery_state === 'delivered' ? 'DELIVERED' : signal.delivery_state.toUpperCase() }}
+          </span>
         </li>
       </ul>
       <p v-else class="region-copy">{{ shell.inboxStateLabel }}</p>

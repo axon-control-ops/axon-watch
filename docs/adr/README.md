@@ -47,7 +47,7 @@ Every numbered ADR must include:
 - [ADR-004: Locked console shell layout](ADR-004-locked-console-shell-layout.md) — operator right-dock seam order superseded in part by ADR-005
 - [ADR-005: Operator sidebar attention toggle](ADR-005-operator-sidebar-attention-toggle.md)
 - [ADR-006: Operator command hero and footer attention](ADR-006-operator-command-hero-and-footer-attention.md)
-- [ADR-007: Operator workbench demotion](ADR-007-operator-workbench-demotion.md)
+- [ADR-007: Operator workbench demotion](ADR-007-operator-workbench-demotion.md) — implementation spec: [`OPERATOR_MISSION_CONTROL_V1.md`](../OPERATOR_MISSION_CONTROL_V1.md)
 - [ADR-008: IDE shell content lock](ADR-008-ide-shell-content-lock.md)
 
 **Planning-only (not yet copied here):**

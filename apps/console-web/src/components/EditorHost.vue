@@ -25,6 +25,10 @@ const loadState = ref<'loading' | 'ready' | 'error'>('loading');
 let editorController: Awaited<ReturnType<typeof createMonacoEditor>> | null = null;
 let suppressChangeEmit = false;
 
+function focusEditor(): void {
+  editorController?.focus();
+}
+
 onMounted(async () => {
   if (!containerRef.value) {
     loadState.value = 'error';
@@ -54,12 +58,28 @@ onMounted(async () => {
 });
 
 watch(
-  () => [props.language, props.value, props.readOnly] as const,
-  ([language, value, readOnly]) => {
-    suppressChangeEmit = true;
+  () => props.language,
+  (language) => {
     editorController?.setLanguage(language);
-    editorController?.setValue(value);
+  },
+);
+
+watch(
+  () => props.readOnly,
+  (readOnly) => {
     editorController?.setReadOnly(Boolean(readOnly));
+  },
+);
+
+watch(
+  () => props.value,
+  (value) => {
+    if (!editorController || editorController.getValue() === value) {
+      return;
+    }
+
+    suppressChangeEmit = true;
+    editorController.setValue(value);
     suppressChangeEmit = false;
   },
 );
@@ -89,7 +109,7 @@ onBeforeUnmount(() => {
       </div>
       <span>{{ props.description }}</span>
     </div>
-    <div class="surface-host__body">
+    <div class="surface-host__body" @click="focusEditor">
       <div ref="containerRef" class="surface-host__frame" aria-label="Monaco editor host" />
     </div>
   </div>

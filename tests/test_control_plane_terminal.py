@@ -40,6 +40,38 @@ class ControlPlaneTerminalTests(unittest.TestCase):
         self.assertTrue(root.is_dir())
         self.assertEqual(root, workspace_roots_base() / "workspace_alpha")
 
+    def test_resolve_workspace_root_uses_project_binding_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "bound-project"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            bindings_file.write_text(
+                json.dumps(
+                    {
+                        "bindings": {
+                            "workspace_bound_terminal": {
+                                "project_root": str(project_root),
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_BINDINGS_FILE": str(bindings_file),
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(tempdir),
+                },
+                clear=False,
+            ):
+                root = resolve_workspace_root("workspace_bound_terminal")
+
+            self.assertEqual(root.resolve(), project_root.resolve())
+            isolated_candidate = workspace_roots_base() / "workspace_bound_terminal"
+            self.assertFalse(isolated_candidate.exists())
+
     def test_terminal_websocket_rejects_unknown_workspace(self) -> None:
         with self.client.websocket_connect("/api/workspaces/workspace_missing/terminal") as ws:
             message = json.loads(ws.receive_text())

@@ -23,6 +23,7 @@ _CANONICAL_TOP_LEVEL_KEYS = {
     "active_runs",
     "approvals",
     "signals",
+    "connectors",
     "capabilities",
     "degraded",
 }

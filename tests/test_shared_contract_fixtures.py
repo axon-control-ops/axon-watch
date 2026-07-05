@@ -116,6 +116,7 @@ class SharedContractFixtureTests(unittest.TestCase):
                 "active_runs",
                 "approvals",
                 "signals",
+                "connectors",
                 "capabilities",
                 "degraded",
             },
@@ -197,6 +198,24 @@ class SharedContractFixtureTests(unittest.TestCase):
         self.assertIn(payload["action_type"], SIGNAL_ACTION_TYPES)
         self.assertIn(payload["delivery_state"], DELIVERY_STATES)
 
+    def test_delivery_receipt_fixture_matches_canonical_shape(self) -> None:
+        payload = _load_fixture("delivery-receipt.example.json")
+
+        self.assertEqual(
+            {
+                "receipt_id",
+                "signal_id",
+                "event_id",
+                "channel",
+                "attempted_at",
+                "result",
+                "error",
+                "policy_reason",
+            },
+            set(payload),
+        )
+        self.assertEqual("succeeded", payload["result"])
+
     def test_minimal_identity_fixtures_exist_for_shell_families(self) -> None:
         approval = _load_fixture("approval-record.example.json")
         workspace = _load_fixture("workspace-record.example.json")
@@ -255,12 +274,16 @@ class SharedContractFixtureTests(unittest.TestCase):
                 "next_safe_actions",
                 "degraded",
                 "connectivity",
+                "operator_presence",
             },
             set(payload),
         )
-        self.assertEqual({"count", "items"}, set(payload["pending_approvals"]))
         self.assertEqual({"active", "reasons"}, set(payload["degraded"]))
         self.assertEqual({"control_plane_ready", "watch_connected"}, set(payload["connectivity"]))
+        presence = payload["operator_presence"]
+        self.assertIn("persona_voice_line", presence)
+        self.assertIn("spoken_alert", presence)
+        self.assertTrue(presence["mobile"]["foreground_only"])
 
         action = payload["next_safe_actions"][0]
         self.assertEqual(

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
+import WorkbenchIcon from './WorkbenchIcon.vue';
 import {
   buildWorkspaceFileTree,
   flattenWorkspaceFileTree,
@@ -64,8 +65,12 @@ function handleRowClick(row: { path: string; kind: 'file' | 'directory' }): void
           @click="handleRowClick(row)"
         >
           <span v-if="row.kind === 'directory'" class="workspace-file-tree__chevron">
-            {{ isExpanded(row.path) ? '▾' : '▸' }}
+            <WorkbenchIcon
+              :name="isExpanded(row.path) ? 'folder-open' : 'folder'"
+              :size="13"
+            />
           </span>
+          <WorkbenchIcon v-else name="file" :size="13" class="workspace-file-tree__file-icon" />
           <span>{{ row.name }}</span>
         </button>
       </li>

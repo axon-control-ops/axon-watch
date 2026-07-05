@@ -15,8 +15,12 @@ It is written for operators, reviewers, and developers who need to understand:
 This is intentionally simple to read, but detailed enough to be useful during
 active implementation.
 
-**Last verified:** 2026-07-04 — `npm run verify` OK, 82 Python tests OK, stack
+**Last verified:** 2026-07-05 — `npm run verify` OK, TEST-0 OK (`npm run verify:test0`), stack
 smoke on ports 4173/8787/8788 OK.
+
+**New operator?** Start with the layered onboarding guide:
+[`docs/AXON-X-STARTER-GUIDE.md`](AXON-X-STARTER-GUIDE.md) ·
+[PDF](AXON-X-STARTER-GUIDE.pdf) · rebuild PDF: `./scripts/docs/build-starter-guide-pdf.sh`
 
 ## Terminology And Abbreviations
 
@@ -568,6 +572,24 @@ This runs:
 - console-web typecheck, unit test, and production build
 - verify harness checks
 - DTO size checks using representative fixtures
+
+## TEST-0 acceptance (`workspace_smoke`)
+
+Requires the dev stack (`./scripts/dev/up.sh`).
+
+```bash
+npm run verify:test0
+```
+
+This runs, in order:
+
+1. `./scripts/dev/check-health.sh`
+2. Mission control unit tests (`operator-status-radar-view`, `workbench-terminal-split`)
+3. Live acceptance — `tests/test_test0_workspace_smoke_acceptance.py` against
+   `workspace_smoke` (briefing Notice/Advise, git status, resume from review, inbox/runs)
+4. `npm run verify`
+
+See also `docs/OPERATOR_MISSION_CONTROL_V1.md` for the manual UI checklist.
 
 ## Latency evidence (D1)
 

@@ -110,10 +110,39 @@ Shared region; **content differs by layout mode** (ADR-007).
 
 ### Operator mode (ADR-007)
 
-1. **Operator status / radar panel** — DTO-backed control-plane summary (`OperatorStatusRadarPanel.vue`): radar widget, briefing Notice/Advise headline, six runtime metrics, shortcuts to Attention sidebar and KAIRO briefing.
-2. **Terminal dock unchanged** — same bottom resizable panel as IDE (`TERMINAL | PROBLEMS | OUTPUT | LOGS`, session-persisted height, resize handle). No close affordance in Operator.
+Authoritative detail: [OPERATOR_MISSION_CONTROL_V1.md](OPERATOR_MISSION_CONTROL_V1.md)
 
-Editor stack is hidden in Operator mode. Terminal-first center promotion remains a **future ADR-007 follow-up**, not current behavior.
+Top → bottom inside one region:
+
+1. **Mission control panel** (`OperatorStatusRadarPanel.vue`) — execution theater, not a
+   second dashboard. Regions:
+   - **Header** — title, terminal chip, KAIRO presence dot
+   - **Execution stage (hero)** — phase tag, run id, elapsed, progress bar, current step,
+     briefing notice; idle standby when no active run
+   - **Live execution feed** — scrollable receipts + current step + agent excerpt (max 6 items;
+     hidden when idle with no history)
+   - **Run controls** — STOP / RESUME / COMPLETE / APPROVE / REJECT wired to shell store
+   - **Utility actions** — Open Attention, Open KAIRO Briefing
+   - **Status rail** — Watch, Signals, Approvals, Control plane, Workspace (compact)
+   - **Terminal dock strip** — when terminal collapsed: full-width reopen bar
+2. **Terminal dock** — same bottom resizable panel as IDE (`TERMINAL | PROBLEMS | OUTPUT | LOGS`,
+   session-persisted height, resize handle), **collapsible in Operator**.
+
+Editor stack is hidden in Operator mode. Mission control owns the upper workbench.
+
+**Terminal defaults (Operator):**
+
+| Setting | Value |
+|---|---|
+| First-visit default | **Hidden** |
+| Session key | `axon-x-workbench-terminal-panel-visible-v1:operator` (mode-specific; independent of IDE) |
+| Default height when open | ~20% of workbench (`OPERATOR_WORKBENCH_TERMINAL_HEIGHT_RATIO`) |
+| Reopen | Header **Open terminal** chip, bottom **Terminal dock · Show** strip, or chip toggle |
+| Close | Terminal tab-bar ✕ (same as IDE) |
+
+**Not in v1:** Operator Ctrl/Cmd+J terminal shortcut; auto-reveal on executing PTY runs;
+rich tool stdout/diff in feed (requires control-plane run-step events). See v1 limitations in
+`OPERATOR_MISSION_CONTROL_V1.md`.
 
 ### IDE mode
 
@@ -217,6 +246,9 @@ Source: `buildStatusBarZones()` in `mockup-shell-view.ts`; attention CTA in `Sta
   run refresh must not override manual sidebar selection.
 - Terminal attach **clears buffer** before restoring per-workspace scrollback
   (`create-xterm-session.ts`).
+- Terminal panel visibility is **mode-specific** in session storage:
+  `axon-x-workbench-terminal-panel-visible-v1:operator` (default hidden) and
+  `:ide` (default visible). See `workbench-terminal-split.ts`.
 - Chat thread rehydration is workspace-scoped via `loadWorkspaceThread()`.
 
 ## Layout Modes
@@ -254,4 +286,6 @@ Future optional guard: screenshot/fitness check against this document's region g
 - ADR: `docs/adr/ADR-004-locked-console-shell-layout.md`
 - ADR: `docs/adr/ADR-005-operator-sidebar-attention-toggle.md`
 - ADR: `docs/adr/ADR-006-operator-command-hero-and-footer-attention.md`
+- ADR: `docs/adr/ADR-007-operator-workbench-demotion.md`
+- Operator mission control v1: `docs/OPERATOR_MISSION_CONTROL_V1.md`
 - Handbook: `docs/HOW-TO-HANDBOOK.md` → **Locked Shell Layout**
