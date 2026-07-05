@@ -62,8 +62,12 @@ echo "Measuring shell boot readiness from ${AXON_WATCH_PUBLIC_BASE_URL}"
 echo "Wrote verify evidence to ${output_dir}/"
 ls -1 "${output_dir}"
 
-echo "Probing live events endpoint (first bytes)..."
-if curl -fsS --max-time 3 -H 'Accept: text/event-stream' "${live_url}" | head -n 3; then
+echo "Probing live events endpoint (connected frame)..."
+live_events_chunk="$(
+  curl -sS --max-time 2 -H 'Accept: text/event-stream' "${live_url}" 2>/dev/null | head -c 256
+)" || true
+if [[ "${live_events_chunk}" == *connected* ]]; then
+  printf '%s\n' "${live_events_chunk%%$'\n'*}"
   echo "ok ${live_url}"
 else
   echo "warn: live events probe failed (stack may be starting)" >&2
