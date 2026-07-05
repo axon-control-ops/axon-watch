@@ -243,4 +243,39 @@ describe('operator status radar view', () => {
       }).currentStep,
     ).toBe('Run paused by operator stop');
   });
+
+  it('reflects awaiting approval boundary in mission control projections', () => {
+    const approvalRun: RunRecord = {
+      ...activeRun,
+      status: 'blocked',
+      phase: 'awaiting_approval',
+      can_stop: true,
+      can_resume: false,
+      can_approve: true,
+      can_review: false,
+      current_step: 'Awaiting operator approval',
+    };
+
+    expect(
+      operatorMissionSummary({
+        workspaceId: 'workspace_smoke',
+        runtimeSummary,
+        primaryActiveRun: approvalRun,
+      }).phase,
+    ).toBe('AWAITING APPROVAL');
+
+    const metrics = operatorStatusMetrics({
+      workspaceId: 'workspace_smoke',
+      runtimeSummary,
+      runtimeSummaryLoadState: 'loaded',
+      briefing,
+      briefingLoadState: 'loaded',
+      primaryActiveRun: approvalRun,
+      pendingApprovals: 1,
+    });
+
+    expect(metrics[1]?.value).toContain('AWAITING APPROVAL');
+    expect(metrics[4]?.value).toBe('1');
+    expect(metrics[4]?.tone).toBe('attention');
+  });
 });

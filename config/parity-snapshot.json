@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 8,
-    "partially_verified": 11,
+    "verified_v1": 9,
+    "partially_verified": 10,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -36,13 +36,15 @@
     },
     {
       "id": "approval_boundaries",
-      "status": "partially_verified",
-      "evidence_gates": ["contract", "ui"],
+      "status": "verified",
+      "evidence_gates": ["P-A2"],
       "evidence": [
-        "tests/test_control_plane_runs.py awaiting_approval phase",
-        "AttentionStackPanel approve/reject wired to /api/runs/{id}/approve|reject"
+        "tests/test_parity_a2_approval_boundaries.py cross-surface approval boundary",
+        "tests/test_control_plane_runs.py approve/reject/resume guards",
+        "orchestrate_command_run blocks non-executing phases",
+        "operator-status-radar-view.test.ts awaiting approval projections"
       ],
-      "gap": "Not proven that approval blocks execution everywhere consistently."
+      "gap": "Browser click E2E deferred; not every legacy axon-local guarded action type."
     },
     {
       "id": "review_ready_state",
@@ -216,7 +218,7 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "11 must-keep behaviors remain partially_verified",
+    "10 must-keep behaviors remain partially_verified",
     "axon-local port 7734 remains production operator reference",
     "Real delivery channels (push/desktop/webhook) not implemented",
     "Voice deck / full JARVIS spoken-alert parity not implemented",

@@ -23,9 +23,9 @@ is complete. Do not reorder cutover items here.
 
 | Metric | Value |
 |---|---:|
-| Verified (v1) | 8 |
-| Partially verified | 11 |
-| Next slice | **P-A2** |
+| Verified (v1) | 9 |
+| Partially verified | 10 |
+| Next slice | **P-A3** |
 
 Machine-readable order: `config/parity-closure-order.json`
 
@@ -39,7 +39,7 @@ integrity, approval transition integrity, signal inbox consistency.
 | ID | Parity row(s) | Deliverable | Gate |
 |---|---|---|---|
 | **P-A1** | `run_stop_resume` | Stop/resume cross-surface consistency: `/api/runs`, `/api/runtime/summary`, history receipts; mission-control projection tests | `npm run verify:parity-a1` |
-| **P-A2** | `approval_boundaries` | Guarded execution blocked until approve; same phase in runs, summary, briefing, Attention | `verify:parity-a2` (TBD) |
+| **P-A2** | `approval_boundaries` | Approve/reject boundary blocks resume/complete/commands until approve; cross-surface pending count | `npm run verify:parity-a2` |
 | **P-A3** | `review_ready_state` | Review-ready visible everywhere; resume-from-review E2E | `verify:parity-a3` (TBD) |
 | **P-A4** | `signal_inbox_consistency` | Expanded fixtures: same signal across summary, inbox, Attention | `verify:parity-a4` (TBD) |
 

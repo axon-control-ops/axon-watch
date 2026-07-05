@@ -22,6 +22,7 @@ Run parity closure gates (post-cutover):
 
 ```bash
 npm run verify:parity-a1   # P-A1 run stop/resume cross-surface parity
+npm run verify:parity-a2   # P-A2 approval boundaries cross-surface parity
 # see docs/PARITY_CLOSURE_ROADMAP.md for P-A2 … P-D6
 ```
 

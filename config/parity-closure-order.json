@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-A2",
+  "next_slice": "P-A3",
   "slices": [
     {
       "id": "P-A1",
@@ -14,9 +14,9 @@
     {
       "id": "P-A2",
       "phase": "A",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["approval_boundaries"],
-      "spec": null,
+      "spec": "docs/PARITY_A2_APPROVAL_BOUNDARIES.md",
       "gate": "npm run verify:parity-a2"
     },
     {

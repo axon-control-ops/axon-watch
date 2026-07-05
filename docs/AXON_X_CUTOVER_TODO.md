@@ -30,7 +30,7 @@ Axon-X is approved for **bounded primary development** on `axon-watch/dev`
 
 Axon-X is **not approved** to fully replace `axon-local` for continuous
 multi-project production work until remaining partially verified behaviors are
-closed (11 of 19 as of 2026-07-05).
+closed (10 of 19 as of 2026-07-05).
 
 ## Already Landed
 

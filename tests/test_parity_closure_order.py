@@ -27,15 +27,29 @@ class ParityClosureOrderTests(unittest.TestCase):
         )
         p_a1 = next(entry for entry in order["slices"] if entry["id"] == "P-A1")
         self.assertEqual("done", p_a1["status"])
-        self.assertEqual("P-A2", order["next_slice"])
 
-    def test_run_stop_resume_promoted_in_snapshot(self) -> None:
+    def test_p_a2_marked_done_in_closure_order(self) -> None:
+        order = json.loads(
+            (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
+        )
+        p_a2 = next(entry for entry in order["slices"] if entry["id"] == "P-A2")
+        self.assertEqual("done", p_a2["status"])
+        self.assertEqual("P-A3", order["next_slice"])
+
+    def test_approval_boundaries_promoted_in_snapshot(self) -> None:
+        snapshot = json.loads(
+            (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
+        )
+        row = next(entry for entry in snapshot["behaviors"] if entry["id"] == "approval_boundaries")
+        self.assertEqual("verified", row["status"])
+        self.assertEqual(9, snapshot["summary"]["verified_v1"])
+
+    def test_run_stop_resume_still_verified_in_snapshot(self) -> None:
         snapshot = json.loads(
             (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
         )
         row = next(entry for entry in snapshot["behaviors"] if entry["id"] == "run_stop_resume")
         self.assertEqual("verified", row["status"])
-        self.assertEqual(8, snapshot["summary"]["verified_v1"])
 
 
 if __name__ == "__main__":
