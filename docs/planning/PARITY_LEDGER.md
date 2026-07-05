@@ -55,7 +55,7 @@ Suggested status vocabulary for future use:
 ## Current Verification Snapshot (2026-07-05)
 
 Implementation repo: `axon-watch` on branch `dev`. **Final assessment** after
-TEST-10 + **Phase A–B** + **P-C1–P-C4**: **17 verified (v1 scope)**, **2 partially_verified**, **0 full parity**.
+TEST-10 + **Phase A–D** (P-D1–P-D6): **19 verified (v1 scope)**, **0 partially_verified**, **0 full parity**.
 See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 
 | Behavior | Status | Evidence |
@@ -64,18 +64,18 @@ See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 | Approval boundaries | `verified` | **P-A2 pass** (2026-07-05): resume/complete/command blocked until approve; cross-surface pending count |
 | Review-ready state | `verified` | **P-A3 pass** (2026-07-05): cross-surface review_ready + resume/complete/command paths |
 | Operator vs IDE mode semantics | `verified` | ADR-007 v1 + **TEST-0 pass**; mission control v1 within v1 degradation |
-| Real project/workspace connection | `verified` | **TEST-1 pass**: bindings + live `git status` in `workspace_axon_local` |
-| Workspace handoffs | `verified` | **TEST-2 pass**: persisted handoff + target workspace summary |
+| Real project/workspace connection | `verified` | **TEST-1 + P-D4 pass**: dual bindings + watch→local handoff + git status in both repos |
+| Workspace handoffs | `verified` | **TEST-2 + P-D4 pass**: persisted handoff + target workspace summary |
 | Watch connectors / runtime awareness | `verified` | **TEST-3 pass**: connectors config, routes, runtime summary block |
-| Watch command / event / status depth | `verified` | **TEST-4 pass**: reprobe, events log, summary observation |
-| Delivery receipts for operator attention | `verified` | **TEST-5 pass**: in-process receipts + inbox `delivery_state` (v1 channels) |
-| Dock behavior | `partially_verified` | Operator terminal collapse + reopen; IDE TERMINAL restore |
+| Watch command / event / status depth | `verified` | **TEST-4 + P-D1 pass**: SQLite persistence + reprobe/events/receipts |
+| Delivery receipts for operator attention | `verified` | **TEST-5 + P-D2 pass**: channel adapters + retry + inbox delivery_state |
+| Dock behavior | `verified` | **P-D6 pass** (2026-07-05): dock contract + collapse/layout prefs + seam ordering tests |
 | Runtime summary behavior | `verified` | **P-B2 + P-B3 pass** (2026-07-05): CI latency fixtures + boot-critical field allowlist + API/assembler tests |
 | Initial shell boot expectations | `verified` | **P-B1 pass** (2026-07-05): shell_boot_readiness wired into default verify; bootstrap report shape |
 | Signal / inbox consistency | `verified` | **P-A4 pass** (2026-07-05): inbox/summary/briefing top signal agreement |
-| Desktop and browser startup | `partially_verified` | `./scripts/dev/up.sh` browser flow; desktop packaging lags |
+| Desktop and browser startup | `verified` | **P-D6 pass** (2026-07-05): browser-only startup contract; packaged desktop explicitly deferred |
 | KAIRO watch rules | `verified` | **TEST-6 pass**: `watch_rule` mapping + Attention mode chip |
-| Spoken high-value alerts | `verified` | **P-C4 pass** (2026-07-05): policy + settings toggle + voice-deck hook with browser TTS fallback |
+| Spoken high-value alerts | `verified` | **P-C4 + P-D5 pass** (2026-07-05): Vue voice deck at boot + policy/settings + TTS fallback |
 | Executive operator rhythm | `verified` | **P-C2 pass** (2026-07-05): full Notice/Advise/Decide/Execute/Verify/Report on `/api/briefing` |
 | KAIRO persona and operator copy | `verified` | **P-C1 pass** (2026-07-05): persisted settings API + UI toggle; neutral copy preserves run/signal truth |
 | Mobile operator cockpit compactness | `verified` | **P-C3 pass** (2026-07-05): viewport resize reactivity + viewport_compact briefing refetch |

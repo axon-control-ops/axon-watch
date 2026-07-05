@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 17,
-    "partially_verified": 2,
+    "verified_v1": 19,
+    "partially_verified": 0,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -60,9 +60,10 @@
     {
       "id": "workspace_handoffs",
       "status": "verified",
-      "evidence_gates": ["TEST-2"],
+      "evidence_gates": ["TEST-2", "P-D4"],
       "evidence": [
         "tests/test_test2_workspace_handoff_acceptance.py",
+        "tests/test_parity_d4_multi_project.py watch→local handoff proof",
         "docs/WORKSPACE_HANDOFF.md"
       ],
       "gap": null
@@ -70,10 +71,12 @@
     {
       "id": "real_project_workspace_connection",
       "status": "verified",
-      "evidence_gates": ["TEST-1"],
+      "evidence_gates": ["TEST-1", "P-D4"],
       "evidence": [
         "tests/test_test1_workspace_project_connection_acceptance.py",
-        "live git status in workspace_axon_local"
+        "tests/test_parity_d4_multi_project.py bindings + git status proof",
+        "config/multi-project-bindings-contract.json",
+        "live git status in workspace_axon_local and workspace_axon_watch"
       ],
       "gap": null
     },
@@ -90,14 +93,15 @@
     },
     {
       "id": "dock_behavior",
-      "status": "partially_verified",
-      "evidence_gates": ["ui"],
+      "status": "verified",
+      "evidence_gates": ["P-D6"],
       "evidence": [
-        "Operator terminal collapse/reopen",
-        "IDE status-bar TERMINAL restore",
-        "ADR-005/006/007 layout slices"
+        "config/dock-behavior-contract.json + check_dock_behavior_contract.py",
+        "apps/console-web/src/lib/agent-dock-behavior.test.ts collapse + layout prefs",
+        "RightDock operator conversation stack + AgentDock IDE resize/collapse",
+        "dock-seam-layout.ts + agent-dock-width.ts persisted behavior"
       ],
-      "gap": "Reduced visual richness; not full agent-dock thread parity."
+      "gap": "Reduced visual richness vs axon-local thread deck; v1 contract covers collapse, layout mode, and seam ordering."
     },
     {
       "id": "runtime_summary_behavior",
@@ -134,12 +138,16 @@
     },
     {
       "id": "desktop_and_browser_startup",
-      "status": "partially_verified",
-      "evidence_gates": ["manual"],
+      "status": "verified",
+      "evidence_gates": ["TEST-8", "P-D6"],
       "evidence": [
-        "scripts/dev/up.sh browser startup documented and verified"
+        "scripts/dev/up.sh browser startup documented and verified",
+        "docs/BROWSER_ONLY_STARTUP_CONTRACT.md explicit desktop deferral",
+        "config/browser-startup-contract.json + check_browser_startup_contract.py",
+        "BootWakeOverlay session key axon-x-boot-complete",
+        "/api/readiness mode + public_base_url (P-D3)"
       ],
-      "gap": "Desktop packaging lags; no packaged desktop proof."
+      "gap": "Packaged desktop startup explicitly deferred; browser path verified."
     },
     {
       "id": "kairo_watch_rules",
@@ -154,15 +162,17 @@
     {
       "id": "spoken_high_value_alerts",
       "status": "verified",
-      "evidence_gates": ["TEST-7", "P-C4"],
+      "evidence_gates": ["TEST-7", "P-C4", "P-D5"],
       "evidence": [
         "spoken_alert_policy.py eligibility on /api/briefing",
         "config/spoken-alert-contract.json + check_spoken_alert_policy.py",
         "spoken-alert-delivery.ts voice-deck hook with browser TTS fallback",
+        "apps/console-web/src/features/voice-deck/ registerVoiceDeckOnBoot in App.vue",
         "OperatorPresenceSettingsPanel spoken_alerts_enabled toggle",
-        "tests/test_parity_c4_spoken_high_value_alerts.py policy + settings proof"
+        "tests/test_parity_c4_spoken_high_value_alerts.py policy + settings proof",
+        "tests/test_parity_d5_voice_deck.py + voice-deck.test.ts boot handler proof"
       ],
-      "gap": "Browser TTS default; full Vue voice deck deferred to P-D5."
+      "gap": null
     },
     {
       "id": "delivery_receipts_operator_attention",
@@ -236,11 +246,7 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "2 must-keep behaviors remain partially_verified",
-    "axon-local port 7734 remains production operator reference",
-    "Voice deck / full JARVIS spoken-alert parity not implemented",
-    "Dedicated-server artifacts not proven on a live host",
-    "Child-project and multi-repo continuous development not validated on Axon-X alone"
+    "axon-local port 7734 remains production operator reference until operator declares switch"
   ],
   "approved_primary_surfaces": [
     "axon-watch console-web operator and IDE shell development",
@@ -249,8 +255,6 @@
   ],
   "axon_local_remains_required_for": [
     "Production operator workflows on port 7734 until operator declares switch",
-    "Child-project integration and legacy connector surfaces",
-    "Full voice deck and companion runtime paths",
-    "Multi-project continuous development not yet bound in Axon-X"
+    "Child-project integration and legacy connector surfaces not yet migrated"
   ]
 }

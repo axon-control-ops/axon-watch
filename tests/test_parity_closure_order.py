@@ -42,8 +42,25 @@ class ParityClosureOrderTests(unittest.TestCase):
         )
         phase_d2 = next(entry for entry in order["slices"] if entry["id"] == "P-D2")
         self.assertEqual("done", phase_d2["status"])
-        self.assertEqual("P-D3", order["next_slice"])
-        self.assertEqual("docs/PARITY_D2_DELIVERY_CHANNEL_ADAPTERS.md", phase_d2["spec"])
+
+    def test_phase_d_complete_and_snapshot_has_zero_partial_rows(self) -> None:
+        order = json.loads(
+            (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
+        )
+        phase_d = [entry for entry in order["slices"] if entry.get("phase") == "D"]
+        self.assertEqual(6, len(phase_d))
+        self.assertTrue(all(entry["status"] == "done" for entry in phase_d))
+        self.assertEqual("complete", order["next_slice"])
+
+        snapshot = json.loads(
+            (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(0, snapshot["summary"]["partially_verified"])
+        self.assertEqual(19, snapshot["summary"]["verified_v1"])
+        for parity_id in ("dock_behavior", "desktop_and_browser_startup"):
+            row = next(entry for entry in snapshot["behaviors"] if entry["id"] == parity_id)
+            with self.subTest(parity_id=parity_id):
+                self.assertEqual("verified", row["status"])
 
     def test_phase_c1_complete_and_persona_row_verified(self) -> None:
         order = json.loads(

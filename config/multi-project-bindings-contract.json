@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "required_workspace_ids": [
+    "workspace_axon_local",
+    "workspace_axon_watch"
+  ],
+  "required_connection_kind": "project_path",
+  "bindings_file": "config/workspace-project-bindings.json",
+  "handoff_proof": {
+    "source_workspace_id": "workspace_axon_watch",
+    "target_workspace_id": "workspace_axon_local"
+  }
+}

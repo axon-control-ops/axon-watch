@@ -40,6 +40,7 @@ Control-plane `/api/readiness` includes:
 - `mode` — `bootstrap` or `dedicated`
 - `watch_base_url` — from env
 - `state_dir` — from env
+- `public_base_url` — from `AXON_WATCH_PUBLIC_BASE_URL`
 
 Watch `/internal/watch/readiness` includes `state_dir`.
 

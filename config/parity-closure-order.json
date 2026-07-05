@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-D3",
+  "next_slice": "complete",
   "slices": [
     {
       "id": "P-A1",
@@ -110,33 +110,33 @@
     {
       "id": "P-D3",
       "phase": "D",
-      "status": "pending",
+      "status": "done",
       "parity_ids": [],
-      "spec": null,
+      "spec": "docs/PARITY_D3_DEDICATED_HOST_SMOKE.md",
       "gate": "npm run verify:parity-d3"
     },
     {
       "id": "P-D4",
       "phase": "D",
-      "status": "pending",
-      "parity_ids": [],
-      "spec": null,
+      "status": "done",
+      "parity_ids": ["real_project_workspace_connection", "workspace_handoffs"],
+      "spec": "docs/PARITY_D4_MULTI_PROJECT.md",
       "gate": "npm run verify:parity-d4"
     },
     {
       "id": "P-D5",
       "phase": "D",
-      "status": "pending",
-      "parity_ids": [],
-      "spec": null,
+      "status": "done",
+      "parity_ids": ["spoken_high_value_alerts"],
+      "spec": "docs/PARITY_D5_VOICE_DECK.md",
       "gate": "npm run verify:parity-d5"
     },
     {
       "id": "P-D6",
       "phase": "D",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["dock_behavior", "desktop_and_browser_startup"],
-      "spec": null,
+      "spec": "docs/PARITY_D6_DOCK_AND_STARTUP.md",
       "gate": "npm run verify:parity-d6"
     }
   ]

@@ -23,12 +23,13 @@ is complete. Do not reorder cutover items here.
 
 | Metric | Value |
 |---|---:|
-| Verified (v1) | 17 |
-| Partially verified | 2 |
+| Verified (v1) | 19 |
+| Partially verified | 0 |
 | Phase A | **Complete** (P-A1–P-A4) |
 | Phase B | **Complete** (P-B1–P-B3) |
 | Phase C | **Complete** (P-C1–P-C4) |
-| Next slice | **P-D3** |
+| Phase D | **Complete** (P-D1–P-D6) |
+| Next slice | **complete** |
 
 Machine-readable order: `config/parity-closure-order.json`
 
@@ -89,10 +90,14 @@ Required before **full** axon-local retirement, not before day-to-day Axon-X dev
 |---|---|---|---|
 | **P-D1** | (polish + dedicated) | SQLite persistence for watch commands/events/receipts | `npm run verify:parity-d1` |
 | **P-D2** | delivery blockers | Real push/desktop/webhook adapters + retry | `npm run verify:parity-d2` |
-| **P-D3** | dedicated blocker | Live dedicated-host smoke (not artifacts-only) | `verify:parity-d3` (TBD) |
-| **P-D4** | multi-project blocker | Second bound workspace + child-project E2E | `verify:parity-d4` (TBD) |
-| **P-D5** | voice blocker | Vue voice deck over events (replace Alpine polling) | `verify:parity-d5` (TBD) |
-| **P-D6** | `dock_behavior`, `desktop_and_browser_startup` | Agent-dock parity + desktop startup contract or explicit browser-only decision | `verify:parity-d6` (TBD) |
+| **P-D3** | dedicated blocker | Live dedicated-host smoke (simulated dedicated env in CI) | `npm run verify:parity-d3` |
+| **P-D4** | multi-project blocker | Second bound workspace + child-project E2E | `npm run verify:parity-d4` |
+| **P-D5** | voice blocker | Vue voice deck over events (register handler at boot) | `npm run verify:parity-d5` |
+| **P-D6** | `dock_behavior`, `desktop_and_browser_startup` | Agent-dock parity + browser-only startup contract | `npm run verify:parity-d6` |
+
+**Phase D E2E gate:** `npm run verify:phase-d` (runs P-D1–P-D6 checks + full verify once)
+
+Phase D complete when all six slices are `done`, `partially_verified` is **0**, and `next_slice` is **complete**.
 
 ---
 

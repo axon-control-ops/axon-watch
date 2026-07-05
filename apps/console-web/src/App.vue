@@ -10,10 +10,12 @@ import TopBar from './components/shell/TopBar.vue';
 import ScanHierarchyPreview from './dev/ScanHierarchyPreview.vue';
 import { startLiveEventsSession } from './lib/live-events-session';
 import { useIdeLayoutShortcuts } from './composables/useIdeLayoutShortcuts';
+import { useVoiceDeckOnBoot } from './features/voice-deck/use-voice-deck';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
 useIdeLayoutShortcuts();
+useVoiceDeckOnBoot();
 let liveEventsSession: ReturnType<typeof startLiveEventsSession> | null = null;
 const showScanPreview = ref(
   typeof window !== 'undefined' &&

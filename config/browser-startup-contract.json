@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "browser_startup_gate": "npm run verify:test8",
+  "bootstrap_entry": "scripts/dev/up.sh",
+  "desktop_deferral": true,
+  "required_docs": [
+    "docs/BROWSER_ONLY_STARTUP_CONTRACT.md",
+    "docs/DEDICATED_SERVER_READINESS.md"
+  ],
+  "console_boot_session_key": "axon-x-boot-complete",
+  "readiness_endpoint": "/api/readiness"
+}
