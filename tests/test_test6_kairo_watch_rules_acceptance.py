@@ -36,10 +36,10 @@ class Test6KairoWatchRulesAcceptance(unittest.TestCase):
     def test_inbox_items_include_watch_rule(self) -> None:
         status, payload = _request("GET", f"{CONTROL_PLANE_BASE}/api/inbox")
         self.assertEqual(200, status)
-        degraded = next(
-            row for row in payload["items"] if row["signal_id"] == "signal_runtime_summary_degraded"
+        bootstrap = next(
+            row for row in payload["items"] if row["signal_id"] == "signal_watch_bootstrap_ready"
         )
-        rule = degraded["watch_rule"]
+        rule = bootstrap["watch_rule"]
         self.assertIn(rule["mode"], {"observe", "advise", "approval", "execute"})
         self.assertTrue(rule["reason"])
         self.assertIsInstance(rule["interrupts"], bool)

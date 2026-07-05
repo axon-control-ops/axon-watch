@@ -47,6 +47,20 @@ Use it to:
 
 ---
 
+## Handbook map
+
+| Audience | Start here | Then read |
+|---|---|---|
+| **Operator (daily use)** | [Quick Start](#quick-start) | [Operator manual](#operator-manual), `docs/PRODUCTION_OPERATOR_SURFACE.md` |
+| **Teacher / reviewer** | [Teaching Axon-X](#teaching-axon-x-to-someone-else) | [Verification](#verification-commands), `docs/FINAL_PARITY_VERIFICATION.md` |
+| **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
+| **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
+| **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
+
+Shorter onboarding: [`docs/AXON-X-STARTER-GUIDE.md`](AXON-X-STARTER-GUIDE.md)
+
+---
+
 ## Quick Start
 
 This section is the living operator onboarding guide.
@@ -549,7 +563,7 @@ It avoids:
 - hidden semantic drift
 - UI and backend inventing different meanings
 
-## Quick Start
+## Detailed setup (first install)
 
 ## 1. Go to the repo
 
@@ -961,6 +975,19 @@ Avoid:
 
 ## Troubleshooting
 
+## Debugging playbook
+
+Use this order when something breaks:
+
+1. **Stack health** — `./scripts/dev/check-health.sh` (all three services + key APIs).
+2. **Restart clean** — `./scripts/dev/down.sh && ./scripts/dev/up.sh` after backend route changes.
+3. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
+4. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
+5. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
+6. **Logs** — `.local/logs/` per service; pid files under `.local/run/`.
+
+Symptom-specific fixes continue in the sections below.
+
 ## Problem: `./scripts/dev/up.sh` fails or the frontend does not start
 
 Check:
@@ -1126,6 +1153,26 @@ Note:
 - changed decisions should be superseded, not silently edited
 
 ## Tips And Tricks
+
+## Upgrading and updating
+
+After pulling new commits or changing dependencies:
+
+```bash
+cd /home/edp/axon-nvme/repos/axon-watch
+git pull
+npm install
+./scripts/dev/down.sh && ./scripts/dev/up.sh
+npm run verify:production-operator
+```
+
+Sync planning docs back to axon-local when Axon-Watch planning changed:
+
+```bash
+python3 scripts/ops/sync_planning_mirror_to_axon_local.py
+```
+
+Hard-refresh `:4173` after frontend changes. Restart the stack after control-plane or watch route changes.
 
 ## Tip 1: Read the planning bundle before expanding semantics
 

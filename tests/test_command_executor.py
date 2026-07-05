@@ -81,7 +81,7 @@ class CommandExecutorTests(unittest.TestCase):
                 return None
 
         with patch("app.chat.command_executor.urlopen", return_value=FakeResponse()):
-            result = execute_command(workspace_id="workspace_alpha", content="check health")
+            result = execute_command(workspace_id="workspace_alpha", content="health")
 
         self.assertTrue(result.success)
         self.assertIn("control-plane", result.output)

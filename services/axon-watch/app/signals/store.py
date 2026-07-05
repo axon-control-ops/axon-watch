@@ -7,6 +7,7 @@ from app.signals.bootstrap_signal import bootstrap_inbox_item
 from app.signals.connector_signal import connector_inbox_items
 from app.signals.iso_time import utc_now_iso
 from app.signals.ranking import rank_inbox_items
+from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.signals.summary_degraded_signal import summary_degraded_inbox_item
 from app.signals.suppression_store import is_signal_acknowledged
 from app.signals.watch_rule import watch_rule_for_inbox_item
@@ -16,10 +17,9 @@ def get_inbox_snapshot(
     *,
     connector_records: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
-    items = [
-        bootstrap_inbox_item(),
-        summary_degraded_inbox_item(),
-    ]
+    items = [bootstrap_inbox_item()]
+    if include_summary_degraded_signal(connector_records=connector_records):
+        items.append(summary_degraded_inbox_item())
     if connector_records is not None:
         items.extend(connector_inbox_items(connector_records))
 

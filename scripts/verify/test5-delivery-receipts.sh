@@ -52,6 +52,7 @@ echo "[4/5] Watch command + inbox regression"
 python3 -m unittest tests.test_watch_commands_events.WatchCommandsAndEventsTests -v
 python3 -m unittest tests.test_control_plane_inbox_projection -v
 python3 -m unittest tests.test_control_plane_watch_integration -v
+python3 -m unittest tests.test_watch_signal_acknowledge -v
 echo
 
 echo "[5/5] Full verify gate"

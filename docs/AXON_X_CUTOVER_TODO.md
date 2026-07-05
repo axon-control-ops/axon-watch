@@ -111,6 +111,17 @@ See `docs/PRODUCTION_OPERATOR_SURFACE.md` and `npm run verify:production-operato
 
 Append new entries here in reverse-chronological order. Do not rewrite history.
 
+### 2026-07-05 — Phase E0–E5 (post-production operator)
+
+- **Phase E** slices E0–E5 complete; **E6 paused** for final retirement review.
+- Command plane: TEST-11 shell gate (`npm run verify:shell-commands`), `check-health` /
+  `verify` shortcuts, Mission Control Connectors rail with reprobe/refresh and `:7734` fallback.
+- Third workspace binding: `workspace_axon_plans` → `../axon-local/Plans/Axon-Watch`.
+- Watch inbox: bootstrap `signal_runtime_summary_degraded` omitted when required connectors trusted.
+- Gates: `npm run verify:production-operator` PASS, `npm run verify:phase-d` PASS.
+- Docs: `docs/TRANSITION_PHASE_E_TODO.md`, `docs/LEGACY_CONNECTOR_INVENTORY.md`, handbook/starter updates.
+- Full axon-local retirement **still not approved** — see E6 in Phase E checklist.
+
 ### 2026-07-05 — Production operator surface declared
 
 - **Production operator:** Axon-X console-web at `http://127.0.0.1:4173`.

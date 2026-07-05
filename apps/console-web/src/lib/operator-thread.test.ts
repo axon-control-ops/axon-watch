@@ -90,7 +90,7 @@ describe('operator-thread', () => {
     expect(canSubmitOperatorCommand('go', 'workspace_alpha')).toBe(true);
     expect(canSubmitOperatorCommand('go', null)).toBe(false);
     expect(commandSeamHint(null)).toContain('Select a workspace');
-    expect(commandSeamHint('workspace_alpha')).toContain('active workspace');
+    expect(commandSeamHint('workspace_alpha')).toContain('IDE Agent dock');
   });
 
   it('maps API chat records and merges without duplicates', () => {

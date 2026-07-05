@@ -61,19 +61,19 @@ class Test5DeliveryReceiptsAcceptance(unittest.TestCase):
         status, payload = _request("GET", f"{CONTROL_PLANE_BASE}/api/inbox")
         self.assertEqual(200, status)
         items = payload["items"] if isinstance(payload, dict) else []
-        degraded = next(
-            (row for row in items if row.get("signal_id") == "signal_runtime_summary_degraded"),
+        bootstrap = next(
+            (row for row in items if row.get("signal_id") == "signal_watch_bootstrap_ready"),
             None,
         )
-        self.assertIsNotNone(degraded)
-        self.assertEqual("delivered", degraded.get("delivery_state"))
-        self.assertTrue(str(degraded.get("latest_receipt_id", "")).startswith("rcpt-"))
+        self.assertIsNotNone(bootstrap)
+        self.assertEqual("delivered", bootstrap.get("delivery_state"))
+        self.assertTrue(str(bootstrap.get("latest_receipt_id", "")).startswith("rcpt-"))
 
     def test_delivery_receipts_available_via_control_plane(self) -> None:
         _request("GET", f"{WATCH_BASE}/internal/watch/inbox")
         status, payload = _request("GET", f"{CONTROL_PLANE_BASE}/api/delivery/receipts?limit=10")
         self.assertEqual(200, status)
-        self.assertGreaterEqual(payload.get("count", 0), 2)
+        self.assertGreaterEqual(payload.get("count", 0), 1)
         channels = {item.get("channel") for item in payload.get("items", [])}
         self.assertIn("inbox", channels)
 
@@ -81,7 +81,7 @@ class Test5DeliveryReceiptsAcceptance(unittest.TestCase):
         status, payload = _request("GET", f"{WATCH_BASE}/internal/watch/summary")
         self.assertEqual(200, status)
         observation = payload.get("observation", {})
-        self.assertGreaterEqual(observation.get("receipts_count", 0), 2)
+        self.assertGreaterEqual(observation.get("receipts_count", 0), 1)
 
 
 if __name__ == "__main__":

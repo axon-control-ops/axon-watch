@@ -11,6 +11,20 @@ _RESUME_FROM_REVIEW = re.compile(
     re.IGNORECASE,
 )
 _RUN_PREFIX = re.compile(r"^run\s+.+", re.IGNORECASE)
+_SHORTCUT_SHELL_COMMANDS = {
+    "check-health": "./scripts/dev/check-health.sh",
+    "check health": "./scripts/dev/check-health.sh",
+    "verify": "npm run verify:production-operator",
+}
+
+
+def expand_command_shortcuts(content: str) -> str:
+    """Map allowlisted operator shortcuts to bounded `run …` shell commands."""
+    trimmed = content.strip()
+    mapped = _SHORTCUT_SHELL_COMMANDS.get(trimmed.lower())
+    if mapped is None:
+        return trimmed
+    return f"run {mapped}"
 
 
 def classify_command(content: str) -> str:
@@ -18,7 +32,12 @@ def classify_command(content: str) -> str:
     if not lowered:
         return "unsupported"
 
-    if any(token in lowered for token in ("health", "api/health", "runtime/summary")):
+    if lowered in _SHORTCUT_SHELL_COMMANDS:
+        return "shell_command"
+    if _RUN_PREFIX.match(content.strip()):
+        return "shell_command"
+
+    if lowered in {"health", "api/health"} or "api/health" in lowered or lowered == "runtime/summary":
         return "health_probe"
     if lowered.startswith("ls") or "list files" in lowered or lowered == "dir":
         return "list_files"
@@ -32,8 +51,6 @@ def classify_command(content: str) -> str:
         "resume-from-review",
     }:
         return "resume_from_review"
-    if _RUN_PREFIX.match(content.strip()):
-        return "shell_command"
     return "unsupported"
 
 
@@ -63,7 +80,7 @@ def command_display_name(content: str) -> str:
     if intent == "shell_command":
         from app.chat.shell_command import extract_shell_command_line
 
-        command_line = extract_shell_command_line(trimmed) or trimmed
+        command_line = extract_shell_command_line(expand_command_shortcuts(trimmed)) or trimmed
         return f"Run {command_line}"
     if trimmed:
         return trimmed

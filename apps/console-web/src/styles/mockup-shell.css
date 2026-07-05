@@ -2681,6 +2681,146 @@ body:has(.console-shell--mockup) {
   font-family: var(--font-mono);
 }
 
+.connectors-rail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(0, 242, 255, 0.16);
+  border-radius: 0.45rem;
+  background: rgba(0, 12, 20, 0.55);
+}
+
+.connectors-rail-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.connectors-rail-panel__eyebrow {
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.connectors-rail-panel__title {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.connectors-rail-panel__summary {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.connectors-rail-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.connectors-rail-panel__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.connectors-rail-panel__item--ok {
+  border-color: rgba(0, 255, 170, 0.18);
+}
+
+.connectors-rail-panel__item--degraded {
+  border-color: rgba(255, 196, 0, 0.22);
+}
+
+.connectors-rail-panel__item--unavailable {
+  border-color: rgba(255, 96, 96, 0.22);
+}
+
+.connectors-rail-panel__item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.connectors-rail-panel__item-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.connectors-rail-panel__required {
+  margin-left: 0.35rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.connectors-rail-panel__item-status {
+  font-size: 0.66rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.connectors-rail-panel__item-detail {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+
+.connectors-rail-panel__item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.connectors-rail-panel__action,
+.connectors-rail-panel__refresh {
+  border: 1px solid rgba(0, 242, 255, 0.24);
+  background: rgba(0, 18, 28, 0.72);
+  color: var(--text-primary);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.45rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.connectors-rail-panel__action--fallback {
+  border-color: rgba(255, 196, 0, 0.28);
+}
+
+.connectors-rail-panel__action:disabled,
+.connectors-rail-panel__refresh:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.connectors-rail-panel__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.connectors-rail-panel__error {
+  margin: 0;
+  font-size: 0.68rem;
+  color: #ff8f8f;
+}
+
 .operator-status-radar-panel {
   display: flex;
   flex: 1 1 auto;

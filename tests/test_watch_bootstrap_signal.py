@@ -65,8 +65,8 @@ class WatchBootstrapSignalTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertEqual({"items", "count", "updated_at"}, set(payload))
-        self.assertEqual(2, payload["count"])
-        self.assertEqual(2, len(payload["items"]))
+        self.assertEqual(1, payload["count"])
+        self.assertEqual(1, len(payload["items"]))
 
     def test_watch_inbox_item_matches_bootstrap_signal_identity(self) -> None:
         response = self.client.get("/internal/watch/inbox")
@@ -85,7 +85,7 @@ class WatchBootstrapSignalTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         notes = payload["bootstrap_notes"]
-        self.assertTrue(notes["summary_degraded_signal_expected"])
+        self.assertFalse(notes["summary_degraded_signal_expected"])
         self.assertIn("bootstrap", notes["detail"].lower())
 
 

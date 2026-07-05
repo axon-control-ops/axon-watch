@@ -60,10 +60,10 @@ class ControlPlaneWatchIntegrationTests(unittest.TestCase):
 
         self.assertEqual(200, response.status_code)
         payload = response.json()
-        self.assertEqual(2, payload["count"])
+        self.assertEqual(1, payload["count"])
         signal_ids = {item["signal_id"] for item in payload["items"]}
         self.assertIn(BOOTSTRAP_SIGNAL_ID, signal_ids)
-        self.assertIn(SUMMARY_DEGRADED_SIGNAL_ID, signal_ids)
+        self.assertNotIn(SUMMARY_DEGRADED_SIGNAL_ID, signal_ids)
 
     def test_runtime_summary_marks_watch_connected_from_live_probe(self) -> None:
         response = self.client.get("/api/runtime/summary")
@@ -80,7 +80,7 @@ class ControlPlaneWatchIntegrationTests(unittest.TestCase):
         summary_item = self.client.get("/api/runtime/summary").json()["signals"]["top_items"][0]
 
         self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(summary_item))
-        self.assertEqual(SUMMARY_DEGRADED_SIGNAL_ID, inbox_item["signal_id"])
+        self.assertEqual(BOOTSTRAP_SIGNAL_ID, inbox_item["signal_id"])
 
     def test_inbox_signals_acknowledge_clears_active_signals(self) -> None:
         before = self.client.get("/api/inbox").json()

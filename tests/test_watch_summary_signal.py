@@ -41,9 +41,12 @@ def _load_watch_app():
 
     sys.path.insert(0, str(WATCH_ROOT))
     from app.main import app as watch_app  # noqa: WPS433
-    from app.signals.summary_degraded_signal import summary_degraded_signal_event  # noqa: WPS433
+    from app.signals.summary_degraded_signal import (  # noqa: WPS433
+        summary_degraded_inbox_item,
+        summary_degraded_signal_event,
+    )
 
-    return watch_app, summary_degraded_signal_event, cached
+    return watch_app, summary_degraded_inbox_item, summary_degraded_signal_event, cached
 
 
 def _restore_modules(cached: dict[str, object]) -> None:
@@ -73,7 +76,12 @@ _IDENTITY_EVENT_FIELDS = (
 class WatchSummarySignalTests(unittest.TestCase):
     def setUp(self) -> None:
         self._cached_modules: dict[str, object] = {}
-        watch_app, self.summary_degraded_signal_event, self._cached_modules = _load_watch_app()
+        (
+            watch_app,
+            self.summary_degraded_inbox_item,
+            self.summary_degraded_signal_event,
+            self._cached_modules,
+        ) = _load_watch_app()
         isolate_watch_db(self)
         from app.delivery import store as delivery_store  # noqa: WPS433
         from app.events import store as event_store  # noqa: WPS433
@@ -88,20 +96,17 @@ class WatchSummarySignalTests(unittest.TestCase):
     def tearDown(self) -> None:
         _restore_modules(self._cached_modules)
 
-    def test_watch_inbox_ranks_summary_degraded_above_bootstrap(self) -> None:
+    def test_watch_inbox_omits_summary_degraded_when_required_connectors_ok(self) -> None:
         response = self.client.get("/internal/watch/inbox")
 
         self.assertEqual(200, response.status_code)
         items = response.json()["items"]
-        self.assertEqual(2, len(items))
-        self.assertEqual(SUMMARY_DEGRADED_SIGNAL_ID, items[0]["signal_id"])
-        self.assertEqual("signal_watch_bootstrap_ready", items[1]["signal_id"])
+        signal_ids = [item["signal_id"] for item in items]
+        self.assertNotIn(SUMMARY_DEGRADED_SIGNAL_ID, signal_ids)
+        self.assertEqual("signal_watch_bootstrap_ready", items[0]["signal_id"])
 
     def test_watch_inbox_item_matches_summary_degraded_contract_fixture(self) -> None:
-        response = self.client.get("/internal/watch/inbox")
-        item = next(
-            row for row in response.json()["items"] if row["signal_id"] == SUMMARY_DEGRADED_SIGNAL_ID
-        )
+        item = self.summary_degraded_inbox_item()
         fixture_item = _load_fixture("inbox-item.example.json")
 
         self.assertEqual(consistency_tuple(fixture_item), consistency_tuple(item))

@@ -40,8 +40,8 @@ axon-local is **not** the default starting point for operator work anymore.
 
 ### 1. Pick your real workspace
 
-After refresh, the left sidebar shows **axon-watch** and **axon-local** (not the old
-demo names like `workspace_nlp`). Start with **axon-watch**.
+After refresh, the left sidebar shows **axon-watch**, **axon-local**, and **DashPro**
+(not the old demo names like `workspace_nlp`). Start with **axon-watch**.
 
 If you still see demo workspaces, hard-refresh the browser (`Ctrl+Shift+R`) to load
 the latest console bundle.
@@ -52,7 +52,7 @@ Use this for day-to-day ops:
 
 | Region | What to do |
 |---|---|
-| **Left → Workspaces** | Select `axon-watch` or `axon-local` |
+| **Left → Workspaces** | Select `axon-watch`, `axon-local`, or `DashPro` |
 | **Left → Attention** | Signals, approvals, delivery badges |
 | **Center** | Mission control — run phase, live feed, **Resume / Complete** |
 | **Right → Conversation** | Type **commands** (see below) — not free-form chat yet |
@@ -66,11 +66,17 @@ The command seam accepts **exact commands** only. Natural language will fail.
 |---|---|
 | `git status` | Git status in the bound repo root |
 | `health` | Control-plane health probe |
+| `check-health` | Shortcut → `run ./scripts/dev/check-health.sh` |
+| `verify` | Shortcut → `run npm run verify:production-operator` |
+| `run …` | Bounded shell command in workspace root (e.g. `run npm test`) |
 | `ls` / `list files` | List workspace files |
 | `read README.md` | Read a file |
 | `resume from review` | Resume the primary review_ready run |
 
-**Footer → Commands** opens the supported-command list and can prefill the Command seam.
+**Footer → Commands** opens the supported-command list. **Run** submits immediately.
+
+Mission Control includes a **Connectors** rail (`GET /api/connectors`) with **Reprobe**,
+**Refresh summary**, and **Open :7734 fallback** for the legacy axon-local connector.
 
 Full guide: `docs/HOW-TO-HANDBOOK.md` → **Quick Start**.
 

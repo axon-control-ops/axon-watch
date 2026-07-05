@@ -5,6 +5,7 @@ import {
   approveRun,
   acknowledgeInboxSignals,
   completeRun,
+  fetchConnectors,
   fetchInbox,
   fetchOperatorBriefing,
   fetchOperatorPresenceSettings,
@@ -19,6 +20,7 @@ import {
   fetchWorkspaceFiles,
   markRunReviewReady,
   postChatMessage,
+  postWatchCommand,
   rejectRun,
   renameWorkspaceFile,
   resumeRun,
@@ -26,6 +28,7 @@ import {
   saveOperatorPresenceSettings,
   stopRun,
 } from '../api/control-plane';
+import type { ConnectorProbeRecord } from '../api/control-plane';
 import type {
   ApprovalRecord,
   InboxItem,
@@ -216,6 +219,17 @@ export const useShellStore = defineStore('shell', () => {
   const inboxItems = ref<InboxItem[]>([]);
   const inboxLoadState = ref<InboxLoadState>('idle');
   const inboxError = ref<string | null>(null);
+  const connectorsItems = ref<ConnectorProbeRecord[]>([]);
+  const connectorsSummary = ref<{
+    configured: number;
+    ok: number;
+    degraded: number;
+    unavailable: number;
+    required_unavailable: number;
+  } | null>(null);
+  const connectorsLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const connectorsError = ref<string | null>(null);
+  const connectorMutationPending = ref(false);
   const operatorBriefing = ref<OperatorBriefing | null>(null);
   const operatorPresenceSettings = ref<OperatorPresenceSettings>(
     readPersistedOperatorPresenceSettings() ?? defaultOperatorPresenceSettings(),
@@ -1172,6 +1186,65 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function loadConnectors(): Promise<void> {
+    connectorsLoadState.value = 'loading';
+    connectorsError.value = null;
+
+    try {
+      const snapshot = await fetchConnectors();
+      connectorsItems.value = snapshot.items;
+      connectorsSummary.value = snapshot.summary;
+      connectorsLoadState.value = 'loaded';
+    } catch (error) {
+      connectorsLoadState.value = 'error';
+      connectorsError.value =
+        error instanceof Error ? error.message : 'connectors request failed';
+    }
+  }
+
+  async function reprobeConnector(connectorId: string): Promise<void> {
+    connectorMutationPending.value = true;
+    connectorsError.value = null;
+
+    try {
+      await postWatchCommand({
+        command_type: 'reprobe_connector',
+        target_type: 'connector',
+        target_id: connectorId,
+        requested_by: 'operator',
+      });
+      await Promise.all([loadConnectors(), loadRuntimeSummary(), loadInbox()]);
+    } catch (error) {
+      connectorsError.value =
+        error instanceof Error ? error.message : 'connector reprobe failed';
+    } finally {
+      connectorMutationPending.value = false;
+    }
+  }
+
+  async function refreshWatchSummary(): Promise<void> {
+    connectorMutationPending.value = true;
+    connectorsError.value = null;
+
+    try {
+      await postWatchCommand({
+        command_type: 'refresh_summary',
+        requested_by: 'operator',
+      });
+      await Promise.all([
+        loadConnectors(),
+        loadRuntimeSummary(),
+        loadInbox(),
+        loadOperatorBriefing(),
+      ]);
+    } catch (error) {
+      connectorsError.value =
+        error instanceof Error ? error.message : 'watch summary refresh failed';
+    } finally {
+      connectorMutationPending.value = false;
+    }
+  }
+
   async function loadOperatorPresenceSettings(): Promise<void> {
     const cached = readPersistedOperatorPresenceSettings();
     if (cached) {
@@ -1315,7 +1388,13 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function refreshRunSurfaces(): Promise<void> {
-    await Promise.all([loadRuns(), loadRuntimeSummary(), loadInbox(), loadOperatorBriefing()]);
+    await Promise.all([
+      loadRuns(),
+      loadRuntimeSummary(),
+      loadInbox(),
+      loadConnectors(),
+      loadOperatorBriefing(),
+    ]);
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
   }
 
@@ -1466,6 +1545,7 @@ export const useShellStore = defineStore('shell', () => {
     await Promise.all([
       loadRuntimeSummary(),
       loadInbox(),
+      loadConnectors(),
       loadOperatorBriefing(),
     ]);
     await loadWorkspaces({ sync: false });
@@ -1538,9 +1618,15 @@ export const useShellStore = defineStore('shell', () => {
     viewportWidth,
     clearActiveSignals,
     completePrimaryRun,
+    connectorMutationPending,
+    connectorsError,
+    connectorsItems,
+    connectorsLoadState,
+    connectorsSummary,
     bindViewportCompactListener,
     unbindViewportCompactListener,
     loadBootstrapData,
+    loadConnectors,
     loadInbox,
     loadOperatorBriefing,
     loadOperatorPresenceSettings,
@@ -1559,7 +1645,9 @@ export const useShellStore = defineStore('shell', () => {
     primaryApprovalRun,
     primaryInboxItem,
     refreshRunSurfaces,
+    refreshWatchSummary,
     rejectPrimaryRun,
+    reprobeConnector,
     runOperatorCommand,
     resumePrimaryRun,
     runs,

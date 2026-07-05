@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from app.chat.command_executor import classify_command
+from app.chat.command_intent import classify_command, expand_command_shortcuts
 from app.chat.dispatch import build_command_dispatch_ack, resolve_command_dispatch
 from app.chat.orchestration import (
     build_agent_command_reply,
@@ -48,7 +48,8 @@ def post_chat_message(
 
     _validate_workspace(workspace_id)
     created_at = _utc_now()
-    intent = classify_command(trimmed)
+    normalized = expand_command_shortcuts(trimmed)
+    intent = classify_command(normalized)
     if intent == "resume_from_review":
         run_record, execution = orchestrate_resume_from_review(workspace_id=workspace_id)
         dispatch_run_id = str(run_record["run_id"])
@@ -56,12 +57,12 @@ def post_chat_message(
     else:
         dispatch_run_id, run_record, dispatched = resolve_command_dispatch(
             workspace_id=workspace_id,
-            content=trimmed,
+            content=normalized,
             run_id=run_id,
         )
         run_record, execution = orchestrate_command_run(
             workspace_id=workspace_id,
-            content=trimmed,
+            content=normalized,
             run_record=run_record,
             dispatched=dispatched,
         )
@@ -69,9 +70,10 @@ def post_chat_message(
         run_id=dispatch_run_id,
         phase=str(run_record["phase"]),
         dispatched=dispatched,
+        execution=execution,
     )
     agent_content = build_agent_command_reply(
-        content=trimmed,
+        content=normalized,
         run_record=run_record,
         dispatched=dispatched,
         execution=execution,

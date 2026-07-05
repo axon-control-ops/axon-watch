@@ -168,6 +168,15 @@ Type natural commands in the **Command** hero. Supported intents:
 | `read README.md` | Reads a workspace file |
 | `git status` | Runs git in workspace root (real output for bound repos) |
 | `resume from review` | Resumes primary `review_ready` run for this workspace |
+| `run npm test` | Runs a bounded shell command in the workspace project root |
+| `run ./scripts/dev/check-health.sh` | Stack health from the bound repo |
+| `check-health` | Shortcut for the health script above |
+| `verify` | Shortcut for `npm run verify:production-operator` |
+
+Footer **Commands → Run** submits immediately (does not copy-only).
+
+Watch **Connectors** in Mission Control shows probe status, **Reprobe**, **Refresh summary**,
+and **Open :7734 fallback** for unmigrated axon-local paths.
 
 Unsupported text gets a helpful capability list back — not a silent failure.
 

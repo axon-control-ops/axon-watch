@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from app.chat.command_intent import classify_command
+from app.chat.command_intent import classify_command, expand_command_shortcuts
 from app.chat.shell_command import execute_shell_command
 from app.runs.service import RunLifecycleError, list_pending_review_runs, resume_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
@@ -228,6 +228,8 @@ def execute_unsupported(content: str) -> CommandExecutionResult:
         "• read README.md / cat notes.txt — read a workspace file\n"
         "• git status — show git status in the workspace root\n"
         "• resume from review — resume the primary review_ready run\n"
+        "• verify — run production-operator smoke gate\n"
+        "• check-health — run ./scripts/dev/check-health.sh\n"
         "• run npm test — run a bounded shell command in the workspace root"
     )
     return CommandExecutionResult(
@@ -239,17 +241,18 @@ def execute_unsupported(content: str) -> CommandExecutionResult:
 
 
 def execute_command(*, workspace_id: str, content: str) -> CommandExecutionResult:
-    intent = classify_command(content)
+    normalized = expand_command_shortcuts(content)
+    intent = classify_command(normalized)
     if intent == "health_probe":
         return execute_health_probe()
     if intent == "list_files":
         return execute_list_files(workspace_id)
     if intent == "read_file":
-        return execute_read_file(workspace_id, content)
+        return execute_read_file(workspace_id, normalized)
     if intent == "git_status":
         return execute_git_status(workspace_id)
     if intent == "resume_from_review":
         return execute_resume_from_review(workspace_id)
     if intent == "shell_command":
-        return execute_shell_command_intent(workspace_id, content)
-    return execute_unsupported(content)
+        return execute_shell_command_intent(workspace_id, normalized)
+    return execute_unsupported(normalized)

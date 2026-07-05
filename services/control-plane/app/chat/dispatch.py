@@ -32,10 +32,23 @@ def build_command_dispatch_ack(
     run_id: str,
     phase: str,
     dispatched: bool,
+    execution: object | None = None,
 ) -> str:
     if dispatched:
-        return f"Run {run_id} dispatched · phase {phase}"
-    return f"Command linked to run {run_id} · phase {phase}"
+        base = f"Run {run_id} dispatched · phase {phase}"
+    else:
+        base = f"Command linked to run {run_id} · phase {phase}"
+
+    if execution is None:
+        return base
+
+    intent = str(getattr(execution, "intent", "")).strip()
+    success = bool(getattr(execution, "success", False))
+    if not intent:
+        return base
+
+    status = "ok" if success else "failed"
+    return f"{base} · executed {intent} ({status})"
 
 
 def resolve_command_dispatch(

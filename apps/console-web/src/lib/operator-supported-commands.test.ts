@@ -13,6 +13,7 @@ describe('operator supported commands', () => {
       'read_file',
       'git_status',
       'resume_from_review',
+      'shell_command',
     ]);
   });
 

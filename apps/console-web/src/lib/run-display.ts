@@ -61,7 +61,7 @@ export function formatRunCommandDetail(run: Pick<RunRecord, 'summary' | 'detail'
   }
 
   const summary = run.summary?.trim();
-  if (summary && summary !== formatRunDisplayName(run)) {
+  if (summary && summary !== humanizeRunSummary(summary)) {
     return summary;
   }
 

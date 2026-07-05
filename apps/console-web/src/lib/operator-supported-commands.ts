@@ -36,6 +36,8 @@ export const OPERATOR_SUPPORTED_COMMANDS: OperatorSupportedCommand[] = [
     examples: [
       'run npm test',
       'run ./scripts/dev/check-health.sh',
+      'check-health',
+      'verify',
       'run npm run verify:production-operator',
     ],
     description: 'Run a bounded shell command in the workspace project root',

@@ -70,13 +70,14 @@ class ParityD4MultiProjectTests(unittest.TestCase):
         verify_script = package["scripts"]["verify:contracts"]
         self.assertIn("tests.test_parity_d4_multi_project", verify_script)
 
-    def test_default_bindings_include_watch_and_local_workspaces(self) -> None:
+    def test_default_bindings_include_watch_local_and_plans_workspaces(self) -> None:
         bindings = json.loads(
             (REPO_ROOT / "config" / "workspace-project-bindings.json").read_text(encoding="utf-8")
         )
         bound = bindings["bindings"]
         self.assertIn(WORKSPACE_AXON_LOCAL, bound)
         self.assertIn(WORKSPACE_AXON_WATCH, bound)
+        self.assertIn("workspace_dashpro", bound)
 
     def test_workspace_catalog_lists_both_bound_projects(self) -> None:
         response = self.client.get("/api/workspaces")
@@ -85,8 +86,28 @@ class ParityD4MultiProjectTests(unittest.TestCase):
         by_id = {item["workspace_id"]: item for item in items}
         self.assertIn(WORKSPACE_AXON_LOCAL, by_id)
         self.assertIn(WORKSPACE_AXON_WATCH, by_id)
+        self.assertIn("workspace_dashpro", by_id)
         self.assertEqual("project_path", by_id[WORKSPACE_AXON_LOCAL]["connection_kind"])
         self.assertEqual("project_path", by_id[WORKSPACE_AXON_WATCH]["connection_kind"])
+
+    def test_handoff_from_watch_to_dashpro_returns_project_path_summary(self) -> None:
+        response = self.client.post(
+            f"/api/workspaces/{WORKSPACE_AXON_WATCH}/handoffs",
+            json={
+                "target_workspace_id": "workspace_dashpro",
+                "task": "Child-project handoff proof",
+                "reason": "multi-project contract",
+            },
+        )
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        handoff = payload["handoff"]
+        self.assertEqual(WORKSPACE_AXON_WATCH, handoff["source_workspace_id"])
+        self.assertEqual("workspace_dashpro", handoff["target_workspace_id"])
+        summary = payload["target_workspace_summary"]
+        self.assertEqual("workspace_dashpro", summary["workspace_id"])
+        self.assertEqual("project_path", summary["connection_kind"])
+        self.assertTrue(str(summary.get("project_root", "")).endswith("dashpro"))
 
     def test_handoff_from_watch_to_local_returns_project_path_summary(self) -> None:
         response = self.client.post(

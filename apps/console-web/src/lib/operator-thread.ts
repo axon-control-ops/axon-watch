@@ -139,5 +139,5 @@ export function commandSeamHint(workspaceId: string | null): string {
   if (!workspaceId) {
     return 'Select a workspace to send operator commands.';
   }
-  return 'Attach intent to the active workspace and run context.';
+  return 'Bounded operator commands only. Switch to IDE Agent dock for scoped plan/ask.';
 }

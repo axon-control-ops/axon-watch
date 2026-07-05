@@ -564,3 +564,77 @@ export async function fetchWorkspaceChatThread(
 
   return response.json() as Promise<WorkspaceChatThreadSnapshot>;
 }
+
+export interface ConnectorProbeRecord {
+  connector_id: string;
+  display_name: string;
+  status: string;
+  required: boolean;
+  workspace_id?: string;
+  health_url?: string;
+  detail?: string;
+  latency_ms?: number;
+  last_checked_at?: string;
+}
+
+export interface ConnectorsSnapshot {
+  count: number;
+  summary: {
+    configured: number;
+    ok: number;
+    degraded: number;
+    unavailable: number;
+    required_unavailable: number;
+    last_updated_at?: string;
+  };
+  items: ConnectorProbeRecord[];
+}
+
+export async function fetchConnectors(): Promise<ConnectorsSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/connectors` : '/api/connectors';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`connectors request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<ConnectorsSnapshot>;
+}
+
+export interface PostWatchCommandRequest {
+  command_type: string;
+  target_type?: string;
+  target_id?: string;
+  requested_by?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface PostWatchCommandResponse {
+  accepted?: boolean;
+  command_id?: string;
+  status?: string;
+  receipt?: {
+    result?: Record<string, unknown>;
+  };
+}
+
+export async function postWatchCommand(
+  body: PostWatchCommandRequest,
+): Promise<PostWatchCommandResponse> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/watch/commands` : '/api/watch/commands';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`watch command request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<PostWatchCommandResponse>;
+}
+
+export const LEGACY_AXON_LOCAL_FALLBACK_URL = 'http://127.0.0.1:7734';

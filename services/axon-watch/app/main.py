@@ -15,6 +15,7 @@ from app.connectors.summary import probe_all_connectors
 from app.events.store import list_events
 from app.events.stream import watch_events_stream_response
 from app.signals.store import get_inbox_snapshot
+from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.watch_summary import build_connectors_response, build_watch_summary
 
 
@@ -53,6 +54,9 @@ def health() -> dict[str, str]:
 def readiness() -> dict[str, object]:
     connectors = build_connectors_response()
     summary = connectors.get("summary", {})
+    connector_items = connectors.get("items")
+    records = connector_items if isinstance(connector_items, list) else None
+    degraded_expected = include_summary_degraded_signal(connector_records=records)
     return {
         "service": "axon-watch",
         "status": "ready",
@@ -64,11 +68,11 @@ def readiness() -> dict[str, object]:
             "connectors_required_unavailable": summary.get("required_unavailable", 0),
         },
         "bootstrap_notes": {
-            "summary_degraded_signal_expected": True,
+            "summary_degraded_signal_expected": degraded_expected,
             "detail": (
-                "Local bootstrap emits a stale runtime-summary signal while watch "
-                "connectivity is healthy; connector probes and watch commands/events "
-                "are available on dedicated routes."
+                "Bootstrap may emit a stale runtime-summary signal until required "
+                "connector probes are trusted; connector probes and watch "
+                "commands/events are available on dedicated routes."
             ),
         },
     }

@@ -162,22 +162,22 @@ onUnmounted(() => {
               <p class="supported-commands-footer__description">{{ command.description }}</p>
             </div>
             <div class="supported-commands-footer__actions">
-              <button
-                v-for="example in command.examples"
-                :key="example"
-                type="button"
-                class="supported-commands-footer__action"
-                @click="runExample(example)"
-              >
-                {{ shell.commandMutationState === 'submitting' ? 'Running…' : 'Run' }}
-              </button>
-              <button
-                type="button"
-                class="supported-commands-footer__action supported-commands-footer__action--ghost"
-                @click="copyExample(example)"
-              >
-                {{ copiedExample === example ? 'Copied' : 'Copy' }}
-              </button>
+              <template v-for="example in command.examples" :key="example">
+                <button
+                  type="button"
+                  class="supported-commands-footer__action"
+                  @click="runExample(example)"
+                >
+                  {{ shell.commandMutationState === 'submitting' ? 'Running…' : 'Run' }}
+                </button>
+                <button
+                  type="button"
+                  class="supported-commands-footer__action supported-commands-footer__action--ghost"
+                  @click="copyExample(example)"
+                >
+                  {{ copiedExample === example ? 'Copied' : 'Copy' }}
+                </button>
+              </template>
             </div>
           </li>
         </ul>

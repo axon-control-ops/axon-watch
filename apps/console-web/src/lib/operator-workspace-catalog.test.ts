@@ -52,6 +52,23 @@ describe('operator workspace catalog', () => {
     ]);
   });
 
+  it('includes additional bound child workspaces after axon-watch and axon-local', () => {
+    const withChild: WorkspaceRecord[] = [
+      ...productionItems,
+      {
+        workspace_id: 'workspace_dashpro',
+        connection_kind: 'project_path',
+        project_root: '/home/edp/Projectx/product/dashpro',
+        display_name: 'DashPro',
+      },
+    ];
+    expect(mergeOperatorWorkspaceCatalog(withChild).map((item) => item.workspace_id)).toEqual([
+      'workspace_axon_watch',
+      'workspace_axon_local',
+      'workspace_dashpro',
+    ]);
+  });
+
   it('defaults to workspace_axon_watch in production catalog mode', () => {
     expect(defaultOperatorWorkspaceId(mergeOperatorWorkspaceCatalog(productionItems))).toBe(
       'workspace_axon_watch',

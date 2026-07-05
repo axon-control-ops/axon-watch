@@ -17,6 +17,7 @@ import {
   formatRunShortId,
 } from '../../lib/run-display';
 import { useShellStore } from '../../stores/shell';
+import ConnectorsRailPanel from './ConnectorsRailPanel.vue';
 
 const props = defineProps<{
   terminalVisible: boolean;
@@ -357,6 +358,8 @@ function toggleTerminal(): void {
         {{ shell.runMutationError }}
       </p>
     </section>
+
+    <ConnectorsRailPanel />
 
     <div class="operator-status-radar-panel__utility-actions">
       <button
