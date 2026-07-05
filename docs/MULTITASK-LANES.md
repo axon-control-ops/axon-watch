@@ -109,7 +109,7 @@ Do not start these until coordinator opens the slice:
 | Item | Owner | Reason |
 |---|---|---|
 | KAIRO operator-presence integration (JX-1–JX-5) | Coordinator | Cross-cutting persona, voice, watch rules — planning only in `axon-local` |
-| Cross-repo planning migration | Coordinator | `axon-local/Plans/Axon-Watch/` remains frozen planning home |
+| Cross-repo planning migration | Coordinator | **Done** — canonical bundle in `docs/planning/` (TEST-9, 2026-07-05) |
 | Shared-contract field changes | Coordinator | `packages/shared-types`, run-state truth surfaces |
 
 ## Completed Queue
@@ -151,6 +151,7 @@ One slice per pass; run the verification gate before the next item.
 | **7** | **TEST-6** | A (+ C) | KAIRO watch rules — `watch_rule` on inbox items, mode mapping, Attention chip | **Done** — `./scripts/verify/test6-kairo-watch-rules.sh` + `docs/KAIRO_WATCH_RULES.md` (2026-07-05) |
 | **8** | **TEST-7** | B (+ C) | Operator presence — persona, spoken-alert eligibility, mobile compact shell | **Done** — `./scripts/verify/test7-operator-presence.sh` + `docs/OPERATOR_PRESENCE.md` (2026-07-05) |
 | **9** | **TEST-8** | D | Dedicated-server readiness — topology, env validation, systemd/Caddy/compose | **Done** — `./scripts/verify/test8-dedicated-server-readiness.sh` + `docs/DEDICATED_SERVER_READINESS.md` (2026-07-05) |
+| **10** | **TEST-9** | Coordinator | Cross-repo planning migration — canonical `docs/planning/` bundle + manifest | **Done** — `./scripts/verify/test9-cross-repo-planning-migration.sh` + `docs/CROSS_REPO_PLANNING_MIGRATION.md` (2026-07-05) |
 | 4 | C4 | C (+ B) | Wire **approve/reject** actions from Attention sidebar to existing API | **Done** — `AttentionStackPanel` APPROVE/REJECT → `/api/runs/{id}/approve|reject` |
 | 5 | C5 | C (+ B) | Expand command executor (`git status`, resume-from-review command) | **Done** — `git status` + `resume from review` via chat orchestration |
 | 6 | D2 | D | Capture `shell_boot_readiness` + latency timing evidence | **Done** — `measure_shell_boot.py` + `collect-verify-evidence.sh` |
@@ -160,7 +161,7 @@ One slice per pass; run the verification gate before the next item.
 | ID | Lane | Slice |
 |---|---|---|
 | JX-1–5 | Coordinator | KAIRO watch rules, delivery policy, voice, persona, mobile |
-| — | Coordinator | Cross-repo planning migration |
+| — | Coordinator | Cross-repo planning migration — **Done** (TEST-9, `docs/planning/`) |
 | — | Coordinator | `axon-local` ADR-005 (KAIRO presence layer) — **not** the same as repo ADR-005 (sidebar attention) |
 
 ## Layout ADR index (implementation repo)

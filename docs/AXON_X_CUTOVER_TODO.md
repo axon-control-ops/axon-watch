@@ -10,8 +10,9 @@ Use this file for cutover readiness only.
 Source inputs:
 
 - implementation truth: `docs/MULTITASK-LANES.md`
-- target parity: `axon-local/Plans/Axon-Watch/PARITY_LEDGER.md`
-- roadmap context: `axon-local/Plans/Axon-Watch/IMPLEMENTATION_ROADMAP.md`
+- target parity: `docs/planning/PARITY_LEDGER.md`
+- roadmap context: `docs/planning/IMPLEMENTATION_ROADMAP.md`
+- migration spec: `docs/CROSS_REPO_PLANNING_MIGRATION.md`
 
 ## Lock Rule
 
@@ -86,9 +87,10 @@ multi-project development.
   (deployment topology, env validation, systemd/Caddy/compose artifacts,
   config-driven readiness). Spec: `docs/DEDICATED_SERVER_READINESS.md`.
 
-- [ ] Cross-repo planning migration
-  Reason: frozen planning still lives in `axon-local`; final cutover should not
-  depend on split-brain documentation.
+- [x] Cross-repo planning migration
+  Verified 2026-07-05 via `./scripts/verify/test9-cross-repo-planning-migration.sh`
+  (canonical bundle in `docs/planning/`, `MANIFEST.json` integrity, axon-local
+  continuity mirror sync script). Spec: `docs/CROSS_REPO_PLANNING_MIGRATION.md`.
 
 - [ ] Final parity verification and cutover decision
   Reason: do not retire `axon-local` until the must-keep behaviors are verified,
@@ -99,6 +101,10 @@ multi-project development.
 Append new entries here in reverse-chronological order. Do not rewrite history.
 
 ### 2026-07-05 (continued)
+
+- **TEST-9** cross-repo planning migration verified: canonical bundle in
+  `docs/planning/`, manifest validation, cutover references updated.
+  Gate: `./scripts/verify/test9-cross-repo-planning-migration.sh`.
 
 - **TEST-8** dedicated-server readiness verified: deployment topology, env
   validation, systemd/Caddy/compose artifacts, readiness `state_dir`/`mode`.

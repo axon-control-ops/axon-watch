@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "canonical_home": "docs/planning/",
+  "legacy_mirror": "axon-local/Plans/Axon-Watch/",
+  "generated_on": "2026-07-05",
+  "file_count": 29,
+  "files": {
+    "ADR-001-greenfield-repo.md": {
+      "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
+      "bytes": 2048
+    },
+    "ADR-002-vue-monaco-xterm-stack.md": {
+      "sha256": "4fe2e22b3597f1a687676c72dee77db2dc4563a96442a5746bd1c25a09799e91",
+      "bytes": 1917
+    },
+    "ADR-003-watch-control-boundary.md": {
+      "sha256": "2b372e2d612659ce4b26b75e3bb7ecf927c2ca4c3c49152a8232bb8a5bedfd94",
+      "bytes": 1838
+    },
+    "ADR-004-execution-state-model.md": {
+      "sha256": "e156fe7a0af4141ac89f1d602bce367ed45365392ef6f1594055aec298d7a7e7",
+      "bytes": 1991
+    },
+    "ADR-005-kairo-as-operator-presence-layer.md": {
+      "sha256": "c26d93f7b3a1d8d207afadee8ec453999e6fc9c6ce8fe99be8247b6a054a02cf",
+      "bytes": 3004
+    },
+    "ADR_GOVERNANCE.md": {
+      "sha256": "f35109fa206d3658b397f1fdf4ad78236fe225c5a52226ac7e5f765dca302051",
+      "bytes": 2894
+    },
+    "ARCHITECTURE.md": {
+      "sha256": "5e5a9430ba1c4110209ddbd43e831a7a6f89ccb9001041c85657078c0b417710",
+      "bytes": 4131
+    },
+    "CONTRACT_TESTING_SPEC.md": {
+      "sha256": "c4081b0ac81cc283dfed0f32b82633115a06d0808dcdb1a0373a29b27d31edb4",
+      "bytes": 3647
+    },
+    "DELIVERY_PLAN.md": {
+      "sha256": "8b5053cfaa554a7a650a7ceae4a1f7bcb01ef752d27a483ac88093b083e8975a",
+      "bytes": 3278
+    },
+    "FITNESS_FUNCTIONS.md": {
+      "sha256": "689eb3c0008eed8a20b297c7a6952211fb1046c6d0b0e38488be93c9a52ea50a",
+      "bytes": 5292
+    },
+    "IMPLEMENTATION_ROADMAP.md": {
+      "sha256": "418de6a9cf1fc2c77533437bf2e3766ad1d717b158b7c62801265e373f833811",
+      "bytes": 9062
+    },
+    "IMPORT_MATRIX.md": {
+      "sha256": "2b534010e891edf3e71d38a6e1d5769f49e137556b8497c6cefad757e6f32d47",
+      "bytes": 6383
+    },
+    "KAIRO_MODE.md": {
+      "sha256": "bb4b5d187d5b91a9a9a4b8c419122a8f1080f96a73cc54df055ff53547c7e8a4",
+      "bytes": 13053
+    },
+    "PARITY_LEDGER.md": {
+      "sha256": "581d201bf06a3edb45c88b8a0b576c9ba10b1bcde270ca6998863dcefef9f486",
+      "bytes": 11028
+    },
+    "PRODUCT.md": {
+      "sha256": "a270d2f52dfa47533c95a66683f13eb72e5ed657da695bed822d740a06ff4ae6",
+      "bytes": 3178
+    },
+    "README.md": {
+      "sha256": "122f918737de574697ce49c25d7ea3e1bc917f934007218bd9c4df853a5bad1a",
+      "bytes": 2938
+    },
+    "REPO_BOOTSTRAP_SPEC.md": {
+      "sha256": "b8617bb75e4b9224f5a6970dc4c43daed46701bd9f7417bfde6b5cfcac5050c9",
+      "bytes": 4205
+    },
+    "SERVER_DEPLOYMENT_SPEC.md": {
+      "sha256": "08076d29985abf962b6a84caf5d0440e9c92a424cd504d369c1c437f0353da4d",
+      "bytes": 3240
+    },
+    "TEST_STRATEGY.md": {
+      "sha256": "3f6d93a3076313249a031c1c4e8ddce1db5c6f7594f9974c64ec3369b9f1ef1f",
+      "bytes": 3292
+    },
+    "TRANSITION_ARCHITECTURE.md": {
+      "sha256": "8ac480b8c8bc61d82c64d4f351a7a184a615fedbc2b2134a2e325fd270713e16",
+      "bytes": 6345
+    },
+    "UI_COMPOSITION_SPEC.md": {
+      "sha256": "74b880bc2025f16a2a630748d1b57476c79767aed19f2ceb31b9ac88efde10ed",
+      "bytes": 15949
+    },
+    "UI_REFERENCE_ARCHETYPES.md": {
+      "sha256": "c3326cfb58c25d5d5f237b1384015ba3eed70b88ea20c0f0f73a5b8e89db5f0b",
+      "bytes": 7426
+    },
+    "UI_SPEC.md": {
+      "sha256": "387e5b46bae1ef415181597c7b9316964595a0d465e54a95d2f105f3d135a6f1",
+      "bytes": 6857
+    },
+    "UI_VISUAL_DIRECTION.md": {
+      "sha256": "c34035844ef68227f5c7f54828e233c2c39f03e6f0aaec3d2f9c1fbd1d31e4e4",
+      "bytes": 7904
+    },
+    "control-api.md": {
+      "sha256": "7c83fa54cde2afb0d2be094eec582fbaefb857ba23354d1ff36053b2e5a6678c",
+      "bytes": 4639
+    },
+    "run-state.md": {
+      "sha256": "c64588ff519a9a1efaa8526b443292f9a24187580f2a6b3b89d733049077f75f",
+      "bytes": 5933
+    },
+    "runtime-summary.md": {
+      "sha256": "3e8a6e5a63e04abd882ccd8e5483e69732d937ca65d9110e7f3b3e62573c3d00",
+      "bytes": 3588
+    },
+    "signal-events.md": {
+      "sha256": "0b5d5c3c24e1e223b7cd3c4450880db26dc6fb9b5cb9a70ea05b9388992de235",
+      "bytes": 5603
+    },
+    "watch-api.md": {
+      "sha256": "66d6d0100369e899c113dae91964986e1285e13ce5d5ca521e09b8a0dd2ddb04",
+      "bytes": 4241
+    }
+  }
+}

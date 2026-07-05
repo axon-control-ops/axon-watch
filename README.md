@@ -27,8 +27,8 @@ This working tree currently combines:
   frozen planning bundle define presentation rules inside the locked regions
 - **`docs/UI_LAYOUT_LOCK.md`** and **`docs/adr/ADR-004-locked-console-shell-layout.md`**
   lock the current five-region shell geometry (authoritative for implementation).
-- the frozen planning bundle in `axon-local/Plans/Axon-Watch/` remains the
-  planning-locked source until later migration slices complete
+- the frozen planning bundle in **`docs/planning/`** is the canonical
+  planning source (migrated from `axon-local/Plans/Axon-Watch/` on 2026-07-05)
 
 ## Repo Shape
 
@@ -106,10 +106,6 @@ known-good bootstrap baseline.
 - Branch workflow: `docs/BRANCHING.md`
 - No `origin` remote is configured by default; add one before pushing (see branching doc)
 
-Frozen planning remains in `axon-local/Plans/Axon-Watch/`. Locked layout and
-implementation ADRs live in this repo under `docs/`.
-
-The product is still intentionally thin, but it is no longer stub-only.
-Contract ownership lives in `packages/shared-types/` and `docs/contracts/`,
-while product semantics still defer to the frozen planning bundle in
-`axon-local/Plans/Axon-Watch/`.
+Frozen planning lives in **`docs/planning/`**. Locked layout and
+implementation ADRs live in this repo under `docs/`. See
+`docs/CROSS_REPO_PLANNING_MIGRATION.md` for the axon-local continuity mirror.
