@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
+  "next_slice": "P-A2",
+  "slices": [
+    {
+      "id": "P-A1",
+      "phase": "A",
+      "status": "done",
+      "parity_ids": ["run_stop_resume"],
+      "spec": "docs/PARITY_A1_RUN_STOP_RESUME.md",
+      "gate": "npm run verify:parity-a1"
+    },
+    {
+      "id": "P-A2",
+      "phase": "A",
+      "status": "pending",
+      "parity_ids": ["approval_boundaries"],
+      "spec": null,
+      "gate": "npm run verify:parity-a2"
+    },
+    {
+      "id": "P-A3",
+      "phase": "A",
+      "status": "pending",
+      "parity_ids": ["review_ready_state"],
+      "spec": null,
+      "gate": "npm run verify:parity-a3"
+    },
+    {
+      "id": "P-A4",
+      "phase": "A",
+      "status": "pending",
+      "parity_ids": ["signal_inbox_consistency"],
+      "spec": null,
+      "gate": "npm run verify:parity-a4"
+    },
+    {
+      "id": "P-B1",
+      "phase": "B",
+      "status": "pending",
+      "parity_ids": ["initial_shell_boot_expectations"],
+      "spec": null,
+      "gate": "npm run verify:parity-b1"
+    },
+    {
+      "id": "P-B2",
+      "phase": "B",
+      "status": "pending",
+      "parity_ids": ["runtime_summary_behavior"],
+      "spec": null,
+      "gate": "npm run verify:parity-b2"
+    },
+    {
+      "id": "P-B3",
+      "phase": "B",
+      "status": "pending",
+      "parity_ids": ["runtime_summary_behavior"],
+      "spec": null,
+      "gate": "npm run verify:parity-b3"
+    },
+    {
+      "id": "P-C1",
+      "phase": "C",
+      "status": "pending",
+      "parity_ids": ["kairo_persona_operator_copy"],
+      "spec": null,
+      "gate": "npm run verify:parity-c1"
+    },
+    {
+      "id": "P-C2",
+      "phase": "C",
+      "status": "pending",
+      "parity_ids": ["executive_operator_rhythm"],
+      "spec": null,
+      "gate": "npm run verify:parity-c2"
+    },
+    {
+      "id": "P-C3",
+      "phase": "C",
+      "status": "pending",
+      "parity_ids": ["mobile_operator_cockpit_compactness"],
+      "spec": null,
+      "gate": "npm run verify:parity-c3"
+    },
+    {
+      "id": "P-C4",
+      "phase": "C",
+      "status": "pending",
+      "parity_ids": ["spoken_high_value_alerts"],
+      "spec": null,
+      "gate": "npm run verify:parity-c4"
+    },
+    {
+      "id": "P-D1",
+      "phase": "D",
+      "status": "pending",
+      "parity_ids": [],
+      "spec": null,
+      "gate": "npm run verify:parity-d1"
+    },
+    {
+      "id": "P-D2",
+      "phase": "D",
+      "status": "pending",
+      "parity_ids": [],
+      "spec": null,
+      "gate": "npm run verify:parity-d2"
+    },
+    {
+      "id": "P-D3",
+      "phase": "D",
+      "status": "pending",
+      "parity_ids": [],
+      "spec": null,
+      "gate": "npm run verify:parity-d3"
+    },
+    {
+      "id": "P-D4",
+      "phase": "D",
+      "status": "pending",
+      "parity_ids": [],
+      "spec": null,
+      "gate": "npm run verify:parity-d4"
+    },
+    {
+      "id": "P-D5",
+      "phase": "D",
+      "status": "pending",
+      "parity_ids": [],
+      "spec": null,
+      "gate": "npm run verify:parity-d5"
+    },
+    {
+      "id": "P-D6",
+      "phase": "D",
+      "status": "pending",
+      "parity_ids": ["dock_behavior", "desktop_and_browser_startup"],
+      "spec": null,
+      "gate": "npm run verify:parity-d6"
+    }
+  ]
+}

@@ -194,4 +194,53 @@ describe('operator status radar view', () => {
     expect(rail[3]?.value).toBe('ready');
     expect(rail[4]?.value).toBe('workspace_smoke');
   });
+
+  it('reflects paused and executing phases in mission control projections', () => {
+    const pausedRun: RunRecord = {
+      ...activeRun,
+      status: 'waiting',
+      phase: 'paused',
+      can_stop: true,
+      can_resume: true,
+      current_step: 'Run paused by operator stop',
+    };
+    const executingRun: RunRecord = {
+      ...activeRun,
+      status: 'running',
+      phase: 'executing',
+      can_stop: true,
+      can_resume: false,
+      current_step: 'Executing thin-slice work',
+    };
+
+    expect(
+      operatorMissionSummary({
+        workspaceId: 'workspace_smoke',
+        runtimeSummary,
+        primaryActiveRun: pausedRun,
+      }).phase,
+    ).toBe('PAUSED');
+
+    expect(
+      operatorStatusMetrics({
+        workspaceId: 'workspace_smoke',
+        runtimeSummary,
+        runtimeSummaryLoadState: 'loaded',
+        briefing,
+        briefingLoadState: 'loaded',
+        primaryActiveRun: executingRun,
+        pendingApprovals: 0,
+      })[1]?.value,
+    ).toContain('EXECUTE');
+
+    expect(
+      operatorExecutionStage({
+        workspaceId: 'workspace_smoke',
+        runtimeSummary,
+        briefing,
+        loadState: 'loaded',
+        primaryActiveRun: pausedRun,
+      }).currentStep,
+    ).toBe('Run paused by operator stop');
+  });
 });

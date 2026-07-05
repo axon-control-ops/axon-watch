@@ -55,12 +55,12 @@ Suggested status vocabulary for future use:
 ## Current Verification Snapshot (2026-07-05)
 
 Implementation repo: `axon-watch` on branch `dev`. **Final assessment** after
-TEST-10: **7 verified (v1 scope)**, **12 partially_verified**, **0 full parity**.
+TEST-10 + **P-A1**: **8 verified (v1 scope)**, **11 partially_verified**, **0 full parity**.
 See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 
 | Behavior | Status | Evidence |
 |---|---|---|
-| Run stop / resume | `partially_verified` | API + dock actions; not full E2E receipt audit |
+| Run stop / resume | `verified` | **P-A1 pass** (2026-07-05): cross-surface stop/resume + history receipts + mission projection tests |
 | Approval boundaries | `partially_verified` | Approve/reject endpoints + dock seam |
 | Review-ready state | `partially_verified` | `review_ready` phase visible in dock + status bar |
 | Operator vs IDE mode semantics | `verified` | ADR-007 v1 + **TEST-0 pass**; mission control v1 within v1 degradation |

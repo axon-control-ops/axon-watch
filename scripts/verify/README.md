@@ -18,6 +18,13 @@ Run TEST-0 acceptance (dev stack required):
 npm run verify:test0
 ```
 
+Run parity closure gates (post-cutover):
+
+```bash
+npm run verify:parity-a1   # P-A1 run stop/resume cross-surface parity
+# see docs/PARITY_CLOSURE_ROADMAP.md for P-A2 … P-D6
+```
+
 Run the full scaffold:
 
 ```bash

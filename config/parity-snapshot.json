@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 7,
-    "partially_verified": 12,
+    "verified_v1": 8,
+    "partially_verified": 11,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -25,12 +25,14 @@
   "behaviors": [
     {
       "id": "run_stop_resume",
-      "status": "partially_verified",
-      "evidence_gates": ["contract"],
+      "status": "verified",
+      "evidence_gates": ["P-A1"],
       "evidence": [
-        "tests/test_control_plane_runs.py stop/resume with operator_stop/operator_resume receipts"
+        "tests/test_parity_a1_run_stop_resume.py cross-surface stop/resume consistency",
+        "tests/test_control_plane_runs.py operator_stop/operator_resume receipts",
+        "operator-status-radar-view.test.ts paused/executing mission projections"
       ],
-      "gap": "No full UI E2E audit that dock and runtime strip stay in sync across stop/resume."
+      "gap": "Browser click E2E deferred to nightly shell-boot harness (acceptable v1 degradation)."
     },
     {
       "id": "approval_boundaries",
@@ -214,7 +216,7 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "12 must-keep behaviors remain partially_verified",
+    "11 must-keep behaviors remain partially_verified",
     "axon-local port 7734 remains production operator reference",
     "Real delivery channels (push/desktop/webhook) not implemented",
     "Voice deck / full JARVIS spoken-alert parity not implemented",

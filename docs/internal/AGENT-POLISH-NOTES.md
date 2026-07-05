@@ -1,5 +1,7 @@
 # Agent polish notes (internal)
 
+Post-cutover parity closure: **`docs/PARITY_CLOSURE_ROADMAP.md`** (locked slice order).
+
 Side notes for future slices — not operator-facing. Keep concise and actionable.
 
 ---

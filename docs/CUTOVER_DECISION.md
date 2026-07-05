@@ -35,8 +35,8 @@ This follows the strangler model in `docs/planning/TRANSITION_ARCHITECTURE.md`.
 | Metric | Value |
 |---|---:|
 | Must-keep behaviors assessed | 19 |
-| Verified for v1 scope | 7 |
-| Partially verified | 12 |
+| Verified for v1 scope | 8 |
+| Partially verified | 11 |
 | Full parity (unlimited axon-local equivalence) | 0 |
 
 Partial verification is **expected** at this stage. TEST-N gates prove thin-slice
