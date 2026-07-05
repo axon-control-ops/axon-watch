@@ -106,8 +106,12 @@ def validate_snapshot() -> list[str]:
             errors.append(f"required_gates_passed missing {gate}")
 
     blockers = payload.get("blockers_for_full_retirement", [])
-    if not isinstance(blockers, list) or len(blockers) < 3:
-        errors.append("blockers_for_full_retirement must list at least three blockers")
+    if not isinstance(blockers, list):
+        errors.append("blockers_for_full_retirement must be a list")
+    elif payload.get("full_axon_local_retirement") is False and len(blockers) < 1:
+        errors.append(
+            "blockers_for_full_retirement must be non-empty when full retirement is not approved"
+        )
 
     if decision == "bounded_cutover_approved" and payload.get("full_axon_local_retirement") is not False:
         errors.append("bounded_cutover_approved requires full_axon_local_retirement=false")

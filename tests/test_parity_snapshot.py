@@ -30,7 +30,9 @@ class ParitySnapshotTests(unittest.TestCase):
         payload = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))
         self.assertEqual("bounded_cutover_approved", payload["decision"])
         self.assertFalse(payload["full_axon_local_retirement"])
-        self.assertGreater(payload["summary"]["partially_verified"], 0)
+        self.assertEqual(0, payload["summary"]["partially_verified"])
+        self.assertEqual(19, payload["summary"]["verified_v1"])
+        self.assertGreaterEqual(len(payload["blockers_for_full_retirement"]), 1)
 
     def test_all_test_gates_listed_through_test9(self) -> None:
         payload = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))

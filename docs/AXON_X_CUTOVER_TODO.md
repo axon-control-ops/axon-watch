@@ -28,9 +28,13 @@ Axon-X is approved for **bounded primary development** on `axon-watch/dev`
 (console shell, control-plane, axon-watch thin slices). See
 `docs/CUTOVER_DECISION.md`.
 
-Axon-X is **not approved** to fully replace `axon-local` for continuous
-multi-project production work until remaining partially verified behaviors are
-closed (8 of 19 as of 2026-07-05).
+**Parity closure (Phase A–D) is complete:** 19 verified v1, 0 partially verified
+(as of 2026-07-05). See `docs/PARITY_CLOSURE_ROADMAP.md` and
+`npm run verify:phase-d`.
+
+Axon-X is **not approved** for **full axon-local retirement** until the operator
+declares production switch from port **7734** to Axon-X **:4173** (sole remaining
+blocker in `config/parity-snapshot.json`).
 
 ## Already Landed
 
@@ -104,6 +108,17 @@ closed (8 of 19 as of 2026-07-05).
 ## Append Log
 
 Append new entries here in reverse-chronological order. Do not rewrite history.
+
+### 2026-07-05 — Phase A–D parity closure
+
+- **Phase A–D** parity closure complete: 19 verified v1, 0 partially verified.
+  Gates: `npm run verify:phase-a` … `npm run verify:phase-d`.
+  Snapshot and ledger updated; `next_slice=complete` in
+  `config/parity-closure-order.json`.
+- Governance docs amended: `docs/CUTOVER_DECISION.md`,
+  `docs/FINAL_PARITY_VERIFICATION.md` (this append log).
+- Full axon-local retirement still **not approved** — operator sign-off on
+  production switch from `:7734` to `:4173` remains the sole blocker.
 
 ### 2026-07-05 (continued)
 
