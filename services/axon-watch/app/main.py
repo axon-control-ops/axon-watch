@@ -16,6 +16,7 @@ from app.events.store import list_events
 from app.events.stream import watch_events_stream_response
 from app.signals.store import get_inbox_snapshot
 from app.signals.inbox_assembly import include_summary_degraded_signal
+from app.vault.credential_resolver import vault_status
 from app.watch_summary import build_connectors_response, build_watch_summary
 
 
@@ -91,6 +92,22 @@ def connectors() -> dict[str, object]:
 @app.get("/internal/watch/inbox")
 def inbox() -> dict[str, object]:
     return get_inbox_snapshot(connector_records=probe_all_connectors())
+
+
+@app.get("/internal/watch/vault/status")
+def vault_status_index() -> dict[str, object]:
+    from pathlib import Path
+
+    config_path = Path(__file__).resolve().parents[3] / "config" / "dashpro-monitor-slice.json"
+    project_root = None
+    if config_path.is_file():
+        import json
+
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+        root_raw = str(payload.get("project_root") or "").strip()
+        if root_raw:
+            project_root = Path(root_raw).expanduser()
+    return {"vault": vault_status(project_root=project_root)}
 
 
 @app.get("/internal/watch/delivery/receipts")

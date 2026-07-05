@@ -71,6 +71,8 @@ onUnmounted(() => {
       :class="{
         'dev-seams': shell.showDevSeams,
         'console-shell--mobile-compact': shell.mobileCompactLayout,
+        'console-shell--ide': shell.layoutMode === 'ide',
+        'console-shell--operator': shell.layoutMode === 'operator',
       }"
       :data-layout-mode="shell.layoutMode"
     >

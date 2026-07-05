@@ -16,10 +16,6 @@ const { resizing, resetDockWidth, startDockResize } = useRightDockResize({
   collapsed: computed(() => shell.agentDockCollapsed),
 });
 
-const signalCount = computed(
-  () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
-);
-
 function collapseDock(): void {
   shell.toggleAgentDock();
 }
@@ -42,19 +38,24 @@ function collapseDock(): void {
       <span class="agent-dock__resize-grip" />
     </div>
 
-    <header class="agent-dock__header agent-dock__header--compact">
+    <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide">
       <div class="agent-dock__head-row">
         <div class="agent-dock__head-main">
+          <div class="agent-dock__ide-brand">
+            <p class="agent-dock__eyebrow">IDE workspace</p>
+            <p class="agent-dock__title">Agent lane</p>
+          </div>
           <AgentDockWorkspaceMenu />
-          <div class="agent-dock__head-pills" aria-label="Runtime attention">
+          <div
+            v-if="shell.primaryActiveRun || shell.pendingApprovalsCount"
+            class="agent-dock__head-pills"
+            aria-label="Runtime attention"
+          >
             <span v-if="shell.primaryActiveRun" class="agent-dock__pill agent-dock__pill--run">
               Run · {{ runPhaseTag(shell.primaryActiveRun.phase) }}
             </span>
             <span v-if="shell.pendingApprovalsCount" class="agent-dock__pill agent-dock__pill--approvals">
               {{ shell.pendingApprovalsCount }} approval{{ shell.pendingApprovalsCount === 1 ? '' : 's' }}
-            </span>
-            <span v-if="signalCount" class="agent-dock__pill agent-dock__pill--signals">
-              {{ signalCount }} signal{{ signalCount === 1 ? '' : 's' }}
             </span>
           </div>
         </div>

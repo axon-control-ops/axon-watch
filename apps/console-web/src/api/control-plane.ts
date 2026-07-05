@@ -484,6 +484,8 @@ export interface PostChatMessageRequest {
   content: string;
   thread_id?: string | null;
   run_id?: string | null;
+  composer_mode?: 'ask' | 'plan' | 'agent' | 'command' | string | null;
+  active_file_path?: string | null;
 }
 
 export interface PostChatMessageResponse {
@@ -491,7 +493,7 @@ export interface PostChatMessageResponse {
   messages: ChatMessageRecord[];
   run_id: string;
   dispatched: boolean;
-  run: RunRecord;
+  run: RunRecord | null;
 }
 
 export interface ThreadHistorySnapshot {

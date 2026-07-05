@@ -189,7 +189,7 @@ function handleStopRun(): void {
 
 function handleSubmit(event?: Event): void {
   event?.preventDefault();
-  shell.submitOperatorCommand();
+  void shell.submitIdeComposer(composerMode.value);
 }
 
 function handleDocumentClick(): void {

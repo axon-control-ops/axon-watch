@@ -628,6 +628,7 @@ export const useShellStore = defineStore('shell', () => {
         content,
         thread_id: activeThreadId.value,
         run_id: primaryActiveRun.value?.run_id ?? null,
+        composer_mode: 'command',
       });
       activeThreadId.value = response.thread_id;
       workspaceThreadIds.value = {
@@ -649,6 +650,52 @@ export const useShellStore = defineStore('shell', () => {
       commandMutationState.value = 'error';
       commandMutationError.value =
         error instanceof Error ? error.message : 'Failed to submit operator command';
+    }
+  }
+
+  async function submitIdeComposer(
+    composerMode: 'ask' | 'plan' | 'agent',
+  ): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    const content = operatorCommandDraft.value.trim();
+    if (!canSubmitOperatorCommand.value || !workspaceId || !content) {
+      return;
+    }
+
+    commandMutationState.value = 'submitting';
+    commandMutationError.value = null;
+
+    try {
+      const response = await postChatMessage({
+        workspace_id: workspaceId,
+        content,
+        thread_id: activeThreadId.value,
+        run_id: primaryActiveRun.value?.run_id ?? null,
+        composer_mode: composerMode,
+        active_file_path: activeWorkspaceFilePath.value,
+      });
+      activeThreadId.value = response.thread_id;
+      workspaceThreadIds.value = {
+        ...workspaceThreadIds.value,
+        [workspaceId]: response.thread_id,
+      };
+      threadMessages.value = mergeThreadMessages(
+        threadMessages.value,
+        response.messages.map((message) => mapChatMessageRecord(message)),
+      );
+      operatorCommandDraft.value = '';
+      commandMutationState.value = 'idle';
+      if (response.dispatched) {
+        await refreshRunSurfaces();
+      }
+
+      const next = new Set(expandedDockSeams.value);
+      next.add('thread');
+      expandedDockSeams.value = next;
+    } catch (error) {
+      commandMutationState.value = 'error';
+      commandMutationError.value =
+        error instanceof Error ? error.message : 'Failed to submit IDE composer message';
     }
   }
 
@@ -1683,6 +1730,7 @@ export const useShellStore = defineStore('shell', () => {
     signalViews,
     stopPrimaryRun,
     submitOperatorCommand,
+    submitIdeComposer,
     terminalSessions,
     threadMessages,
     threadStateLabel,

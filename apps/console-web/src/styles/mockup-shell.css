@@ -1042,6 +1042,11 @@ body:has(.console-shell--mockup) {
   overflow: hidden;
 }
 
+.center-workbench--operator .center-workbench__operator-status > .operator-status-radar-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .center-workbench--operator .center-workbench__operator-status {
   flex: 1 1 auto;
   min-height: 8.5rem;
@@ -2828,6 +2833,10 @@ body:has(.console-shell--mockup) {
   gap: 0.55rem;
   min-height: 0;
   padding: 0.75rem 0.85rem 0.65rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   --hud-surface-fill: rgba(0, 8, 14, 0.82);
 }
 

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "workspace_id": "workspace_dashpro",
+  "project_root": "/home/edp/Projectx/product/dashpro",
+  "checks": [
+    {
+      "id": "dashpro_sentry_recent_issues",
+      "type": "sentry_recent_issues",
+      "service": "Sentry"
+    },
+    {
+      "id": "dashpro_posthog_recent_events",
+      "type": "posthog_recent_events",
+      "service": "PostHog"
+    }
+  ]
+}

@@ -5,6 +5,8 @@ from __future__ import annotations
 from app.delivery.service import enrich_inbox_with_delivery
 from app.signals.bootstrap_signal import bootstrap_inbox_item
 from app.signals.connector_signal import connector_inbox_items
+from app.signals.monitor_signal import monitor_inbox_items
+from app.monitors.dashpro_monitor import probe_dashpro_monitor_records
 from app.signals.iso_time import utc_now_iso
 from app.signals.ranking import rank_inbox_items
 from app.signals.inbox_assembly import include_summary_degraded_signal
@@ -22,6 +24,7 @@ def get_inbox_snapshot(
         items.append(summary_degraded_inbox_item())
     if connector_records is not None:
         items.extend(connector_inbox_items(connector_records))
+    items.extend(monitor_inbox_items(probe_dashpro_monitor_records()))
 
     ranked = rank_inbox_items(items)
     delivered = enrich_inbox_with_delivery(ranked)

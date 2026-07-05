@@ -1,0 +1,56 @@
+
+/* IDE mode shell differentiation — distinct from operator Mission Control chrome */
+
+.console-shell--ide .center-workbench__operator-status {
+  display: none;
+}
+
+.console-shell--ide .region-center-workbench {
+  border-left: 1px solid rgba(99, 102, 241, 0.12);
+  border-right: 1px solid rgba(99, 102, 241, 0.12);
+}
+
+.console-shell--ide .agent-dock {
+  border-left: 1px solid rgba(99, 102, 241, 0.18);
+  background:
+    linear-gradient(180deg, rgba(15, 18, 28, 0.98), rgba(8, 10, 18, 0.99)),
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 55%);
+}
+
+.console-shell--ide .agent-dock__header--ide {
+  background: rgba(15, 18, 28, 0.72);
+  border-bottom-color: rgba(99, 102, 241, 0.16);
+}
+
+.console-shell--ide .agent-dock__ide-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.console-shell--ide .agent-dock__eyebrow {
+  margin: 0;
+  color: rgba(165, 180, 252, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.console-shell--ide .agent-dock__title {
+  margin: 0;
+  color: rgba(238, 242, 255, 0.96);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.console-shell--ide .agent-dock__composer {
+  background: rgba(10, 12, 20, 0.88);
+  border-top-color: rgba(99, 102, 241, 0.14);
+}
+
+.console-shell--ide .agent-dock__transcript .conversation-seam__item--agent {
+  border-color: rgba(129, 140, 248, 0.18);
+  background: rgba(99, 102, 241, 0.06);
+}

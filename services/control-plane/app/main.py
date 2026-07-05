@@ -80,6 +80,8 @@ class PostChatMessageRequest(BaseModel):
     content: str
     thread_id: str | None = None
     run_id: str | None = None
+    composer_mode: str | None = None
+    active_file_path: str | None = None
 
 
 class CreateWorkspaceHandoffRequest(BaseModel):
@@ -275,6 +277,8 @@ def chat_messages_create(body: PostChatMessageRequest) -> dict[str, object]:
             content=body.content,
             thread_id=body.thread_id,
             run_id=body.run_id,
+            composer_mode=body.composer_mode,
+            active_file_path=body.active_file_path,
         )
     except chat_store.ChatThreadNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

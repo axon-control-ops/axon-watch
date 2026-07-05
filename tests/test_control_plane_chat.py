@@ -251,3 +251,23 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertTrue(payload["dispatched"])
         self.assertNotEqual(completed_run["run_id"], payload["run_id"])
         self.assertIn("dispatched", payload["messages"][1]["content"])
+
+    def test_post_chat_message_lane_b_skips_command_dispatch(self) -> None:
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "content": "Explain how this workspace is wired.",
+                "composer_mode": "ask",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["dispatched"])
+        self.assertIsNone(payload["run"])
+        self.assertEqual(3, len(payload["messages"]))
+        self.assertEqual("system", payload["messages"][1]["role"])
+        self.assertIn("Lane B (ask)", payload["messages"][1]["content"])
+        self.assertEqual("agent", payload["messages"][2]["role"])
+        self.assertIn("Lane B (ask)", payload["messages"][2]["content"])

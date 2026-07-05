@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from app.chat.command_intent import classify_command, expand_command_shortcuts
 from app.chat.dispatch import build_command_dispatch_ack, resolve_command_dispatch
+from app.chat.lane_b_agent import LaneBContext, generate_lane_b_reply, should_use_lane_b
 from app.chat.orchestration import (
     build_agent_command_reply,
     orchestrate_command_run,
@@ -41,6 +42,8 @@ def post_chat_message(
     content: str,
     thread_id: str | None = None,
     run_id: str | None = None,
+    composer_mode: str | None = None,
+    active_file_path: str | None = None,
 ) -> dict[str, object]:
     trimmed = content.strip()
     if not trimmed:
@@ -50,6 +53,15 @@ def post_chat_message(
     created_at = _utc_now()
     normalized = expand_command_shortcuts(trimmed)
     intent = classify_command(normalized)
+    if should_use_lane_b(composer_mode=composer_mode, command_intent=intent):
+        return _post_lane_b_message(
+            workspace_id=workspace_id,
+            content=trimmed,
+            thread_id=thread_id,
+            composer_mode=str(composer_mode or "agent"),
+            active_file_path=active_file_path,
+            created_at=created_at,
+        )
     if intent == "resume_from_review":
         run_record, execution = orchestrate_resume_from_review(workspace_id=workspace_id)
         dispatch_run_id = str(run_record["run_id"])
@@ -133,6 +145,82 @@ def post_chat_message(
         "run_id": dispatch_run_id,
         "dispatched": dispatched,
         "run": run_record,
+    }
+
+
+def _post_lane_b_message(
+    *,
+    workspace_id: str,
+    content: str,
+    thread_id: str | None,
+    composer_mode: str,
+    active_file_path: str | None,
+    created_at: str,
+) -> dict[str, object]:
+    context = LaneBContext(
+        workspace_id=workspace_id,
+        composer_mode=composer_mode,
+        active_file_path=active_file_path,
+    )
+    agent_content = generate_lane_b_reply(context=context, user_prompt=content)
+    system_content = (
+        f"Lane B ({composer_mode}) — conversational reply only; no command dispatch."
+    )
+
+    if thread_id:
+        thread = chat_store.get_thread(thread_id)
+        if thread is None:
+            raise chat_store.ChatThreadNotFoundError(f"thread not found: {thread_id}")
+        if thread["workspace_id"] != workspace_id:
+            raise ChatValidationError("thread_id does not belong to workspace_id")
+    else:
+        thread = chat_store.create_thread(
+            workspace_id=workspace_id,
+            run_id=None,
+            created_at=created_at,
+        )
+        thread_id = thread["thread_id"]
+
+    operator_message = chat_store.save_message(
+        {
+            "message_id": _new_message_id("message_operator"),
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": thread.get("run_id"),
+            "role": "operator",
+            "content": content,
+            "created_at": created_at,
+        }
+    )
+    system_message = chat_store.save_message(
+        {
+            "message_id": _new_message_id("message_system"),
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": thread.get("run_id"),
+            "role": "system",
+            "content": system_content,
+            "created_at": created_at,
+        }
+    )
+    agent_message = chat_store.save_message(
+        {
+            "message_id": _new_message_id("message_agent"),
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": thread.get("run_id"),
+            "role": "agent",
+            "content": agent_content,
+            "created_at": created_at,
+        }
+    )
+
+    return {
+        "thread_id": thread_id,
+        "messages": [operator_message, system_message, agent_message],
+        "run_id": thread.get("run_id") or "",
+        "dispatched": False,
+        "run": None,
     }
 
 
