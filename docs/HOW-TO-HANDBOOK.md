@@ -590,6 +590,16 @@ Shell boot measurement:
   `/api/inbox`, `/api/briefing`, `/api/workspaces`, `/api/runs`)
 - optional full browser mode: `pip install playwright && playwright install chromium`
   then `AXON_WATCH_SHELL_BOOT_MODE=browser npm run verify:evidence`
+- repo-local setup:
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m playwright install chromium
+```
+
+`collect-verify-evidence.sh` prefers `.venv/bin/python3` when present so `auto` mode can use Playwright.
 
 Example fixture: `scripts/verify/fixtures/shell-boot-report.dev.json`.
 

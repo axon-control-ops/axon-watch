@@ -9,6 +9,12 @@ source "${repo_root}/scripts/dev/lib/common.sh"
 
 load_env
 
+if [[ -x "${repo_root}/.venv/bin/python3" ]]; then
+  PYTHON="${repo_root}/.venv/bin/python3"
+else
+  PYTHON="python3"
+fi
+
 output_dir="${1:-${repo_root}/.local/verify}"
 request_count="${AXON_WATCH_LATENCY_SAMPLES:-15}"
 mkdir -p "${output_dir}"
@@ -16,7 +22,7 @@ mkdir -p "${output_dir}"
 measure_url() {
   local url="$1"
   local count="$2"
-  python3 - "${url}" "${count}" <<'PY'
+  "${PYTHON}" - "${url}" "${count}" <<'PY'
 import json
 import sys
 import time
@@ -47,7 +53,7 @@ echo "Collecting ${request_count} watch health samples from ${watch_url}"
 measure_url "${watch_url}" "${request_count}" >"${output_dir}/watch-summary-latency.json"
 
 echo "Measuring shell boot readiness from ${AXON_WATCH_PUBLIC_BASE_URL}"
-python3 "${repo_root}/scripts/dev/measure_shell_boot.py" \
+"${PYTHON}" "${repo_root}/scripts/dev/measure_shell_boot.py" \
   --console-base-url "${AXON_WATCH_PUBLIC_BASE_URL}" \
   --control-plane-base-url "${AXON_WATCH_CONTROL_PLANE_BASE_URL}" \
   --mode "${AXON_WATCH_SHELL_BOOT_MODE:-auto}" \
