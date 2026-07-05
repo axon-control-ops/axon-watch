@@ -61,6 +61,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "generated_at",
                 "notice",
                 "advise",
+                "executive_rhythm",
                 "top_signals",
                 "pending_approvals",
                 "active_runs",

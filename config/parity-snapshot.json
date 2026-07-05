@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 14,
-    "partially_verified": 5,
+    "verified_v1": 15,
+    "partially_verified": 4,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -173,13 +173,15 @@
     },
     {
       "id": "executive_operator_rhythm",
-      "status": "partially_verified",
-      "evidence_gates": ["contract"],
+      "status": "verified",
+      "evidence_gates": ["P-C2"],
       "evidence": [
-        "operator_briefing.py Notice/Advise projection",
-        "BriefingPanel consumption"
+        "executive_rhythm block on /api/briefing with Notice/Advise/Decide/Execute/Verify/Report",
+        "config/executive-operator-rhythm-contract.json + check_executive_operator_rhythm.py",
+        "tests/test_parity_c2_executive_operator_rhythm.py canonical-state derivation proof",
+        "BriefingPanel + mission-control Decide projection"
       ],
-      "gap": "Narrative fields thin vs executive_operator_workflow.py parity."
+      "gap": "Template-based rhythm strings; not full executive_operator_workflow plan generation."
     },
     {
       "id": "kairo_persona_operator_copy",
@@ -225,7 +227,7 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "5 must-keep behaviors remain partially_verified",
+    "4 must-keep behaviors remain partially_verified",
     "axon-local port 7734 remains production operator reference",
     "Real delivery channels (push/desktop/webhook) not implemented",
     "Voice deck / full JARVIS spoken-alert parity not implemented",

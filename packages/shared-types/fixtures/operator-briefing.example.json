@@ -2,6 +2,14 @@
   "generated_at": "2026-07-04T07:55:00Z",
   "notice": "1 run awaiting explicit approval.",
   "advise": "Approve Contract baseline run to continue execution.",
+  "executive_rhythm": {
+    "notice": "1 run awaiting explicit approval.",
+    "advise": "Approve Contract baseline run to continue execution.",
+    "decide": "Decide whether to approve or reject the guarded run before execution continues.",
+    "execute": "Execute: approve the guarded run to unblock execution.",
+    "verify": "Verify approval boundary blocks execution until you decide.",
+    "report": "Report: 1 pending approval, 1 surfaced signal, 1 active run."
+  },
   "top_signals": [
     {
       "signal_id": "signal_runtime_summary_degraded",

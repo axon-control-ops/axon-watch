@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { OperatorBriefing } from '../contracts/canonical';
+import type { ExecutiveOperatorRhythm, OperatorBriefing } from '../contracts/canonical';
 import {
   briefingAdvise,
   briefingConnectivityLabels,
@@ -8,12 +8,33 @@ import {
   briefingIsEmpty,
   briefingNotice,
   briefingPanelHeadline,
+  briefingRhythmField,
 } from './briefing-panel-view';
+
+function rhythmFrom(
+  notice: string,
+  advise: string,
+  overrides: Partial<ExecutiveOperatorRhythm> = {},
+): ExecutiveOperatorRhythm {
+  return {
+    notice,
+    advise,
+    decide: 'Decide whether to continue.',
+    execute: 'Execute the next safe action.',
+    verify: 'Verify canonical state before continuing.',
+    report: 'Report: systems nominal.',
+    ...overrides,
+  };
+}
 
 const emptyBriefing: OperatorBriefing = {
   generated_at: '2026-07-04T08:00:00Z',
   notice: 'No active runs. Systems nominal.',
   advise: 'Describe the next operator action in Command.',
+  executive_rhythm: rhythmFrom(
+    'No active runs. Systems nominal.',
+    'Describe the next operator action in Command.',
+  ),
   top_signals: [],
   pending_approvals: { count: 0, items: [] },
   active_runs: [],
@@ -26,6 +47,14 @@ const approvalBriefing: OperatorBriefing = {
   ...emptyBriefing,
   notice: '1 run awaiting explicit approval.',
   advise: 'Approve test run to continue execution.',
+  executive_rhythm: rhythmFrom(
+    '1 run awaiting explicit approval.',
+    'Approve test run to continue execution.',
+    {
+      decide: 'Decide whether to approve or reject the guarded run before execution continues.',
+      execute: 'Execute: approve the guarded run to unblock execution.',
+    },
+  ),
   pending_approvals: {
     count: 1,
     items: [
@@ -104,5 +133,6 @@ describe('briefing panel view helpers', () => {
     expect(briefingAdvise(emptyBriefing, 'loaded')).toBe(
       'Describe the next operator action in Command.',
     );
+    expect(briefingRhythmField(approvalBriefing, 'decide', 'loaded')).toContain('approve or reject');
   });
 });

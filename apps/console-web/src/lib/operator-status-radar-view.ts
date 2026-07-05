@@ -48,6 +48,7 @@ export interface OperatorExecutionStage {
   currentStep: string;
   notice: string;
   advise: string;
+  decide: string;
   elapsed: string;
   hasActiveRun: boolean;
 }
@@ -397,6 +398,9 @@ export function operatorExecutionStage(input: {
       briefing: input.briefing,
       loadState: input.loadState,
     }),
+    decide:
+      input.briefing?.executive_rhythm?.decide ??
+      'Decide whether to continue from the current operator posture.',
     elapsed: mission.elapsed,
     hasActiveRun: Boolean(run),
   };

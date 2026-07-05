@@ -210,6 +210,7 @@ function toggleTerminal(): void {
         {{ executionStage.summary }}
       </p>
       <p class="operator-status-radar-panel__stage-notice">{{ executionStage.notice }}</p>
+      <p class="operator-status-radar-panel__stage-decide">{{ executionStage.decide }}</p>
       <p v-if="!executionStage.hasActiveRun" class="operator-status-radar-panel__stage-advise">
         {{ executionStage.advise }}
       </p>

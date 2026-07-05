@@ -9,7 +9,11 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.operator_briefing_rhythm import (  # noqa: E402
     build_briefing_advise,
+    build_briefing_decide,
+    build_briefing_execute,
     build_briefing_notice,
+    build_briefing_report,
+    build_briefing_verify,
     build_operator_briefing_rhythm,
 )
 
@@ -69,9 +73,39 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
             ],
         )
 
-        self.assertEqual({"notice", "advise"}, set(rhythm))
+        self.assertEqual({"notice", "advise", "decide", "execute", "verify", "report"}, set(rhythm))
         self.assertIn("review", rhythm["notice"])
         self.assertIn("Resume Smoke run.", rhythm["advise"])
+        self.assertIn("Decide whether to resume", rhythm["decide"])
+        self.assertIn("Execute:", rhythm["execute"])
+        self.assertIn("Verify", rhythm["verify"])
+        self.assertIn("Report:", rhythm["report"])
+
+    def test_decide_prioritizes_pending_approvals(self) -> None:
+        decide = build_briefing_decide(
+            pending_approvals_count=1,
+            active_runs=[],
+            top_signals=[{"title": "Signal", "severity": "high"}],
+            degraded={"active": False, "reasons": []},
+        )
+        self.assertIn("approve or reject", decide.lower())
+
+    def test_execute_maps_next_safe_action_kind(self) -> None:
+        execute = build_briefing_execute(
+            next_safe_actions=[{"kind": "approve_run", "title": "Approve guarded run"}],
+        )
+        self.assertIn("approve the guarded run", execute.lower())
+
+    def test_report_summarizes_canonical_counts(self) -> None:
+        report = build_briefing_report(
+            pending_approvals_count=2,
+            top_signals=[{"title": "A"}, {"title": "B"}],
+            active_runs=[{"phase": "executing"}],
+            degraded={"active": True, "reasons": ["watch probe failed"]},
+        )
+        self.assertIn("2 pending approvals", report)
+        self.assertIn("2 surfaced signals", report)
+        self.assertIn("runtime degraded", report)
 
 
 if __name__ == "__main__":

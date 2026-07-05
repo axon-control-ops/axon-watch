@@ -55,7 +55,7 @@ Suggested status vocabulary for future use:
 ## Current Verification Snapshot (2026-07-05)
 
 Implementation repo: `axon-watch` on branch `dev`. **Final assessment** after
-TEST-10 + **Phase A (P-A1–P-A4)** + **Phase B (P-B1–P-B3)** + **P-C1**: **14 verified (v1 scope)**, **5 partially_verified**, **0 full parity**.
+TEST-10 + **Phase A–B** + **P-C1–P-C2**: **15 verified (v1 scope)**, **4 partially_verified**, **0 full parity**.
 See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 
 | Behavior | Status | Evidence |
@@ -76,7 +76,7 @@ See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 | Desktop and browser startup | `partially_verified` | `./scripts/dev/up.sh` browser flow; desktop packaging lags |
 | KAIRO watch rules | `verified` | **TEST-6 pass**: `watch_rule` mapping + Attention mode chip |
 | Spoken high-value alerts | `partially_verified` | **TEST-7 pass**: eligibility + browser TTS hook only |
-| Executive operator rhythm | `partially_verified` | Briefing Notice/Advise; narrative fields thin |
+| Executive operator rhythm | `verified` | **P-C2 pass** (2026-07-05): full Notice/Advise/Decide/Execute/Verify/Report on `/api/briefing` |
 | KAIRO persona and operator copy | `verified` | **P-C1 pass** (2026-07-05): persisted settings API + UI toggle; neutral copy preserves run/signal truth |
 | Mobile operator cockpit compactness | `partially_verified` | **TEST-7 pass**: compact shell; foreground-only, no resize reactivity |
 

@@ -131,6 +131,7 @@ def build_operator_briefing(
         "generated_at": runtime_summary["generated_at"],
         "notice": rhythm["notice"],
         "advise": rhythm["advise"],
+        "executive_rhythm": rhythm,
         "top_signals": top_signals,
         "pending_approvals": {
             "count": runtime_summary["approvals"]["pending_count"],

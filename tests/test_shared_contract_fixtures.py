@@ -268,6 +268,7 @@ class SharedContractFixtureTests(unittest.TestCase):
                 "generated_at",
                 "notice",
                 "advise",
+                "executive_rhythm",
                 "top_signals",
                 "pending_approvals",
                 "active_runs",
@@ -278,6 +279,13 @@ class SharedContractFixtureTests(unittest.TestCase):
             },
             set(payload),
         )
+        rhythm = payload["executive_rhythm"]
+        self.assertEqual(payload["notice"], rhythm["notice"])
+        self.assertEqual(payload["advise"], rhythm["advise"])
+        self.assertIn("decide", rhythm)
+        self.assertIn("execute", rhythm)
+        self.assertIn("verify", rhythm)
+        self.assertIn("report", rhythm)
         self.assertEqual({"active", "reasons"}, set(payload["degraded"]))
         self.assertEqual({"control_plane_ready", "watch_connected"}, set(payload["connectivity"]))
         presence = payload["operator_presence"]

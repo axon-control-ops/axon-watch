@@ -162,6 +162,7 @@ describe('operator status radar view', () => {
     expect(stage.phaseProgress).toBeGreaterThan(0);
     expect(stage.currentStep).toBe('Review when ready');
     expect(stage.notice).toBe(briefing.notice);
+    expect(stage.decide).toBe(briefing.executive_rhythm.decide);
   });
 
   it('builds a bounded live feed from receipts and agent output', () => {

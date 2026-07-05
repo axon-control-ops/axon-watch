@@ -106,3 +106,31 @@ export function briefingAdvise(
 
   return 'Describe the next operator action in Command.';
 }
+
+export function briefingRhythmField(
+  briefing: OperatorBriefing | null,
+  field: keyof OperatorBriefing['executive_rhythm'],
+  loadState: BriefingPanelLoadState,
+): string {
+  if (loadState === 'loading') {
+    return 'Standing by while executive rhythm loads.';
+  }
+
+  if (loadState === 'error') {
+    return 'Review runtime summary before continuing.';
+  }
+
+  const rhythm = briefing?.executive_rhythm;
+  if (rhythm?.[field]) {
+    return rhythm[field];
+  }
+
+  if (field === 'notice') {
+    return briefingNotice(briefing, loadState);
+  }
+  if (field === 'advise') {
+    return briefingAdvise(briefing, loadState);
+  }
+
+  return '';
+}

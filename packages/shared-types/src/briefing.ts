@@ -31,10 +31,20 @@ export interface OperatorBriefingConnectivity {
   watch_connected: boolean;
 }
 
+export interface ExecutiveOperatorRhythm {
+  notice: string;
+  advise: string;
+  decide: string;
+  execute: string;
+  verify: string;
+  report: string;
+}
+
 export interface OperatorBriefing {
   generated_at: string;
   notice: string;
   advise: string;
+  executive_rhythm: ExecutiveOperatorRhythm;
   top_signals: InboxItem[];
   pending_approvals: OperatorBriefingPendingApprovals;
   active_runs: RuntimeSummaryActiveRun[];

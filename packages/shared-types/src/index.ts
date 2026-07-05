@@ -5,6 +5,7 @@ export type {
   OperatorBriefing,
   OperatorBriefingConnectivity,
   OperatorBriefingPendingApprovals,
+  ExecutiveOperatorRhythm,
 } from './briefing';
 export { BRIEFING_ACTION_KINDS } from './briefing';
 export type {

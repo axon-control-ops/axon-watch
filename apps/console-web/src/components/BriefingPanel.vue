@@ -10,6 +10,7 @@ import {
   briefingIsEmpty,
   briefingNotice,
   briefingPanelHeadline,
+  briefingRhythmField,
   type BriefingPanelLoadState,
 } from '../lib/briefing-panel-view';
 
@@ -28,6 +29,10 @@ const emit = defineEmits<{
 const headline = computed(() => briefingPanelHeadline(props.briefing, props.loadState));
 const heroNotice = computed(() => briefingNotice(props.briefing, props.loadState));
 const heroAdvise = computed(() => briefingAdvise(props.briefing, props.loadState));
+const heroDecide = computed(() => briefingRhythmField(props.briefing, 'decide', props.loadState));
+const heroExecute = computed(() => briefingRhythmField(props.briefing, 'execute', props.loadState));
+const heroVerify = computed(() => briefingRhythmField(props.briefing, 'verify', props.loadState));
+const heroReport = computed(() => briefingRhythmField(props.briefing, 'report', props.loadState));
 const showEmptyState = computed(
   () => props.loadState === 'loaded' && briefingIsEmpty(props.briefing),
 );
@@ -136,6 +141,26 @@ const voiceLine = computed(() => {
         <div class="briefing-panel__section">
           <p class="briefing-panel__section-label">Advise</p>
           <p class="briefing-panel__rhythm-copy">{{ heroAdvise }}</p>
+        </div>
+
+        <div class="briefing-panel__section">
+          <p class="briefing-panel__section-label">Decide</p>
+          <p class="briefing-panel__rhythm-copy">{{ heroDecide }}</p>
+        </div>
+
+        <div class="briefing-panel__section">
+          <p class="briefing-panel__section-label">Execute</p>
+          <p class="briefing-panel__rhythm-copy">{{ heroExecute }}</p>
+        </div>
+
+        <div class="briefing-panel__section">
+          <p class="briefing-panel__section-label">Verify</p>
+          <p class="briefing-panel__rhythm-copy">{{ heroVerify }}</p>
+        </div>
+
+        <div class="briefing-panel__section">
+          <p class="briefing-panel__section-label">Report</p>
+          <p class="briefing-panel__rhythm-copy">{{ heroReport }}</p>
         </div>
 
         <div class="briefing-panel__section">

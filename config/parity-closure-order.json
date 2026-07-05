@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-C2",
+  "next_slice": "P-C3",
   "slices": [
     {
       "id": "P-A1",
@@ -70,9 +70,9 @@
     {
       "id": "P-C2",
       "phase": "C",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["executive_operator_rhythm"],
-      "spec": null,
+      "spec": "docs/PARITY_C2_EXECUTIVE_OPERATOR_RHYTHM.md",
       "gate": "npm run verify:parity-c2"
     },
     {
