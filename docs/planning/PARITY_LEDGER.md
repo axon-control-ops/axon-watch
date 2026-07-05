@@ -55,7 +55,7 @@ Suggested status vocabulary for future use:
 ## Current Verification Snapshot (2026-07-05)
 
 Implementation repo: `axon-watch` on branch `dev`. **Final assessment** after
-TEST-10 + **Phase A (P-A1–P-A4)**: **11 verified (v1 scope)**, **8 partially_verified**, **0 full parity**.
+TEST-10 + **Phase A (P-A1–P-A4)** + **Phase B (P-B1–P-B3)**: **13 verified (v1 scope)**, **6 partially_verified**, **0 full parity**.
 See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 
 | Behavior | Status | Evidence |
@@ -70,8 +70,8 @@ See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 | Watch command / event / status depth | `verified` | **TEST-4 pass**: reprobe, events log, summary observation |
 | Delivery receipts for operator attention | `verified` | **TEST-5 pass**: in-process receipts + inbox `delivery_state` (v1 channels) |
 | Dock behavior | `partially_verified` | Operator terminal collapse + reopen; IDE TERMINAL restore |
-| Runtime summary behavior | `partially_verified` | Boot path uses `/api/runtime/summary`; Phase 4 API E2E |
-| Initial shell boot expectations | `partially_verified` | Sequential bootstrap; timing fitness PENDING |
+| Runtime summary behavior | `verified` | **P-B2 + P-B3 pass** (2026-07-05): CI latency fixtures + boot-critical field allowlist + API/assembler tests |
+| Initial shell boot expectations | `verified` | **P-B1 pass** (2026-07-05): shell_boot_readiness wired into default verify; bootstrap report shape |
 | Signal / inbox consistency | `verified` | **P-A4 pass** (2026-07-05): inbox/summary/briefing top signal agreement |
 | Desktop and browser startup | `partially_verified` | `./scripts/dev/up.sh` browser flow; desktop packaging lags |
 | KAIRO watch rules | `verified` | **TEST-6 pass**: `watch_rule` mapping + Attention mode chip |

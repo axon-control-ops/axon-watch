@@ -23,10 +23,11 @@ is complete. Do not reorder cutover items here.
 
 | Metric | Value |
 |---|---:|
-| Verified (v1) | 11 |
-| Partially verified | 8 |
+| Verified (v1) | 13 |
+| Partially verified | 6 |
 | Phase A | **Complete** (P-A1–P-A4) |
-| Next slice | **P-B1** |
+| Phase B | **Complete** (P-B1–P-B3) |
+| Next slice | **P-C1** |
 
 Machine-readable order: `config/parity-closure-order.json`
 
@@ -56,9 +57,15 @@ Phase A complete when all four slices are `done` and `next_slice` is **P-B1**.
 
 | ID | Parity row(s) | Deliverable | Gate |
 |---|---|---|---|
-| **P-B1** | `initial_shell_boot_expectations` | Wire `shell_boot_readiness` report into verify; clear PENDING fitness | `verify:parity-b1` (TBD) |
-| **P-B2** | `runtime_summary_behavior` | Runtime + watch summary latency samples in CI or nightly | `verify:parity-b2` (TBD) |
-| **P-B3** | `runtime_summary_behavior` | Boot-critical field allowlist vs axon-local | `verify:parity-b3` (TBD) |
+| **P-B1** | `initial_shell_boot_expectations` | Wire `shell_boot_readiness` report into verify; clear PENDING fitness | `npm run verify:parity-b1` |
+| **P-B2** | `runtime_summary_behavior` | Runtime + watch summary latency samples in CI or nightly | `npm run verify:parity-b2` |
+| **P-B3** | `runtime_summary_behavior` | Boot-critical field allowlist vs axon-local | `npm run verify:parity-b3` |
+
+**Phase B E2E gate:** `npm run verify:phase-b` (runs P-B1–P-B3 checks + full verify once)
+
+Phase B complete when all three slices are `done` and `next_slice` is **P-C1**.
+
+**P-B1 spec:** `docs/PARITY_B1_INITIAL_SHELL_BOOT.md`
 
 ---
 

@@ -21,14 +21,35 @@ class ParityClosureOrderTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, msg=result.stderr or result.stdout)
 
-    def test_phase_a_complete_and_next_slice_is_p_b1(self) -> None:
+    def test_phase_a_complete_and_next_slice_is_p_c1(self) -> None:
         order = json.loads(
             (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
         )
         phase_a = [entry for entry in order["slices"] if entry.get("phase") == "A"]
         self.assertEqual(4, len(phase_a))
         self.assertTrue(all(entry["status"] == "done" for entry in phase_a))
-        self.assertEqual("P-B1", order["next_slice"])
+        self.assertEqual("P-C1", order["next_slice"])
+
+    def test_phase_b_complete_and_parity_rows_verified(self) -> None:
+        order = json.loads(
+            (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
+        )
+        phase_b = [entry for entry in order["slices"] if entry.get("phase") == "B"]
+        self.assertEqual(3, len(phase_b))
+        self.assertTrue(all(entry["status"] == "done" for entry in phase_b))
+
+        snapshot = json.loads(
+            (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
+        )
+        for parity_id in (
+            "initial_shell_boot_expectations",
+            "runtime_summary_behavior",
+        ):
+            row = next(entry for entry in snapshot["behaviors"] if entry["id"] == parity_id)
+            with self.subTest(parity_id=parity_id):
+                self.assertEqual("verified", row["status"])
+        self.assertEqual(13, snapshot["summary"]["verified_v1"])
+        self.assertEqual(6, snapshot["summary"]["partially_verified"])
 
     def test_phase_a_parity_rows_verified_in_snapshot(self) -> None:
         snapshot = json.loads(
@@ -43,8 +64,6 @@ class ParityClosureOrderTests(unittest.TestCase):
             row = next(entry for entry in snapshot["behaviors"] if entry["id"] == parity_id)
             with self.subTest(parity_id=parity_id):
                 self.assertEqual("verified", row["status"])
-        self.assertEqual(11, snapshot["summary"]["verified_v1"])
-        self.assertEqual(8, snapshot["summary"]["partially_verified"])
 
 
 if __name__ == "__main__":

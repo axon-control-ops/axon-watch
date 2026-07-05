@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-B1",
+  "next_slice": "P-C1",
   "slices": [
     {
       "id": "P-A1",
@@ -38,25 +38,25 @@
     {
       "id": "P-B1",
       "phase": "B",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["initial_shell_boot_expectations"],
-      "spec": null,
+      "spec": "docs/PARITY_B1_INITIAL_SHELL_BOOT.md",
       "gate": "npm run verify:parity-b1"
     },
     {
       "id": "P-B2",
       "phase": "B",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["runtime_summary_behavior"],
-      "spec": null,
+      "spec": "docs/PARITY_B2_RUNTIME_LATENCY.md",
       "gate": "npm run verify:parity-b2"
     },
     {
       "id": "P-B3",
       "phase": "B",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["runtime_summary_behavior"],
-      "spec": null,
+      "spec": "docs/PARITY_B3_BOOT_CRITICAL_FIELDS.md",
       "gate": "npm run verify:parity-b3"
     },
     {

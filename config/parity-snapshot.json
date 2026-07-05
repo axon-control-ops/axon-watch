@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 11,
-    "partially_verified": 8,
+    "verified_v1": 13,
+    "partially_verified": 6,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -101,23 +101,26 @@
     },
     {
       "id": "runtime_summary_behavior",
-      "status": "partially_verified",
-      "evidence_gates": ["contract"],
+      "status": "verified",
+      "evidence_gates": ["P-B2", "P-B3"],
       "evidence": [
-        "tests/test_control_plane_runtime_summary.py",
-        "tests/test_control_plane_skeleton_e2e.py"
+        "scripts/verify/fixtures/runtime-summary-latency.ci.json + watch-summary-latency.ci.json under p95 gates",
+        "config/runtime-summary-boot-critical-fields.json allowlist",
+        "tests/test_parity_b3_boot_critical_fields.py assembler + /api/runtime/summary",
+        "tests/test_control_plane_runtime_summary.py contract regression"
       ],
-      "gap": "Fewer fields than axon-local runtime truth surfaces."
+      "gap": "Fewer enrichment fields than axon-local runtime truth; CI uses fixture latency samples not live stack."
     },
     {
       "id": "initial_shell_boot_expectations",
-      "status": "partially_verified",
-      "evidence_gates": ["contract"],
+      "status": "verified",
+      "evidence_gates": ["P-B1"],
       "evidence": [
-        "Sequential bootstrap in console-web shell store",
-        "scripts/dev/measure_shell_boot.py"
+        "scripts/verify/fixtures/shell-boot-report.dev.json wired into default npm run verify",
+        "tests/test_parity_b1_shell_boot_verify_wiring.py",
+        "scripts/dev/measure_shell_boot.py bootstrap-critical-path report shape"
       ],
-      "gap": "shell_boot_readiness fitness budget still PENDING in default verify run."
+      "gap": "CI uses bootstrap-critical-path fixture; Playwright browser paint measurement deferred to nightly."
     },
     {
       "id": "signal_inbox_consistency",
@@ -219,12 +222,11 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "8 must-keep behaviors remain partially_verified",
+    "6 must-keep behaviors remain partially_verified",
     "axon-local port 7734 remains production operator reference",
     "Real delivery channels (push/desktop/webhook) not implemented",
     "Voice deck / full JARVIS spoken-alert parity not implemented",
     "Dedicated-server artifacts not proven on a live host",
-    "shell_boot_readiness and latency fitness budgets PENDING in default verify",
     "Child-project and multi-repo continuous development not validated on Axon-X alone"
   ],
   "approved_primary_surfaces": [

@@ -56,9 +56,7 @@ phase_a = [entry for entry in order["slices"] if entry.get("phase") == "A"]
 if not phase_a or any(entry.get("status") != "done" for entry in phase_a):
     pending = [entry["id"] for entry in phase_a if entry.get("status") != "done"]
     raise SystemExit(f"Phase A incomplete; pending slices: {pending}")
-if order.get("next_slice") != "P-B1":
-    raise SystemExit(f"expected next_slice P-B1, got {order.get('next_slice')!r}")
-print("Phase A slices done; next_slice=P-B1")
+print("Phase A slices done")
 PY
 echo
 

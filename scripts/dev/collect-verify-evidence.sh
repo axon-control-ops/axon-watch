@@ -43,13 +43,13 @@ PY
 }
 
 runtime_url="$(service_base_url control-plane)/api/runtime/summary"
-watch_url="$(service_base_url axon-watch)/internal/watch/health"
+watch_url="$(service_base_url axon-watch)/internal/watch/summary"
 live_url="$(service_base_url control-plane)/api/live/events"
 
 echo "Collecting ${request_count} runtime summary samples from ${runtime_url}"
 measure_url "${runtime_url}" "${request_count}" >"${output_dir}/runtime-summary-latency.json"
 
-echo "Collecting ${request_count} watch health samples from ${watch_url}"
+echo "Collecting ${request_count} watch summary samples from ${watch_url}"
 measure_url "${watch_url}" "${request_count}" >"${output_dir}/watch-summary-latency.json"
 
 echo "Measuring shell boot readiness from ${AXON_WATCH_PUBLIC_BASE_URL}"

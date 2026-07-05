@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "description": "Boot-critical runtime summary fields required before console-web treats control-plane as ready.",
+  "top_level": [
+    "generated_at",
+    "control_plane",
+    "watch",
+    "runtime_identity",
+    "active_runs",
+    "approvals",
+    "signals",
+    "connectors",
+    "capabilities",
+    "degraded"
+  ],
+  "nested": {
+    "control_plane": ["status", "version", "uptime_seconds", "ready"],
+    "watch": ["status", "connected", "last_summary_at", "degraded_reason"],
+    "runtime_identity": [
+      "provider_family",
+      "provider_name",
+      "model_name",
+      "mode_default",
+      "tool_calling_supported",
+      "reasoning_supported"
+    ],
+    "approvals": ["pending_count", "highest_severity", "latest_approval_at"],
+    "signals": ["open_count", "critical_count", "high_count", "top_items", "last_updated_at"],
+    "connectors": [
+      "configured",
+      "ok",
+      "degraded",
+      "unavailable",
+      "required_unavailable",
+      "last_updated_at"
+    ],
+    "capabilities": [
+      "editor",
+      "terminal",
+      "browser_preview",
+      "watch_connected",
+      "approvals_enabled",
+      "notifications_enabled"
+    ],
+    "degraded": ["active", "reasons"]
+  },
+  "active_run_item": [
+    "run_id",
+    "workspace_id",
+    "mode",
+    "status",
+    "phase",
+    "title",
+    "detail",
+    "lane_id",
+    "updated_at"
+  ]
+}
