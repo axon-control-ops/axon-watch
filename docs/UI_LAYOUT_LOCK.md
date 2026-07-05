@@ -1,7 +1,7 @@
 # Axon-X Console UI Layout Lock
 
 **Status:** Locked — 2026-07-04  
-**Authority:** [ADR-004](adr/ADR-004-locked-console-shell-layout.md), [ADR-005](adr/ADR-005-operator-sidebar-attention-toggle.md) (Operator seam ownership), [ADR-006](adr/ADR-006-operator-command-hero-and-footer-attention.md) (Command hero + footer attention)  
+**Authority:** [ADR-004](adr/ADR-004-locked-console-shell-layout.md), [ADR-005](adr/ADR-005-operator-sidebar-attention-toggle.md), [ADR-006](adr/ADR-006-operator-command-hero-and-footer-attention.md), [ADR-007](adr/ADR-007-operator-workbench-demotion.md), [ADR-008](adr/ADR-008-ide-shell-content-lock.md) (IDE shell content)  
 **Implementation:** `apps/console-web/src/App.vue`, `apps/console-web/src/components/shell/*`, `apps/console-web/src/styles/mockup-shell.css`, `apps/console-web/src/styles/tokens.css`
 
 **Status:** Locked — 2026-07-04 (Operator shell slice through ADR-006)
@@ -91,13 +91,16 @@ Top → bottom:
 3. **Attention view** — Active Run, Approvals, Signals (`AttentionStackPanel`)
 4. **Workspace status card** — radar widget + four runtime-backed status rows (pinned in both views)
 
-### IDE mode
+### IDE mode (ADR-008)
 
 Top → bottom:
 
-1. **Workspaces panel** — filter, workspace list, `+ New Workspace`
-2. **Explorer** — `WorkspaceFileTree`
-3. **Workspace status card** — radar widget + four runtime-backed status rows
+1. **Activity bar** — Explorer (default), Search/Git stubs, Terminal focus, Agent dock focus (`IdeActivityBar`, 42px)
+2. **Explorer column** — `WorkspaceFileTree` in `IdeExplorerPanel`; collapsible via Ctrl/Cmd+B
+3. **KAIRO sidebar anchor** — `KairoSidebarPanel` pinned footer (**replaces** workspace status card in IDE)
+
+Workspaces move to **agent dock header tabs** (`AgentDockWorkspaceTabs`). Runtime status rows
+appear on status bar + topbar chips only — not the left footer.
 
 Workspace catalog currently filters to mockup workspace IDs for presentation parity.
 
@@ -162,20 +165,20 @@ Footer KAIRO CTA (ADR-006): when briefing attention is active and hero mode is
 **Command**, a glowing **OPEN KAIRO BRIEFING** button renders in the status bar
 **right column** (aligned under the hero), calling `focusKairoBriefing()`.
 
-### IDE mode (ADR-004 + center dock collapse)
+### IDE mode (ADR-008 — agent dock)
 
 Structure:
 
 ```text
-dock-stack
-├── dock-stack__upper (scrollable)
-│   ├── Active Run
-│   ├── Approvals
-│   ├── Signals
-│   └── Conversation
-└── DOCK HERO (bottom-anchored, fixed height)
-    └── Command ↔ KAIRO toggle (`DockHeroPanel`)
+agent-dock (replaces dock-stack in IDE)
+├── header — AGENT DOCK title + workspace tabs
+├── attention-rail — compact run / approvals / signals pills + STOP
+├── transcript — `ConversationSeamPanel` (primary surface)
+└── composer — pinned `CommandSeamPanel`
 ```
+
+No `AttentionStackPanel`, `HudSeamCard` seams, or `DockHeroPanel` in IDE mode.
+KAIRO narrative lives in left sidebar `KairoSidebarPanel` + topbar `KairoPresenceBar`.
 
 Center workbench (IDE only): bottom terminal panel may be **closed** via tab-bar action;
 editor fills the workbench until the status-bar **TERMINAL** chip restores the panel.

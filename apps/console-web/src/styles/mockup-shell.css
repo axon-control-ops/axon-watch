@@ -1759,6 +1759,51 @@ body:has(.console-shell--mockup) {
   background: rgba(0, 242, 255, 0.1);
 }
 
+
+.editor-statusbar__state {
+  color: rgba(0, 242, 255, 0.88);
+}
+
+.center-workbench__panel-surface {
+  flex: 1;
+  min-height: 0;
+  padding: 0.35rem 0.55rem 0.5rem;
+  overflow: auto;
+}
+
+.center-workbench__panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.center-workbench__panel-item {
+  padding: 0.38rem 0.5rem;
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  background: rgba(5, 17, 27, 0.72);
+  color: rgba(196, 218, 232, 0.9);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.center-workbench__panel-item--problem {
+  border-color: rgba(255, 159, 0, 0.28);
+  color: #ffd08a;
+}
+
+.center-workbench__panel-item--log {
+  color: rgba(168, 186, 204, 0.92);
+}
+
+.center-workbench__panel-empty {
+  margin: 0;
+  padding: 0.25rem 0.1rem;
+}
+
 .surface-host--mockup {
   border: 0;
   background: transparent;

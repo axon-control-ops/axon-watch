@@ -25,22 +25,36 @@ const shell = useShellStore();
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
 const terminalPanelVisible = ref(true);
-const showTerminalDock = computed(
-  () => !isIdeMode.value || terminalPanelVisible.value,
-);
-const bottomTab = ref<'terminal' | 'problems' | 'output' | 'logs'>('terminal');
+const showTerminalDock = computed(() => !isIdeMode.value || terminalPanelVisible.value);
+type BottomTabId = 'terminal' | 'problems' | 'output' | 'logs';
+const bottomTab = ref<BottomTabId>('terminal');
 const workbenchRef = ref<HTMLElement | null>(null);
 const terminalHostRef = ref<InstanceType<typeof TerminalHost> | null>(null);
 const terminalHeight = ref(240);
 const resizing = ref(false);
 const terminalHeightCustomized = ref(false);
+const editorCursorLine = ref(1);
+const editorCursorColumn = ref(1);
 
-const bottomTabs = [
+const problemItems = computed(() => {
+  const items: string[] = [];
+  if (shell.fileSaveError) items.push(`Save failed: ${shell.fileSaveError}`);
+  if (shell.workspaceFilesError) items.push(`Workspace files: ${shell.workspaceFilesError}`);
+  if (shell.commandMutationError) items.push(`Command: ${shell.commandMutationError}`);
+  if (shell.runMutationError) items.push(`Run: ${shell.runMutationError}`);
+  if (shell.runtimeSummaryError) items.push(`Runtime summary: ${shell.runtimeSummaryError}`);
+  if (shell.briefingError) items.push(`Briefing: ${shell.briefingError}`);
+  if (shell.runsError) items.push(`Runs: ${shell.runsError}`);
+  if (shell.inboxError) items.push(`Inbox: ${shell.inboxError}`);
+  return items;
+});
+
+const bottomTabs = computed(() => [
   { id: 'terminal' as const, label: 'TERMINAL' },
-  { id: 'problems' as const, label: 'PROBLEMS 0' },
+  { id: 'problems' as const, label: `PROBLEMS ${problemItems.value.length}` },
   { id: 'output' as const, label: 'OUTPUT' },
   { id: 'logs' as const, label: 'LOGS' },
-];
+]);
 
 const editorBreadcrumb = computed(() => {
   const workspace = shell.currentWorkspace?.workspace_id ?? 'workspace_smoke';
@@ -57,6 +71,58 @@ const workspaceTerminalLabel = computed(() => {
     ? `Connected · ${workspaceId}`
     : `Workspace · ${workspaceId}`;
 });
+
+const activeEditorValue = computed(() => shell.activeEditorDocument?.value ?? '');
+const editorLineCount = computed(() => {
+  const value = activeEditorValue.value;
+  return value.length === 0 ? 1 : value.split(/\r\n|\r|\n/).length;
+});
+const editorEol = computed(() => (activeEditorValue.value.includes('\r\n') ? 'CRLF' : 'LF'));
+const editorLanguageLabel = computed(() => {
+  const language = shell.activeEditorDocument?.language ?? 'plaintext';
+  const labels: Record<string, string> = {
+    markdown: 'Markdown',
+    json: 'JSON',
+    plaintext: 'Plain Text',
+    typescript: 'TypeScript',
+    javascript: 'JavaScript',
+    python: 'Python',
+    shell: 'Shell',
+  };
+  return labels[language] ?? language;
+});
+const editorAccessLabel = computed(() => {
+  if (!shell.activeEditorDocument) {
+    return 'No document';
+  }
+  if (shell.activeEditorDocument.readOnly) {
+    return 'Read-only';
+  }
+  return shell.activeEditorDocument.dirty ? 'Unsaved' : 'Saved';
+});
+const outputLines = computed(() => {
+  const document = shell.activeEditorDocument;
+  return [
+    document ? `Document · ${document.title}` : 'Document · none',
+    document ? `Source · ${document.source}` : '',
+    document ? `Access · ${document.readOnly ? 'read-only' : 'editable'}` : '',
+    `Workspace · ${shell.currentWorkspace?.workspace_id ?? 'none'}`,
+    `Runtime · ${shell.runtimeStateLabel}`,
+    `Conversation · ${shell.threadStateLabel}`,
+    shell.fileSaveState === 'saving' ? 'Save state · saving' : 'Save state · idle',
+  ].filter(Boolean);
+});
+const logLines = computed(() => {
+  if (shell.runHistoryRows.length > 0) {
+    return shell.runHistoryRows.map((row) => row.label);
+  }
+  return [shell.runStateLabel, shell.inboxStateLabel];
+});
+
+function handleEditorCursorChange(position: { line: number; column: number }): void {
+  editorCursorLine.value = position.line;
+  editorCursorColumn.value = position.column;
+}
 
 function syncTerminalHeightToContainer(): void {
   const container = workbenchRef.value;
@@ -89,6 +155,27 @@ function hideTerminalPanel(): void {
   persistTerminalPanelVisible(false);
   requestAnimationFrame(() => runLayoutSync('resize'));
 }
+
+watch(
+  () => shell.ideTerminalRevealToken,
+  () => {
+    showTerminalPanel();
+  },
+);
+
+watch(
+  () => shell.ideTerminalToggleToken,
+  () => {
+    if (!isIdeMode.value) {
+      return;
+    }
+    if (terminalPanelVisible.value) {
+      hideTerminalPanel();
+    } else {
+      showTerminalPanel();
+    }
+  },
+);
 
 function showTerminalPanel(): void {
   if (!isIdeMode.value || terminalPanelVisible.value) {
@@ -151,13 +238,13 @@ let resizeObserver: ResizeObserver | undefined;
 function syncShellColumnHeights(): void {
   const workbench = workbenchRef.value;
   const statusBar = document.querySelector('.region-status-bar');
-  const shell = workbench?.closest('.console-shell') ?? null;
-  if (!workbench || !statusBar || !shell) {
+  const shellRoot = workbench?.closest('.console-shell') ?? null;
+  if (!workbench || !statusBar || !shellRoot) {
     return;
   }
 
   const statusTop = statusBar.getBoundingClientRect().top;
-  const footerGapPx = readShellFooterGapPx(shell);
+  const footerGapPx = readShellFooterGapPx(shellRoot);
   const columns = [
     workbench,
     document.querySelector('.region-right-dock'),
@@ -239,6 +326,14 @@ watch(
     runLayoutSync('resize');
   },
 );
+
+watch(
+  () => shell.activeEditorDocumentId,
+  () => {
+    editorCursorLine.value = 1;
+    editorCursorColumn.value = 1;
+  },
+);
 </script>
 
 <template>
@@ -314,6 +409,7 @@ watch(
           :description="shell.activeEditorDocument.description"
           :read-only="shell.activeEditorDocument.readOnly"
           :dirty="shell.activeEditorDocument.dirty"
+          @cursor-change="handleEditorCursorChange"
           @value-change="shell.updateActiveFileContent"
           @save="shell.saveActiveFileDocument"
         />
@@ -322,18 +418,18 @@ watch(
             v-if="isIdeMode && !terminalPanelVisible"
             type="button"
             class="editor-statusbar__panel-toggle"
-            title="Show terminal panel"
+            title="Show terminal panel (Ctrl/Cmd+J)"
             aria-label="Show terminal panel"
             @click="showTerminalPanel"
           >
             TERMINAL
           </button>
           <div class="editor-statusbar__meta">
-            <span>Ln 11, Col 22</span>
-            <span>Spaces: 2</span>
-            <span>UTF-8</span>
-            <span>LF</span>
-            <span>Markdown</span>
+            <span>Ln {{ editorCursorLine }}, Col {{ editorCursorColumn }}</span>
+            <span>{{ editorLineCount }} line{{ editorLineCount === 1 ? '' : 's' }}</span>
+            <span>{{ editorEol }}</span>
+            <span>{{ editorLanguageLabel }}</span>
+            <span class="editor-statusbar__state">{{ editorAccessLabel }}</span>
           </div>
         </div>
       </section>
@@ -403,7 +499,7 @@ watch(
               v-if="isIdeMode"
               type="button"
               class="terminal-tabbar__action-button"
-              title="Close terminal panel"
+              title="Close terminal panel (Ctrl/Cmd+J)"
               aria-label="Close terminal panel"
               @click="hideTerminalPanel"
             >
@@ -426,9 +522,30 @@ watch(
             :runtime-connected="Boolean(shell.runtimeSummary?.watch.connected)"
           />
         </div>
-        <p v-else class="center-workbench__terminal-placeholder region-copy">
-          {{ bottomTab.toUpperCase() }} surface attaches in a later slice.
-        </p>
+        <div v-else-if="bottomTab === 'problems'" class="center-workbench__panel-surface">
+          <p v-if="problemItems.length === 0" class="center-workbench__panel-empty region-copy">
+            No active problems. Runtime, save, briefing, and run surfaces are clear.
+          </p>
+          <ul v-else class="center-workbench__panel-list">
+            <li v-for="item in problemItems" :key="item" class="center-workbench__panel-item center-workbench__panel-item--problem">
+              {{ item }}
+            </li>
+          </ul>
+        </div>
+        <div v-else-if="bottomTab === 'output'" class="center-workbench__panel-surface">
+          <ul class="center-workbench__panel-list">
+            <li v-for="item in outputLines" :key="item" class="center-workbench__panel-item">
+              {{ item }}
+            </li>
+          </ul>
+        </div>
+        <div v-else class="center-workbench__panel-surface">
+          <ul class="center-workbench__panel-list">
+            <li v-for="item in logLines" :key="item" class="center-workbench__panel-item center-workbench__panel-item--log">
+              {{ item }}
+            </li>
+          </ul>
+        </div>
       </section>
     </div>
   </main>

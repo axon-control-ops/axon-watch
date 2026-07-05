@@ -17,6 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   valueChange: [value: string];
   save: [];
+  cursorChange: [position: { line: number; column: number }];
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -41,6 +42,9 @@ onMounted(async () => {
           return;
         }
         emit('valueChange', value);
+      },
+      onCursorChange: (position) => {
+        emit('cursorChange', position);
       },
     });
     loadState.value = 'ready';

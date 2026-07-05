@@ -104,6 +104,16 @@ import {
   mergeMockupWorkspaceCatalog,
   resolveOperatorWorkspaceId,
 } from '../lib/mockup-shell-view';
+import {
+  type IdeActivityView,
+  persistAgentDockCollapsed,
+  persistIdeExplorerCollapsed,
+  persistLayoutMode,
+  readStoredAgentDockCollapsed,
+  readStoredIdeExplorerCollapsed,
+  readStoredLayoutMode,
+} from '../lib/ide-layout-prefs';
+import { WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY } from '../lib/workbench-terminal-split';
 
 export type LayoutMode = 'operator' | 'ide';
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
@@ -157,7 +167,7 @@ const DEFAULT_DOCK_CONTEXT: DockContextDescriptor = {
 };
 
 export const useShellStore = defineStore('shell', () => {
-  const layoutMode = ref<LayoutMode>('operator');
+  const layoutMode = ref<LayoutMode>(readStoredLayoutMode() ?? 'operator');
 
   // Backend-owned state stays on shared canonical DTO seams.
   const workspaces = ref<WorkspaceRecord[]>([]);
@@ -213,6 +223,12 @@ export const useShellStore = defineStore('shell', () => {
   const dockHeroModeTouched = ref(false);
   const leftSidebarMode = ref<LeftSidebarMode>(readStoredLeftSidebarMode() ?? 'workspaces');
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
+  const ideActivityView = ref<IdeActivityView>('explorer');
+  const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
+  const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
+  const ideTerminalRevealToken = ref(0);
+  const ideTerminalToggleToken = ref(0);
+
 
   const layoutModeLabel = computed(() =>
     layoutMode.value === 'operator' ? 'Operator mode' : 'IDE mode',
@@ -650,10 +666,52 @@ export const useShellStore = defineStore('shell', () => {
 
   function setLayoutMode(mode: LayoutMode): void {
     layoutMode.value = mode;
+    persistLayoutMode(mode);
     expandedDockSeams.value = new Set();
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
     applyOperatorDockDefaults();
+  }
+
+  function revealIdeTerminalPanel(): void {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY, '1');
+    }
+    ideTerminalRevealToken.value += 1;
+  }
+
+  function toggleIdeTerminalPanel(): void {
+    ideTerminalToggleToken.value += 1;
+  }
+
+  function setIdeActivityView(view: IdeActivityView): void {
+    ideActivityView.value = view;
+    if (view === 'explorer') {
+      ideExplorerCollapsed.value = false;
+      persistIdeExplorerCollapsed(false);
+      return;
+    }
+    if (view === 'terminal') {
+      revealIdeTerminalPanel();
+      return;
+    }
+    if (view === 'agent') {
+      agentDockCollapsed.value = false;
+      persistAgentDockCollapsed(false);
+    }
+  }
+
+  function toggleIdeExplorer(): void {
+    ideExplorerCollapsed.value = !ideExplorerCollapsed.value;
+    persistIdeExplorerCollapsed(ideExplorerCollapsed.value);
+    if (!ideExplorerCollapsed.value) {
+      ideActivityView.value = 'explorer';
+    }
+  }
+
+  function toggleAgentDock(): void {
+    agentDockCollapsed.value = !agentDockCollapsed.value;
+    persistAgentDockCollapsed(agentDockCollapsed.value);
   }
 
   const activeWorkspaceFilePath = computed(() => {
@@ -1203,6 +1261,11 @@ export const useShellStore = defineStore('shell', () => {
     kairoBriefingAttention,
     kairoBriefingAttentionLabel,
     kairoPresenceState,
+    agentDockCollapsed,
+    ideActivityView,
+    ideExplorerCollapsed,
+    ideTerminalRevealToken,
+    ideTerminalToggleToken,
     layoutMode,
     layoutModeLabel,
     leftSidebarAttentionBadgeCount,
@@ -1248,8 +1311,11 @@ export const useShellStore = defineStore('shell', () => {
     setActiveEditorDocument,
     setCurrentWorkspace,
     setDockHeroMode,
+    setIdeActivityView,
     setLayoutMode,
     setLeftSidebarMode,
+    toggleAgentDock,
+    toggleIdeExplorer,
     signalViews,
     stopPrimaryRun,
     submitOperatorCommand,

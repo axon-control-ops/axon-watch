@@ -13,6 +13,7 @@ export interface MonacoEditorOptions {
   language: string;
   readOnly?: boolean;
   onValueChange?: (value: string) => void;
+  onCursorChange?: (position: { line: number; column: number }) => void;
   variant?: 'default' | 'mockup';
 }
 
@@ -67,10 +68,26 @@ export async function createMonacoEditor(
     padding: { top: 12, bottom: 12 },
   });
 
+  const emitCursor = () => {
+    const position = editor.getPosition();
+    options.onCursorChange?.({
+      line: position?.lineNumber ?? 1,
+      column: position?.column ?? 1,
+    });
+  };
+
   if (options.onValueChange) {
     editor.onDidChangeModelContent(() => {
       options.onValueChange?.(model.getValue());
+      emitCursor();
     });
+  }
+
+  if (options.onCursorChange) {
+    editor.onDidChangeCursorPosition(() => {
+      emitCursor();
+    });
+    emitCursor();
   }
 
   return {
@@ -86,6 +103,7 @@ export async function createMonacoEditor(
     },
     setValue(value: string) {
       model.setValue(value);
+      emitCursor();
     },
     getValue() {
       return model.getValue();

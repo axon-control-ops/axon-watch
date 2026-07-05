@@ -48,6 +48,7 @@ Every numbered ADR must include:
 - [ADR-005: Operator sidebar attention toggle](ADR-005-operator-sidebar-attention-toggle.md)
 - [ADR-006: Operator command hero and footer attention](ADR-006-operator-command-hero-and-footer-attention.md)
 - [ADR-007: Operator workbench demotion](ADR-007-operator-workbench-demotion.md)
+- [ADR-008: IDE shell content lock](ADR-008-ide-shell-content-lock.md)
 
 **Planning-only (not yet copied here):**
 
