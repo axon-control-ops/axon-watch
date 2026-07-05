@@ -57,4 +57,5 @@ npm run verify:test9
   until a later cleanup pass
 - Manifest covers `.md` files only
 
-Next locked item: **Final parity verification and cutover decision**.
+Next locked item: none — cutover checklist complete. See `docs/CUTOVER_DECISION.md`
+for operating rules and remaining blockers.

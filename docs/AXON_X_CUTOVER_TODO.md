@@ -24,10 +24,13 @@ Source inputs:
 
 ## Current Readiness
 
-Axon-X is already usable for bounded local workspace development.
+Axon-X is approved for **bounded primary development** on `axon-watch/dev`
+(console shell, control-plane, axon-watch thin slices). See
+`docs/CUTOVER_DECISION.md`.
 
-Axon-X is **not yet ready** to replace `axon-local` for continuous
-multi-project development.
+Axon-X is **not approved** to fully replace `axon-local` for continuous
+multi-project production work until remaining partially verified behaviors are
+closed (12 of 19 as of 2026-07-05).
 
 ## Already Landed
 
@@ -92,15 +95,21 @@ multi-project development.
   (canonical bundle in `docs/planning/`, `MANIFEST.json` integrity, axon-local
   continuity mirror sync script). Spec: `docs/CROSS_REPO_PLANNING_MIGRATION.md`.
 
-- [ ] Final parity verification and cutover decision
-  Reason: do not retire `axon-local` until the must-keep behaviors are verified,
-  not just implemented thinly.
+- [x] Final parity verification and cutover decision
+  Verified 2026-07-05 via `./scripts/verify/test10-final-parity-cutover.sh`
+  (parity snapshot: 7 verified v1, 12 partially verified; bounded cutover
+  approved, full axon-local retirement not approved).
+  Spec: `docs/FINAL_PARITY_VERIFICATION.md`, `docs/CUTOVER_DECISION.md`.
 
 ## Append Log
 
 Append new entries here in reverse-chronological order. Do not rewrite history.
 
 ### 2026-07-05 (continued)
+
+- **TEST-10** final parity verification and cutover decision: 7 verified v1,
+  12 partially verified; bounded cutover approved; axon-local retirement not
+  approved. Gate: `./scripts/verify/test10-final-parity-cutover.sh`.
 
 - **TEST-9** cross-repo planning migration verified: canonical bundle in
   `docs/planning/`, manifest validation, cutover references updated.

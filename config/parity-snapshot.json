@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "assessed_on": "2026-07-05",
+  "assessment_scope": "Axon-X thin-slice gates TEST-0 through TEST-9 on axon-watch/dev",
+  "decision": "bounded_cutover_approved",
+  "full_axon_local_retirement": false,
+  "summary": {
+    "total_behaviors": 19,
+    "verified_v1": 7,
+    "partially_verified": 12,
+    "verified_full_parity": 0
+  },
+  "required_gates_passed": [
+    "TEST-0",
+    "TEST-1",
+    "TEST-2",
+    "TEST-3",
+    "TEST-4",
+    "TEST-5",
+    "TEST-6",
+    "TEST-7",
+    "TEST-8",
+    "TEST-9"
+  ],
+  "behaviors": [
+    {
+      "id": "run_stop_resume",
+      "status": "partially_verified",
+      "evidence_gates": ["contract"],
+      "evidence": [
+        "tests/test_control_plane_runs.py stop/resume with operator_stop/operator_resume receipts"
+      ],
+      "gap": "No full UI E2E audit that dock and runtime strip stay in sync across stop/resume."
+    },
+    {
+      "id": "approval_boundaries",
+      "status": "partially_verified",
+      "evidence_gates": ["contract", "ui"],
+      "evidence": [
+        "tests/test_control_plane_runs.py awaiting_approval phase",
+        "AttentionStackPanel approve/reject wired to /api/runs/{id}/approve|reject"
+      ],
+      "gap": "Not proven that approval blocks execution everywhere consistently."
+    },
+    {
+      "id": "review_ready_state",
+      "status": "partially_verified",
+      "evidence_gates": ["contract", "ui"],
+      "evidence": [
+        "tests/test_control_plane_runs.py review_ready transitions",
+        "resume-from-review via command executor (TEST-0)"
+      ],
+      "gap": "Fewer review affordances than axon-local; no full apply/discard parity."
+    },
+    {
+      "id": "workspace_handoffs",
+      "status": "verified",
+      "evidence_gates": ["TEST-2"],
+      "evidence": [
+        "tests/test_test2_workspace_handoff_acceptance.py",
+        "docs/WORKSPACE_HANDOFF.md"
+      ],
+      "gap": null
+    },
+    {
+      "id": "real_project_workspace_connection",
+      "status": "verified",
+      "evidence_gates": ["TEST-1"],
+      "evidence": [
+        "tests/test_test1_workspace_project_connection_acceptance.py",
+        "live git status in workspace_axon_local"
+      ],
+      "gap": null
+    },
+    {
+      "id": "operator_vs_ide_mode_semantics",
+      "status": "verified",
+      "evidence_gates": ["TEST-0"],
+      "evidence": [
+        "tests/test_test0_workspace_smoke_acceptance.py",
+        "docs/OPERATOR_MISSION_CONTROL_V1.md",
+        "ADR-007 operator workbench demotion"
+      ],
+      "gap": "Mission control feed is receipt-depth only (acceptable v1 degradation)."
+    },
+    {
+      "id": "dock_behavior",
+      "status": "partially_verified",
+      "evidence_gates": ["ui"],
+      "evidence": [
+        "Operator terminal collapse/reopen",
+        "IDE status-bar TERMINAL restore",
+        "ADR-005/006/007 layout slices"
+      ],
+      "gap": "Reduced visual richness; not full agent-dock thread parity."
+    },
+    {
+      "id": "runtime_summary_behavior",
+      "status": "partially_verified",
+      "evidence_gates": ["contract"],
+      "evidence": [
+        "tests/test_control_plane_runtime_summary.py",
+        "tests/test_control_plane_skeleton_e2e.py"
+      ],
+      "gap": "Fewer fields than axon-local runtime truth surfaces."
+    },
+    {
+      "id": "initial_shell_boot_expectations",
+      "status": "partially_verified",
+      "evidence_gates": ["contract"],
+      "evidence": [
+        "Sequential bootstrap in console-web shell store",
+        "scripts/dev/measure_shell_boot.py"
+      ],
+      "gap": "shell_boot_readiness fitness budget still PENDING in default verify run."
+    },
+    {
+      "id": "signal_inbox_consistency",
+      "status": "partially_verified",
+      "evidence_gates": ["contract"],
+      "evidence": [
+        "tests/test_control_plane_watch_integration.py",
+        "tests/test_signal_consistency.py"
+      ],
+      "gap": "Dev bootstrap signals only; fewer signal types than axon-local."
+    },
+    {
+      "id": "desktop_and_browser_startup",
+      "status": "partially_verified",
+      "evidence_gates": ["manual"],
+      "evidence": [
+        "scripts/dev/up.sh browser startup documented and verified"
+      ],
+      "gap": "Desktop packaging lags; no packaged desktop proof."
+    },
+    {
+      "id": "kairo_watch_rules",
+      "status": "verified",
+      "evidence_gates": ["TEST-6"],
+      "evidence": [
+        "tests/test_test6_kairo_watch_rules_acceptance.py",
+        "services/axon-watch/app/signals/watch_rule.py"
+      ],
+      "gap": null
+    },
+    {
+      "id": "spoken_high_value_alerts",
+      "status": "partially_verified",
+      "evidence_gates": ["TEST-7"],
+      "evidence": [
+        "spoken_alert_policy.py eligibility on /api/briefing",
+        "browser SpeechSynthesis hook with session dedupe"
+      ],
+      "gap": "No voice deck; desktop-first browser TTS only."
+    },
+    {
+      "id": "delivery_receipts_operator_attention",
+      "status": "verified",
+      "evidence_gates": ["TEST-5"],
+      "evidence": [
+        "tests/test_test5_delivery_receipts_acceptance.py",
+        "inbox delivery_state + Attention DELIVERED badge"
+      ],
+      "gap": "In-process inbox/desktop simulation only (acceptable v1 degradation)."
+    },
+    {
+      "id": "executive_operator_rhythm",
+      "status": "partially_verified",
+      "evidence_gates": ["contract"],
+      "evidence": [
+        "operator_briefing.py Notice/Advise projection",
+        "BriefingPanel consumption"
+      ],
+      "gap": "Narrative fields thin vs executive_operator_workflow.py parity."
+    },
+    {
+      "id": "kairo_persona_operator_copy",
+      "status": "partially_verified",
+      "evidence_gates": ["TEST-7"],
+      "evidence": [
+        "kairo_persona.py persona_voice_line on /api/briefing"
+      ],
+      "gap": "Default settings only; no persisted operator persona UI."
+    },
+    {
+      "id": "mobile_operator_cockpit_compactness",
+      "status": "partially_verified",
+      "evidence_gates": ["TEST-7"],
+      "evidence": [
+        "viewport_compact on /api/briefing",
+        "console-shell--mobile-compact class"
+      ],
+      "gap": "Foreground-only honest model; compact layout does not react to viewport resize after mount."
+    },
+    {
+      "id": "watch_connectors_runtime_awareness",
+      "status": "verified",
+      "evidence_gates": ["TEST-3"],
+      "evidence": [
+        "tests/test_test3_watch_connectors_acceptance.py",
+        "runtime summary connectors block"
+      ],
+      "gap": null
+    },
+    {
+      "id": "watch_command_event_status_depth",
+      "status": "verified",
+      "evidence_gates": ["TEST-4"],
+      "evidence": [
+        "tests/test_test4_watch_command_event_acceptance.py",
+        "reprobe_connector + events log + summary observation"
+      ],
+      "gap": null
+    }
+  ],
+  "blockers_for_full_retirement": [
+    "12 must-keep behaviors remain partially_verified",
+    "axon-local port 7734 remains production operator reference",
+    "Real delivery channels (push/desktop/webhook) not implemented",
+    "Voice deck / full JARVIS spoken-alert parity not implemented",
+    "Dedicated-server artifacts not proven on a live host",
+    "shell_boot_readiness and latency fitness budgets PENDING in default verify",
+    "Child-project and multi-repo continuous development not validated on Axon-X alone"
+  ],
+  "approved_primary_surfaces": [
+    "axon-watch console-web operator and IDE shell development",
+    "axon-watch control-plane and axon-watch service thin slices",
+    "Cutover verification and planning on axon-watch/docs/planning/"
+  ],
+  "axon_local_remains_required_for": [
+    "Production operator workflows on port 7734 until operator declares switch",
+    "Child-project integration and legacy connector surfaces",
+    "Full voice deck and companion runtime paths",
+    "Multi-project continuous development not yet bound in Axon-X"
+  ]
+}

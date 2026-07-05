@@ -54,30 +54,31 @@ Suggested status vocabulary for future use:
 
 ## Current Verification Snapshot (2026-07-05)
 
-Implementation repo: `axon-watch` on branch `dev`. This table records **observed**
-status against the must-keep behaviors above — not aspirational completion.
+Implementation repo: `axon-watch` on branch `dev`. **Final assessment** after
+TEST-10: **7 verified (v1 scope)**, **12 partially_verified**, **0 full parity**.
+See `config/parity-snapshot.json` and `docs/CUTOVER_DECISION.md`.
 
 | Behavior | Status | Evidence |
 |---|---|---|
 | Run stop / resume | `partially_verified` | API + dock actions; not full E2E receipt audit |
 | Approval boundaries | `partially_verified` | Approve/reject endpoints + dock seam |
 | Review-ready state | `partially_verified` | `review_ready` phase visible in dock + status bar |
-| Operator vs IDE mode semantics | `partially_verified` | ADR-007 v1 + **TEST-0 pass** (2026-07-05): `test_test0_workspace_smoke_acceptance.py`, mission control unit tests, live git status / resume-from-review on `workspace_smoke` |
-| Real project/workspace connection | `partially_verified` | **TEST-1 pass** (2026-07-05): `workspace_project_bindings.py`, `test_test1_workspace_project_connection_acceptance.py`, live `git status` in bound `workspace_axon_local` |
-| Workspace handoffs | `partially_verified` | **TEST-2 pass** (2026-07-05): `POST/GET /api/workspaces/{id}/handoffs`, persisted record + target workspace summary in `test_test2_workspace_handoff_acceptance.py` |
-| Watch connectors / runtime awareness | `partially_verified` | **TEST-3 pass** (2026-07-05): `config/watch-connectors.json`, `/internal/watch/connectors`, `/api/connectors`, runtime summary `connectors` block |
-| Watch command / event / status depth | `partially_verified` | **TEST-4 pass** (2026-07-05): `reprobe_connector`, `/api/watch/events`, summary `observation`, `test_test4_watch_command_event_acceptance.py` |
-| Delivery receipts for operator attention | `partially_verified` | **TEST-5 pass** (2026-07-05): `app/delivery/`, `/api/delivery/receipts`, inbox `delivery_state`, Attention sidebar badge |
-| Dock behavior | `partially_verified` | Operator terminal collapse + reopen (chip/strip/✕); IDE status-bar TERMINAL restore; run controls in center + Attention sidebar |
-| Runtime summary behavior | `partially_verified` | Boot path uses `/api/runtime/summary`; Phase 4 API E2E in `test_control_plane_skeleton_e2e.py` |
+| Operator vs IDE mode semantics | `verified` | ADR-007 v1 + **TEST-0 pass**; mission control v1 within v1 degradation |
+| Real project/workspace connection | `verified` | **TEST-1 pass**: bindings + live `git status` in `workspace_axon_local` |
+| Workspace handoffs | `verified` | **TEST-2 pass**: persisted handoff + target workspace summary |
+| Watch connectors / runtime awareness | `verified` | **TEST-3 pass**: connectors config, routes, runtime summary block |
+| Watch command / event / status depth | `verified` | **TEST-4 pass**: reprobe, events log, summary observation |
+| Delivery receipts for operator attention | `verified` | **TEST-5 pass**: in-process receipts + inbox `delivery_state` (v1 channels) |
+| Dock behavior | `partially_verified` | Operator terminal collapse + reopen; IDE TERMINAL restore |
+| Runtime summary behavior | `partially_verified` | Boot path uses `/api/runtime/summary`; Phase 4 API E2E |
 | Initial shell boot expectations | `partially_verified` | Sequential bootstrap; timing fitness PENDING |
-| Signal / inbox consistency | `partially_verified` | Phase 5 CP→watch E2E in `test_control_plane_watch_integration.py`; bootstrap signals in dev |
-| Desktop and browser startup | `partially_verified` | `./scripts/dev/up.sh` documented and verified |
-| KAIRO watch rules | `partially_verified` | **TEST-6 pass** (2026-07-05): `watch_rule` on inbox items, observe/advise/approval/execute mapping, Attention mode chip |
-| Spoken high-value alerts | `partially_verified` | **TEST-7 pass** (2026-07-05): spoken-alert eligibility on briefing, browser speech hook with session dedupe |
-| Executive operator rhythm | `partially_verified` | Briefing API consumed; narrative fields thin |
-| KAIRO persona and operator copy | `partially_verified` | **TEST-7 pass** (2026-07-05): `persona_voice_line` on `/api/briefing`, BriefingPanel consumption |
-| Mobile operator cockpit compactness | `partially_verified` | **TEST-7 pass** (2026-07-05): `viewport_compact` + `console-shell--mobile-compact`, `foreground_only: true` |
+| Signal / inbox consistency | `partially_verified` | CP→watch E2E; dev bootstrap signals |
+| Desktop and browser startup | `partially_verified` | `./scripts/dev/up.sh` browser flow; desktop packaging lags |
+| KAIRO watch rules | `verified` | **TEST-6 pass**: `watch_rule` mapping + Attention mode chip |
+| Spoken high-value alerts | `partially_verified` | **TEST-7 pass**: eligibility + browser TTS hook only |
+| Executive operator rhythm | `partially_verified` | Briefing Notice/Advise; narrative fields thin |
+| KAIRO persona and operator copy | `partially_verified` | **TEST-7 pass**: `persona_voice_line`; defaults not persisted in UI |
+| Mobile operator cockpit compactness | `partially_verified` | **TEST-7 pass**: compact shell; foreground-only, no resize reactivity |
 
 ## Verification Rule
 

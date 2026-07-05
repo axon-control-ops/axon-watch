@@ -11,3 +11,4 @@ Local bootstrap lifecycle remains under `scripts/dev/`.
 
 Dedicated-server spec: `docs/DEDICATED_SERVER_READINESS.md`.
 Planning migration spec: `docs/CROSS_REPO_PLANNING_MIGRATION.md`.
+Cutover decision: `docs/CUTOVER_DECISION.md` (parity snapshot in `config/parity-snapshot.json`).

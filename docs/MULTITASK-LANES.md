@@ -152,6 +152,7 @@ One slice per pass; run the verification gate before the next item.
 | **8** | **TEST-7** | B (+ C) | Operator presence — persona, spoken-alert eligibility, mobile compact shell | **Done** — `./scripts/verify/test7-operator-presence.sh` + `docs/OPERATOR_PRESENCE.md` (2026-07-05) |
 | **9** | **TEST-8** | D | Dedicated-server readiness — topology, env validation, systemd/Caddy/compose | **Done** — `./scripts/verify/test8-dedicated-server-readiness.sh` + `docs/DEDICATED_SERVER_READINESS.md` (2026-07-05) |
 | **10** | **TEST-9** | Coordinator | Cross-repo planning migration — canonical `docs/planning/` bundle + manifest | **Done** — `./scripts/verify/test9-cross-repo-planning-migration.sh` + `docs/CROSS_REPO_PLANNING_MIGRATION.md` (2026-07-05) |
+| **11** | **TEST-10** | Coordinator | Final parity verification + cutover decision | **Done** — `./scripts/verify/test10-final-parity-cutover.sh` + `docs/CUTOVER_DECISION.md` (2026-07-05) |
 | 4 | C4 | C (+ B) | Wire **approve/reject** actions from Attention sidebar to existing API | **Done** — `AttentionStackPanel` APPROVE/REJECT → `/api/runs/{id}/approve|reject` |
 | 5 | C5 | C (+ B) | Expand command executor (`git status`, resume-from-review command) | **Done** — `git status` + `resume from review` via chat orchestration |
 | 6 | D2 | D | Capture `shell_boot_readiness` + latency timing evidence | **Done** — `measure_shell_boot.py` + `collect-verify-evidence.sh` |
