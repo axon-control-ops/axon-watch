@@ -1,18 +1,55 @@
-"""In-memory watch observation event log (bounded ring buffer)."""
+"""Persisted watch observation event log (bounded)."""
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+import json
+import os
 import uuid
-from collections import deque
 
+from app.persistence import watch_store_sqlite
 from app.signals.iso_time import utc_now_iso
 
-_MAX_EVENTS = 200
-_EVENTS: deque[dict[str, object]] = deque(maxlen=_MAX_EVENTS)
+_MAX_EVENTS = watch_store_sqlite.MAX_EVENTS
+
+
+def _configured_db_path() -> str | None:
+    return os.environ.get("AXON_WATCH_WATCH_SERVICE_DB")
+
+
+@contextmanager
+def _managed_connection():
+    connection = watch_store_sqlite.connect(_configured_db_path())
+    try:
+        yield connection
+    finally:
+        connection.close()
 
 
 def reset_store() -> None:
-    _EVENTS.clear()
+    with _managed_connection() as connection:
+        connection.execute("DELETE FROM watch_events")
+        connection.commit()
+
+
+def _next_sequence(connection) -> int:
+    row = connection.execute("SELECT COALESCE(MAX(sequence), 0) FROM watch_events").fetchone()
+    return int(row[0]) + 1
+
+
+def _trim_events(connection) -> None:
+    connection.execute(
+        """
+        DELETE FROM watch_events
+        WHERE event_id NOT IN (
+            SELECT event_id
+            FROM watch_events
+            ORDER BY sequence DESC
+            LIMIT ?
+        )
+        """,
+        (_MAX_EVENTS,),
+    )
 
 
 def append_event(
@@ -28,14 +65,37 @@ def append_event(
         "command_id": command_id,
         "payload": payload or {},
     }
-    _EVENTS.append(event)
+    with _managed_connection() as connection:
+        sequence = _next_sequence(connection)
+        connection.execute(
+            """
+            INSERT INTO watch_events (event_id, sequence, occurred_at, record_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                event["event_id"],
+                sequence,
+                event["occurred_at"],
+                json.dumps(event),
+            ),
+        )
+        _trim_events(connection)
+        connection.commit()
     return event
 
 
 def list_events(*, limit: int = 20, cursor: str = "") -> dict[str, object]:
     max_limit = max(1, min(100, int(limit or 20)))
-    items = list(_EVENTS)
-    items.reverse()
+    with _managed_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT record_json
+            FROM watch_events
+            ORDER BY sequence DESC
+            """
+        ).fetchall()
+
+    items = [json.loads(str(row["record_json"])) for row in rows]
 
     start_index = 0
     if cursor.strip():
@@ -58,16 +118,28 @@ def list_events(*, limit: int = 20, cursor: str = "") -> dict[str, object]:
 
 
 def events_summary() -> dict[str, object]:
-    if not _EVENTS:
+    with _managed_connection() as connection:
+        count_row = connection.execute("SELECT COUNT(*) FROM watch_events").fetchone()
+        latest_row = connection.execute(
+            """
+            SELECT record_json
+            FROM watch_events
+            ORDER BY sequence DESC
+            LIMIT 1
+            """
+        ).fetchone()
+
+    events_count = int(count_row[0]) if count_row is not None else 0
+    if events_count == 0 or latest_row is None:
         return {
             "events_count": 0,
             "last_event_at": "",
             "last_event_type": "",
         }
 
-    latest = _EVENTS[-1]
+    latest = json.loads(str(latest_row["record_json"]))
     return {
-        "events_count": len(_EVENTS),
+        "events_count": events_count,
         "last_event_at": str(latest.get("occurred_at", "")),
         "last_event_type": str(latest.get("event_type", "")),
     }

@@ -2,43 +2,90 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from copy import deepcopy
+import json
+import os
 
-_COMMANDS: dict[str, dict[str, object]] = {}
+from app.persistence import watch_store_sqlite
+
+
+def _configured_db_path() -> str | None:
+    return os.environ.get("AXON_WATCH_WATCH_SERVICE_DB")
+
+
+@contextmanager
+def _managed_connection():
+    connection = watch_store_sqlite.connect(_configured_db_path())
+    try:
+        yield connection
+    finally:
+        connection.close()
 
 
 def reset_store() -> None:
-    _COMMANDS.clear()
+    with _managed_connection() as connection:
+        connection.execute("DELETE FROM watch_commands")
+        connection.commit()
 
 
 def save_command(record: dict[str, object]) -> dict[str, object]:
     stored = deepcopy(record)
-    _COMMANDS[str(stored["command_id"])] = stored
+    command_id = str(stored["command_id"])
+    updated_at = str(stored.get("updated_at", ""))
+    with _managed_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO watch_commands (command_id, updated_at, record_json)
+            VALUES (?, ?, ?)
+            ON CONFLICT(command_id) DO UPDATE SET
+              updated_at=excluded.updated_at,
+              record_json=excluded.record_json
+            """,
+            (command_id, updated_at, json.dumps(stored)),
+        )
+        connection.commit()
     return deepcopy(stored)
 
 
 def get_command(command_id: str) -> dict[str, object] | None:
-    record = _COMMANDS.get(command_id.strip())
-    return deepcopy(record) if record is not None else None
+    with _managed_connection() as connection:
+        row = connection.execute(
+            "SELECT record_json FROM watch_commands WHERE command_id = ?",
+            (command_id.strip(),),
+        ).fetchone()
+    if row is None:
+        return None
+    return deepcopy(json.loads(str(row["record_json"])))
 
 
 def update_command(command_id: str, **fields: object) -> dict[str, object] | None:
-    record = _COMMANDS.get(command_id.strip())
+    record = get_command(command_id)
     if record is None:
         return None
     record.update(fields)
-    return deepcopy(record)
+    return save_command(record)
 
 
 def latest_command_snapshot() -> dict[str, object]:
-    if not _COMMANDS:
+    with _managed_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT record_json
+            FROM watch_commands
+            ORDER BY updated_at DESC, command_id ASC
+            LIMIT 1
+            """
+        ).fetchone()
+
+    if row is None:
         return {
             "last_command_id": "",
             "last_command_status": "",
             "last_command_at": "",
         }
 
-    latest = max(_COMMANDS.values(), key=lambda item: str(item.get("updated_at", "")))
+    latest = json.loads(str(row["record_json"]))
     return {
         "last_command_id": str(latest.get("command_id", "")),
         "last_command_status": str(latest.get("status", "")),

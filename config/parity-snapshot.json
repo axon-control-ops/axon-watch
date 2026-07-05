@@ -170,9 +170,10 @@
       "evidence_gates": ["TEST-5"],
       "evidence": [
         "tests/test_test5_delivery_receipts_acceptance.py",
-        "inbox delivery_state + Attention DELIVERED badge"
+        "inbox delivery_state + Attention DELIVERED badge",
+        "SQLite-backed watch delivery receipts (P-D1)"
       ],
-      "gap": "In-process inbox/desktop simulation only (acceptable v1 degradation)."
+      "gap": "Real push/desktop/webhook channels deferred to P-D2; inbox/desktop simulation only."
     },
     {
       "id": "executive_operator_rhythm",
@@ -227,7 +228,8 @@
       "evidence_gates": ["TEST-4"],
       "evidence": [
         "tests/test_test4_watch_command_event_acceptance.py",
-        "reprobe_connector + events log + summary observation"
+        "reprobe_connector + events log + summary observation",
+        "services/axon-watch/app/persistence/watch_store_sqlite.py (P-D1)"
       ],
       "gap": null
     }

@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from tests.support.stable_connector_probe import reset_watch_ephemeral_stores
 from tests.support.watch_app_loader import load_watch_app, restore_app_modules
+from tests.support.watch_db import isolate_watch_db
 
 
 def _stable_probe_connector(definition, *, timeout_seconds: float = 0.75) -> dict[str, object]:
@@ -25,6 +26,7 @@ def _stable_probe_connector(definition, *, timeout_seconds: float = 0.75) -> dic
 
 class WatchCommandsAndEventsTests(unittest.TestCase):
     def setUp(self) -> None:
+        isolate_watch_db(self)
         watch_app, self._watch_modules = load_watch_app()
         reset_watch_ephemeral_stores()
         self._probe_patch = patch(

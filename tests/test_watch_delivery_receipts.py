@@ -5,10 +5,12 @@ import unittest
 from fastapi.testclient import TestClient
 
 from tests.support.watch_app_loader import load_watch_app, restore_app_modules
+from tests.support.watch_db import isolate_watch_db
 
 
 class WatchDeliveryReceiptTests(unittest.TestCase):
     def setUp(self) -> None:
+        isolate_watch_db(self)
         watch_app, self._watch_modules = load_watch_app()
         from app.delivery import store as delivery_store  # noqa: WPS433
         from app.events import store as event_store  # noqa: WPS433
