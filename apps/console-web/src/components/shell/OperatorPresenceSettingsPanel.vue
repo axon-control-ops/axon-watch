@@ -18,6 +18,11 @@ const personaEnabled = computed({
   get: () => props.settings.operator_persona_enabled,
   set: (value: boolean) => emit('save', { operator_persona_enabled: value }),
 });
+
+const spokenAlertsEnabled = computed({
+  get: () => props.settings.spoken_alerts_enabled,
+  set: (value: boolean) => emit('save', { spoken_alerts_enabled: value }),
+});
 </script>
 
 <template>
@@ -37,8 +42,16 @@ const personaEnabled = computed({
         />
         <span>KAIRO persona copy</span>
       </label>
+      <label class="operator-presence-settings__row">
+        <input
+          v-model="spokenAlertsEnabled"
+          type="checkbox"
+          :disabled="saving"
+        />
+        <span>Spoken high-value alerts</span>
+      </label>
       <p class="operator-presence-settings__hint">
-        Changes tone only. Run state, signals, and approvals stay canonical.
+        Changes tone and spoken delivery only. Run state, signals, and approvals stay canonical.
       </p>
     </div>
   </div>

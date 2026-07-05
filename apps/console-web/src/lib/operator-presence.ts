@@ -1,5 +1,14 @@
 import type { OperatorPresence, SpokenAlertEligibility } from '../contracts/canonical';
 
+import { deliverSpokenOperatorAlert } from './spoken-alert-delivery';
+
+export {
+  deliverSpokenOperatorAlert,
+  registerVoiceDeckSpokenAlertHandler,
+  type SpokenAlertDeliveryChannel,
+  type VoiceDeckSpokenAlertHandler,
+} from './spoken-alert-delivery';
+
 import {
   shouldUseMobileCompactLayout as shouldUseMobileCompactLayoutFromViewport,
 } from './viewport-compact';
@@ -55,9 +64,5 @@ export function maybeSpeakOperatorAlert(
     : speechSynthesis,
   storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
 ): boolean {
-  if (!shouldSpeakAlert(alert, storage)) {
-    return false;
-  }
-  speakAlertMessage(alert.message, speech);
-  return true;
+  return deliverSpokenOperatorAlert(alert, speech, storage) !== 'skipped';
 }

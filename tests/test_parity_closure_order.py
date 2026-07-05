@@ -36,25 +36,26 @@ class ParityClosureOrderTests(unittest.TestCase):
         )
         self.assertEqual("verified", row["status"])
 
-    def test_phase_c3_complete_and_mobile_compact_row_verified(self) -> None:
+    def test_phase_c4_complete_and_spoken_alerts_row_verified(self) -> None:
         order = json.loads(
             (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
         )
-        phase_c3 = next(entry for entry in order["slices"] if entry["id"] == "P-C3")
-        self.assertEqual("done", phase_c3["status"])
-        self.assertEqual("P-C4", order["next_slice"])
+        phase_c4 = next(entry for entry in order["slices"] if entry["id"] == "P-C4")
+        self.assertEqual("done", phase_c4["status"])
+        self.assertEqual("P-D1", order["next_slice"])
+
+        phase_c = [entry for entry in order["slices"] if entry.get("phase") == "C"]
+        self.assertTrue(all(entry["status"] == "done" for entry in phase_c))
 
         snapshot = json.loads(
             (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
         )
         row = next(
-            entry
-            for entry in snapshot["behaviors"]
-            if entry["id"] == "mobile_operator_cockpit_compactness"
+            entry for entry in snapshot["behaviors"] if entry["id"] == "spoken_high_value_alerts"
         )
         self.assertEqual("verified", row["status"])
-        self.assertEqual(16, snapshot["summary"]["verified_v1"])
-        self.assertEqual(3, snapshot["summary"]["partially_verified"])
+        self.assertEqual(17, snapshot["summary"]["verified_v1"])
+        self.assertEqual(2, snapshot["summary"]["partially_verified"])
 
     def test_phase_c1_complete_and_persona_row_verified(self) -> None:
         order = json.loads(

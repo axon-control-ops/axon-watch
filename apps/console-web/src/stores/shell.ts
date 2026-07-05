@@ -35,7 +35,7 @@ import type {
   SignalView,
   WorkspaceRecord,
 } from '../contracts/canonical';
-import { maybeSpeakOperatorAlert } from '../lib/operator-presence';
+import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
 import {
   readViewportWidth,
   shouldRequestViewportCompactBriefing,
@@ -1130,7 +1130,7 @@ export const useShellStore = defineStore('shell', () => {
       approvals.value = operatorBriefing.value.pending_approvals.items;
       briefingLoadState.value = 'loaded';
       if (operatorBriefing.value.operator_presence?.spoken_alert) {
-        maybeSpeakOperatorAlert(operatorBriefing.value.operator_presence.spoken_alert);
+        deliverSpokenOperatorAlert(operatorBriefing.value.operator_presence.spoken_alert);
       }
       applyOperatorDockDefaults();
     } catch (error) {

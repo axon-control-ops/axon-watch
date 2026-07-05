@@ -14,7 +14,7 @@ without claiming full voice-deck or background mobile listening parity.
 | `spoken_alert_policy.py` | Spoken-alert eligibility (privacy, watch_rule, approvals) |
 | `operator_presence.py` | Assembled `operator_presence` block |
 | `/api/briefing` | Returns `operator_presence` (+ optional `viewport_compact`) |
-| `console-web` | Persona copy, spoken-alert hook, mobile compact shell class |
+| `console-web` | Persona copy, spoken-alert delivery hook, mobile compact shell class |
 
 ## `operator_presence` block
 
@@ -36,7 +36,13 @@ Eligible when:
   `interrupts` with `high` / `critical` severity)
 
 Browser speech uses `SpeechSynthesisUtterance` with session dedupe — desktop
-foreground only. No background listening claim.
+foreground only. Optional voice-deck hook via `registerVoiceDeckSpokenAlertHandler`
+in `spoken-alert-delivery.ts` (full deck in P-D5). No background listening claim.
+
+## Operator settings UI
+
+- KAIRO persona toggle (`operator_persona_enabled`) — P-C1
+- Spoken high-value alerts toggle (`spoken_alerts_enabled`) — P-C4
 
 ## Mobile posture (v1)
 
@@ -60,5 +66,5 @@ Verified by **TEST-7**. Next locked item: **Cross-repo planning migration**.
 
 - Full voice command deck / hands-free loop
 - Background mobile listening
-- Persisted operator notification preferences UI (persona toggle landed in P-C1; spoken/mobile toggles still API-only)
+- Persisted operator notification preferences UI (privacy/mobile toggles still API-only)
 - `packages/prompt-contracts` extraction (Python owns policy for now)

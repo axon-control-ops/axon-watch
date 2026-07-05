@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-C4",
+  "next_slice": "P-D1",
   "slices": [
     {
       "id": "P-A1",
@@ -86,9 +86,9 @@
     {
       "id": "P-C4",
       "phase": "C",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["spoken_high_value_alerts"],
-      "spec": null,
+      "spec": "docs/PARITY_C4_SPOKEN_HIGH_VALUE_ALERTS.md",
       "gate": "npm run verify:parity-c4"
     },
     {

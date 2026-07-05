@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 16,
-    "partially_verified": 3,
+    "verified_v1": 17,
+    "partially_verified": 2,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -153,13 +153,16 @@
     },
     {
       "id": "spoken_high_value_alerts",
-      "status": "partially_verified",
-      "evidence_gates": ["TEST-7"],
+      "status": "verified",
+      "evidence_gates": ["TEST-7", "P-C4"],
       "evidence": [
         "spoken_alert_policy.py eligibility on /api/briefing",
-        "browser SpeechSynthesis hook with session dedupe"
+        "config/spoken-alert-contract.json + check_spoken_alert_policy.py",
+        "spoken-alert-delivery.ts voice-deck hook with browser TTS fallback",
+        "OperatorPresenceSettingsPanel spoken_alerts_enabled toggle",
+        "tests/test_parity_c4_spoken_high_value_alerts.py policy + settings proof"
       ],
-      "gap": "No voice deck; desktop-first browser TTS only."
+      "gap": "Browser TTS default; full Vue voice deck deferred to P-D5."
     },
     {
       "id": "delivery_receipts_operator_attention",
@@ -230,7 +233,7 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "4 must-keep behaviors remain partially_verified",
+    "2 must-keep behaviors remain partially_verified",
     "axon-local port 7734 remains production operator reference",
     "Real delivery channels (push/desktop/webhook) not implemented",
     "Voice deck / full JARVIS spoken-alert parity not implemented",
