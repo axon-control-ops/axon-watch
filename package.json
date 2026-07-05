@@ -31,6 +31,9 @@
     "verify:test10": "./scripts/verify/test10-final-parity-cutover.sh",
     "verify:parity-a1": "./scripts/verify/parity-a1-run-stop-resume.sh",
     "verify:parity-a2": "./scripts/verify/parity-a2-approval-boundaries.sh",
+    "verify:parity-a3": "./scripts/verify/parity-a3-review-ready-state.sh",
+    "verify:parity-a4": "./scripts/verify/parity-a4-signal-inbox-consistency.sh",
+    "verify:phase-a": "./scripts/verify/phase-a-run-state-trust.sh",
     "verify:console-web": "npm run typecheck -w @axon-watch/console-web && npm run test -w @axon-watch/console-web && npm run build -w @axon-watch/console-web",
     "verify": "npm run verify:contracts && npm run verify:console-web && python3 scripts/verify/all.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json"
   }

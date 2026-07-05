@@ -23,9 +23,10 @@ is complete. Do not reorder cutover items here.
 
 | Metric | Value |
 |---|---:|
-| Verified (v1) | 9 |
-| Partially verified | 10 |
-| Next slice | **P-A3** |
+| Verified (v1) | 11 |
+| Partially verified | 8 |
+| Phase A | **Complete** (P-A1–P-A4) |
+| Next slice | **P-B1** |
 
 Machine-readable order: `config/parity-closure-order.json`
 
@@ -40,8 +41,12 @@ integrity, approval transition integrity, signal inbox consistency.
 |---|---|---|---|
 | **P-A1** | `run_stop_resume` | Stop/resume cross-surface consistency: `/api/runs`, `/api/runtime/summary`, history receipts; mission-control projection tests | `npm run verify:parity-a1` |
 | **P-A2** | `approval_boundaries` | Approve/reject boundary blocks resume/complete/commands until approve; cross-surface pending count | `npm run verify:parity-a2` |
-| **P-A3** | `review_ready_state` | Review-ready visible everywhere; resume-from-review E2E | `verify:parity-a3` (TBD) |
-| **P-A4** | `signal_inbox_consistency` | Expanded fixtures: same signal across summary, inbox, Attention | `verify:parity-a4` (TBD) |
+| **P-A3** | `review_ready_state` | Review-ready cross-surface + resume/complete/command paths | `npm run verify:parity-a3` |
+| **P-A4** | `signal_inbox_consistency` | Inbox/summary/briefing signal_id/severity/status/source agreement | `npm run verify:parity-a4` |
+
+**Phase A E2E gate:** `npm run verify:phase-a` (runs P-A1–P-A4 checks + full verify once)
+
+Phase A complete when all four slices are `done` and `next_slice` is **P-B1**.
 
 **P-A1 spec:** `docs/PARITY_A1_RUN_STOP_RESUME.md`
 

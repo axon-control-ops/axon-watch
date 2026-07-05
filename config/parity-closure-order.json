@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-A3",
+  "next_slice": "P-B1",
   "slices": [
     {
       "id": "P-A1",
@@ -22,17 +22,17 @@
     {
       "id": "P-A3",
       "phase": "A",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["review_ready_state"],
-      "spec": null,
+      "spec": "docs/PARITY_A3_REVIEW_READY_STATE.md",
       "gate": "npm run verify:parity-a3"
     },
     {
       "id": "P-A4",
       "phase": "A",
-      "status": "pending",
+      "status": "done",
       "parity_ids": ["signal_inbox_consistency"],
-      "spec": null,
+      "spec": "docs/PARITY_A4_SIGNAL_INBOX_CONSISTENCY.md",
       "gate": "npm run verify:parity-a4"
     },
     {

@@ -21,35 +21,30 @@ class ParityClosureOrderTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, msg=result.stderr or result.stdout)
 
-    def test_p_a1_marked_done_in_closure_order(self) -> None:
+    def test_phase_a_complete_and_next_slice_is_p_b1(self) -> None:
         order = json.loads(
             (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
         )
-        p_a1 = next(entry for entry in order["slices"] if entry["id"] == "P-A1")
-        self.assertEqual("done", p_a1["status"])
+        phase_a = [entry for entry in order["slices"] if entry.get("phase") == "A"]
+        self.assertEqual(4, len(phase_a))
+        self.assertTrue(all(entry["status"] == "done" for entry in phase_a))
+        self.assertEqual("P-B1", order["next_slice"])
 
-    def test_p_a2_marked_done_in_closure_order(self) -> None:
-        order = json.loads(
-            (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
-        )
-        p_a2 = next(entry for entry in order["slices"] if entry["id"] == "P-A2")
-        self.assertEqual("done", p_a2["status"])
-        self.assertEqual("P-A3", order["next_slice"])
-
-    def test_approval_boundaries_promoted_in_snapshot(self) -> None:
+    def test_phase_a_parity_rows_verified_in_snapshot(self) -> None:
         snapshot = json.loads(
             (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
         )
-        row = next(entry for entry in snapshot["behaviors"] if entry["id"] == "approval_boundaries")
-        self.assertEqual("verified", row["status"])
-        self.assertEqual(9, snapshot["summary"]["verified_v1"])
-
-    def test_run_stop_resume_still_verified_in_snapshot(self) -> None:
-        snapshot = json.loads(
-            (REPO_ROOT / "config" / "parity-snapshot.json").read_text(encoding="utf-8")
-        )
-        row = next(entry for entry in snapshot["behaviors"] if entry["id"] == "run_stop_resume")
-        self.assertEqual("verified", row["status"])
+        for parity_id in (
+            "run_stop_resume",
+            "approval_boundaries",
+            "review_ready_state",
+            "signal_inbox_consistency",
+        ):
+            row = next(entry for entry in snapshot["behaviors"] if entry["id"] == parity_id)
+            with self.subTest(parity_id=parity_id):
+                self.assertEqual("verified", row["status"])
+        self.assertEqual(11, snapshot["summary"]["verified_v1"])
+        self.assertEqual(8, snapshot["summary"]["partially_verified"])
 
 
 if __name__ == "__main__":

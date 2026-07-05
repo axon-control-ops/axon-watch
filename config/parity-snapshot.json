@@ -6,8 +6,8 @@
   "full_axon_local_retirement": false,
   "summary": {
     "total_behaviors": 19,
-    "verified_v1": 9,
-    "partially_verified": 10,
+    "verified_v1": 11,
+    "partially_verified": 8,
     "verified_full_parity": 0
   },
   "required_gates_passed": [
@@ -48,13 +48,14 @@
     },
     {
       "id": "review_ready_state",
-      "status": "partially_verified",
-      "evidence_gates": ["contract", "ui"],
+      "status": "verified",
+      "evidence_gates": ["P-A3"],
       "evidence": [
-        "tests/test_control_plane_runs.py review_ready transitions",
-        "resume-from-review via command executor (TEST-0)"
+        "tests/test_parity_a3_review_ready_state.py cross-surface review_ready",
+        "tests/test_control_plane_runs.py review_ready/resume/complete transitions",
+        "execute_resume_from_review command path"
       ],
-      "gap": "Fewer review affordances than axon-local; no full apply/discard parity."
+      "gap": "No apply/discard UI parity with axon-local (acceptable v1 degradation)."
     },
     {
       "id": "workspace_handoffs",
@@ -120,13 +121,13 @@
     },
     {
       "id": "signal_inbox_consistency",
-      "status": "partially_verified",
-      "evidence_gates": ["contract"],
+      "status": "verified",
+      "evidence_gates": ["P-A4"],
       "evidence": [
-        "tests/test_control_plane_watch_integration.py",
-        "tests/test_signal_consistency.py"
+        "tests/test_parity_a4_signal_inbox_consistency.py inbox/summary/briefing agreement",
+        "tests/test_signal_consistency.py ranked top signal regression"
       ],
-      "gap": "Dev bootstrap signals only; fewer signal types than axon-local."
+      "gap": "Mocked watch inbox in gate; bootstrap/dev signal set only."
     },
     {
       "id": "desktop_and_browser_startup",
@@ -218,7 +219,7 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "10 must-keep behaviors remain partially_verified",
+    "8 must-keep behaviors remain partially_verified",
     "axon-local port 7734 remains production operator reference",
     "Real delivery channels (push/desktop/webhook) not implemented",
     "Voice deck / full JARVIS spoken-alert parity not implemented",
