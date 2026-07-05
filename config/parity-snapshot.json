@@ -167,13 +167,14 @@
     {
       "id": "delivery_receipts_operator_attention",
       "status": "verified",
-      "evidence_gates": ["TEST-5"],
+      "evidence_gates": ["TEST-5", "P-D2"],
       "evidence": [
         "tests/test_test5_delivery_receipts_acceptance.py",
         "inbox delivery_state + Attention DELIVERED badge",
-        "SQLite-backed watch delivery receipts (P-D1)"
+        "SQLite-backed watch delivery receipts (P-D1)",
+        "delivery/adapters registry with webhook/desktop/mobile_push/slack + retry"
       ],
-      "gap": "Real push/desktop/webhook channels deferred to P-D2; inbox/desktop simulation only."
+      "gap": "File-based desktop ledger and HTTP webhook adapters; native OS push/Slack app install deferred."
     },
     {
       "id": "executive_operator_rhythm",
@@ -237,7 +238,6 @@
   "blockers_for_full_retirement": [
     "2 must-keep behaviors remain partially_verified",
     "axon-local port 7734 remains production operator reference",
-    "Real delivery channels (push/desktop/webhook) not implemented",
     "Voice deck / full JARVIS spoken-alert parity not implemented",
     "Dedicated-server artifacts not proven on a live host",
     "Child-project and multi-repo continuous development not validated on Axon-X alone"

@@ -36,14 +36,14 @@ class ParityClosureOrderTests(unittest.TestCase):
         )
         self.assertEqual("verified", row["status"])
 
-    def test_phase_d1_complete_and_next_slice_is_p_d2(self) -> None:
+    def test_phase_d2_complete_and_next_slice_is_p_d3(self) -> None:
         order = json.loads(
             (REPO_ROOT / "config" / "parity-closure-order.json").read_text(encoding="utf-8")
         )
-        phase_d1 = next(entry for entry in order["slices"] if entry["id"] == "P-D1")
-        self.assertEqual("done", phase_d1["status"])
-        self.assertEqual("P-D2", order["next_slice"])
-        self.assertEqual("docs/PARITY_D1_WATCH_PERSISTENCE.md", phase_d1["spec"])
+        phase_d2 = next(entry for entry in order["slices"] if entry["id"] == "P-D2")
+        self.assertEqual("done", phase_d2["status"])
+        self.assertEqual("P-D3", order["next_slice"])
+        self.assertEqual("docs/PARITY_D2_DELIVERY_CHANNEL_ADAPTERS.md", phase_d2["spec"])
 
     def test_phase_c1_complete_and_persona_row_verified(self) -> None:
         order = json.loads(

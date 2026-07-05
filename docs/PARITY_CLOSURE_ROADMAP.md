@@ -28,7 +28,7 @@ is complete. Do not reorder cutover items here.
 | Phase A | **Complete** (P-A1–P-A4) |
 | Phase B | **Complete** (P-B1–P-B3) |
 | Phase C | **Complete** (P-C1–P-C4) |
-| Next slice | **P-D2** |
+| Next slice | **P-D3** |
 
 Machine-readable order: `config/parity-closure-order.json`
 
@@ -88,7 +88,7 @@ Required before **full** axon-local retirement, not before day-to-day Axon-X dev
 | ID | Parity row(s) | Deliverable | Gate |
 |---|---|---|---|
 | **P-D1** | (polish + dedicated) | SQLite persistence for watch commands/events/receipts | `npm run verify:parity-d1` |
-| **P-D2** | delivery blockers | Real push/desktop/webhook adapters + retry | `verify:parity-d2` (TBD) |
+| **P-D2** | delivery blockers | Real push/desktop/webhook adapters + retry | `npm run verify:parity-d2` |
 | **P-D3** | dedicated blocker | Live dedicated-host smoke (not artifacts-only) | `verify:parity-d3` (TBD) |
 | **P-D4** | multi-project blocker | Second bound workspace + child-project E2E | `verify:parity-d4` (TBD) |
 | **P-D5** | voice blocker | Vue voice deck over events (replace Alpine polling) | `verify:parity-d5` (TBD) |

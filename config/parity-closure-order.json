@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "roadmap_doc": "docs/PARITY_CLOSURE_ROADMAP.md",
-  "next_slice": "P-D2",
+  "next_slice": "P-D3",
   "slices": [
     {
       "id": "P-A1",
@@ -102,9 +102,9 @@
     {
       "id": "P-D2",
       "phase": "D",
-      "status": "pending",
+      "status": "done",
       "parity_ids": [],
-      "spec": null,
+      "spec": "docs/PARITY_D2_DELIVERY_CHANNEL_ADAPTERS.md",
       "gate": "npm run verify:parity-d2"
     },
     {

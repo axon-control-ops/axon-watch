@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "required_adapters": ["inbox", "desktop", "webhook", "mobile_push", "slack"],
+  "required_env_keys": [
+    "AXON_WATCH_DELIVERY_WEBHOOK_URL",
+    "AXON_WATCH_MOBILE_PUSH_URL",
+    "AXON_WATCH_SLACK_WEBHOOK_URL",
+    "AXON_WATCH_DESKTOP_NOTIFY_PATH",
+    "AXON_WATCH_DELIVERY_RETRY_MAX"
+  ],
+  "retry_max_default": 3,
+  "retryable_http_codes": [429, 502, 503, 504]
+}

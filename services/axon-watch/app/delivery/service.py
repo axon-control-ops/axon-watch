@@ -2,36 +2,14 @@
 
 from __future__ import annotations
 
-import uuid
-
 from app.delivery import policy, store
+from app.delivery.adapters.registry import attempt_channel_delivery
 from app.events.store import append_event
 from app.signals.iso_time import utc_now_iso
 
 
 def _event_id_for_signal(signal_id: str) -> str:
     return f"event-delivery-{signal_id.strip()}"
-
-
-def _simulate_channel_delivery(*, channel: str, item: dict[str, object]) -> tuple[str, str, str]:
-    severity = str(item.get("severity", "info")).strip().lower() or "info"
-    if channel == "inbox":
-        return (
-            "succeeded",
-            "",
-            "inbox_projection_available",
-        )
-    if channel == "desktop":
-        return (
-            "succeeded",
-            "",
-            "bootstrap_simulated_desktop_delivery",
-        )
-    return (
-        "failed",
-        f"Channel {channel} is not wired in bootstrap delivery slice.",
-        "channel_unavailable",
-    )
 
 
 def _aggregate_delivery_state(receipts: list[dict[str, object]], attempted: bool) -> str:
@@ -84,7 +62,11 @@ def ensure_signal_delivery(item: dict[str, object]) -> dict[str, object]:
             },
         )
 
-        result, error, policy_reason = _simulate_channel_delivery(channel=channel, item=item)
+        result, error, policy_reason = attempt_channel_delivery(
+            channel=channel,
+            item=item,
+            signal_id=signal_id,
+        )
         receipt = store.append_receipt(
             signal_id=signal_id,
             event_id=event_id,

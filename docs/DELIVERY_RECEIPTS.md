@@ -43,8 +43,10 @@ Severity routing (channels attempted once per signal):
 | `high` | `inbox`, `desktop` |
 | `critical` | `inbox`, `desktop` |
 
-v1 simulates successful `inbox` and `desktop` delivery in-process. External
-push/Slack/webhook channels are recorded as failed with `channel_unavailable`.
+v1 uses bounded channel adapters with retry. `inbox` and `desktop` (JSONL file
+under `AXON_WATCH_STATE_DIR`) succeed in-process. `webhook`, `mobile_push`, and
+`slack` POST to operator-configured URLs when env vars are set; otherwise they
+are omitted from routing for high/critical signals.
 
 Dedupe: successful `signal_id + channel` pairs are not re-delivered on repeated
 inbox reads.
