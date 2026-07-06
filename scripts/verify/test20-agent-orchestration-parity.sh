@@ -29,10 +29,12 @@ fi
 
 echo "[1/4] Control-plane orchestration tests"
 PYTHONPATH=services/control-plane "${python_bin}" -m unittest \
+  tests.test_agent_orchestration_parity \
   tests.test_lane_b_agent \
+  tests.test_lane_b_run_dispatch \
   tests.test_cli_runtime_agents \
   tests.test_cli_runtime_approval_gate \
-  tests.test_lane_b_run_dispatch \
+  tests.test_cli_runtime_mcp_registry \
   tests.test_cli_runtime_process_registry \
   tests.test_control_plane_runtime_status \
   tests.test_control_plane_chat \

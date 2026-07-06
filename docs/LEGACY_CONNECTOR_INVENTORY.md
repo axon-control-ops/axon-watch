@@ -3,7 +3,7 @@
 **Purpose:** Track unmigrated capabilities that still require axon-local fallback.
 Axon-X production operator is `:4173`; axon-local remains explicit fallback only.
 
-**Last updated:** 2026-07-05 (Phase E3.1)
+**Last updated:** 2026-07-06 (Phase G3 orchestration gate)
 
 ---
 
@@ -28,15 +28,20 @@ See `docs/CHILD_PROJECT_WORKSPACE.md`.
 
 ---
 
+## Replaced on Axon-X (Phase G G3)
+
+1. **Full agent ReAct loop** — **replaced** by control-plane runtime fabric + persisted run truth (`npm run verify:agent-orchestration-parity`). ReAct may still appear inside a Cursor agent turn; `brain.py` is not ported.
+
+---
+
 ## Unmigrated capability areas (v1)
 
 These remain on axon-local until a bounded Axon-X slice replaces them:
 
-1. **Full agent ReAct loop** — classic brain/orchestration on `:7734`. **Target:** Phase G G3 — runtime fabric + persisted run truth; ReAct only as in-step technique (`ADR-004`). Not a `brain.py` port.
-2. **Voice deck / mobile cockpit** — not wired in Axon-X console-web v1.
-3. **Child-project connectors** — WhatsApp, external MCP, tunnel-specific flows still rooted in axon-local.
-4. **Legacy console chrome** — Agent Dock parity features not yet extracted (see `config/parity-snapshot.json`).
-5. **Classic settings / storage paths** — some keys and SQLite paths differ; no silent merge of truths.
+1. **Voice deck / mobile cockpit** — not wired in Axon-X console-web v1.
+2. **Child-project connectors** — WhatsApp, external MCP, tunnel-specific flows still rooted in axon-local.
+3. **Legacy console chrome** — Agent Dock parity features not yet extracted (see `config/parity-snapshot.json`).
+4. **Classic settings / storage paths** — some keys and SQLite paths differ; no silent merge of truths.
 
 ---
 

@@ -38,8 +38,8 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 | # | Slice | Deliverable | Gate | Status |
 |---|---|---|---|---|
 | 5 | **G3.5** | MCP tools in dispatch metadata; composer Tools panel from registry | `/api/runtime/mcp-tools` + dispatch test | **Done** |
-| 6 | **G3.6** | Donor workflow parity tests (bounded `IMPORT_MATRIX` set) | `tests/test_agent_orchestration_parity.py` | |
-| 7 | **G3.7** | `verify:agent-orchestration-parity` fully green | `test20-agent-orchestration-parity.sh` | |
+| 6 | **G3.6** | Donor workflow parity tests (bounded `IMPORT_MATRIX` set) | `tests/test_agent_orchestration_parity.py` | **Done** |
+| 7 | **G3.7** | `verify:agent-orchestration-parity` fully green | `test20-agent-orchestration-parity.sh` | **Done** |
 
 **Wave 2 exit:** `LEGACY_CONNECTOR_INVENTORY` item 1 (ReAct loop) marked **replaced**.
 
@@ -87,7 +87,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 2):** G3.6 donor workflow parity tests, then G3.7 `verify:agent-orchestration-parity`.
+**Next up (Wave 3 / G4):** UX-IDE quiet shell (UX-IDE-1) or G4.1 connector inventory — operator reprioritizes.
 
 ---
 
@@ -112,7 +112,13 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 - Full Access consent replaces per-run approval; Cursor stream-json + transcript blocks.
 - Successful IDE agent runs auto-complete; operator thread isolation fixed.
 - KAIRO milestone narration + JARVIS voice script (browser TTS — cloud TTS deferred to Wave 3).
-- **Resume here:** Wave 2 slice 6 — **G3.6** donor workflow parity tests.
+- **Resume here:** Wave 3 slice 8 — **UX-IDE-1** quiet IDE shell, or Wave 4 **G4.1** connector inventory.
+
+### 2026-07-06 — G3.6 + G3.7 orchestration gate closed
+
+- G3.6: `tests/test_agent_orchestration_parity.py` maps IMPORT_MATRIX runtime rows to bounded owners and verifies IDE agent workflow receipts + run-state truth.
+- G3.7: `npm run verify:agent-orchestration-parity` green; gate includes parity, MCP registry, lane B dispatch, and process-registry tests.
+- Fixed vault integration test isolation when host Cursor CLI is OAuth-signed-in.
 
 ### 2026-07-06 — G3.4 + G3.5 landed in parallel
 

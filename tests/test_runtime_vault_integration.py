@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -54,12 +55,30 @@ class RuntimeVaultIntegrationTests(unittest.TestCase):
     @patch("app.cli_runtime.catalog.fetch_runtime_context")
     @patch("app.cli_runtime.catalog.find_cursor_cli", return_value="/usr/bin/cursor")
     @patch("app.cli_runtime.catalog.find_codex_cli", return_value="")
+    @patch("app.cli_runtime.catalog._run_command")
     def test_runtime_status_ready_when_vault_feeds_cursor_key(
         self,
+        mock_run,
         _find_codex,
         _find_cursor,
         mock_fetch_context,
     ) -> None:
+        def _auth_probe(parts: list[str], *, timeout: int = 8, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+            if env and str(env.get("CURSOR_API_KEY", "")).strip():
+                return subprocess.CompletedProcess(
+                    args=parts,
+                    returncode=0,
+                    stdout="cursor account ready",
+                    stderr="",
+                )
+            return subprocess.CompletedProcess(
+                args=parts,
+                returncode=1,
+                stdout="not logged in",
+                stderr="",
+            )
+
+        mock_run.side_effect = _auth_probe
         mock_fetch_context.return_value = {
             "vault_runtime": {
                 "unlocked": True,
