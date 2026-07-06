@@ -41,14 +41,20 @@ def _utc_now_iso() -> str:
     )
 
 
-def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool]:
+def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str]:
     defaults = default_operator_presence_settings()
     if not raw:
         return defaults
     normalized = dict(defaults)
     for key in defaults:
-        if key in raw:
-            normalized[key] = bool(raw[key])
+        if key not in raw:
+            continue
+        if key == "kairo_narration":
+            value = str(raw[key] or defaults[key]).strip().lower()
+            if value in {"off", "minimal", "conversational"}:
+                normalized[key] = value
+            continue
+        normalized[key] = bool(raw[key])
     return normalized
 
 

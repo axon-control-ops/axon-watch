@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import IdeActivityBar from '../ide/IdeActivityBar.vue';
 import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
-import KairoSidebarPanel from '../ide/KairoSidebarPanel.vue';
+import IdeKairoFooter from '../ide/IdeKairoFooter.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
@@ -20,11 +20,14 @@ import {
   SIDEBAR_WIDTH_KEY,
 } from '../../lib/sidebar-width-split';
 import { useShellStore } from '../../stores/shell';
+import {
+  resolveIdeSidebarWidthPx,
+} from '../../lib/ide-layout-prefs';
 
 const shell = useShellStore();
 const workspaceFilter = ref('');
 const sidebarRef = ref<HTMLElement | null>(null);
-const sidebarWidth = ref(readStoredSidebarWidth() ?? 280);
+const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? 280);
 const resizing = ref(false);
 
 const catalogWorkspaces = computed(() => shell.workspaces);
@@ -64,15 +67,24 @@ function workspaceSubtext(workspaceId: string): string {
   );
 }
 
-function applySidebarWidth(width: number): void {
+function syncShellSidebarWidth(): void {
   const shellRoot = sidebarRef.value?.closest('.console-shell--mockup') as HTMLElement | null;
-  const clamped = clampSidebarWidth(width, window.innerWidth);
-  sidebarWidth.value = clamped;
-  shellRoot?.style.setProperty('--shell-left-sidebar-width', `${clamped}px`);
+  const width = resolveIdeSidebarWidthPx({
+    layoutMode: shell.layoutMode,
+    explorerCollapsed: shell.ideExplorerCollapsed,
+    expandedSidebarWidth: expandedSidebarWidth.value,
+    viewportWidth: window.innerWidth,
+  });
+
+  if (!(shell.layoutMode === 'ide' && shell.ideExplorerCollapsed)) {
+    expandedSidebarWidth.value = width;
+  }
+
+  shellRoot?.style.setProperty('--shell-left-sidebar-width', `${width}px`);
 }
 
 function persistSidebarWidth(): void {
-  sessionStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth.value));
+  sessionStorage.setItem(SIDEBAR_WIDTH_KEY, String(expandedSidebarWidth.value));
 }
 
 function startSidebarResize(event: MouseEvent): void {
@@ -84,10 +96,13 @@ function startSidebarResize(event: MouseEvent): void {
   resizing.value = true;
 
   const startX = event.clientX;
-  const startWidth = sidebarWidth.value;
+  const startWidth = expandedSidebarWidth.value;
 
   const onMove = (moveEvent: MouseEvent): void => {
-    applySidebarWidth(startWidth + (moveEvent.clientX - startX));
+    const shellRoot = sidebarRef.value?.closest('.console-shell--mockup') as HTMLElement | null;
+    const clamped = clampSidebarWidth(startWidth + (moveEvent.clientX - startX), window.innerWidth);
+    expandedSidebarWidth.value = clamped;
+    shellRoot?.style.setProperty('--shell-left-sidebar-width', `${clamped}px`);
   };
 
   const onUp = (): void => {
@@ -106,8 +121,15 @@ function startSidebarResize(event: MouseEvent): void {
 }
 
 onMounted(() => {
-  applySidebarWidth(sidebarWidth.value);
+  syncShellSidebarWidth();
 });
+
+watch(
+  () => [shell.layoutMode, shell.ideExplorerCollapsed] as const,
+  () => {
+    syncShellSidebarWidth();
+  },
+);
 
 onBeforeUnmount(() => {
   if (resizing.value) {
@@ -131,15 +153,6 @@ onBeforeUnmount(() => {
       <div class="left-sidebar-mockup__ide-body">
         <IdeActivityBar />
         <div class="left-sidebar-mockup__ide-main">
-          <button
-            v-if="shell.ideExplorerCollapsed"
-            type="button"
-            class="left-sidebar-mockup__explorer-reopen"
-            aria-label="Expand explorer"
-            @click="shell.toggleIdeExplorer()"
-          >
-            EXPLORER
-          </button>
           <IdeExplorerPanel />
         </div>
       </div>
@@ -261,9 +274,11 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div class="left-sidebar-mockup__status-anchor">
-      <KairoSidebarPanel v-if="isIdeMode" />
-      <section v-else class="workspace-status-card hud-panel-frame">
+    <div v-if="isIdeMode" class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
+      <IdeKairoFooter />
+    </div>
+    <div v-else class="left-sidebar-mockup__status-anchor">
+      <section class="workspace-status-card hud-panel-frame">
         <p class="workspace-status-card__title">WORKSPACE STATUS</p>
         <div class="workspace-status-card__body">
           <div class="workspace-status-card__radar" aria-hidden="true">

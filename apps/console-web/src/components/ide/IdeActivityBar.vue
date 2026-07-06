@@ -25,6 +25,14 @@ function isActive(item: (typeof items)[number]): boolean {
 }
 
 function selectView(view: IdeActivityView): void {
+  if (
+    view === 'explorer' &&
+    shell.ideActivityView === 'explorer' &&
+    !shell.ideExplorerCollapsed
+  ) {
+    shell.toggleIdeExplorer();
+    return;
+  }
   shell.setIdeActivityView(view);
 }
 </script>

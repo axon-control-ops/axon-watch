@@ -18,6 +18,7 @@ describe('operator presence helpers', () => {
           spoken_alerts_enabled: true,
           privacy_mode: false,
           mobile_compact_preferred: true,
+          kairo_narration: 'conversational',
         },
         spoken_alert: {
           eligible: false,

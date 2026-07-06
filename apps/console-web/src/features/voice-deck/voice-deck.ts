@@ -1,7 +1,6 @@
 import type { SpokenAlertEligibility } from '../../contracts/canonical';
 
 import { speakAlertMessage, type SpeechPort } from '../../lib/operator-presence';
-import { jarvisAlertSpeech } from '../../lib/kairo-voice-script';
 import { registerVoiceDeckSpokenAlertHandler } from '../../lib/spoken-alert-delivery';
 
 export function handleVoiceDeckSpokenAlert(
@@ -14,12 +13,7 @@ export function handleVoiceDeckSpokenAlert(
     return false;
   }
 
-  const line = jarvisAlertSpeech(alert.message);
-  if (!line) {
-    return false;
-  }
-
-  speakAlertMessage(line, speech);
+  speakAlertMessage(alert.message.trim(), speech);
   return true;
 }
 

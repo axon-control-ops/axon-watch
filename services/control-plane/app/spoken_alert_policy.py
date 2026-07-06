@@ -5,12 +5,13 @@ from __future__ import annotations
 INTERRUPTIVE_MODES = frozenset({"approval", "execute"})
 
 
-def default_operator_presence_settings() -> dict[str, bool]:
+def default_operator_presence_settings() -> dict[str, bool | str]:
     return {
         "operator_persona_enabled": True,
         "spoken_alerts_enabled": True,
         "privacy_mode": False,
         "mobile_compact_preferred": True,
+        "kairo_narration": "conversational",
     }
 
 

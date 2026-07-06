@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 
 import BootWakeOverlay from './components/BootWakeOverlay.vue';
 import CenterWorkbench from './components/shell/CenterWorkbench.vue';
+import IdeInterruptPanel from './components/ide/IdeInterruptPanel.vue';
 import LeftSidebar from './components/shell/LeftSidebar.vue';
 import RightDock from './components/shell/RightDock.vue';
 import StatusBar from './components/shell/StatusBar.vue';
@@ -69,6 +70,15 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => [bootComplete.value, shell.briefingLoadState] as const,
+  ([complete, briefingState]) => {
+    if (complete && briefingState === 'loaded') {
+      void shell.maybeSpeakBootGreeting();
+    }
+  },
+);
+
 onUnmounted(() => {
   shell.unbindViewportCompactListener();
   liveEventsSession?.disconnect();
@@ -96,6 +106,7 @@ onUnmounted(() => {
       :data-layout-mode="shell.layoutMode"
     >
       <TopBar />
+      <IdeInterruptPanel v-show="!isFoundationSurface" />
       <LeftSidebar v-show="!isFoundationSurface" />
       <VaultSurface v-show="isVaultSurface" />
       <DataSurface v-show="isDataSurface" />

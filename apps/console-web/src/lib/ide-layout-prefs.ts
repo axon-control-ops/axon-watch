@@ -1,8 +1,24 @@
 import type { LayoutMode } from '../stores/shell';
+import { clampSidebarWidth } from './sidebar-width-split';
 
 export const LAYOUT_MODE_KEY = 'axon-x-layout-mode-v1';
 export const IDE_EXPLORER_COLLAPSED_KEY = 'axon-x-ide-explorer-collapsed-v1';
 export const AGENT_DOCK_COLLAPSED_KEY = 'axon-x-agent-dock-collapsed-v1';
+/** Activity bar width when the IDE explorer panel is fully collapsed (matches --ide-activity-width). */
+export const IDE_COLLAPSED_SIDEBAR_WIDTH_PX = 42;
+
+export function resolveIdeSidebarWidthPx(input: {
+  layoutMode: LayoutMode;
+  explorerCollapsed: boolean;
+  expandedSidebarWidth: number;
+  viewportWidth: number;
+}): number {
+  if (input.layoutMode === 'ide' && input.explorerCollapsed) {
+    return IDE_COLLAPSED_SIDEBAR_WIDTH_PX;
+  }
+
+  return clampSidebarWidth(input.expandedSidebarWidth, input.viewportWidth);
+}
 
 export type IdeActivityView = 'explorer' | 'search' | 'git' | 'run' | 'terminal' | 'agent';
 

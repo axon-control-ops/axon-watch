@@ -13,6 +13,7 @@ export type {
   OperatorPresenceMobile,
   OperatorPresenceSettings,
   OperatorPresenceState,
+  KairoNarrationLevel,
   SpokenAlertEligibility,
 } from './presence';
 export type {

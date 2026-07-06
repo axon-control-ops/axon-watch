@@ -23,6 +23,19 @@ const spokenAlertsEnabled = computed({
   get: () => props.settings.spoken_alerts_enabled,
   set: (value: boolean) => emit('save', { spoken_alerts_enabled: value }),
 });
+
+const narrationOptions = [
+  { value: 'off', label: 'Off' },
+  { value: 'minimal', label: 'Minimal (start, done, interrupts)' },
+  { value: 'conversational', label: 'Conversational (model-generated)' },
+] as const;
+
+function onNarrationChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  if (value === 'off' || value === 'minimal' || value === 'conversational') {
+    emit('save', { kairo_narration: value });
+  }
+}
 </script>
 
 <template>
@@ -50,8 +63,26 @@ const spokenAlertsEnabled = computed({
         />
         <span>Spoken high-value alerts</span>
       </label>
+      <label class="operator-presence-settings__row operator-presence-settings__row--select">
+        <span>KAIRO narration</span>
+        <select
+          class="operator-presence-settings__select"
+          :value="settings.kairo_narration"
+          :disabled="saving"
+          @change="onNarrationChange"
+        >
+          <option
+            v-for="option in narrationOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
       <p class="operator-presence-settings__hint">
         Changes tone and spoken delivery only. Run state, signals, and approvals stay canonical.
+        IDE quiet tier mutes narration unless conversational is selected.
       </p>
     </div>
   </div>
@@ -93,6 +124,23 @@ const spokenAlertsEnabled = computed({
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
+}
+
+.operator-presence-settings__row--select {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.operator-presence-settings__select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  padding: 0.35rem 0.5rem;
 }
 
 .operator-presence-settings__hint {

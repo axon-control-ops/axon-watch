@@ -8,6 +8,7 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     spoken_alerts_enabled: true,
     privacy_mode: false,
     mobile_compact_preferred: true,
+    kairo_narration: 'conversational',
   };
 }
 
@@ -23,6 +24,12 @@ export function normalizeOperatorPresenceSettings(
     spoken_alerts_enabled: raw.spoken_alerts_enabled ?? defaults.spoken_alerts_enabled,
     privacy_mode: raw.privacy_mode ?? defaults.privacy_mode,
     mobile_compact_preferred: raw.mobile_compact_preferred ?? defaults.mobile_compact_preferred,
+    kairo_narration:
+      raw.kairo_narration === 'off' ||
+      raw.kairo_narration === 'minimal' ||
+      raw.kairo_narration === 'conversational'
+        ? raw.kairo_narration
+        : defaults.kairo_narration,
   };
 }
 

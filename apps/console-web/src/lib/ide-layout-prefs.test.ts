@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   AGENT_DOCK_COLLAPSED_KEY,
+  IDE_COLLAPSED_SIDEBAR_WIDTH_PX,
   IDE_EXPLORER_COLLAPSED_KEY,
   LAYOUT_MODE_KEY,
   persistAgentDockCollapsed,
@@ -10,6 +11,7 @@ import {
   readStoredAgentDockCollapsed,
   readStoredIdeExplorerCollapsed,
   readStoredLayoutMode,
+  resolveIdeSidebarWidthPx,
 } from './ide-layout-prefs';
 
 class MemoryStorage {
@@ -53,5 +55,26 @@ describe('ide layout prefs', () => {
     persistAgentDockCollapsed(true);
     expect(readStoredAgentDockCollapsed()).toBe(true);
     expect(window.localStorage.getItem(AGENT_DOCK_COLLAPSED_KEY)).toBe('1');
+  });
+
+  it('resolves collapsed IDE sidebar width to the activity bar width', () => {
+    expect(
+      resolveIdeSidebarWidthPx({
+        layoutMode: 'ide',
+        explorerCollapsed: true,
+        expandedSidebarWidth: 280,
+        viewportWidth: 1280,
+      }),
+    ).toBe(IDE_COLLAPSED_SIDEBAR_WIDTH_PX);
+  });
+
+  it('resolves expanded IDE sidebar width via clamp', () => {
+    const width = resolveIdeSidebarWidthPx({
+      layoutMode: 'ide',
+      explorerCollapsed: false,
+      expandedSidebarWidth: 280,
+      viewportWidth: 1280,
+    });
+    expect(width).toBeGreaterThan(IDE_COLLAPSED_SIDEBAR_WIDTH_PX);
   });
 });

@@ -4,6 +4,8 @@ import { computed, ref } from 'vue';
 import WorkbenchIcon from './WorkbenchIcon.vue';
 import {
   buildWorkspaceFileTree,
+  buildCollapsedDirectoryState,
+  buildExpandedDirectoryState,
   flattenWorkspaceFileTree,
 } from '../lib/workspace-file-tree';
 import { workspaceExplorerStatusMessage } from '../lib/workspace-explorer-view';
@@ -21,9 +23,10 @@ const emit = defineEmits<{
 }>();
 
 const expandedDirectories = ref<Record<string, boolean>>({});
+const treeNodes = computed(() => buildWorkspaceFileTree(props.entries));
 
 const rows = computed(() =>
-  flattenWorkspaceFileTree(buildWorkspaceFileTree(props.entries), expandedDirectories.value),
+  flattenWorkspaceFileTree(treeNodes.value, expandedDirectories.value),
 );
 
 const statusMessage = computed(() =>
@@ -54,6 +57,19 @@ function handleRowClick(row: { path: string; kind: 'file' | 'directory' }): void
 
   emit('open', row.path);
 }
+
+function expandAll(): void {
+  expandedDirectories.value = buildExpandedDirectoryState(treeNodes.value);
+}
+
+function collapseAll(): void {
+  expandedDirectories.value = buildCollapsedDirectoryState(treeNodes.value);
+}
+
+defineExpose({
+  expandAll,
+  collapseAll,
+});
 </script>
 
 <template>

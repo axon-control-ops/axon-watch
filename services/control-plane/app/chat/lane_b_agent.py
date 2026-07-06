@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.cli_runtime.router import dispatch_ide_composer
+from app.chat.lane_b_git_dispatch import try_lane_b_git_commit_dispatch
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_files import WorkspaceFileError, list_workspace_files
 
@@ -92,6 +93,14 @@ def generate_lane_b_result(
         }
 
     context_block = build_lane_b_context_block(context)
+    git_result = try_lane_b_git_commit_dispatch(
+        workspace_id=context.workspace_id,
+        user_prompt=trimmed,
+        execution_access=execution_access,
+    )
+    if git_result is not None:
+        return git_result
+
     try:
         return dispatch_ide_composer(
             workspace_id=context.workspace_id,

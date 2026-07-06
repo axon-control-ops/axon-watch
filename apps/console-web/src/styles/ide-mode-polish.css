@@ -122,6 +122,11 @@
   display: none;
 }
 
+.console-shell--ide .ide-kairo-footer__chip.kairo-chip--idle .kairo-chip__pulse {
+  animation: none;
+  opacity: 0.45;
+}
+
 .console-shell--ide .agent-dock__composer {
   background: rgba(10, 12, 20, 0.88);
   border-top-color: rgba(99, 102, 241, 0.14);

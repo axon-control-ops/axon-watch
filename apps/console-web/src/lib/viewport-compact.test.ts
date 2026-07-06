@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import type { OperatorPresence } from '../contracts/canonical';
+
 import {
   MOBILE_COMPACT_BREAKPOINT,
   shouldRequestViewportCompactBriefing,
   shouldUseMobileCompactLayout,
 } from './viewport-compact';
 
-const presence = {
+const presence: OperatorPresence = {
   persona_voice_line: 'KAIRO: ready',
   presence_state: 'observing' as const,
   settings: {
@@ -14,6 +16,7 @@ const presence = {
     spoken_alerts_enabled: true,
     privacy_mode: false,
     mobile_compact_preferred: true,
+    kairo_narration: 'conversational' as const,
   },
   spoken_alert: {
     eligible: false,

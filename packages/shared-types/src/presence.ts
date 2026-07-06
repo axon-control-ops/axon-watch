@@ -1,8 +1,11 @@
+export type KairoNarrationLevel = 'off' | 'minimal' | 'conversational';
+
 export interface OperatorPresenceSettings {
   operator_persona_enabled: boolean;
   spoken_alerts_enabled: boolean;
   privacy_mode: boolean;
   mobile_compact_preferred: boolean;
+  kairo_narration: KairoNarrationLevel;
 }
 
 export interface SpokenAlertEligibility {

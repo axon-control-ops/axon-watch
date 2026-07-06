@@ -41,6 +41,7 @@ import type {
   RunRecord,
   RuntimeSummary,
   SignalView,
+  SpokenAlertEligibility,
   WorkspaceRecord,
 } from '../contracts/canonical';
 import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
@@ -53,10 +54,11 @@ import {
   streamingActivityLabel,
 } from '../lib/kairo-agent-narration';
 import {
-  jarvisAgentStartLine,
-  jarvisSpokenLine,
-  type KairoVoiceContext,
-} from '../lib/kairo-voice-script';
+  effectiveKairoNarration,
+  mapMilestoneToSpeakEvent,
+  shouldNarrateAgentEvent,
+} from '../lib/kairo-narration-policy';
+import { postKairoSpeak } from '../lib/kairo-speak-client';
 import { languageForFilePath } from '../lib/workspace-file-language';
 import {
   normalizeAgentExecutionAccess,
@@ -691,6 +693,14 @@ export const useShellStore = defineStore('shell', () => {
       : kairoPresenceState.value,
   );
 
+  const effectiveKairoNarrationLevel = computed(() =>
+    effectiveKairoNarration({
+      settingsNarration: operatorPresenceSettings.value.kairo_narration ?? 'minimal',
+      layoutMode: layoutMode.value,
+      idePresenceProfile: idePresenceProfile.value,
+    }),
+  );
+
   const leftSidebarAttentionBadgeCount = computed(() =>
     computeLeftSidebarAttentionBadgeCount({
       pendingApprovals: pendingApprovalsCount.value,
@@ -923,16 +933,145 @@ export const useShellStore = defineStore('shell', () => {
     );
   }
 
-  function narrateAgentStreamMilestone(messageId: string, key: string, message: string): void {
+  function kairoSpeechSessionId(): string {
+    const key = 'axon-x:kairo-speech-session';
+    if (typeof sessionStorage === 'undefined') {
+      return 'default';
+    }
+    let id = sessionStorage.getItem(key);
+    if (!id) {
+      id = `kairo-${Date.now()}`;
+      sessionStorage.setItem(key, id);
+    }
+    return id;
+  }
+
+  async function narrateAgentStreamMilestone(
+    messageId: string,
+    eventKey: string,
+    eventType: string,
+    context: Record<string, unknown> = {},
+  ): Promise<void> {
+    const narration = effectiveKairoNarrationLevel.value;
+    if (!shouldNarrateAgentEvent({ eventKey, narration })) {
+      return;
+    }
+    try {
+      const response = await postKairoSpeak({
+        event_type: eventType,
+        context,
+        session_id: kairoSpeechSessionId(),
+        workspace_id: currentWorkspace.value?.workspace_id ?? '',
+        narration,
+      });
+      if (response.source === 'skipped' || !response.line?.trim()) {
+        return;
+      }
+      deliverSpokenOperatorAlert({
+        eligible: true,
+        reason: `kairo-agent-narration:${eventKey}`,
+        signal_id: `${messageId}:${eventKey}`,
+        message: response.line.trim(),
+      });
+    } catch {
+      // No frontend template fallback — spoken lines must come from /api/kairo/speak.
+    }
+  }
+
+  async function deliverKairoSpokenAlert(alert: SpokenAlertEligibility): Promise<void> {
+    if (!alert.eligible || !operatorPresenceSettings.value.spoken_alerts_enabled) {
+      return;
+    }
+    if (operatorPresenceSettings.value.privacy_mode) {
+      return;
+    }
+    if (effectiveKairoNarrationLevel.value === 'off') {
+      return;
+    }
+
+    let eventType = 'alert';
+    const context: Record<string, unknown> = {
+      fallback: alert.message,
+      pending_approvals: pendingApprovalsCount.value,
+      top_signal_title: operatorBriefing.value?.top_signals[0]?.title ?? '',
+      degraded_active: Boolean(runtimeSummary.value?.degraded.active),
+    };
+
+    if (alert.reason === 'operator_approval_required') {
+      eventType = 'approval_literal';
+      context.literal_line = alert.message.replace(/^KAIRO:\s*/i, '').trim();
+    }
+
+    let message = '';
+    try {
+      const response = await postKairoSpeak({
+        event_type: eventType,
+        context,
+        session_id: kairoSpeechSessionId(),
+        workspace_id: currentWorkspace.value?.workspace_id ?? '',
+        narration: effectiveKairoNarrationLevel.value,
+      });
+      if (response.source === 'skipped' || !response.line?.trim()) {
+        return;
+      }
+      message = response.line.trim();
+    } catch {
+      return;
+    }
+
     deliverSpokenOperatorAlert({
       eligible: true,
-      reason: `kairo-agent-narration:${key}`,
-      signal_id: `${messageId}:${key}`,
+      reason: alert.reason,
+      signal_id: alert.signal_id,
       message,
     });
   }
 
-  function kairoVoiceContext(): KairoVoiceContext {
+  async function maybeSpeakBootGreeting(): Promise<void> {
+    const greetingKey = 'axon-x:kairo-greeting-spoken';
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(greetingKey) === '1') {
+      return;
+    }
+    if (effectiveKairoNarrationLevel.value === 'off' || operatorPresenceSettings.value.privacy_mode) {
+      return;
+    }
+
+    let message = '';
+    try {
+      const response = await postKairoSpeak({
+        event_type: 'greeting',
+        context: {
+          workspace_count: workspaces.value.length,
+          pending_approvals: pendingApprovalsCount.value,
+        },
+        session_id: kairoSpeechSessionId(),
+        workspace_id: currentWorkspace.value?.workspace_id ?? '',
+        narration: effectiveKairoNarrationLevel.value,
+      });
+      if (response.source === 'skipped' || !response.line?.trim()) {
+        return;
+      }
+      message = response.line.trim();
+    } catch {
+      return;
+    }
+
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(greetingKey, '1');
+    }
+
+    deliverSpokenOperatorAlert({
+      eligible: true,
+      reason: 'boot_greeting',
+      signal_id: null,
+      message,
+    });
+  }
+
+  function kairoVoiceContext(): {
+    fullAccess: boolean;
+    activeFile?: string | null;
+  } {
     return {
       fullAccess: ideComposerActivity.value?.executionAccess === 'full',
       activeFile: activeWorkspaceFilePath.value,
@@ -949,7 +1088,10 @@ export const useShellStore = defineStore('shell', () => {
     const voiceContext = kairoVoiceContext();
 
     if (narrationEnabled) {
-      narrateAgentStreamMilestone(messageId, 'start', jarvisAgentStartLine(voiceContext));
+      void narrateAgentStreamMilestone(messageId, 'start', 'agent_start', {
+        active_file: voiceContext.activeFile ?? '',
+        full_access: voiceContext.fullAccess,
+      });
     }
 
     chatStreamSession = startChatStreamSession({
@@ -969,10 +1111,16 @@ export const useShellStore = defineStore('shell', () => {
         const milestones = narrationMilestonesForDelta(narratedContent, content);
         narratedContent = content;
         for (const milestone of milestones) {
-          const spoken = jarvisSpokenLine(milestone, voiceContext);
-          if (spoken) {
-            narrateAgentStreamMilestone(messageId, milestone.key, spoken);
-          }
+          void narrateAgentStreamMilestone(
+            messageId,
+            milestone.key,
+            mapMilestoneToSpeakEvent(milestone.key),
+            {
+              tool_label: milestone.toolLabel ?? '',
+              file_name: milestone.editPath ?? '',
+              active_file: voiceContext.activeFile ?? '',
+            },
+          );
         }
       },
       onDone: (payload) => {
@@ -992,10 +1140,11 @@ export const useShellStore = defineStore('shell', () => {
         const finalContent = payload.content ?? narratedContent;
         if (narrationEnabled) {
           const done = narrationForCompletion(finalContent);
-          const spoken = jarvisSpokenLine(done, voiceContext);
-          if (spoken) {
-            narrateAgentStreamMilestone(messageId, done.key, spoken);
-          }
+          void narrateAgentStreamMilestone(messageId, done.key, mapMilestoneToSpeakEvent(done.key), {
+            edit_count: done.editCount ?? 0,
+            file_name: done.editPath ?? '',
+            active_file: voiceContext.activeFile ?? '',
+          });
         }
         for (const path of editedFilePathsFromTranscript(finalContent)) {
           if (openedFilePaths.value.includes(path)) {
@@ -1345,7 +1494,10 @@ export const useShellStore = defineStore('shell', () => {
     if (view === 'agent') {
       agentDockCollapsed.value = false;
       persistAgentDockCollapsed(false);
+      return;
     }
+    ideExplorerCollapsed.value = false;
+    persistIdeExplorerCollapsed(false);
   }
 
   function toggleIdeExplorer(): void {
@@ -1528,6 +1680,40 @@ export const useShellStore = defineStore('shell', () => {
       await openWorkspaceFile(path);
     } catch (error) {
       fileSaveError.value = error instanceof Error ? error.message : 'workspace file create failed';
+    } finally {
+      fileSaveState.value = 'idle';
+    }
+  }
+
+  async function createWorkspaceFolder(): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      workspaceFilesError.value = 'Select a workspace before creating a folder.';
+      return;
+    }
+
+    workspaceFilesError.value = null;
+    const folderPath = promptWorkspaceFilePath('New folder path', 'src/new-folder');
+    if (!folderPath) {
+      return;
+    }
+
+    const markerPath = `${folderPath.replace(/\/+$/, '')}/.gitkeep`;
+    if (workspaceFileEntries.value.some((entry) => entry.path === markerPath)) {
+      return;
+    }
+
+    fileSaveState.value = 'saving';
+    fileSaveError.value = null;
+
+    try {
+      const payload = await saveWorkspaceFile(workspaceId, markerPath, '');
+      workspaceFileEntries.value = [...workspaceFileEntries.value, payload].sort((left, right) =>
+        left.path.localeCompare(right.path),
+      );
+      await loadWorkspaceFiles();
+    } catch (error) {
+      fileSaveError.value = error instanceof Error ? error.message : 'workspace folder create failed';
     } finally {
       fileSaveState.value = 'idle';
     }
@@ -1974,7 +2160,7 @@ export const useShellStore = defineStore('shell', () => {
       approvals.value = operatorBriefing.value.pending_approvals.items;
       briefingLoadState.value = 'loaded';
       if (operatorBriefing.value.operator_presence?.spoken_alert) {
-        deliverSpokenOperatorAlert(operatorBriefing.value.operator_presence.spoken_alert);
+        void deliverKairoSpokenAlert(operatorBriefing.value.operator_presence.spoken_alert);
       }
       applyOperatorDockDefaults();
     } catch (error) {
@@ -2394,6 +2580,7 @@ export const useShellStore = defineStore('shell', () => {
     operatorPresenceSettingsOpen,
     operatorPresenceSettingsSaving,
     createWorkspaceFile,
+    createWorkspaceFolder,
     pendingApprovalsCount,
     primaryActiveRun,
     primaryApprovalRun,
@@ -2469,6 +2656,7 @@ export const useShellStore = defineStore('shell', () => {
     focusAttentionSidebar,
     focusMissionControl,
     focusKairoBriefing,
+    maybeSpeakBootGreeting,
     loadWorkspaceFiles,
     openWorkspaceFile,
     saveActiveFileDocument,

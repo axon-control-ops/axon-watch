@@ -2366,6 +2366,8 @@ body:has(.console-shell--mockup) {
   display: flex;
   align-items: center;
   gap: 0.55rem;
+  flex-shrink: 0;
+  min-width: max-content;
 }
 
 .layout-toggle--mockup {

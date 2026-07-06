@@ -53,7 +53,7 @@ from app.workspace_handoffs import (
     create_workspace_handoff,
     list_workspace_handoffs,
 )
-from app.live_events import live_events_response
+from app.kairo_voice import generate_spoken_line, narration_allows_event
 from app.cli_runtime.routes import get_cursor_runtime_status, get_runtime_mcp_tools, get_runtime_status
 from app.vault.routes import (
     create_vault_secret,
@@ -165,6 +165,16 @@ class OperatorPresenceSettingsRequest(BaseModel):
     spoken_alerts_enabled: bool | None = None
     privacy_mode: bool | None = None
     mobile_compact_preferred: bool | None = None
+    kairo_narration: str | None = None
+
+
+class KairoSpeakRequest(BaseModel):
+    event_type: str
+    context: dict[str, Any] = {}
+    session_id: str = "default"
+    workspace_id: str = ""
+    use_runtime: bool = True
+    narration: str | None = None
 
 
 def _watch_base_url() -> str:
@@ -518,6 +528,26 @@ def operator_presence_settings_put(body: OperatorPresenceSettingsRequest) -> dic
     patch = body.model_dump(exclude_none=True)
     current.update(patch)
     return operator_presence_settings_store.save_settings(current)
+
+
+@app.post("/api/kairo/speak")
+def kairo_speak(body: KairoSpeakRequest) -> dict[str, str]:
+    settings = operator_presence_settings_store.load_settings()
+    narration = str(body.narration or settings.get("kairo_narration") or "minimal").strip().lower()
+    if narration not in {"off", "minimal", "conversational"}:
+        narration = "minimal"
+    event_type = str(body.event_type or "").strip().lower()
+    if not narration_allows_event(event_type, narration):  # type: ignore[arg-type]
+        return {"line": "", "source": "skipped"}
+    return generate_spoken_line(
+        event_type=event_type,
+        context=body.context,
+        session_id=body.session_id,
+        persona_enabled=bool(settings.get("operator_persona_enabled", True)),
+        narration=narration,  # type: ignore[arg-type]
+        workspace_id=body.workspace_id,
+        use_runtime=body.use_runtime,
+    )
 
 
 @app.get("/api/live/events")

@@ -2,6 +2,7 @@ export type {
   ApprovalRecord,
   OperatorBriefing,
   ExecutiveOperatorRhythm,
+  KairoNarrationLevel,
   OperatorPresence,
   OperatorPresenceSettings,
   InboxItem,
