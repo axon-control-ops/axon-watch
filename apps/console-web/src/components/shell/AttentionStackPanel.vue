@@ -76,11 +76,13 @@ function signalHint(signal: {
   signal_id: string;
   title: string;
   summary?: string | null;
+  meta?: Record<string, unknown> | null;
 }): string {
   return signalOperatorHint({
     signalId: signal.signal_id,
     title: signal.title,
     summary: signal.summary,
+    meta: signal.meta,
   });
 }
 </script>

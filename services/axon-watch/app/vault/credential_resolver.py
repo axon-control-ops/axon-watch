@@ -23,12 +23,11 @@ def _state_dir() -> Path:
         path = (_repo_root() / path).resolve()
     return path
 
-def _vault_import_path() -> Path:
-    return _state_dir() / "vault-import.json"
+from app.vault.paths import vault_import_path
 
 
 def load_vault_import() -> dict[str, str]:
-    path = _vault_import_path()
+    path = vault_import_path()
     if not path.is_file():
         return {}
     try:
@@ -48,7 +47,7 @@ def load_vault_import() -> dict[str, str]:
 
 
 def save_vault_import(secrets: dict[str, str]) -> Path:
-    path = _vault_import_path()
+    path = vault_import_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "schema_version": 1,
@@ -78,7 +77,15 @@ def parse_dotenv_file(path: Path) -> dict[str, str]:
 
 def merge_monitor_env(*, project_root: Path | None = None) -> dict[str, str]:
     env = {key: value for key, value in os.environ.items() if value is not None}
-    env.update(load_vault_import())
+    from app.vault.session import VaultSession
+    from app.vault.operations import vault_named_secrets_map, vault_runtime_env
+    from app.vault.snapshot import ALLOWED_IMPORT_KEYS
+
+    if VaultSession.is_unlocked():
+        env.update(vault_named_secrets_map(ALLOWED_IMPORT_KEYS))
+        env.update(vault_runtime_env())
+    else:
+        env.update(load_vault_import())
     if project_root is not None and project_root.is_dir():
         for name in (".env", ".env.local", ".env.production"):
             env.update(parse_dotenv_file(project_root / name))
@@ -94,16 +101,50 @@ def list_available_credential_keys(env: dict[str, str]) -> list[str]:
         "EXPO_PUBLIC_POSTHOG_KEY",
         "EXPO_PUBLIC_POSTHOG_HOST",
         "EXPO_PUBLIC_SENTRY_DSN",
+        "CURSOR_API_KEY",
+        "CODEX_API_KEY",
+        "OPENAI_API_KEY",
     )
     return [name for name in interesting if str(env.get(name, "")).strip()]
 
 
+def merge_vault_import(
+    secrets: dict[str, str],
+    *,
+    allowed_keys: tuple[str, ...] | None = None,
+) -> dict[str, object]:
+    allowed = set(allowed_keys or ())
+    filtered: dict[str, str] = {}
+    for key, value in secrets.items():
+        name = str(key).strip()
+        text = str(value).strip()
+        if not name or not text:
+            continue
+        if allowed and name not in allowed:
+            continue
+        filtered[name] = text
+
+    if not filtered:
+        return {"imported_keys": [], "count": 0}
+
+    merged = load_vault_import()
+    merged.update(filtered)
+    save_vault_import(merged)
+    return {
+        "imported_keys": sorted(filtered.keys()),
+        "count": len(filtered),
+    }
+
+
 def vault_status(*, project_root: Path | None = None) -> dict[str, object]:
     env = merge_monitor_env(project_root=project_root)
-    import_path = _vault_import_path()
+    import_path = vault_import_path()
+    imported = load_vault_import()
     return {
         "import_file_present": import_path.is_file(),
         "import_file": str(import_path),
+        "imported_keys": sorted(imported.keys()),
+        "imported_key_count": len(imported),
         "available_keys": list_available_credential_keys(env),
         "sources": [
             "process_env",

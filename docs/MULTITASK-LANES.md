@@ -102,6 +102,29 @@ Must not:
 
 - change product semantics while touching tooling
 
+### Lane E — Runtime Fabric, Vault, And Data Surfaces
+
+Ownership:
+
+- `services/control-plane/app/chat/*` (runtime-routing surfaces only)
+- `services/control-plane/app/cli_runtime/*`
+- `services/axon-watch/app/vault/*`
+- `services/axon-watch/app/monitors/*`
+- dedicated runtime / vault / data docs and tests
+
+May:
+
+- integrate Cursor/Codex local and cloud runtimes
+- add runtime status, auth posture, and session orchestration routes
+- add vault import/status APIs and monitor credential resolution
+- add data / diagnostics APIs for persisted operator state
+
+Must not:
+
+- bypass canonical approval or run-state rules
+- rearrange shell geometry without Lane B approval and an ADR
+- hide runtime policy inside prompts when it belongs in explicit code/config
+
 ## Blocked Until Explicit Assignment
 
 Do not start these until coordinator opens the slice:

@@ -7,6 +7,10 @@ retirement. This is the active ordered list after `docs/AXON_X_CUTOVER_TODO.md`
 **Production operator:** http://127.0.0.1:4173  
 **Fallback:** axon-local http://127.0.0.1:7734 (legacy connectors + unmigrated child-project paths)
 
+**Status:** **Initial-Progressed** — E0–E5 complete. Follow-on runtime, vault,
+data, and automation work moved to `docs/PHASE_F_OPERATOR_FOUNDATION.md`. E6
+remains deferred until Phase F closes.
+
 **Lock rule:** Same as cutover TODO — append discoveries to the log; do not reorder
 without explicit operator approval.
 
@@ -20,7 +24,7 @@ without explicit operator approval.
 | Production operator declared | Yes (`docs/PRODUCTION_OPERATOR_SURFACE.md`) |
 | Full axon-local retirement | **Not approved** (E6 paused for review) |
 | Sole retirement blocker (snapshot) | Child-project + legacy connector migration |
-| Phase E (E0–E5) | **Complete** — E6 paused |
+| Phase E (E0–E5) | **Initial-Progressed** — follow-on work moved to Phase F |
 
 ---
 
@@ -65,6 +69,8 @@ without explicit operator approval.
 
 - [x] **E4.1** System ack includes execution summary; agent reply already carries evidence
 - [x] **E4.2** Composer hint: operator commands only; IDE Agent dock for scoped plan/ask
+- [ ] **E4.F1** Full runtime-backed Lane B is **not** complete here. The exit target
+  is Phase F1: Cursor/Codex local + cloud runtimes, not a local-model bridge.
 
 ### E5 — Documentation and onboarding debt
 
@@ -93,6 +99,17 @@ without explicit operator approval.
 ---
 
 ## Append log
+
+### 2026-07-05 — Phase E closed as Initial Progress
+
+- Phase E is no longer the active build checklist. Treat it as the **Initial Progress**
+  closeout for Axon-X: production operator declared, parity A–D complete, cutover
+  TEST-0 … TEST-10 complete, and E0–E5 delivered.
+- New build truth lives in `docs/PHASE_F_OPERATOR_FOUNDATION.md`.
+- E6 stays deferred until Phase F runtime fabric, vault, data, monitor, and
+  polish gates are green.
+- Full runtime-backed Lane B remains **unshipped** here; the committed local-model
+  scaffold is an interim checkpoint, not the approved architecture target.
 
 ### 2026-07-05 — Phase E checklist opened
 

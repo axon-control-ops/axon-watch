@@ -128,3 +128,23 @@ def list_handoffs_for_workspace(workspace_id: str, *, limit: int = 20) -> list[d
             (normalized_id, normalized_id, max_limit),
         ).fetchall()
     return [_row_to_record(row) for row in rows]
+
+
+def list_recent_handoffs(*, limit: int = 50) -> list[dict[str, Any]]:
+    max_limit = max(1, min(100, int(limit or 50)))
+    with _managed_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM workspace_handoffs
+            ORDER BY created_at DESC, handoff_id ASC
+            LIMIT ?
+            """,
+            (max_limit,),
+        ).fetchall()
+    return [_row_to_record(row) for row in rows]
+
+
+def count_handoffs() -> int:
+    with _managed_connection() as connection:
+        row = connection.execute("SELECT COUNT(*) FROM workspace_handoffs").fetchone()
+    return int(row[0]) if row is not None else 0

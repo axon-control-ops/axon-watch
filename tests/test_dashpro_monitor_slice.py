@@ -51,7 +51,7 @@ class DashProMonitorSignalTests(unittest.TestCase):
         assert item is not None
         self.assertEqual("signal_monitor_dashpro_sentry_recent_issues_warning", item["signal_id"])
         self.assertEqual("high", item["severity"])
-        self.assertEqual("dashpro_monitor", item["meta"]["signal_family"])
+        self.assertEqual("child_project_monitor", item["meta"]["signal_family"])
 
     def test_monitor_inbox_items_filters_ok(self) -> None:
         items = monitor_inbox_items(

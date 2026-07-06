@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -19,6 +21,13 @@ from app.persistence import run_store  # noqa: E402
 class ControlPlaneChatTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_control_plane_db(self, run_store)
+        self.streaming_env = patch.dict(
+            os.environ,
+            {"AXON_WATCH_LANE_B_STREAMING": "0"},
+            clear=False,
+        )
+        self.streaming_env.start()
+        self.addCleanup(self.streaming_env.stop)
         chat_store.reset_store()
         self.addCleanup(chat_store.reset_store)
         self.client = TestClient(app)
@@ -148,6 +157,10 @@ class ControlPlaneChatTests(unittest.TestCase):
             {"message_id", "thread_id", "run_id", "workspace_id", "role", "content", "created_at"},
             set(history_payload["items"][0]),
         )
+        self.assertEqual(
+            ["operator", "system", "agent"],
+            [item["role"] for item in history_payload["items"]],
+        )
 
     def test_post_chat_message_rejects_empty_content(self) -> None:
         response = self.client.post(
@@ -167,23 +180,28 @@ class ControlPlaneChatTests(unittest.TestCase):
         response = self.client.get("/api/chat/threads/thread_missing/history")
         self.assertEqual(404, response.status_code)
 
-    def test_get_workspace_chat_thread_returns_latest_thread(self) -> None:
+    def test_get_workspace_chat_thread_returns_latest_operator_thread(self) -> None:
         first = self.client.post(
             "/api/chat/messages",
-            json={"workspace_id": "workspace_alpha", "content": "first thread"},
+            json={"workspace_id": "workspace_alpha", "content": "first command"},
         ).json()
         second = self.client.post(
             "/api/chat/messages",
-            json={"workspace_id": "workspace_alpha", "content": "second thread"},
+            json={"workspace_id": "workspace_alpha", "content": "second command"},
         ).json()
 
-        response = self.client.get("/api/workspaces/workspace_alpha/chat/thread")
+        self.assertEqual(first["thread_id"], second["thread_id"])
+
+        response = self.client.get("/api/workspaces/workspace_alpha/chat/thread?surface=operator")
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertEqual(second["thread_id"], payload["thread_id"])
         self.assertEqual("workspace_alpha", payload["workspace_id"])
+        self.assertEqual("operator", payload["thread_kind"])
         self.assertIn("updated_at", payload)
-        self.assertNotEqual(first["thread_id"], payload["thread_id"])
+
+        history = self.client.get(f"/api/chat/threads/{payload['thread_id']}/history").json()
+        self.assertEqual(6, history["count"])
 
     def test_get_workspace_chat_thread_returns_empty_snapshot_when_no_thread(self) -> None:
         response = self.client.get("/api/workspaces/workspace_alpha/chat/thread")
@@ -197,6 +215,44 @@ class ControlPlaneChatTests(unittest.TestCase):
     def test_get_workspace_chat_thread_returns_404_for_unknown_workspace(self) -> None:
         response = self.client.get("/api/workspaces/workspace_missing/chat/thread")
         self.assertEqual(404, response.status_code)
+
+    def test_workspace_chat_thread_separates_operator_and_ide_surfaces(self) -> None:
+        operator = self.client.post(
+            "/api/chat/messages",
+            json={"workspace_id": "workspace_alpha", "content": "git status"},
+        ).json()
+        with patch(
+            "app.chat.service.generate_lane_b_result",
+            return_value={
+                "content": "Lane B reply",
+                "dispatched": True,
+                "runtime_id": "cursor_local",
+                "runtime_label": "Cursor CLI (local)",
+                "reason": "",
+            },
+        ):
+            ide = self.client.post(
+                "/api/chat/messages",
+                json={
+                    "workspace_id": "workspace_alpha",
+                    "content": "Explain the repo layout.",
+                    "composer_mode": "ask",
+                },
+            ).json()
+
+        self.assertNotEqual(operator["thread_id"], ide["thread_id"])
+
+        operator_thread = self.client.get(
+            "/api/workspaces/workspace_alpha/chat/thread?surface=operator",
+        ).json()
+        ide_thread = self.client.get(
+            "/api/workspaces/workspace_alpha/chat/thread?surface=ide",
+        ).json()
+
+        self.assertEqual(operator["thread_id"], operator_thread["thread_id"])
+        self.assertEqual("operator", operator_thread["thread_kind"])
+        self.assertEqual(ide["thread_id"], ide_thread["thread_id"])
+        self.assertEqual("ide", ide_thread["thread_kind"])
 
     def test_post_chat_message_attaches_to_active_run(self) -> None:
         active_run = self.client.post(
@@ -252,7 +308,17 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertNotEqual(completed_run["run_id"], payload["run_id"])
         self.assertIn("dispatched", payload["messages"][1]["content"])
 
-    def test_post_chat_message_lane_b_skips_command_dispatch(self) -> None:
+    @patch(
+        "app.chat.service.generate_lane_b_result",
+        return_value={
+            "content": "Runtime-backed reply",
+            "dispatched": True,
+            "runtime_id": "cursor_local",
+            "runtime_label": "Cursor CLI (local)",
+            "reason": "",
+        },
+    )
+    def test_post_chat_message_lane_b_skips_command_dispatch(self, _mock_runtime) -> None:
         response = self.client.post(
             "/api/chat/messages",
             json={
@@ -270,4 +336,156 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertEqual("system", payload["messages"][1]["role"])
         self.assertIn("Lane B (ask)", payload["messages"][1]["content"])
         self.assertEqual("agent", payload["messages"][2]["role"])
-        self.assertIn("Lane B (ask)", payload["messages"][2]["content"])
+        self.assertEqual("Runtime-backed reply", payload["messages"][2]["content"])
+
+    @patch(
+        "app.chat.service.generate_lane_b_result",
+        return_value={
+            "content": "Consultative agent reply",
+            "dispatched": True,
+            "runtime_id": "cursor_local",
+            "runtime_label": "Cursor CLI (local)",
+            "reason": "",
+            "execution_tier": "consultative",
+        },
+    )
+    def test_post_chat_message_lane_b_agent_full_access_executes_without_approval(
+        self, _mock_runtime
+    ) -> None:
+        # Full Access consent replaces the per-run approval boundary.
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "content": "Implement the guarded slice.",
+                "composer_mode": "agent",
+                "execution_access": "full",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["dispatched"])
+        # Run executed in the same turn and auto-completed (no review queue).
+        self.assertEqual("completed", payload["run"]["phase"])
+        self.assertFalse(payload["run"]["can_approve"])
+        self.assertNotIn("approval boundary", payload["messages"][1]["content"].lower())
+
+    @patch(
+        "app.chat.service.generate_lane_b_result",
+        return_value={
+            "content": "I inspected the workspace and propose the next bounded steps.",
+            "dispatched": True,
+            "runtime_id": "cursor_local",
+            "runtime_label": "Cursor CLI (local)",
+            "reason": "",
+        },
+    )
+    def test_post_chat_message_lane_b_agent_creates_run_and_receipts(self, _mock_runtime) -> None:
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "content": "Implement the next thin slice.",
+                "composer_mode": "agent",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["dispatched"])
+        self.assertIsNotNone(payload["run"])
+        self.assertTrue(payload["run_id"].startswith("run_"))
+        # Successful dispatch auto-completes the run.
+        self.assertEqual("completed", payload["run"]["phase"])
+        self.assertIn("runtime fabric", payload["messages"][1]["content"])
+        self.assertIn("bounded steps", payload["messages"][2]["content"])
+
+        history = self.client.get(f"/api/runs/{payload['run_id']}/history").json()
+        receipt_types = [item["receipt"]["type"] for item in history["items"]]
+        self.assertIn("runtime_dispatch", receipt_types)
+        phases = [item["to_phase"] for item in history["items"]]
+        self.assertIn("completed", phases)
+
+    @patch(
+        "app.chat.service.generate_lane_b_result",
+        return_value={
+            "content": "Fallback reply — runtime unavailable.",
+            "dispatched": False,
+            "runtime_id": "",
+            "runtime_label": "",
+            "reason": "runtime unavailable",
+        },
+    )
+    def test_post_chat_message_lane_b_agent_failure_parks_for_review(self, _mock_runtime) -> None:
+        # Failed dispatches surface in Mission Control instead of auto-completing.
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "content": "Implement the next thin slice.",
+                "composer_mode": "agent",
+                "execution_access": "full",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["dispatched"])
+        self.assertEqual("review_ready", payload["run"]["phase"])
+
+    def test_post_chat_message_lane_b_streaming_returns_placeholder_agent(self) -> None:
+        def _streaming_lane_b_result(**kwargs):
+            on_chunk = kwargs.get("on_chunk")
+            if on_chunk is not None:
+                on_chunk("Runtime-backed reply", "Runtime-backed reply")
+            return {
+                "content": "Runtime-backed reply",
+                "dispatched": True,
+                "runtime_id": "cursor_local",
+                "runtime_label": "Cursor CLI (local)",
+                "reason": "",
+            }
+
+        with patch.dict(os.environ, {"AXON_WATCH_LANE_B_STREAMING": "1"}, clear=False):
+            with patch(
+                "app.chat.service.generate_lane_b_result",
+                side_effect=_streaming_lane_b_result,
+            ):
+                response = self.client.post(
+                    "/api/chat/messages",
+                    json={
+                        "workspace_id": "workspace_alpha",
+                        "content": "Stream this reply.",
+                        "composer_mode": "ask",
+                    },
+                )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["streaming"])
+        self.assertTrue(payload["stream_agent_message_id"])
+        self.assertEqual("", payload["messages"][2]["content"])
+        self.assertIn("generating reply", payload["messages"][1]["content"].lower())
+
+    def test_post_chat_message_lane_b_workspace_switch_returns_ui_action(self) -> None:
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_axon_watch",
+                "content": "Open and switch to the Dashpro workspace",
+                "composer_mode": "agent",
+                "execution_access": "full",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["dispatched"])
+        self.assertIsNone(payload["run"])
+        ui_action = payload.get("ui_action")
+        self.assertIsInstance(ui_action, dict)
+        assert isinstance(ui_action, dict)
+        self.assertEqual("switch_workspace", ui_action.get("type"))
+        self.assertEqual("workspace_dashpro", ui_action.get("workspace_id"))
+        self.assertIn("workspace_dashpro", payload["messages"][2]["content"])

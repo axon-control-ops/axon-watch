@@ -76,6 +76,27 @@ class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
         paths = {item["path"] for item in response.json()["items"]}
         self.assertIn("src/notes.md", paths)
 
+    def test_list_workspace_files_skips_generated_and_hidden_directories(self) -> None:
+        root = Path(self.workspace_tempdir.name) / "workspace_alpha"
+        hidden = root / ".git" / "config"
+        hidden.parent.mkdir(parents=True, exist_ok=True)
+        hidden.write_text("[core]\n", encoding="utf-8")
+
+        generated = root / "node_modules" / "left-pad" / "index.js"
+        generated.parent.mkdir(parents=True, exist_ok=True)
+        generated.write_text("module.exports = 1;\n", encoding="utf-8")
+
+        source = root / "src" / "main.ts"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("export const ok = true;\n", encoding="utf-8")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files")
+        self.assertEqual(200, response.status_code)
+        paths = {item["path"] for item in response.json()["items"]}
+        self.assertIn("src/main.ts", paths)
+        self.assertNotIn(".git/config", paths)
+        self.assertNotIn("node_modules/left-pad/index.js", paths)
+
     def test_write_nested_workspace_file_creates_directories(self) -> None:
         write_response = self.client.put(
             "/api/workspaces/workspace_alpha/files/src/deep.txt",

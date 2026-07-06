@@ -1,11 +1,12 @@
 import type { SpokenAlertEligibility } from '../../contracts/canonical';
 
-import { speakAlertMessage } from '../../lib/operator-presence';
+import { speakAlertMessage, type SpeechPort } from '../../lib/operator-presence';
+import { jarvisAlertSpeech } from '../../lib/kairo-voice-script';
 import { registerVoiceDeckSpokenAlertHandler } from '../../lib/spoken-alert-delivery';
 
 export function handleVoiceDeckSpokenAlert(
   alert: SpokenAlertEligibility,
-  speech: Pick<SpeechSynthesis, 'speak'> | null = typeof speechSynthesis === 'undefined'
+  speech: SpeechPort | null = typeof speechSynthesis === 'undefined'
     ? null
     : speechSynthesis,
 ): boolean {
@@ -13,12 +14,17 @@ export function handleVoiceDeckSpokenAlert(
     return false;
   }
 
-  speakAlertMessage(alert.message, speech);
+  const line = jarvisAlertSpeech(alert.message);
+  if (!line) {
+    return false;
+  }
+
+  speakAlertMessage(line, speech);
   return true;
 }
 
 export function registerVoiceDeckOnBoot(
-  speech: Pick<SpeechSynthesis, 'speak'> | null = typeof speechSynthesis === 'undefined'
+  speech: SpeechPort | null = typeof speechSynthesis === 'undefined'
     ? null
     : speechSynthesis,
 ): void {

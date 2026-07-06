@@ -22,6 +22,20 @@ describe('operator-signal-hints', () => {
     ).toContain('Expected in local bootstrap');
   });
 
+  it('returns child-project monitor hint copy with vault guidance', () => {
+    expect(
+      signalOperatorHint({
+        signalId: 'signal_monitor_dashpro_sentry_recent_issues_warning',
+        title: 'DashPro Sentry warning',
+        meta: {
+          signal_family: 'child_project_monitor',
+          workspace_label: 'DashPro',
+          monitor_status: 'warning',
+        },
+      }),
+    ).toContain('/vault');
+  });
+
   it('explains observe mode is not a button', () => {
     expect(watchRuleTooltip('observe')).toContain('informational only');
   });

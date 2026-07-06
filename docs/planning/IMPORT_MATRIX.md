@@ -71,6 +71,19 @@ Every imported capability must be classified before implementation.
 | Plan mode concept | `adapt` | run-state + UI | Keep concept, tie to explicit phases |
 | Implicit state from prompt text | `discard` | n/a | Replace with persisted run-state |
 
+## Runtime / AI Orchestration
+
+| Current capability | Status | New owner | Notes |
+|---|---|---|---|
+| Cursor CLI agent loop | `adapt` | `services/control-plane/app/cli_runtime/cursor_agent.py` | Primary live workspace runtime for Ask/Plan/Agent |
+| Codex CLI agent loop | `adapt` | `services/control-plane/app/cli_runtime/codex_agent.py` | Primary automation/runtime worker for scripted and batch flows |
+| CLI binary catalog / resolve | `adapt` | `services/control-plane/app/cli_runtime/catalog.py` | Keep explicit runtime discovery and health |
+| Cursor -> Codex reroute / recovery | `adapt` | `services/control-plane/app/cli_runtime/recovery.py` | Preserve fallback idea, rebuild cleanly |
+| Cursor cloud agents / automations | `adapt` | `services/control-plane/app/cli_runtime/cloud_cursor.py` | Cloud path belongs in Axon-X runtime fabric, not hidden in prompts |
+| Codex cloud tasks | `adapt` | `services/control-plane/app/cli_runtime/cloud_codex.py` | Durable automation / best-of-N / background tasks |
+| Model Context Protocol (MCP) integration | `adopt` | control-plane tool fabric + watch integrations | MCP is the standard native-tools contract |
+| Local model bridge / Ollama path | `discard` | n/a | Not the approved operator architecture target for Phase F |
+
 ## Delivery / Notifications
 
 | Current capability | Status | New owner | Notes |
@@ -101,6 +114,8 @@ Every imported capability must be classified before implementation.
 | SQLite local-first posture | `adopt` | both services via adapters | Good phase-1 choice |
 | Split ownership by concern | `adapt` | persistence layer | Preserve principle, refine implementation |
 | Hidden direct DB reach-through | `discard` | n/a | Replace with explicit ownership and contracts |
+| Secure vault (full crypto parity) | `adapt` | `services/axon-watch/app/vault/*` + dedicated `/vault` UI | **F2 done:** import/status/consumer UX. **G1 (Vault II):** full crypto/session/CRUD/export parity — see `docs/PHASE_G_SIGNAL_PARITY.md` |
+| DashPro external monitors | `adapt` | `services/axon-watch/app/monitors/*` | Keep the behavior, route it through watch signals |
 
 ## Developer Experience
 

@@ -2,6 +2,7 @@
   "schema_version": 1,
   "enabled": true,
   "workspace_id": "workspace_dashpro",
+  "workspace_label": "DashPro",
   "project_root": "/home/edp/Projectx/product/dashpro",
   "checks": [
     {

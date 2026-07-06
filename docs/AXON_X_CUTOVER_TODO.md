@@ -111,6 +111,15 @@ See `docs/PRODUCTION_OPERATOR_SURFACE.md` and `npm run verify:production-operato
 
 Append new entries here in reverse-chronological order. Do not rewrite history.
 
+### 2026-07-05 — Initial Progress closed, Phase F opened
+
+- Axon-X remains approved for **bounded primary development** on `dev`.
+- Treat the completed planning/bootstrap/parity/cutover/Phase E body of work as
+  **Initial Progress COMPLETE**.
+- Follow-on build work now moves to `docs/PHASE_F_OPERATOR_FOUNDATION.md`.
+- Full axon-local retirement remains **not approved** pending Phase F closure and
+  the later E6/F6 readiness review.
+
 ### 2026-07-05 — Phase E0–E5 (post-production operator)
 
 - **Phase E** slices E0–E5 complete; **E6 paused** for final retirement review.

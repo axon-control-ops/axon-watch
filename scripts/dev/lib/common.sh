@@ -9,6 +9,15 @@ resolve_repo_root() {
   cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd
 }
 
+resolve_python() {
+  local root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  if [[ -x "${root}/.venv/bin/python3" ]]; then
+    printf '%s' "${root}/.venv/bin/python3"
+  else
+    printf '%s' "python3"
+  fi
+}
+
 load_env() {
   repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
 

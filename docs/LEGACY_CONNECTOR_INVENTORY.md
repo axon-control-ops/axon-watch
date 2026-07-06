@@ -32,7 +32,7 @@ See `docs/CHILD_PROJECT_WORKSPACE.md`.
 
 These remain on axon-local until a bounded Axon-X slice replaces them:
 
-1. **Full agent ReAct loop** — classic brain/orchestration on `:7734` (Axon-X uses bounded command executor + chat orchestration).
+1. **Full agent ReAct loop** — classic brain/orchestration on `:7734`. **Target:** Phase G G3 — runtime fabric + persisted run truth; ReAct only as in-step technique (`ADR-004`). Not a `brain.py` port.
 2. **Voice deck / mobile cockpit** — not wired in Axon-X console-web v1.
 3. **Child-project connectors** — WhatsApp, external MCP, tunnel-specific flows still rooted in axon-local.
 4. **Legacy console chrome** — Agent Dock parity features not yet extracted (see `config/parity-snapshot.json`).

@@ -67,6 +67,28 @@ def update_command(command_id: str, **fields: object) -> dict[str, object] | Non
     return save_command(record)
 
 
+def list_commands(*, limit: int = 50) -> dict[str, object]:
+    max_limit = max(1, min(100, int(limit or 50)))
+    with _managed_connection() as connection:
+        count_row = connection.execute("SELECT COUNT(*) FROM watch_commands").fetchone()
+        rows = connection.execute(
+            """
+            SELECT record_json
+            FROM watch_commands
+            ORDER BY updated_at DESC, command_id ASC
+            LIMIT ?
+            """,
+            (max_limit,),
+        ).fetchall()
+
+    items = [json.loads(str(row["record_json"])) for row in rows]
+    return {
+        "items": items,
+        "count": len(items),
+        "total": int(count_row[0]) if count_row is not None else 0,
+    }
+
+
 def latest_command_snapshot() -> dict[str, object]:
     with _managed_connection() as connection:
         row = connection.execute(

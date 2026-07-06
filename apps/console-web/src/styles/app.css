@@ -2,6 +2,8 @@
 @import './mockup-shell.css';
 @import './ide-layout.css';
 @import './ide-mode-polish.css';
+@import './vault-surface.css';
+@import './data-surface.css';
 
 :root {
   font-family: var(--font-display);

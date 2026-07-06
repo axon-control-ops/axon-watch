@@ -4,6 +4,7 @@ import {
   deliverSpokenOperatorAlert,
   registerVoiceDeckSpokenAlertHandler,
 } from './spoken-alert-delivery';
+import { resetSpeechQueue } from './speech-queue';
 
 describe('spoken alert delivery', () => {
   beforeAll(() => {
@@ -21,6 +22,7 @@ describe('spoken alert delivery', () => {
 
   afterEach(() => {
     registerVoiceDeckSpokenAlertHandler(null);
+    resetSpeechQueue();
   });
 
   it('uses voice deck hook when registered and handler accepts', () => {
@@ -30,7 +32,7 @@ describe('spoken alert delivery', () => {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
     };
-    const speech = { speak: vi.fn() };
+    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
 
     const channel = deliverSpokenOperatorAlert(
       {
@@ -54,7 +56,7 @@ describe('spoken alert delivery', () => {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
     };
-    const speech = { speak: vi.fn() };
+    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
 
     const channel = deliverSpokenOperatorAlert(
       {
@@ -74,7 +76,7 @@ describe('spoken alert delivery', () => {
   it('skips ineligible alerts without invoking handlers', () => {
     const handler = vi.fn();
     registerVoiceDeckSpokenAlertHandler(handler);
-    const speech = { speak: vi.fn() };
+    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
 
     const channel = deliverSpokenOperatorAlert(
       {

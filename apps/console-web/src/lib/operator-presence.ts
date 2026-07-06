@@ -1,6 +1,10 @@
 import type { OperatorPresence, SpokenAlertEligibility } from '../contracts/canonical';
 
 import { deliverSpokenOperatorAlert } from './spoken-alert-delivery';
+import { enqueueSpeech, type SpeechPort } from './speech-queue';
+
+export type { SpeechPort } from './speech-queue';
+export { enqueueSpeech, resetSpeechQueue } from './speech-queue';
 
 export {
   deliverSpokenOperatorAlert,
@@ -44,22 +48,16 @@ export function shouldSpeakAlert(
   return true;
 }
 
-export function speakAlertMessage(message: string, speech: Pick<SpeechSynthesis, 'speak'> | null): void {
-  if (
-    !speech ||
-    !message.trim() ||
-    typeof SpeechSynthesisUtterance === 'undefined'
-  ) {
+export function speakAlertMessage(message: string, speech: SpeechPort | null): void {
+  if (!speech || !message.trim()) {
     return;
   }
-  const utterance = new SpeechSynthesisUtterance(message);
-  utterance.rate = 1;
-  speech.speak(utterance);
+  enqueueSpeech(message, speech);
 }
 
 export function maybeSpeakOperatorAlert(
   alert: SpokenAlertEligibility,
-  speech: Pick<SpeechSynthesis, 'speak'> | null = typeof speechSynthesis === 'undefined'
+  speech: SpeechPort | null = typeof speechSynthesis === 'undefined'
     ? null
     : speechSynthesis,
   storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,

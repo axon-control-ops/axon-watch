@@ -17,13 +17,14 @@ def monitor_inbox_item(record: dict[str, object]) -> dict[str, object] | None:
     service = str(record.get("service") or check_id).strip()
     detail = str(record.get("detail", "")).strip()
     workspace_id = str(record.get("workspace_id", "workspace_dashpro")).strip()
+    workspace_label = str(record.get("workspace_label") or workspace_id).strip()
     severity = "high" if status == "warning" else "critical"
     now = utc_now_iso()
 
     return {
         "signal_id": f"signal_monitor_{check_id}_{status}",
         "workspace_id": workspace_id,
-        "title": f"DashPro {service} {status}",
+        "title": f"{workspace_label} {service} {status}",
         "summary": detail or f"{service} monitor reported {status}.",
         "severity": severity,
         "status": "open",
@@ -33,7 +34,8 @@ def monitor_inbox_item(record: dict[str, object]) -> dict[str, object] | None:
         "action_type": "investigate",
         "delivery_state": "pending",
         "meta": {
-            "signal_family": "dashpro_monitor",
+            "signal_family": "child_project_monitor",
+            "workspace_label": workspace_label,
             "check_id": check_id,
             "check_type": record.get("check_type"),
             "monitor_status": status,

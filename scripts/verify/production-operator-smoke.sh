@@ -23,10 +23,12 @@ echo "[4/6] TEST-1 live workspace bindings + git status"
 python3 -m unittest tests.test_test1_workspace_project_connection_acceptance -v
 echo
 
-echo "[5/6] Mission control UI unit smoke"
+echo "[5/6] F5 operator polish unit smoke"
 npm run test -w @axon-watch/console-web -- \
   src/lib/operator-status-radar-view.test.ts \
-  src/lib/workbench-terminal-split.test.ts
+  src/lib/workbench-terminal-split.test.ts \
+  src/lib/workspace-explorer-view.test.ts \
+  src/lib/agent-dock-runtime-view.test.ts
 echo
 
 echo "[6/6] Console-web production build"

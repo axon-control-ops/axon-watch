@@ -10,6 +10,7 @@ import {
 export const PRODUCTION_OPERATOR_WORKSPACE_IDS = [
   'workspace_axon_watch',
   'workspace_axon_local',
+  'workspace_dashpro',
 ] as const;
 
 export function hasBoundProjectWorkspaces(items: WorkspaceRecord[]): boolean {

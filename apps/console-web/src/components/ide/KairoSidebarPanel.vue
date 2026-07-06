@@ -11,12 +11,18 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 
-const headline = computed(() =>
-  briefingPanelHeadline(shell.operatorBriefing, shell.briefingLoadState),
-);
-const notice = computed(() =>
-  briefingNotice(shell.operatorBriefing, shell.briefingLoadState),
-);
+const headline = computed(() => {
+  if (shell.kairoAgentLiveLine) {
+    return shell.kairoAgentLiveLine.replace(/^KAIRO —\s*/, '');
+  }
+  return briefingPanelHeadline(shell.operatorBriefing, shell.briefingLoadState);
+});
+const notice = computed(() => {
+  if (shell.kairoAgentLiveLine) {
+    return 'Streaming agent activity — thinking, tools, and edits appear here as they land.';
+  }
+  return briefingNotice(shell.operatorBriefing, shell.briefingLoadState);
+});
 const advise = computed(() =>
   briefingAdvise(shell.operatorBriefing, shell.briefingLoadState),
 );

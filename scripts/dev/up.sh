@@ -13,6 +13,8 @@ rollback_stack() {
 }
 
 load_env
+"${repo_root}/scripts/dev/ensure-python-deps.sh"
+python_bin="$(resolve_python "${repo_root}")"
 ensure_runtime_dirs
 require_root_node_modules
 prune_stale_pid_files
@@ -27,7 +29,7 @@ trap 'rollback_stack' ERR
 start_service \
   "axon-watch" \
   "${repo_root}/services/axon-watch" \
-  python3 -m uvicorn app.main:app --host 127.0.0.1 --port "${AXON_WATCH_WATCH_SERVICE_PORT}"
+  "${python_bin}" -m uvicorn app.main:app --host 127.0.0.1 --port "${AXON_WATCH_WATCH_SERVICE_PORT}"
 wait_for_http \
   "axon-watch" \
   "$(service_ready_url "axon-watch")" \
@@ -37,7 +39,7 @@ wait_for_http \
 start_service \
   "control-plane" \
   "${repo_root}/services/control-plane" \
-  python3 -m uvicorn app.main:app --host 127.0.0.1 --port "${AXON_WATCH_CONTROL_PLANE_PORT}"
+  "${python_bin}" -m uvicorn app.main:app --host 127.0.0.1 --port "${AXON_WATCH_CONTROL_PLANE_PORT}"
 wait_for_http \
   "control-plane" \
   "$(service_ready_url "control-plane")" \

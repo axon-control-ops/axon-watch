@@ -1045,6 +1045,8 @@ body:has(.console-shell--mockup) {
 .center-workbench--operator .center-workbench__operator-status > .operator-status-radar-panel {
   flex: 1 1 auto;
   min-height: 0;
+  max-height: 100%;
+  height: 100%;
 }
 
 .center-workbench--operator .center-workbench__operator-status {
@@ -2730,6 +2732,9 @@ body:has(.console-shell--mockup) {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .connectors-rail-panel__item {
@@ -2824,6 +2829,21 @@ body:has(.console-shell--mockup) {
   margin: 0;
   font-size: 0.68rem;
   color: #ff8f8f;
+}
+
+.operator-status-radar-panel__header,
+.operator-status-radar-panel__rail,
+.operator-status-radar-panel__utility-actions,
+.operator-status-radar-panel__controls,
+.operator-status-radar-panel__terminal-dock {
+  flex-shrink: 0;
+}
+
+.operator-status-radar-panel__stage,
+.operator-status-radar-panel__feed,
+.connectors-rail-panel {
+  flex-shrink: 1;
+  min-height: 0;
 }
 
 .operator-status-radar-panel {
@@ -3032,6 +3052,9 @@ body:has(.console-shell--mockup) {
     linear-gradient(180deg, rgba(0, 242, 255, 0.07), rgba(0, 242, 255, 0.01)),
     rgba(3, 12, 18, 0.78);
   box-shadow: inset 0 1px 0 rgba(0, 242, 255, 0.08);
+  /* The stage may shrink (flex-shrink + min-height: 0); scroll instead of
+     letting guide/notice text bleed over the live execution feed below. */
+  overflow-y: auto;
 }
 
 .operator-status-radar-panel--attention .operator-status-radar-panel__stage,
@@ -3116,6 +3139,15 @@ body:has(.console-shell--mockup) {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  max-height: min(8rem, 18vh);
+  overflow: auto;
+}
+
+.operator-status-radar-panel__run-queue-more {
+  margin: 0.35rem 0 0;
+  font-size: 0.58rem;
+  line-height: 1.35;
+  color: var(--text-muted);
 }
 
 .operator-status-radar-panel__run-queue-item {
@@ -3223,7 +3255,7 @@ body:has(.console-shell--mockup) {
   flex: 1 1 auto;
   flex-direction: column;
   gap: 0.42rem;
-  min-height: 0;
+  min-height: 5.5rem;
   max-height: min(15rem, 34vh);
   padding: 0.55rem 0.65rem;
   border: 1px solid rgba(0, 242, 255, 0.1);
@@ -3926,9 +3958,279 @@ body:has(.console-shell--mockup) {
   border-color: rgba(255, 201, 120, 0.18);
 }
 
+.conversation-seam__content--system-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: rgba(255, 201, 120, 0.78);
+  font-size: 0.72rem;
+}
+
+.conversation-seam__expand-toggle--inline {
+  margin-left: 0.15rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 201, 120, 0.92);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.conversation-seam__content--typing-full-access {
+  color: rgba(255, 170, 185, 0.94);
+}
+
+.conversation-seam__content--typing-full-access .conversation-seam__typing-dot {
+  background: rgba(244, 63, 94, 0.92);
+}
+
+.conversation-seam__access-chip {
+  padding: 0.08rem 0.35rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.conversation-seam__access-chip--full {
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  background: rgba(76, 5, 25, 0.45);
+  color: rgba(255, 190, 200, 0.96);
+}
+
+.conversation-seam__content--streaming {
+  border-left: 2px solid rgba(56, 189, 248, 0.45);
+  padding-left: 0.45rem;
+}
+
+.conversation-seam__item--full-access .conversation-seam__content--streaming {
+  border-left-color: rgba(244, 63, 94, 0.55);
+}
+
+.conversation-seam__content--streaming-full-access {
+  border-left-color: rgba(244, 63, 94, 0.55);
+}
+
+.conversation-seam__content--streaming-full-access + .conversation-seam__stream-cursor,
+.conversation-seam__content--streaming-full-access .conversation-seam__stream-cursor {
+  color: rgba(255, 140, 160, 0.95);
+}
+
+.conversation-seam__content--typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: rgba(0, 210, 255, 0.82);
+  font-style: italic;
+}
+
+.conversation-seam__typing-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: rgba(0, 210, 255, 0.85);
+  animation: conversation-seam-typing-pulse 1.1s ease-in-out infinite;
+}
+
+.conversation-seam__stream-cursor {
+  color: rgba(0, 210, 255, 0.92);
+  animation: conversation-seam-cursor-blink 0.9s step-end infinite;
+}
+
+.conversation-seam__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  white-space: normal;
+}
+
+.agent-block--text {
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: rgba(226, 236, 248, 0.94);
+}
+
+.agent-block--thinking {
+  border-left: 2px solid rgba(138, 154, 173, 0.35);
+  padding-left: 0.55rem;
+}
+
+.agent-block__thinking-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(150, 168, 190, 0.85);
+  font-size: 0.6rem;
+  font-style: italic;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agent-block--thinking-live .agent-block__thinking-toggle {
+  color: rgba(0, 210, 255, 0.8);
+}
+
+.agent-block__thinking-icon {
+  font-style: normal;
+  font-size: 0.55rem;
+  opacity: 0.7;
+}
+
+.agent-block__thinking-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-block__thinking-body {
+  margin: 0.35rem 0 0;
+  font-size: 0.62rem;
+  font-style: italic;
+  line-height: 1.5;
+  color: rgba(168, 184, 204, 0.85);
+  white-space: pre-wrap;
+}
+
+.agent-block--tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.6rem;
+  color: rgba(150, 168, 190, 0.9);
+}
+
+.agent-block__tool-dot {
+  width: 0.32rem;
+  height: 0.32rem;
+  border-radius: 50%;
+  background: rgba(0, 210, 255, 0.7);
+}
+
+.agent-block--edit {
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  border-radius: 0.45rem;
+  background: rgba(6, 12, 18, 0.65);
+  overflow: hidden;
+}
+
+.agent-block__edit-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: none;
+  background: rgba(0, 242, 255, 0.05);
+  color: rgba(226, 236, 248, 0.92);
+  font-size: 0.62rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agent-block__edit-icon {
+  font-size: 0.55rem;
+  opacity: 0.7;
+}
+
+.agent-block__edit-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
+.agent-block__edit-stat {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.58rem;
+}
+
+.agent-block__edit-stat--add {
+  color: rgba(120, 220, 160, 0.95);
+}
+
+.agent-block__edit-stat--remove {
+  color: rgba(255, 140, 150, 0.95);
+}
+
+.agent-block__edit-diff {
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  max-height: 16rem;
+  overflow: auto;
+  font-size: 0.58rem;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.agent-block__diff-line {
+  display: block;
+}
+
+.agent-block__diff-line--add {
+  color: rgba(140, 230, 175, 0.95);
+  background: rgba(60, 180, 110, 0.1);
+}
+
+.agent-block__diff-line--remove {
+  color: rgba(255, 150, 160, 0.95);
+  background: rgba(220, 80, 100, 0.1);
+}
+
+.agent-block__diff-line--meta {
+  color: rgba(0, 210, 255, 0.75);
+}
+
+.agent-block__diff-line--context {
+  color: rgba(178, 194, 212, 0.8);
+}
+
+@keyframes conversation-seam-typing-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes conversation-seam-cursor-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
 .conversation-seam__item--agent {
   border-color: rgba(0, 242, 255, 0.28);
   background: rgba(0, 242, 255, 0.06);
+}
+
+.conversation-seam__run-chip {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: rgba(0, 210, 255, 0.72);
+  border: 1px solid rgba(0, 210, 255, 0.18);
+  border-radius: 999px;
+  padding: 0.06rem 0.32rem;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .conversation-seam__meta {
@@ -4053,6 +4355,32 @@ body:has(.console-shell--mockup) {
 .right-dock--resizing .right-dock__resize-grip {
   height: 3rem;
   background: rgba(0, 245, 212, 0.72);
+}
+
+.conversation-seam__expand-toggle {
+  margin-top: 0.25rem;
+  padding: 0.08rem 0.38rem;
+  border: 1px solid rgba(255, 120, 120, 0.28);
+  border-radius: 2px;
+  background: rgba(20, 8, 8, 0.65);
+  color: rgba(255, 180, 180, 0.88);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.conversation-seam__content--error {
+  border-left: 2px solid rgba(255, 120, 120, 0.55);
+  background: rgba(255, 72, 72, 0.08);
+  color: rgba(255, 214, 214, 0.96);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.conversation-seam__content--error-detail {
+  margin-top: 0.35rem;
+  max-height: 12rem;
 }
 
 .conversation-seam__role {

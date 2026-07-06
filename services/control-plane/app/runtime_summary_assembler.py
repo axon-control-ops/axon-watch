@@ -11,6 +11,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from app.adapters.watch_client import fetch_watch_inbox, fetch_watch_summary
+from app.cli_runtime.catalog import runtime_identity_snapshot
 from app.runs.service import approval_summary, list_active_runs, to_runtime_summary_active_run
 
 _APP_VERSION = "0.1.0"
@@ -64,14 +65,17 @@ def default_watch_probe(timeout_seconds: float = 0.5) -> tuple[bool, str, str | 
 
 
 def _runtime_identity() -> dict[str, object]:
-    return {
-        "provider_family": os.environ.get("AXON_WATCH_PROVIDER_FAMILY", "bootstrap"),
-        "provider_name": os.environ.get("AXON_WATCH_PROVIDER_NAME", "Axon-X Bootstrap"),
-        "model_name": os.environ.get("AXON_WATCH_MODEL_NAME", "bootstrap-model"),
-        "mode_default": os.environ.get("AXON_WATCH_MODE_DEFAULT", "agent"),
-        "tool_calling_supported": _env_bool("AXON_WATCH_TOOL_CALLING_SUPPORTED", False),
-        "reasoning_supported": _env_bool("AXON_WATCH_REASONING_SUPPORTED", False),
-    }
+    try:
+        return runtime_identity_snapshot()
+    except Exception:
+        return {
+            "provider_family": os.environ.get("AXON_WATCH_PROVIDER_FAMILY", "bootstrap"),
+            "provider_name": os.environ.get("AXON_WATCH_PROVIDER_NAME", "Axon-X Bootstrap"),
+            "model_name": os.environ.get("AXON_WATCH_MODEL_NAME", "bootstrap-model"),
+            "mode_default": os.environ.get("AXON_WATCH_MODE_DEFAULT", "agent"),
+            "tool_calling_supported": _env_bool("AXON_WATCH_TOOL_CALLING_SUPPORTED", False),
+            "reasoning_supported": _env_bool("AXON_WATCH_REASONING_SUPPORTED", False),
+        }
 
 
 def _signals_summary_from_inbox(

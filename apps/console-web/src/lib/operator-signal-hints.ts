@@ -16,7 +16,18 @@ export function signalOperatorHint(input: {
   signalId: string;
   title: string;
   summary?: string | null;
+  meta?: Record<string, unknown> | null;
 }): string {
+  const signalFamily = String(input.meta?.signal_family ?? '');
+  if (signalFamily === 'child_project_monitor') {
+    const workspaceLabel = String(input.meta?.workspace_label ?? 'Child project');
+    const monitorStatus = String(input.meta?.monitor_status ?? 'issue');
+    return (
+      `${workspaceLabel} monitor reported ${monitorStatus}. ` +
+      'Review the external service dashboard. Missing credentials can be imported on /vault.'
+    );
+  }
+
   if (isBootstrapSummarySignal(input.signalId, input.title)) {
     return (
       'Expected in local bootstrap dev — not a production outage. Watch is connected; ' +

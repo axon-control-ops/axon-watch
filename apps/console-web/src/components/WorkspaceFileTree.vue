@@ -6,12 +6,14 @@ import {
   buildWorkspaceFileTree,
   flattenWorkspaceFileTree,
 } from '../lib/workspace-file-tree';
+import { workspaceExplorerStatusMessage } from '../lib/workspace-explorer-view';
 
 const props = defineProps<{
   entries: Array<{ path: string; size_bytes: number }>;
   activePath: string | null;
   loadState: 'idle' | 'loading' | 'loaded' | 'error';
   error: string | null;
+  hasWorkspace?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -22,6 +24,15 @@ const expandedDirectories = ref<Record<string, boolean>>({});
 
 const rows = computed(() =>
   flattenWorkspaceFileTree(buildWorkspaceFileTree(props.entries), expandedDirectories.value),
+);
+
+const statusMessage = computed(() =>
+  workspaceExplorerStatusMessage({
+    loadState: props.loadState,
+    hasWorkspace: props.hasWorkspace ?? true,
+    entryCount: props.entries.length,
+    error: props.error,
+  }),
 );
 
 function toggleDirectory(path: string): void {
@@ -47,9 +58,7 @@ function handleRowClick(row: { path: string; kind: 'file' | 'directory' }): void
 
 <template>
   <div class="workspace-file-tree">
-    <p v-if="loadState === 'loading'" class="region-copy">Loading workspace files…</p>
-    <p v-else-if="loadState === 'error'" class="region-copy">{{ error }}</p>
-    <p v-else-if="entries.length === 0" class="region-copy">No workspace files found.</p>
+    <p v-if="statusMessage" class="region-copy workspace-file-tree__status">{{ statusMessage }}</p>
 
     <ul v-else class="workspace-file-tree__list">
       <li v-for="row in rows" :key="`${row.kind}:${row.path}`" class="workspace-file-tree__item">

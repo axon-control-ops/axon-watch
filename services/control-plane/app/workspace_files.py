@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from app.terminal.workspace_roots import resolve_workspace_root
@@ -10,6 +11,17 @@ from app.workspace_catalog import get_workspace_record
 
 class WorkspaceFileError(ValueError):
     pass
+
+
+_SKIPPED_DIRECTORY_NAMES = {
+    "__pycache__",
+    "coverage",
+    "dist",
+    "build",
+    "node_modules",
+    "venv",
+}
+_MAX_LISTED_FILES = 5000
 
 
 def _safe_resolve(workspace_root: Path, relative_path: str) -> Path:
@@ -51,21 +63,34 @@ def ensure_bootstrap_files(workspace_id: str) -> Path:
     return root
 
 
+def _should_skip_directory(name: str) -> bool:
+    return name.startswith(".") or name in _SKIPPED_DIRECTORY_NAMES
+
+
+def _should_skip_file(name: str) -> bool:
+    return name.startswith(".")
+
+
 def list_workspace_files(workspace_id: str) -> list[dict[str, object]]:
     root = ensure_bootstrap_files(workspace_id)
     items: list[dict[str, object]] = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(root).as_posix()
-        if relative.startswith(".") or "/." in relative:
-            continue
-        items.append(
-            {
-                "path": relative,
-                "size_bytes": path.stat().st_size,
-            }
+    for current_root, dirnames, filenames in os.walk(root, topdown=True):
+        dirnames[:] = sorted(
+            directory for directory in dirnames if not _should_skip_directory(directory)
         )
+        for filename in sorted(filenames):
+            if _should_skip_file(filename):
+                continue
+            path = Path(current_root) / filename
+            relative = path.relative_to(root).as_posix()
+            items.append(
+                {
+                    "path": relative,
+                    "size_bytes": path.stat().st_size,
+                }
+            )
+            if len(items) >= _MAX_LISTED_FILES:
+                return items
     return items
 
 

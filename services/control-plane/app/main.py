@@ -5,17 +5,21 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Query, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app.chat.service import (
     ChatValidationError,
+    LaneBStreamJob,
+    execute_lane_b_stream,
     get_chat_thread,
     get_chat_thread_history,
     get_workspace_chat_thread,
     post_chat_message,
 )
+from app.chat.stream_events import chat_thread_stream_response
 from app.inbox_projection import build_inbox_response
 from app.inbox_signals import acknowledge_inbox_signals
 from app.adapters.watch_client import (
@@ -50,6 +54,27 @@ from app.workspace_handoffs import (
     list_workspace_handoffs,
 )
 from app.live_events import live_events_response
+from app.cli_runtime.routes import get_cursor_runtime_status, get_runtime_mcp_tools, get_runtime_status
+from app.vault.routes import (
+    create_vault_secret,
+    delete_vault_secret,
+    export_vault_backup,
+    export_vault_csv,
+    get_vault_secret,
+    get_vault_status,
+    import_vault_backup,
+    import_vault_monitor_keys,
+    list_vault_secrets,
+    update_vault_secret,
+    vault_auto_unlock_disable,
+    vault_auto_unlock_enable,
+    vault_auto_unlock_status,
+    vault_lock,
+    vault_provider_keys,
+    vault_setup,
+    vault_unlock,
+)
+from app.data.routes import get_data_export, get_data_snapshot
 from app.workspace_files import (
     WorkspaceFileError,
     list_workspace_files,
@@ -82,6 +107,9 @@ class PostChatMessageRequest(BaseModel):
     run_id: str | None = None
     composer_mode: str | None = None
     active_file_path: str | None = None
+    runtime_target: str | None = None
+    runtime_model: str | None = None
+    execution_access: str | None = None
 
 
 class CreateWorkspaceHandoffRequest(BaseModel):
@@ -102,6 +130,34 @@ class WatchCommandRequest(BaseModel):
 
 class AcknowledgeInboxSignalsRequest(BaseModel):
     signal_ids: list[str]
+
+
+class VaultImportRequest(BaseModel):
+    secrets: dict[str, str] = {}
+    export_text: str = ""
+
+
+class VaultSetupRequest(BaseModel):
+    master_password: str
+
+
+class VaultUnlockRequest(BaseModel):
+    master_password: str
+    totp_code: str
+    remember_me: bool = False
+
+
+class VaultSecretRequest(BaseModel):
+    name: str
+    category: str = "general"
+    username: str = ""
+    password: str = ""
+    url: str = ""
+    notes: str = ""
+
+
+class VaultExportRequest(BaseModel):
+    backup_password: str
 
 
 class OperatorPresenceSettingsRequest(BaseModel):
@@ -189,6 +245,206 @@ def runtime_summary() -> dict[str, object]:
     return build_runtime_summary()
 
 
+@app.get("/api/runtime/status")
+def runtime_status() -> dict[str, object]:
+    return get_runtime_status()
+
+
+@app.get("/api/runtime/cursor/status")
+def cursor_runtime_status(force_refresh: bool = False) -> dict[str, object]:
+    return get_cursor_runtime_status(force_refresh=force_refresh)
+
+
+@app.get("/api/runtime/mcp-tools")
+def runtime_mcp_tools() -> dict[str, object]:
+    return get_runtime_mcp_tools()
+
+
+def _vault_http_error(exc: RuntimeError) -> HTTPException:
+    message = str(exc)
+    for code in (401, 423, 400, 404):
+        if f"HTTP {code}" in message:
+            detail = message.split(": ", 1)[-1] if ": " in message else message
+            return HTTPException(status_code=code, detail=detail)
+    return HTTPException(status_code=503, detail=message)
+
+
+@app.get("/api/vault/status")
+def vault_status_route() -> dict[str, object]:
+    try:
+        return get_vault_status()
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.get("/api/vault/provider-keys")
+def vault_provider_keys_route() -> dict[str, object]:
+    try:
+        return vault_provider_keys()
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.post("/api/vault/setup")
+def vault_setup_route(body: VaultSetupRequest) -> dict[str, object]:
+    try:
+        return vault_setup(body.master_password)
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.post("/api/vault/unlock")
+def vault_unlock_route(body: VaultUnlockRequest) -> dict[str, object]:
+    try:
+        return vault_unlock(body.master_password, body.totp_code, remember_me=body.remember_me)
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.post("/api/vault/lock")
+def vault_lock_route() -> dict[str, object]:
+    try:
+        return vault_lock()
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.get("/api/vault/auto-unlock/status")
+def vault_auto_unlock_status_route() -> dict[str, object]:
+    try:
+        return vault_auto_unlock_status()
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.post("/api/vault/auto-unlock/enable")
+def vault_auto_unlock_enable_route() -> dict[str, object]:
+    try:
+        return vault_auto_unlock_enable()
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.post("/api/vault/auto-unlock/disable")
+def vault_auto_unlock_disable_route() -> dict[str, object]:
+    try:
+        return vault_auto_unlock_disable()
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.get("/api/vault/secrets")
+def vault_secrets_list_route() -> list[dict[str, object]]:
+    try:
+        return list_vault_secrets()
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.get("/api/vault/secrets/{secret_id}")
+def vault_secrets_show_route(secret_id: int) -> dict[str, object]:
+    try:
+        return get_vault_secret(secret_id)
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.post("/api/vault/secrets")
+def vault_secrets_create_route(body: VaultSecretRequest) -> dict[str, object]:
+    try:
+        return create_vault_secret(body.model_dump())
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.put("/api/vault/secrets/{secret_id}")
+def vault_secrets_update_route(secret_id: int, body: VaultSecretRequest) -> dict[str, object]:
+    try:
+        return update_vault_secret(secret_id, body.model_dump())
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.delete("/api/vault/secrets/{secret_id}")
+def vault_secrets_delete_route(secret_id: int) -> dict[str, object]:
+    try:
+        return delete_vault_secret(secret_id)
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.post("/api/vault/export")
+def vault_export_backup_route(body: VaultExportRequest):
+    try:
+        content, headers = export_vault_backup(body.backup_password)
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+    disposition = headers.get("content-disposition", "")
+    media_type = headers.get("content-type", "application/json")
+    response_headers = {"Content-Disposition": disposition} if disposition else {}
+    return Response(content=content, media_type=media_type, headers=response_headers)
+
+
+@app.get("/api/vault/export/csv")
+def vault_export_csv_route(format: str = Query(default="axon")):
+    try:
+        content, headers = export_vault_csv(format)
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+    disposition = headers.get("content-disposition", "")
+    media_type = headers.get("content-type", "text/csv; charset=utf-8")
+    response_headers = {"Content-Disposition": disposition} if disposition else {}
+    return Response(content=content, media_type=media_type, headers=response_headers)
+
+
+@app.post("/api/vault/import")
+async def vault_import_backup_route(
+    backup_password: str = Form(""),
+    mode: str = Form("merge"),
+    file: UploadFile = File(...),
+) -> dict[str, object]:
+    try:
+        raw = await file.read()
+        return import_vault_backup(
+            file_bytes=raw,
+            filename=str(file.filename or "vault-import.bin"),
+            backup_password=backup_password,
+            mode=mode,
+        )
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.post("/api/vault/import/monitor-keys")
+def vault_import_monitor_keys_route(body: VaultImportRequest) -> dict[str, object]:
+    try:
+        return import_vault_monitor_keys(body.secrets, export_text=body.export_text)
+    except RuntimeError as exc:
+        raise _vault_http_error(exc) from exc
+
+
+@app.get("/api/data/snapshot")
+def data_snapshot_route(limit: int = 50) -> dict[str, object]:
+    try:
+        return get_data_snapshot(limit=limit)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/data/export")
+def data_export_route(limit: int = 50) -> JSONResponse:
+    try:
+        payload = get_data_export(limit=limit)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return JSONResponse(
+        content=payload,
+        headers={
+            "Content-Disposition": 'attachment; filename="axon-operator-data-export.json"',
+        },
+    )
+
+
 @app.get("/api/inbox")
 def inbox() -> dict[str, object]:
     return build_inbox_response()
@@ -270,20 +526,35 @@ def live_events():
 
 
 @app.post("/api/chat/messages")
-def chat_messages_create(body: PostChatMessageRequest) -> dict[str, object]:
+def chat_messages_create(
+    body: PostChatMessageRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, object]:
     try:
-        return post_chat_message(
+        payload = post_chat_message(
             workspace_id=body.workspace_id,
             content=body.content,
             thread_id=body.thread_id,
             run_id=body.run_id,
             composer_mode=body.composer_mode,
             active_file_path=body.active_file_path,
+            runtime_target=body.runtime_target,
+            runtime_model=body.runtime_model,
+            execution_access=body.execution_access,
         )
+        stream_job = payload.pop("_stream_job", None)
+        if isinstance(stream_job, LaneBStreamJob):
+            background_tasks.add_task(execute_lane_b_stream, stream_job)
+        return payload
     except chat_store.ChatThreadNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ChatValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/chat/threads/{thread_id}/stream")
+def chat_threads_stream(thread_id: str):
+    return chat_thread_stream_response(thread_id)
 
 
 @app.get("/api/chat/threads/{thread_id}")
@@ -350,9 +621,9 @@ def workspace_handoffs_index(workspace_id: str) -> dict[str, object]:
 
 
 @app.get("/api/workspaces/{workspace_id}/chat/thread")
-def workspace_chat_thread(workspace_id: str) -> dict[str, object]:
+def workspace_chat_thread(workspace_id: str, surface: str = "operator") -> dict[str, object]:
     try:
-        return get_workspace_chat_thread(workspace_id)
+        return get_workspace_chat_thread(workspace_id, thread_kind=surface)
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ChatValidationError as exc:

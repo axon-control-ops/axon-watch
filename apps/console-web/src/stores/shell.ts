@@ -6,11 +6,13 @@ import {
   acknowledgeInboxSignals,
   completeRun,
   fetchConnectors,
+  fetchCursorRuntimeStatus,
   fetchInbox,
   fetchOperatorBriefing,
   fetchOperatorPresenceSettings,
   fetchRunHistory,
   fetchRuns,
+  fetchRuntimeStatus,
   fetchRuntimeSummary,
   fetchThreadHistory,
   fetchWorkspaceChatThread,
@@ -28,7 +30,8 @@ import {
   saveOperatorPresenceSettings,
   stopRun,
 } from '../api/control-plane';
-import type { ConnectorProbeRecord } from '../api/control-plane';
+import type { ConnectorProbeRecord, CursorRuntimeStatusSnapshot } from '../api/control-plane';
+import type { RuntimeStatusSnapshot } from '../api/control-plane';
 import type {
   ApprovalRecord,
   InboxItem,
@@ -40,6 +43,36 @@ import type {
   WorkspaceRecord,
 } from '../contracts/canonical';
 import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
+import {
+  editedFilePathsFromTranscript,
+} from '../lib/agent-transcript-blocks';
+import {
+  narrationForCompletion,
+  narrationMilestonesForDelta,
+  streamingActivityLabel,
+} from '../lib/kairo-agent-narration';
+import {
+  jarvisAgentStartLine,
+  jarvisSpokenLine,
+  type KairoVoiceContext,
+} from '../lib/kairo-voice-script';
+import { languageForFilePath } from '../lib/workspace-file-language';
+import {
+  normalizeAgentExecutionAccess,
+  persistAgentExecutionAccess,
+  resolveAgentExecutionAccess,
+  clearFullAccessSessionConsent,
+  markFullAccessSessionConsent,
+  type AgentExecutionAccess,
+} from '../lib/agent-execution-access-prefs';
+import {
+  buildIdeComposerActivityLabel,
+  buildIdeStreamActivityLabel,
+  type IdeComposerActivity,
+} from '../lib/agent-dock-activity-view';
+import {
+  resolveIdeAgentLinkedRunId,
+} from '../lib/ide-agent-run-link';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
   readViewportWidth,
@@ -68,6 +101,32 @@ import {
   type OperatorThreadEntry,
 } from '../lib/operator-thread';
 import {
+  filterThreadMessagesForSurface,
+  threadSurfaceForLayout,
+  type ThreadSurface,
+} from '../lib/thread-surface-view';
+import {
+  buildCursorCatalogRows,
+  cursorComposerRuntimeLabel,
+  type CursorCatalogRow,
+} from '../lib/cursor-catalog-view';
+import {
+  readComposerRuntimePrefs,
+  writeComposerRuntimePrefs,
+} from '../lib/composer-runtime-prefs';
+import {
+  readCursorPickerVisibleModelIds,
+  toggleCursorPickerVisibleModel as toggleCursorPickerVisibleModelPref,
+} from '../lib/cursor-picker-prefs';
+import {
+  applyChatUiAction,
+  parseChatUiAction,
+} from '../lib/chat-ui-action';
+import {
+  startChatStreamSession,
+  type ChatStreamSession,
+} from '../lib/chat-stream-session';
+import {
   filePathFromDocumentId,
   workspaceFileDocumentId,
 } from '../lib/workspace-file-language';
@@ -82,6 +141,7 @@ import {
 } from '../lib/workspace-file-session';
 import {
   buildWorkspaceDocuments,
+  type EditorDocumentLanguage,
   type WorkspaceDocumentDescriptor,
 } from '../lib/workspace-documents';
 import {
@@ -144,6 +204,7 @@ import { persistWorkbenchTerminalPanelVisible } from '../lib/workbench-terminal-
 
 export type LayoutMode = 'operator' | 'ide';
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+export type RuntimeStatusLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type InboxLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type RunsLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type WorkspacesLoadState = 'idle' | 'loading' | 'loaded' | 'error';
@@ -205,6 +266,17 @@ export const useShellStore = defineStore('shell', () => {
   const runtimeSummary = ref<RuntimeSummary | null>(null);
   const runtimeSummaryLoadState = ref<RuntimeSummaryLoadState>('idle');
   const runtimeSummaryError = ref<string | null>(null);
+  const runtimeStatus = ref<RuntimeStatusSnapshot | null>(null);
+  const runtimeStatusLoadState = ref<RuntimeStatusLoadState>('idle');
+  const runtimeStatusError = ref<string | null>(null);
+  const cursorRuntimeStatus = ref<CursorRuntimeStatusSnapshot | null>(null);
+  const cursorCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const cursorCatalogError = ref<string | null>(null);
+  const agentStreamActive = ref(false);
+  const agentStreamMessageId = ref<string | null>(null);
+  let chatStreamSession: ChatStreamSession | null = null;
+  const composerRuntimePrefsRevision = ref(0);
+  const cursorPickerVisibleRevision = ref(0);
   const activeRun = ref<RunRecord | null>(null);
   const runs = ref<RunRecord[]>([]);
   const runsLoadState = ref<RunsLoadState>('idle');
@@ -243,9 +315,22 @@ export const useShellStore = defineStore('shell', () => {
   const briefingError = ref<string | null>(null);
   const signalViews = ref<SignalView[]>([]);
   const threadMessages = ref<OperatorThreadEntry[]>([]);
+  const operatorThreadMessages = ref<OperatorThreadEntry[]>([]);
   const activeThreadId = ref<string | null>(null);
-  const workspaceThreadIds = ref<Record<string, string>>({});
+  const workspaceSurfaceThreadIds = ref<
+    Record<string, Partial<Record<ThreadSurface, string>>>
+  >({});
   const operatorCommandDraft = ref('');
+  const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
+  const ideAgentRunId = ref<string | null>(null);
+  const ideComposerActivity = ref<IdeComposerActivity | null>(null);
+  const ideAgentLinkedRun = computed(() => {
+    const runId = ideAgentRunId.value;
+    if (!runId) {
+      return null;
+    }
+    return runs.value.find((run) => run.run_id === runId) ?? null;
+  });
   const commandMutationState = ref<'idle' | 'submitting' | 'error'>('idle');
   const commandMutationError = ref<string | null>(null);
   const workspaceFileEntries = ref<Array<{ path: string; size_bytes: number }>>([]);
@@ -403,6 +488,25 @@ export const useShellStore = defineStore('shell', () => {
       return matched;
     }
 
+    const selectedPath = filePathFromDocumentId(activeEditorDocumentId.value);
+    if (selectedPath) {
+      const loadState = fileContentLoadStates.value[selectedPath] ?? 'idle';
+      return {
+        id: activeEditorDocumentId.value,
+        title: selectedPath,
+        language: languageForFilePath(selectedPath) as EditorDocumentLanguage,
+        value: fileContents.value[selectedPath] ?? '',
+        description:
+          loadState === 'loaded'
+            ? 'Workspace file on disk.'
+            : 'Loading workspace file…',
+        source: 'file' as const,
+        filePath: selectedPath,
+        readOnly: loadState !== 'loaded',
+        dirty: false,
+      };
+    }
+
     if (fileDocuments.value.length > 0) {
       return fileDocuments.value[0];
     }
@@ -457,17 +561,24 @@ export const useShellStore = defineStore('shell', () => {
   const canApprovePrimaryRun = computed(
     () => Boolean(primaryApprovalRun.value?.can_approve) && !runMutationPending.value,
   );
+  const canApproveIdeAgentRun = computed(
+    () => Boolean(ideAgentLinkedRun.value?.can_approve) && !runMutationPending.value,
+  );
   const canRejectPrimaryRun = computed(
     () => primaryApprovalRun.value?.phase === 'awaiting_approval' && !runMutationPending.value,
   );
 
   const threadStateLabel = computed(() =>
-    conversationEmptyStateLabel(threadMessages.value.length),
+    conversationEmptyStateLabel(
+      (layoutMode.value === 'operator' ? operatorThreadMessages.value : threadMessages.value)
+        .length,
+    ),
   );
 
   const canSubmitOperatorCommand = computed(
     () =>
       commandMutationState.value !== 'submitting' &&
+      !agentStreamActive.value &&
       canSubmitOperatorCommandDraft(
         operatorCommandDraft.value,
         currentWorkspace.value?.workspace_id ?? null,
@@ -479,6 +590,12 @@ export const useShellStore = defineStore('shell', () => {
   );
 
   const kairoPresenceState = computed<KairoPresenceState>(() => {
+    if (agentStreamActive.value && ideComposerActivity.value?.mode === 'agent') {
+      return 'speaking';
+    }
+    if (agentStreamActive.value) {
+      return 'listening';
+    }
     const summary = runtimeSummary.value;
     return resolveKairoPresenceState({
       pendingApprovals:
@@ -488,6 +605,13 @@ export const useShellStore = defineStore('shell', () => {
       watchConnected: Boolean(summary?.watch.connected),
       runtimeLoaded: runtimeSummaryLoadState.value === 'loaded' && Boolean(summary),
     });
+  });
+
+  const kairoAgentLiveLine = computed(() => {
+    if (!agentStreamActive.value) {
+      return null;
+    }
+    return ideComposerActivity.value?.label ?? null;
   });
 
   const kairoBriefingAttention = computed(() =>
@@ -572,6 +696,9 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function resetThreadContext(): void {
+    disconnectChatStreamSession();
+    agentStreamActive.value = false;
+    agentStreamMessageId.value = null;
     threadMessages.value = [];
     activeThreadId.value = null;
     operatorCommandDraft.value = '';
@@ -579,36 +706,125 @@ export const useShellStore = defineStore('shell', () => {
     commandMutationError.value = null;
   }
 
-  async function loadWorkspaceThread(workspaceId: string): Promise<void> {
+  async function refreshThreadHistory(threadId: string): Promise<void> {
+    const history = await fetchThreadHistory(threadId);
+    activeThreadId.value = history.thread_id;
+    threadMessages.value = history.items.map((item) => mapChatMessageRecord(item));
+  }
+
+  function currentThreadSurface(): ThreadSurface {
+    return threadSurfaceForLayout(layoutMode.value);
+  }
+
+  function getWorkspaceSurfaceThreadId(
+    workspaceId: string,
+    surface: ThreadSurface,
+  ): string | null {
+    return workspaceSurfaceThreadIds.value[workspaceId]?.[surface] ?? null;
+  }
+
+  function setWorkspaceSurfaceThreadId(
+    workspaceId: string,
+    surface: ThreadSurface,
+    threadId: string,
+  ): void {
+    workspaceSurfaceThreadIds.value = {
+      ...workspaceSurfaceThreadIds.value,
+      [workspaceId]: {
+        ...(workspaceSurfaceThreadIds.value[workspaceId] ?? {}),
+        [surface]: threadId,
+      },
+    };
+  }
+
+  function clearWorkspaceSurfaceThreadId(workspaceId: string, surface: ThreadSurface): void {
+    const next = { ...workspaceSurfaceThreadIds.value };
+    const record = { ...(next[workspaceId] ?? {}) };
+    delete record[surface];
+    if (Object.keys(record).length) {
+      next[workspaceId] = record;
+    } else {
+      delete next[workspaceId];
+    }
+    workspaceSurfaceThreadIds.value = next;
+  }
+
+  async function refreshOperatorThreadMessages(workspaceId: string): Promise<void> {
     try {
-      let threadId = workspaceThreadIds.value[workspaceId] ?? null;
+      const workspaceThread = await fetchWorkspaceChatThread(workspaceId, { surface: 'operator' });
+      if (!hasWorkspaceChatThread(workspaceThread)) {
+        operatorThreadMessages.value = [];
+        return;
+      }
+      const history = await fetchThreadHistory(workspaceThread.thread_id);
+      operatorThreadMessages.value = filterThreadMessagesForSurface(
+        history.items.map((item) => mapChatMessageRecord(item)),
+        'operator',
+      );
+      if (workspaceThread.thread_id) {
+        setWorkspaceSurfaceThreadId(workspaceId, 'operator', workspaceThread.thread_id);
+      }
+    } catch {
+      operatorThreadMessages.value = [];
+    }
+  }
+
+  async function loadWorkspaceThread(
+    workspaceId: string,
+    surface: ThreadSurface = currentThreadSurface(),
+  ): Promise<void> {
+    try {
+      let threadId = getWorkspaceSurfaceThreadId(workspaceId, surface);
       if (!threadId) {
-        const workspaceThread = await fetchWorkspaceChatThread(workspaceId);
+        const workspaceThread = await fetchWorkspaceChatThread(workspaceId, { surface });
         if (!hasWorkspaceChatThread(workspaceThread)) {
-          resetThreadContext();
+          if (surface === currentThreadSurface()) {
+            resetThreadContext();
+          }
+          if (surface === 'operator') {
+            operatorThreadMessages.value = [];
+          }
           return;
         }
 
         threadId = workspaceThread.thread_id;
-        workspaceThreadIds.value = {
-          ...workspaceThreadIds.value,
-          [workspaceId]: threadId,
-        };
+        if (threadId) {
+          setWorkspaceSurfaceThreadId(workspaceId, surface, threadId);
+        }
+      }
+
+      if (!threadId) {
+        if (surface === currentThreadSurface()) {
+          resetThreadContext();
+        }
+        return;
       }
 
       const history = await fetchThreadHistory(threadId);
-      activeThreadId.value = history.thread_id;
-      threadMessages.value = history.items.map((item) => mapChatMessageRecord(item));
-      commandMutationState.value = 'idle';
-      commandMutationError.value = null;
+      const mapped = filterThreadMessagesForSurface(
+        history.items.map((item) => mapChatMessageRecord(item)),
+        surface,
+      );
+      if (surface === currentThreadSurface()) {
+        activeThreadId.value = history.thread_id;
+        threadMessages.value = mapped;
+        commandMutationState.value = 'idle';
+        commandMutationError.value = null;
+      }
+      if (surface === 'operator') {
+        operatorThreadMessages.value = mapped;
+      }
     } catch (error) {
-      const nextThreadIds = { ...workspaceThreadIds.value };
-      delete nextThreadIds[workspaceId];
-      workspaceThreadIds.value = nextThreadIds;
-      resetThreadContext();
-      commandMutationState.value = 'error';
-      commandMutationError.value =
-        error instanceof Error ? error.message : 'Failed to load conversation history';
+      clearWorkspaceSurfaceThreadId(workspaceId, surface);
+      if (surface === currentThreadSurface()) {
+        resetThreadContext();
+        commandMutationState.value = 'error';
+        commandMutationError.value =
+          error instanceof Error ? error.message : 'Failed to load conversation history';
+      }
+      if (surface === 'operator') {
+        operatorThreadMessages.value = [];
+      }
     }
   }
 
@@ -626,19 +842,20 @@ export const useShellStore = defineStore('shell', () => {
       const response = await postChatMessage({
         workspace_id: workspaceId,
         content,
-        thread_id: activeThreadId.value,
+        thread_id: getWorkspaceSurfaceThreadId(workspaceId, 'operator'),
         run_id: primaryActiveRun.value?.run_id ?? null,
         composer_mode: 'command',
       });
       activeThreadId.value = response.thread_id;
-      workspaceThreadIds.value = {
-        ...workspaceThreadIds.value,
-        [workspaceId]: response.thread_id,
-      };
-      threadMessages.value = mergeThreadMessages(
-        threadMessages.value,
+      setWorkspaceSurfaceThreadId(workspaceId, 'operator', response.thread_id);
+      const merged = mergeThreadMessages(
+        operatorThreadMessages.value,
         response.messages.map((message) => mapChatMessageRecord(message)),
       );
+      operatorThreadMessages.value = filterThreadMessagesForSurface(merged, 'operator');
+      if (currentThreadSurface() === 'operator') {
+        threadMessages.value = operatorThreadMessages.value;
+      }
       operatorCommandDraft.value = '';
       commandMutationState.value = 'idle';
       await refreshRunSurfaces();
@@ -653,6 +870,139 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  function disconnectChatStreamSession(): void {
+    if (chatStreamSession) {
+      chatStreamSession.disconnect();
+      chatStreamSession = null;
+    }
+  }
+
+  function patchThreadMessageContent(messageId: string, content: string): void {
+    threadMessages.value = threadMessages.value.map((message) =>
+      message.message_id === messageId ? { ...message, content } : message,
+    );
+  }
+
+  function narrateAgentStreamMilestone(messageId: string, key: string, message: string): void {
+    deliverSpokenOperatorAlert({
+      eligible: true,
+      reason: `kairo-agent-narration:${key}`,
+      signal_id: `${messageId}:${key}`,
+      message,
+    });
+  }
+
+  function kairoVoiceContext(): KairoVoiceContext {
+    return {
+      fullAccess: ideComposerActivity.value?.executionAccess === 'full',
+      activeFile: activeWorkspaceFilePath.value,
+    };
+  }
+
+  function attachChatStream(threadId: string, messageId: string): void {
+    disconnectChatStreamSession();
+    agentStreamActive.value = true;
+    agentStreamMessageId.value = messageId;
+    const narrationEnabled = ideComposerActivity.value?.mode === 'agent';
+    const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
+    let narratedContent = '';
+    const voiceContext = kairoVoiceContext();
+
+    if (narrationEnabled) {
+      narrateAgentStreamMilestone(messageId, 'start', jarvisAgentStartLine(voiceContext));
+    }
+
+    chatStreamSession = startChatStreamSession({
+      threadId,
+      messageId,
+      onDelta: (content) => {
+        patchThreadMessageContent(messageId, content);
+        if (ideComposerActivity.value) {
+          ideComposerActivity.value = {
+            ...ideComposerActivity.value,
+            label: streamingActivityLabel(content, fullAccessNarration),
+          };
+        }
+        if (!narrationEnabled) {
+          return;
+        }
+        const milestones = narrationMilestonesForDelta(narratedContent, content);
+        narratedContent = content;
+        for (const milestone of milestones) {
+          const spoken = jarvisSpokenLine(milestone, voiceContext);
+          if (spoken) {
+            narrateAgentStreamMilestone(messageId, milestone.key, spoken);
+          }
+        }
+      },
+      onDone: (payload) => {
+        if (payload.system_message_id && payload.system_content) {
+          patchThreadMessageContent(payload.system_message_id, payload.system_content);
+        }
+        const uiAction = parseChatUiAction(payload.ui_action);
+        if (uiAction) {
+          applyChatUiAction(
+            {
+              setCurrentWorkspace,
+              openWorkspaceFile,
+            },
+            uiAction,
+          );
+        }
+        const finalContent = payload.content ?? narratedContent;
+        if (narrationEnabled) {
+          const done = narrationForCompletion(finalContent);
+          const spoken = jarvisSpokenLine(done, voiceContext);
+          if (spoken) {
+            narrateAgentStreamMilestone(messageId, done.key, spoken);
+          }
+        }
+        for (const path of editedFilePathsFromTranscript(finalContent)) {
+          if (openedFilePaths.value.includes(path)) {
+            void reloadWorkspaceFile(path);
+          }
+        }
+        agentStreamActive.value = false;
+        agentStreamMessageId.value = null;
+        ideComposerActivity.value = null;
+        disconnectChatStreamSession();
+        void refreshRunSurfaces();
+      },
+      onError: (message, payload) => {
+        if (payload?.system_message_id && payload.system_content) {
+          patchThreadMessageContent(payload.system_message_id, payload.system_content);
+        } else {
+          void refreshThreadHistory(threadId).catch(() => {
+            commandMutationError.value = message;
+          });
+        }
+        agentStreamActive.value = false;
+        agentStreamMessageId.value = null;
+        ideComposerActivity.value = null;
+        disconnectChatStreamSession();
+        void refreshRunSurfaces();
+      },
+    });
+  }
+
+  function clearIdeAgentRunLink(): void {
+    ideAgentRunId.value = null;
+  }
+
+  function setAgentExecutionAccess(value: AgentExecutionAccess): void {
+    const normalized = normalizeAgentExecutionAccess(value);
+    if (normalized === 'full') {
+      markFullAccessSessionConsent();
+    } else {
+      clearFullAccessSessionConsent();
+      persistAgentExecutionAccess('consultative');
+      agentExecutionAccess.value = 'consultative';
+      return;
+    }
+    agentExecutionAccess.value = normalized;
+    persistAgentExecutionAccess(normalized);
+  }
+
   async function submitIdeComposer(
     composerMode: 'ask' | 'plan' | 'agent',
   ): Promise<void> {
@@ -664,38 +1014,90 @@ export const useShellStore = defineStore('shell', () => {
 
     commandMutationState.value = 'submitting';
     commandMutationError.value = null;
+    ideComposerActivity.value = {
+      label: buildIdeComposerActivityLabel(composerMode, agentExecutionAccess.value),
+      mode: composerMode,
+      executionAccess: agentExecutionAccess.value,
+    };
 
     try {
+      const linkedRunId =
+        composerMode === 'agent'
+          ? resolveIdeAgentLinkedRunId(ideAgentRunId.value, runs.value)
+          : null;
       const response = await postChatMessage({
         workspace_id: workspaceId,
         content,
-        thread_id: activeThreadId.value,
-        run_id: primaryActiveRun.value?.run_id ?? null,
+        thread_id: getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
+        run_id: linkedRunId,
         composer_mode: composerMode,
         active_file_path: activeWorkspaceFilePath.value,
+        runtime_target: selectedRuntimeTargetId.value || null,
+        runtime_model: selectedComposerModel.value || null,
+        execution_access: composerMode === 'agent' ? agentExecutionAccess.value : undefined,
       });
       activeThreadId.value = response.thread_id;
-      workspaceThreadIds.value = {
-        ...workspaceThreadIds.value,
-        [workspaceId]: response.thread_id,
-      };
-      threadMessages.value = mergeThreadMessages(
+      setWorkspaceSurfaceThreadId(workspaceId, 'ide', response.thread_id);
+      const merged = mergeThreadMessages(
         threadMessages.value,
         response.messages.map((message) => mapChatMessageRecord(message)),
       );
+      threadMessages.value = filterThreadMessagesForSurface(merged, 'ide');
       operatorCommandDraft.value = '';
-      commandMutationState.value = 'idle';
-      if (response.dispatched) {
-        await refreshRunSurfaces();
+      if (composerMode === 'agent' && response.run_id) {
+        ideAgentRunId.value = response.run_id;
       }
-
-      const next = new Set(expandedDockSeams.value);
-      next.add('thread');
-      expandedDockSeams.value = next;
+      const uiAction = parseChatUiAction(response.ui_action);
+      if (uiAction) {
+        applyChatUiAction(
+          {
+            setCurrentWorkspace,
+            openWorkspaceFile,
+          },
+          uiAction,
+        );
+      }
+      if (response.streaming && response.stream_agent_message_id) {
+        commandMutationState.value = 'idle';
+        ideComposerActivity.value = {
+          label: buildIdeStreamActivityLabel(agentExecutionAccess.value),
+          mode: composerMode,
+          executionAccess: agentExecutionAccess.value,
+        };
+        attachChatStream(response.thread_id, response.stream_agent_message_id);
+        const next = new Set(expandedDockSeams.value);
+        next.add('thread');
+        if (response.run_id) {
+          next.add('run');
+        }
+        expandedDockSeams.value = next;
+        return;
+      }
+      commandMutationState.value = 'idle';
+      if (response.run || response.run_id) {
+        await refreshRunSurfaces();
+        const next = new Set(expandedDockSeams.value);
+        next.add('run');
+        next.add('thread');
+        expandedDockSeams.value = next;
+      } else if (response.dispatched) {
+        await refreshRunSurfaces();
+        const next = new Set(expandedDockSeams.value);
+        next.add('thread');
+        expandedDockSeams.value = next;
+      } else {
+        const next = new Set(expandedDockSeams.value);
+        next.add('thread');
+        expandedDockSeams.value = next;
+      }
     } catch (error) {
       commandMutationState.value = 'error';
       commandMutationError.value =
         error instanceof Error ? error.message : 'Failed to submit IDE composer message';
+    } finally {
+      if (!agentStreamActive.value) {
+        ideComposerActivity.value = null;
+      }
     }
   }
 
@@ -868,6 +1270,16 @@ export const useShellStore = defineStore('shell', () => {
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
     applyOperatorDockDefaults();
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (workspaceId) {
+      void loadWorkspaceThread(workspaceId, threadSurfaceForLayout(mode));
+    }
+    if (mode === 'ide' && workspaceId) {
+      if (workspaceFilesLoadState.value === 'idle') {
+        workspaceFilesLoadState.value = 'loading';
+      }
+      void loadWorkspaceFiles();
+    }
   }
 
   function revealIdeTerminalPanel(): void {
@@ -948,6 +1360,41 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     return normalized;
+  }
+
+  async function reloadWorkspaceFile(path: string): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+
+    fileContentLoadStates.value = {
+      ...fileContentLoadStates.value,
+      [path]: 'loading',
+    };
+
+    try {
+      const payload = await fetchWorkspaceFile(workspaceId, path);
+      fileContents.value = {
+        ...fileContents.value,
+        [path]: payload.content,
+      };
+      fileSavedContents.value = {
+        ...fileSavedContents.value,
+        [path]: payload.content,
+      };
+      fileContentLoadStates.value = {
+        ...fileContentLoadStates.value,
+        [path]: 'loaded',
+      };
+    } catch (error) {
+      fileContentLoadStates.value = {
+        ...fileContentLoadStates.value,
+        [path]: 'error',
+      };
+      workspaceFilesError.value =
+        error instanceof Error ? error.message : 'workspace file reload failed';
+    }
   }
 
   async function ensureWorkspaceFileLoaded(path: string): Promise<void> {
@@ -1098,7 +1545,9 @@ export const useShellStore = defineStore('shell', () => {
     syncCurrentWorkspace(workspaceId);
     if (previousWorkspaceId !== workspaceId) {
       resetThreadContext();
-      void loadWorkspaceThread(workspaceId);
+      clearIdeAgentRunLink();
+      void refreshOperatorThreadMessages(workspaceId);
+      void loadWorkspaceThread(workspaceId, currentThreadSurface());
       void loadRunHistory(selectWorkspacePrimaryRun(
         runs.value.filter((run) => run.workspace_id === workspaceId),
       )?.run_id ?? null);
@@ -1216,6 +1665,124 @@ export const useShellStore = defineStore('shell', () => {
       runtimeSummaryError.value =
         error instanceof Error ? error.message : 'runtime summary request failed';
     }
+  }
+
+  async function loadRuntimeStatus(): Promise<void> {
+    runtimeStatusLoadState.value = 'loading';
+    runtimeStatusError.value = null;
+
+    try {
+      const status = await fetchRuntimeStatus();
+      runtimeStatus.value = status;
+      runtimeStatusLoadState.value = 'loaded';
+    } catch (error) {
+      runtimeStatusLoadState.value = 'error';
+      runtimeStatusError.value =
+        error instanceof Error ? error.message : 'runtime status request failed';
+    }
+  }
+
+  const composerRuntimePrefs = computed(() => {
+    composerRuntimePrefsRevision.value;
+    return readComposerRuntimePrefs(currentWorkspace.value?.workspace_id ?? null);
+  });
+
+  const selectedRuntimeTargetId = computed(() => {
+    const preferred = composerRuntimePrefs.value.runtime_target?.trim();
+    if (preferred) {
+      return preferred;
+    }
+    return runtimeStatus.value?.default_runtime ?? '';
+  });
+
+  const selectedComposerModel = computed(() => {
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    if (!workspaceId) {
+      return 'auto';
+    }
+    const prefs = composerRuntimePrefs.value;
+    const target = selectedRuntimeTargetId.value;
+    const targetRecord = [...(runtimeStatus.value?.local ?? []), ...(runtimeStatus.value?.cloud ?? [])]
+      .find((record) => record.id === target);
+    const family = targetRecord?.family ?? 'cursor';
+    if (family === 'codex') {
+      return prefs.codex_cli_model?.trim() || 'auto';
+    }
+    return prefs.cursor_cli_model?.trim() || 'auto';
+  });
+
+  const cursorCatalogRows = computed((): CursorCatalogRow[] =>
+    buildCursorCatalogRows(cursorRuntimeStatus.value),
+  );
+
+  const cursorPickerVisibleModelIds = computed(() => {
+    cursorPickerVisibleRevision.value;
+    return readCursorPickerVisibleModelIds();
+  });
+
+  const composerRuntimeLabel = computed(() => {
+    const target = [...(runtimeStatus.value?.local ?? []), ...(runtimeStatus.value?.cloud ?? [])]
+      .find((record) => record.id === selectedRuntimeTargetId.value);
+    const scope = target?.target_type === 'cloud' ? 'cloud' : 'local';
+    const family = target?.family ?? 'runtime';
+    if (family === 'cursor') {
+      return cursorComposerRuntimeLabel({
+        family,
+        scope,
+        modelId: selectedComposerModel.value,
+        rows: cursorCatalogRows.value,
+      });
+    }
+    const model = selectedComposerModel.value;
+    const modelLabel = model === 'auto' ? 'Auto' : model;
+    return `${family} ${scope} · ${modelLabel}`;
+  });
+
+  async function loadCursorCatalog(forceRefresh = false): Promise<void> {
+    cursorCatalogLoadState.value = 'loading';
+    cursorCatalogError.value = null;
+
+    try {
+      const snapshot = await fetchCursorRuntimeStatus({ forceRefresh });
+      cursorRuntimeStatus.value = snapshot;
+      cursorCatalogLoadState.value = 'loaded';
+    } catch (error) {
+      cursorCatalogLoadState.value = 'error';
+      cursorCatalogError.value =
+        error instanceof Error ? error.message : 'cursor catalog request failed';
+    }
+  }
+
+  function setSelectedRuntimeTarget(runtimeTarget: string): void {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+    writeComposerRuntimePrefs(workspaceId, { runtime_target: runtimeTarget });
+    composerRuntimePrefsRevision.value += 1;
+  }
+
+  function setSelectedComposerModel(modelId: string): void {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+    const target = selectedRuntimeTargetId.value;
+    const targetRecord = [...(runtimeStatus.value?.local ?? []), ...(runtimeStatus.value?.cloud ?? [])]
+      .find((record) => record.id === target);
+    const family = targetRecord?.family ?? 'cursor';
+    const normalized = modelId.trim() || 'auto';
+    if (family === 'codex') {
+      writeComposerRuntimePrefs(workspaceId, { codex_cli_model: normalized });
+    } else {
+      writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: normalized });
+    }
+    composerRuntimePrefsRevision.value += 1;
+  }
+
+  function toggleCursorPickerVisibleModel(modelId: string): void {
+    toggleCursorPickerVisibleModelPref(modelId, readCursorPickerVisibleModelIds());
+    cursorPickerVisibleRevision.value += 1;
   }
 
   async function loadInbox(): Promise<void> {
@@ -1437,6 +2004,7 @@ export const useShellStore = defineStore('shell', () => {
   async function refreshRunSurfaces(): Promise<void> {
     await Promise.all([
       loadRuns(),
+      loadRuntimeStatus(),
       loadRuntimeSummary(),
       loadInbox(),
       loadConnectors(),
@@ -1526,6 +2094,45 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function approveIdeAgentRun(): Promise<void> {
+    const run = ideAgentLinkedRun.value;
+    if (!run?.can_approve || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'approving';
+    runMutationError.value = null;
+
+    try {
+      await approveRun(run.run_id);
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value = error instanceof Error ? error.message : 'approve run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
+  async function rejectIdeAgentRun(): Promise<void> {
+    const run = ideAgentLinkedRun.value;
+    if (run?.phase !== 'awaiting_approval' || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'rejecting';
+    runMutationError.value = null;
+
+    try {
+      await rejectRun(run.run_id);
+      clearIdeAgentRunLink();
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value = error instanceof Error ? error.message : 'reject run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
   async function approvePrimaryRun(): Promise<void> {
     const run = primaryApprovalRun.value;
     if (!run?.can_approve || runMutationPending.value) {
@@ -1590,6 +2197,7 @@ export const useShellStore = defineStore('shell', () => {
   async function loadBootstrapData(): Promise<void> {
     await loadOperatorPresenceSettings();
     await Promise.all([
+      loadRuntimeStatus(),
       loadRuntimeSummary(),
       loadInbox(),
       loadConnectors(),
@@ -1605,7 +2213,8 @@ export const useShellStore = defineStore('shell', () => {
     await loadWorkspaceFiles();
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
-      await loadWorkspaceThread(workspaceId);
+      await refreshOperatorThreadMessages(workspaceId);
+      await loadWorkspaceThread(workspaceId, currentThreadSurface());
     }
     applyOperatorDockDefaults();
   }
@@ -1615,8 +2224,10 @@ export const useShellStore = defineStore('shell', () => {
     activeEditorDocument,
     activeEditorDocumentId,
     activeRun,
+    agentExecutionAccess,
     activeTerminalSessionId,
     activeWorkspaceFilePath,
+    approveIdeAgentRun,
     approvePrimaryRun,
     approvalsSummaryLabel,
     approvals,
@@ -1627,6 +2238,7 @@ export const useShellStore = defineStore('shell', () => {
     signalsSeamEmphasized,
     highlightedSignalId,
     briefingSummaryLine,
+    canApproveIdeAgentRun,
     canApprovePrimaryRun,
     canCompletePrimaryRun,
     canMarkPrimaryRunReviewReady,
@@ -1639,19 +2251,32 @@ export const useShellStore = defineStore('shell', () => {
     commandMutationError,
     commandMutationState,
     commandFocusToken,
+    composerRuntimeLabel,
+    composerRuntimePrefs,
     commandSeamHint,
+    cursorCatalogError,
+    cursorCatalogLoadState,
+    cursorCatalogRows,
+    cursorPickerVisibleModelIds,
+    cursorRuntimeStatus,
     dockContext,
     dockHeroMode,
     dockSeamLayout,
     dockSeamState,
     editorTabs,
     inboxError,
+    ideAgentLinkedRun,
+    ideAgentRunId,
+    ideComposerActivity,
     inboxItems,
     inboxLoadState,
     inboxStateLabel,
     kairoBriefingAttention,
+    kairoAgentLiveLine,
     kairoBriefingAttentionLabel,
     kairoPresenceState,
+    agentStreamActive,
+    agentStreamMessageId,
     agentDockCollapsed,
     ideActivityView,
     ideExplorerCollapsed,
@@ -1678,7 +2303,10 @@ export const useShellStore = defineStore('shell', () => {
     loadOperatorBriefing,
     loadOperatorPresenceSettings,
     loadRuns,
+    loadCursorCatalog,
+    loadRuntimeStatus,
     loadRuntimeSummary,
+    loadWorkspaceThread,
     loadWorkspaces,
     markPrimaryRunReviewReady,
     operatorBriefing,
@@ -1693,6 +2321,7 @@ export const useShellStore = defineStore('shell', () => {
     primaryInboxItem,
     refreshRunSurfaces,
     refreshWatchSummary,
+    rejectIdeAgentRun,
     rejectPrimaryRun,
     reprobeConnector,
     runOperatorCommand,
@@ -1707,6 +2336,9 @@ export const useShellStore = defineStore('shell', () => {
     runMutationState,
     runStateLabel,
     runtimeStateLabel,
+    runtimeStatus,
+    runtimeStatusError,
+    runtimeStatusLoadState,
     runtimeSummary,
     runtimeSummaryError,
     runtimeSummaryLoadState,
@@ -1721,8 +2353,14 @@ export const useShellStore = defineStore('shell', () => {
     setCurrentWorkspace,
     setDockHeroMode,
     setIdeActivityView,
+    selectedComposerModel,
+    selectedRuntimeTargetId,
+    setSelectedComposerModel,
+    setSelectedRuntimeTarget,
+    setAgentExecutionAccess,
     setLayoutMode,
     setLeftSidebarMode,
+    toggleCursorPickerVisibleModel,
     toggleAgentDock,
     toggleIdeExplorer,
     signalClearError,
@@ -1733,6 +2371,7 @@ export const useShellStore = defineStore('shell', () => {
     submitIdeComposer,
     terminalSessions,
     threadMessages,
+    operatorThreadMessages,
     threadStateLabel,
     toggleDockSeam,
     toggleDockHeroMode,

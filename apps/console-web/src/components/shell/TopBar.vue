@@ -7,14 +7,38 @@ import {
   buildMockupTopbarBreadcrumb,
   buildTopbarRuntimeVersionChips,
 } from '../../lib/mockup-shell-view';
+import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
+import { useAppSurface } from '../../composables/useAppSurface';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
+const { appSurface: activeSurface } = useAppSurface();
 
-const mockupBreadcrumb = computed(() => buildMockupTopbarBreadcrumb());
+const isFoundationSurface = computed(
+  () => activeSurface.value === 'vault' || activeSurface.value === 'data',
+);
+const mockupBreadcrumb = computed(() => {
+  if (activeSurface.value === 'vault') {
+    return 'Axon-X / Vault';
+  }
+  if (activeSurface.value === 'data') {
+    return 'Axon-X / Data';
+  }
+  return buildMockupTopbarBreadcrumb();
+});
+const topbarSubtitle = computed(() => {
+  if (isFoundationSurface.value) {
+    return 'OPERATOR CONSOLE';
+  }
+  return shell.layoutMode === 'ide' ? 'IDE WORKSPACE' : 'OPERATOR CONSOLE';
+});
 const runtimeVersionChips = computed(() =>
   buildTopbarRuntimeVersionChips(shell.runtimeSummary),
 );
+
+function openSurface(surface: AppSurface): void {
+  navigateToAppSurface(surface);
+}
 </script>
 
 <template>
@@ -23,13 +47,13 @@ const runtimeVersionChips = computed(() =>
       <div class="topbar-mockup__identity-zone">
         <div class="topbar-mockup__brand">
           <p class="topbar-mockup__logo">AXON-X</p>
-          <p class="topbar-mockup__subtitle">OPERATOR CONSOLE</p>
+          <p class="topbar-mockup__subtitle">{{ topbarSubtitle }}</p>
         </div>
 
         <div class="topbar-mockup__context-panel">
           <div class="topbar-mockup__breadcrumb">
             <span>{{ mockupBreadcrumb }}</span>
-            <span class="topbar-mockup__external" aria-hidden="true">↗</span>
+            <span v-if="!isFoundationSurface" class="topbar-mockup__external" aria-hidden="true">↗</span>
           </div>
           <div class="topbar-mockup__runtime-bar">
             <span class="topbar-mockup__runtime-label">RUNTIME</span>
@@ -75,7 +99,43 @@ const runtimeVersionChips = computed(() =>
       />
 
       <div class="topbar-mockup__controls">
-        <div class="layout-toggle layout-toggle--mockup" role="group" aria-label="Layout mode">
+        <div
+          class="layout-toggle layout-toggle--mockup topbar-mockup__surface-nav"
+          role="group"
+          aria-label="Operator surfaces"
+        >
+          <button
+            v-if="activeSurface !== 'console'"
+            type="button"
+            class="layout-toggle__button layout-toggle__button--active"
+            aria-current="page"
+            @click="openSurface('console')"
+          >
+            ← CONSOLE
+          </button>
+          <button
+            v-if="activeSurface !== 'vault'"
+            type="button"
+            class="layout-toggle__button"
+            @click="openSurface('vault')"
+          >
+            VAULT
+          </button>
+          <button
+            v-if="activeSurface !== 'data'"
+            type="button"
+            class="layout-toggle__button"
+            @click="openSurface('data')"
+          >
+            DATA
+          </button>
+        </div>
+        <div
+          v-if="!isFoundationSurface"
+          class="layout-toggle layout-toggle--mockup"
+          role="group"
+          aria-label="Layout mode"
+        >
           <button
             type="button"
             class="layout-toggle__button"
@@ -122,5 +182,9 @@ const runtimeVersionChips = computed(() =>
 <style scoped>
 .topbar-mockup__settings-wrap {
   position: relative;
+}
+
+.topbar-mockup__surface-nav {
+  margin-right: 0.35rem;
 }
 </style>

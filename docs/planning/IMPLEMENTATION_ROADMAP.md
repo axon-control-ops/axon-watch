@@ -17,6 +17,28 @@ Build in slices that preserve clarity:
 3. explicit contracts before integrations
 4. end-to-end thin slices before broad feature expansion
 
+## Initial Progress Closeout (2026-07-05)
+
+The original Phase 0–11 roadmap has now produced a real operator foundation:
+
+- production operator shell on `:4173`
+- three-service local stack (`:4173`, `:8787`, `:8788`)
+- parity closure Phases A–D complete (`19/19` verified v1)
+- cutover TEST-0 … TEST-10 complete
+- post-cutover Phase E E0–E5 complete
+
+Treat that body of work as **Initial Progress COMPLETE**.
+
+Phase F (`docs/PHASE_F_OPERATOR_FOUNDATION.md`) is **complete** (F0–F5, 2026-07-06).
+
+Follow-on work now moves into `docs/PHASE_G_SIGNAL_PARITY.md`, which focuses on:
+
+- Vault II — full encrypted vault parity with Axon-Signal
+- runtime secrets wired into the Cursor/Codex runtime fabric
+- agent orchestration without the legacy ReAct monolith
+- legacy connector migration and full capability matrix gates
+- retirement readiness only after G1–G5 evidence + operator sign-off (G6)
+
 ## Phase 0 — Planning Lock
 
 Goal:
@@ -311,6 +333,18 @@ Verified in `/home/edp/axon-nvme/repos/axon-watch` (`dev` branch). Gates:
 | Phase 6 — First E2E thin slice | **partial** | Bootstrap signals render in dock; watch degraded in dev |
 | Phase 7 — Canonical run flow | **partial** | review_ready + stop/resume paths tested |
 | Phase 8 — IDE surfaces | **partial** | Monaco file tree, PTY terminal (zsh ZDOTDIR fix), scrollback |
+
+## Next Execution Track (2026-07-05)
+
+The next execution track is **Phase F — Operator Foundation II**:
+
+1. F0 close out Initial Progress and lock the new checklist
+2. F1 build runtime fabric (Cursor/Codex, local + cloud)
+3. F2 add dedicated vault surface
+4. F3 add dedicated data / DB surface
+5. F4 complete DashPro monitors through watch signals
+6. F5 close polish
+7. F6 revisit full axon-local retirement readiness
 
 **Recent verified slices (Lane B / control-plane):**
 

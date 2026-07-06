@@ -1,10 +1,7 @@
 import type { SpokenAlertEligibility } from '../contracts/canonical';
 
-import {
-  shouldSpeakAlert,
-  speakAlertMessage,
-  spokenAlertDedupeKey,
-} from './operator-presence';
+import { shouldSpeakAlert, speakAlertMessage, spokenAlertDedupeKey } from './operator-presence';
+import type { SpeechPort } from './speech-queue';
 
 export type SpokenAlertDeliveryChannel = 'voice_deck' | 'browser_tts' | 'skipped';
 
@@ -24,7 +21,7 @@ export function getVoiceDeckSpokenAlertHandler(): VoiceDeckSpokenAlertHandler | 
 
 export function deliverSpokenOperatorAlert(
   alert: SpokenAlertEligibility,
-  speech: Pick<SpeechSynthesis, 'speak'> | null = typeof speechSynthesis === 'undefined'
+  speech: SpeechPort | null = typeof speechSynthesis === 'undefined'
     ? null
     : speechSynthesis,
   storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,

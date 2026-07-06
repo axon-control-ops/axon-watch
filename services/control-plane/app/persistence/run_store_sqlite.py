@@ -114,3 +114,23 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         );
         """
     )
+    _ensure_chat_thread_kind_column(connection)
+
+
+def _ensure_chat_thread_kind_column(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(chat_threads)").fetchall()
+    }
+    if "thread_kind" in columns:
+        return
+    connection.execute(
+        "ALTER TABLE chat_threads ADD COLUMN thread_kind TEXT NOT NULL DEFAULT 'operator'"
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_chat_threads_workspace_kind
+            ON chat_threads(workspace_id, thread_kind, updated_at DESC)
+        """
+    )
+    connection.commit()

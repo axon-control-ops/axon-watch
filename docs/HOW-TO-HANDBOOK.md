@@ -15,7 +15,7 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-05 — production operator at `:4173`, `npm run verify:production-operator` OK.
+**Last verified:** 2026-07-06 — production operator at `:4173`, vault subscription auth + IDE composer catalog.
 
 **Production URL:** http://127.0.0.1:4173 — [`docs/PRODUCTION_OPERATOR_SURFACE.md`](PRODUCTION_OPERATOR_SURFACE.md)
 
@@ -28,6 +28,7 @@ Use it to:
 1. [Quick Start](#quick-start) — first 5 minutes
 2. [Handbook map](#handbook-map) — who reads what
 3. [Operator manual](#operator-manual) — daily rituals
+3.5. [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools) — Pro vs API key, native vs Cursor
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
 6. [Source index](#source-index) — where truth lives
@@ -51,7 +52,7 @@ Use it to:
 
 | Audience | Start here | Then read |
 |---|---|---|
-| **Operator (daily use)** | [Quick Start](#quick-start) | [Operator manual](#operator-manual), `docs/PRODUCTION_OPERATOR_SURFACE.md` |
+| **Operator (daily use)** | [Quick Start](#quick-start) | [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [Operator manual](#operator-manual) |
 | **Teacher / reviewer** | [Teaching Axon-X](#teaching-axon-x-to-someone-else) | [Verification](#verification-commands), `docs/FINAL_PARITY_VERIFICATION.md` |
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
@@ -266,6 +267,152 @@ KAIRO **ADVISE** uses the same friendly names (e.g. “Resume Health check.” n
 
 When **2+ paused tasks** appear, Mission Control lists each friendly name — click **COMPLETE RUN**
 for the current one, repeat until the queue clears.
+
+## Runtime auth, CLI, and tools
+
+This section explains how Axon-X authenticates agent runtimes, when you need
+secrets in **/vault**, and when Axon uses its own executors vs external CLIs.
+
+Official Cursor CLI reference:
+[Cursor CLI authentication](https://cursor.com/docs/cli/reference/authentication)
+
+### Two auth paths for Cursor (Pro / daily use vs headless)
+
+| Path | When to use | What you do | Vault key required? |
+| --- | --- | --- | --- |
+| **CLI subscription (recommended)** | Daily operator work on your machine with Cursor Pro/Team | Run `cursor agent login` once on the **host**; verify with `cursor agent status` | **No** — `CURSOR_API_KEY` is optional |
+| **API key (headless / CI)** | Servers without browser, automation, cloud agents | Generate key in **Cursor Dashboard → Integrations → API Keys**; store as `CURSOR_API_KEY` in /vault or shell env | **Yes** (or shell env) |
+
+Axon-X probes subscription auth live:
+
+- **Vault consumer** (`/vault` → Consumer readiness): marks **Cursor CLI runtime** **Ready** when `cursor agent status` shows a logged-in account, even with zero vault keys.
+- **Control plane** (`GET /api/runtime/status`, `GET /api/runtime/cursor/status`): same probe; composer shows account + auth method.
+- **Dispatch**: if subscription is active, control-plane **strips** `CURSOR_API_KEY` from the subprocess env to avoid auth conflicts (browser login and API key are alternate paths per Cursor docs).
+
+**Pro without vault key:** if `cursor agent status` prints `Logged in as …@…` and vault search shows no `CURSOR_API_KEY`, you are on the **subscription path** — correct for daily Pro use.
+
+### Codex / OpenAI auth
+
+| Path | Setup |
+| --- | --- |
+| **Codex CLI login** | `codex login` on the host; vault consumer probes `codex login status` |
+| **API keys in vault** | `CODEX_API_KEY` or `OPENAI_API_KEY` in /vault (either satisfies the codex consumer) |
+
+### Vault consumers vs runtime dispatch
+
+**Consumers** are readiness labels for operators — they never expose secret values.
+
+| Consumer | Ready when | Optional / fallback |
+| --- | --- | --- |
+| `cursor_runtime` | CLI subscription **or** `CURSOR_API_KEY` in vault | API key only needed for headless |
+| `codex_runtime` | `codex login` **or** Codex/OpenAI vault keys | |
+| `openai_provider` | `OPENAI_API_KEY` in vault | Direct OpenAI fallback |
+| DashPro monitor consumers | Required monitor keys in vault/import | |
+
+Source: `services/axon-watch/app/vault/snapshot.py`, `cli_runtime_probe.py`
+
+**Runtime dispatch** (actually running a model) lives in the control-plane:
+
+- `services/control-plane/app/cli_runtime/catalog.py` — auth probes, ready flags
+- `services/control-plane/app/cli_runtime/router.py` — picks binary, env, retry without API key on oauth
+- `services/control-plane/app/cli_runtime/vault_keys.py` — merges unlocked vault keys into runtime context
+
+### Native Axon tools vs Cursor CLI
+
+Axon-X has **two execution lanes** — do not mix them when debugging.
+
+| Surface | Lane | Executor | Tools |
+| --- | --- | --- | --- |
+| **Operator mode** → Command seam | **Lane A — Command** | Axon `command_executor.py` | Exact commands only (`health`, `git status`, `read …`) — **Axon native** |
+| **IDE mode** → Agent dock composer | **Lane B — Ask / Plan / Agent** | Cursor CLI subprocess (`cursor agent …`) | Cursor model + consultative prompt; **not** full Cursor IDE agent tools yet |
+| **Future (G3.5+)** | MCP registry | Planned wiring | Static registry exists; **not** connected to dispatch today |
+
+**When to use native Axon tools:** Operator oversight, deterministic repo commands, health checks, file reads — anything in the [supported commands](#supported-commands-operator-mode) table.
+
+**When Cursor CLI runs:** IDE composer messages in Ask, Plan, or Agent mode with runtime target **Cursor CLI (local)**. Streaming (SSE) applies to this lane when `AXON_WATCH_LANE_B_STREAMING=1` (default).
+
+**Composer modes (IDE dock):**
+
+| Mode | Cursor CLI flag | Behavior today |
+| --- | --- | --- |
+| **Ask** | `--mode ask` | Read-only style answers |
+| **Plan** | `--mode plan` | Step mapping before execution |
+| **Agent** | Default consultative; **Full Access** in composer → approval → Cursor `--mode agent` / Codex workspace-write | `execution_access: full` + G3.3 approval gate |
+
+### Choosing runtime target and model
+
+Open the **model picker** (⚡ chip) in the IDE agent dock:
+
+1. **Runtime target** — `Cursor CLI (local)`, `Codex CLI (local)`, or cloud placeholders. Preference persists in shell local storage via `shell.setSelectedRuntimeTarget`.
+2. **Auto toggle** — when ON, Cursor picks the best model per request (no `--model` flag). When OFF, your pinned catalog model is passed to the CLI.
+3. **Add models** — browse live output of `cursor agent --list-models` (cached ~5 min). Badges like **Fast** / **High** come from CLI labels when present.
+4. **Auth line** — shows `CLI subscription · you@domain` or vault/API-key status; **Open Vault** only when auth is actually blocked (vault locked or missing keys **and** CLI not signed in).
+
+Environment overrides:
+
+| Variable | Purpose |
+| --- | --- |
+| `AXON_WATCH_CURSOR_CLI_PATH` | Non-default `cursor` binary path |
+| `AXON_WATCH_CODEX_CLI_PATH` | Non-default `codex` binary path |
+| `AXON_WATCH_LANE_B_STREAMING` | `1` (default) SSE streaming for IDE composer; `0` in tests |
+
+API endpoints:
+
+- `GET /api/runtime/status` — all targets + vault posture
+- `GET /api/runtime/cursor/status?force_refresh=1` — Cursor auth + live model catalog
+- `GET /api/vault/status` — consumer readiness (axon-watch service)
+
+### Troubleshooting auth
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| Vault shows **Missing: CURSOR_API_KEY** but CLI is logged in | Stale UI or old snapshot | Refresh /vault; consumer should show **CLI subscription · …** |
+| Composer says invalid API key | Stale `CURSOR_API_KEY` in vault **or** shell env conflicting with subscription | Remove bad key from vault; unset shell `CURSOR_API_KEY`; restart control-plane |
+| `cursor agent status` → not logged in | No subscription session on host | `cursor agent login` |
+| Runtime ready but dispatch fails | Wrong binary or model id | Check `AXON_WATCH_CURSOR_CLI_PATH`; pick **Auto** or a model from live catalog |
+| **Open Vault** when Pro works | Should not show if oauth ready | Hard-refresh; verify `GET /api/runtime/status` shows `ready: true` |
+| **Out of usage** / rate limit from Cursor | Current CLI account hit subscription quota | Switch accounts (below) or use **Auto** / another model; admin may need to raise team limits |
+
+### Switch Cursor subscription account (logout → login)
+
+When the agent reports **out of usage** or you need a different Pro/Team account on this machine:
+
+```bash
+# 1. Sign out (clears stored CLI session on this host)
+cursor agent logout
+
+# 2. Confirm logged out
+cursor agent status   # should say not logged in / auth required
+
+# 3. Sign in with the other Cursor account (opens browser)
+cursor agent login
+
+# 4. Verify the new account
+cursor agent status   # expect: Logged in as other@domain
+```
+
+Headless terminal (no browser auto-open):
+
+```bash
+NO_OPEN_BROWSER=1 cursor agent login
+# Open the printed URL manually in a browser logged into the target account
+```
+
+After switching:
+
+1. Refresh **/vault** → Cursor consumer should show the new **CLI subscription · email**
+2. Hard-refresh `:4173` or reopen the model picker (forces runtime status refresh)
+3. Retry IDE composer — old thread errors are from the prior account/session; start a new turn
+
+**Note:** Axon-X does not store Cursor passwords. Logout/login only affects the **host Cursor CLI** session. Vault `CURSOR_API_KEY` (if present) is separate — remove or update it if you switch to API-key auth instead.
+
+Quick host checks:
+
+```bash
+cursor agent status          # expect: Logged in as …
+echo "${CURSOR_API_KEY:+set}" # empty = good for Pro path
+curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
+```
 
 ## Terminology And Abbreviations
 

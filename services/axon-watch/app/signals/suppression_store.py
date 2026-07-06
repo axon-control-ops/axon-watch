@@ -52,6 +52,37 @@ def is_signal_acknowledged(signal_id: str) -> bool:
     return normalized in _load_acknowledged_cache()
 
 
+def list_acknowledgements(*, limit: int = 50) -> dict[str, object]:
+    max_limit = max(1, min(100, int(limit or 50)))
+    with _managed_connection() as connection:
+        count_row = connection.execute(
+            "SELECT COUNT(*) FROM watch_signal_acknowledgements",
+        ).fetchone()
+        rows = connection.execute(
+            """
+            SELECT signal_id, acknowledged_at, acknowledged_by
+            FROM watch_signal_acknowledgements
+            ORDER BY acknowledged_at DESC, signal_id ASC
+            LIMIT ?
+            """,
+            (max_limit,),
+        ).fetchall()
+
+    items = [
+        {
+            "signal_id": str(row["signal_id"]),
+            "acknowledged_at": str(row["acknowledged_at"]),
+            "acknowledged_by": str(row["acknowledged_by"]),
+        }
+        for row in rows
+    ]
+    return {
+        "items": items,
+        "count": len(items),
+        "total": int(count_row[0]) if count_row is not None else 0,
+    }
+
+
 def acknowledge_signals(
     signal_ids: list[str],
     *,

@@ -233,6 +233,9 @@ def mark_review_ready(run_id: str) -> dict[str, Any]:
 
 
 def stop_run(run_id: str) -> dict[str, Any]:
+    from app.cli_runtime.process_registry import terminate
+
+    terminate(run_id)
     record = run_store.get_run(run_id)
     if record is None:
         raise RunNotFoundError(f"run not found: {run_id}")

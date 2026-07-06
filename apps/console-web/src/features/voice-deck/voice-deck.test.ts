@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach, beforeAll } from 'vitest';
 
 import { deliverSpokenOperatorAlert, registerVoiceDeckSpokenAlertHandler } from '../../lib/spoken-alert-delivery';
+import { resetSpeechQueue } from '../../lib/speech-queue';
 
 import { handleVoiceDeckSpokenAlert, registerVoiceDeckOnBoot } from './voice-deck';
 
@@ -20,10 +21,11 @@ describe('voice deck', () => {
 
   afterEach(() => {
     registerVoiceDeckSpokenAlertHandler(null);
+    resetSpeechQueue();
   });
 
   it('speaks eligible alerts through the deck handler', () => {
-    const speech = { speak: vi.fn() };
+    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
 
     const handled = handleVoiceDeckSpokenAlert(
       {
@@ -40,7 +42,7 @@ describe('voice deck', () => {
   });
 
   it('declines ineligible alerts without speaking', () => {
-    const speech = { speak: vi.fn() };
+    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
 
     const handled = handleVoiceDeckSpokenAlert(
       {
@@ -57,7 +59,7 @@ describe('voice deck', () => {
   });
 
   it('registers boot handler that routes spoken alerts to voice deck channel', () => {
-    const speech = { speak: vi.fn() };
+    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
     const storage = {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),

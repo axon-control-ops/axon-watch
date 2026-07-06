@@ -8,6 +8,11 @@ import type {
 } from '../contracts/canonical';
 
 import type { RunHistorySnapshot } from '../lib/run-history-view';
+import type {
+  VaultSecretDetail,
+  VaultSecretRecord,
+  VaultStatusSnapshot,
+} from '../lib/vault-surface-view';
 
 export interface InboxSnapshot {
   items: InboxItem[];
@@ -33,6 +38,61 @@ export interface CreateRunRequest {
   requires_approval?: boolean;
 }
 
+export interface RuntimeAuthStatus {
+  logged_in?: boolean;
+  auth_method?: string;
+  provider_label?: string;
+  account_label?: string;
+  message?: string;
+  vault_posture?: 'ready' | 'vault_locked' | 'missing_keys' | string;
+}
+
+export interface RuntimeVaultPosture {
+  unlocked: boolean;
+  posture: 'ready' | 'vault_locked' | 'missing_keys' | string;
+  hint?: string;
+  runtime_keys?: Record<string, boolean>;
+  provider_keys?: Record<string, boolean>;
+}
+
+export interface RuntimeTargetRecord {
+  id: string;
+  family: string;
+  label: string;
+  target_type: 'local' | 'cloud' | string;
+  available: boolean;
+  binary: string;
+  auth: RuntimeAuthStatus;
+  ready: boolean;
+  mode_support: string[];
+  recommended?: boolean;
+}
+
+export interface RuntimeStatusSnapshot {
+  updated_at: string;
+  default_runtime: string;
+  vault_runtime?: RuntimeVaultPosture;
+  local: RuntimeTargetRecord[];
+  cloud: RuntimeTargetRecord[];
+}
+
+export interface CursorModelRecord {
+  id: string;
+  label: string;
+  description?: string;
+  badge?: string;
+  available?: boolean;
+}
+
+export interface CursorRuntimeStatusSnapshot {
+  installed: boolean;
+  binary: string;
+  auth: RuntimeAuthStatus;
+  available_models: CursorModelRecord[];
+  cursor_models: CursorModelRecord[];
+  catalog_source: 'live' | 'fallback' | string;
+}
+
 function controlPlaneBaseUrl(): string {
   const configured = import.meta.env.VITE_CONTROL_PLANE_BASE_URL;
   if (configured) {
@@ -52,6 +112,276 @@ export async function fetchRuntimeSummary(): Promise<RuntimeSummary> {
   }
 
   return response.json() as Promise<RuntimeSummary>;
+}
+
+export async function fetchRuntimeStatus(): Promise<RuntimeStatusSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/runtime/status` : '/api/runtime/status';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`runtime status request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<RuntimeStatusSnapshot>;
+}
+
+export async function fetchCursorRuntimeStatus(
+  options: { forceRefresh?: boolean } = {},
+): Promise<CursorRuntimeStatusSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const query = options.forceRefresh ? '?force_refresh=1' : '';
+  const url = baseUrl
+    ? `${baseUrl}/api/runtime/cursor/status${query}`
+    : `/api/runtime/cursor/status${query}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`cursor runtime status request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<CursorRuntimeStatusSnapshot>;
+}
+
+export interface VaultImportResult {
+  imported_keys: string[];
+  count: number;
+}
+
+export interface VaultStatusResponse {
+  vault: VaultStatusSnapshot;
+}
+
+export interface VaultImportResponse extends VaultStatusResponse {
+  vault_import: VaultImportResult;
+}
+
+export interface VaultSetupResponse {
+  totp_secret: string;
+  qr_data_uri: string;
+}
+
+export interface VaultUnlockResponse {
+  unlocked: boolean;
+  session_ttl: number;
+  ttl_label: string;
+  migrated_settings: string[];
+}
+
+async function vaultRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}${path}` : path;
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    let detail = `request failed with status ${response.status}`;
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(detail);
+  }
+  if (response.status === 204) {
+    return {} as T;
+  }
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    return (await response.blob()) as T;
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function fetchVaultStatus(): Promise<VaultStatusResponse> {
+  return vaultRequest<VaultStatusResponse>('/api/vault/status');
+}
+
+export async function fetchVaultProviderKeys(): Promise<{
+  unlocked: boolean;
+  resolved: Record<string, boolean>;
+  dev_bypass: boolean;
+}> {
+  return vaultRequest('/api/vault/provider-keys');
+}
+
+export async function setupVault(masterPassword: string): Promise<VaultSetupResponse> {
+  return vaultRequest<VaultSetupResponse>('/api/vault/setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ master_password: masterPassword }),
+  });
+}
+
+export async function unlockVault(
+  masterPassword: string,
+  totpCode: string,
+  rememberMe = false,
+): Promise<VaultUnlockResponse> {
+  return vaultRequest<VaultUnlockResponse>('/api/vault/unlock', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      master_password: masterPassword,
+      totp_code: totpCode,
+      remember_me: rememberMe,
+    }),
+  });
+}
+
+export async function lockVault(): Promise<{ locked: boolean }> {
+  return vaultRequest<{ locked: boolean }>('/api/vault/lock', { method: 'POST' });
+}
+
+export async function fetchVaultSecrets(): Promise<VaultSecretRecord[]> {
+  return vaultRequest<VaultSecretRecord[]>('/api/vault/secrets');
+}
+
+export async function fetchVaultSecret(secretId: number): Promise<VaultSecretDetail> {
+  return vaultRequest<VaultSecretDetail>(`/api/vault/secrets/${secretId}`);
+}
+
+export async function createVaultSecret(body: {
+  name: string;
+  category?: string;
+  username?: string;
+  password?: string;
+  url?: string;
+  notes?: string;
+}): Promise<{ id: number; name: string }> {
+  return vaultRequest('/api/vault/secrets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateVaultSecret(
+  secretId: number,
+  body: {
+    name: string;
+    category?: string;
+    username?: string;
+    password?: string;
+    url?: string;
+    notes?: string;
+  },
+): Promise<{ updated: boolean }> {
+  return vaultRequest(`/api/vault/secrets/${secretId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteVaultSecret(secretId: number): Promise<{ deleted: boolean }> {
+  return vaultRequest(`/api/vault/secrets/${secretId}`, { method: 'DELETE' });
+}
+
+export async function enableVaultAutoUnlock(): Promise<{ enabled: boolean; message: string }> {
+  return vaultRequest('/api/vault/auto-unlock/enable', { method: 'POST' });
+}
+
+export async function disableVaultAutoUnlock(): Promise<{ enabled: boolean; removed: boolean }> {
+  return vaultRequest('/api/vault/auto-unlock/disable', { method: 'POST' });
+}
+
+export async function importVaultSecrets(
+  secrets: Record<string, string>,
+  options: { exportText?: string } = {},
+): Promise<VaultImportResponse> {
+  return vaultRequest<VaultImportResponse>('/api/vault/import/monitor-keys', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      secrets,
+      export_text: options.exportText ?? '',
+    }),
+  });
+}
+
+export async function importVaultBackupFile(
+  file: File,
+  options: { backupPassword?: string; mode?: 'merge' | 'replace' } = {},
+): Promise<Record<string, unknown>> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/vault/import` : '/api/vault/import';
+  const form = new FormData();
+  form.append('file', file);
+  form.append('backup_password', options.backupPassword ?? '');
+  form.append('mode', options.mode ?? 'merge');
+  const response = await fetch(url, { method: 'POST', body: form });
+  if (!response.ok) {
+    throw new Error(`vault backup import failed with status ${response.status}`);
+  }
+  return response.json() as Promise<Record<string, unknown>>;
+}
+
+export async function exportVaultBackup(backupPassword: string): Promise<Blob> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/vault/export` : '/api/vault/export';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ backup_password: backupPassword }),
+  });
+  if (!response.ok) {
+    throw new Error(`vault export failed with status ${response.status}`);
+  }
+  return response.blob();
+}
+
+export async function exportVaultCsv(format: 'axon' | 'bitwarden' = 'axon'): Promise<Blob> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl
+    ? `${baseUrl}/api/vault/export/csv?format=${format}`
+    : `/api/vault/export/csv?format=${format}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`vault CSV export failed with status ${response.status}`);
+  }
+  return response.blob();
+}
+
+export interface OperatorDataSnapshotResponse {
+  data: {
+    updated_at: string;
+    control_plane: {
+      runs: { total: number; count: number; items: Record<string, unknown>[] };
+      chat_threads: { total: number; count: number; items: Record<string, unknown>[] };
+      chat_messages: { total: number; count: number; items: Record<string, unknown>[] };
+      handoffs: { total: number; count: number; items: Record<string, unknown>[] };
+    };
+    watch: Record<string, { total: number; count: number; items: Record<string, unknown>[] }>;
+  };
+}
+
+export async function fetchDataSnapshot(): Promise<OperatorDataSnapshotResponse> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/data/snapshot` : '/api/data/snapshot';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`data snapshot request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<OperatorDataSnapshotResponse>;
+}
+
+export async function downloadDataExport(): Promise<Blob> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/data/export` : '/api/data/export';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`data export request failed with status ${response.status}`);
+  }
+
+  return response.blob();
 }
 
 export async function fetchInbox(): Promise<InboxSnapshot> {
@@ -486,7 +816,12 @@ export interface PostChatMessageRequest {
   run_id?: string | null;
   composer_mode?: 'ask' | 'plan' | 'agent' | 'command' | string | null;
   active_file_path?: string | null;
+  runtime_target?: string | null;
+  runtime_model?: string | null;
+  execution_access?: 'consultative' | 'full' | string | null;
 }
+
+import type { ChatUiAction } from '../lib/chat-ui-action';
 
 export interface PostChatMessageResponse {
   thread_id: string;
@@ -494,6 +829,9 @@ export interface PostChatMessageResponse {
   run_id: string;
   dispatched: boolean;
   run: RunRecord | null;
+  streaming?: boolean;
+  stream_agent_message_id?: string;
+  ui_action?: ChatUiAction | null;
 }
 
 export interface ThreadHistorySnapshot {
@@ -552,12 +890,15 @@ export async function fetchThreadHistory(threadId: string): Promise<ThreadHistor
 
 export async function fetchWorkspaceChatThread(
   workspaceId: string,
+  options: { surface?: 'operator' | 'ide' } = {},
 ): Promise<WorkspaceChatThreadSnapshot> {
   const baseUrl = controlPlaneBaseUrl();
   const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const surface = options.surface ?? 'operator';
+  const query = `?surface=${encodeURIComponent(surface)}`;
   const url = baseUrl
-    ? `${baseUrl}/api/workspaces/${encodedWorkspaceId}/chat/thread`
-    : `/api/workspaces/${encodedWorkspaceId}/chat/thread`;
+    ? `${baseUrl}/api/workspaces/${encodedWorkspaceId}/chat/thread${query}`
+    : `/api/workspaces/${encodedWorkspaceId}/chat/thread${query}`;
   const response = await fetch(url);
 
   if (!response.ok) {

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import ConversationSeamPanel from '../ConversationSeamPanel.vue';
 import { runPhaseTag } from '../../lib/mockup-shell-view';
+import { buildAgentDockRuntimeChip } from '../../lib/agent-dock-runtime-view';
 import { useRightDockResize } from '../../composables/useRightDockResize';
 import AgentDockComposer from './AgentDockComposer.vue';
 import AgentDockWorkspaceMenu from './AgentDockWorkspaceMenu.vue';
@@ -16,9 +17,30 @@ const { resizing, resetDockWidth, startDockResize } = useRightDockResize({
   collapsed: computed(() => shell.agentDockCollapsed),
 });
 
+const runtimeChip = computed(() =>
+  buildAgentDockRuntimeChip({
+    runtimeStatus: shell.runtimeStatus,
+    loadState: shell.runtimeStatusLoadState,
+    error: shell.runtimeStatusError,
+  }),
+);
+
 function collapseDock(): void {
   shell.toggleAgentDock();
 }
+
+onMounted(() => {
+  if (shell.runtimeStatusLoadState === 'idle') {
+    void shell.loadRuntimeStatus();
+  }
+  if (shell.cursorCatalogLoadState === 'idle') {
+    void shell.loadCursorCatalog();
+  }
+  const workspaceId = shell.currentWorkspace?.workspace_id;
+  if (workspaceId) {
+    void shell.loadWorkspaceThread(workspaceId, 'ide');
+  }
+});
 </script>
 
 <template>
@@ -46,11 +68,14 @@ function collapseDock(): void {
             <p class="agent-dock__title">Agent lane</p>
           </div>
           <AgentDockWorkspaceMenu />
-          <div
-            v-if="shell.primaryActiveRun || shell.pendingApprovalsCount"
-            class="agent-dock__head-pills"
-            aria-label="Runtime attention"
-          >
+          <div class="agent-dock__head-pills" aria-label="Runtime attention">
+            <span
+              class="agent-dock__pill agent-dock__pill--runtime"
+              :class="`agent-dock__pill--runtime-${runtimeChip.tone}`"
+              :title="runtimeChip.detail"
+            >
+              {{ runtimeChip.label }}
+            </span>
             <span v-if="shell.primaryActiveRun" class="agent-dock__pill agent-dock__pill--run">
               Run · {{ runPhaseTag(shell.primaryActiveRun.phase) }}
             </span>

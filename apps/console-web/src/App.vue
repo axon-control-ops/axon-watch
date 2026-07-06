@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 import BootWakeOverlay from './components/BootWakeOverlay.vue';
 import CenterWorkbench from './components/shell/CenterWorkbench.vue';
@@ -7,7 +7,10 @@ import LeftSidebar from './components/shell/LeftSidebar.vue';
 import RightDock from './components/shell/RightDock.vue';
 import StatusBar from './components/shell/StatusBar.vue';
 import TopBar from './components/shell/TopBar.vue';
+import VaultSurface from './components/vault/VaultSurface.vue';
+import DataSurface from './components/data/DataSurface.vue';
 import ScanHierarchyPreview from './dev/ScanHierarchyPreview.vue';
+import { useAppSurface } from './composables/useAppSurface';
 import { startLiveEventsSession } from './lib/live-events-session';
 import { useIdeLayoutShortcuts } from './composables/useIdeLayoutShortcuts';
 import { useVoiceDeckOnBoot } from './features/voice-deck/use-voice-deck';
@@ -17,6 +20,10 @@ const shell = useShellStore();
 useIdeLayoutShortcuts();
 useVoiceDeckOnBoot();
 let liveEventsSession: ReturnType<typeof startLiveEventsSession> | null = null;
+const { appSurface } = useAppSurface();
+const isVaultSurface = computed(() => appSurface.value === 'vault');
+const isDataSurface = computed(() => appSurface.value === 'data');
+const isFoundationSurface = computed(() => isVaultSurface.value || isDataSurface.value);
 const showScanPreview = ref(
   typeof window !== 'undefined' &&
     import.meta.env.DEV &&
@@ -33,6 +40,16 @@ function completeBoot(): void {
   sessionStorage.setItem('axon-x-boot-complete', '1');
   bootComplete.value = true;
 }
+
+watch(
+  appSurface,
+  (surface, previous) => {
+    if (surface === 'console' && (previous === 'vault' || previous === 'data')) {
+      void shell.refreshRunSurfaces();
+      void shell.loadWorkspaceFiles();
+    }
+  },
+);
 
 watch(
   bootComplete,
@@ -73,13 +90,17 @@ onUnmounted(() => {
         'console-shell--mobile-compact': shell.mobileCompactLayout,
         'console-shell--ide': shell.layoutMode === 'ide',
         'console-shell--operator': shell.layoutMode === 'operator',
+        'console-shell--vault': isVaultSurface,
+        'console-shell--data': isDataSurface,
       }"
       :data-layout-mode="shell.layoutMode"
     >
       <TopBar />
-      <LeftSidebar />
-      <CenterWorkbench />
-      <RightDock />
+      <LeftSidebar v-show="!isFoundationSurface" />
+      <VaultSurface v-show="isVaultSurface" />
+      <DataSurface v-show="isDataSurface" />
+      <CenterWorkbench v-show="!isFoundationSurface" />
+      <RightDock v-show="!isFoundationSurface" />
       <StatusBar />
     </div>
   </template>

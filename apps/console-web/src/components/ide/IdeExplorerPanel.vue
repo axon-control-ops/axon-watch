@@ -48,6 +48,7 @@ function openSearchResult(path: string): void {
         :active-path="shell.activeWorkspaceFilePath"
         :load-state="shell.workspaceFilesLoadState"
         :error="shell.workspaceFilesError"
+        :has-workspace="Boolean(shell.currentWorkspace?.workspace_id)"
         @open="shell.openWorkspaceFile"
       />
     </div>

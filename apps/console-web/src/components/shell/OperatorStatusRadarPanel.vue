@@ -60,8 +60,8 @@ const liveFeed = computed(() =>
     historyRows: shell.runHistoryRows,
     currentStep: shell.primaryActiveRun?.current_step ?? null,
     lastAgentMessage:
-      [...shell.threadMessages].reverse().find((message) => message.role === 'agent')?.content ??
-      null,
+      [...shell.operatorThreadMessages].reverse().find((message) => message.role === 'agent')
+        ?.content ?? null,
     advise: executionStage.value.advise,
     hasActiveRun: executionStage.value.hasActiveRun,
   }),
@@ -136,6 +136,10 @@ const reviewReadyRuns = computed(() =>
       run.phase === 'review_ready' &&
       run.workspace_id === shell.currentWorkspace?.workspace_id,
   ),
+);
+const reviewReadyRunsShown = computed(() => reviewReadyRuns.value.slice(0, 5));
+const reviewReadyRunsOverflow = computed(() =>
+  Math.max(0, reviewReadyRuns.value.length - reviewReadyRunsShown.value.length),
 );
 
 const workspaceTerminalLabel = computed(() => {
@@ -248,7 +252,7 @@ function toggleTerminal(): void {
         </p>
         <ul class="operator-status-radar-panel__run-queue-list">
           <li
-            v-for="run in reviewReadyRuns"
+            v-for="run in reviewReadyRunsShown"
             :key="run.run_id"
             class="operator-status-radar-panel__run-queue-item"
             :class="{
@@ -260,6 +264,9 @@ function toggleTerminal(): void {
             <span>#{{ formatRunShortId(run.run_id) }}</span>
           </li>
         </ul>
+        <p v-if="reviewReadyRunsOverflow > 0" class="operator-status-radar-panel__run-queue-more">
+          + {{ reviewReadyRunsOverflow }} more in run history — complete the primary run first
+        </p>
       </section>
       <p class="operator-status-radar-panel__stage-notice">{{ executionStage.notice }}</p>
       <p class="operator-status-radar-panel__stage-decide">{{ executionStage.decide }}</p>

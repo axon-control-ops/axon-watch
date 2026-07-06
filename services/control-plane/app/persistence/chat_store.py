@@ -24,6 +24,7 @@ _THREAD_COLUMNS = (
     "thread_id",
     "workspace_id",
     "run_id",
+    "thread_kind",
     "created_at",
     "updated_at",
 )
@@ -74,17 +75,28 @@ def _thread_row_to_record(row: Any) -> dict[str, Any]:
         "thread_id": row["thread_id"],
         "workspace_id": row["workspace_id"],
         "run_id": row["run_id"],
+        "thread_kind": str(row["thread_kind"] if "thread_kind" in row.keys() else "operator"),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
 
 
-def create_thread(*, workspace_id: str, run_id: str | None, created_at: str) -> dict[str, Any]:
+def create_thread(
+    *,
+    workspace_id: str,
+    run_id: str | None,
+    created_at: str,
+    thread_kind: str = "operator",
+) -> dict[str, Any]:
     thread_id = f"thread_{uuid4().hex}"
+    kind = str(thread_kind or "operator").strip().lower() or "operator"
+    if kind not in {"operator", "ide"}:
+        kind = "operator"
     record = {
         "thread_id": thread_id,
         "workspace_id": workspace_id,
         "run_id": run_id,
+        "thread_kind": kind,
         "created_at": created_at,
         "updated_at": created_at,
     }
@@ -92,12 +104,13 @@ def create_thread(*, workspace_id: str, run_id: str | None, created_at: str) -> 
         connection.execute(
             f"""
             INSERT INTO chat_threads ({", ".join(_THREAD_COLUMNS)})
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 record["thread_id"],
                 record["workspace_id"],
                 record["run_id"],
+                record["thread_kind"],
                 record["created_at"],
                 record["updated_at"],
             ),
@@ -115,17 +128,22 @@ def get_thread(thread_id: str) -> dict[str, Any] | None:
     return _thread_row_to_record(row) if row is not None else None
 
 
-def get_latest_thread_for_workspace(workspace_id: str) -> dict[str, Any] | None:
+def get_latest_thread_for_workspace(
+    workspace_id: str,
+    *,
+    thread_kind: str = "operator",
+) -> dict[str, Any] | None:
+    kind = str(thread_kind or "operator").strip().lower() or "operator"
     with _managed_connection() as connection:
         row = connection.execute(
             """
             SELECT *
             FROM chat_threads
-            WHERE workspace_id = ?
+            WHERE workspace_id = ? AND thread_kind = ?
             ORDER BY updated_at DESC, created_at DESC, rowid DESC
             LIMIT 1
             """,
-            (workspace_id,),
+            (workspace_id, kind),
         ).fetchone()
     return _thread_row_to_record(row) if row is not None else None
 
@@ -160,6 +178,41 @@ def save_message(record: dict[str, Any]) -> dict[str, Any]:
     return deepcopy(stored)
 
 
+def update_message_content(*, message_id: str, content: str, updated_at: str) -> dict[str, Any] | None:
+    clean_message_id = str(message_id or "").strip()
+    if not clean_message_id:
+        return None
+    with _managed_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM chat_messages WHERE message_id = ?",
+            (clean_message_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        connection.execute(
+            """
+            UPDATE chat_messages
+            SET content = ?
+            WHERE message_id = ?
+            """,
+            (content, clean_message_id),
+        )
+        connection.execute(
+            """
+            UPDATE chat_threads
+            SET updated_at = ?
+            WHERE thread_id = ?
+            """,
+            (updated_at, row["thread_id"]),
+        )
+        connection.commit()
+        updated = connection.execute(
+            "SELECT * FROM chat_messages WHERE message_id = ?",
+            (clean_message_id,),
+        ).fetchone()
+    return _message_row_to_record(updated) if updated is not None else None
+
+
 def list_thread_messages(thread_id: str) -> list[dict[str, Any]]:
     with _managed_connection() as connection:
         rows = connection.execute(
@@ -167,8 +220,50 @@ def list_thread_messages(thread_id: str) -> list[dict[str, Any]]:
             SELECT *
             FROM chat_messages
             WHERE thread_id = ?
-            ORDER BY created_at ASC, message_id ASC
+            ORDER BY rowid ASC
             """,
             (thread_id,),
         ).fetchall()
     return [_message_row_to_record(row) for row in rows]
+
+
+def list_threads(*, limit: int = 50) -> list[dict[str, Any]]:
+    max_limit = max(1, min(100, int(limit or 50)))
+    with _managed_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM chat_threads
+            ORDER BY updated_at DESC, created_at DESC, rowid DESC
+            LIMIT ?
+            """,
+            (max_limit,),
+        ).fetchall()
+    return [_thread_row_to_record(row) for row in rows]
+
+
+def count_threads() -> int:
+    with _managed_connection() as connection:
+        row = connection.execute("SELECT COUNT(*) FROM chat_threads").fetchone()
+    return int(row[0]) if row is not None else 0
+
+
+def list_recent_messages(*, limit: int = 50) -> list[dict[str, Any]]:
+    max_limit = max(1, min(100, int(limit or 50)))
+    with _managed_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM chat_messages
+            ORDER BY rowid DESC
+            LIMIT ?
+            """,
+            (max_limit,),
+        ).fetchall()
+    return [_message_row_to_record(row) for row in rows]
+
+
+def count_messages() -> int:
+    with _managed_connection() as connection:
+        row = connection.execute("SELECT COUNT(*) FROM chat_messages").fetchone()
+    return int(row[0]) if row is not None else 0

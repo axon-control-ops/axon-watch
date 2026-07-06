@@ -52,7 +52,7 @@ describe('operator presence helpers', () => {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
     };
-    const speech = { speak: vi.fn() };
+    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
     const spoken = maybeSpeakOperatorAlert(
       {
         eligible: true,
