@@ -37,3 +37,19 @@ def runtime_mcp_tools_registry() -> dict[str, object]:
         },
     ]
     return {"count": len(items), "items": items}
+
+
+def mcp_tools_for_composer_mode(composer_mode: str) -> dict[str, object]:
+    """Return registry entries available for the active IDE composer mode."""
+    normalized = str(composer_mode or "agent").strip().lower()
+    registry = runtime_mcp_tools_registry()
+    items = registry.get("items")
+    if not isinstance(items, list):
+        return {"count": 0, "items": []}
+    filtered = [
+        item
+        for item in items
+        if isinstance(item, dict)
+        and normalized in [str(mode).lower() for mode in (item.get("mode_support") or [])]
+    ]
+    return {"count": len(filtered), "items": filtered}

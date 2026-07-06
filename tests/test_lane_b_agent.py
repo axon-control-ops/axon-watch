@@ -36,6 +36,7 @@ class LaneBAgentTests(unittest.TestCase):
         )
         self.assertIn("Full Access", executing)
         self.assertIn("edit files and run commands", executing)
+        self.assertIn("Reply in first person", executing)
         self.assertNotIn("consultative", executing.lower())
 
         consultative = _build_prompt(
@@ -46,6 +47,14 @@ class LaneBAgentTests(unittest.TestCase):
         )
         self.assertIn("consultative", consultative.lower())
         self.assertIn("do not claim", consultative.lower())
+        self.assertIn("Reply in first person", consultative)
+
+        ask = _build_prompt(
+            composer_mode="ask",
+            user_prompt="what is this?",
+            context_block="ctx",
+        )
+        self.assertIn("Reply in first person", ask)
 
     def test_ide_modes_keep_lane_b_even_when_prompt_matches_command_keywords(self) -> None:
         # "Add a comment to README.md" must not become an operator read_file run.
@@ -89,6 +98,13 @@ class LaneBAgentTests(unittest.TestCase):
             "runtime_id": "cursor_local",
             "runtime_label": "Cursor CLI (local)",
             "reason": "",
+            "mcp_tools": {
+                "count": 2,
+                "items": [
+                    {"id": "workspace_files.read", "mode_support": ["ask", "plan", "agent"]},
+                    {"id": "runs.history", "mode_support": ["plan", "agent"]},
+                ],
+            },
         },
     )
     def test_generate_lane_b_result_exposes_dispatch_metadata(self, mock_dispatch) -> None:
@@ -99,6 +115,9 @@ class LaneBAgentTests(unittest.TestCase):
         self.assertEqual("Runtime reply", result["content"])
         self.assertTrue(result["dispatched"])
         self.assertEqual("cursor_local", result["runtime_id"])
+        mcp_tools = result.get("mcp_tools")
+        self.assertIsInstance(mcp_tools, dict)
+        self.assertGreaterEqual(mcp_tools.get("count"), 1)
         mock_dispatch.assert_called_once()
 
 

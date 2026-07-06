@@ -159,8 +159,8 @@ Close the largest functional gap in `docs/LEGACY_CONNECTOR_INVENTORY.md` item 1.
 - [x] **G3.1** Define orchestration contract: operator command → run record → runtime fabric dispatch → normalized events → receipts
 - [x] **G3.2** Wire Mission Control / Agent Dock chat to runtime fabric sessions (Cursor primary, Codex fallback per `cli_runtime/recovery.py`)
 - [x] **G3.3** Preserve approval boundaries: no silent tool execution outside `executing` phase
-- [ ] **G3.4** Stop/resume/cancel maps to runtime process control, not prompt cancellation alone
-- [ ] **G3.5** MCP tool surface registered in control-plane; no ad hoc tool strings in shell
+- [x] **G3.4** Stop/resume/cancel maps to runtime process control, not prompt cancellation alone
+- [x] **G3.5** MCP tool surface registered in control-plane; no ad hoc tool strings in shell
 - [ ] **G3.6** Parity tests against donor workflows (bounded set from `IMPORT_MATRIX` runtime section)
 - [ ] **G3.7** Gate script + focused tests
 - [x] **G3.8** Full Access composer toggle + `execution_access` API (Codex/Cursor executing tier after approve)

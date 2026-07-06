@@ -126,6 +126,30 @@ export async function fetchRuntimeStatus(): Promise<RuntimeStatusSnapshot> {
   return response.json() as Promise<RuntimeStatusSnapshot>;
 }
 
+export interface RuntimeMcpToolRecord {
+  id: string;
+  label: string;
+  bounded_context: string;
+  mode_support: string[];
+}
+
+export interface RuntimeMcpToolsSnapshot {
+  count: number;
+  items: RuntimeMcpToolRecord[];
+}
+
+export async function fetchRuntimeMcpTools(): Promise<RuntimeMcpToolsSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/runtime/mcp-tools` : '/api/runtime/mcp-tools';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`runtime mcp-tools request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<RuntimeMcpToolsSnapshot>;
+}
+
 export async function fetchCursorRuntimeStatus(
   options: { forceRefresh?: boolean } = {},
 ): Promise<CursorRuntimeStatusSnapshot> {

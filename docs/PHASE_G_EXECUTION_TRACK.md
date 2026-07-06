@@ -24,7 +24,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 | # | Slice | Deliverable | Gate | Status |
 |---|---|---|---|---|
-| 1 | **G3.4-complete** | IDE Stop → `stop_run` → `process_registry`; resume/cancel tests | `tests/test_cli_runtime_process_registry.py` | Partial (Stop wired) |
+| 1 | **G3.4-complete** | IDE Stop → `stop_run` → `process_registry`; resume/cancel tests | `tests/test_cli_runtime_process_registry.py` | **Done** |
 | 2 | **G3.8 Full Access UI** | Composer toggle; consent-as-approval; executing tier; stream-json blocks | Chat + dispatch + CLI tests | **Done** |
 | 3 | **G3.1 contract** | `docs/planning/agent-orchestration-contract.md` | Doc review | Done |
 | 4 | Operator/IDE threads | Separate operator vs IDE conversation threads | Chat surface tests | Done |
@@ -35,11 +35,11 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 ## Wave 2 — Close G3 orchestration gate
 
-| # | Slice | Deliverable | Gate |
-|---|---|---|---|
-| 5 | **G3.5** | MCP tools in dispatch metadata; composer Tools panel from registry | `/api/runtime/mcp-tools` + dispatch test |
-| 6 | **G3.6** | Donor workflow parity tests (bounded `IMPORT_MATRIX` set) | `tests/test_agent_orchestration_parity.py` |
-| 7 | **G3.7** | `verify:agent-orchestration-parity` fully green | `test20-agent-orchestration-parity.sh` |
+| # | Slice | Deliverable | Gate | Status |
+|---|---|---|---|---|
+| 5 | **G3.5** | MCP tools in dispatch metadata; composer Tools panel from registry | `/api/runtime/mcp-tools` + dispatch test | **Done** |
+| 6 | **G3.6** | Donor workflow parity tests (bounded `IMPORT_MATRIX` set) | `tests/test_agent_orchestration_parity.py` | |
+| 7 | **G3.7** | `verify:agent-orchestration-parity` fully green | `test20-agent-orchestration-parity.sh` | |
 
 **Wave 2 exit:** `LEGACY_CONNECTOR_INVENTORY` item 1 (ReAct loop) marked **replaced**.
 
@@ -87,7 +87,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 2):** G3.5 MCP tools registry in dispatch metadata + composer Tools panel.
+**Next up (Wave 2):** G3.6 donor workflow parity tests, then G3.7 `verify:agent-orchestration-parity`.
 
 ---
 
@@ -112,4 +112,9 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 - Full Access consent replaces per-run approval; Cursor stream-json + transcript blocks.
 - Successful IDE agent runs auto-complete; operator thread isolation fixed.
 - KAIRO milestone narration + JARVIS voice script (browser TTS — cloud TTS deferred to Wave 3).
-- **Resume here:** Wave 2 slice 5 — **G3.5** MCP tools in dispatch + composer Tools panel.
+- **Resume here:** Wave 2 slice 6 — **G3.6** donor workflow parity tests.
+
+### 2026-07-06 — G3.4 + G3.5 landed in parallel
+
+- G3.4: IDE Stop targets linked agent run, tears down stream, `stop_run` terminates `process_registry`.
+- G3.5: MCP tools filtered by composer mode in dispatch metadata; Agent Dock Tools panel reads `/api/runtime/mcp-tools`.

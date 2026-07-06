@@ -13,6 +13,7 @@ import {
   fetchRunHistory,
   fetchRuns,
   fetchRuntimeStatus,
+  fetchRuntimeMcpTools,
   fetchRuntimeSummary,
   fetchThreadHistory,
   fetchWorkspaceChatThread,
@@ -30,7 +31,7 @@ import {
   saveOperatorPresenceSettings,
   stopRun,
 } from '../api/control-plane';
-import type { ConnectorProbeRecord, CursorRuntimeStatusSnapshot } from '../api/control-plane';
+import type { ConnectorProbeRecord, CursorRuntimeStatusSnapshot, RuntimeMcpToolsSnapshot } from '../api/control-plane';
 import type { RuntimeStatusSnapshot } from '../api/control-plane';
 import type {
   ApprovalRecord,
@@ -268,6 +269,8 @@ export const useShellStore = defineStore('shell', () => {
   const runtimeSummaryError = ref<string | null>(null);
   const runtimeStatus = ref<RuntimeStatusSnapshot | null>(null);
   const runtimeStatusLoadState = ref<RuntimeStatusLoadState>('idle');
+  const runtimeMcpTools = ref<RuntimeMcpToolsSnapshot | null>(null);
+  const runtimeMcpToolsLoadState = ref<RuntimeStatusLoadState>('idle');
   const runtimeStatusError = ref<string | null>(null);
   const cursorRuntimeStatus = ref<CursorRuntimeStatusSnapshot | null>(null);
   const cursorCatalogLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
@@ -514,6 +517,15 @@ export const useShellStore = defineStore('shell', () => {
     return editorDocuments.value[0] ?? null;
   });
   const runMutationPending = computed(() => runMutationState.value !== 'idle');
+  const canStopIdeAgentRun = computed(() => {
+    if (runMutationPending.value) {
+      return false;
+    }
+    if (agentStreamActive.value) {
+      return Boolean(ideAgentLinkedRun.value?.run_id ?? ideAgentRunId.value);
+    }
+    return Boolean(ideAgentLinkedRun.value?.can_stop);
+  });
   const canStopPrimaryRun = computed(
     () => Boolean(primaryActiveRun.value?.can_stop) && !runMutationPending.value,
   );
@@ -1682,6 +1694,18 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function loadRuntimeMcpTools(): Promise<void> {
+    runtimeMcpToolsLoadState.value = 'loading';
+
+    try {
+      runtimeMcpTools.value = await fetchRuntimeMcpTools();
+      runtimeMcpToolsLoadState.value = 'loaded';
+    } catch {
+      runtimeMcpTools.value = null;
+      runtimeMcpToolsLoadState.value = 'error';
+    }
+  }
+
   const composerRuntimePrefs = computed(() => {
     composerRuntimePrefsRevision.value;
     return readComposerRuntimePrefs(currentWorkspace.value?.workspace_id ?? null);
@@ -2013,6 +2037,30 @@ export const useShellStore = defineStore('shell', () => {
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
   }
 
+  async function stopIdeAgentRun(): Promise<void> {
+    const runId = ideAgentLinkedRun.value?.run_id ?? ideAgentRunId.value;
+    if (!runId || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'stopping';
+    runMutationError.value = null;
+    disconnectChatStreamSession();
+    agentStreamActive.value = false;
+    agentStreamMessageId.value = null;
+    ideComposerActivity.value = null;
+
+    try {
+      await stopRun(runId);
+      clearIdeAgentRunLink();
+      await refreshRunSurfaces();
+    } catch (error) {
+      runMutationError.value = error instanceof Error ? error.message : 'stop run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
   async function stopPrimaryRun(): Promise<void> {
     const run = primaryActiveRun.value;
     if (!run?.can_stop || runMutationPending.value) {
@@ -2247,6 +2295,7 @@ export const useShellStore = defineStore('shell', () => {
     editorDocuments,
     canResumePrimaryRun,
     canStopPrimaryRun,
+    canStopIdeAgentRun,
     canSubmitOperatorCommand,
     commandMutationError,
     commandMutationState,
@@ -2339,6 +2388,9 @@ export const useShellStore = defineStore('shell', () => {
     runtimeStatus,
     runtimeStatusError,
     runtimeStatusLoadState,
+    runtimeMcpTools,
+    runtimeMcpToolsLoadState,
+    loadRuntimeMcpTools,
     runtimeSummary,
     runtimeSummaryError,
     runtimeSummaryLoadState,
@@ -2367,6 +2419,7 @@ export const useShellStore = defineStore('shell', () => {
     signalClearState,
     signalViews,
     stopPrimaryRun,
+    stopIdeAgentRun,
     submitOperatorCommand,
     submitIdeComposer,
     terminalSessions,

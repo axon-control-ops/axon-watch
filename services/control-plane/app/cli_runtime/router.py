@@ -12,6 +12,7 @@ from app.cli_runtime.approval_gate import (
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
 from app.cli_runtime.codex_agent import run_codex_local
+from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.recovery import ordered_runtime_candidates
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.cursor_agent import run_cursor_local
@@ -27,16 +28,24 @@ from app.runs.service import RunNotFoundError, get_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 
+_REPLY_STYLE = (
+    "Reply in first person. Use plain language the operator understands — "
+    "avoid internal repo jargon such as lane IDs, slice names, or implementation acronyms."
+)
+
+
 def _system_prompt(composer_mode: str, execution_tier: str = "consultative") -> str:
     if composer_mode == "ask":
         return (
             "You are Axon-X Lane B in Ask mode. Stay read-only. Answer using the supplied "
-            "workspace context and do not claim you edited files or ran commands."
+            "workspace context and do not claim you edited files or ran commands. "
+            f"{_REPLY_STYLE}"
         )
     if composer_mode == "plan":
         return (
             "You are Axon-X Lane B in Plan mode. Produce a short numbered plan using the "
-            "supplied workspace context. Do not claim execution happened."
+            "supplied workspace context. Do not claim execution happened. "
+            f"{_REPLY_STYLE}"
         )
     if execution_tier == "executing":
         return (
@@ -45,12 +54,12 @@ def _system_prompt(composer_mode: str, execution_tier: str = "consultative") -> 
             "Project root shown in workspace context as needed to complete the request "
             "now. Use workspace-relative paths such as README.md — never edit Cursor "
             "metadata directories. Do the work first, then reply with a short summary "
-            "of what changed."
+            f"of what changed. {_REPLY_STYLE}"
         )
     return (
         "You are Axon-X Lane B in Agent mode (consultative slice). Answer using the "
         "supplied workspace context, propose concrete next steps, and do not claim you "
-        "edited files or ran commands."
+        f"edited files or ran commands. {_REPLY_STYLE}"
     )
 
 
@@ -135,6 +144,10 @@ def _run_phase(run_id: str) -> str | None:
     return str(record.get("phase") or "") or None
 
 
+def _attach_dispatch_metadata(result: dict[str, object], *, composer_mode: str) -> dict[str, object]:
+    return {**result, "mcp_tools": mcp_tools_for_composer_mode(composer_mode)}
+
+
 def dispatch_ide_composer(
     *,
     workspace_id: str,
@@ -147,10 +160,13 @@ def dispatch_ide_composer(
     execution_access: str | None = None,
     on_chunk: Callable[[str, str], None] | None = None,
 ) -> dict[str, object]:
+    def _finish(payload: dict[str, object]) -> dict[str, object]:
+        return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
+
     snapshot = runtime_status_snapshot()
     workspace_root = _resolve_workspace_root(workspace_id)
     if workspace_root is None:
-        return {
+        return _finish({
             "content": _fallback_reply(
                 composer_mode=composer_mode,
                 user_prompt=user_prompt,
@@ -161,7 +177,7 @@ def dispatch_ide_composer(
             "runtime_id": "",
             "runtime_label": "",
             "reason": "workspace root unavailable",
-        }
+        })
 
     run_phase = _run_phase(run_id)
     execution_tier = resolve_runtime_execution_tier(
@@ -215,14 +231,14 @@ def dispatch_ide_composer(
                 )
                 if approval_notice:
                     content = f"{content.rstrip()}\n\n---\n{approval_notice}"
-                return {
+                return _finish({
                     "content": content,
                     "dispatched": True,
                     "runtime_id": runtime_id,
                     "runtime_label": str(record.get("label") or runtime_id),
                     "reason": "",
                     "execution_tier": execution_tier,
-                }
+                })
             if family == "codex":
                 content = run_codex_local(
                     binary=binary,
@@ -237,17 +253,17 @@ def dispatch_ide_composer(
                 )
                 if approval_notice:
                     content = f"{content.rstrip()}\n\n---\n{approval_notice}"
-                return {
+                return _finish({
                     "content": content,
                     "dispatched": True,
                     "runtime_id": runtime_id,
                     "runtime_label": str(record.get("label") or runtime_id),
                     "reason": "",
                     "execution_tier": execution_tier,
-                }
+                })
         except RuntimeError as exc:
             if isinstance(exc, RuntimeProcessStoppedError):
-                return {
+                return _finish({
                     "content": _fallback_reply(
                         composer_mode=composer_mode,
                         user_prompt=user_prompt,
@@ -259,7 +275,7 @@ def dispatch_ide_composer(
                     "runtime_label": str(record.get("label") or runtime_id),
                     "reason": str(exc),
                     "stopped": True,
-                }
+                })
             detail = str(exc)
             if looks_like_auth_error(detail) and env_has_api_key(dispatch_env, family=family):
                 retry_env = env_without_api_keys(dispatch_env, family=family)
@@ -291,20 +307,20 @@ def dispatch_ide_composer(
                             )
                         if approval_notice:
                             content = f"{content.rstrip()}\n\n---\n{approval_notice}"
-                        return {
+                        return _finish({
                             "content": content,
                             "dispatched": True,
                             "runtime_id": runtime_id,
                             "runtime_label": str(record.get("label") or runtime_id),
                             "reason": "",
                             "execution_tier": execution_tier,
-                        }
+                        })
                     except RuntimeError as retry_exc:
                         detail = str(retry_exc)
             errors.append(summarize_auth_error(family=family, detail=detail))
 
     reason = "; ".join(item for item in errors if item) or "no CLI runtime is installed"
-    return {
+    return _finish({
         "content": _fallback_reply(
             composer_mode=composer_mode,
             user_prompt=user_prompt,
@@ -315,7 +331,7 @@ def dispatch_ide_composer(
         "runtime_id": "",
         "runtime_label": "",
         "reason": reason,
-    }
+    })
 
 
 def route_ide_composer(

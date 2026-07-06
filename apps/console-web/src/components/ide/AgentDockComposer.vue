@@ -32,6 +32,10 @@ import {
 
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { shouldSubmitAgentDockComposer } from '../../lib/agent-dock-composer-input';
+import {
+  filterMcpToolsForComposerMode,
+  mcpToolDetail,
+} from '../../lib/composer-mcp-tools-view';
 import { useShellStore } from '../../stores/shell';
 
 type ComposerMode = 'agent' | 'plan' | 'ask';
@@ -53,6 +57,7 @@ const composerMode = ref<ComposerMode>(
   (shell.runtimeSummary?.runtime_identity.mode_default as ComposerMode) || 'agent',
 );
 const showContextMenu = ref(false);
+const showToolsMenu = ref(false);
 const showModelMenu = ref(false);
 const showModeMenu = ref(false);
 const showFullAccessConsent = ref(false);
@@ -205,11 +210,10 @@ const workspaceToken = computed(() =>
 );
 const ideToken = '@ide-context';
 const pinnedToken = '@pin-context';
-const showComposerStop = computed(() => {
-  const run = shell.ideAgentLinkedRun ?? shell.primaryActiveRun;
-  if (!run) return false;
-  return shell.canStopPrimaryRun || run.phase === 'executing';
-});
+const mcpToolsForMode = computed(() =>
+  filterMcpToolsForComposerMode(shell.runtimeMcpTools, composerMode.value),
+);
+const showComposerStop = computed(() => shell.canStopIdeAgentRun);
 const showApprovalBanner = computed(
   () =>
     composerMode.value === 'agent' &&
@@ -267,6 +271,7 @@ function syncComposerHeight(): void {
 
 function closeMenus(): void {
   showContextMenu.value = false;
+  showToolsMenu.value = false;
   showModelMenu.value = false;
   showModeMenu.value = false;
   showAddModelsPanel.value = false;
@@ -274,8 +279,10 @@ function closeMenus(): void {
   modelSearchQuery.value = '';
 }
 
-function toggleSection(section: 'context' | 'model' | 'mode'): void {
+function toggleSection(section: 'context' | 'tools' | 'model' | 'mode'): void {
   showContextMenu.value = section === 'context' ? !showContextMenu.value : false;
+  const openingTools = section === 'tools' ? !showToolsMenu.value : false;
+  showToolsMenu.value = openingTools;
   const openingModel = section === 'model' ? !showModelMenu.value : false;
   showModelMenu.value = openingModel;
   showModeMenu.value = section === 'mode' ? !showModeMenu.value : false;
@@ -283,6 +290,9 @@ function toggleSection(section: 'context' | 'model' | 'mode'): void {
     showAddModelsPanel.value = false;
     showRuntimeTargetsPanel.value = false;
     modelSearchQuery.value = '';
+  }
+  if (openingTools) {
+    void shell.loadRuntimeMcpTools();
   }
   if (openingModel) {
     void Promise.all([shell.loadRuntimeStatus(), shell.loadCursorCatalog(true)]);
@@ -438,7 +448,7 @@ function runtimeStatusLine(record: (typeof runtimeTargets.value)[number]): strin
 }
 
 function handleStopRun(): void {
-  void shell.stopPrimaryRun();
+  void shell.stopIdeAgentRun();
 }
 
 function handleSubmit(event?: Event): void {
@@ -657,6 +667,53 @@ onUnmounted(() => {
                 >
                   <span>Pin context</span>
                   <small>Keep current context across turns</small>
+                </button>
+              </div>
+            </div>
+
+            <div class="agent-dock-composer__tool-group">
+              <button
+                type="button"
+                class="agent-dock-composer__tool"
+                :class="{ 'is-active': showToolsMenu }"
+                title="Runtime MCP tools available for this mode"
+                aria-label="Open tools registry"
+                @click="toggleSection('tools')"
+              >
+                <span>Tools</span>
+                <span
+                  v-if="mcpToolsForMode.length"
+                  class="agent-dock-composer__tool-count"
+                >
+                  {{ mcpToolsForMode.length }}
+                </span>
+              </button>
+              <div
+                v-if="showToolsMenu"
+                class="agent-dock-composer__menu agent-dock-composer__menu--tools"
+              >
+                <p class="agent-dock-composer__menu-heading">Runtime tools · {{ composerMode }}</p>
+                <p
+                  v-if="shell.runtimeMcpToolsLoadState === 'loading'"
+                  class="agent-dock-composer__menu-note"
+                >
+                  Loading tool registry…
+                </p>
+                <p
+                  v-else-if="!mcpToolsForMode.length"
+                  class="agent-dock-composer__menu-note"
+                >
+                  No tools registered for this mode.
+                </p>
+                <button
+                  v-for="tool in mcpToolsForMode"
+                  :key="tool.id"
+                  type="button"
+                  class="agent-dock-composer__menu-item agent-dock-composer__menu-item--readonly"
+                  disabled
+                >
+                  <span>{{ tool.label }}</span>
+                  <small>{{ mcpToolDetail(tool) }}</small>
                 </button>
               </div>
             </div>
