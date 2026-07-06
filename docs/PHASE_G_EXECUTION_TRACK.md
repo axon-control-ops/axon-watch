@@ -49,7 +49,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 | # | Slice | Deliverable | Source |
 |---|---|---|---|
-| 8 | **UX-IDE-1** | Quiet IDE: chip not radar; no watch in status bar (healthy) | IDE refocus plan |
+| 8 | **UX-IDE-1** | Quiet IDE: chip not radar; no watch in status bar (healthy) | IDE refocus plan | **Done** |
 | 9 | **UX-IDE-2** | `IdeInterruptPanel` (approvals + critical signals) | IDE refocus + G3.3 |
 | 10 | **KAIRO Ask** | Ask mode + KAIRO persona prompt | JARVIS video personality |
 | 11 | **UX-IDE-3** | Research cards in agent transcript | JARVIS video |
@@ -87,7 +87,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 3 / G4):** UX-IDE quiet shell (UX-IDE-1) or G4.1 connector inventory — operator reprioritizes.
+**Next up (Wave 3):** UX-IDE-2 `IdeInterruptPanel`, or Wave 4 **G4.1** connector inventory.
 
 ---
 
@@ -112,7 +112,12 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 - Full Access consent replaces per-run approval; Cursor stream-json + transcript blocks.
 - Successful IDE agent runs auto-complete; operator thread isolation fixed.
 - KAIRO milestone narration + JARVIS voice script (browser TTS — cloud TTS deferred to Wave 3).
-- **Resume here:** Wave 3 slice 8 — **UX-IDE-1** quiet IDE shell, or Wave 4 **G4.1** connector inventory.
+- **Resume here:** Wave 3 slice 9 — **UX-IDE-2** `IdeInterruptPanel`.
+
+### 2026-07-06 — UX-IDE-1 quiet IDE presence profile
+
+- `ide-presence-profile.ts` derives quiet/assist/interrupt tiers from run/signal/watch state.
+- IDE mode uses `KairoChip` (not radar), collapses KAIRO sidebar to compact chip, and hides healthy watch + ops telemetry from status bar.
 
 ### 2026-07-06 — G3.6 + G3.7 orchestration gate closed
 

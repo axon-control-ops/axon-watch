@@ -15,6 +15,7 @@ function updateClock(): void {
 let timer: number | undefined;
 
 const watchZone = computed(() => shell.statusBarZones.left.find((item) => item.id === 'watch'));
+const workspaceZone = computed(() => shell.statusBarZones.left.find((item) => item.id === 'workspace'));
 const agentZone = computed(() => shell.statusBarZones.left.find((item) => item.id === 'agent'));
 const versionZone = computed(() => shell.statusBarZones.left.find((item) => item.id === 'version'));
 const centerZones = computed(() => shell.statusBarZones.center);
@@ -41,6 +42,7 @@ onUnmounted(() => {
     <div class="status-bar-mockup__grid">
       <div class="status-bar-mockup__frame">
         <div
+          v-if="watchZone"
           class="status-bar-mockup__chip status-bar-mockup__chip--watch"
           :class="{
             'status-bar-mockup__chip--success': watchZone?.tone === 'success',
@@ -53,11 +55,26 @@ onUnmounted(() => {
             aria-hidden="true"
           />
           <span class="status-bar-mockup__chip-primary">{{ watchZone?.label }}</span>
-          <span class="status-bar-mockup__chip-secondary">
-            <span>{{ agentZone?.label }}</span>
+          <span v-if="agentZone" class="status-bar-mockup__chip-secondary">
+            <span>{{ agentZone.label }}</span>
             <span class="status-bar-mockup__sep" aria-hidden="true">|</span>
             <span>{{ versionZone?.label }}</span>
           </span>
+        </div>
+        <div
+          v-else-if="workspaceZone"
+          class="status-bar-mockup__chip"
+        >
+          <span class="status-bar-mockup__chip-primary">{{ workspaceZone.label }}</span>
+          <span v-if="versionZone" class="status-bar-mockup__chip-secondary">
+            <span>{{ versionZone.label }}</span>
+          </span>
+        </div>
+        <div
+          v-else-if="versionZone"
+          class="status-bar-mockup__chip"
+        >
+          <span class="status-bar-mockup__chip-primary">{{ versionZone.label }}</span>
         </div>
 
         <span class="status-bar-mockup__rail" aria-hidden="true" />

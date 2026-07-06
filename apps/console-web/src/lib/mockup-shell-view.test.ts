@@ -99,6 +99,21 @@ describe('mockup shell view helpers', () => {
     expect(zones.right[0]?.label).toBe('WORKSPACE: workspace_smoke');
   });
 
+  it('builds IDE quiet status bar without watch or ops telemetry', () => {
+    const zones = buildStatusBarZones({
+      runtimeSummary,
+      runtimeSummaryLoadState: 'loaded',
+      primaryActiveRun: { phase: 'executing' } as RunRecord,
+      workspaceId: 'workspace_smoke',
+      layoutMode: 'ide',
+      idePresenceProfile: 'quiet',
+    });
+
+    expect(zones.left.some((item) => item.id === 'watch')).toBe(false);
+    expect(zones.left[0]?.id).toBe('workspace');
+    expect(zones.center).toEqual([]);
+  });
+
   it('builds workspace status card rows from runtime summary', () => {
     const rows = buildWorkspaceStatusCardRows({
       runtimeSummary,

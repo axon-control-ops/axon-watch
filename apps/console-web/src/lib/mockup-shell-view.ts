@@ -1,5 +1,7 @@
 import type { OperatorBriefing, RunRecord, RuntimeSummary, WorkspaceRecord } from '../contracts/canonical';
 import type { KairoPresenceState } from './kairo-presence';
+import type { IdePresenceProfile } from './ide-presence-profile';
+import { ideShowWatchInStatusBar } from './ide-presence-profile';
 import type { RuntimeSummaryLoadState } from './runtime-strip';
 
 export interface TopbarMetaPill {
@@ -344,6 +346,8 @@ export function buildStatusBarZones(input: {
   runtimeSummaryLoadState: RuntimeSummaryLoadState;
   primaryActiveRun: RunRecord | null;
   workspaceId: string | null;
+  layoutMode?: 'operator' | 'ide';
+  idePresenceProfile?: IdePresenceProfile;
 }): StatusBarZones {
   if (input.runtimeSummaryLoadState === 'loading') {
     return {
@@ -367,25 +371,43 @@ export function buildStatusBarZones(input: {
   const openSignals = summary.signals.open_count;
   const phase = input.primaryActiveRun?.phase ?? 'idle';
   const workspaceLabel = input.workspaceId ?? 'no workspace';
+  const layoutMode = input.layoutMode ?? 'operator';
+  const ideProfile = input.idePresenceProfile ?? 'quiet';
+  const showWatch = ideShowWatchInStatusBar({
+    layoutMode,
+    profile: ideProfile,
+    watchConnected,
+    degradedActive: summary.degraded.active,
+  });
+  const showOpsTelemetry =
+    layoutMode === 'operator' || ideProfile === 'interrupt' || ideProfile === 'voice';
+
+  const left: StatusBarZoneItem[] = [];
+  if (showWatch) {
+    left.push({
+      id: 'watch',
+      label: watchConnected ? 'WATCH CONNECTED' : 'WATCH OFFLINE',
+      tone: watchConnected ? 'success' : 'warning',
+    });
+    left.push({ id: 'agent', label: `WATCH ${watchStatus}`, tone: 'default' });
+  } else if (layoutMode === 'ide') {
+    left.push({ id: 'workspace', label: workspaceLabel, tone: 'default' });
+  }
+  left.push({ id: 'version', label: `v${summary.control_plane.version}`, tone: 'default' });
+
+  const center: StatusBarZoneItem[] = [];
+  if (showOpsTelemetry) {
+    center.push({ id: 'phase', label: `RUN PHASE: ${runPhaseTag(phase)}`, tone: 'brand' });
+    center.push({
+      id: 'signals',
+      label: `SIGNALS: ${openSignals} ACTIVE`,
+      tone: openSignals > 0 ? 'warning' : 'default',
+    });
+  }
 
   return {
-    left: [
-      {
-        id: 'watch',
-        label: watchConnected ? 'WATCH CONNECTED' : 'WATCH OFFLINE',
-        tone: watchConnected ? 'success' : 'warning',
-      },
-      { id: 'agent', label: `WATCH ${watchStatus}`, tone: 'default' },
-      { id: 'version', label: `v${summary.control_plane.version}`, tone: 'default' },
-    ],
-    center: [
-      { id: 'phase', label: `RUN PHASE: ${runPhaseTag(phase)}`, tone: 'brand' },
-      {
-        id: 'signals',
-        label: `SIGNALS: ${openSignals} ACTIVE`,
-        tone: openSignals > 0 ? 'warning' : 'default',
-      },
-    ],
+    left,
+    center,
     right: [{ id: 'workspace', label: `WORKSPACE: ${workspaceLabel}`, tone: 'default' }],
   };
 }

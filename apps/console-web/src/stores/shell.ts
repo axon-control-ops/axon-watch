@@ -152,6 +152,12 @@ import {
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
 import {
+  filterTopbarChipsForIde,
+  ideDisplayKairoState,
+  resolveIdePresenceProfile,
+  type IdePresenceProfile,
+} from '../lib/ide-presence-profile';
+import {
   buildDockSeamLayout,
   type DockSeamId,
 } from '../lib/dock-seam-layout';
@@ -394,13 +400,14 @@ export const useShellStore = defineStore('shell', () => {
     () => workspaceCatalogMode(workspaces.value) === 'production',
   );
 
-  const topbarChips = computed(() =>
-    buildTopbarChips({
+  const topbarChips = computed(() => {
+    const chips = buildTopbarChips({
       runtimeSummary: runtimeSummary.value,
       runtimeSummaryLoadState: runtimeSummaryLoadState.value,
       primaryActiveRun: activeRun.value,
-    }),
-  );
+    });
+    return filterTopbarChipsForIde(chips, layoutMode.value, idePresenceProfile.value);
+  });
 
   const topbarMetaPills = computed(() => buildTopbarMetaPills(runtimeSummary.value));
   const topbarBreadcrumb = computed(() =>
@@ -412,6 +419,8 @@ export const useShellStore = defineStore('shell', () => {
       runtimeSummaryLoadState: runtimeSummaryLoadState.value,
       primaryActiveRun: primaryActiveRun.value,
       workspaceId: currentWorkspace.value?.workspace_id ?? null,
+      layoutMode: layoutMode.value,
+      idePresenceProfile: idePresenceProfile.value,
     }),
   );
 
@@ -662,6 +671,25 @@ export const useShellStore = defineStore('shell', () => {
     const fromBriefing = operatorBriefing.value?.pending_approvals.count ?? 0;
     return Math.max(fromSummary, fromBriefing);
   });
+
+  const idePresenceProfile = computed<IdePresenceProfile>(() => {
+    const summary = runtimeSummary.value;
+    return resolveIdePresenceProfile({
+      pendingApprovals: pendingApprovalsCount.value,
+      criticalSignals: summary?.signals.critical_count ?? 0,
+      highSignals: summary?.signals.high_count ?? 0,
+      watchConnected: Boolean(summary?.watch.connected),
+      degradedActive: Boolean(summary?.degraded.active),
+      primaryRunPhase: primaryActiveRun.value?.phase,
+      agentStreamActive: agentStreamActive.value,
+    });
+  });
+
+  const ideDisplayKairoPresenceState = computed<KairoPresenceState>(() =>
+    layoutMode.value === 'ide'
+      ? ideDisplayKairoState(idePresenceProfile.value, kairoPresenceState.value)
+      : kairoPresenceState.value,
+  );
 
   const leftSidebarAttentionBadgeCount = computed(() =>
     computeLeftSidebarAttentionBadgeCount({
@@ -2317,6 +2345,8 @@ export const useShellStore = defineStore('shell', () => {
     ideAgentLinkedRun,
     ideAgentRunId,
     ideComposerActivity,
+    ideDisplayKairoPresenceState,
+    idePresenceProfile,
     inboxItems,
     inboxLoadState,
     inboxStateLabel,

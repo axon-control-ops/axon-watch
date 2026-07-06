@@ -113,6 +113,15 @@
   color: rgba(224, 242, 254, 0.96);
 }
 
+.console-shell--ide .kairo-chip--idle .kairo-chip__pulse {
+  animation: none;
+  opacity: 0.45;
+}
+
+.console-shell--ide .kairo-chip--idle .kairo-chip__waveform {
+  display: none;
+}
+
 .console-shell--ide .agent-dock__composer {
   background: rgba(10, 12, 20, 0.88);
   border-top-color: rgba(99, 102, 241, 0.14);

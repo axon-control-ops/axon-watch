@@ -7,9 +7,14 @@ import {
   briefingPanelHeadline,
 } from '../../lib/briefing-panel-view';
 import { kairoPresenceLabel } from '../../lib/kairo-presence';
+import { ideShowKairoSidebarExpanded } from '../../lib/ide-presence-profile';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
+
+const showExpandedPanel = computed(() =>
+  ideShowKairoSidebarExpanded(shell.idePresenceProfile),
+);
 
 const headline = computed(() => {
   if (shell.kairoAgentLiveLine) {
@@ -38,6 +43,20 @@ function handleExpand(): void {
 
 <template>
   <button
+    v-if="!showExpandedPanel"
+    type="button"
+    class="kairo-sidebar-panel kairo-sidebar-panel--compact"
+    :class="`kairo-sidebar-panel--${shell.ideDisplayKairoPresenceState}`"
+    :aria-label="`KAIRO. ${kairoPresenceLabel(shell.ideDisplayKairoPresenceState)}`"
+    @click="handleExpand"
+  >
+    <span class="kairo-sidebar-panel__compact-dot" aria-hidden="true" />
+    <span class="kairo-sidebar-panel__compact-label">
+      {{ kairoPresenceLabel(shell.ideDisplayKairoPresenceState) }}
+    </span>
+  </button>
+  <button
+    v-else
     type="button"
     class="kairo-sidebar-panel hud-panel-frame"
     :class="`kairo-sidebar-panel--${shell.kairoPresenceState}`"
