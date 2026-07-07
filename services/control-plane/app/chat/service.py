@@ -30,7 +30,7 @@ from app.chat.workspace_switch import (
     resolve_workspace_switch_intent,
     workspace_switch_ui_action,
 )
-from app.persistence import chat_store
+from app.persistence import attachment_store, chat_store
 from app.workspace_handoffs import create_workspace_handoff
 from app.runs.service import (
     RunLifecycleError,
@@ -40,6 +40,7 @@ from app.runs.service import (
     get_run,
     mark_review_ready,
 )
+from app.terminal.session_registry import ensure_agent_session, serialize_session
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
 
@@ -59,11 +60,83 @@ class LaneBStreamJob:
     active_file_path: str | None
     editor_selection: EditorSelectionContext | None
     terminal_snippet: str | None
+    image_paths: tuple[str, ...]
     runtime_target: str | None
     runtime_model: str | None
     execution_access: str
     dispatch_run_id: str
     created_at: str
+
+
+def _coerce_attachment_ids(raw: list[str] | None) -> list[str]:
+    if not raw:
+        return []
+    seen: set[str] = set()
+    attachment_ids: list[str] = []
+    for item in raw:
+        clean = str(item or "").strip()
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        attachment_ids.append(clean)
+    return attachment_ids
+
+
+def _attachment_paths_for_ids(attachment_ids: list[str], workspace_id: str) -> tuple[str, ...]:
+    if not attachment_ids:
+        return ()
+    paths: list[str] = []
+    for attachment_id in attachment_ids:
+        record = attachment_store.get_attachment(attachment_id)
+        if record is None:
+            raise ChatValidationError(f"attachment not found: {attachment_id}")
+        if record["workspace_id"] != workspace_id:
+            raise ChatValidationError("attachment does not belong to workspace")
+        if record["message_id"]:
+            raise ChatValidationError("attachment is already linked to a message")
+        paths.append(str(record["storage_path"]))
+    return tuple(paths)
+
+
+def _bind_message_attachments(
+    *,
+    attachment_ids: list[str],
+    workspace_id: str,
+    message_id: str,
+    thread_id: str,
+) -> tuple[list[dict[str, object]], tuple[str, ...]]:
+    if not attachment_ids:
+        return [], ()
+    try:
+        bound = attachment_store.bind_attachments_to_message(
+            attachment_ids=attachment_ids,
+            workspace_id=workspace_id,
+            message_id=message_id,
+            thread_id=thread_id,
+        )
+    except attachment_store.AttachmentNotFoundError as exc:
+        raise ChatValidationError(str(exc)) from exc
+    except attachment_store.AttachmentValidationError as exc:
+        raise ChatValidationError(str(exc)) from exc
+    serialized = [attachment_store.serialize_attachment(item) for item in bound]
+    paths = tuple(str(item["storage_path"]) for item in bound)
+    return serialized, paths
+
+
+def _enrich_message_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    message_ids = [str(item.get("message_id") or "") for item in records]
+    grouped = attachment_store.list_attachments_for_messages(message_ids)
+    enriched: list[dict[str, object]] = []
+    for record in records:
+        next_record = dict(record)
+        message_id = str(record.get("message_id") or "")
+        attachments = grouped.get(message_id, [])
+        if attachments:
+            next_record["attachments"] = [
+                attachment_store.serialize_attachment(item) for item in attachments
+            ]
+        enriched.append(next_record)
+    return enriched
 
 
 def _utc_now() -> str:
@@ -159,6 +232,7 @@ def post_chat_message(
     active_file_path: str | None = None,
     editor_selection: dict[str, object] | None = None,
     terminal_snippet: str | None = None,
+    attachment_ids: list[str] | None = None,
     runtime_target: str | None = None,
     runtime_model: str | None = None,
     execution_access: str | None = None,
@@ -169,6 +243,7 @@ def post_chat_message(
 
     _validate_workspace(workspace_id)
     created_at = _utc_now()
+    normalized_attachment_ids = _coerce_attachment_ids(attachment_ids)
     normalized = expand_command_shortcuts(trimmed)
     intent = classify_command(normalized)
     if should_use_lane_b(composer_mode=composer_mode, command_intent=intent):
@@ -181,6 +256,7 @@ def post_chat_message(
             active_file_path=active_file_path,
             editor_selection=_coerce_editor_selection(editor_selection),
             terminal_snippet=_coerce_terminal_snippet(terminal_snippet),
+            attachment_ids=normalized_attachment_ids,
             runtime_target=runtime_target,
             runtime_model=runtime_model,
             execution_access=normalize_execution_access(execution_access),
@@ -243,6 +319,14 @@ def post_chat_message(
             "created_at": created_at,
         }
     )
+    operator_attachments, _ = _bind_message_attachments(
+        attachment_ids=normalized_attachment_ids,
+        workspace_id=workspace_id,
+        message_id=str(operator_message["message_id"]),
+        thread_id=thread_id,
+    )
+    if operator_attachments:
+        operator_message = {**operator_message, "attachments": operator_attachments}
     system_message = chat_store.save_message(
         {
             "message_id": _new_message_id("message_system"),
@@ -352,6 +436,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
         active_file_path=job.active_file_path,
         editor_selection=job.editor_selection,
         terminal_snippet=job.terminal_snippet,
+        image_paths=job.image_paths,
     )
     dispatched = False
     run_record = None
@@ -586,6 +671,7 @@ def _post_lane_b_message(
     active_file_path: str | None,
     editor_selection: EditorSelectionContext | None,
     terminal_snippet: str | None,
+    attachment_ids: list[str],
     runtime_target: str | None,
     runtime_model: str | None,
     execution_access: str,
@@ -614,6 +700,7 @@ def _post_lane_b_message(
     dispatch_run_id = ""
     dispatched = False
     run_record = None
+    agent_terminal_session = None
 
     if composer_mode == "agent":
         run_record = resolve_lane_b_agent_run(
@@ -623,6 +710,10 @@ def _post_lane_b_message(
             execution_access=execution_access,
         )
         dispatch_run_id = str(run_record["run_id"])
+        agent_terminal_session = ensure_agent_session(
+            workspace_id=workspace_id,
+            run_id=dispatch_run_id,
+        )
 
     if _lane_b_streaming_enabled():
         thread, thread_id = _resolve_chat_thread(
@@ -643,6 +734,22 @@ def _post_lane_b_message(
                 "content": content,
                 "created_at": created_at,
             }
+        )
+        operator_attachments, image_paths = _bind_message_attachments(
+            attachment_ids=attachment_ids,
+            workspace_id=workspace_id,
+            message_id=str(operator_message["message_id"]),
+            thread_id=thread_id,
+        )
+        if operator_attachments:
+            operator_message = {**operator_message, "attachments": operator_attachments}
+        context = LaneBContext(
+            workspace_id=workspace_id,
+            composer_mode=composer_mode,
+            active_file_path=active_file_path,
+            editor_selection=editor_selection,
+            terminal_snippet=terminal_snippet,
+            image_paths=image_paths,
         )
         system_message_id = _new_message_id("message_system")
         system_message = chat_store.save_message(
@@ -683,13 +790,14 @@ def _post_lane_b_message(
             active_file_path=active_file_path,
             editor_selection=editor_selection,
             terminal_snippet=terminal_snippet,
+            image_paths=image_paths,
             runtime_target=runtime_target,
             runtime_model=runtime_model,
             execution_access=execution_access,
             dispatch_run_id=dispatch_run_id,
             created_at=created_at,
         )
-        return {
+        payload: dict[str, object] = {
             "thread_id": thread_id,
             "messages": [operator_message, system_message, agent_message],
             "run_id": dispatch_run_id or thread.get("run_id") or "",
@@ -699,7 +807,19 @@ def _post_lane_b_message(
             "stream_agent_message_id": agent_message_id,
             "_stream_job": stream_job,
         }
+        if agent_terminal_session is not None:
+            payload["agent_terminal_session"] = serialize_session(agent_terminal_session)
+        return payload
 
+    image_paths = _attachment_paths_for_ids(attachment_ids, workspace_id)
+    context = LaneBContext(
+        workspace_id=workspace_id,
+        composer_mode=composer_mode,
+        active_file_path=active_file_path,
+        editor_selection=editor_selection,
+        terminal_snippet=terminal_snippet,
+        image_paths=image_paths,
+    )
     system_content = _lane_b_system_content(
         composer_mode=composer_mode,
         dispatch_run_id="",
@@ -758,6 +878,14 @@ def _post_lane_b_message(
             "created_at": created_at,
         }
     )
+    operator_attachments, _ = _bind_message_attachments(
+        attachment_ids=attachment_ids,
+        workspace_id=workspace_id,
+        message_id=str(operator_message["message_id"]),
+        thread_id=thread_id,
+    )
+    if operator_attachments:
+        operator_message = {**operator_message, "attachments": operator_attachments}
     system_message = chat_store.save_message(
         {
             "message_id": _new_message_id("message_system"),
@@ -788,6 +916,11 @@ def _post_lane_b_message(
         "dispatched": dispatched,
         "run": run_record,
         "streaming": False,
+        **(
+            {"agent_terminal_session": serialize_session(agent_terminal_session)}
+            if agent_terminal_session is not None
+            else {}
+        ),
     }
 
 
@@ -814,12 +947,62 @@ def get_chat_thread_history(thread_id: str) -> dict[str, object]:
             if content.strip():
                 record["content"] = normalize_transcript_content(content)
         normalized_items.append(record)
+    enriched_items = _enrich_message_records(normalized_items)
     return {
         "thread_id": thread["thread_id"],
         "workspace_id": thread["workspace_id"],
         "run_id": thread["run_id"],
-        "items": normalized_items,
-        "count": len(normalized_items),
+        "items": enriched_items,
+        "count": len(enriched_items),
+    }
+
+
+def list_workspace_chat_threads(
+    workspace_id: str,
+    *,
+    thread_kind: str = "ide",
+    limit: int = 25,
+) -> dict[str, object]:
+    get_workspace_record(workspace_id)
+    kind = _normalize_thread_kind(thread_kind)
+    threads = chat_store.list_threads_for_workspace(
+        workspace_id,
+        thread_kind=kind,
+        limit=limit,
+    )
+    items = [
+        {
+            **thread,
+            "preview_label": chat_store.first_operator_message_preview(str(thread["thread_id"])),
+        }
+        for thread in threads
+    ]
+    return {
+        "workspace_id": workspace_id,
+        "thread_kind": kind,
+        "items": items,
+        "count": len(items),
+    }
+
+
+def create_workspace_chat_thread(
+    workspace_id: str,
+    *,
+    thread_kind: str = "ide",
+    run_id: str | None = None,
+) -> dict[str, object]:
+    get_workspace_record(workspace_id)
+    kind = _normalize_thread_kind(thread_kind)
+    created_at = _utc_now()
+    created = chat_store.create_thread(
+        workspace_id=workspace_id,
+        run_id=run_id,
+        created_at=created_at,
+        thread_kind=kind,
+    )
+    return {
+        **created,
+        "preview_label": "New chat",
     }
 
 

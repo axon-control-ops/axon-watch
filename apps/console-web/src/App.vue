@@ -105,6 +105,7 @@ onUnmounted(() => {
         'console-shell--mobile-compact': shell.mobileCompactLayout,
         'console-shell--ide': shell.layoutMode === 'ide',
         'console-shell--operator': shell.layoutMode === 'operator',
+        'console-shell--brain-galaxy': shell.operatorBrainGalaxyActive,
         'console-shell--vault': isVaultSurface,
         'console-shell--data': isDataSurface,
       }"

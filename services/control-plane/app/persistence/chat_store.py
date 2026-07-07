@@ -128,6 +128,50 @@ def get_thread(thread_id: str) -> dict[str, Any] | None:
     return _thread_row_to_record(row) if row is not None else None
 
 
+def list_threads_for_workspace(
+    workspace_id: str,
+    *,
+    thread_kind: str = "operator",
+    limit: int = 25,
+) -> list[dict[str, Any]]:
+    kind = str(thread_kind or "operator").strip().lower() or "operator"
+    max_limit = max(1, min(50, int(limit or 25)))
+    with _managed_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM chat_threads
+            WHERE workspace_id = ? AND thread_kind = ?
+            ORDER BY updated_at DESC, created_at DESC, rowid DESC
+            LIMIT ?
+            """,
+            (workspace_id, kind, max_limit),
+        ).fetchall()
+    return [_thread_row_to_record(row) for row in rows]
+
+
+def first_operator_message_preview(thread_id: str, *, max_chars: int = 72) -> str:
+    with _managed_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT content
+            FROM chat_messages
+            WHERE thread_id = ? AND role = 'operator'
+            ORDER BY rowid ASC
+            LIMIT 1
+            """,
+            (thread_id,),
+        ).fetchone()
+    if row is None:
+        return "New chat"
+    preview = str(row["content"] or "").strip().replace("\n", " ")
+    if not preview:
+        return "New chat"
+    if len(preview) <= max_chars:
+        return preview
+    return f"{preview[: max_chars - 1].rstrip()}…"
+
+
 def get_latest_thread_for_workspace(
     workspace_id: str,
     *,

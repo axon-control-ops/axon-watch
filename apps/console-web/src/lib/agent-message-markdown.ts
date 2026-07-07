@@ -107,7 +107,7 @@ export function shouldOfferMarkdownPreview(content: string): boolean {
   return splitAgentMessageForPreview(content).hasMarkdownPreview;
 }
 
-/** Rich agent prose gets Preview/Raw in the lane — not interim search status lines. */
+/** Rich agent prose renders as inline markdown — not interim status or read_file stubs. */
 export function shouldUseAgentMarkdownBlock(content: string, isComplete = true): boolean {
   const trimmed = content.trim();
   if (!trimmed) {
@@ -119,14 +119,17 @@ export function shouldUseAgentMarkdownBlock(content: string, isComplete = true):
   if (isInterimAgentStatus(trimmed)) {
     return false;
   }
+  if (isMarkdownFileAgentResponse(trimmed)) {
+    return false;
+  }
   return true;
 }
 
-const MD_FILENAME_HEADING_RE = /^#{1,6}\s+([^\s/\\]+\.md)\s*$/im;
+const MD_FILE_HEADING_RE = /^#{1,6}\s+(.+\.md)\s*$/im;
 
 export function isMarkdownFileAgentResponse(content: string): boolean {
   const parts = splitAgentMessageForPreview(content);
-  if (MD_FILENAME_HEADING_RE.test(parts.markdownSource)) {
+  if (MD_FILE_HEADING_RE.test(parts.markdownSource)) {
     return true;
   }
   if (parts.executionIntent === 'read_file' && /\.md\b/i.test(parts.preamble ?? '')) {
@@ -135,8 +138,18 @@ export function isMarkdownFileAgentResponse(content: string): boolean {
   return false;
 }
 
-export function shouldHideAgentReportInThread(content: string): boolean {
-  return shouldAutoOpenAgentReportInEditor(content);
+/** Workspace path from a read_file agent message that returned markdown file content. */
+export function extractReadMarkdownFilePath(content: string): string | null {
+  if (!isMarkdownFileAgentResponse(content)) {
+    return null;
+  }
+  const parts = splitAgentMessageForPreview(content);
+  const match = parts.markdownSource.match(MD_FILE_HEADING_RE);
+  return match?.[1]?.trim() ?? null;
+}
+
+export function shouldHideAgentReportInThread(_content: string): boolean {
+  return false;
 }
 
 export function shouldOfferOpenInEditor(content: string, isComplete = true): boolean {
@@ -146,27 +159,9 @@ export function shouldOfferOpenInEditor(content: string, isComplete = true): boo
   return shouldAutoOpenAgentReportInEditor(content) || isAgentReportMarkdown(content);
 }
 
-export function shouldAutoOpenAgentReportInEditor(content: string): boolean {
-  const trimmed = content.trim();
-  if (!trimmed) {
-    return false;
-  }
-
-  // Cursor-style: tool/research/edit transcripts stay in the agent lane.
-  if (agentContentHasTranscriptBlocks(trimmed)) {
-    return false;
-  }
-
-  if (isMarkdownFileAgentResponse(content)) {
-    return true;
-  }
-  if (!isAgentReportMarkdown(content)) {
-    return false;
-  }
-  if (/^#{1,3}\s+/m.test(content.trim())) {
-    return true;
-  }
-  return content.trim().length >= 300;
+export function shouldAutoOpenAgentReportInEditor(_content: string): boolean {
+  // Cursor-style: agent prose stays in the chat lane; only workspace files belong in the editor.
+  return false;
 }
 
 /** @deprecated use shouldUseAgentMarkdownBlock */

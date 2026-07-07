@@ -8,6 +8,8 @@ const props = defineProps<{
   runtimeConnected: boolean;
   runSummary: string | null;
   workspaceId: string | null;
+  sessionId?: string;
+  sessionRole?: string;
   variant?: 'default' | 'mockup';
 }>();
 
@@ -49,6 +51,8 @@ onMounted(async () => {
       runSummary: props.runSummary,
       primarySignalId: props.primarySignalId,
       runtimeConnected: props.runtimeConnected,
+      sessionId: props.sessionId ?? 'terminal-operator',
+      sessionRole: props.sessionRole ?? 'operator',
     });
     loadState.value = 'ready';
   } catch {
@@ -62,6 +66,8 @@ watch(
     runSummary: props.runSummary,
     primarySignalId: props.primarySignalId,
     runtimeConnected: props.runtimeConnected,
+    sessionId: props.sessionId ?? 'terminal-operator',
+    sessionRole: props.sessionRole ?? 'operator',
   }),
   (context) => {
     terminalController?.setContext(context);

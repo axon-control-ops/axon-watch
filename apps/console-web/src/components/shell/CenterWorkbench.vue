@@ -25,7 +25,20 @@ import {
   persistEditorMarkdownPreviewEnabled,
   resolveEditorMarkdownPreviewEnabled,
 } from '../../lib/editor-markdown-preview-prefs';
-import { editorTabLabelForDocument, editorTabLabelsForDocuments } from '../../lib/editor-tab-labels';
+import {
+  editorDocumentResourcePath,
+  editorTabLabelForDocument,
+  editorTabLabelsForDocuments,
+} from '../../lib/editor-tab-labels';
+import {
+  buildEditorBreadcrumbTrail,
+  type EditorBreadcrumbSegment,
+} from '../../lib/editor-breadcrumb-view';
+import {
+  persistEditorMinimapEnabled,
+  readEditorMinimapEnabled,
+} from '../../lib/editor-surface-prefs';
+import { terminalSessionTabLabel } from '../../lib/terminal-session-view';
 
 const shell = useShellStore();
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
@@ -44,6 +57,7 @@ const resizing = ref(false);
 const terminalHeightCustomized = ref(false);
 const editorCursorLine = ref(1);
 const editorCursorColumn = ref(1);
+const editorMinimapEnabled = ref(readEditorMinimapEnabled());
 
 const problemItems = computed(() => {
   const items: string[] = [];
@@ -58,6 +72,16 @@ const problemItems = computed(() => {
   return items;
 });
 
+function createTerminalSession(): void {
+  void shell.createTerminalSession();
+}
+
+function selectTerminalSession(sessionId: string): void {
+  shell.setActiveTerminalSession(sessionId);
+}
+
+const activeTerminalSession = computed(() => shell.activeTerminalSession);
+
 const bottomTabs = computed(() => [
   { id: 'terminal' as const, label: 'TERMINAL' },
   { id: 'problems' as const, label: `PROBLEMS ${problemItems.value.length}` },
@@ -65,19 +89,31 @@ const bottomTabs = computed(() => [
   { id: 'logs' as const, label: 'LOGS' },
 ]);
 
-const editorBreadcrumb = computed(() => {
+const editorBreadcrumbSegments = computed((): EditorBreadcrumbSegment[] => {
   const workspace = shell.currentWorkspace?.workspace_id ?? 'workspace_smoke';
   const document = shell.activeEditorDocument;
   if (!document) {
-    return { workspace, file: 'README.md' };
+    return buildEditorBreadcrumbTrail({
+      workspaceId: workspace,
+      filePath: 'README.md',
+      content: '',
+      cursorLine: editorCursorLine.value,
+      language: 'markdown',
+    });
   }
 
-  const labels = editorTabLabelsForDocuments(editorTabDocuments.value);
-  const file =
+  const filePath =
     document.source === 'file' && document.filePath
       ? document.filePath
-      : labels.get(document.id) ?? document.title;
-  return { workspace, file };
+      : editorDocumentResourcePath(document);
+
+  return buildEditorBreadcrumbTrail({
+    workspaceId: workspace,
+    filePath,
+    content: activeEditorValue.value,
+    cursorLine: editorCursorLine.value,
+    language: document.language,
+  });
 });
 
 const workspaceTerminalLabel = computed(() => {
@@ -195,6 +231,22 @@ const logLines = computed(() => {
 function handleEditorCursorChange(position: { line: number; column: number }): void {
   editorCursorLine.value = position.line;
   editorCursorColumn.value = position.column;
+}
+
+function handleEditorTabClose(event: MouseEvent, documentId: string): void {
+  event.stopPropagation();
+  shell.closeEditorDocument(documentId);
+}
+
+function handleBreadcrumbSegmentClick(segment: EditorBreadcrumbSegment): void {
+  if (segment.revealLine) {
+    shell.revealEditorLine(segment.revealLine);
+  }
+}
+
+function toggleEditorMinimap(): void {
+  editorMinimapEnabled.value = !editorMinimapEnabled.value;
+  persistEditorMinimapEnabled(editorMinimapEnabled.value);
 }
 
 function syncTerminalHeightToContainer(): void {
@@ -434,18 +486,41 @@ watch(
     >
       <div class="editor-tabbar editor-tabbar--mockup">
         <div class="editor-tabbar__tabs">
-          <button
+          <div
             v-for="document in editorTabDocuments"
             :key="document.id"
-            type="button"
+            role="tab"
             class="editor-tabbar__tab hud-active-chip hud-active-chip--tab"
-            :class="{ 'editor-tabbar__tab--active hud-active-chip--active': shell.activeEditorDocumentId === document.id }"
-            @click="shell.setActiveEditorDocument(document.id)"
+            :class="{
+              'editor-tabbar__tab--active hud-active-chip--active': shell.activeEditorDocumentId === document.id,
+              'editor-tabbar__tab--dirty': document.dirty,
+            }"
+            :aria-selected="shell.activeEditorDocumentId === document.id"
           >
-            <WorkbenchIcon name="file" />
-            <span class="editor-tabbar__label">{{ editorTabLabel(document.id, document) }}</span>
-            <WorkbenchIcon name="close" class="editor-tabbar__close-icon" />
-          </button>
+            <button
+              type="button"
+              class="editor-tabbar__tab-select"
+              @click="shell.setActiveEditorDocument(document.id)"
+            >
+              <WorkbenchIcon name="file" />
+              <span class="editor-tabbar__label">{{ editorTabLabel(document.id, document) }}</span>
+              <span
+                v-if="document.dirty"
+                class="editor-tabbar__dirty-dot"
+                aria-label="Unsaved changes"
+                title="Unsaved changes"
+              />
+            </button>
+            <button
+              type="button"
+              class="editor-tabbar__close"
+              title="Close editor tab"
+              aria-label="Close editor tab"
+              @click="handleEditorTabClose($event, document.id)"
+            >
+              <WorkbenchIcon name="close" class="editor-tabbar__close-icon" />
+            </button>
+          </div>
         </div>
         <div class="editor-tabbar__tools">
           <div
@@ -497,14 +572,28 @@ watch(
         </div>
       </div>
 
-      <p class="editor-breadcrumb editor-breadcrumb--mockup">
-        <span class="editor-breadcrumb__workspace">{{ editorBreadcrumb.workspace }}</span>
-        <span class="editor-breadcrumb__sep" aria-hidden="true">&gt;</span>
-        <span class="editor-breadcrumb__file">
-          <WorkbenchIcon name="file" :size="12" />
-          <span>{{ editorBreadcrumb.file }}</span>
-        </span>
-      </p>
+      <nav class="editor-breadcrumb editor-breadcrumb--mockup" aria-label="Editor location">
+        <template v-for="(segment, index) in editorBreadcrumbSegments" :key="segment.id">
+          <span v-if="index > 0" class="editor-breadcrumb__sep" aria-hidden="true">›</span>
+          <button
+            type="button"
+            class="editor-breadcrumb__segment"
+            :class="{
+              'editor-breadcrumb__segment--symbol': segment.kind === 'symbol',
+              'editor-breadcrumb__segment--active': index === editorBreadcrumbSegments.length - 1,
+            }"
+            :disabled="!segment.revealLine"
+            @click="handleBreadcrumbSegmentClick(segment)"
+          >
+            <WorkbenchIcon
+              v-if="segment.kind === 'file' || segment.kind === 'symbol'"
+              name="file"
+              :size="12"
+            />
+            <span>{{ segment.label }}</span>
+          </button>
+        </template>
+      </nav>
 
       <section
         class="center-workbench__editor"
@@ -519,6 +608,7 @@ watch(
           :description="shell.activeEditorDocument.description"
           :read-only="shell.activeEditorDocument.readOnly"
           :dirty="shell.activeEditorDocument.dirty"
+          :minimap-enabled="editorMinimapEnabled"
           :reveal-request="shell.editorRevealRequest"
           @cursor-change="handleEditorCursorChange"
           @selection-change="shell.setEditorSelection"
@@ -542,8 +632,20 @@ watch(
             TERMINAL
           </button>
           <div class="editor-statusbar__meta">
+            <button
+              type="button"
+              class="editor-statusbar__toggle"
+              :class="{ 'editor-statusbar__toggle--active': editorMinimapEnabled }"
+              title="Toggle minimap"
+              aria-label="Toggle minimap"
+              @click="toggleEditorMinimap"
+            >
+              Minimap
+            </button>
             <span>Ln {{ editorCursorLine }}, Col {{ editorCursorColumn }}</span>
             <span>{{ editorLineCount }} line{{ editorLineCount === 1 ? '' : 's' }}</span>
+            <span>Spaces: 2</span>
+            <span>UTF-8</span>
             <span>{{ editorEol }}</span>
             <span>{{ editorLanguageLabel }}</span>
             <span class="editor-statusbar__state">{{ editorAccessLabel }}</span>
@@ -601,7 +703,7 @@ watch(
             {{ workspaceTerminalLabel }}
           </p>
           <div class="terminal-tabbar__actions">
-            <button type="button" class="terminal-tabbar__action-button" title="New terminal" aria-label="New terminal">
+            <button type="button" class="terminal-tabbar__action-button" title="New terminal" aria-label="New terminal" @click="createTerminalSession">
               <WorkbenchIcon name="plus" class="terminal-tabbar__action" />
             </button>
             <button type="button" class="terminal-tabbar__action-button" title="Split terminal" aria-label="Split terminal">
@@ -629,10 +731,36 @@ watch(
         </div>
 
         <div v-if="bottomTab === 'terminal'" class="center-workbench__terminal-body">
+          <div class="terminal-session-tabs" role="tablist" aria-label="Terminal sessions">
+            <button
+              v-for="session in shell.terminalSessions"
+              :key="session.id"
+              type="button"
+              role="tab"
+              class="terminal-session-tabs__tab"
+              :class="{
+                'terminal-session-tabs__tab--active': shell.activeTerminalSessionId === session.id,
+                'terminal-session-tabs__tab--agent': session.role === 'agent',
+              }"
+              :aria-selected="shell.activeTerminalSessionId === session.id"
+              @click="selectTerminalSession(session.id)"
+            >
+              {{ terminalSessionTabLabel({
+                session_id: session.id,
+                workspace_id: shell.currentWorkspace?.workspace_id ?? '',
+                role: session.role,
+                title: session.title,
+                run_id: session.runId,
+                created_at: '',
+              }) }}
+            </button>
+          </div>
           <TerminalHost
             ref="terminalHostRef"
             variant="mockup"
             :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
+            :session-id="activeTerminalSession.id"
+            :session-role="activeTerminalSession.role"
             :run-summary="
               shell.primaryActiveRun
                 ? `${shell.primaryActiveRun.run_id} · ${shell.primaryActiveRun.phase} · ${shell.primaryActiveRun.status}`

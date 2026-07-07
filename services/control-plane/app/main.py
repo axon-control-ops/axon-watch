@@ -7,20 +7,28 @@ from typing import Any
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Query, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from app.chat.service import (
     ChatValidationError,
     LaneBStreamJob,
+    create_workspace_chat_thread,
     execute_lane_b_stream,
     get_chat_thread,
     get_chat_thread_history,
     get_workspace_chat_thread,
+    list_workspace_chat_threads,
     post_chat_message,
 )
+from app.persistence import attachment_store, chat_store, operator_presence_settings_store
 from app.chat.stream_events import chat_thread_stream_response
-from app.inbox_projection import build_inbox_response
+from app.terminal.session_registry import (
+    create_session,
+    ensure_operator_session,
+    list_sessions,
+    serialize_session,
+)
 from app.inbox_signals import acknowledge_inbox_signals
 from app.adapters.watch_client import (
     fetch_watch_connectors,
@@ -31,8 +39,9 @@ from app.adapters.watch_client import (
     post_watch_command,
     post_watch_tunnel_action,
 )
-from app.persistence import chat_store, operator_presence_settings_store
+from app.operator_brain_graph import build_operator_brain_graph
 from app.operator_briefing import build_operator_briefing
+from app.operator_fleet_health import build_operator_fleet_health
 from app.runs.service import (
     approve_run,
     RunLifecycleError,
@@ -119,9 +128,22 @@ class PostChatMessageRequest(BaseModel):
     active_file_path: str | None = None
     editor_selection: EditorSelectionContextRequest | None = None
     terminal_snippet: str | None = None
+    attachment_ids: list[str] | None = None
     runtime_target: str | None = None
     runtime_model: str | None = None
     execution_access: str | None = None
+
+
+class CreateWorkspaceChatThreadRequest(BaseModel):
+    surface: str = "ide"
+    run_id: str | None = None
+
+
+class CreateTerminalSessionRequest(BaseModel):
+    role: str = "operator"
+    title: str | None = None
+    run_id: str | None = None
+    session_id: str | None = None
 
 
 class CreateWorkspaceHandoffRequest(BaseModel):
@@ -238,8 +260,18 @@ app.add_middleware(
 
 
 @app.websocket("/api/workspaces/{workspace_id}/terminal")
-async def workspace_terminal(websocket: WebSocket, workspace_id: str) -> None:
-    await handle_terminal_session(websocket, workspace_id)
+async def workspace_terminal(
+    websocket: WebSocket,
+    workspace_id: str,
+    session_id: str = Query("terminal-operator"),
+    role: str = Query("operator"),
+) -> None:
+    await handle_terminal_session(
+        websocket,
+        workspace_id,
+        session_id=session_id,
+        role=role,
+    )
 
 
 @app.get("/api/health")
@@ -549,8 +581,22 @@ def delivery_receipts_index(limit: int = 20, cursor: str = "") -> dict[str, obje
 
 
 @app.get("/api/briefing")
-def operator_briefing(viewport_compact: bool = False) -> dict[str, object]:
-    return build_operator_briefing(viewport_compact=viewport_compact)
+def operator_briefing(viewport_compact: bool = False, workspace_id: str = "") -> dict[str, object]:
+    scoped_workspace_id = workspace_id.strip() or None
+    return build_operator_briefing(
+        viewport_compact=viewport_compact,
+        workspace_id=scoped_workspace_id,
+    )
+
+
+@app.get("/api/operator/fleet-health")
+def operator_fleet_health() -> dict[str, object]:
+    return build_operator_fleet_health()
+
+
+@app.get("/api/operator/brain-graph")
+def operator_brain_graph() -> dict[str, object]:
+    return build_operator_brain_graph()
 
 
 @app.get("/api/operator-presence/settings")
@@ -609,6 +655,7 @@ def chat_messages_create(
                 body.editor_selection.model_dump() if body.editor_selection is not None else None
             ),
             terminal_snippet=body.terminal_snippet,
+            attachment_ids=body.attachment_ids,
             runtime_target=body.runtime_target,
             runtime_model=body.runtime_model,
             execution_access=body.execution_access,
@@ -644,6 +691,48 @@ def chat_threads_history(thread_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.post("/api/chat/attachments")
+async def chat_attachments_upload(
+    workspace_id: str = Form(...),
+    file: UploadFile = File(...),
+) -> dict[str, object]:
+    from datetime import datetime, timezone
+
+    try:
+        payload = await file.read()
+        created_at = (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+        record = attachment_store.save_upload(
+            workspace_id=workspace_id,
+            filename=file.filename or "attachment",
+            mime_type=file.content_type or "application/octet-stream",
+            data=payload,
+            created_at=created_at,
+        )
+        return attachment_store.serialize_attachment(record)
+    except attachment_store.AttachmentValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/chat/attachments/{attachment_id}")
+def chat_attachments_show(attachment_id: str) -> FileResponse:
+    try:
+        record = attachment_store.require_attachment(attachment_id)
+    except attachment_store.AttachmentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    storage_path = str(record["storage_path"])
+    return FileResponse(
+        storage_path,
+        media_type=str(record["mime_type"]),
+        filename=str(record["filename"]),
+    )
+
+
 @app.get("/api/runs")
 def runs_index() -> dict[str, Any]:
     items = list_runs()
@@ -651,9 +740,10 @@ def runs_index() -> dict[str, Any]:
 
 
 @app.get("/api/workspaces")
-def workspaces_index() -> dict[str, Any]:
-    items = list_workspace_records()
-    return {"items": items, "count": len(items)}
+def workspaces_index(scope: str = "") -> dict[str, Any]:
+    operator_surface = scope.strip().lower() == "operator"
+    items = list_workspace_records(operator_surface=operator_surface)
+    return {"items": items, "count": len(items), "scope": "operator" if operator_surface else "all"}
 
 
 @app.get("/api/workspaces/{workspace_id}")
@@ -699,6 +789,73 @@ def workspace_chat_thread(workspace_id: str, surface: str = "operator") -> dict[
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ChatValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/workspaces/{workspace_id}/chat/threads")
+def workspace_chat_threads(
+    workspace_id: str,
+    surface: str = "ide",
+    limit: int = 25,
+) -> dict[str, object]:
+    try:
+        return list_workspace_chat_threads(
+            workspace_id,
+            thread_kind=surface,
+            limit=limit,
+        )
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ChatValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/workspaces/{workspace_id}/chat/threads")
+def workspace_chat_threads_create(
+    workspace_id: str,
+    body: CreateWorkspaceChatThreadRequest,
+) -> dict[str, object]:
+    try:
+        return create_workspace_chat_thread(
+            workspace_id,
+            thread_kind=body.surface,
+            run_id=body.run_id,
+        )
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ChatValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/workspaces/{workspace_id}/terminal/sessions")
+def workspace_terminal_sessions(workspace_id: str) -> dict[str, object]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    ensure_operator_session(workspace_id)
+    items = [serialize_session(record) for record in list_sessions(workspace_id)]
+    return {"workspace_id": workspace_id, "items": items, "count": len(items)}
+
+
+@app.post("/api/workspaces/{workspace_id}/terminal/sessions")
+def workspace_terminal_sessions_create(
+    workspace_id: str,
+    body: CreateTerminalSessionRequest,
+) -> dict[str, object]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    record = create_session(
+        workspace_id=workspace_id,
+        role=body.role,
+        title=body.title,
+        run_id=body.run_id,
+        session_id=body.session_id,
+    )
+    return serialize_session(record)
 
 
 @app.get("/api/workspaces/{workspace_id}/files")

@@ -199,6 +199,17 @@ def _fallback_for_event(
         line = _pick_pool_line("greeting", recent, persona_enabled=persona_enabled)
         return f"{line} {tail.capitalize()}."
 
+    if event_type == "briefing":
+        notice = str(context.get("notice") or "").strip()
+        advise = str(context.get("advise") or "").strip()
+        if notice and advise:
+            return f"{notice} {advise}"
+        if notice:
+            return notice
+        if advise:
+            return advise
+        return "Systems nominal — standing by for your next command."
+
     if event_type == "tool":
         tool_label = str(context.get("tool_label") or "").strip().lower()
         if tool_label.startswith("read"):
@@ -282,7 +293,7 @@ def should_use_runtime_for_event(event_type: str, narration: NarrationLevel) -> 
     if narration == "off":
         return False
     # Narration is bookend-only (agent_start + done) plus alerts/greetings.
-    return event_type in {"agent_start", "done", "greeting", "chat_summary", "alert"}
+    return event_type in {"agent_start", "done", "greeting", "chat_summary", "alert", "briefing"}
 
 
 def generate_spoken_line(
@@ -331,8 +342,16 @@ def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:
     if narration == "off":
         return False
     if narration == "conversational":
-        return event_type in {"agent_start", "done", "alert", "approval_literal", "greeting", "chat_summary"}
-    return event_type in {"agent_start", "done", "alert", "approval_literal", "greeting"}
+        return event_type in {
+            "agent_start",
+            "done",
+            "alert",
+            "approval_literal",
+            "greeting",
+            "chat_summary",
+            "briefing",
+        }
+    return event_type in {"agent_start", "done", "alert", "approval_literal", "greeting", "briefing"}
 
 
 __all__ = [

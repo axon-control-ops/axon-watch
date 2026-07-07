@@ -31,6 +31,7 @@ function openSurface(surface: AppSurface): void {
     <div class="topbar-mockup__grid">
       <div class="topbar-mockup__identity-zone">
         <div class="topbar-mockup__brand">
+          <p class="topbar-mockup__logo">AXON-X</p>
           <p class="topbar-mockup__subtitle">{{ topbarSubtitle }}</p>
         </div>
       </div>

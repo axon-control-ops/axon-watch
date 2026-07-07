@@ -59,6 +59,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
         self.assertEqual(
             {
                 "generated_at",
+                "scope",
                 "notice",
                 "advise",
                 "executive_rhythm",

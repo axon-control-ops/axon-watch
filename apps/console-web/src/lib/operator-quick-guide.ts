@@ -26,11 +26,11 @@ export function buildOperatorQuickGuide(input: {
 
   if (input.runPhase === 'review_ready') {
     return {
-      title: 'Review ready — the run paused for you',
+      title: 'Review ready — read output, then complete',
       steps: [
         'Read the Conversation panel (right) for command output — e.g. git status results.',
-        'Center → RESUME RUN to continue, or COMPLETE RUN if the output looks good.',
-        'Or right dock → Command tab → type resume from review (or footer Commands → Use).',
+        'Center → COMPLETE RUN when the output looks good (one-shot commands do not need RESUME).',
+        'For multi-step work only: RESUME RUN or type resume from review in Command.',
         'Left → Attention when signals still need review.',
       ],
     };

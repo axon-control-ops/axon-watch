@@ -101,6 +101,20 @@ export function cursorComposerPickerRows(rows: CursorCatalogRow[]): CursorCatalo
   return ordered;
 }
 
+export function shouldShowCursorManualModelCatalog(activeModelId: string): boolean {
+  return !isCursorAutoModel(activeModelId);
+}
+
+export function cursorComposerPickerRowsForActiveModel(input: {
+  rows: CursorCatalogRow[];
+  activeModelId: string;
+}): CursorCatalogRow[] {
+  if (!shouldShowCursorManualModelCatalog(input.activeModelId)) {
+    return [];
+  }
+  return cursorComposerPickerRows(input.rows);
+}
+
 export function resolveCursorComposerModel(modelId: string, rows: CursorCatalogRow[]): string {
   const normalized = modelId.trim();
   if (!normalized || normalized === 'auto') {

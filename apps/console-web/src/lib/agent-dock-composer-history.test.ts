@@ -1,13 +1,48 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  persistAgentComposerHistory,
+  readStoredAgentComposerHistory,
   recordAgentComposerHistoryEntry,
   shouldRecallNextAgentComposerHistory,
   shouldRecallPreviousAgentComposerHistory,
   stepAgentComposerHistory,
 } from './agent-dock-composer-history';
 
+class MemoryStorage {
+  private store = new Map<string, string>();
+
+  getItem(key: string): string | null {
+    return this.store.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.store.set(key, value);
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
+}
+
 describe('agent dock composer history', () => {
+  beforeEach(() => {
+    vi.stubGlobal('window', { localStorage: new MemoryStorage() });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('stores history per workspace', () => {
+    persistAgentComposerHistory('workspace_axon_watch', ['axon prompt']);
+    persistAgentComposerHistory('workspace_dashpro', ['dashpro prompt']);
+
+    expect(readStoredAgentComposerHistory('workspace_axon_watch')).toEqual(['axon prompt']);
+    expect(readStoredAgentComposerHistory('workspace_dashpro')).toEqual(['dashpro prompt']);
+    expect(readStoredAgentComposerHistory('workspace_other')).toEqual([]);
+  });
+
   it('stores newest unique prompts first', () => {
     expect(
       recordAgentComposerHistoryEntry(

@@ -20,6 +20,8 @@ export interface TerminalContext {
   runtimeConnected: boolean;
   runSummary: string | null;
   workspaceId: string | null;
+  sessionId: string;
+  sessionRole: string;
 }
 
 export interface XtermSessionOptions {
@@ -84,6 +86,8 @@ export async function createXtermSession(
   fitAddon.fit();
 
   let attachedWorkspaceId: string | null = null;
+  let attachedSessionId = 'terminal-operator';
+  let attachedSessionRole = 'operator';
   let socket: WebSocket | null = null;
   let inputDisposable: { dispose: () => void } | null = null;
   let pasteDisposable: (() => void) | null = null;
@@ -97,7 +101,7 @@ export async function createXtermSession(
     if (!attachedWorkspaceId) {
       return;
     }
-    persistTerminalScrollback(attachedWorkspaceId, terminal);
+    persistTerminalScrollback(attachedWorkspaceId, terminal, attachedSessionId);
   };
 
   const writeStatus = (message: string): void => {
@@ -128,9 +132,14 @@ export async function createXtermSession(
     }
   };
 
-  const attachWorkspace = (workspaceId: string | null): void => {
+  const attachWorkspace = (
+    workspaceId: string | null,
+    sessionId = 'terminal-operator',
+    sessionRole = 'operator',
+  ): void => {
     if (
       workspaceId === attachedWorkspaceId &&
+      sessionId === attachedSessionId &&
       socket &&
       (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)
     ) {
@@ -144,19 +153,26 @@ export async function createXtermSession(
     disposeSocket();
     pendingInputLine = '';
     attachedWorkspaceId = workspaceId;
+    attachedSessionId = sessionId;
+    attachedSessionRole = sessionRole;
 
     if (!workspaceId) {
       return;
     }
 
-    migrateTerminalScrollback(workspaceId);
+    migrateTerminalScrollback(workspaceId, sessionId);
     terminal.clear();
-    const restoredScrollback = restoreTerminalScrollback(workspaceId, terminal);
+    const restoredScrollback = restoreTerminalScrollback(workspaceId, terminal, sessionId);
     if (restoredScrollback) {
       terminal.write('\r\n');
     }
 
-    const nextSocket = new WebSocket(buildTerminalWebSocketUrl(workspaceId));
+    const nextSocket = new WebSocket(
+      buildTerminalWebSocketUrl(workspaceId, {
+        sessionId,
+        role: sessionRole,
+      }),
+    );
     socket = nextSocket;
 
     nextSocket.onopen = () => {
@@ -257,8 +273,12 @@ export async function createXtermSession(
     },
     persistScrollback: persistAttachedScrollback,
     setContext(context: TerminalContext) {
-      if (context.workspaceId !== attachedWorkspaceId) {
-        attachWorkspace(context.workspaceId);
+      if (
+        context.workspaceId !== attachedWorkspaceId ||
+        context.sessionId !== attachedSessionId ||
+        context.sessionRole !== attachedSessionRole
+      ) {
+        attachWorkspace(context.workspaceId, context.sessionId, context.sessionRole);
       }
     },
   };

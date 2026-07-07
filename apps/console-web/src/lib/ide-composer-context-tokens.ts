@@ -26,12 +26,15 @@ export function truncateContextSnippet(text: string, maxChars: number): string {
   return `${trimmed.slice(0, maxChars - 1).trimEnd()}…`;
 }
 
-export function readStoredTerminalSnippet(workspaceId: string): string {
+export function readStoredTerminalSnippet(
+  workspaceId: string,
+  sessionId = 'terminal-operator',
+): string {
   if (typeof sessionStorage === 'undefined' || !workspaceId.trim()) {
     return '';
   }
 
-  const raw = sessionStorage.getItem(scrollbackStorageKey(workspaceId)) ?? '';
+  const raw = sessionStorage.getItem(scrollbackStorageKey(workspaceId, sessionId)) ?? '';
   return truncateContextSnippet(
     sanitizeScrollbackText(raw),
     MAX_TERMINAL_CONTEXT_CHARS,
@@ -42,6 +45,7 @@ export function resolveComposerContextPayload(input: {
   draft: string;
   workspaceId: string | null;
   activeFilePath: string | null;
+  terminalSessionId?: string | null;
   editorSelection: {
     startLine: number;
     endLine: number;
@@ -67,7 +71,10 @@ export function resolveComposerContextPayload(input: {
 
   const terminal_snippet =
     includeTerminal && input.workspaceId
-      ? readStoredTerminalSnippet(input.workspaceId) || null
+      ? readStoredTerminalSnippet(
+          input.workspaceId,
+          input.terminalSessionId ?? 'terminal-operator',
+        ) || null
       : null;
 
   return { editor_selection, terminal_snippet };

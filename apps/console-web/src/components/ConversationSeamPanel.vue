@@ -3,8 +3,10 @@ import { computed, ref, watch } from 'vue';
 
 import AgentResearchBlock from './ide/AgentResearchBlock.vue';
 import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
+import AgentFileReadBlock from './ide/AgentFileReadBlock.vue';
 import { useConversationSeamScroll } from '../composables/useConversationSeamScroll';
 import {
+  isMarkdownFileAgentResponse,
   shouldHideAgentReportInThread,
   shouldUseAgentMarkdownBlock,
 } from '../lib/agent-message-markdown';
@@ -87,6 +89,10 @@ function isMarkdownBlock(content: string, isComplete = true): boolean {
   return shouldUseAgentMarkdownBlock(content, isComplete) && !isErrorDump(content);
 }
 
+function isMarkdownFileBlock(content: string): boolean {
+  return isMarkdownFileAgentResponse(content);
+}
+
 function shouldShowEditorStub(messageId: string, content: string): boolean {
   return Boolean(shell.agentReportEditorLink(messageId)) && shouldHideAgentReportInThread(content);
 }
@@ -127,6 +133,17 @@ function transcriptSegments(content: string) {
 
 function segmentKey(messageId: string, index: number): string {
   return `${messageId}:${index}`;
+}
+
+function revealTerminalPanel(): void {
+  shell.revealIdeTerminalPanel();
+}
+
+async function copyTerminalOutput(output: string): Promise<void> {
+  if (typeof navigator === 'undefined' || !navigator.clipboard || !output.trim()) {
+    return;
+  }
+  await navigator.clipboard.writeText(output);
 }
 
 function isThinkingExpanded(key: string, open: boolean): boolean {
@@ -277,7 +294,10 @@ watch(
 
         <template v-else>
           <template v-if="item.message">
-        <div class="conversation-seam__meta">
+        <div
+          v-if="shell.layoutMode !== 'ide' || item.message.role !== 'agent'"
+          class="conversation-seam__meta"
+        >
           <span class="conversation-seam__role">{{ formatThreadRole(item.message.role) }}</span>
           <span
             v-if="item.message.run_id"
@@ -395,12 +415,28 @@ watch(
 
             <div v-else-if="segment.kind === 'terminal'" class="agent-block agent-block--terminal">
               <div class="agent-block__terminal-header">
-                <span class="agent-block__terminal-prompt" aria-hidden="true">$</span>
-                <code class="agent-block__terminal-command">{{ segment.command }}</code>
-                <span
-                  v-if="segment.open && isStreamingMessage(item.message.message_id)"
-                  class="agent-block__terminal-running"
-                >running…</span>
+                <button
+                  type="button"
+                  class="agent-block__terminal-reveal"
+                  :title="`Open terminal panel for ${segment.command}`"
+                  @click="revealTerminalPanel"
+                >
+                  <span class="agent-block__terminal-prompt" aria-hidden="true">$</span>
+                  <code class="agent-block__terminal-command">{{ segment.command }}</code>
+                  <span
+                    v-if="segment.open && isStreamingMessage(item.message.message_id)"
+                    class="agent-block__terminal-running"
+                  >running…</span>
+                </button>
+                <button
+                  v-if="segment.output"
+                  type="button"
+                  class="agent-block__terminal-copy"
+                  title="Copy terminal output"
+                  @click="copyTerminalOutput(segment.output)"
+                >
+                  Copy
+                </button>
               </div>
               <pre
                 v-if="segment.output"
@@ -456,11 +492,14 @@ watch(
               </button>
             </div>
 
+            <AgentFileReadBlock
+              v-else-if="isMarkdownFileBlock(segment.text)"
+              :content="segment.text"
+            />
+
             <AgentMarkdownBlock
               v-else-if="isMarkdownBlock(segment.text, !isStreamingMessage(item.message.message_id))"
-              :block-id="segmentKey(item.message.message_id, segmentIndex)"
               :content="segment.text"
-              :allow-open-in-editor="!isStreamingMessage(item.message.message_id)"
             />
 
             <p
@@ -508,11 +547,14 @@ watch(
           </button>
         </div>
 
+        <AgentFileReadBlock
+          v-else-if="isMarkdownFileBlock(item.message.content)"
+          :content="item.message.content"
+        />
+
         <AgentMarkdownBlock
           v-else-if="isMarkdownBlock(item.message.content, !isStreamingMessage(item.message.message_id))"
-          :block-id="item.message.message_id"
           :content="item.message.content"
-          :allow-open-in-editor="!isStreamingMessage(item.message.message_id)"
         />
 
         <pre
@@ -540,8 +582,11 @@ watch(
             shell.ideComposerActivity?.executionAccess === 'full',
         }"
       >
-        <div class="conversation-seam__meta">
-          <span class="conversation-seam__role">AGENT</span>
+        <div
+          v-if="shell.layoutMode !== 'ide' || shell.ideComposerActivity?.executionAccess === 'full'"
+          class="conversation-seam__meta"
+        >
+          <span v-if="shell.layoutMode !== 'ide'" class="conversation-seam__role">AGENT</span>
           <span
             v-if="shell.ideComposerActivity?.executionAccess === 'full'"
             class="conversation-seam__access-chip conversation-seam__access-chip--full"

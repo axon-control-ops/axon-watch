@@ -526,6 +526,15 @@
   flex-wrap: wrap;
 }
 
+.agent-dock__head-tabs {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  margin: 0.35rem -0.65rem -0.4rem;
+  border-top: 1px solid rgba(0, 242, 255, 0.14);
+  background: #031622;
+}
+
 .agent-dock__head-pills {
   display: inline-flex;
   align-items: center;
@@ -539,28 +548,55 @@
   z-index: 24;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 8.5rem;
+  max-width: 13rem;
 }
 
 .agent-dock-workspace-menu__trigger {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.28rem;
+  gap: 0.32rem;
   width: 100%;
-  max-width: 8.5rem;
-  min-height: 1.5rem;
-  padding: 0.18rem 0.42rem;
-  border: 1px solid rgba(138, 154, 173, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
+  max-width: 13rem;
+  min-height: 1.65rem;
+  padding: 0.22rem 0.5rem;
+  border: 1px solid rgba(138, 154, 173, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
   color: rgba(196, 206, 218, 0.94);
-  font-family: var(--font-mono);
-  font-size: 0.54rem;
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
   text-align: left;
   cursor: pointer;
+}
+
+.agent-dock-workspace-menu__trigger--active {
+  border-color: rgba(0, 242, 255, 0.34);
+  background: rgba(0, 242, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.08);
+  color: #edf8ff;
+}
+
+.agent-dock-workspace-menu__trigger-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.agent-dock-workspace-menu__trigger-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.04rem;
+  min-width: 0;
+}
+
+.agent-dock-workspace-menu__icon,
+.agent-dock-workspace-menu__item-icon {
+  flex-shrink: 0;
+  color: rgba(191, 219, 254, 0.88);
 }
 
 .agent-dock-workspace-menu__trigger:hover,
@@ -572,6 +608,18 @@
 .agent-dock-workspace-menu__label {
   overflow: hidden;
   min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-workspace-menu__meta {
+  overflow: hidden;
+  min-width: 0;
+  color: rgba(138, 154, 173, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -594,10 +642,10 @@
   z-index: 12;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  width: 11rem;
-  max-height: 12rem;
-  padding: 0.35rem;
+  gap: 0.14rem;
+  width: 13.5rem;
+  max-height: 13rem;
+  padding: 0.32rem;
   border: 1px solid rgba(138, 154, 173, 0.16);
   border-radius: 10px;
   background: rgba(10, 14, 20, 0.98);
@@ -606,16 +654,212 @@
 }
 
 .agent-dock-workspace-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
   width: 100%;
-  padding: 0.42rem 0.5rem;
+  padding: 0.38rem 0.46rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: transparent;
   color: rgba(226, 232, 240, 0.94);
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   text-align: left;
   cursor: pointer;
+}
+
+.agent-dock-workspace-menu__item-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.agent-dock-workspace-menu__item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.agent-dock-workspace-menu__item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-workspace-menu__item-meta {
+  overflow: hidden;
+  color: rgba(138, 154, 173, 0.84);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-workspace-menu__item-active-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.92);
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.16);
+}
+
+.agent-dock-workspace-menu__item--active {
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.agent-dock-thread-tabbar {
+  width: 100%;
+  min-width: 0;
+  border-bottom: 0;
+  background: transparent;
+  padding-inline: 0.35rem 0.45rem;
+}
+
+.agent-dock-thread-tabbar__tabs {
+  flex: 1 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.agent-dock-thread-tabbar__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.agent-dock-thread-tabbar__tab {
+  max-width: 9.5rem;
+}
+
+.agent-dock-thread-tabbar__tab-icon {
+  flex-shrink: 0;
+  color: rgba(191, 219, 254, 0.88);
+}
+
+.agent-dock-thread-tabbar__tab-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-thread-tabbar__tab-close {
+  display: inline-grid;
+  place-items: center;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-left: 0.08rem;
+  border-radius: 4px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__tab:hover .agent-dock-thread-tabbar__tab-close,
+.agent-dock-thread-tabbar__tab--active .agent-dock-thread-tabbar__tab-close {
+  opacity: 1;
+}
+
+.agent-dock-thread-tabbar__tab-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.agent-dock-thread-tabbar__tools {
+  flex-shrink: 0;
+}
+
+.agent-dock-thread-tabbar__history {
+  position: relative;
+}
+
+.agent-dock-thread-tabbar__tool-button.is-active {
+  border-color: rgba(0, 242, 255, 0.28);
+  background: rgba(0, 242, 255, 0.1);
+}
+
+.agent-dock-thread-tabbar__history-panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 0.14rem;
+  width: 14rem;
+  max-height: 14rem;
+  padding: 0.32rem;
+  border: 1px solid rgba(138, 154, 173, 0.16);
+  border-radius: 10px;
+  background: rgba(10, 14, 20, 0.98);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  overflow: auto;
+}
+
+.agent-dock-thread-tabbar__history-new {
+  width: 100%;
+  padding: 0.42rem 0.5rem;
+  border: 1px dashed rgba(138, 154, 173, 0.22);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(150, 231, 255, 0.94);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.38rem 0.46rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.94);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__history-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.06rem;
+  min-width: 0;
+}
+
+.agent-dock-thread-tabbar__history-label,
+.agent-dock-thread-tabbar__history-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-thread-tabbar__history-meta {
+  color: rgba(138, 154, 173, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+}
+
+.agent-dock-thread-tabbar__history-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.92);
+}
+
+.agent-dock-thread-tabbar__history-new:hover,
+.agent-dock-thread-tabbar__history-item:hover,
+.agent-dock-thread-tabbar__history-item--active {
+  background: rgba(0, 242, 255, 0.08);
 }
 
 .agent-dock-workspace-menu__item:hover,
@@ -674,8 +918,8 @@
 }
 
 .agent-dock__section-header--compact {
-  padding-top: 0.55rem;
-  padding-bottom: 0.35rem;
+  justify-content: flex-end;
+  padding: 0.35rem 0.75rem 0.2rem;
 }
 
 .agent-dock__section-title {
@@ -719,18 +963,18 @@
 }
 
 .agent-dock__transcript .conversation-seam__item {
-  border: 1px solid rgba(138, 154, 173, 0.14);
-  border-radius: 10px;
-  padding: 0.55rem 0.65rem;
-  background: rgba(255, 255, 255, 0.025);
+  border: 0;
+  border-radius: 0;
+  padding: 0.4rem 0;
+  background: transparent;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
 }
 
 .agent-dock__transcript .conversation-seam__item--agent {
-  border-color: rgba(0, 242, 255, 0.14);
-  background: rgba(0, 242, 255, 0.045);
+  border: 0;
+  background: transparent;
 }
 
 .agent-dock__transcript .conversation-seam__meta {
@@ -749,12 +993,15 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  border-color: rgba(0, 242, 255, 0.16);
-  background: rgba(0, 0, 0, 0.18);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
-.agent-dock__transcript .conversation-seam__markdown-toolbar {
-  width: 100%;
+.agent-dock__transcript .conversation-seam__content--markdown {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .agent-dock__transcript .conversation-seam__content--markdown,
@@ -784,10 +1031,10 @@
 
 .agent-dock__transcript .conversation-seam__content--agent {
   border: 0;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.14);
+  border-radius: 0;
+  background: transparent;
   color: rgba(228, 236, 243, 0.92);
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   max-height: none;
   max-width: 100%;
   overflow-x: hidden;
@@ -1197,6 +1444,60 @@
 
 .agent-dock-composer__chip-remove {
   color: rgba(148, 163, 184, 0.88);
+}
+
+.agent-dock-composer__image-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem 0.15rem;
+}
+
+.agent-dock-composer__image-card {
+  position: relative;
+  display: block;
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+  border-radius: 10px;
+  background: rgba(8, 12, 18, 0.92);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.agent-dock-composer__image-card:hover {
+  border-color: rgba(0, 242, 255, 0.28);
+}
+
+.agent-dock-composer__image-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-dock-composer__image-remove {
+  position: absolute;
+  top: 0.18rem;
+  right: 0.18rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: rgba(8, 12, 18, 0.82);
+  color: rgba(226, 232, 240, 0.94);
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.agent-dock-composer__image-card:hover .agent-dock-composer__image-remove,
+.agent-dock-composer__image-card:focus-visible .agent-dock-composer__image-remove {
+  opacity: 1;
 }
 
 .agent-dock-composer__input-row {

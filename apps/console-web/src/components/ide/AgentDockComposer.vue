@@ -23,7 +23,7 @@ import {
   cursorCatalogCountLabel,
   cursorCatalogModelRows,
   cursorCatalogStatusLabel,
-  cursorComposerPickerRows,
+  cursorComposerPickerRowsForActiveModel,
   cursorManageModelRows,
   cursorModelLabel,
   cursorPrimaryModelRows,
@@ -31,10 +31,17 @@ import {
   isCursorAutoModel,
   isCursorComposerModel,
   type CursorCatalogRow,
+  shouldShowCursorManualModelCatalog,
 } from '../../lib/cursor-catalog-view';
 import { CURSOR_PICKER_COMPOSER_IDS, CURSOR_PICKER_DEFAULT_MODEL } from '../../lib/cursor-picker-prefs';
 
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
+import {
+  type ComposerClipboardImage,
+  readClipboardImages,
+  revokeComposerClipboardImages,
+  shouldInterceptComposerImagePaste,
+} from '../../lib/composer-clipboard-paste';
 import { shouldSubmitAgentDockComposer } from '../../lib/agent-dock-composer-input';
 import {
   persistAgentComposerHistory,
@@ -89,10 +96,12 @@ const contextSelection = ref(false);
 const contextTerminal = ref(false);
 const contextIde = ref(false);
 const contextPinned = ref(false);
-const composerHistory = ref<string[]>(readStoredAgentComposerHistory());
+const composerHistory = ref<string[]>([]);
+const composerHistoryWorkspaceId = ref<string | null>(null);
 const composerHistoryIndex = ref(-1);
 const composerHistoryScratch = ref('');
 const applyingHistoryDraft = ref(false);
+const composerImages = ref<ComposerClipboardImage[]>([]);
 
 const activeMode = computed(
   () => MODE_OPTIONS.find((option) => option.key === composerMode.value) ?? MODE_OPTIONS[2],
@@ -145,9 +154,15 @@ const autoModelRow = computed(() =>
   },
 );
 const composerPickerRows = computed(() => {
-  const fromCatalog = cursorComposerPickerRows(shell.cursorCatalogRows);
+  const fromCatalog = cursorComposerPickerRowsForActiveModel({
+    rows: shell.cursorCatalogRows,
+    activeModelId: selectedModelId.value,
+  });
   if (fromCatalog.length) {
     return fromCatalog;
+  }
+  if (!shouldShowCursorManualModelCatalog(selectedModelId.value)) {
+    return [];
   }
   return CURSOR_PICKER_COMPOSER_IDS.map((id): CursorCatalogRow => ({
     id,
@@ -207,7 +222,9 @@ const selectedRuntimeSummary = computed(() => {
   return `${target.label} · ${status}`;
 });
 const autoModelEnabled = computed(() => isCursorAutoModel(selectedModelId.value));
-const showAddModelsEntry = computed(() => !showAddModelsPanel.value);
+const showAddModelsEntry = computed(
+  () => !showAddModelsPanel.value && shouldShowCursorManualModelCatalog(selectedModelId.value),
+);
 const autoToggleChecked = computed(() => autoModelEnabled.value && !showAddModelsPanel.value);
 const showExtraPinnedRows = computed(
   () => extraPinnedRows.value.length > 0 && !showAddModelsPanel.value,
@@ -268,9 +285,7 @@ const mcpToolsForMode = computed(() =>
   filterMcpToolsForComposerMode(shell.runtimeMcpTools, composerMode.value),
 );
 const showComposerResume = computed(() => shell.canResumeIdeAgentRun);
-const showComposerStop = computed(
-  () => shell.canStopIdeAgentRun && !shell.canResumeIdeAgentRun,
-);
+const showComposerStop = computed(() => shell.agentStreamActive);
 const showApprovalBanner = computed(
   () =>
     composerMode.value === 'agent' &&
@@ -334,6 +349,25 @@ const attachmentChips = computed(() => {
   }
   return chips;
 });
+
+function resetComposerHistoryNavigation(): void {
+  composerHistoryIndex.value = -1;
+  composerHistoryScratch.value = '';
+}
+
+function loadComposerHistoryForWorkspace(workspaceId: string | null | undefined): void {
+  const nextWorkspaceId = workspaceId?.trim() || null;
+  if (composerHistoryWorkspaceId.value === nextWorkspaceId) {
+    return;
+  }
+  composerHistoryWorkspaceId.value = nextWorkspaceId;
+  composerHistory.value = readStoredAgentComposerHistory(nextWorkspaceId);
+  resetComposerHistoryNavigation();
+}
+
+function persistCurrentComposerHistory(): void {
+  persistAgentComposerHistory(composerHistoryWorkspaceId.value, composerHistory.value);
+}
 
 function syncComposerHeight(): void {
   if (!inputRef.value) return;
@@ -505,9 +539,11 @@ function selectRuntimeTarget(runtimeId: string): void {
   shell.setSelectedRuntimeTarget(runtimeId);
 }
 
-function selectComposerModel(modelId: string): void {
+function selectComposerModel(modelId: string, options?: { keepMenuOpen?: boolean }): void {
   shell.setSelectedComposerModel(modelId);
-  closeMenus();
+  if (!options?.keepMenuOpen) {
+    closeMenus();
+  }
 }
 
 function toggleRuntimeTargetsPanel(): void {
@@ -516,11 +552,12 @@ function toggleRuntimeTargetsPanel(): void {
 
 function onAutoToggleClick(event: MouseEvent): void {
   event.preventDefault();
+  event.stopPropagation();
   if (autoModelEnabled.value && !showAddModelsPanel.value) {
-    selectComposerModel(CURSOR_PICKER_DEFAULT_MODEL);
+    selectComposerModel(CURSOR_PICKER_DEFAULT_MODEL, { keepMenuOpen: true });
     return;
   }
-  selectComposerModel('auto');
+  selectComposerModel('auto', { keepMenuOpen: true });
   closeAddModelsPanel();
 }
 
@@ -571,17 +608,39 @@ function handleHistory(direction: 'previous' | 'next'): void {
 async function handleSubmit(event?: Event): Promise<void> {
   event?.preventDefault();
   const draft = shell.ideComposerDraft.trim();
-  await shell.submitIdeComposer(composerMode.value);
+  const attachmentFiles = composerImages.value.map((image) => image.file);
+  await shell.submitIdeComposer(composerMode.value, { attachmentFiles });
+  if (composerImages.value.length) {
+    revokeComposerClipboardImages(composerImages.value);
+    composerImages.value = [];
+  }
   if (draft && !shell.ideComposerDraft.trim() && shell.commandMutationState === 'idle') {
     composerHistory.value = recordAgentComposerHistoryEntry(composerHistory.value, draft);
-    persistAgentComposerHistory(composerHistory.value);
-    composerHistoryIndex.value = -1;
-    composerHistoryScratch.value = '';
+    persistCurrentComposerHistory();
+    resetComposerHistoryNavigation();
   }
 }
 
 function handleResumeRun(): void {
   void shell.resumeIdeAgentRun();
+}
+
+function handleComposerPaste(event: ClipboardEvent): void {
+  const images = readClipboardImages(event);
+  if (!shouldInterceptComposerImagePaste(images)) {
+    return;
+  }
+
+  event.preventDefault();
+  composerImages.value = [...composerImages.value, ...images];
+}
+
+function removeComposerImage(imageId: string): void {
+  const removed = composerImages.value.find((image) => image.id === imageId);
+  if (removed) {
+    URL.revokeObjectURL(removed.previewUrl);
+  }
+  composerImages.value = composerImages.value.filter((image) => image.id !== imageId);
 }
 
 function handleComposerKeydown(event: KeyboardEvent): void {
@@ -666,6 +725,14 @@ watch(
 );
 
 watch(
+  () => shell.currentWorkspace?.workspace_id ?? null,
+  (workspaceId) => {
+    loadComposerHistoryForWorkspace(workspaceId);
+  },
+  { immediate: true },
+);
+
+watch(
   () => shell.commandFocusToken,
   () => {
     void nextTick(() => {
@@ -683,6 +750,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick);
+  revokeComposerClipboardImages(composerImages.value);
 });
 </script>
 
@@ -781,6 +849,28 @@ onUnmounted(() => {
         </div>
 
         <div
+          v-if="composerImages.length"
+          class="agent-dock-composer__image-strip"
+          aria-label="Attached images"
+        >
+          <button
+            v-for="image in composerImages"
+            :key="image.id"
+            type="button"
+            class="agent-dock-composer__image-card"
+            :title="`Remove ${image.name}`"
+            @click="removeComposerImage(image.id)"
+          >
+            <img
+              class="agent-dock-composer__image-preview"
+              :src="image.previewUrl"
+              :alt="image.name"
+            >
+            <span class="agent-dock-composer__image-remove" aria-hidden="true">×</span>
+          </button>
+        </div>
+
+        <div
           v-if="shell.ideComposerActivity || shell.agentStreamActive"
           class="agent-dock-composer__activity"
           :class="{
@@ -805,6 +895,7 @@ onUnmounted(() => {
             :disabled="!shell.currentWorkspace"
             @input="syncComposerHeight"
             @keydown="handleComposerKeydown"
+            @paste="handleComposerPaste"
           />
         </div>
 

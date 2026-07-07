@@ -38,6 +38,19 @@ const editorColors: Monaco.editor.IColors = {
   'editorWhitespace.foreground': '#1a3040',
   'editorIndentGuide.background': '#122838',
   'editorIndentGuide.activeBackground': '#1e4460',
+  'editorBracketHighlight.foreground1': '#00f2ff',
+  'editorBracketHighlight.foreground2': '#7ec8e0',
+  'editorBracketHighlight.foreground3': '#8fd9b2',
+  'editorBracketMatch.border': '#00f2ff88',
+  'editorBracketMatch.background': '#10304488',
+  'editorOverviewRuler.border': '#00000000',
+  'minimap.background': '#041018',
+  'minimapSlider.background': '#00f2ff18',
+  'minimapSlider.hoverBackground': '#00f2ff30',
+  'minimapSlider.activeBackground': '#00f2ff44',
+  'editorStickyScroll.background': '#061424',
+  'editorStickyScrollHover.background': '#0a2030',
+  'editorGutter.foldingControlForeground': '#5a8098',
 };
 
 export function defineMockupMonacoTheme(monaco: typeof Monaco): void {

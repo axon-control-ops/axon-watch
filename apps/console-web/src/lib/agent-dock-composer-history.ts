@@ -1,4 +1,4 @@
-const AGENT_COMPOSER_HISTORY_KEY = 'axon-x-agent-composer-history-v1';
+const AGENT_COMPOSER_HISTORY_KEY = 'axon-x-agent-composer-history-v2';
 const HISTORY_LIMIT = 25;
 
 export interface AgentDockComposerHistoryKeyEvent {
@@ -45,35 +45,66 @@ function normalizeHistoryEntries(entries: string[]): string[] {
   return normalized;
 }
 
-export function readStoredAgentComposerHistory(): string[] {
+function readStoredAgentComposerHistoryByWorkspace(): Record<string, string[]> {
   if (typeof window === 'undefined') {
-    return [];
+    return {};
   }
 
   const raw = window.localStorage.getItem(AGENT_COMPOSER_HISTORY_KEY);
   if (!raw) {
-    return [];
+    return {};
   }
 
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
     }
-    return normalizeHistoryEntries(parsed.filter((entry): entry is string => typeof entry === 'string'));
+
+    const output: Record<string, string[]> = {};
+    for (const [workspaceId, entries] of Object.entries(parsed)) {
+      const id = workspaceId.trim();
+      if (!id || !Array.isArray(entries)) {
+        continue;
+      }
+      output[id] = normalizeHistoryEntries(
+        entries.filter((entry): entry is string => typeof entry === 'string'),
+      );
+    }
+    return output;
   } catch {
-    return [];
+    return {};
   }
 }
 
-export function persistAgentComposerHistory(entries: string[]): void {
+export function readStoredAgentComposerHistory(workspaceId: string | null | undefined): string[] {
+  const id = workspaceId?.trim();
+  if (!id) {
+    return [];
+  }
+  return readStoredAgentComposerHistoryByWorkspace()[id] ?? [];
+}
+
+export function persistAgentComposerHistory(
+  workspaceId: string | null | undefined,
+  entries: string[],
+): void {
   if (typeof window === 'undefined') {
     return;
   }
 
+  const id = workspaceId?.trim();
+  if (!id) {
+    return;
+  }
+
+  const current = readStoredAgentComposerHistoryByWorkspace();
   window.localStorage.setItem(
     AGENT_COMPOSER_HISTORY_KEY,
-    JSON.stringify(normalizeHistoryEntries(entries)),
+    JSON.stringify({
+      ...current,
+      [id]: normalizeHistoryEntries(entries),
+    }),
   );
 }
 

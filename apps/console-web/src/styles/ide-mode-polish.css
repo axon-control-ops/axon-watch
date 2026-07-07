@@ -133,8 +133,8 @@
 }
 
 .console-shell--ide .agent-dock__transcript .conversation-seam__item--agent {
-  border-color: rgba(129, 140, 248, 0.18);
-  background: rgba(99, 102, 241, 0.06);
+  border: 0;
+  background: transparent;
 }
 
 .console-shell--ide .workspace-file-tree__status {

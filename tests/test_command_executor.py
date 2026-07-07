@@ -150,6 +150,29 @@ class CommandExecutorTests(unittest.TestCase):
         self.assertEqual(created["run_id"], result.run_id)
         self.assertEqual("executing", client.get(f"/api/runs/{created['run_id']}").json()["phase"])
 
+    def test_execute_resume_from_review_auto_completes_one_shot_git_status(self) -> None:
+        from app.main import app  # noqa: WPS433
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        created = client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "git status",
+            },
+        ).json()
+        client.post(f"/api/runs/{created['run_id']}/review-ready")
+
+        result = execute_resume_from_review("workspace_alpha")
+
+        self.assertTrue(result.success)
+        self.assertEqual(created["run_id"], result.run_id)
+        self.assertIn("One-shot command", result.output)
+        self.assertEqual("completed", client.get(f"/api/runs/{created['run_id']}").json()["phase"])
+
 
 if __name__ == "__main__":
     unittest.main()

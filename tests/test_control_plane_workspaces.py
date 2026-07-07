@@ -45,6 +45,16 @@ class ControlPlaneWorkspacesTests(unittest.TestCase):
         self.assertIn("workspace_smoke", ids)
         self.assertIn("workspace_gamma", ids)
 
+    def test_workspaces_operator_scope_hides_demo_defaults(self) -> None:
+        response = self.client.get("/api/workspaces?scope=operator")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        ids = {item["workspace_id"] for item in payload["items"]}
+        self.assertEqual("operator", payload["scope"])
+        self.assertNotIn("workspace_smoke", ids)
+        self.assertNotIn("workspace_bootstrap", ids)
+        self.assertNotIn("workspace_alpha", ids)
+
     def test_workspaces_show_returns_known_workspace(self) -> None:
         response = self.client.get("/api/workspaces/workspace_alpha")
         self.assertEqual(200, response.status_code)

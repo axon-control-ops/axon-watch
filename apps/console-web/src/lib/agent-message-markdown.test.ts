@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   agentMessageLooksLikeMarkdown,
   isInterimAgentStatus,
+  extractReadMarkdownFilePath,
   isMarkdownFileAgentResponse,
   renderAgentMessageMarkdown,
   shouldAutoOpenAgentReportInEditor,
@@ -71,6 +72,20 @@ describe('agent-message-markdown', () => {
     );
   });
 
+  it('shows markdown file reads as thread links instead of inline preview', () => {
+    const content = [
+      'Executed `read_file` (ok) for run run_abc.',
+      '',
+      '```',
+      '# README.md',
+      '',
+      '**Axon-X** is the product.',
+      '```',
+    ].join('\n');
+    expect(shouldUseAgentMarkdownBlock(content)).toBe(false);
+    expect(isMarkdownFileAgentResponse(content)).toBe(true);
+  });
+
   it('keeps interim status lines out of markdown preview', () => {
     expect(shouldUseAgentMarkdownBlock('Searching the docs…', false)).toBe(false);
     expect(shouldUseAgentMarkdownBlock('Searching the docs…', true)).toBe(false);
@@ -81,7 +96,7 @@ describe('agent-message-markdown', () => {
     expect(isInterimAgentStatus('**Summary**\n\n- item one')).toBe(false);
   });
 
-  it('detects markdown file read responses for editor open', () => {
+  it('detects markdown file read responses for workspace editor open', () => {
     const content = [
       'Executed `read_file` (ok) for run run_abc.',
       '',
@@ -92,17 +107,18 @@ describe('agent-message-markdown', () => {
       '```',
     ].join('\n');
     expect(isMarkdownFileAgentResponse(content)).toBe(true);
-    expect(shouldAutoOpenAgentReportInEditor(content)).toBe(true);
+    expect(extractReadMarkdownFilePath(content)).toBe('README.md');
+    expect(shouldAutoOpenAgentReportInEditor(content)).toBe(false);
   });
 
-  it('detects report markdown eligible for editor open', () => {
+  it('keeps agent report markdown in the chat lane', () => {
     const report = ['# Cursor vs EduDash Pro', '', '## Images', '', '| Method | How |', '| --- | --- |'].join(
       '\n',
     );
     expect(shouldOfferOpenInEditor(report, true)).toBe(true);
     const longReport = `${report}\n\n${'Additional findings about image upload.\n'.repeat(20)}`;
-    expect(shouldAutoOpenAgentReportInEditor(longReport)).toBe(true);
-    expect(shouldAutoOpenAgentReportInEditor('# Short report\n\nOne paragraph.')).toBe(true);
+    expect(shouldAutoOpenAgentReportInEditor(longReport)).toBe(false);
+    expect(shouldAutoOpenAgentReportInEditor('# Short report\n\nOne paragraph.')).toBe(false);
   });
 
   it('does not auto-open block-structured agent transcripts in the editor', () => {

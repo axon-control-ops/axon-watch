@@ -19,6 +19,7 @@ const props = defineProps<{
   loadState: BriefingPanelLoadState;
   error: string | null;
   hero?: boolean;
+  galaxyCompact?: boolean;
   summaryLine?: string;
 }>();
 
@@ -88,9 +89,20 @@ const voiceLine = computed(() => {
 <template>
   <div
     class="briefing-panel briefing-panel--mockup"
-    :class="{ 'briefing-panel--hero': hero }"
+    :class="{
+      'briefing-panel--hero': hero,
+      'briefing-panel--galaxy-compact': hero && galaxyCompact,
+    }"
   >
-    <template v-if="hero">
+    <template v-if="hero && galaxyCompact">
+      <p v-if="summaryLine" class="briefing-panel__summary-line">{{ summaryLine }}</p>
+      <p class="briefing-panel__galaxy-compact-copy">{{ heroAdvise || heroNotice }}</p>
+      <button type="button" class="briefing-panel__galaxy-compact-link" @click="emit('openChat')">
+        Full briefing →
+      </button>
+    </template>
+
+    <template v-else-if="hero">
       <p v-if="summaryLine" class="briefing-panel__summary-line">{{ summaryLine }}</p>
 
       <div class="briefing-panel__hero-body">

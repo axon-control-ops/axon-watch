@@ -9,17 +9,8 @@ from app.chat.command_executor import (
     execute_command,
     execute_resume_from_review,
 )
+from app.chat.command_intent import AUTO_COMPLETE_COMMAND_INTENTS
 from app.runs.service import RunLifecycleError, append_run_execution_receipt, complete_run, get_run, list_runs, mark_review_ready
-
-# Read-only operator commands that should not clog Mission Control in review_ready.
-AUTO_COMPLETE_COMMAND_INTENTS = frozenset(
-    {
-        "git_status",
-        "health_probe",
-        "list_files",
-        "read_file",
-    }
-)
 
 
 def build_agent_command_reply(

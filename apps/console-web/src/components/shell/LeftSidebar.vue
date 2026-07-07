@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import IdeActivityBar from '../ide/IdeActivityBar.vue';
 import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
+import KairoVoiceDeckPanel from './KairoVoiceDeckPanel.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import {
@@ -146,6 +147,7 @@ onBeforeUnmount(() => {
       'left-sidebar-mockup--resizing': resizing,
       'left-sidebar-mockup--ide': isIdeMode,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
+      'left-sidebar-mockup--galaxy': shell.operatorBrainGalaxyActive,
     }"
   >
     <template v-if="isIdeMode">
@@ -273,30 +275,18 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div v-if="!isIdeMode" class="left-sidebar-mockup__status-anchor">
-      <section class="workspace-status-card hud-panel-frame">
-        <p class="workspace-status-card__title">WORKSPACE STATUS</p>
-        <div class="workspace-status-card__body">
-          <div class="workspace-status-card__radar" aria-hidden="true">
-            <span class="workspace-status-card__ring workspace-status-card__ring--outer" />
-            <span class="workspace-status-card__ring workspace-status-card__ring--mid" />
-            <span class="workspace-status-card__ring workspace-status-card__ring--inner" />
-            <span class="workspace-status-card__crosshair workspace-status-card__crosshair--h" />
-            <span class="workspace-status-card__crosshair workspace-status-card__crosshair--v" />
-            <span class="workspace-status-card__tick workspace-status-card__tick--n" />
-            <span class="workspace-status-card__tick workspace-status-card__tick--e" />
-            <span class="workspace-status-card__tick workspace-status-card__tick--s" />
-            <span class="workspace-status-card__tick workspace-status-card__tick--w" />
-            <span class="workspace-status-card__sweep" />
-          </div>
-          <dl class="workspace-status-card__meta">
-            <div v-for="row in shell.workspaceStatusCardRows" :key="row.label">
-              <dt>{{ row.label }}</dt>
-              <dd>{{ row.value }}</dd>
-            </div>
-          </dl>
-        </div>
-      </section>
+    <div
+      v-if="!isIdeMode && shell.operatorBrainGalaxyActive && shell.leftSidebarMode === 'workspaces'"
+      class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--galaxy"
+    >
+      <AttentionStackPanel variant="sidebar" />
+    </div>
+
+    <div
+      v-else-if="!isIdeMode && !shell.operatorBrainGalaxyActive"
+      class="left-sidebar-mockup__status-anchor"
+    >
+      <KairoVoiceDeckPanel />
     </div>
 
     <div

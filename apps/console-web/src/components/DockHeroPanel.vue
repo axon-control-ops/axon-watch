@@ -79,6 +79,7 @@ const shell = useShellStore();
         :error="shell.briefingError"
         :summary-line="shell.briefingSummaryLine"
         :hero="true"
+        :galaxy-compact="shell.operatorBrainGalaxyActive"
         @open-chat="shell.setDockHeroMode('command')"
       />
     </div>

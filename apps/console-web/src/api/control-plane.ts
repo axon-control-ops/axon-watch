@@ -7,6 +7,7 @@ import type {
   WorkspaceRecord,
 } from '../contracts/canonical';
 
+import type { BrainGraphSnapshot } from '../lib/operator-brain-graph-view';
 import type { RunHistorySnapshot } from '../lib/run-history-view';
 import type {
   VaultSecretDetail,
@@ -502,10 +503,19 @@ async function acknowledgeInboxSignalsViaWatchCommand(
 
 export async function fetchOperatorBriefing(options?: {
   viewportCompact?: boolean;
+  workspaceId?: string | null;
 }): Promise<OperatorBriefing> {
   const baseUrl = controlPlaneBaseUrl();
   const compact = Boolean(options?.viewportCompact);
-  const query = compact ? '?viewport_compact=true' : '';
+  const params = new URLSearchParams();
+  if (compact) {
+    params.set('viewport_compact', 'true');
+  }
+  const workspaceId = options?.workspaceId?.trim();
+  if (workspaceId) {
+    params.set('workspace_id', workspaceId);
+  }
+  const query = params.size > 0 ? `?${params.toString()}` : '';
   const url = baseUrl ? `${baseUrl}/api/briefing${query}` : `/api/briefing${query}`;
   const response = await fetch(url);
 
@@ -514,6 +524,51 @@ export async function fetchOperatorBriefing(options?: {
   }
 
   return response.json() as Promise<OperatorBriefing>;
+}
+
+export type FleetHealthSnapshot = {
+  generated_at: string;
+  watch_connected: boolean;
+  connectors: RuntimeSummary['connectors'];
+  degraded: RuntimeSummary['degraded'];
+  items: Array<{
+    workspace_id: string;
+    display_name: string;
+    connection_kind: string;
+    health: 'nominal' | 'attention' | 'critical';
+    active_runs: number;
+    review_ready_count: number;
+    executing_count: number;
+    pending_approvals_count: number;
+    open_signals_count: number;
+    critical_signals_count: number;
+    top_signal_title: string | null;
+  }>;
+  count: number;
+};
+
+export async function fetchOperatorFleetHealth(): Promise<FleetHealthSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/operator/fleet-health` : '/api/operator/fleet-health';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`operator fleet health request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<FleetHealthSnapshot>;
+}
+
+export async function fetchOperatorBrainGraph(): Promise<BrainGraphSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/operator/brain-graph` : '/api/operator/brain-graph';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`operator brain graph request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<BrainGraphSnapshot>;
 }
 
 export interface OperatorPresenceSettingsSnapshot {
@@ -567,9 +622,13 @@ export async function fetchRuns(): Promise<RunListSnapshot> {
   return response.json() as Promise<RunListSnapshot>;
 }
 
-export async function fetchWorkspaces(): Promise<WorkspaceListSnapshot> {
+export async function fetchWorkspaces(options?: {
+  scope?: 'all' | 'operator';
+}): Promise<WorkspaceListSnapshot> {
   const baseUrl = controlPlaneBaseUrl();
-  const url = baseUrl ? `${baseUrl}/api/workspaces` : '/api/workspaces';
+  const scope = options?.scope === 'operator' ? 'operator' : '';
+  const query = scope ? '?scope=operator' : '';
+  const url = baseUrl ? `${baseUrl}/api/workspaces${query}` : `/api/workspaces${query}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -823,6 +882,17 @@ export async function renameWorkspaceFile(
   return response.json() as Promise<WorkspaceFileRenameResponse>;
 }
 
+export interface ChatAttachmentRecord {
+  attachment_id: string;
+  workspace_id: string;
+  message_id?: string | null;
+  thread_id?: string | null;
+  filename: string;
+  mime_type: string;
+  url: string;
+  created_at: string;
+}
+
 export interface ChatMessageRecord {
   message_id: string;
   thread_id: string;
@@ -831,6 +901,7 @@ export interface ChatMessageRecord {
   role: 'operator' | 'system' | string;
   content: string;
   created_at: string;
+  attachments?: ChatAttachmentRecord[];
 }
 
 export interface EditorSelectionContext {
@@ -849,6 +920,7 @@ export interface PostChatMessageRequest {
   active_file_path?: string | null;
   editor_selection?: EditorSelectionContext | null;
   terminal_snippet?: string | null;
+  attachment_ids?: string[] | null;
   runtime_target?: string | null;
   runtime_model?: string | null;
   execution_access?: 'consultative' | 'full' | string | null;
@@ -865,6 +937,33 @@ export interface PostChatMessageResponse {
   streaming?: boolean;
   stream_agent_message_id?: string;
   ui_action?: ChatUiAction | null;
+  agent_terminal_session?: TerminalSessionRecord | null;
+}
+
+export interface TerminalSessionRecord {
+  session_id: string;
+  workspace_id: string;
+  role: 'operator' | 'agent' | string;
+  title: string;
+  run_id: string | null;
+  created_at: string;
+}
+
+export interface WorkspaceChatThreadListItem {
+  thread_id: string;
+  workspace_id: string;
+  run_id: string | null;
+  thread_kind: string;
+  created_at: string;
+  updated_at: string;
+  preview_label: string;
+}
+
+export interface WorkspaceChatThreadListSnapshot {
+  workspace_id: string;
+  thread_kind: string;
+  items: WorkspaceChatThreadListItem[];
+  count: number;
 }
 
 export interface ThreadHistorySnapshot {
@@ -939,6 +1038,130 @@ export async function fetchWorkspaceChatThread(
   }
 
   return response.json() as Promise<WorkspaceChatThreadSnapshot>;
+}
+
+export async function uploadChatAttachment(
+  workspaceId: string,
+  file: File,
+): Promise<ChatAttachmentRecord> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const url = baseUrl
+    ? `${baseUrl}/api/chat/attachments`
+    : '/api/chat/attachments';
+  const formData = new FormData();
+  formData.append('workspace_id', workspaceId);
+  formData.append('file', file, file.name);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`chat attachment upload failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<ChatAttachmentRecord>;
+}
+
+export async function fetchWorkspaceChatThreads(
+  workspaceId: string,
+  options: { surface?: 'operator' | 'ide'; limit?: number } = {},
+): Promise<WorkspaceChatThreadListSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const surface = options.surface ?? 'ide';
+  const limit = options.limit ?? 25;
+  const query = `?surface=${encodeURIComponent(surface)}&limit=${encodeURIComponent(String(limit))}`;
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encodedWorkspaceId}/chat/threads${query}`
+    : `/api/workspaces/${encodedWorkspaceId}/chat/threads${query}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`workspace chat thread list failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<WorkspaceChatThreadListSnapshot>;
+}
+
+export async function createWorkspaceChatThread(
+  workspaceId: string,
+  options: { surface?: 'operator' | 'ide'; runId?: string | null } = {},
+): Promise<WorkspaceChatThreadListItem> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encodedWorkspaceId}/chat/threads`
+    : `/api/workspaces/${encodedWorkspaceId}/chat/threads`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      surface: options.surface ?? 'ide',
+      run_id: options.runId ?? null,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`workspace chat thread create failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<WorkspaceChatThreadListItem>;
+}
+
+export async function fetchWorkspaceTerminalSessions(
+  workspaceId: string,
+): Promise<{ workspace_id: string; items: TerminalSessionRecord[]; count: number }> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encodedWorkspaceId}/terminal/sessions`
+    : `/api/workspaces/${encodedWorkspaceId}/terminal/sessions`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`workspace terminal sessions failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<{
+    workspace_id: string;
+    items: TerminalSessionRecord[];
+    count: number;
+  }>;
+}
+
+export async function createWorkspaceTerminalSession(
+  workspaceId: string,
+  options: {
+    role?: 'operator' | 'agent' | string;
+    title?: string | null;
+    runId?: string | null;
+    sessionId?: string | null;
+  } = {},
+): Promise<TerminalSessionRecord> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encodedWorkspaceId}/terminal/sessions`
+    : `/api/workspaces/${encodedWorkspaceId}/terminal/sessions`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      role: options.role ?? 'operator',
+      title: options.title ?? null,
+      run_id: options.runId ?? null,
+      session_id: options.sessionId ?? null,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`workspace terminal session create failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<TerminalSessionRecord>;
 }
 
 export interface ConnectorProbeRecord {

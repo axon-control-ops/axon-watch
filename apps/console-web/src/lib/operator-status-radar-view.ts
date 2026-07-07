@@ -2,13 +2,8 @@ import type { OperatorBriefing, RunRecord, RuntimeSummary } from '../contracts/c
 import type { RunHistoryRow } from './run-history-view';
 
 import { runPhaseProgress, runPhaseTag } from './mockup-shell-view';
-import {
-  formatRunDisplayName,
-  formatRunIdentityLabel,
-  formatRunShortId,
-  humanizeRunSummary,
-  formatRunCommandDetail,
-} from './run-display';
+import { formatRunDisplayName, formatRunIdentityLabel, formatRunShortId, humanizeRunSummary, formatRunCommandDetail } from './run-display';
+import { isAutoCompleteRunSummary } from './operator-run-strip-view';
 
 export type OperatorRadarTone = 'nominal' | 'watch' | 'attention' | 'degraded';
 export type OperatorStatusMetricTone = 'default' | 'ok' | 'warn' | 'attention';
@@ -181,6 +176,14 @@ export function operatorStatusHeadline(input: {
 
   const workspaceReviewReadyCount = input.workspaceReviewReadyCount ?? 0;
   if (workspaceReviewReadyCount > 0) {
+    const autoCompleteBacklog =
+      workspaceReviewReadyCount > 1 &&
+      input.primaryActiveRun?.phase === 'review_ready' &&
+      isAutoCompleteRunSummary(input.primaryActiveRun.summary);
+    if (autoCompleteBacklog && input.primaryActiveRun) {
+      const label = formatRunDisplayName(input.primaryActiveRun);
+      return `${workspaceReviewReadyCount}× ${label} runs queued — use Complete all to clear.`;
+    }
     if (workspaceReviewReadyCount === 1 && input.primaryActiveRun?.phase === 'review_ready') {
       return `${formatRunDisplayName(input.primaryActiveRun)} is ready for operator review.`;
     }

@@ -19,6 +19,7 @@ const props = defineProps<{
   readOnly?: boolean;
   dirty?: boolean;
   variant?: 'default' | 'mockup';
+  minimapEnabled?: boolean;
   revealRequest?: EditorRevealRequest | null;
 }>();
 
@@ -63,6 +64,7 @@ onMounted(async () => {
       language: props.language,
       readOnly: props.readOnly,
       variant: props.variant,
+      minimapEnabled: props.minimapEnabled,
       onValueChange: (value) => {
         if (suppressChangeEmit) {
           return;
@@ -105,6 +107,15 @@ watch(
 );
 
 watch(
+  () => props.minimapEnabled,
+  (minimapEnabled) => {
+    if (minimapEnabled !== undefined) {
+      editorController?.setMinimapEnabled(minimapEnabled);
+    }
+  },
+);
+
+watch(
   () => props.value,
   (value) => {
     if (!editorController || editorController.getValue() === value) {
@@ -142,8 +153,8 @@ onBeforeUnmount(() => {
       </div>
       <span>{{ props.description }}</span>
     </div>
-    <div class="surface-host__body" @click="focusEditor">
-      <div ref="containerRef" class="surface-host__frame" aria-label="Monaco editor host" />
+    <div class="surface-host__body surface-host__body--editor" @click="focusEditor">
+      <div ref="containerRef" class="surface-host__frame surface-host__frame--editor" aria-label="Monaco editor host" />
     </div>
   </div>
 </template>

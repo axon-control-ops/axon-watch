@@ -2,10 +2,9 @@
 import { computed, onMounted, ref } from 'vue';
 
 import ConversationSeamPanel from '../ConversationSeamPanel.vue';
-import { runPhaseTag } from '../../lib/mockup-shell-view';
-import { buildAgentDockRuntimeChip } from '../../lib/agent-dock-runtime-view';
 import { useRightDockResize } from '../../composables/useRightDockResize';
 import AgentDockComposer from './AgentDockComposer.vue';
+import AgentDockThreadTabbar from './AgentDockThreadTabbar.vue';
 import AgentDockWorkspaceMenu from './AgentDockWorkspaceMenu.vue';
 import { useShellStore } from '../../stores/shell';
 
@@ -16,14 +15,6 @@ const { resizing, resetDockWidth, startDockResize } = useRightDockResize({
   dockRef,
   collapsed: computed(() => shell.agentDockCollapsed),
 });
-
-const runtimeChip = computed(() =>
-  buildAgentDockRuntimeChip({
-    runtimeStatus: shell.runtimeStatus,
-    loadState: shell.runtimeStatusLoadState,
-    error: shell.runtimeStatusError,
-  }),
-);
 
 function collapseDock(): void {
   shell.toggleAgentDock();
@@ -38,7 +29,7 @@ onMounted(() => {
   }
   const workspaceId = shell.currentWorkspace?.workspace_id;
   if (workspaceId) {
-    void shell.loadWorkspaceThread(workspaceId, 'ide');
+    void shell.hydrateWorkspaceIdeChat(workspaceId);
   }
 });
 </script>
@@ -63,22 +54,8 @@ onMounted(() => {
     <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide">
       <div class="agent-dock__head-row">
         <div class="agent-dock__head-main">
-          <div class="agent-dock__ide-brand">
-            <p class="agent-dock__eyebrow">IDE workspace</p>
-            <p class="agent-dock__title">Agent lane</p>
-          </div>
           <AgentDockWorkspaceMenu />
-          <div class="agent-dock__head-pills" aria-label="Runtime attention">
-            <span
-              class="agent-dock__pill agent-dock__pill--runtime"
-              :class="`agent-dock__pill--runtime-${runtimeChip.tone}`"
-              :title="runtimeChip.detail"
-            >
-              {{ runtimeChip.label }}
-            </span>
-            <span v-if="shell.primaryActiveRun" class="agent-dock__pill agent-dock__pill--run">
-              Run · {{ runPhaseTag(shell.primaryActiveRun.phase) }}
-            </span>
+          <div v-if="shell.pendingApprovalsCount" class="agent-dock__head-pills" aria-label="Agent attention">
             <span v-if="shell.pendingApprovalsCount" class="agent-dock__pill agent-dock__pill--approvals">
               {{ shell.pendingApprovalsCount }} approval{{ shell.pendingApprovalsCount === 1 ? '' : 's' }}
             </span>
@@ -93,11 +70,16 @@ onMounted(() => {
           ×
         </button>
       </div>
+      <div class="agent-dock__head-tabs">
+        <AgentDockThreadTabbar />
+      </div>
     </header>
 
     <section class="agent-dock__thread">
-      <div class="agent-dock__section-header agent-dock__section-header--compact">
-        <p class="agent-dock__section-title">Agent transcript</p>
+      <div
+        v-if="shell.threadStateLabel"
+        class="agent-dock__section-header agent-dock__section-header--compact"
+      >
         <p class="agent-dock__section-meta">{{ shell.threadStateLabel }}</p>
       </div>
       <div class="agent-dock__transcript">

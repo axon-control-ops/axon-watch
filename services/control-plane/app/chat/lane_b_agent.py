@@ -27,6 +27,7 @@ class LaneBContext:
     active_file_path: str | None = None
     editor_selection: EditorSelectionContext | None = None
     terminal_snippet: str | None = None
+    image_paths: tuple[str, ...] = ()
 
 
 def _read_file_preview(workspace_id: str, path: str, *, max_chars: int = 1200) -> str:
@@ -71,6 +72,11 @@ def build_lane_b_context_block(context: LaneBContext) -> str:
     if context.terminal_snippet and context.terminal_snippet.strip():
         lines.append("Terminal output (recent):")
         lines.append(context.terminal_snippet.strip())
+
+    if context.image_paths:
+        lines.append("Attached images (absolute paths):")
+        for image_path in context.image_paths:
+            lines.append(image_path)
 
     try:
         files = list_workspace_files(context.workspace_id)

@@ -115,6 +115,37 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         """
     )
     _ensure_chat_thread_kind_column(connection)
+    _ensure_chat_attachments_table(connection)
+
+
+def _ensure_chat_attachments_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_attachments (
+            attachment_id TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            message_id TEXT,
+            thread_id TEXT,
+            filename TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            storage_path TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_chat_attachments_message
+            ON chat_attachments(message_id, created_at ASC)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_chat_attachments_workspace
+            ON chat_attachments(workspace_id, created_at DESC)
+        """
+    )
+    connection.commit()
 
 
 def _ensure_chat_thread_kind_column(connection: sqlite3.Connection) -> None:

@@ -10,9 +10,13 @@ from dataclasses import dataclass
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from app.chat.command_intent import classify_command, expand_command_shortcuts
+from app.chat.command_intent import (
+    classify_command,
+    expand_command_shortcuts,
+    is_auto_complete_run_summary,
+)
 from app.chat.shell_command import execute_shell_command
-from app.runs.service import RunLifecycleError, list_pending_review_runs, resume_run
+from app.runs.service import RunLifecycleError, complete_run, list_pending_review_runs, resume_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_files import WorkspaceFileError, list_workspace_files, read_workspace_file
 
@@ -193,6 +197,30 @@ def execute_resume_from_review(workspace_id: str) -> CommandExecutionResult:
         )
 
     run_id = str(target["run_id"])
+    summary = str(target.get("summary") or "")
+    if is_auto_complete_run_summary(summary):
+        try:
+            completed = complete_run(run_id)
+        except RunLifecycleError as exc:
+            return CommandExecutionResult(
+                intent="resume_from_review",
+                success=False,
+                output=_truncate_output(str(exc)),
+                receipt_summary="Auto-complete failed",
+                run_id=run_id,
+            )
+        return CommandExecutionResult(
+            intent="resume_from_review",
+            success=True,
+            output=_truncate_output(
+                f"One-shot command `{summary.strip()}` does not need resume — "
+                f"marked {run_id} completed.\n"
+                f"Phase is now {completed['phase']}."
+            ),
+            receipt_summary=f"Auto-completed one-shot run {run_id}",
+            run_id=run_id,
+        )
+
     try:
         resumed = resume_run(run_id)
     except RunLifecycleError as exc:

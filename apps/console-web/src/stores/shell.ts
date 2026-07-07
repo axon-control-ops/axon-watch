@@ -8,7 +8,9 @@ import {
   fetchConnectors,
   fetchCursorRuntimeStatus,
   fetchInbox,
+  fetchOperatorBrainGraph,
   fetchOperatorBriefing,
+  fetchOperatorFleetHealth,
   fetchOperatorPresenceSettings,
   fetchRunHistory,
   fetchRuns,
@@ -22,6 +24,11 @@ import {
   fetchWorkspaces,
   fetchWorkspaceFiles,
   markRunReviewReady,
+  createWorkspaceChatThread,
+  createWorkspaceTerminalSession,
+  fetchWorkspaceChatThreads,
+  fetchWorkspaceTerminalSessions,
+  uploadChatAttachment,
   postChatMessage,
   postWatchCommand,
   rejectRun,
@@ -33,7 +40,20 @@ import {
   stopRun,
   stopTunnel,
 } from '../api/control-plane';
-import type { ConnectorProbeRecord, CursorRuntimeStatusSnapshot, RuntimeMcpToolsSnapshot } from '../api/control-plane';
+import type {
+  ConnectorProbeRecord,
+  CursorRuntimeStatusSnapshot,
+  FleetHealthSnapshot,
+  RuntimeMcpToolsSnapshot,
+  TerminalSessionRecord,
+  WorkspaceChatThreadListItem,
+} from '../api/control-plane';
+import {
+  persistOperatorCenterView,
+  readStoredOperatorCenterView,
+  type BrainGraphSnapshot,
+  type OperatorCenterView,
+} from '../lib/operator-brain-graph-view';
 import type { RuntimeStatusSnapshot } from '../api/control-plane';
 import type {
   ApprovalRecord,
@@ -66,7 +86,25 @@ import {
 import { postKairoSpeak } from '../lib/kairo-speak-client';
 import type { EditorRevealRequest } from '../components/EditorHost.vue';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
-import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
+import {
+  DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+  upsertTerminalSession,
+} from '../lib/terminal-session-view';
+import { sortIdeThreadsNewestFirst } from '../lib/ide-thread-picker-view';
+import {
+  ensureOpenIdeThreadTabs,
+  openIdeThreadTab,
+  pruneOpenIdeThreadTabs,
+  resolveIdeThreadTabAfterClose,
+  resolveOpenIdeThreadTabItems,
+} from '../lib/ide-thread-tabs-view';
+import {
+  clearActiveIdeThreadIdForWorkspace,
+  readActiveIdeThreadIdsByWorkspace,
+  readOpenIdeThreadIdsByWorkspace,
+  writeActiveIdeThreadIdForWorkspace,
+  writeOpenIdeThreadIdsForWorkspace,
+} from '../lib/ide-thread-tabs-prefs';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
 import {
   normalizeAgentExecutionAccess,
@@ -89,6 +127,7 @@ import {
   shouldClearIdeAgentRunLink,
   shouldShowIdeAgentStop,
 } from '../lib/ide-agent-run-active';
+import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
 import {
   defaultWorkspaceStreamUi,
   shouldSyncWorkspaceStreamGlobals,
@@ -168,11 +207,6 @@ import {
   type WorkspaceDocumentDescriptor,
 } from '../lib/workspace-documents';
 import { persistEditorMarkdownPreviewEnabled } from '../lib/editor-markdown-preview-prefs';
-import {
-  deriveAgentReportTitle,
-  extractAgentReportMarkdown,
-  shouldAutoOpenAgentReportInEditor,
-} from '../lib/agent-message-markdown';
 import { formatAgentDraftTitle } from '../lib/editor-tab-labels';
 import {
   selectPrimaryApprovalRun,
@@ -270,7 +304,9 @@ interface EditorTabDescriptor {
 interface TerminalSessionDescriptor {
   id: string;
   title: string;
-  state: 'placeholder';
+  role: 'operator' | 'agent' | string;
+  runId: string | null;
+  state: 'ready';
 }
 
 interface DockContextDescriptor {
@@ -285,7 +321,13 @@ const DEFAULT_EDITOR_TABS: EditorTabDescriptor[] = [
 ];
 
 const DEFAULT_TERMINAL_SESSIONS: TerminalSessionDescriptor[] = [
-  { id: 'terminal-primary', title: 'Terminal', state: 'placeholder' },
+  {
+    id: DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+    title: 'Terminal',
+    role: 'operator',
+    runId: null,
+    state: 'ready',
+  },
 ];
 
 const DEFAULT_DOCK_CONTEXT: DockContextDescriptor = {
@@ -293,6 +335,17 @@ const DEFAULT_DOCK_CONTEXT: DockContextDescriptor = {
   title: 'Dock Thread Shell',
   state: 'placeholder',
 };
+
+function hydrateWorkspaceSurfaceThreadIds(): Record<
+  string,
+  Partial<Record<ThreadSurface, string>>
+> {
+  const output: Record<string, Partial<Record<ThreadSurface, string>>> = {};
+  for (const [workspaceId, threadId] of Object.entries(readActiveIdeThreadIdsByWorkspace())) {
+    output[workspaceId] = { ide: threadId };
+  }
+  return output;
+}
 
 export const useShellStore = defineStore('shell', () => {
   const layoutMode = ref<LayoutMode>(readStoredLayoutMode() ?? 'operator');
@@ -359,6 +412,14 @@ export const useShellStore = defineStore('shell', () => {
   const connectorsError = ref<string | null>(null);
   const connectorMutationPending = ref(false);
   const operatorBriefing = ref<OperatorBriefing | null>(null);
+  const operatorFleetHealth = ref<FleetHealthSnapshot | null>(null);
+  const operatorFleetHealthLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const operatorFleetHealthError = ref<string | null>(null);
+  const operatorBrainGraph = ref<BrainGraphSnapshot | null>(null);
+  const operatorBrainGraphLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const operatorBrainGraphError = ref<string | null>(null);
+  const operatorCenterView = ref<OperatorCenterView>(readStoredOperatorCenterView());
+  const operatorBrainGalaxyActive = computed(() => operatorCenterView.value === 'graph');
   const operatorPresenceSettings = ref<OperatorPresenceSettings>(
     readPersistedOperatorPresenceSettings() ?? defaultOperatorPresenceSettings(),
   );
@@ -376,7 +437,7 @@ export const useShellStore = defineStore('shell', () => {
   const activeThreadId = ref<string | null>(null);
   const workspaceSurfaceThreadIds = ref<
     Record<string, Partial<Record<ThreadSurface, string>>>
-  >({});
+  >(hydrateWorkspaceSurfaceThreadIds());
   const operatorCommandDraft = ref('');
   const ideComposerDraft = ref('');
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
@@ -408,7 +469,11 @@ export const useShellStore = defineStore('shell', () => {
   const activeEditorDocumentId = ref<string>('file:README.md');
   const editorSelection = ref<EditorSelectionSnapshot | null>(null);
   const terminalSessions = ref<TerminalSessionDescriptor[]>(DEFAULT_TERMINAL_SESSIONS);
-  const activeTerminalSessionId = ref<string>(DEFAULT_TERMINAL_SESSIONS[0].id);
+  const activeTerminalSessionId = ref<string>(DEFAULT_OPERATOR_TERMINAL_SESSION_ID);
+  const ideThreadsByWorkspaceId = ref<Record<string, WorkspaceChatThreadListItem[]>>({});
+  const openIdeThreadIdsByWorkspaceId = ref<Record<string, string[]>>(
+    readOpenIdeThreadIdsByWorkspace(),
+  );
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
   const expandedDockSeams = ref<Set<DockSeamId>>(new Set(['thread']));
   const briefingSeamEmphasized = ref(false);
@@ -858,10 +923,15 @@ export const useShellStore = defineStore('shell', () => {
       activeThreadId.value = threadId;
       commandMutationState.value = 'idle';
       commandMutationError.value = null;
+      await loadIdeThreads(workspaceId);
       return;
     }
 
     await loadWorkspaceThread(workspaceId, currentThreadSurface());
+    if (currentThreadSurface() === 'ide') {
+      await loadIdeThreads(workspaceId);
+      applyIdeThreadMessagesToView(workspaceId);
+    }
   }
 
   function resetThreadContext(): void {
@@ -918,6 +988,9 @@ export const useShellStore = defineStore('shell', () => {
         [surface]: threadId,
       },
     };
+    if (surface === 'ide') {
+      writeActiveIdeThreadIdForWorkspace(workspaceId, threadId);
+    }
   }
 
   function clearWorkspaceSurfaceThreadId(workspaceId: string, surface: ThreadSurface): void {
@@ -930,6 +1003,280 @@ export const useShellStore = defineStore('shell', () => {
       delete next[workspaceId];
     }
     workspaceSurfaceThreadIds.value = next;
+    if (surface === 'ide') {
+      clearActiveIdeThreadIdForWorkspace(workspaceId);
+    }
+  }
+
+  const activeIdeThreadId = computed(() => {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return null;
+    }
+    return getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+  });
+
+  const ideThreadsForCurrentWorkspace = computed(() => {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return [];
+    }
+    return sortIdeThreadsNewestFirst(ideThreadsByWorkspaceId.value[workspaceId] ?? []);
+  });
+
+  const openIdeThreadTabsForCurrentWorkspace = computed(() => {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return [];
+    }
+    return resolveOpenIdeThreadTabItems({
+      openIds: openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [],
+      threads: ideThreadsByWorkspaceId.value[workspaceId] ?? [],
+      activeThreadId: getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
+      workspaceId,
+    });
+  });
+
+  function persistOpenIdeThreadTabs(workspaceId: string, threadIds: string[]): void {
+    openIdeThreadIdsByWorkspaceId.value = {
+      ...openIdeThreadIdsByWorkspaceId.value,
+      [workspaceId]: threadIds,
+    };
+    writeOpenIdeThreadIdsForWorkspace(workspaceId, threadIds);
+  }
+
+  function syncOpenIdeThreadTabs(workspaceId: string): void {
+    const threads = ideThreadsByWorkspaceId.value[workspaceId] ?? [];
+    const knownIds = threads.map((thread) => thread.thread_id);
+    const activeId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    const currentOpen = openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [];
+    const pruned = pruneOpenIdeThreadTabs(currentOpen, knownIds);
+    const next = ensureOpenIdeThreadTabs(
+      activeId ? openIdeThreadTab(pruned, activeId) : pruned,
+      activeId,
+    );
+    if (next.join('|') !== currentOpen.join('|')) {
+      persistOpenIdeThreadTabs(workspaceId, next);
+    }
+  }
+
+  function ensureIdeThreadTabOpen(threadId: string): void {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+    const currentOpen = openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [];
+    const next = openIdeThreadTab(currentOpen, threadId);
+    if (next.join('|') !== currentOpen.join('|')) {
+      persistOpenIdeThreadTabs(workspaceId, next);
+    }
+  }
+
+  async function closeIdeThreadTab(threadId: string): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+
+    const currentOpen = openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [];
+    if (currentOpen.length <= 1) {
+      return;
+    }
+
+    const nextOpen = currentOpen.filter((id) => id !== threadId);
+    persistOpenIdeThreadTabs(workspaceId, nextOpen);
+
+    const nextActive = resolveIdeThreadTabAfterClose({
+      openIds: currentOpen,
+      closedId: threadId,
+      activeId: activeIdeThreadId.value,
+    });
+    if (nextActive && nextActive !== activeIdeThreadId.value) {
+      await selectIdeThread(nextActive);
+    }
+  }
+
+  const activeTerminalSession = computed(
+    () =>
+      terminalSessions.value.find((session) => session.id === activeTerminalSessionId.value) ??
+      DEFAULT_TERMINAL_SESSIONS[0],
+  );
+
+  const workspaceThreadLoadPromises = new Map<string, Promise<void>>();
+  const ideThreadsLoadPromises = new Map<string, Promise<void>>();
+
+  function workspaceThreadLoadKey(workspaceId: string, surface: ThreadSurface): string {
+    return `${workspaceId}:${surface}`;
+  }
+
+  function applyIdeThreadMessagesToView(workspaceId: string): void {
+    if (layoutMode.value !== 'ide') {
+      return;
+    }
+    const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    const cached = workspaceIdeThreadMessagesById.value[workspaceId];
+    if (!threadId || !cached?.length) {
+      return;
+    }
+    activeThreadId.value = threadId;
+    threadMessages.value = cached;
+    commandMutationState.value = 'idle';
+    commandMutationError.value = null;
+  }
+
+  async function loadIdeThreadsImpl(workspaceId: string): Promise<void> {
+    try {
+      const snapshot = await fetchWorkspaceChatThreads(workspaceId, { surface: 'ide' });
+      ideThreadsByWorkspaceId.value = {
+        ...ideThreadsByWorkspaceId.value,
+        [workspaceId]: snapshot.items,
+      };
+    } catch {
+      ideThreadsByWorkspaceId.value = {
+        ...ideThreadsByWorkspaceId.value,
+        [workspaceId]: [],
+      };
+    }
+    syncOpenIdeThreadTabs(workspaceId);
+  }
+
+  async function loadIdeThreads(workspaceId: string): Promise<void> {
+    const inflight = ideThreadsLoadPromises.get(workspaceId);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = loadIdeThreadsImpl(workspaceId).finally(() => {
+      ideThreadsLoadPromises.delete(workspaceId);
+    });
+    ideThreadsLoadPromises.set(workspaceId, promise);
+    return promise;
+  }
+
+  async function hydrateWorkspaceIdeChat(workspaceId: string): Promise<void> {
+    await loadWorkspaceThread(workspaceId, 'ide');
+    await loadIdeThreads(workspaceId);
+    applyIdeThreadMessagesToView(workspaceId);
+  }
+
+  async function createIdeThread(): Promise<string | null> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return null;
+    }
+
+    try {
+      const created = await createWorkspaceChatThread(workspaceId, { surface: 'ide' });
+      ideThreadsByWorkspaceId.value = {
+        ...ideThreadsByWorkspaceId.value,
+        [workspaceId]: sortIdeThreadsNewestFirst([
+          created,
+          ...(ideThreadsByWorkspaceId.value[workspaceId] ?? []).filter(
+            (thread) => thread.thread_id !== created.thread_id,
+          ),
+        ]),
+      };
+      ideComposerDraft.value = '';
+      await selectIdeThread(created.thread_id);
+      return created.thread_id;
+    } catch (error) {
+      commandMutationError.value =
+        error instanceof Error ? error.message : 'Failed to create a new chat';
+      return null;
+    }
+  }
+
+  async function selectIdeThread(threadId: string): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+
+    disconnectChatStreamSession(workspaceId);
+    setWorkspaceStreamUi(workspaceId, {
+      active: false,
+      messageId: null,
+      activity: null,
+      ideAgentRunId: null,
+    });
+
+    setWorkspaceSurfaceThreadId(workspaceId, 'ide', threadId);
+    activeThreadId.value = threadId;
+    ensureIdeThreadTabOpen(threadId);
+
+    if (layoutMode.value === 'ide') {
+      threadMessages.value = [];
+      ideComposerActivity.value = null;
+      ideAgentRunId.value = null;
+      commandMutationState.value = 'idle';
+      commandMutationError.value = null;
+      workspaceIdeThreadMessagesById.value = {
+        ...workspaceIdeThreadMessagesById.value,
+        [workspaceId]: [],
+      };
+    }
+
+    await loadWorkspaceThread(workspaceId, 'ide');
+  }
+
+  function mapTerminalSessionRecord(record: TerminalSessionRecord): TerminalSessionDescriptor {
+    return {
+      id: record.session_id,
+      title: record.title,
+      role: record.role,
+      runId: record.run_id,
+      state: 'ready',
+    };
+  }
+
+  async function loadTerminalSessions(workspaceId: string): Promise<void> {
+    try {
+      const snapshot = await fetchWorkspaceTerminalSessions(workspaceId);
+      const mapped = snapshot.items.map((item) => mapTerminalSessionRecord(item));
+      terminalSessions.value = mapped.length ? mapped : [...DEFAULT_TERMINAL_SESSIONS];
+      if (!terminalSessions.value.some((session) => session.id === activeTerminalSessionId.value)) {
+        activeTerminalSessionId.value = DEFAULT_OPERATOR_TERMINAL_SESSION_ID;
+      }
+    } catch {
+      terminalSessions.value = [...DEFAULT_TERMINAL_SESSIONS];
+      activeTerminalSessionId.value = DEFAULT_OPERATOR_TERMINAL_SESSION_ID;
+    }
+  }
+
+  function setActiveTerminalSession(sessionId: string): void {
+    if (!terminalSessions.value.some((session) => session.id === sessionId)) {
+      return;
+    }
+    activeTerminalSessionId.value = sessionId;
+    revealIdeTerminalPanel();
+  }
+
+  async function createTerminalSession(): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+
+    const created = await createWorkspaceTerminalSession(workspaceId, {
+      role: 'operator',
+      title: 'Terminal',
+    });
+    applyAgentTerminalSession(created);
+    revealIdeTerminalPanel();
+  }
+
+  function applyAgentTerminalSession(record: TerminalSessionRecord): void {
+    const existingRecords: TerminalSessionRecord[] = terminalSessions.value.map((session) => ({
+      session_id: session.id,
+      workspace_id: currentWorkspace.value?.workspace_id ?? record.workspace_id,
+      role: session.role,
+      title: session.title,
+      run_id: session.runId,
+      created_at: '',
+    }));
+    const next = upsertTerminalSession(existingRecords, record);
+    terminalSessions.value = next.map((session) => mapTerminalSessionRecord(session));
+    activeTerminalSessionId.value = record.session_id;
   }
 
   async function refreshOperatorThreadMessages(workspaceId: string): Promise<void> {
@@ -952,7 +1299,7 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadWorkspaceThread(
+  async function loadWorkspaceThreadImpl(
     workspaceId: string,
     surface: ThreadSurface = currentThreadSurface(),
   ): Promise<void> {
@@ -995,20 +1342,19 @@ export const useShellStore = defineStore('shell', () => {
         surface,
       );
       if (surface === 'ide') {
+        workspaceIdeThreadMessagesById.value = {
+          ...workspaceIdeThreadMessagesById.value,
+          [workspaceId]: mapped,
+        };
         ideAgentRunId.value = resolveIdeAgentLinkedRunIdFromMessages(mapped, runs.value);
+        ensureIdeThreadTabOpen(history.thread_id);
+        syncOpenIdeThreadTabs(workspaceId);
       }
       if (surface === currentThreadSurface()) {
         activeThreadId.value = history.thread_id;
         threadMessages.value = mapped;
         commandMutationState.value = 'idle';
         commandMutationError.value = null;
-        if (surface === 'ide') {
-          workspaceIdeThreadMessagesById.value = {
-            ...workspaceIdeThreadMessagesById.value,
-            [workspaceId]: mapped,
-          };
-          hydrateLatestAgentReportEditorLink(mapped);
-        }
       }
       if (surface === 'operator') {
         operatorThreadMessages.value = mapped;
@@ -1028,6 +1374,23 @@ export const useShellStore = defineStore('shell', () => {
         operatorThreadMessages.value = [];
       }
     }
+  }
+
+  async function loadWorkspaceThread(
+    workspaceId: string,
+    surface: ThreadSurface = currentThreadSurface(),
+  ): Promise<void> {
+    const key = workspaceThreadLoadKey(workspaceId, surface);
+    const inflight = workspaceThreadLoadPromises.get(key);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = loadWorkspaceThreadImpl(workspaceId, surface).finally(() => {
+      workspaceThreadLoadPromises.delete(key);
+    });
+    workspaceThreadLoadPromises.set(key, promise);
+    return promise;
   }
 
   async function submitOperatorCommand(): Promise<void> {
@@ -1221,6 +1584,49 @@ export const useShellStore = defineStore('shell', () => {
     });
   }
 
+  async function speakOperatorBriefing(): Promise<void> {
+    if (!voiceDeliveryAllowed() || operatorPresenceSettings.value.privacy_mode) {
+      return;
+    }
+    if (effectiveKairoNarrationLevel.value === 'off') {
+      return;
+    }
+
+    const notice = operatorBriefing.value?.notice?.trim() ?? '';
+    const advise = operatorBriefing.value?.advise?.trim() ?? '';
+    if (!notice && !advise) {
+      return;
+    }
+
+    try {
+      const response = await postKairoSpeak({
+        event_type: 'briefing',
+        context: {
+          notice,
+          advise,
+          workspace_id: currentWorkspace.value?.workspace_id ?? '',
+          pending_approvals: pendingApprovalsCount.value,
+          top_signal_title: operatorBriefing.value?.top_signals[0]?.title ?? '',
+        },
+        session_id: kairoSpeechSessionId(),
+        workspace_id: currentWorkspace.value?.workspace_id ?? '',
+        narration: effectiveKairoNarrationLevel.value,
+        use_runtime: true,
+      });
+      if (response.source === 'skipped' || !response.line?.trim()) {
+        return;
+      }
+      deliverSpokenOperatorAlert({
+        eligible: true,
+        reason: 'operator_briefing_spoken',
+        signal_id: null,
+        message: response.line.trim(),
+      });
+    } catch {
+      // Voice line unavailable — operator can read briefing in dock.
+    }
+  }
+
   async function maybeSpeakBootGreeting(): Promise<void> {
     if (!voiceDeliveryAllowed()) {
       return;
@@ -1377,36 +1783,15 @@ export const useShellStore = defineStore('shell', () => {
                 void reloadWorkspaceFile(path);
               }
             }
-            const reportMarkdown = extractAgentReportMarkdown(finalContent);
-            if (reportMarkdown && shouldAutoOpenAgentReportInEditor(reportMarkdown)) {
-              const documentId = openAgentContentInEditor({
-                title: deriveAgentReportTitle(reportMarkdown),
-                content: reportMarkdown,
-                preferPreview: true,
-              });
-              if (documentId) {
-                recordAgentReportEditorLink(messageId, {
-                  title: deriveAgentReportTitle(reportMarkdown),
-                  documentId,
-                });
-              }
-            }
           }
           setWorkspaceStreamUi(workspaceId, {
             active: false,
             messageId: null,
             activity: null,
+            ideAgentRunId: null,
           });
           disconnectChatStreamSession(workspaceId);
-          void refreshRunSurfaces().then(() => {
-            const linkedRunId = getWorkspaceStreamUi(workspaceId).ideAgentRunId;
-            const linked = linkedRunId
-              ? runs.value.find((run) => run.run_id === linkedRunId) ?? null
-              : null;
-            if (shouldClearIdeAgentRunLink(linked)) {
-              setWorkspaceStreamUi(workspaceId, { ideAgentRunId: null });
-            }
-          });
+          void refreshRunSurfaces();
         },
         onError: (message, payload) => {
           if (payload?.system_message_id && payload.system_content) {
@@ -1476,6 +1861,7 @@ export const useShellStore = defineStore('shell', () => {
       contentOverride?: string;
       linkedRunIdOverride?: string | null;
       clearDraftOnSuccess?: boolean;
+      attachmentFiles?: File[];
     } = {},
   ): Promise<boolean> {
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
@@ -1507,6 +1893,7 @@ export const useShellStore = defineStore('shell', () => {
         draft: content,
         workspaceId,
         activeFilePath: activeWorkspaceFilePath.value,
+        terminalSessionId: activeTerminalSessionId.value,
         editorSelection: editorSelection.value
           ? {
               startLine: editorSelection.value.startLine,
@@ -1515,6 +1902,11 @@ export const useShellStore = defineStore('shell', () => {
             }
           : null,
       });
+      const attachmentIds: string[] = [];
+      for (const file of options.attachmentFiles ?? []) {
+        const uploaded = await uploadChatAttachment(workspaceId, file);
+        attachmentIds.push(uploaded.attachment_id);
+      }
       const response = await postChatMessage({
         workspace_id: workspaceId,
         content,
@@ -1524,12 +1916,14 @@ export const useShellStore = defineStore('shell', () => {
         active_file_path: activeWorkspaceFilePath.value,
         editor_selection: contextPayload.editor_selection,
         terminal_snippet: contextPayload.terminal_snippet,
+        attachment_ids: attachmentIds.length ? attachmentIds : undefined,
         runtime_target: selectedRuntimeTargetId.value || null,
         runtime_model: selectedComposerModel.value || null,
         execution_access: composerMode === 'agent' ? agentExecutionAccess.value : undefined,
       });
       activeThreadId.value = response.thread_id;
       setWorkspaceSurfaceThreadId(workspaceId, 'ide', response.thread_id);
+      void loadIdeThreads(workspaceId);
       const merged = mergeThreadMessages(
         threadMessages.value,
         response.messages.map((message) => mapChatMessageRecord(message)),
@@ -1553,6 +1947,10 @@ export const useShellStore = defineStore('shell', () => {
       }
       if (response.streaming && response.stream_agent_message_id) {
         commandMutationState.value = 'idle';
+        if (response.agent_terminal_session) {
+          applyAgentTerminalSession(response.agent_terminal_session);
+          revealIdeTerminalPanel();
+        }
         ideComposerActivity.value = {
           label: buildIdeStreamActivityLabel(agentExecutionAccess.value),
           mode: composerMode,
@@ -1614,8 +2012,9 @@ export const useShellStore = defineStore('shell', () => {
 
   async function submitIdeComposer(
     composerMode: 'ask' | 'plan' | 'agent',
+    options: { attachmentFiles?: File[] } = {},
   ): Promise<void> {
-    await dispatchIdeComposerMessage(composerMode);
+    await dispatchIdeComposerMessage(composerMode, options);
   }
 
   async function runOperatorCommand(content: string): Promise<void> {
@@ -1714,6 +2113,11 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  function setOperatorCenterView(view: OperatorCenterView): void {
+    operatorCenterView.value = view;
+    persistOperatorCenterView(view);
+  }
+
   function afterRunLifecycleMutation(): void {
     focusMissionControl();
     if (dockHeroMode.value === 'briefing' && typeof window !== 'undefined') {
@@ -1790,8 +2194,10 @@ export const useShellStore = defineStore('shell', () => {
     if (workspaceId) {
       if (mode === 'operator') {
         threadMessages.value = operatorThreadMessages.value;
+        void loadWorkspaceThread(workspaceId, 'operator');
+      } else {
+        void hydrateWorkspaceIdeChat(workspaceId);
       }
-      void loadWorkspaceThread(workspaceId, threadSurfaceForLayout(mode));
     }
     if (mode === 'ide' && workspaceId) {
       if (workspaceFilesLoadState.value === 'idle') {
@@ -1864,6 +2270,50 @@ export const useShellStore = defineStore('shell', () => {
     if (path) {
       void openWorkspaceFile(path);
     }
+  }
+
+  function closeEditorDocument(id: string): void {
+    const path = filePathFromDocumentId(id);
+    const openTabs = editorDocuments.value.filter(
+      (document) => document.source === 'file' || document.source === 'draft',
+    );
+    const closingIndex = openTabs.findIndex((document) => document.id === id);
+    if (closingIndex < 0) {
+      return;
+    }
+
+    if (path) {
+      openedFilePaths.value = openedFilePaths.value.filter((entry) => entry !== path);
+    } else {
+      draftDocuments.value = draftDocuments.value.filter((document) => document.id !== id);
+    }
+
+    if (activeEditorDocumentId.value !== id) {
+      return;
+    }
+
+    const remaining = openTabs.filter((document) => document.id !== id);
+    if (remaining.length === 0) {
+      activeEditorDocumentId.value = 'file:README.md';
+      if (!openedFilePaths.value.includes('README.md')) {
+        openedFilePaths.value = ['README.md'];
+      }
+      void openWorkspaceFile('README.md');
+      return;
+    }
+
+    const nextIndex = closingIndex >= remaining.length ? remaining.length - 1 : closingIndex;
+    setActiveEditorDocument(remaining[nextIndex].id);
+  }
+
+  function revealEditorLine(line: number): void {
+    if (line < 1) {
+      return;
+    }
+    editorRevealRequest.value = {
+      line,
+      nonce: Date.now(),
+    };
   }
 
   function promptWorkspaceFilePath(message: string, defaultValue = ''): string | null {
@@ -2086,33 +2536,6 @@ export const useShellStore = defineStore('shell', () => {
     return id;
   }
 
-  function hydrateLatestAgentReportEditorLink(messages: OperatorThreadEntry[]): void {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index];
-      if (message.role !== 'agent') {
-        continue;
-      }
-      if (agentReportEditorLink(message.message_id)) {
-        return;
-      }
-      const reportMarkdown = extractAgentReportMarkdown(message.content);
-      if (!reportMarkdown || !shouldAutoOpenAgentReportInEditor(reportMarkdown)) {
-        return;
-      }
-      const title = deriveAgentReportTitle(reportMarkdown);
-      const documentId = openAgentContentInEditor({
-        title,
-        content: reportMarkdown,
-        preferPreview: true,
-        focus: false,
-      });
-      if (documentId) {
-        recordAgentReportEditorLink(message.message_id, { title, documentId });
-      }
-      return;
-    }
-  }
-
   function recordAgentReportEditorLink(
     messageId: string,
     link: AgentReportEditorLink,
@@ -2273,6 +2696,8 @@ export const useShellStore = defineStore('shell', () => {
       void loadRunHistory(selectWorkspacePrimaryRun(
         runs.value.filter((run) => run.workspace_id === workspaceId),
       )?.run_id ?? null);
+      void loadOperatorBriefing({ background: briefingLoadState.value === 'loaded' });
+      void loadTerminalSessions(workspaceId);
     }
     void loadWorkspaceFiles();
   }
@@ -2361,7 +2786,7 @@ export const useShellStore = defineStore('shell', () => {
     workspacesError.value = null;
 
     try {
-      const snapshot = await fetchWorkspaces();
+      const snapshot = await fetchWorkspaces({ scope: 'operator' });
       workspaces.value = mergeOperatorWorkspaceCatalog(snapshot.items);
       const visibleIds = new Set(workspaces.value.map((workspace) => workspace.workspace_id));
       if (
@@ -2620,6 +3045,7 @@ export const useShellStore = defineStore('shell', () => {
         loadRuntimeSummary(),
         loadInbox(),
         loadOperatorBriefing(),
+        loadOperatorFleetHealth(),
       ]);
     } catch (error) {
       connectorsError.value =
@@ -2729,7 +3155,10 @@ export const useShellStore = defineStore('shell', () => {
         );
 
       try {
-        operatorBriefing.value = await fetchOperatorBriefing({ viewportCompact });
+        operatorBriefing.value = await fetchOperatorBriefing({
+          viewportCompact,
+          workspaceId: currentWorkspace.value?.workspace_id ?? null,
+        });
         lastViewportCompactRequested = viewportCompact;
         approvals.value = operatorBriefing.value.pending_approvals.items;
         briefingLoadState.value = 'loaded';
@@ -2747,6 +3176,46 @@ export const useShellStore = defineStore('shell', () => {
       await operatorBriefingFetchInFlight;
     } finally {
       operatorBriefingFetchInFlight = null;
+    }
+  }
+
+  async function loadOperatorFleetHealth(options?: { background?: boolean }): Promise<void> {
+    const backgroundRefresh =
+      options?.background === true && operatorFleetHealthLoadState.value === 'loaded';
+    if (!backgroundRefresh) {
+      operatorFleetHealthLoadState.value = 'loading';
+      operatorFleetHealthError.value = null;
+    }
+
+    try {
+      operatorFleetHealth.value = await fetchOperatorFleetHealth();
+      operatorFleetHealthLoadState.value = 'loaded';
+    } catch (error) {
+      if (!backgroundRefresh) {
+        operatorFleetHealthLoadState.value = 'error';
+        operatorFleetHealthError.value =
+          error instanceof Error ? error.message : 'operator fleet health request failed';
+      }
+    }
+  }
+
+  async function loadOperatorBrainGraph(options?: { background?: boolean }): Promise<void> {
+    const backgroundRefresh =
+      options?.background === true && operatorBrainGraphLoadState.value === 'loaded';
+    if (!backgroundRefresh) {
+      operatorBrainGraphLoadState.value = 'loading';
+      operatorBrainGraphError.value = null;
+    }
+
+    try {
+      operatorBrainGraph.value = await fetchOperatorBrainGraph();
+      operatorBrainGraphLoadState.value = 'loaded';
+    } catch (error) {
+      if (!backgroundRefresh) {
+        operatorBrainGraphLoadState.value = 'error';
+        operatorBrainGraphError.value =
+          error instanceof Error ? error.message : 'operator brain graph request failed';
+      }
     }
   }
 
@@ -2833,6 +3302,10 @@ export const useShellStore = defineStore('shell', () => {
       loadInbox(),
       loadConnectors(),
       loadOperatorBriefing({ background: briefingBackground }),
+      loadOperatorFleetHealth({ background: operatorFleetHealthLoadState.value === 'loaded' }),
+      operatorBrainGraphLoadState.value === 'loaded'
+        ? loadOperatorBrainGraph({ background: true })
+        : Promise.resolve(),
     ]);
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
   }
@@ -3116,6 +3589,7 @@ export const useShellStore = defineStore('shell', () => {
       loadInbox(),
       loadConnectors(),
       loadOperatorBriefing(),
+      loadOperatorFleetHealth(),
     ]);
     await loadWorkspaces({ sync: false });
     await loadRuns({ sync: false });
@@ -3127,10 +3601,8 @@ export const useShellStore = defineStore('shell', () => {
     await loadWorkspaceFiles();
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
-      await Promise.all([
-        loadWorkspaceThread(workspaceId, 'operator'),
-        loadWorkspaceThread(workspaceId, 'ide'),
-      ]);
+      await loadWorkspaceThread(workspaceId, 'operator');
+      await hydrateWorkspaceIdeChat(workspaceId);
       if (layoutMode.value === 'operator') {
         threadMessages.value = operatorThreadMessages.value;
       }
@@ -3192,6 +3664,10 @@ export const useShellStore = defineStore('shell', () => {
     ideAgentLinkedRun,
     ideAgentRunId,
     ideComposerActivity,
+    activeIdeThreadId,
+    ideThreadsForCurrentWorkspace,
+    openIdeThreadTabsForCurrentWorkspace,
+    activeTerminalSession,
     ideDisplayKairoPresenceState,
     idePresenceProfile,
     inboxItems,
@@ -3229,16 +3705,34 @@ export const useShellStore = defineStore('shell', () => {
     loadBootstrapData,
     loadConnectors,
     loadInbox,
+    loadOperatorBrainGraph,
     loadOperatorBriefing,
+    loadOperatorFleetHealth,
     loadOperatorPresenceSettings,
     loadRuns,
     loadCursorCatalog,
     loadRuntimeStatus,
     loadRuntimeSummary,
     loadWorkspaceThread,
+    loadIdeThreads,
+    hydrateWorkspaceIdeChat,
+    createIdeThread,
+    selectIdeThread,
+    closeIdeThreadTab,
+    loadTerminalSessions,
+    setActiveTerminalSession,
+    createTerminalSession,
     loadWorkspaces,
     markPrimaryRunReviewReady,
+    operatorBrainGraph,
+    operatorBrainGraphError,
+    operatorBrainGraphLoadState,
+    operatorBrainGalaxyActive,
+    operatorCenterView,
     operatorBriefing,
+    operatorFleetHealth,
+    operatorFleetHealthError,
+    operatorFleetHealthLoadState,
     operatorCommandDraft,
     ideComposerDraft,
     operatorPresenceSettings,
@@ -3261,6 +3755,7 @@ export const useShellStore = defineStore('shell', () => {
     runOperatorCommand,
     resumePrimaryRun,
     resumeIdeAgentRun,
+    revealIdeTerminalPanel,
     runs,
     runsError,
     runsLoadState,
@@ -3286,6 +3781,8 @@ export const useShellStore = defineStore('shell', () => {
     statusBarSegments,
     statusBarZones,
     renameActiveWorkspaceFile,
+    closeEditorDocument,
+    revealEditorLine,
     setActiveEditorTab,
     setActiveEditorDocument,
     setCurrentWorkspace,
@@ -3296,6 +3793,7 @@ export const useShellStore = defineStore('shell', () => {
     setSelectedComposerModel,
     setSelectedRuntimeTarget,
     setAgentExecutionAccess,
+    setOperatorCenterView,
     setLayoutMode,
     setLeftSidebarMode,
     toggleCursorPickerVisibleModel,
@@ -3328,6 +3826,7 @@ export const useShellStore = defineStore('shell', () => {
     focusMissionControl,
     focusKairoBriefing,
     deliverKairoSpokenAlert,
+    speakOperatorBriefing,
     maybeSpeakBootGreeting,
     loadWorkspaceFiles,
     openAgentContentInEditor,

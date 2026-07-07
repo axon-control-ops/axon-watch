@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.runs.service import list_runs
+from app.operator_workspace_scope import filter_operator_workspace_records
 from app.workspace_project_bindings import WorkspaceProjectBinding, load_workspace_project_bindings
 
 _OPERATOR_WORKSPACE_IDS = (
@@ -41,6 +42,7 @@ def _workspace_record(
 def list_workspace_records(
     *,
     inbox_fetcher: WatchInboxFetcher | None = None,
+    operator_surface: bool = False,
 ) -> list[dict[str, str]]:
     bindings = load_workspace_project_bindings()
     workspace_ids = {
@@ -48,8 +50,9 @@ def list_workspace_records(
         for record in list_runs()
         if str(record.get("workspace_id", "")).strip()
     }
-    workspace_ids.update(_OPERATOR_WORKSPACE_IDS)
-    workspace_ids.update(_DEFAULT_WORKSPACE_IDS)
+    if not operator_surface:
+        workspace_ids.update(_OPERATOR_WORKSPACE_IDS)
+        workspace_ids.update(_DEFAULT_WORKSPACE_IDS)
     workspace_ids.update(bindings.keys())
 
     inbox_snapshot = build_inbox_response(inbox_fetcher=inbox_fetcher)
@@ -59,10 +62,17 @@ def list_workspace_records(
             if workspace_id:
                 workspace_ids.add(workspace_id)
 
-    return [
+    records = [
         _workspace_record(workspace_id, bindings.get(workspace_id))
         for workspace_id in sorted(workspace_ids)
     ]
+    if not operator_surface:
+        return records
+
+    return filter_operator_workspace_records(
+        records,
+        bound_workspace_ids=frozenset(bindings.keys()),
+    )
 
 
 def get_workspace_record(

@@ -31,14 +31,21 @@ def build_shell_command(shell: str) -> list[str]:
     return [shell, "-i"]
 
 
-def build_shell_env(base_env: dict[str, str], *, workspace_root: str, shell: str) -> dict[str, str]:
+def build_shell_env(
+    base_env: dict[str, str],
+    *,
+    workspace_root: str,
+    shell: str,
+    session_id: str | None = None,
+) -> dict[str, str]:
     env = base_env.copy()
     env.setdefault("TERM", "xterm-256color")
     env.setdefault("COLORTERM", "truecolor")
     env["PWD"] = workspace_root
     env["STARSHIP_DISABLED"] = "1"
     env["DISABLE_AUTO_TITLE"] = "1"
-    env["HISTFILE"] = str(Path(workspace_root) / ".axon_terminal_history")
+    session_suffix = f"_{session_id}" if str(session_id or "").strip() else ""
+    env["HISTFILE"] = str(Path(workspace_root) / f".axon_terminal_history{session_suffix}")
 
     shell_name = Path(shell).name
     if shell_name == "zsh":

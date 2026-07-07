@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.chat.command_intent import humanize_run_summary
+from app.chat.command_intent import humanize_run_summary, is_auto_complete_run_summary
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.runs.service import (
     list_active_runs,
@@ -43,6 +43,10 @@ def _build_next_safe_actions(
     for run in active_run_records:
         if bool(run.get("can_resume")):
             if bool(run.get("can_approve")):
+                continue
+            if run.get("phase") == "review_ready" and is_auto_complete_run_summary(
+                str(run.get("summary", "")),
+            ):
                 continue
             run_id = str(run.get("run_id", ""))
             summary = humanize_run_summary(str(run.get("summary", "this run")))
@@ -90,11 +94,25 @@ def _build_next_safe_actions(
     return actions
 
 
+def _filter_records_by_workspace(
+    records: list[dict[str, object]],
+    workspace_id: str | None,
+) -> list[dict[str, object]]:
+    if not workspace_id:
+        return records
+    return [
+        record
+        for record in records
+        if str(record.get("workspace_id", "")).strip() == workspace_id
+    ]
+
+
 def build_operator_briefing(
     *,
     watch_probe: WatchProbe | None = None,
     inbox_fetcher: WatchInboxFetcher | None = None,
     viewport_compact: bool = False,
+    workspace_id: str | None = None,
 ) -> dict[str, object]:
     runtime_summary = assemble_runtime_summary(
         watch_probe=watch_probe,
@@ -108,9 +126,23 @@ def build_operator_briefing(
     )
     top_signals = [
         item for item in inbox_snapshot.get("items", []) if isinstance(item, dict)
-    ][:3]
+    ]
+    scoped_workspace_id = workspace_id.strip() if workspace_id else None
+    if scoped_workspace_id:
+        top_signals = [
+            item
+            for item in top_signals
+            if str(item.get("workspace_id", "")).strip() in {"", scoped_workspace_id}
+        ]
+    top_signals = top_signals[:3]
     active_run_records = list_active_runs()
     pending_approval_records = list_pending_approval_records()
+    if scoped_workspace_id:
+        active_run_records = _filter_records_by_workspace(active_run_records, scoped_workspace_id)
+        pending_approval_records = _filter_records_by_workspace(
+            pending_approval_records,
+            scoped_workspace_id,
+        )
     active_runs = [
         to_runtime_summary_active_run(record) for record in active_run_records
     ]
@@ -119,23 +151,31 @@ def build_operator_briefing(
         top_signals=top_signals,
         degraded_active=bool(runtime_summary["degraded"]["active"]),
     )
+    pending_approvals_count = len(pending_approval_records)
     rhythm = build_operator_briefing_rhythm(
         active_runs=active_runs,
         top_signals=top_signals,
-        pending_approvals_count=int(runtime_summary["approvals"]["pending_count"]),
+        pending_approvals_count=pending_approvals_count,
         degraded=runtime_summary["degraded"],
         watch_connected=watch_connected,
         next_safe_actions=next_safe_actions,
     )
 
+    scope: dict[str, object] = (
+        {"mode": "workspace", "workspace_id": scoped_workspace_id}
+        if scoped_workspace_id
+        else {"mode": "fleet"}
+    )
+
     return {
         "generated_at": runtime_summary["generated_at"],
+        "scope": scope,
         "notice": rhythm["notice"],
         "advise": rhythm["advise"],
         "executive_rhythm": rhythm,
         "top_signals": top_signals,
         "pending_approvals": {
-            "count": runtime_summary["approvals"]["pending_count"],
+            "count": pending_approvals_count,
             "items": pending_approval_records,
         },
         "active_runs": active_runs,

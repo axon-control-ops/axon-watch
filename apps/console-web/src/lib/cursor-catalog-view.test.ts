@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCursorCatalogRows,
   cursorComposerPickerRows,
+  cursorComposerPickerRowsForActiveModel,
   isCursorComposerModel,
   resolveCursorComposerModel,
 } from './cursor-catalog-view';
@@ -31,6 +32,18 @@ describe('cursor-catalog-view', () => {
       'composer-2.5-fast',
       'composer-2.5',
     ]);
+  });
+
+  it('hides manual model rows while auto is enabled', () => {
+    expect(
+      cursorComposerPickerRowsForActiveModel({ rows, activeModelId: 'auto' }).map((row) => row.id),
+    ).toEqual([]);
+    expect(
+      cursorComposerPickerRowsForActiveModel({
+        rows,
+        activeModelId: 'composer-2.5-fast',
+      }).map((row) => row.id),
+    ).toEqual(['composer-2.5-fast', 'composer-2.5']);
   });
 
   it('falls back stale api model pins to composer default', () => {

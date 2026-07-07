@@ -40,8 +40,14 @@ export interface ExecutiveOperatorRhythm {
   report: string;
 }
 
+export interface OperatorBriefingScope {
+  mode: 'fleet' | 'workspace';
+  workspace_id?: string;
+}
+
 export interface OperatorBriefing {
   generated_at: string;
+  scope?: OperatorBriefingScope;
   notice: string;
   advise: string;
   executive_rhythm: ExecutiveOperatorRhythm;

@@ -1,6 +1,6 @@
 import type { Terminal } from '@xterm/xterm';
 
-export const TERMINAL_SCROLLBACK_PREFIX = 'axon-xterm-scrollback-v3:';
+export const TERMINAL_SCROLLBACK_PREFIX = 'axon-xterm-scrollback-v4:';
 export const MAX_TERMINAL_SCROLLBACK_CHARS = 256_000;
 
 const SCROLLBACK_SCAFFOLD_LINE =
@@ -36,17 +36,19 @@ export function sanitizeScrollbackText(text: string): string {
     .trimEnd();
 }
 
-export function migrateTerminalScrollback(workspaceId: string): void {
+export function scrollbackStorageKey(workspaceId: string, sessionId = 'terminal-operator'): string {
+  return `${TERMINAL_SCROLLBACK_PREFIX}${workspaceId}:${sessionId}`;
+}
+
+export function migrateTerminalScrollback(workspaceId: string, sessionId = 'terminal-operator'): void {
   if (typeof sessionStorage === 'undefined') {
     return;
   }
 
   sessionStorage.removeItem(`axon-xterm-scrollback-v1:${workspaceId}`);
   sessionStorage.removeItem(`axon-xterm-scrollback-v2:${workspaceId}`);
-}
-
-export function scrollbackStorageKey(workspaceId: string): string {
-  return `${TERMINAL_SCROLLBACK_PREFIX}${workspaceId}`;
+  sessionStorage.removeItem(`axon-xterm-scrollback-v3:${workspaceId}`);
+  sessionStorage.removeItem(scrollbackStorageKey(workspaceId, sessionId));
 }
 
 export function serializeTerminalBuffer(terminal: Terminal): string {
@@ -63,30 +65,41 @@ export function serializeTerminalBuffer(terminal: Terminal): string {
   return sanitizeScrollbackText(lines.join('\n')).slice(-MAX_TERMINAL_SCROLLBACK_CHARS);
 }
 
-export function persistTerminalScrollback(workspaceId: string, terminal: Terminal): void {
+export function persistTerminalScrollback(
+  workspaceId: string,
+  terminal: Terminal,
+  sessionId = 'terminal-operator',
+): void {
   if (typeof sessionStorage === 'undefined') {
     return;
   }
 
   try {
     const serialized = serializeTerminalBuffer(terminal);
+    const key = scrollbackStorageKey(workspaceId, sessionId);
     if (!serialized) {
-      sessionStorage.removeItem(scrollbackStorageKey(workspaceId));
+      sessionStorage.removeItem(key);
       return;
     }
 
-    sessionStorage.setItem(scrollbackStorageKey(workspaceId), serialized);
+    sessionStorage.setItem(key, serialized);
   } catch {
     // Ignore quota errors; scrollback persistence is best-effort.
   }
 }
 
-export function restoreTerminalScrollback(workspaceId: string, terminal: Terminal): boolean {
+export function restoreTerminalScrollback(
+  workspaceId: string,
+  terminal: Terminal,
+  sessionId = 'terminal-operator',
+): boolean {
   if (typeof sessionStorage === 'undefined') {
     return false;
   }
 
-  const saved = sanitizeScrollbackText(sessionStorage.getItem(scrollbackStorageKey(workspaceId)) ?? '');
+  const saved = sanitizeScrollbackText(
+    sessionStorage.getItem(scrollbackStorageKey(workspaceId, sessionId)) ?? '',
+  );
   if (!saved) {
     return false;
   }

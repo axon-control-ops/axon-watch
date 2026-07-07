@@ -12,8 +12,8 @@ describe('buildOperatorQuickGuide', () => {
     });
 
     expect(guide?.title).toContain('Review ready');
-    expect(guide?.steps.join(' ')).toContain('RESUME RUN');
-    expect(guide?.steps.join(' ')).toContain('Commands');
+    expect(guide?.steps.join(' ')).toContain('COMPLETE RUN');
+    expect(guide?.steps.join(' ')).toContain('multi-step');
   });
 
   it('returns idle guidance when no run is active', () => {

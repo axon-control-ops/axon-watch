@@ -12,7 +12,8 @@ withDefaults(
       | 'plus'
       | 'trash'
       | 'folder'
-      | 'folder-open';
+      | 'folder-open'
+      | 'history';
     size?: number;
   }>(),
   { size: 14 },
@@ -75,6 +76,11 @@ withDefaults(
     </template>
     <template v-else-if="name === 'folder-open'">
       <path d="M2.5 4.5h4.2l1.4 1.5H13.5a1 1 0 0 1 1 1v1.5H3.2a1 1 0 0 0-.98 1.2l.8 3.8a1 1 0 0 0 .98.8h9.5a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1H8.1z" />
+    </template>
+    <template v-else-if="name === 'history'">
+      <circle cx="8" cy="8" r="4.5" />
+      <path d="M8 5.2V8l2 1.4" />
+      <path d="M5.2 3.2 4 2" />
     </template>
   </svg>
 </template>

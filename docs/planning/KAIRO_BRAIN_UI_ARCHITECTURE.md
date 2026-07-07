@@ -8,7 +8,7 @@
 
 Map JARVIS prompt-pack ideas to **Axon-shaped** services and define what Operator vs IDE modes should subscribe to — without building new UI in this planning handoff.
 
-**KAIRO ≠ JARVIS skeleton:** Axon adopts loop + personality + prove-source + server-side brain. Axon **rejects** 3D note galaxy and markdown keyword RAG as system truth.
+**KAIRO ≠ JARVIS skeleton:** Axon adopts loop + personality + prove-source + server-side brain. Axon **rejects** markdown keyword RAG as system truth. **3D brain galaxy** is adopted as **visualization-only** over server DTOs — see [`OPERATOR_BRAIN_PIVOT.md`](OPERATOR_BRAIN_PIVOT.md) (OP-B6).
 
 ---
 
@@ -51,7 +51,7 @@ See ADR-008: IDE Agent dock = Lane B CLI; Operator right dock = command thread +
 
 | JARVIS pack prompt (6) | Axon adoption | Axon-shaped equivalent | Service owner | UI status |
 |------------------------|---------------|------------------------|---------------|-----------|
-| **Galaxy** (3D note space) | **Reject as system truth** | Operator mission control + Attention list; optional future **doc graph DTO** (not spatial UI) | control-plane briefing | **Deferred** `BRAIN-UI-1` |
+| **Galaxy** (3D brain space) | **Adopt as viz only** (not authority) | `BrainGraphDTO` + OP-B6 galaxy/grid/feed views; see [`OPERATOR_BRAIN_PIVOT.md`](OPERATOR_BRAIN_PIVOT.md) | control-plane `/api/operator/brain-graph` | **Planned** OP-B6 (supersedes `BRAIN-UI-1`) |
 | **Note-RAG brain** (markdown keyword search) | **Reject as orchestration truth** | `/api/briefing` + run history + signal store; explicit search API later | control-plane + watch SQLite | **Deferred** `BRAIN-UI-2` |
 | **Voice** (hands-free loop) | **Adapt** | `features/voice-deck/`, `kairo_ask_prompt.py`, browser TTS v1 | console-web + CP | **Done** G4.4; cloud TTS deferred |
 | **Fly-to-source** (jump to evidence) | **Adapt as prove-source** | Research cards (`:::research`), `@file:` / `@selection` tokens, run history receipts | lane B + console-web | **Partial** UX-IDE-3/4 done |
@@ -100,7 +100,7 @@ flowchart TB
 
 | Slice ID | Description | Mode | Backend prerequisite |
 |----------|-------------|------|----------------------|
-| `BRAIN-UI-1` | Doc graph / handoff timeline in Operator center (DTO, not 3D) | Operator | Handoffs + run history APIs |
+| `BRAIN-UI-1` | ~~Doc graph DTO~~ → **superseded by OP-B6** in [`OPERATOR_BRAIN_PIVOT.md`](OPERATOR_BRAIN_PIVOT.md) | Operator | BrainGraphDTO + handoff APIs |
 | `BRAIN-UI-2` | Contracted search over signals + runs (not markdown RAG) | Operator | Watch signal persistence stable |
 | `BRAIN-UI-3` | Operator-only SSE channel (subset of live events) | Operator | Event taxonomy in `live_events.py` |
 | `BRAIN-UI-4` | Handoff DTO operator → IDE (“continue in editor”) | Both | `workspace_handoffs` UI projection |
@@ -124,7 +124,7 @@ flowchart TB
 | `UX-DEF-WHATSAPP` | WhatsApp monitor UI on Axon-X | G4.2 deferred |
 | `UX-DEF-ELECTRON` | Desktop shell | BROWSER_ONLY contract |
 | `UX-DEF-DB-UI` | Supabase-style table browser | IMPORT_MATRIX discard |
-| `UX-DEF-GALAXY` | 3D note galaxy from JARVIS pack | Not Axon-shaped |
+| `UX-DEF-GALAXY` | ~~Rejected~~ → **reopened as OP-B6 viz** | See [`OPERATOR_BRAIN_PIVOT.md`](OPERATOR_BRAIN_PIVOT.md) |
 
 **Allowed without opening UX wave:** one-line contract notes in backend docs referencing DTO field names consumed by future UI.
 

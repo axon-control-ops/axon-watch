@@ -12,6 +12,7 @@ export interface MonacoEditorOptions {
   value: string;
   language: string;
   readOnly?: boolean;
+  minimapEnabled?: boolean;
   onValueChange?: (value: string) => void;
   onCursorChange?: (position: { line: number; column: number }) => void;
   onSelectionChange?: (selection: EditorSelectionSnapshot | null) => void;
@@ -30,6 +31,7 @@ export interface MonacoEditorController {
   dispose: () => void;
   setLanguage: (language: string) => void;
   setReadOnly: (readOnly: boolean) => void;
+  setMinimapEnabled: (enabled: boolean) => void;
   setValue: (value: string) => void;
   getValue: () => string;
   getSelection: () => EditorSelectionSnapshot | null;
@@ -64,12 +66,38 @@ export async function createMonacoEditor(
     defineMockupMonacoTheme(monaco);
   }
 
+  const minimapEnabled = options.minimapEnabled ?? useMockupTheme;
   const model = monaco.editor.createModel(options.value, options.language);
   const editor = monaco.editor.create(container, {
     model,
     theme: useMockupTheme ? MOCKUP_MONACO_THEME_ID : 'vs-dark',
     automaticLayout: true,
-    minimap: { enabled: false },
+    minimap: {
+      enabled: minimapEnabled,
+      scale: 2,
+      showSlider: 'mouseover',
+      renderCharacters: false,
+      maxColumn: 80,
+    },
+    stickyScroll: {
+      enabled: useMockupTheme,
+    },
+    bracketPairColorization: {
+      enabled: useMockupTheme,
+    },
+    guides: {
+      bracketPairs: useMockupTheme,
+      bracketPairsHorizontal: useMockupTheme,
+      indentation: true,
+      highlightActiveIndentation: useMockupTheme,
+    },
+    folding: useMockupTheme,
+    showFoldingControls: useMockupTheme ? 'mouseover' : 'never',
+    smoothScrolling: true,
+    cursorBlinking: 'smooth',
+    cursorSmoothCaretAnimation: 'on',
+    renderLineHighlight: useMockupTheme ? 'all' : 'line',
+    renderWhitespace: useMockupTheme ? 'selection' : 'none',
     fontSize: useMockupTheme ? mockupEditorFontOptions.fontSize : 15,
     lineHeight: useMockupTheme ? mockupEditorFontOptions.lineHeight : 22,
     fontFamily: useMockupTheme
@@ -78,7 +106,14 @@ export async function createMonacoEditor(
     fontLigatures: useMockupTheme ? false : undefined,
     scrollBeyondLastLine: false,
     readOnly: options.readOnly ?? false,
-    padding: { top: 12, bottom: 12 },
+    padding: { top: 16, bottom: 16 },
+    overviewRulerBorder: false,
+    scrollbar: {
+      verticalScrollbarSize: 10,
+      horizontalScrollbarSize: 10,
+    },
+    matchBrackets: 'always',
+    wordWrap: 'off',
   });
 
   const emitCursor = () => {
@@ -140,6 +175,9 @@ export async function createMonacoEditor(
     },
     setReadOnly(readOnly: boolean) {
       editor.updateOptions({ readOnly });
+    },
+    setMinimapEnabled(enabled: boolean) {
+      editor.updateOptions({ minimap: { enabled } });
     },
     setValue(value: string) {
       model.setValue(value);

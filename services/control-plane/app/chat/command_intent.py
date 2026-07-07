@@ -14,6 +14,15 @@ _RUN_PREFIX = re.compile(r"^run\s+.+", re.IGNORECASE)
 # Questions must be answered by the runtime, never executed as commands.
 # "did you commit?" or "what does the README say?" are conversation, while
 # "read README.md" or "git status" are imperative operator commands.
+AUTO_COMPLETE_COMMAND_INTENTS = frozenset(
+    {
+        "git_status",
+        "health_probe",
+        "list_files",
+        "read_file",
+    }
+)
+
 _QUESTION_PREFIX = re.compile(
     r"^\s*(?:did|do|does|have|has|had|is|are|was|were|can|could|will|would|"
     r"should|shall|what|when|where|which|who|why|how)\b",
@@ -44,6 +53,14 @@ def expand_command_shortcuts(content: str) -> str:
     if mapped is None:
         return trimmed
     return f"run {mapped}"
+
+
+def is_auto_complete_run_summary(summary: str) -> bool:
+    """True when a run summary maps to a read-only one-shot operator command."""
+    trimmed = summary.strip()
+    if not trimmed:
+        return False
+    return classify_command(trimmed) in AUTO_COMPLETE_COMMAND_INTENTS
 
 
 def classify_command(content: str) -> str:

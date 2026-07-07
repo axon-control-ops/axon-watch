@@ -16,10 +16,12 @@
     "marked": "^18.0.5",
     "monaco-editor": "latest",
     "pinia": "latest",
+    "three": "^0.185.1",
     "vue": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "@types/three": "^0.185.0",
     "@vitejs/plugin-vue": "latest",
     "typescript": "latest",
     "vite": "latest",
