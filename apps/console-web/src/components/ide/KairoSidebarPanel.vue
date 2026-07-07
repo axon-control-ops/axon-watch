@@ -35,9 +35,19 @@ const approvalBadge = computed(() => shell.pendingApprovalsCount);
 const signalBadge = computed(
   () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
 );
+const showStopSpeech = computed(() => shell.kairoSpeechActive);
 
 function handleExpand(): void {
+  if (showStopSpeech.value) {
+    shell.stopKairoSpeech();
+    return;
+  }
   shell.focusKairoBriefing();
+}
+
+function handleStopSpeech(event: Event): void {
+  event.stopPropagation();
+  shell.stopKairoSpeech();
 }
 </script>
 
@@ -87,6 +97,14 @@ function handleExpand(): void {
             {{ signalBadge }} signal{{ signalBadge === 1 ? '' : 's' }}
           </span>
         </div>
+        <button
+          v-if="showStopSpeech"
+          type="button"
+          class="kairo-sidebar-panel__stop-speech"
+          @click="handleStopSpeech"
+        >
+          Stop speaking
+        </button>
       </div>
     </div>
   </button>

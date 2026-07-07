@@ -103,6 +103,7 @@ export interface SignalView {
   delivery_state?: DeliveryState;
   latest_receipt_id?: string;
   watch_rule?: WatchRule;
+  meta?: Record<string, unknown>;
 }
 
 export type WatchRuleMode = 'observe' | 'advise' | 'approval' | 'execute';

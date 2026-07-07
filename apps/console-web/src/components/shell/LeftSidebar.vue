@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import IdeActivityBar from '../ide/IdeActivityBar.vue';
 import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
+import KairoSidebarPanel from '../ide/KairoSidebarPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
 import KairoVoiceDeckPanel from './KairoVoiceDeckPanel.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
@@ -156,6 +157,9 @@ onBeforeUnmount(() => {
         <div class="left-sidebar-mockup__ide-main">
           <IdeExplorerPanel />
         </div>
+      </div>
+      <div class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
+        <KairoSidebarPanel />
       </div>
     </template>
 

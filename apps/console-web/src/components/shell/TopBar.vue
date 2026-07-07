@@ -50,7 +50,7 @@ function openSurface(surface: AppSurface): void {
       <KairoPresenceBar
         v-if="showTopbarKairoPresence"
         :state="shell.kairoPresenceState"
-        @open-briefing="shell.focusKairoBriefing()"
+        @open-briefing="shell.handleKairoPresenceAction()"
       />
 
       <div class="topbar-mockup__controls">

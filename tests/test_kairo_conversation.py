@@ -24,7 +24,15 @@ _MOCK_BRIEFING = {
     "generated_at": "2026-07-08T00:00:00Z",
     "notice": "Two runs are active.",
     "advise": "Review the top signal before dispatching more work.",
-    "top_signals": [{"title": "Sentry spike in DashPro", "severity": "high"}],
+    "top_signals": [
+        {
+            "signal_id": "signal_monitor_dashpro_sentry_recent_issues_warning",
+            "workspace_id": "workspace_dashpro",
+            "title": "Sentry spike in DashPro",
+            "summary": "3 unresolved issues",
+            "severity": "high",
+        }
+    ],
     "pending_approvals": {"count": 2, "items": [{}, {}]},
     "active_runs": [{"run_id": "run_1", "summary": "Git status"}],
     "degraded": {"active": False, "reasons": []},
@@ -78,6 +86,23 @@ class KairoConversationUnitTests(unittest.TestCase):
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
     @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_followup_handoff_action(
+        self,
+        *_mocks: object,
+    ) -> None:
+        converse_turn(
+            content="what needs my attention?",
+            session_id="followup-session",
+        )
+        payload = converse_turn(content="hand it off", session_id="followup-session")
+        self.assertEqual("action", payload["turn_kind"])
+        action = payload["action"]
+        assert isinstance(action, dict)
+        self.assertEqual("handoff_signal", action.get("type"))
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
     def test_converse_status_question_is_fast_template(
         self,
         *_mocks: object,
@@ -105,7 +130,7 @@ class KairoConversationEndpointTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertEqual(
-            {"turn_kind", "reply", "source", "command_content"},
+            {"turn_kind", "reply", "source", "command_content", "action"},
             set(payload),
         )
         self.assertEqual("status_question", payload["turn_kind"])

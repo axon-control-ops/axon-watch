@@ -26,6 +26,8 @@ def project_inbox_item(item: dict[str, object]) -> dict[str, object]:
             "watch_rule": item.get("watch_rule", {"mode": "observe", "reason": "ambient_watch_signal", "interrupts": False}),
         }
     )
+    if isinstance(item.get("meta"), dict):
+        projected["meta"] = item["meta"]
     return projected
 
 

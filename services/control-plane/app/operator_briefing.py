@@ -134,7 +134,23 @@ def build_operator_briefing(
             for item in top_signals
             if str(item.get("workspace_id", "")).strip() in {"", scoped_workspace_id}
         ]
-    top_signals = top_signals[:3]
+
+    def _signal_priority(item: dict[str, object]) -> tuple[int, str]:
+        signal_id = str(item.get("signal_id", ""))
+        title = str(item.get("title", "")).lower()
+        meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+        if meta.get("signal_family") == "child_project_monitor":
+            return (0, signal_id)
+        if signal_id in {
+            "signal_runtime_summary_degraded",
+            "signal_watch_bootstrap_ready",
+        } or "bootstrap" in title:
+            return (3, signal_id)
+        severity = str(item.get("severity", "info"))
+        rank = 1 if severity in {"critical", "high"} else 2
+        return (rank, signal_id)
+
+    top_signals = sorted(top_signals, key=_signal_priority)[:3]
     active_run_records = list_active_runs()
     pending_approval_records = list_pending_approval_records()
     if scoped_workspace_id:

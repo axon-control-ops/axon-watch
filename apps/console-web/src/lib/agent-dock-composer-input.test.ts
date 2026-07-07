@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldSubmitAgentDockComposer } from './agent-dock-composer-input';
+import {
+  shouldSteerAgentDockComposer,
+  shouldSubmitAgentDockComposer,
+} from './agent-dock-composer-input';
 
 describe('agent dock composer input', () => {
   it('submits on plain Enter', () => {
@@ -29,6 +32,25 @@ describe('agent dock composer input', () => {
         key: 'Enter',
         shiftKey: false,
         isComposing: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('steers on Ctrl/Cmd+Enter instead of queueing', () => {
+    expect(
+      shouldSteerAgentDockComposer({
+        key: 'Enter',
+        shiftKey: false,
+        ctrlKey: true,
+        isComposing: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSubmitAgentDockComposer({
+        key: 'Enter',
+        shiftKey: false,
+        ctrlKey: true,
+        isComposing: false,
       }),
     ).toBe(false);
   });

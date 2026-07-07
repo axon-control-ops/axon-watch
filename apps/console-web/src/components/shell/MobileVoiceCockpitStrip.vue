@@ -50,7 +50,10 @@ onBeforeUnmount(() => {
     />
     <div class="mobile-voice-cockpit-strip__copy">
       <p class="mobile-voice-cockpit-strip__label">{{ statusLine }}</p>
-      <p class="mobile-voice-cockpit-strip__note">Foreground voice · no background listening</p>
+      <p class="mobile-voice-cockpit-strip__note">
+        <a class="mobile-voice-cockpit-strip__mobile-link" href="/mobile">Open mobile shell</a>
+        · Foreground voice · no background listening
+      </p>
     </div>
   </aside>
 </template>

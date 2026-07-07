@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import { buildOperatorIncidentFeed } from '../../lib/operator-incident-feed-view';
+import HandoffToIdeButton from './HandoffToIdeButton.vue';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -36,13 +37,26 @@ function focusSignal(signalId: string): void {
         class="operator-incident-feed__item"
         :class="`operator-incident-feed__item--${item.severity}`"
       >
-        <button type="button" class="operator-incident-feed__button" @click="focusSignal(item.id)">
-          <span class="operator-incident-feed__item-title">{{ item.title }}</span>
-          <span class="operator-incident-feed__item-summary">{{ item.summary }}</span>
-          <span class="operator-incident-feed__item-meta">
-            {{ item.source === 'fleet' ? 'Fleet rollup' : 'Signal inbox' }}
-          </span>
-        </button>
+        <div class="operator-incident-feed__row">
+          <button type="button" class="operator-incident-feed__button" @click="focusSignal(item.id)">
+            <span class="operator-incident-feed__item-title">
+              {{ item.title }}
+              <span v-if="item.monitorSignal" class="operator-incident-feed__monitor-tag">Monitor</span>
+            </span>
+            <span class="operator-incident-feed__item-summary">{{ item.summary }}</span>
+            <span class="operator-incident-feed__item-meta">
+              {{ item.source === 'fleet' ? 'Fleet rollup' : 'Signal inbox' }}
+            </span>
+          </button>
+          <HandoffToIdeButton
+            v-if="item.source === 'signal'"
+            :signal-id="item.id"
+            :workspace-id="item.workspaceId"
+            :title="item.title"
+            :summary="item.summary"
+            compact
+          />
+        </div>
       </li>
     </ul>
     <p v-else class="operator-incident-feed__empty">{{ feedView.emptyCopy }}</p>

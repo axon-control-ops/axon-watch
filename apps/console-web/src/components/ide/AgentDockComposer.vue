@@ -39,10 +39,16 @@ import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import {
   type ComposerClipboardImage,
   readClipboardImages,
+  readDroppedImages,
   revokeComposerClipboardImages,
+  shouldAcceptComposerFileDrop,
   shouldInterceptComposerImagePaste,
 } from '../../lib/composer-clipboard-paste';
-import { shouldSubmitAgentDockComposer } from '../../lib/agent-dock-composer-input';
+import { shouldSteerAgentDockComposer, shouldSubmitAgentDockComposer } from '../../lib/agent-dock-composer-input';
+import {
+  resolveActiveIdeAgentMessage,
+} from '../../lib/ide-agent-center-view';
+import { summarizeIdeAgentActivity } from '../../lib/ide-agent-activity-view';
 import {
   persistAgentComposerHistory,
   readStoredAgentComposerHistory,
@@ -102,6 +108,7 @@ const composerHistoryIndex = ref(-1);
 const composerHistoryScratch = ref('');
 const applyingHistoryDraft = ref(false);
 const composerImages = ref<ComposerClipboardImage[]>([]);
+const composerDragOver = ref(false);
 
 const activeMode = computed(
   () => MODE_OPTIONS.find((option) => option.key === composerMode.value) ?? MODE_OPTIONS[2],
@@ -248,6 +255,9 @@ const runtimeHint = computed(() => {
 });
 const showVaultAction = computed(() => runtimeNeedsVaultAction(shell.runtimeStatus));
 const composerPlaceholder = computed(() => {
+  if (composerAgentBusy.value && composerMode.value === 'agent') {
+    return 'Queue a follow-up or steer with Ctrl+Enter…';
+  }
   if (composerMode.value === 'plan') {
     return 'Plan your approach, constraints, and verification path…';
   }
@@ -285,7 +295,41 @@ const mcpToolsForMode = computed(() =>
   filterMcpToolsForComposerMode(shell.runtimeMcpTools, composerMode.value),
 );
 const showComposerResume = computed(() => shell.canResumeIdeAgentRun);
-const showComposerStop = computed(() => shell.agentStreamActive);
+const showComposerStop = computed(() => shell.canStopIdeAgentRun);
+const composerAgentBusy = computed(() => shell.composerAgentBusy);
+const composerQueueHint = computed(() => {
+  if (!composerAgentBusy.value || composerMode.value !== 'agent') {
+    return '';
+  }
+  const steerKey = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
+    ? '⌘'
+    : 'Ctrl';
+  return `Enter queues · ${steerKey}+Enter steers`;
+});
+const composerActivitySummary = computed(() => {
+  if (!shell.agentStreamActive && !shell.composerAgentBusy) {
+    return null;
+  }
+  const message = resolveActiveIdeAgentMessage(
+    shell.threadMessages,
+    shell.agentStreamActive,
+    shell.agentStreamMessageId,
+  );
+  if (!message) {
+    return null;
+  }
+  return summarizeIdeAgentActivity(message.content);
+});
+const composerActivityChips = computed(() => composerActivitySummary.value?.chips ?? []);
+const composerSubmitLabel = computed(() => {
+  if (shell.commandMutationState === 'submitting') {
+    return 'Sending command';
+  }
+  if (composerAgentBusy.value && composerMode.value === 'agent') {
+    return 'Queue message';
+  }
+  return 'Send command';
+});
 const showApprovalBanner = computed(
   () =>
     composerMode.value === 'agent' &&
@@ -304,6 +348,7 @@ const isFullAccessAgent = computed(
 const composerShellClasses = computed(() => ({
   [`agent-dock-composer__shell--${composerMode.value}`]: true,
   'agent-dock-composer__shell--full-access': isFullAccessAgent.value,
+  'agent-dock-composer__shell--drag-over': composerDragOver.value,
 }));
 const modeButtonLabel = computed(() => {
   if (isFullAccessAgent.value) {
@@ -610,6 +655,18 @@ async function handleSubmit(event?: Event): Promise<void> {
   const draft = shell.ideComposerDraft.trim();
   const attachmentFiles = composerImages.value.map((image) => image.file);
   await shell.submitIdeComposer(composerMode.value, { attachmentFiles });
+  recordComposerHistoryIfSent(draft);
+}
+
+async function handleSteer(event?: Event): Promise<void> {
+  event?.preventDefault();
+  const draft = shell.ideComposerDraft.trim();
+  const attachmentFiles = composerImages.value.map((image) => image.file);
+  await shell.steerIdeComposer(composerMode.value, { attachmentFiles });
+  recordComposerHistoryIfSent(draft);
+}
+
+function recordComposerHistoryIfSent(draft: string): void {
   if (composerImages.value.length) {
     revokeComposerClipboardImages(composerImages.value);
     composerImages.value = [];
@@ -621,8 +678,23 @@ async function handleSubmit(event?: Event): Promise<void> {
   }
 }
 
+function removeQueuedMessage(messageId: string): void {
+  shell.removeIdeComposerQueuedMessage(messageId);
+}
+
+function revealComposerTerminalPanel(): void {
+  shell.revealIdeTerminalPanel();
+}
+
 function handleResumeRun(): void {
   void shell.resumeIdeAgentRun();
+}
+
+function addComposerImages(images: ComposerClipboardImage[]): void {
+  if (!images.length) {
+    return;
+  }
+  composerImages.value = [...composerImages.value, ...images];
 }
 
 function handleComposerPaste(event: ClipboardEvent): void {
@@ -632,7 +704,36 @@ function handleComposerPaste(event: ClipboardEvent): void {
   }
 
   event.preventDefault();
-  composerImages.value = [...composerImages.value, ...images];
+  addComposerImages(images);
+}
+
+function handleComposerDragOver(event: DragEvent): void {
+  if (!shouldAcceptComposerFileDrop(event)) {
+    return;
+  }
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy';
+  }
+  composerDragOver.value = true;
+}
+
+function handleComposerDragLeave(event: DragEvent): void {
+  const nextTarget = event.relatedTarget as Node | null;
+  if (nextTarget && event.currentTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+    return;
+  }
+  composerDragOver.value = false;
+}
+
+function handleComposerDrop(event: DragEvent): void {
+  event.preventDefault();
+  composerDragOver.value = false;
+  const images = readDroppedImages(event);
+  if (!shouldInterceptComposerImagePaste(images)) {
+    return;
+  }
+  addComposerImages(images);
 }
 
 function removeComposerImage(imageId: string): void {
@@ -682,6 +783,12 @@ function handleComposerKeydown(event: KeyboardEvent): void {
       handleHistory('next');
       return;
     }
+  }
+
+  if (shouldSteerAgentDockComposer(event)) {
+    event.preventDefault();
+    void handleSteer();
+    return;
   }
 
   if (!shouldSubmitAgentDockComposer(event)) {
@@ -796,7 +903,13 @@ onUnmounted(() => {
     </div>
   </Teleport>
 
-  <form class="agent-dock-composer" @submit="handleSubmit">
+  <form
+    class="agent-dock-composer"
+    @submit="handleSubmit"
+    @dragover="handleComposerDragOver"
+    @dragleave="handleComposerDragLeave"
+    @drop="handleComposerDrop"
+  >
     <div
       v-if="showApprovalBanner"
       class="agent-dock-composer__approval-banner"
@@ -871,6 +984,34 @@ onUnmounted(() => {
         </div>
 
         <div
+          v-if="shell.ideComposerQueue.length"
+          class="agent-dock-composer__queue"
+          role="status"
+          aria-live="polite"
+        >
+          <p class="agent-dock-composer__queue-summary">
+            {{ shell.ideComposerQueueSummary }}
+          </p>
+          <ul class="agent-dock-composer__queue-list">
+            <li
+              v-for="item in shell.ideComposerQueue"
+              :key="item.id"
+              class="agent-dock-composer__queue-item"
+            >
+              <span class="agent-dock-composer__queue-text">{{ item.content }}</span>
+              <button
+                type="button"
+                class="agent-dock-composer__queue-remove"
+                aria-label="Remove queued message"
+                @click="removeQueuedMessage(item.id)"
+              >
+                ×
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <div
           v-if="shell.ideComposerActivity || shell.agentStreamActive"
           class="agent-dock-composer__activity"
           :class="{
@@ -900,6 +1041,24 @@ onUnmounted(() => {
         </div>
 
         <div class="agent-dock-composer__footer">
+          <div
+            v-if="composerActivityChips.length"
+            class="agent-dock-composer__activity-chips"
+            aria-label="Live agent activity"
+          >
+            <button
+              v-for="chip in composerActivityChips"
+              :key="chip.id"
+              type="button"
+              class="agent-dock-composer__activity-chip"
+              :class="`agent-dock-composer__activity-chip--${chip.kind}`"
+              :disabled="chip.kind !== 'terminal'"
+              @click="chip.kind === 'terminal' ? revealComposerTerminalPanel() : undefined"
+            >
+              {{ chip.label }}
+            </button>
+          </div>
+
           <div class="agent-dock-composer__tools" @click.stop>
             <div class="agent-dock-composer__tool-group">
               <button
@@ -1274,6 +1433,12 @@ onUnmounted(() => {
           </div>
 
           <div class="agent-dock-composer__actions">
+            <p
+              v-if="composerQueueHint"
+              class="agent-dock-composer__queue-hint"
+            >
+              {{ composerQueueHint }}
+            </p>
             <button
               v-if="showComposerResume"
               type="button"
@@ -1302,8 +1467,8 @@ onUnmounted(() => {
               v-else
               type="submit"
               class="agent-dock-composer__send"
-              :disabled="!shell.canSubmitOperatorCommand"
-              :aria-label="shell.commandMutationState === 'submitting' ? 'Sending command' : 'Send command'"
+              :disabled="!shell.canSubmitIdeComposer"
+              :aria-label="composerSubmitLabel"
             >
               <span
                 v-if="shell.commandMutationState === 'submitting'"
@@ -1322,6 +1487,9 @@ onUnmounted(() => {
     </p>
     <p v-if="shell.commandMutationError" class="agent-dock-composer__error">
       {{ shell.commandMutationError }}
+    </p>
+    <p v-if="shell.runMutationError" class="agent-dock-composer__error">
+      {{ shell.runMutationError }}
     </p>
   </form>
 </template>

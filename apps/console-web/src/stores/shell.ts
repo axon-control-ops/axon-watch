@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
 
 import {
@@ -25,6 +25,7 @@ import {
   fetchWorkspaceFiles,
   markRunReviewReady,
   createWorkspaceChatThread,
+  createWorkspaceHandoff,
   createWorkspaceTerminalSession,
   fetchWorkspaceChatThreads,
   fetchWorkspaceTerminalSessions,
@@ -54,6 +55,7 @@ import {
   type BrainGraphSnapshot,
   type OperatorCenterView,
 } from '../lib/operator-brain-graph-view';
+import { resolveSignalHandoff, type SignalHandoffInput } from '../lib/signal-handoff-view';
 import type { RuntimeStatusSnapshot } from '../api/control-plane';
 import type {
   ApprovalRecord,
@@ -107,6 +109,15 @@ import {
 } from '../lib/ide-thread-tabs-prefs';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
 import {
+  onSpeechQueueIdle,
+  stopSpeech,
+  subscribeSpeechQueueSpeaking,
+} from '../lib/speech-queue';
+import {
+  setKairoConversationPhase,
+  kairoConversationPhase,
+} from '../features/kairo-conversation/kairo-conversation-state';
+import {
   normalizeAgentExecutionAccess,
   persistAgentExecutionAccess,
   resolveAgentExecutionAccess,
@@ -128,6 +139,20 @@ import {
   shouldShowIdeAgentStop,
 } from '../lib/ide-agent-run-active';
 import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
+import {
+  appendIdeComposerQueueEntry,
+  ideComposerQueueLabel as buildIdeComposerQueueLabel,
+  removeIdeComposerQueueEntry,
+  resolveIdeStopRun,
+  shiftIdeComposerQueue,
+  shouldQueueIdeComposerSubmit,
+  type IdeComposerMode,
+  type IdeComposerQueuedMessage,
+} from '../lib/ide-composer-queue';
+import {
+  persistIdeComposerDraft,
+  readStoredIdeComposerDraft,
+} from '../lib/ide-composer-draft-prefs';
 import {
   defaultWorkspaceStreamUi,
   shouldSyncWorkspaceStreamGlobals,
@@ -394,6 +419,9 @@ export const useShellStore = defineStore('shell', () => {
   const runMutationError = ref<string | null>(null);
   const signalClearState = ref<'idle' | 'clearing'>('idle');
   const signalClearError = ref<string | null>(null);
+  const handoffMutationState = ref<'idle' | 'submitting' | 'error'>('idle');
+  const handoffMutationError = ref<string | null>(null);
+  const lastDiscussedSignal = ref<SignalHandoffInput | null>(null);
   const runHistorySnapshot = ref<RunHistorySnapshot | null>(null);
   const runHistoryLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const approvals = ref<ApprovalRecord[]>([]);
@@ -440,6 +468,10 @@ export const useShellStore = defineStore('shell', () => {
   >(hydrateWorkspaceSurfaceThreadIds());
   const operatorCommandDraft = ref('');
   const ideComposerDraft = ref('');
+  let ideComposerDraftPersistTimer: ReturnType<typeof setTimeout> | null = null;
+  const kairoSpeechQueueActive = ref(false);
+  const ideComposerQueueByWorkspaceId = ref<Record<string, IdeComposerQueuedMessage[]>>({});
+  let flushingIdeComposerQueue = false;
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
   const ideAgentRunId = ref<string | null>(null);
   const ideComposerActivity = ref<IdeComposerActivity | null>(null);
@@ -643,14 +675,28 @@ export const useShellStore = defineStore('shell', () => {
     return editorDocuments.value[0] ?? null;
   });
   const runMutationPending = computed(() => runMutationState.value !== 'idle');
+  const activeIdeStopRun = computed(() =>
+    resolveIdeStopRun({
+      linkedRun: ideAgentLinkedRun.value,
+      linkedRunId: ideAgentRunId.value,
+      runs: runs.value,
+      primaryRun: primaryActiveRun.value,
+      workspaceId: currentWorkspace.value?.workspace_id ?? null,
+    }),
+  );
   const canStopIdeAgentRun = computed(() => {
     if (runMutationPending.value) {
       return false;
     }
-    return shouldShowIdeAgentStop({
-      agentStreamActive: agentStreamActive.value,
-      run: ideAgentLinkedRun.value,
-    });
+    if (agentStreamActive.value) {
+      return true;
+    }
+    return (
+      shouldShowIdeAgentStop({
+        agentStreamActive: false,
+        run: ideAgentLinkedRun.value,
+      }) || Boolean(activeIdeStopRun.value)
+    );
   });
   const canStopPrimaryRun = computed(
     () => Boolean(primaryActiveRun.value?.can_stop) && !runMutationPending.value,
@@ -726,11 +772,43 @@ export const useShellStore = defineStore('shell', () => {
       ),
   );
 
+  const canSubmitIdeComposer = computed(
+    () =>
+      commandMutationState.value !== 'submitting' &&
+      ideComposerDraft.value.trim().length > 0 &&
+      Boolean(currentWorkspace.value?.workspace_id),
+  );
+
+  const ideComposerQueue = computed(() => {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return [];
+    }
+    return ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+  });
+
+  const ideComposerQueueSummary = computed(() =>
+    buildIdeComposerQueueLabel(ideComposerQueue.value.length),
+  );
+
+  const composerAgentBusy = computed(
+    () => agentStreamActive.value || canStopIdeAgentRun.value,
+  );
+
   const commandSeamHint = computed(() =>
     buildCommandSeamHint(currentWorkspace.value?.workspace_id ?? null),
   );
 
   const kairoPresenceState = computed<KairoPresenceState>(() => {
+    if (kairoSpeechActive.value || kairoConversationPhase.value === 'speaking') {
+      return 'speaking';
+    }
+    if (kairoConversationPhase.value === 'listening') {
+      return 'listening';
+    }
+    if (kairoConversationPhase.value === 'thinking') {
+      return 'listening';
+    }
     if (agentStreamActive.value && ideComposerActivity.value?.mode === 'agent') {
       return 'speaking';
     }
@@ -802,8 +880,16 @@ export const useShellStore = defineStore('shell', () => {
       degradedActive: Boolean(summary?.degraded.active),
       primaryRunPhase: primaryActiveRun.value?.phase,
       agentStreamActive: agentStreamActive.value,
+      voiceSessionActive:
+        kairoSpeechActive.value ||
+        kairoConversationPhase.value !== 'idle' ||
+        agentStreamActive.value,
     });
   });
+
+  const kairoSpeechActive = computed(
+    () => kairoSpeechQueueActive.value || kairoConversationPhase.value === 'speaking',
+  );
 
   const ideDisplayKairoPresenceState = computed<KairoPresenceState>(() =>
     layoutMode.value === 'ide'
@@ -1444,6 +1530,51 @@ export const useShellStore = defineStore('shell', () => {
     await submitOperatorCommand();
   }
 
+  async function handoffSignalToIde(signal: SignalHandoffInput): Promise<void> {
+    handoffMutationState.value = 'submitting';
+    handoffMutationError.value = null;
+    lastDiscussedSignal.value = signal;
+
+    const resolved = resolveSignalHandoff(
+      signal,
+      currentWorkspace.value?.workspace_id ?? null,
+      workspaces.value.map((workspace) => ({
+        workspace_id: workspace.workspace_id,
+        display_name: workspace.display_name,
+      })),
+    );
+    if (!resolved) {
+      handoffMutationState.value = 'error';
+      handoffMutationError.value = 'This signal cannot be handed off to the IDE.';
+      return;
+    }
+
+    try {
+      if (resolved.mode === 'handoff' && resolved.sourceWorkspaceId) {
+        await createWorkspaceHandoff(resolved.sourceWorkspaceId, {
+          target_workspace_id: resolved.targetWorkspaceId,
+          task: resolved.task,
+          reason: resolved.reason,
+        });
+      }
+      setCurrentWorkspace(resolved.targetWorkspaceId);
+      ideComposerDraft.value = resolved.task;
+      setLayoutMode('ide');
+      handoffMutationState.value = 'idle';
+    } catch (error) {
+      handoffMutationState.value = 'error';
+      handoffMutationError.value =
+        error instanceof Error ? error.message : 'Failed to hand off signal to IDE';
+    }
+  }
+
+  async function handoffDiscussedSignalToIde(): Promise<void> {
+    if (!lastDiscussedSignal.value) {
+      return;
+    }
+    await handoffSignalToIde(lastDiscussedSignal.value);
+  }
+
   function disconnectChatStreamSession(workspaceId?: string): void {
     if (workspaceId) {
       const session = chatStreamSessionsByWorkspace.get(workspaceId);
@@ -1503,6 +1634,72 @@ export const useShellStore = defineStore('shell', () => {
     return ideVoiceSpeechAllowed({
       layoutMode: layoutMode.value,
       settings: operatorPresenceSettings.value,
+    });
+  }
+
+  function stopKairoSpeech(): void {
+    stopSpeech(typeof speechSynthesis === 'undefined' ? null : speechSynthesis);
+    if (kairoConversationPhase.value === 'speaking') {
+      setKairoConversationPhase('idle');
+    }
+  }
+
+  async function speakKairoConversationLine(line: string): Promise<void> {
+    const trimmed = line.trim();
+    if (
+      !trimmed ||
+      !voiceDeliveryAllowed() ||
+      operatorPresenceSettings.value.privacy_mode ||
+      !operatorPresenceSettings.value.spoken_alerts_enabled ||
+      effectiveKairoNarrationLevel.value === 'off'
+    ) {
+      return;
+    }
+
+    setKairoConversationPhase('speaking');
+    let message = trimmed;
+    try {
+      const response = await postKairoSpeak({
+        event_type: 'conversation_reply',
+        context: {
+          fallback: trimmed,
+          reply: trimmed,
+        },
+        session_id: kairoSpeechSessionId(),
+        workspace_id: currentWorkspace.value?.workspace_id ?? '',
+        narration: effectiveKairoNarrationLevel.value,
+      });
+      if (response.line?.trim()) {
+        message = response.line.trim();
+      }
+    } catch {
+      // Fall back to the raw reply when the speak endpoint is unavailable.
+    }
+
+    deliverSpokenOperatorAlert({
+      eligible: true,
+      reason: 'kairo-conversation',
+      signal_id: `kairo-conversation-${Date.now()}`,
+      message,
+    });
+  }
+
+  function handleKairoPresenceAction(): void {
+    if (layoutMode.value === 'ide' && kairoSpeechActive.value) {
+      stopKairoSpeech();
+      return;
+    }
+    focusKairoBriefing();
+  }
+
+  if (typeof window !== 'undefined') {
+    subscribeSpeechQueueSpeaking((active) => {
+      kairoSpeechQueueActive.value = active;
+    });
+    onSpeechQueueIdle(() => {
+      if (kairoConversationPhase.value === 'speaking' && !kairoSpeechQueueActive.value) {
+        setKairoConversationPhase('idle');
+      }
     });
   }
 
@@ -1800,7 +1997,9 @@ export const useShellStore = defineStore('shell', () => {
             ideAgentRunId: null,
           });
           disconnectChatStreamSession(workspaceId);
-          void refreshRunSurfaces();
+          void refreshRunSurfaces().finally(() => {
+            void flushIdeComposerQueueIfIdle();
+          });
         },
         onError: (message, payload) => {
           if (payload?.system_message_id && payload.system_content) {
@@ -1819,7 +2018,9 @@ export const useShellStore = defineStore('shell', () => {
             activity: null,
           });
           disconnectChatStreamSession(workspaceId);
-          void refreshRunSurfaces();
+          void refreshRunSurfaces().finally(() => {
+            void flushIdeComposerQueueIfIdle();
+          });
         },
       }),
     );
@@ -1843,6 +2044,30 @@ export const useShellStore = defineStore('shell', () => {
     persistAgentDockCollapsed(false);
     ideActivityView.value = 'agent';
   }
+
+  function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {
+    ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId);
+  }
+
+  function schedulePersistIdeComposerDraft(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (ideComposerDraftPersistTimer) {
+      clearTimeout(ideComposerDraftPersistTimer);
+    }
+    ideComposerDraftPersistTimer = setTimeout(() => {
+      ideComposerDraftPersistTimer = null;
+      persistIdeComposerDraft(
+        currentWorkspace.value?.workspace_id ?? null,
+        ideComposerDraft.value,
+      );
+    }, 140);
+  }
+
+  watch(ideComposerDraft, () => {
+    schedulePersistIdeComposerDraft();
+  });
 
   function latestIdeOperatorPromptForRun(runId: string | null | undefined): string | null {
     const targetRunId = String(runId ?? '').trim();
@@ -2019,10 +2244,122 @@ export const useShellStore = defineStore('shell', () => {
     persistAgentExecutionAccess(normalized);
   }
 
+  function resolveActiveIdeStopRun(): RunRecord | null {
+    return activeIdeStopRun.value;
+  }
+
+  function enqueueIdeComposerMessage(
+    composerMode: IdeComposerMode,
+    content: string,
+  ): void {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    const trimmed = content.trim();
+    if (!workspaceId || !trimmed) {
+      return;
+    }
+
+    const entry: IdeComposerQueuedMessage = {
+      id: `queued_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      content: trimmed,
+      composerMode,
+      createdAt: new Date().toISOString(),
+    };
+    ideComposerQueueByWorkspaceId.value = {
+      ...ideComposerQueueByWorkspaceId.value,
+      [workspaceId]: appendIdeComposerQueueEntry(
+        ideComposerQueueByWorkspaceId.value[workspaceId] ?? [],
+        entry,
+      ),
+    };
+  }
+
+  function removeIdeComposerQueuedMessage(messageId: string): void {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+    ideComposerQueueByWorkspaceId.value = {
+      ...ideComposerQueueByWorkspaceId.value,
+      [workspaceId]: removeIdeComposerQueueEntry(
+        ideComposerQueueByWorkspaceId.value[workspaceId] ?? [],
+        messageId,
+      ),
+    };
+  }
+
+  async function flushIdeComposerQueueIfIdle(): Promise<void> {
+    if (flushingIdeComposerQueue) {
+      return;
+    }
+    if (composerAgentBusy.value || commandMutationState.value === 'submitting') {
+      return;
+    }
+
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+
+    const queue = ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+    const { next, remaining } = shiftIdeComposerQueue(queue);
+    if (!next) {
+      return;
+    }
+
+    flushingIdeComposerQueue = true;
+    ideComposerQueueByWorkspaceId.value = {
+      ...ideComposerQueueByWorkspaceId.value,
+      [workspaceId]: remaining,
+    };
+
+    try {
+      await dispatchIdeComposerMessage(next.composerMode, {
+        contentOverride: next.content,
+      });
+    } finally {
+      flushingIdeComposerQueue = false;
+      void flushIdeComposerQueueIfIdle();
+    }
+  }
+
+  async function steerIdeComposer(
+    composerMode: 'ask' | 'plan' | 'agent',
+    options: { attachmentFiles?: File[] } = {},
+  ): Promise<void> {
+    const content = ideComposerDraft.value.trim();
+    if (!content || !currentWorkspace.value?.workspace_id) {
+      return;
+    }
+
+    if (composerAgentBusy.value) {
+      await stopIdeAgentRun();
+    }
+
+    await dispatchIdeComposerMessage(composerMode, options);
+  }
+
   async function submitIdeComposer(
     composerMode: 'ask' | 'plan' | 'agent',
     options: { attachmentFiles?: File[] } = {},
   ): Promise<void> {
+    const content = ideComposerDraft.value.trim();
+    if (!content || !currentWorkspace.value?.workspace_id) {
+      return;
+    }
+
+    if (
+      shouldQueueIdeComposerSubmit({
+        agentBusy: composerAgentBusy.value,
+        composerMode,
+      }) &&
+      !(options.attachmentFiles?.length)
+    ) {
+      enqueueIdeComposerMessage(composerMode, content);
+      ideComposerDraft.value = '';
+      commandMutationError.value = null;
+      return;
+    }
+
     await dispatchIdeComposerMessage(composerMode, options);
   }
 
@@ -2700,6 +3037,7 @@ export const useShellStore = defineStore('shell', () => {
       if (previousWorkspaceId) {
         stashWorkspaceIdeView(previousWorkspaceId);
       }
+      syncIdeComposerDraftForWorkspace(workspaceId);
       void refreshOperatorThreadMessages(workspaceId);
       void restoreWorkspaceIdeView(workspaceId);
       void loadRunHistory(selectWorkspacePrimaryRun(
@@ -3317,6 +3655,7 @@ export const useShellStore = defineStore('shell', () => {
         : Promise.resolve(),
     ]);
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
+    await flushIdeComposerQueueIfIdle();
   }
 
   async function completeAllReviewReadyRuns(): Promise<void> {
@@ -3349,26 +3688,46 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function stopIdeAgentRun(): Promise<void> {
-    const runId = ideAgentLinkedRun.value?.run_id ?? ideAgentRunId.value;
-    if (!runId || runMutationPending.value) {
+    if (runMutationPending.value) {
       return;
     }
 
+    stopKairoSpeech();
+    const run = resolveActiveIdeStopRun();
+    const workspaceId = currentWorkspace.value?.workspace_id ?? undefined;
     runMutationState.value = 'stopping';
     runMutationError.value = null;
-    disconnectChatStreamSession(currentWorkspace.value?.workspace_id);
+    disconnectChatStreamSession(workspaceId);
     agentStreamActive.value = false;
     agentStreamMessageId.value = null;
     ideComposerActivity.value = null;
+    if (workspaceId) {
+      setWorkspaceStreamUi(workspaceId, {
+        active: false,
+        messageId: null,
+        activity: null,
+      });
+    }
+
+    if (!run) {
+      runMutationError.value = 'No active run to stop.';
+      runMutationState.value = 'idle';
+      void flushIdeComposerQueueIfIdle();
+      return;
+    }
 
     try {
-      await stopRun(runId);
-      clearIdeAgentRunLink();
+      await stopRun(run.run_id);
       await refreshRunSurfaces();
+      const updated = runs.value.find((record) => record.run_id === run.run_id);
+      if (shouldClearIdeAgentRunLink(updated)) {
+        clearIdeAgentRunLink();
+      }
     } catch (error) {
       runMutationError.value = error instanceof Error ? error.message : 'stop run request failed';
     } finally {
       runMutationState.value = 'idle';
+      void flushIdeComposerQueueIfIdle();
     }
   }
 
@@ -3610,6 +3969,7 @@ export const useShellStore = defineStore('shell', () => {
     await loadWorkspaceFiles();
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
+      syncIdeComposerDraftForWorkspace(workspaceId);
       await loadWorkspaceThread(workspaceId, 'operator');
       await hydrateWorkspaceIdeChat(workspaceId);
       if (layoutMode.value === 'operator') {
@@ -3653,6 +4013,10 @@ export const useShellStore = defineStore('shell', () => {
     canStopPrimaryRun,
     canStopIdeAgentRun,
     canSubmitOperatorCommand,
+    canSubmitIdeComposer,
+    composerAgentBusy,
+    ideComposerQueue,
+    ideComposerQueueSummary,
     commandMutationError,
     commandMutationState,
     commandFocusToken,
@@ -3815,7 +4179,14 @@ export const useShellStore = defineStore('shell', () => {
     stopIdeAgentRun,
     submitOperatorCommand,
     submitOperatorCommandContent,
+    handoffSignalToIde,
+    handoffDiscussedSignalToIde,
+    handoffMutationState,
+    handoffMutationError,
+    lastDiscussedSignal,
     submitIdeComposer,
+    steerIdeComposer,
+    removeIdeComposerQueuedMessage,
     terminalSessions,
     threadMessages,
     operatorThreadMessages,
@@ -3837,6 +4208,10 @@ export const useShellStore = defineStore('shell', () => {
     focusKairoBriefing,
     deliverKairoSpokenAlert,
     speakOperatorBriefing,
+    speakKairoConversationLine,
+    stopKairoSpeech,
+    handleKairoPresenceAction,
+    kairoSpeechActive,
     maybeSpeakBootGreeting,
     loadWorkspaceFiles,
     openAgentContentInEditor,

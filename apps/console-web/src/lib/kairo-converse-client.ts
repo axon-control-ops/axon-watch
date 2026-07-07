@@ -3,8 +3,25 @@ function controlPlaneBaseUrl(): string {
   return typeof configured === 'string' ? configured.replace(/\/$/, '') : '';
 }
 
-export type KairoConverseTurnKind = 'status_question' | 'open_question' | 'command' | 'chat';
+export type KairoConverseTurnKind =
+  | 'status_question'
+  | 'open_question'
+  | 'command'
+  | 'chat'
+  | 'action';
 export type KairoConverseSource = 'template' | 'model' | 'fallback';
+
+export type KairoConverseAction =
+  | {
+      type: 'handoff_signal';
+      signal_id: string;
+      target_workspace_id: string;
+      task: string;
+    }
+  | {
+      type: 'dispatch_command';
+      content: string;
+    };
 
 export interface KairoConverseRequest {
   content: string;
@@ -18,6 +35,7 @@ export interface KairoConverseResponse {
   reply: string;
   source: KairoConverseSource;
   command_content: string | null;
+  action: KairoConverseAction | null;
 }
 
 export async function postKairoConverse(body: KairoConverseRequest): Promise<KairoConverseResponse> {

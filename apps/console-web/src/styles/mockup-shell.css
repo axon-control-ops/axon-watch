@@ -4099,6 +4099,168 @@ body:has(.console-shell--mockup) {
   cursor: not-allowed;
 }
 
+.kairo-conversation-bar__mic--active {
+  border-color: rgba(0, 242, 255, 0.55);
+  color: rgba(0, 242, 255, 0.95);
+  box-shadow: 0 0 0.65rem rgba(0, 242, 255, 0.25);
+}
+
+.kairo-conversation-bar__interim {
+  margin: 0;
+  padding: 0 0.35rem;
+  color: rgba(0, 242, 255, 0.75);
+  font-size: 0.64rem;
+  font-style: italic;
+}
+
+.handoff-to-ide-button {
+  margin-top: 0.35rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(0, 242, 255, 0.95);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  padding: 0.24rem 0.65rem;
+  text-transform: uppercase;
+}
+
+.handoff-to-ide-button--compact {
+  font-size: 0.58rem;
+  padding: 0.18rem 0.5rem;
+}
+
+.operator-incident-feed__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.operator-incident-feed__monitor-tag {
+  margin-left: 0.35rem;
+  color: rgba(255, 196, 72, 0.9);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kairo-galaxy-orb--ptt {
+  cursor: crosshair;
+}
+
+.operator-mobile-shell {
+  grid-column: 1 / -1;
+  grid-row: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.85rem;
+  overflow: auto;
+}
+
+.operator-mobile-shell__header,
+.operator-mobile-shell__briefing,
+.operator-mobile-shell__fleet,
+.operator-mobile-shell__voice,
+.operator-mobile-shell__tunnel {
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  border-radius: 0.65rem;
+  background: rgba(0, 8, 14, 0.82);
+  padding: 0.75rem;
+}
+
+.operator-mobile-shell__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.operator-mobile-shell__eyebrow,
+.operator-mobile-shell__section-title {
+  margin: 0;
+  color: rgba(0, 242, 255, 0.75);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.operator-mobile-shell__title {
+  margin: 0.15rem 0 0;
+  font-size: 1.1rem;
+}
+
+.operator-mobile-shell__link,
+.operator-mobile-shell__action {
+  border: 1px solid rgba(0, 242, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(0, 242, 255, 0.95);
+  font-size: 0.68rem;
+  padding: 0.28rem 0.65rem;
+}
+
+.operator-mobile-shell__action--ghost {
+  background: transparent;
+}
+
+.operator-mobile-shell__notice {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.operator-mobile-shell__advise {
+  margin: 0.35rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.operator-mobile-shell__fleet-list {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.operator-mobile-shell__fleet-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+}
+
+.operator-mobile-shell__voice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.operator-mobile-shell__voice .brain-galaxy-stage__jarvis-float {
+  position: relative;
+  inset: auto;
+  margin: 0 auto;
+}
+
+.operator-mobile-shell__tunnel-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.console-shell--mobile .topbar-mockup,
+.console-shell--mobile .left-sidebar-mockup,
+.console-shell--mobile .right-dock-mockup,
+.console-shell--mobile .statusbar-mockup {
+  display: none;
+}
+
+.mobile-voice-cockpit-strip__mobile-link {
+  color: rgba(0, 242, 255, 0.9);
+  text-decoration: none;
+}
+
 .kairo-conversation-bar__reply {
   display: flex;
   gap: 0.45rem;

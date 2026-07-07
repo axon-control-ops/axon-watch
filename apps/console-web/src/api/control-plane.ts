@@ -453,6 +453,38 @@ export async function acknowledgeInboxSignals(
   return response.json() as Promise<AcknowledgeInboxSignalsResult>;
 }
 
+export interface CreateWorkspaceHandoffRequest {
+  target_workspace_id: string;
+  task: string;
+  reason?: string;
+}
+
+export interface WorkspaceHandoffCreateResponse {
+  handoff: Record<string, unknown>;
+  target_workspace: WorkspaceRecord;
+  target_workspace_summary: Record<string, unknown>;
+}
+
+export async function createWorkspaceHandoff(
+  sourceWorkspaceId: string,
+  body: CreateWorkspaceHandoffRequest,
+): Promise<WorkspaceHandoffCreateResponse> {
+  const baseUrl = controlPlaneBaseUrl();
+  const encoded = encodeURIComponent(sourceWorkspaceId);
+  const url = baseUrl
+    ? `${baseUrl}/api/workspaces/${encoded}/handoffs`
+    : `/api/workspaces/${encoded}/handoffs`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`workspace handoff failed with status ${response.status}`);
+  }
+  return response.json() as Promise<WorkspaceHandoffCreateResponse>;
+}
+
 async function acknowledgeInboxSignalsViaWatchCommand(
   signalIds: string[],
 ): Promise<AcknowledgeInboxSignalsResult> {

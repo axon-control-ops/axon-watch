@@ -98,5 +98,5 @@ export function galaxyOrbHint(
   if (state === 'alerting') {
     return 'Attention needed — tap orb for briefing';
   }
-  return 'Tap orb to speak briefing · type below to converse';
+  return 'Tap orb to speak briefing · hold orb or Space to talk';
 }

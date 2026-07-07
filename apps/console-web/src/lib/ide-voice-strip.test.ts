@@ -1,65 +1,82 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ideConversationalVoiceEnabled,
   ideVoiceSpeechAllowed,
   ideVoiceStripStatusLabel,
   shouldShowIdeVoiceStrip,
 } from './ide-voice-strip';
 
 describe('ide voice strip', () => {
-  it('shows only in IDE mode when opt-in is enabled', () => {
+  it('shows in IDE when conversational narration is enabled', () => {
     expect(
       shouldShowIdeVoiceStrip({
         layoutMode: 'ide',
-        settings: { ide_voice_strip_enabled: true },
+        settings: {
+          ide_voice_strip_enabled: false,
+          kairo_narration: 'conversational',
+          privacy_mode: false,
+        },
         foundationSurface: false,
       }),
     ).toBe(true);
     expect(
       shouldShowIdeVoiceStrip({
         layoutMode: 'ide',
-        settings: { ide_voice_strip_enabled: false },
+        settings: {
+          ide_voice_strip_enabled: false,
+          kairo_narration: 'off',
+          privacy_mode: false,
+        },
         foundationSurface: false,
       }),
     ).toBe(false);
     expect(
       shouldShowIdeVoiceStrip({
         layoutMode: 'operator',
-        settings: { ide_voice_strip_enabled: true },
+        settings: {
+          ide_voice_strip_enabled: true,
+          kairo_narration: 'conversational',
+          privacy_mode: false,
+        },
         foundationSurface: false,
       }),
     ).toBe(false);
   });
 
-  it('gates IDE speech delivery behind the opt-in strip', () => {
+  it('allows IDE speech when conversational narration is enabled', () => {
     expect(
       ideVoiceSpeechAllowed({
         layoutMode: 'ide',
-        settings: { ide_voice_strip_enabled: false, privacy_mode: false },
+        settings: {
+          ide_voice_strip_enabled: false,
+          kairo_narration: 'conversational',
+          privacy_mode: false,
+        },
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       ideVoiceSpeechAllowed({
         layoutMode: 'operator',
-        settings: { ide_voice_strip_enabled: false, privacy_mode: false },
+        settings: {
+          ide_voice_strip_enabled: false,
+          kairo_narration: 'conversational',
+          privacy_mode: false,
+        },
       }),
     ).toBe(true);
   });
 
-  it('labels speaking and narration-off states', () => {
+  it('labels speaking and interrupt hint states', () => {
     expect(
       ideVoiceStripStatusLabel({
         speaking: true,
         narration: 'conversational',
         liveLine: null,
       }),
-    ).toBe('Speaking…');
-    expect(
-      ideVoiceStripStatusLabel({
-        speaking: false,
-        narration: 'off',
-        liveLine: null,
-      }),
-    ).toContain('narration off');
+    ).toContain('interrupt');
+    expect(ideConversationalVoiceEnabled({ kairo_narration: 'off', privacy_mode: false })).toBe(
+      false,
+    );
   });
 });

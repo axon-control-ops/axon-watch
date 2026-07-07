@@ -1,6 +1,7 @@
 import type { InboxItem } from '../contracts/canonical';
 
 import type { FleetHealthSnapshot } from '../api/control-plane';
+import { isBootstrapSummarySignal } from './operator-signal-hints';
 
 export type OperatorIncidentFeedItem = {
   id: string;
@@ -9,6 +10,7 @@ export type OperatorIncidentFeedItem = {
   severity: 'info' | 'high' | 'critical' | string;
   source: 'signal' | 'fleet';
   workspaceId: string | null;
+  monitorSignal: boolean;
 };
 
 export type OperatorIncidentFeedView = {
@@ -25,6 +27,20 @@ const SEVERITY_RANK: Record<string, number> = {
 
 function severityRank(severity: string): number {
   return SEVERITY_RANK[severity] ?? 3;
+}
+
+function isMonitorSignal(signal: InboxItem): boolean {
+  return String(signal.meta?.signal_family ?? '') === 'child_project_monitor';
+}
+
+function incidentSignalRank(signal: InboxItem): number {
+  if (isMonitorSignal(signal)) {
+    return 0;
+  }
+  if (isBootstrapSummarySignal(signal.signal_id, signal.title)) {
+    return 4;
+  }
+  return severityRank(signal.severity);
 }
 
 export function buildOperatorIncidentFeed(input: {
@@ -56,6 +72,7 @@ export function buildOperatorIncidentFeed(input: {
       severity: signal.severity,
       source: 'signal',
       workspaceId: signal.workspace_id ?? null,
+      monitorSignal: isMonitorSignal(signal),
     });
   }
 
@@ -75,13 +92,21 @@ export function buildOperatorIncidentFeed(input: {
         severity: row.critical_signals_count > 0 ? 'critical' : 'high',
         source: 'fleet',
         workspaceId: row.workspace_id,
+        monitorSignal: false,
       });
     }
   }
 
-  const sorted = items.sort(
-    (left, right) => severityRank(left.severity) - severityRank(right.severity),
-  );
+  const sorted = items.sort((left, right) => {
+    if (left.source === 'signal' && right.source === 'signal') {
+      const leftSignal = input.topSignals.find((signal) => signal.signal_id === left.id);
+      const rightSignal = input.topSignals.find((signal) => signal.signal_id === right.id);
+      if (leftSignal && rightSignal) {
+        return incidentSignalRank(leftSignal) - incidentSignalRank(rightSignal);
+      }
+    }
+    return severityRank(left.severity) - severityRank(right.severity);
+  });
   const limited = sorted.slice(0, limit);
 
   return {

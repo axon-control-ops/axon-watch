@@ -1,4 +1,4 @@
-export type AppSurface = 'console' | 'vault' | 'data';
+export type AppSurface = 'console' | 'vault' | 'data' | 'mobile';
 
 export function normalizeAppPath(pathname: string): string {
   const trimmed = pathname.replace(/\/+$/, '');
@@ -13,6 +13,9 @@ export function readAppSurface(pathname = window.location.pathname): AppSurface 
   if (normalized === '/data') {
     return 'data';
   }
+  if (normalized === '/mobile') {
+    return 'mobile';
+  }
   return 'console';
 }
 
@@ -22,6 +25,9 @@ export function appSurfacePath(surface: AppSurface): string {
   }
   if (surface === 'data') {
     return '/data';
+  }
+  if (surface === 'mobile') {
+    return '/mobile';
   }
   return '/';
 }

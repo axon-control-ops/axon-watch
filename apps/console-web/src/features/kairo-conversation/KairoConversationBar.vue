@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 
 import {
   kairoConversationError,
   kairoConversationReply,
 } from './kairo-conversation-state';
 import { useKairoConversation } from './use-kairo-conversation';
+import { registerKairoConversationSubmit } from './kairo-conversation-bus';
 import { operatorExecutionStage } from '../../lib/operator-status-radar-view';
 import { formatRunShortId } from '../../lib/run-display';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
-const { draft, pending, canSubmit, submitTurn, handleFocus, handleBlur } = useKairoConversation();
+const { draft, pending, canSubmit, submitTurn, handleFocus, handleBlur, speechCapture } =
+  useKairoConversation();
 
 const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 const pendingApprovals = computed(
@@ -46,9 +48,92 @@ const showStopAction = computed(
     shell.primaryActiveRun?.phase === 'executing',
 );
 
+const inputPlaceholder = computed(() => {
+  if (speechCapture.interimTranscript.value) {
+    return speechCapture.interimTranscript.value;
+  }
+  return 'Ask KAIRO or dispatch a command… (Space hold-to-talk)';
+});
+
+const micDisabled = computed(
+  () =>
+    pending.value ||
+    speechCapture.capturing.value ||
+    shell.operatorPresenceSettings.privacy_mode ||
+    !speechCapture.supported,
+);
+
+const micTitle = computed(() => {
+  if (shell.operatorPresenceSettings.privacy_mode) {
+    return 'Voice blocked in privacy mode';
+  }
+  if (!speechCapture.supported) {
+    return 'Speech recognition unavailable in this browser';
+  }
+  return 'Hold to talk';
+});
+
 async function handleSubmit(): Promise<void> {
   await submitTurn();
 }
+
+function handleMicPointerDown(): void {
+  if (micDisabled.value) {
+    return;
+  }
+  speechCapture.startCapture();
+}
+
+function handleMicPointerUp(): void {
+  if (speechCapture.capturing.value) {
+    speechCapture.stopCapture();
+  }
+}
+
+function handleSpaceHotkey(event: KeyboardEvent): void {
+  if (event.code !== 'Space' || event.repeat) {
+    return;
+  }
+  const target = event.target;
+  if (
+    target instanceof HTMLElement &&
+    (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+  ) {
+    return;
+  }
+  if (!shell.operatorBrainGalaxyActive || shell.layoutMode !== 'operator') {
+    return;
+  }
+  event.preventDefault();
+  if (speechCapture.capturing.value) {
+    speechCapture.stopCapture();
+  } else if (speechCapture.canCapture()) {
+    speechCapture.startCapture();
+  }
+}
+
+function handleSpaceKeyup(event: KeyboardEvent): void {
+  if (event.code !== 'Space') {
+    return;
+  }
+  if (speechCapture.capturing.value) {
+    speechCapture.stopCapture();
+  }
+}
+
+let unregisterSubmit: (() => void) | null = null;
+
+onMounted(() => {
+  window.addEventListener('keydown', handleSpaceHotkey);
+  window.addEventListener('keyup', handleSpaceKeyup);
+  unregisterSubmit = registerKairoConversationSubmit(submitTurn);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleSpaceHotkey);
+  window.removeEventListener('keyup', handleSpaceKeyup);
+  unregisterSubmit?.();
+});
 </script>
 
 <template>
@@ -61,17 +146,21 @@ async function handleSubmit(): Promise<void> {
         type="text"
         autocomplete="off"
         spellcheck="false"
-        placeholder="Ask KAIRO or dispatch a command…"
-        :disabled="pending"
+        :placeholder="inputPlaceholder"
+        :disabled="pending || speechCapture.capturing.value"
         @focus="handleFocus"
         @blur="handleBlur"
       />
       <button
         type="button"
         class="kairo-conversation-bar__mic"
-        disabled
-        title="Push-to-talk arrives in OP-C3"
-        aria-label="Push-to-talk (coming soon)"
+        :class="{ 'kairo-conversation-bar__mic--active': speechCapture.capturing.value }"
+        :disabled="micDisabled"
+        :title="micTitle"
+        aria-label="Hold to talk"
+        @pointerdown.prevent="handleMicPointerDown"
+        @pointerup.prevent="handleMicPointerUp"
+        @pointerleave="handleMicPointerUp"
       >
         Mic
       </button>
@@ -80,6 +169,9 @@ async function handleSubmit(): Promise<void> {
       </button>
     </form>
 
+    <p v-if="speechCapture.interimTranscript" class="kairo-conversation-bar__interim">
+      {{ speechCapture.interimTranscript }}
+    </p>
     <p v-if="kairoConversationReply" class="kairo-conversation-bar__reply">
       <strong>KAIRO</strong>
       <span>{{ kairoConversationReply }}</span>

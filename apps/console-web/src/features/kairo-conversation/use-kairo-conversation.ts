@@ -1,7 +1,6 @@
 import { computed, ref } from 'vue';
 
 import { postKairoConverse } from '../../lib/kairo-converse-client';
-import { enqueueSpeech } from '../../lib/speech-queue';
 import { useShellStore } from '../../stores/shell';
 import { resolveConversationNavigationIntent } from './conversation-intents';
 import {
@@ -10,6 +9,9 @@ import {
   kairoConversationReply,
   setKairoConversationPhase,
 } from './kairo-conversation-state';
+import { useKairoSpeechCapture } from './use-kairo-speech-capture';
+
+const HANDOFF_CLIENT_RE = /\b(hand\s*off|handoff|continue in ide|investigate in ide)\b/i;
 
 export function useKairoConversation() {
   const shell = useShellStore();
@@ -18,6 +20,14 @@ export function useKairoConversation() {
 
   const canSubmit = computed(() => draft.value.trim().length > 0 && !pending.value);
   const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? '');
+
+  const speechCapture = useKairoSpeechCapture({
+    privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
+    onFinalTranscript: async (transcript) => {
+      draft.value = transcript;
+      await submitTurn(transcript);
+    },
+  });
 
   function kairoSpeechSessionId(): string {
     const key = 'axon-x:kairo-speech-session';
@@ -33,20 +43,46 @@ export function useKairoConversation() {
   }
 
   function speakReply(line: string): void {
-    const trimmed = line.trim();
-    if (!trimmed) {
+    shell.stopKairoSpeech();
+    void shell.speakKairoConversationLine(line);
+  }
+
+  async function executeConverseAction(
+    action: NonNullable<Awaited<ReturnType<typeof postKairoConverse>>['action']>,
+  ): Promise<void> {
+    if (action.type === 'handoff_signal') {
+      await shell.handoffSignalToIde({
+        signal_id: action.signal_id,
+        workspace_id: action.target_workspace_id,
+        title: action.task.replace(/^Investigate signal "/, '').split('"')[0] ?? action.task,
+        summary: action.task,
+      });
       return;
     }
-    const blocked =
-      shell.operatorPresenceSettings.privacy_mode ||
-      shell.operatorPresenceSettings.kairo_narration === 'off' ||
-      !shell.operatorPresenceSettings.spoken_alerts_enabled;
-    if (blocked || typeof window === 'undefined' || !window.speechSynthesis) {
-      return;
+    if (action.type === 'dispatch_command') {
+      await shell.submitOperatorCommandContent(action.content);
     }
-    setKairoConversationPhase('speaking');
-    enqueueSpeech(trimmed, window.speechSynthesis);
-    window.setTimeout(() => setKairoConversationPhase('idle'), Math.max(1200, trimmed.length * 45));
+  }
+
+  async function tryClientHandoff(content: string): Promise<boolean> {
+    if (!HANDOFF_CLIENT_RE.test(content)) {
+      return false;
+    }
+    const topSignal = shell.operatorBriefing?.top_signals[0];
+    if (!topSignal) {
+      kairoConversationReply.value = 'No signal in context to hand off yet.';
+      speakReply(kairoConversationReply.value);
+      return true;
+    }
+    await shell.handoffSignalToIde({
+      signal_id: topSignal.signal_id,
+      workspace_id: topSignal.workspace_id,
+      title: topSignal.title,
+      summary: topSignal.summary,
+    });
+    kairoConversationReply.value = 'Handing the top signal off to the IDE.';
+    speakReply(kairoConversationReply.value);
+    return true;
   }
 
   async function submitTurn(rawContent?: string): Promise<void> {
@@ -55,6 +91,7 @@ export function useKairoConversation() {
       return;
     }
 
+    shell.stopKairoSpeech();
     pending.value = true;
     kairoConversationError.value = null;
     setKairoConversationPhase('thinking');
@@ -79,6 +116,14 @@ export function useKairoConversation() {
       draft.value = '';
       speakReply(navIntent.reply);
       pending.value = false;
+      setKairoConversationPhase('idle');
+      return;
+    }
+
+    if (await tryClientHandoff(content)) {
+      draft.value = '';
+      pending.value = false;
+      setKairoConversationPhase('idle');
       return;
     }
 
@@ -93,7 +138,11 @@ export function useKairoConversation() {
       draft.value = '';
       speakReply(response.reply);
 
-      if (response.turn_kind === 'command' && response.command_content) {
+      if (response.action) {
+        await executeConverseAction(response.action);
+      } else if (response.turn_kind === 'command' && response.command_content) {
+        await shell.submitOperatorCommandContent(response.command_content);
+      } else if (response.turn_kind === 'action' && response.command_content) {
         await shell.submitOperatorCommandContent(response.command_content);
       }
     } catch (error) {
@@ -109,13 +158,24 @@ export function useKairoConversation() {
   }
 
   function handleFocus(): void {
-    setKairoConversationPhase('listening');
+    if (!speechCapture.capturing.value) {
+      setKairoConversationPhase('listening');
+    }
   }
 
   function handleBlur(): void {
-    if (kairoConversationPhase.value === 'listening') {
+    if (kairoConversationPhase.value === 'listening' && !speechCapture.capturing.value) {
       setKairoConversationPhase('idle');
     }
+  }
+
+  function startVoiceCapture(): boolean {
+    shell.stopKairoSpeech();
+    return speechCapture.startCapture();
+  }
+
+  function stopVoiceCapture(): void {
+    speechCapture.stopCapture();
   }
 
   return {
@@ -125,5 +185,8 @@ export function useKairoConversation() {
     submitTurn,
     handleFocus,
     handleBlur,
+    speechCapture,
+    startVoiceCapture,
+    stopVoiceCapture,
   };
 }

@@ -1,6 +1,7 @@
 /** Serialize browser speech synthesis so lines do not clip each other. */
 
 export type SpeechPort = Pick<SpeechSynthesis, 'speak' | 'getVoices'> & {
+  cancel?: SpeechSynthesis['cancel'];
   addEventListener?: SpeechSynthesis['addEventListener'];
 };
 
@@ -8,6 +9,24 @@ let queue: string[] = [];
 let speaking = false;
 let voicesReady = false;
 let cachedVoice: SpeechSynthesisVoice | null = null;
+const speakingListeners = new Set<(active: boolean) => void>();
+const idleListeners = new Set<() => void>();
+
+function notifySpeaking(active: boolean): void {
+  speaking = active;
+  for (const listener of speakingListeners) {
+    listener(active);
+  }
+}
+
+function notifyIdle(): void {
+  if (speaking || queue.length > 0) {
+    return;
+  }
+  for (const listener of idleListeners) {
+    listener();
+  }
+}
 
 const JARVIS_VOICE_PREFS = [
   /ryan.*neural/i,
@@ -62,14 +81,17 @@ function warmSpeechIfNeeded(speech: SpeechPort): void {
 
 function drainQueue(speech: SpeechPort): void {
   if (speaking || queue.length === 0) {
+    notifyIdle();
     return;
   }
   if (typeof SpeechSynthesisUtterance === 'undefined') {
     queue = [];
+    notifySpeaking(false);
+    notifyIdle();
     return;
   }
 
-  speaking = true;
+  notifySpeaking(true);
   const text = queue.shift() ?? '';
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = 0.88;
@@ -80,14 +102,16 @@ function drainQueue(speech: SpeechPort): void {
     utterance.voice = voice;
   }
 
-  utterance.onend = () => {
-    speaking = false;
-    window.setTimeout(() => drainQueue(speech), 220);
+  const finish = (): void => {
+    notifySpeaking(false);
+    window.setTimeout(() => {
+      drainQueue(speech);
+      notifyIdle();
+    }, 220);
   };
-  utterance.onerror = () => {
-    speaking = false;
-    window.setTimeout(() => drainQueue(speech), 220);
-  };
+
+  utterance.onend = finish;
+  utterance.onerror = finish;
 
   speech.speak(utterance);
 }
@@ -103,10 +127,35 @@ export function enqueueSpeech(message: string, speech: SpeechPort | null): void 
 }
 
 export function resetSpeechQueue(): void {
+  stopSpeech(null);
+}
+
+export function stopSpeech(speech: SpeechPort | null): void {
   queue = [];
-  speaking = false;
+  if (speech && typeof speech.cancel === 'function') {
+    speech.cancel();
+  }
+  notifySpeaking(false);
+  notifyIdle();
 }
 
 export function isSpeechQueueSpeaking(): boolean {
   return speaking;
+}
+
+export function subscribeSpeechQueueSpeaking(
+  listener: (active: boolean) => void,
+): () => void {
+  speakingListeners.add(listener);
+  listener(speaking);
+  return () => {
+    speakingListeners.delete(listener);
+  };
+}
+
+export function onSpeechQueueIdle(listener: () => void): () => void {
+  idleListeners.add(listener);
+  return () => {
+    idleListeners.delete(listener);
+  };
 }

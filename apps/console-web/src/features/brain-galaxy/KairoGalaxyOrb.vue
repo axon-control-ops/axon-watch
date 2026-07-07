@@ -12,6 +12,8 @@ import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import { isSpeechQueueSpeaking } from '../../lib/speech-queue';
 import { kairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
+import { submitKairoConversationTranscript } from '../kairo-conversation/kairo-conversation-bus';
+import { useKairoSpeechCapture } from '../kairo-conversation/use-kairo-speech-capture';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -60,6 +62,24 @@ const voiceBlocked = computed(
     !shell.operatorPresenceSettings.spoken_alerts_enabled,
 );
 
+const speechCapture = useKairoSpeechCapture({
+  privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
+  onFinalTranscript: submitKairoConversationTranscript,
+});
+
+function handleOrbPointerDown(): void {
+  if (shell.operatorPresenceSettings.privacy_mode || !speechCapture.supported) {
+    return;
+  }
+  speechCapture.startCapture();
+}
+
+function handleOrbPointerUp(): void {
+  if (speechCapture.capturing.value) {
+    speechCapture.stopCapture();
+  }
+}
+
 function refreshSpeakingState(): void {
   speaking.value = isSpeechQueueSpeaking();
 }
@@ -79,14 +99,18 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="brain-galaxy-stage__jarvis-float kairo-galaxy-orb"
-    :class="orbClass"
+    :class="[orbClass, { 'kairo-galaxy-orb--ptt': speechCapture.capturing.value }]"
     aria-label="KAIRO voice orb"
+    @pointerdown.prevent="handleOrbPointerDown"
+    @pointerup.prevent="handleOrbPointerUp"
+    @pointerleave="handleOrbPointerUp"
   >
     <button
       type="button"
       class="kairo-galaxy-orb__trigger"
       :disabled="voiceBlocked"
       :aria-label="voiceBlocked ? 'KAIRO voice muted' : 'Speak operator briefing'"
+      @pointerdown.stop
       @click="shell.speakOperatorBriefing()"
     >
       <svg
@@ -162,6 +186,7 @@ onBeforeUnmount(() => {
     <button
       type="button"
       class="kairo-galaxy-orb__model"
+      @pointerdown.stop
       @click="shell.focusKairoBriefing()"
     >
       <span aria-hidden="true">◆</span>

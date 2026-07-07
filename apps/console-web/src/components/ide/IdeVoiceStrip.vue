@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
+import { kairoConversationPhase } from '../../features/kairo-conversation/kairo-conversation-state';
 import {
   ideVoiceStripStatusLabel,
   shouldShowIdeVoiceStrip,
@@ -24,16 +25,20 @@ const visible = computed(() =>
     layoutMode: shell.layoutMode,
     settings: shell.operatorPresenceSettings,
     foundationSurface: props.foundationSurface,
+    speaking: speaking.value || shell.kairoSpeechActive,
   }),
 );
 
 const statusLabel = computed(() =>
   ideVoiceStripStatusLabel({
-    speaking: speaking.value,
+    speaking: speaking.value || shell.kairoSpeechActive,
     narration: shell.operatorPresenceSettings.kairo_narration,
     liveLine: shell.kairoAgentLiveLine,
+    conversationPhase: kairoConversationPhase.value,
   }),
 );
+
+const showStopSpeech = computed(() => shell.kairoSpeechActive);
 
 function refreshSpeakingState(): void {
   speaking.value = isSpeechQueueSpeaking();
@@ -41,6 +46,10 @@ function refreshSpeakingState(): void {
 
 function disableStrip(): void {
   void shell.saveOperatorPresenceSettingsPatch({ ide_voice_strip_enabled: false });
+}
+
+function handleStopSpeech(): void {
+  shell.stopKairoSpeech();
 }
 
 onMounted(() => {
@@ -64,14 +73,24 @@ onBeforeUnmount(() => {
     <div class="ide-voice-strip__status">
       <span
         class="ide-voice-strip__pulse"
-        :class="{ 'ide-voice-strip__pulse--active': speaking }"
+        :class="{ 'ide-voice-strip__pulse--active': speaking || shell.kairoSpeechActive }"
         aria-hidden="true"
       />
       <span class="ide-voice-strip__label">{{ statusLabel }}</span>
     </div>
-    <button type="button" class="ide-voice-strip__close" @click="disableStrip">
-      Hide voice strip
-    </button>
+    <div class="ide-voice-strip__actions">
+      <button
+        v-if="showStopSpeech"
+        type="button"
+        class="ide-voice-strip__stop"
+        @click="handleStopSpeech"
+      >
+        Stop speaking
+      </button>
+      <button type="button" class="ide-voice-strip__close" @click="disableStrip">
+        Hide voice strip
+      </button>
+    </div>
   </aside>
 </template>
 
@@ -122,6 +141,24 @@ onBeforeUnmount(() => {
   opacity: 0.92;
 }
 
+.ide-voice-strip__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.ide-voice-strip__stop {
+  border: 1px solid rgba(255, 140, 120, 0.42);
+  border-radius: 0.35rem;
+  background: rgba(255, 120, 72, 0.12);
+  color: rgba(255, 210, 190, 0.96);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.3rem 0.55rem;
+}
+
 .ide-voice-strip__close {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 0.35rem;
@@ -131,7 +168,6 @@ onBeforeUnmount(() => {
   font: inherit;
   font-size: 0.72rem;
   padding: 0.3rem 0.55rem;
-  flex-shrink: 0;
 }
 
 @keyframes ide-voice-strip-pulse {
