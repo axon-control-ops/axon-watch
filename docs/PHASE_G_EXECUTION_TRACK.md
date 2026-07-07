@@ -62,7 +62,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 | # | Slice | Deliverable | Blocks |
 |---|---|---|---|
-| 14 | **G4.1** | Connector inventory with probe + removal criteria | — |
+| 14 | **G4.1** | Connector inventory with probe + removal criteria | `verify:connector-inventory` | **Done** |
 | 15 | **G4.2–G4.5** | WhatsApp / tunnel / voice / dock parity (or explicit discard) | DashPro `:7734` fallback |
 | 16 | **G4.6** | `verify:connector-parity` | — |
 | 17 | **G5** | Capability matrix + extended regression | — |
@@ -87,7 +87,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 4):** **G4.1** connector inventory with probe + removal criteria.
+**Next up (Wave 4):** **G4.2** WhatsApp / external messaging, or **G4.3** tunnel / remote control.
 
 ---
 
@@ -101,6 +101,12 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-07 — G4.1 legacy connector inventory
+
+- `config/legacy-connector-inventory.json` lists owner, probe, Phase G slice, and fallback removal criteria per connector.
+- `verify:connector-inventory` (`test21-connector-inventory.sh`) validates contract + parity-snapshot blocker map.
+- `docs/LEGACY_CONNECTOR_INVENTORY.md` updated with G4.1 table.
 
 ### 2026-07-07 — UX-IDE-5 opt-in IDE voice strip
 

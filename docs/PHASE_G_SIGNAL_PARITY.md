@@ -175,7 +175,7 @@ Close the largest functional gap in `docs/LEGACY_CONNECTOR_INVENTORY.md` item 1.
 
 Per `config/parity-snapshot.json` → `blockers_for_full_retirement` and `docs/LEGACY_CONNECTOR_INVENTORY.md`.
 
-- [ ] **G4.1** Inventory each unmigrated connector with owner, probe, and fallback removal criteria
+- [x] **G4.1** Inventory each unmigrated connector with owner, probe, and fallback removal criteria
 - [ ] **G4.2** WhatsApp / external messaging — bounded watch integration or explicit discard with operator approval
 - [ ] **G4.3** Tunnel / remote control — auth + binary + live status in connectors rail (operator foundation rule)
 - [ ] **G4.4** Voice deck / mobile cockpit — event-driven presence (`IMPORT_MATRIX` KAIRO section)
@@ -228,6 +228,12 @@ Same as Phase F:
 | F6 retirement | Deferred | G6 with evidence |
 
 ## Append log
+
+### 2026-07-07 — G4.1 legacy connector inventory
+
+- Published `config/legacy-connector-inventory.json` with owner, probe, Phase G slice, and removal criteria per connector.
+- Gate: `npm run verify:connector-inventory` (`test21-connector-inventory.sh`).
+- Retirement blocker map ties `parity-snapshot.json` blockers to inventory IDs.
 
 ### 2026-07-06 — G2 runtime vault integration implemented
 

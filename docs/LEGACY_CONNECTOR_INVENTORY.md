@@ -3,17 +3,43 @@
 **Purpose:** Track unmigrated capabilities that still require axon-local fallback.
 Axon-X production operator is `:4173`; axon-local remains explicit fallback only.
 
-**Last updated:** 2026-07-06 (Phase G3 orchestration gate)
+**Last updated:** 2026-07-07 (Phase G4.1 inventory gate)
+
+**Machine-readable source:** `config/legacy-connector-inventory.json`  
+**Gate:** `npm run verify:connector-inventory` (`scripts/verify/test21-connector-inventory.sh`)
 
 ---
 
-## Connector façade status
+## G4.1 inventory (owner · probe · removal criteria)
 
-| Connector ID | Health probe | Axon-X UI | Fallback |
-|---|---|---|---|
-| `control_plane` | Required · `:8787/api/health` | Mission Control connectors rail | — |
-| `console_web` | Required · `:4173/` | Mission Control connectors rail | — |
-| `axon_local` | Optional · `:7734/api/health` | Connectors rail + **Open :7734 fallback** | http://127.0.0.1:7734 |
+| ID | Status | Owner | Probe | Phase G | Fallback removal criteria |
+|---|---|---|---|---|---|
+| `control_plane` | **migrated** | `services/control-plane` | HTTP `${AXON_WATCH_CONTROL_PLANE_BASE_URL}/api/health` · `verify:test3` | — | Native on Axon-X; axon-local not required. |
+| `console_web` | **migrated** | `apps/console-web` | HTTP `${AXON_WATCH_PUBLIC_BASE_URL}/` · `verify:test3` | — | Primary operator is `:4173`. |
+| `axon_local` | **optional fallback** | axon-local `:7734` | HTTP `http://127.0.0.1:7734/api/health` (optional) · `verify:test3` | G6 | Remove rail + probe after G4.2–G4.5 replaced/discarded, G5 matrix green, G6 one-week `:4173`-only sign-off. |
+| `agent_orchestration` | **replaced** | `cli_runtime` + run store | `verify:agent-orchestration-parity` | G3 | Blocker cleared when orchestration gate stays green; no `:7734` needed for agent file edits. |
+| `whatsapp_web_monitor` | **unmigrated** | axon-local `whatsapp_web_monitor.py` | Manual (scheduler job on `:7734`) | G4.2 | Bounded watch slice + vault auth + inbox signals, or explicit operator discard (G5.4). |
+| `cloudflare_tunnel` | **unmigrated** | axon-local tunnel settings | Manual (binary + token + status) | G4.3 | Binary on PATH, auth/config present, live status in connectors rail + parity gate. |
+| `voice_deck_mobile_cockpit` | **partial** | `console-web/features/voice-deck` | `verify:parity-d5` (browser TTS v1) | G4.4 | Event-driven presence replaces Alpine polling, or operator approves foreground-only ceiling. |
+| `agent_dock_legacy_parity` | **partial** | `RightDock` + `AgentDock` | `config/dock-behavior-contract.json` · `verify:parity-d6` | G4.5 | Remaining dock gaps closed or documented as intentional v1 degradation. |
+| `dashpro_external_monitors` | **partial** | `axon-watch/app/monitors` | `verify:dashpro-monitors` · `dashpro-monitor-slice.json` | G4.2 | Sentry/PostHog on watch; WhatsApp/tunnel remain separate rows. |
+| `legacy_settings_storage` | **unmigrated** | axon-local settings/SQLite | Manual (G5.1 capability matrix) | G5 | Every operator-needed key has Axon-X owner or documented discard; no silent truth merge. |
+
+---
+
+## Health-probe connectors (watch)
+
+Configured in `config/watch-connectors.json` and surfaced on Mission Control → **Connectors**.
+
+| Connector ID | Required | Axon-X UI |
+|---|---|---|
+| `control_plane` | yes | Connectors rail |
+| `console_web` | yes | Connectors rail |
+| `axon_local` | no | Connectors rail + **Open :7734 fallback** |
+
+See `docs/WATCH_CONNECTORS.md`.
+
+---
 
 ## Child-project workspace (partial migration)
 
@@ -21,8 +47,8 @@ Axon-X production operator is `:4173`; axon-local remains explicit fallback only
 |---|---|---|
 | `workspace_dashpro` | `/home/edp/Projectx/product/dashpro` | DashPro office workspace (id 5) |
 
-Files, terminal, and bounded commands (`git status`, `run …`) work in Axon-X for DashPro.
-DashPro-specific integrations (WhatsApp monitor, production URLs, mobile app flows) remain on axon-local until migrated.
+Files, terminal, and bounded commands (`git status`, agent Full Access) work in Axon-X for DashPro.
+DashPro-specific integrations (WhatsApp monitor, tunnel, mobile app flows) remain on axon-local until G4.2–G4.4.
 
 See `docs/CHILD_PROJECT_WORKSPACE.md`.
 
@@ -34,14 +60,13 @@ See `docs/CHILD_PROJECT_WORKSPACE.md`.
 
 ---
 
-## Unmigrated capability areas (v1)
+## Retirement blocker map
 
-These remain on axon-local until a bounded Axon-X slice replaces them:
+`config/parity-snapshot.json` → `blockers_for_full_retirement`:
 
-1. **Voice deck / mobile cockpit** — not wired in Axon-X console-web v1.
-2. **Child-project connectors** — WhatsApp, external MCP, tunnel-specific flows still rooted in axon-local.
-3. **Legacy console chrome** — Agent Dock parity features not yet extracted (see `config/parity-snapshot.json`).
-4. **Classic settings / storage paths** — some keys and SQLite paths differ; no silent merge of truths.
+> Child-project integration and legacy connector surfaces not yet migrated to Axon-X
+
+Mapped inventory IDs: `whatsapp_web_monitor`, `cloudflare_tunnel`, `voice_deck_mobile_cockpit`, `agent_dock_legacy_parity`, `legacy_settings_storage`, `axon_local`.
 
 ---
 
@@ -51,7 +76,7 @@ When an operator hits an unmigrated path:
 
 1. Use Mission Control → **Connectors** → **Open :7734 fallback** for `axon_local`.
 2. Do **not** assume Axon-X and axon-local share the same run store or chat history.
-3. Record blockers in planning docs; do not mark full retirement until E6 sign-off.
+3. Record blockers in planning docs; do not mark full retirement until G6 sign-off.
 
 ---
 
@@ -61,3 +86,4 @@ When an operator hits an unmigrated path:
 - `docs/CUTOVER_DECISION.md`
 - `config/parity-snapshot.json` → `blockers_for_full_retirement`
 - `docs/WATCH_CONNECTORS.md`
+- `docs/PHASE_G_SIGNAL_PARITY.md` → G4.1 / G4.6
