@@ -28,6 +28,9 @@ python3 scripts/ops/sync_planning_mirror_to_axon_local.py
 - `run-state.md` — canonical run lifecycle and stop/resume rules
 - `signal-events.md` — signal envelope, inbox ranking, delivery receipts
 - `KAIRO_MODE.md` — KAIRO operator-presence research
+- `KAIRO_BRAIN_UI_ARCHITECTURE.md` — JARVIS pack mapping, Operator vs IDE subscriptions (UI deferred)
+- `OPERATOR_REFRESH_POLICY.md` — anti-freeze refresh rules (G4.4 guards)
+- `agent-orchestration-contract.md` — G3 orchestration contract (add to MANIFEST on triage)
 - `watch-api.md` — internal watch ↔ control-plane contract
 - `control-api.md` — control-plane public API contract
 - `runtime-summary.md` — runtime identity and watch-backed summaries
@@ -50,7 +53,8 @@ python3 scripts/ops/sync_planning_mirror_to_axon_local.py
   research, visual north star, parity ledger.
 - **Implementation authority (`docs/` outside this folder):** locked layout
   (`UI_LAYOUT_LOCK.md`, ADR-004 layout), implementation ADRs 001–008, handbook,
-  multitask lanes, thin-slice specs (`WORKSPACE_*`, `WATCH_*`, etc.).
+  multitask lanes, thin-slice specs (`WORKSPACE_*`, `WATCH_*`, etc.), Phase G
+  tracks (`PHASE_G_SIGNAL_PARITY.md`, `PHASE_G5_*`, `PHASE_G6_*`).
 
 When implementation diverges from planning, amend planning docs here — do not
 delete history. Layout geometry remains locked in

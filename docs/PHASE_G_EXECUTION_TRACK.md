@@ -68,7 +68,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 | 17 | **G4.5** | Agent Dock parity gaps (hero persist, thread meta, collapsible seam) | `verify:agent-dock-parity` | **Done** |
 | 18 | **G4.2** | WhatsApp — bounded watch integration or explicit discard | DashPro `:7734` fallback | **Deferred** |
 | 19 | **G4.6** | `verify:connector-parity` bundled gate | `test25-connector-parity-bundle.sh` | **Done** |
-| 20 | **G5** | Capability matrix + extended regression | — | — |
+| 20 | **G5** | Capability matrix + gate design + discards docs | `verify:signal-parity-matrix` (after triage) | **Planning done** |
 | 21 | **G6** | One week `:4173` only + operator sign-off | **Retirement** | — |
 
 ---
@@ -90,9 +90,11 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Wave 4 exit:** G4.1–G4.6 gates green (G4.2 WhatsApp deferred with operator approval). **Next:** **G5** capability matrix.
+**Wave 4 exit:** G4.1–G4.6 gates green (G4.2 WhatsApp deferred with operator approval). **Next:** **G5** gate triage + matrix, then **G6** dry-run.
 
-**Next up:** **G5** capability matrix, then **G6** retirement dry-run. **G4.2 WhatsApp deferred.**
+**UI deferred (planning handoff):** No new `apps/console-web/**` — see `docs/planning/KAIRO_BRAIN_UI_ARCHITECTURE.md` (`UX-DEF-*`). Backend/gates/orchestration only.
+
+**Next up:** **G5.0-triage** → **G5.2** `verify:signal-parity-matrix` → **G6.2** one-week `:4173`-only. **G4.2 WhatsApp deferred.**
 
 ---
 
@@ -106,6 +108,15 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-07 — G5/G6 planning handoff (UI deferred)
+
+- Published: `PHASE_G5_CAPABILITY_MATRIX.md`, `PHASE_G5_INTENTIONAL_DISCARDS.md`, `PHASE_G5_GATE_DESIGN.md`, `PHASE_G6_RETIREMENT_READINESS.md`.
+- Published: `docs/planning/KAIRO_BRAIN_UI_ARCHITECTURE.md`, `docs/planning/OPERATOR_REFRESH_POLICY.md`.
+- Wave 4 closed on `dev`; `verify:connector-parity` = TEST-25 (not full `npm run verify`).
+- JARVIS pack: adopt loop/personality/prove-source/server brain; reject galaxy + keyword RAG.
+- Blockers: planning MANIFEST drift; TEST-3/9 full verify hooks — see G5 gate design.
+- Dirty files off limits: `lane_b_git_dispatch.py`, `workspace_git.py`, `kairo_voice.py`, related tests.
 
 ### 2026-07-07 — G4.6 connector parity bundle (Wave 4 exit)
 

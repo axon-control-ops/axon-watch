@@ -190,21 +190,23 @@ Per `config/parity-snapshot.json` → `blockers_for_full_retirement` and `docs/L
 
 Prove Axon-X ≥ Signal for operator daily work, not just thin-slice behaviors.
 
-- [ ] **G5.1** Generate capability matrix: every `IMPORT_MATRIX` row marked `adapt`/`adopt` has Axon-X owner + gate
-- [ ] **G5.2** Run extended production operator regression (F5 gate + G1–G4 gates)
+- [x] **G5.1** Generate capability matrix: every `IMPORT_MATRIX` row marked `adapt`/`adopt` has Axon-X owner + gate → `docs/PHASE_G5_CAPABILITY_MATRIX.md`
+- [ ] **G5.2** Run extended production operator regression (F5 gate + G1–G4 gates) → see `docs/PHASE_G5_GATE_DESIGN.md`
 - [ ] **G5.3** Update `config/parity-snapshot.json`: `full_axon_local_retirement` candidate flag only if all gates green
-- [ ] **G5.4** Document known intentional discards (`IMPORT_MATRIX` `discard` rows) with operator acknowledgment
+- [x] **G5.4** Document known intentional discards (`IMPORT_MATRIX` `discard` rows) with operator acknowledgment → `docs/PHASE_G5_INTENTIONAL_DISCARDS.md`
 
-**Exit gate:** `npm run verify:signal-parity-matrix`
+**Exit gate:** `npm run verify:signal-parity-matrix` (design: `docs/PHASE_G5_GATE_DESIGN.md` — **not** full `npm run verify` until triage)
+
+**UI deferred:** All new console-web work — see `docs/planning/KAIRO_BRAIN_UI_ARCHITECTURE.md` deferral register.
 
 ---
 
 ### G6 — Retirement readiness (was F6)
 
-- [ ] **G6.1** Reassess `blockers_for_full_retirement` with G1–G5 evidence
-- [ ] **G6.2** Operator dry-run: one full week on `:4173` only for DashPro + Axon workspaces
+- [ ] **G6.1** Reassess `blockers_for_full_retirement` with G1–G5 evidence → `docs/PHASE_G6_RETIREMENT_READINESS.md`
+- [ ] **G6.2** Operator dry-run: one full week on `:4173` only for DashPro + Axon workspaces → checklist in G6 doc
 - [ ] **G6.3** Decide whether axon-local process can move to archive / explicit fallback-off mode
-- [ ] **G6.4** Add `test17-full-retirement-readiness.sh` only if G1–G5 gates are green
+- [ ] **G6.4** Add `test17-full-retirement-readiness.sh` only if G1–G5 gates are green → spec in G6 doc (no script yet)
 
 **Exit gate:** explicit operator sign-off only — no automated gate substitutes for this slice.
 
@@ -228,6 +230,18 @@ Same as Phase F:
 | F6 retirement | Deferred | G6 with evidence |
 
 ## Append log
+
+### 2026-07-07 — G5/G6 planning handoff (UI deferred)
+
+- **Wave 4 exit confirmed** on `dev`: G4.3 (`03739d7`), G4.4+G4.5 (`9f93051`), G4.6 (`0ece5bc`); `npm run verify:connector-parity` green (TEST-25 — not full `npm run verify`).
+- **G5 planning artifacts:** `PHASE_G5_CAPABILITY_MATRIX.md`, `PHASE_G5_INTENTIONAL_DISCARDS.md`, `PHASE_G5_GATE_DESIGN.md`.
+- **G6 planning artifacts:** `PHASE_G6_RETIREMENT_READINESS.md` (test17 spec only).
+- **Brain–UI planning:** `docs/planning/KAIRO_BRAIN_UI_ARCHITECTURE.md`, `docs/planning/OPERATOR_REFRESH_POLICY.md`.
+- **UI work deferred** for implementation agent — deferral register `UX-DEF-*` in KAIRO_BRAIN_UI doc; no Vue/CSS unless one-line contract notes.
+- **Electron:** not in scope — browser `:4173` + Playwright only.
+- **JARVIS pack review:** adopt loop, personality, prove-source, server-side briefing brain; reject 3D galaxy and markdown RAG as system truth (summary in KAIRO_BRAIN_UI doc).
+- **Full verify blockers triaged:** planning MANIFEST drift (`IMPORT_MATRIX`, `IMPLEMENTATION_ROADMAP`, untracked `agent-orchestration-contract.md`); TEST-3/9 step 5 hooks — see `PHASE_G5_GATE_DESIGN.md`.
+- **Next implementation slices:** G5.0-triage (manifest + decouple TEST-3/9), G5.2 regression, G6.2 dry-run — backend/gates only.
 
 ### 2026-07-07 — G4.6 connector parity bundle (Wave 4 exit)
 
