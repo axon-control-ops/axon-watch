@@ -51,7 +51,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 |---|---|---|---|
 | 8 | **UX-IDE-1** | Quiet IDE: chip not radar; no watch in status bar (healthy) | IDE refocus plan | **Done** |
 | 9 | **UX-IDE-2** | `IdeInterruptPanel` (approvals + critical signals) | IDE refocus + G3.3 | **Done** |
-| 10 | **KAIRO Ask** | Ask mode + KAIRO persona prompt | JARVIS video personality |
+| 10 | **KAIRO Ask** | Ask mode + KAIRO persona prompt | JARVIS video personality | **Done** |
 | 11 | **UX-IDE-3** | Research cards in agent transcript | JARVIS video |
 | 12 | **UX-IDE-4** | `@selection`, `@terminal` context tokens | JARVIS “pull up notes” |
 | 13 | **UX-IDE-5** | Opt-in IDE voice strip | JARVIS hands-free (later) |
@@ -87,7 +87,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 3):** **KAIRO Ask** (slice 10), or Wave 4 **G4.1** connector inventory.
+**Next up (Wave 3):** **UX-IDE-3** research cards in agent transcript, or Wave 4 **G4.1** connector inventory.
 
 ---
 
@@ -101,6 +101,11 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-07 — KAIRO Ask persona for composer Ask mode
+
+- `kairo_ask_prompt.py` supplies KAIRO voice/tone for Lane B Ask mode when `operator_persona_enabled` is on.
+- Neutral Lane B copy remains when persona is disabled.
 
 ### 2026-07-07 — UX-IDE-2 interrupt panel + IDE layout polish
 

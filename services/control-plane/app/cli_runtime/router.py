@@ -24,6 +24,8 @@ from app.cli_runtime.runtime_auth import (
     summarize_auth_error,
 )
 from app.cli_runtime.vault_keys import runtime_subprocess_env
+from app.kairo_ask_prompt import build_ask_system_prompt
+from app.persistence.operator_presence_settings_store import load_settings
 from app.runs.service import RunNotFoundError, get_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
@@ -34,13 +36,19 @@ _REPLY_STYLE = (
 )
 
 
-def _system_prompt(composer_mode: str, execution_tier: str = "consultative") -> str:
+def _operator_persona_enabled() -> bool:
+    return bool(load_settings().get("operator_persona_enabled", True))
+
+
+def _system_prompt(
+    composer_mode: str,
+    execution_tier: str = "consultative",
+    *,
+    persona_enabled: bool | None = None,
+) -> str:
     if composer_mode == "ask":
-        return (
-            "You are Axon-X Lane B in Ask mode. Stay read-only. Answer using the supplied "
-            "workspace context and do not claim you edited files or ran commands. "
-            f"{_REPLY_STYLE}"
-        )
+        enabled = persona_enabled if persona_enabled is not None else _operator_persona_enabled()
+        return build_ask_system_prompt(persona_enabled=enabled)
     if composer_mode == "plan":
         return (
             "You are Axon-X Lane B in Plan mode. Produce a short numbered plan using the "
