@@ -11,6 +11,11 @@ The assembled reply uses fenced block markers the console renders specially:
     :::
 
     :::tool Read README.md
+
+    :::research vite configuration
+    - Vite Guide | https://vitejs.dev/guide/
+    Official Vite documentation.
+    :::
 """
 
 from __future__ import annotations
@@ -87,6 +92,90 @@ def _relative_path(path: str, workspace_root: str) -> str:
 
 
 _TERMINAL_OUTPUT_LIMIT = 4000
+_RESEARCH_ITEM_LIMIT = 8
+
+
+def _research_items_from_result(result: Any) -> list[dict[str, str]]:
+    if not isinstance(result, dict):
+        return []
+
+    containers: list[dict[str, Any]] = []
+    success = result.get("success")
+    if isinstance(success, dict):
+        containers.append(success)
+    containers.append(result)
+
+    raw_results: Any = None
+    for container in containers:
+        for key in ("results", "items", "sources", "citations", "matches"):
+            candidate = container.get(key)
+            if isinstance(candidate, list) and candidate:
+                raw_results = candidate
+                break
+        if raw_results is not None:
+            break
+
+    if not isinstance(raw_results, list):
+        return []
+
+    items: list[dict[str, str]] = []
+    for entry in raw_results:
+        if not isinstance(entry, dict):
+            continue
+        title = str(entry.get("title") or entry.get("name") or entry.get("label") or "").strip()
+        url = str(entry.get("url") or entry.get("link") or entry.get("href") or "").strip()
+        snippet = str(
+            entry.get("snippet")
+            or entry.get("summary")
+            or entry.get("description")
+            or entry.get("content")
+            or ""
+        ).strip()
+        if not title and not url and not snippet:
+            continue
+        items.append(
+            {
+                "title": title or (url or "Source"),
+                "url": url,
+                "snippet": snippet,
+            }
+        )
+        if len(items) >= _RESEARCH_ITEM_LIMIT:
+            break
+    return items
+
+
+def _research_block(query: str, items: list[dict[str, str]]) -> str:
+    trimmed_query = query.strip() or "Research"
+    lines = [f"\n:::research {trimmed_query}"]
+    for item in items:
+        title = str(item.get("title") or "Source").strip()
+        url = str(item.get("url") or "").strip()
+        snippet = str(item.get("snippet") or "").strip()
+        lines.append(f"- {title} | {url or 'about:blank'}")
+        if snippet:
+            lines.append(snippet)
+    lines.append(":::\n")
+    return "\n".join(lines)
+
+
+def _research_block_from_tool_call(tool_call: dict[str, Any]) -> str:
+    for key in ("webSearchToolCall", "webFetchToolCall", "searchToolCall", "fetchToolCall"):
+        call = tool_call.get(key)
+        if not isinstance(call, dict):
+            continue
+        args = call.get("args") if isinstance(call.get("args"), dict) else {}
+        query = str(
+            args.get("query")
+            or args.get("search_term")
+            or args.get("url")
+            or args.get("prompt")
+            or ""
+        ).strip()
+        items = _research_items_from_result(call.get("result"))
+        if items or query:
+            return _research_block(query or key.replace("ToolCall", ""), items)
+    return ""
 
 
 def _shell_output_from_result(result: Any) -> str:
@@ -139,6 +228,10 @@ def _tool_block_from_event(event: dict[str, Any], workspace_root: str) -> str:
         args = read.get("args") if isinstance(read.get("args"), dict) else {}
         path = _relative_path(str(args.get("path") or ""), workspace_root)
         return f"\n:::tool Read {path}\n"
+
+    research_block = _research_block_from_tool_call(tool_call)
+    if research_block:
+        return research_block
 
     # Shell commands render as a terminal block (command + captured output),
     # mirroring how Cursor surfaces agent-run commands in its own terminal.

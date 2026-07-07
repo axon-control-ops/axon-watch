@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+import AgentResearchBlock from './ide/AgentResearchBlock.vue';
 import { useConversationSeamScroll } from '../composables/useConversationSeamScroll';
 import {
   renderAgentMessageMarkdown,
@@ -309,6 +310,13 @@ watch(
               <span class="agent-block__tool-dot" aria-hidden="true" />
               <span>{{ segment.label }}</span>
             </div>
+
+            <AgentResearchBlock
+              v-else-if="segment.kind === 'research'"
+              :query="segment.query"
+              :items="segment.items"
+              :live="segment.open && isStreamingMessage(message.message_id)"
+            />
 
             <div v-else-if="segment.kind === 'terminal'" class="agent-block agent-block--terminal">
               <div class="agent-block__terminal-header">

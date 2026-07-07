@@ -78,6 +78,45 @@ describe('parseAgentTranscriptBlocks', () => {
     ]);
   });
 
+  it('parses research cards with query, sources, and snippets', () => {
+    const content = [
+      ':::research vite configuration',
+      '- Vite Guide | https://vitejs.dev/guide/',
+      'Official Vite documentation.',
+      '- Rollup options | https://rollupjs.org/',
+      'Bundler reference.',
+      ':::',
+    ].join('\n');
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments).toEqual([
+      {
+        kind: 'research',
+        query: 'vite configuration',
+        items: [
+          {
+            title: 'Vite Guide',
+            url: 'https://vitejs.dev/guide/',
+            snippet: 'Official Vite documentation.',
+          },
+          {
+            title: 'Rollup options',
+            url: 'https://rollupjs.org/',
+            snippet: 'Bundler reference.',
+          },
+        ],
+        open: false,
+      },
+    ]);
+  });
+
+  it('marks streaming research blocks as open', () => {
+    const segments = parseAgentTranscriptBlocks(':::research react hooks');
+    expect(segments).toEqual([
+      { kind: 'research', query: 'react hooks', items: [], open: true },
+    ]);
+  });
+
   it('passes plain replies through as one text segment', () => {
     expect(agentContentHasTranscriptBlocks('Just a reply')).toBe(false);
     expect(parseAgentTranscriptBlocks('Just a reply')).toEqual([
