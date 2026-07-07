@@ -12,6 +12,7 @@ def default_operator_presence_settings() -> dict[str, bool | str]:
         "privacy_mode": False,
         "mobile_compact_preferred": True,
         "kairo_narration": "conversational",
+        "ide_voice_strip_enabled": False,
     }
 
 

@@ -17,6 +17,7 @@ const presence: OperatorPresence = {
     privacy_mode: false,
     mobile_compact_preferred: true,
     kairo_narration: 'conversational' as const,
+    ide_voice_strip_enabled: false,
   },
   spoken_alert: {
     eligible: false,

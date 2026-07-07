@@ -61,7 +61,7 @@ import {
 import { postKairoSpeak } from '../lib/kairo-speak-client';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
 import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
-import { languageForFilePath } from '../lib/workspace-file-language';
+import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
 import {
   normalizeAgentExecutionAccess,
   persistAgentExecutionAccess,
@@ -133,6 +133,7 @@ import {
 } from '../lib/chat-stream-session';
 import {
   filePathFromDocumentId,
+  languageForFilePath,
   workspaceFileDocumentId,
 } from '../lib/workspace-file-language';
 import {
@@ -949,12 +950,22 @@ export const useShellStore = defineStore('shell', () => {
     return id;
   }
 
+  function voiceDeliveryAllowed(): boolean {
+    return ideVoiceSpeechAllowed({
+      layoutMode: layoutMode.value,
+      settings: operatorPresenceSettings.value,
+    });
+  }
+
   async function narrateAgentStreamMilestone(
     messageId: string,
     eventKey: string,
     eventType: string,
     context: Record<string, unknown> = {},
   ): Promise<void> {
+    if (!voiceDeliveryAllowed()) {
+      return;
+    }
     const narration = effectiveKairoNarrationLevel.value;
     if (!shouldNarrateAgentEvent({ eventKey, narration })) {
       return;
@@ -982,6 +993,9 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function deliverKairoSpokenAlert(alert: SpokenAlertEligibility): Promise<void> {
+    if (!voiceDeliveryAllowed()) {
+      return;
+    }
     if (!alert.eligible || !operatorPresenceSettings.value.spoken_alerts_enabled) {
       return;
     }
@@ -1031,6 +1045,9 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function maybeSpeakBootGreeting(): Promise<void> {
+    if (!voiceDeliveryAllowed()) {
+      return;
+    }
     const greetingKey = 'axon-x:kairo-greeting-spoken';
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(greetingKey) === '1') {
       return;

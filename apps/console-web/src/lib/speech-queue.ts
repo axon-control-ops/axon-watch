@@ -106,3 +106,7 @@ export function resetSpeechQueue(): void {
   queue = [];
   speaking = false;
 }
+
+export function isSpeechQueueSpeaking(): boolean {
+  return speaking;
+}

@@ -4,6 +4,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import BootWakeOverlay from './components/BootWakeOverlay.vue';
 import CenterWorkbench from './components/shell/CenterWorkbench.vue';
 import IdeInterruptPanel from './components/ide/IdeInterruptPanel.vue';
+import IdeVoiceStrip from './components/ide/IdeVoiceStrip.vue';
 import LeftSidebar from './components/shell/LeftSidebar.vue';
 import RightDock from './components/shell/RightDock.vue';
 import StatusBar from './components/shell/StatusBar.vue';
@@ -113,6 +114,7 @@ onUnmounted(() => {
       <CenterWorkbench v-show="!isFoundationSurface" />
       <RightDock v-show="!isFoundationSurface" />
       <StatusBar />
+      <IdeVoiceStrip v-show="!isFoundationSurface" :foundation-surface="isFoundationSurface" />
     </div>
   </template>
 </template>

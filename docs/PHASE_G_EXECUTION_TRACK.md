@@ -54,7 +54,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 | 10 | **KAIRO Ask** | Ask mode + KAIRO persona prompt | JARVIS video personality | **Done** |
 | 11 | **UX-IDE-3** | Research cards in agent transcript | JARVIS video | **Done** |
 | 12 | **UX-IDE-4** | `@selection`, `@terminal` context tokens | JARVIS “pull up notes” | **Done** |
-| 13 | **UX-IDE-5** | Opt-in IDE voice strip | JARVIS hands-free (later) |
+| 13 | **UX-IDE-5** | Opt-in IDE voice strip | JARVIS hands-free (later) | **Done** |
 
 ---
 
@@ -87,13 +87,13 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 3):** **UX-IDE-5** opt-in IDE voice strip, or Wave 4 **G4.1** connector inventory.
+**Next up (Wave 4):** **G4.1** connector inventory with probe + removal criteria.
 
 ---
 
 ## What still forces `:7734`
 
-1. Agent loop with file edits → Wave 1–2  
+1. Agent loop with file edits → Wave 1–2 (**done** on axon-watch)  
 2. Child-project connectors (WhatsApp, tunnel) → G4  
 3. Voice / mobile cockpit → G4.4 or explicit discard  
 4. Legacy settings / storage paths → G5 matrix  
@@ -101,6 +101,12 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-07 — UX-IDE-5 opt-in IDE voice strip
+
+- `ide_voice_strip_enabled` setting (default off) gates IDE speech delivery and shows a bottom voice strip when enabled.
+- Operator mode speech unchanged; IDE narration, spoken alerts, and boot greeting require opt-in.
+- Settings toggle in Operator Presence panel; strip exposes live status and one-click hide.
 
 ### 2026-07-07 — UX-IDE-4 composer `@selection` and `@terminal` context tokens
 

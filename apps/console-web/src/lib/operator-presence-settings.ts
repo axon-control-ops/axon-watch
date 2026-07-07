@@ -9,6 +9,7 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     privacy_mode: false,
     mobile_compact_preferred: true,
     kairo_narration: 'conversational',
+    ide_voice_strip_enabled: false,
   };
 }
 
@@ -30,6 +31,7 @@ export function normalizeOperatorPresenceSettings(
       raw.kairo_narration === 'conversational'
         ? raw.kairo_narration
         : defaults.kairo_narration,
+    ide_voice_strip_enabled: raw.ide_voice_strip_enabled ?? defaults.ide_voice_strip_enabled,
   };
 }
 

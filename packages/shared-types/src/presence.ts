@@ -6,6 +6,7 @@ export interface OperatorPresenceSettings {
   privacy_mode: boolean;
   mobile_compact_preferred: boolean;
   kairo_narration: KairoNarrationLevel;
+  ide_voice_strip_enabled: boolean;
 }
 
 export interface SpokenAlertEligibility {

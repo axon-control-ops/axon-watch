@@ -162,6 +162,17 @@ class OperatorPresenceSettingsApiTests(unittest.TestCase):
             disabled_briefing["notice"],
         )
 
+    def test_ide_voice_strip_setting_round_trip(self) -> None:
+        save = self.client.put(
+            "/api/operator-presence/settings",
+            json={"ide_voice_strip_enabled": True},
+        )
+        self.assertEqual(200, save.status_code)
+        self.assertTrue(save.json()["settings"]["ide_voice_strip_enabled"])
+
+        loaded = self.client.get("/api/operator-presence/settings").json()
+        self.assertTrue(loaded["settings"]["ide_voice_strip_enabled"])
+
 
 if __name__ == "__main__":
     unittest.main()

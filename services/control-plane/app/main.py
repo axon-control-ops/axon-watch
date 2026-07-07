@@ -175,6 +175,7 @@ class OperatorPresenceSettingsRequest(BaseModel):
     privacy_mode: bool | None = None
     mobile_compact_preferred: bool | None = None
     kairo_narration: str | None = None
+    ide_voice_strip_enabled: bool | None = None
 
 
 class KairoSpeakRequest(BaseModel):

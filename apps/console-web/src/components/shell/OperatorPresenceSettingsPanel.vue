@@ -24,6 +24,11 @@ const spokenAlertsEnabled = computed({
   set: (value: boolean) => emit('save', { spoken_alerts_enabled: value }),
 });
 
+const ideVoiceStripEnabled = computed({
+  get: () => props.settings.ide_voice_strip_enabled,
+  set: (value: boolean) => emit('save', { ide_voice_strip_enabled: value }),
+});
+
 const narrationOptions = [
   { value: 'off', label: 'Off' },
   { value: 'minimal', label: 'Minimal (start, done, interrupts)' },
@@ -62,6 +67,14 @@ function onNarrationChange(event: Event): void {
           :disabled="saving"
         />
         <span>Spoken high-value alerts</span>
+      </label>
+      <label class="operator-presence-settings__row">
+        <input
+          v-model="ideVoiceStripEnabled"
+          type="checkbox"
+          :disabled="saving"
+        />
+        <span>IDE voice strip (opt-in)</span>
       </label>
       <label class="operator-presence-settings__row operator-presence-settings__row--select">
         <span>KAIRO narration</span>
