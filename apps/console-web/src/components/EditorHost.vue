@@ -5,6 +5,12 @@ import { createMonacoEditor } from '../lib/create-monaco-editor';
 import type { EditorDocumentLanguage } from '../lib/workspace-documents';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
 
+export type EditorRevealRequest = {
+  line?: number;
+  searchText?: string;
+  nonce: number;
+};
+
 const props = defineProps<{
   title: string;
   value: string;
@@ -13,6 +19,7 @@ const props = defineProps<{
   readOnly?: boolean;
   dirty?: boolean;
   variant?: 'default' | 'mockup';
+  revealRequest?: EditorRevealRequest | null;
 }>();
 
 const emit = defineEmits<{
@@ -29,6 +36,19 @@ let suppressChangeEmit = false;
 
 function focusEditor(): void {
   editorController?.focus();
+}
+
+function applyRevealRequest(request: EditorRevealRequest | null | undefined): void {
+  if (!editorController || !request) {
+    return;
+  }
+  if (request.line && request.line > 0) {
+    editorController.revealLine(request.line);
+    return;
+  }
+  if (request.searchText) {
+    editorController.findAndReveal(request.searchText);
+  }
 }
 
 onMounted(async () => {
@@ -57,10 +77,18 @@ onMounted(async () => {
       },
     });
     loadState.value = 'ready';
+    applyRevealRequest(props.revealRequest);
   } catch {
     loadState.value = 'error';
   }
 });
+
+watch(
+  () => props.revealRequest?.nonce,
+  () => {
+    applyRevealRequest(props.revealRequest);
+  },
+);
 
 watch(
   () => props.language,

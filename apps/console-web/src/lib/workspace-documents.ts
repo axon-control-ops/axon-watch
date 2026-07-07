@@ -15,7 +15,7 @@ export interface WorkspaceDocumentDescriptor {
   language: EditorDocumentLanguage;
   value: string;
   description: string;
-  source: 'dto' | 'file';
+  source: 'dto' | 'file' | 'draft';
   filePath?: string;
   readOnly?: boolean;
   dirty?: boolean;

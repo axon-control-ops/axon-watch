@@ -71,13 +71,14 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertTrue(payload["dispatched"])
+        self.assertEqual("completed", payload["run"]["phase"])
         self.assertIn("health_probe", payload["messages"][2]["content"])
         self.assertIn("```", payload["messages"][2]["content"])
 
         history = self.client.get(f"/api/runs/{payload['run_id']}/history").json()
         receipt_types = [item["receipt"]["type"] for item in history["items"]]
         self.assertIn("command_execution", receipt_types)
-        self.assertIn("review_ready", receipt_types)
+        self.assertIn("operator_complete", receipt_types)
 
     def test_post_chat_message_resume_from_review_resumes_existing_run(self) -> None:
         created = self.client.post(
@@ -489,3 +490,37 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertEqual("switch_workspace", ui_action.get("type"))
         self.assertEqual("workspace_dashpro", ui_action.get("workspace_id"))
         self.assertIn("workspace_dashpro", payload["messages"][2]["content"])
+
+    def test_thread_history_normalizes_agent_research_blocks_on_read(self) -> None:
+        thread = chat_store.create_thread(
+            workspace_id="workspace_alpha",
+            run_id=None,
+            created_at="2026-07-07T16:00:00Z",
+            thread_kind="ide",
+        )
+        raw = (
+            ":::research Web search\n"
+            "- No web results | about:blank\n"
+            """[{'text': {'text': '{"success": true, "query": "react hooks", """
+            """"results": [], "provider": "duckduckgo_instant"}'}}]\n"""
+            ":::\n"
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_agent_history_normalize",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_alpha",
+                "run_id": None,
+                "role": "agent",
+                "content": raw,
+                "created_at": "2026-07-07T16:00:00Z",
+            }
+        )
+
+        response = self.client.get(f"/api/chat/threads/{thread['thread_id']}/history")
+        self.assertEqual(200, response.status_code)
+        agent_messages = [item for item in response.json()["items"] if item["role"] == "agent"]
+        self.assertEqual(1, len(agent_messages))
+        normalized = agent_messages[0]["content"]
+        self.assertNotIn("[{'text'", normalized)
+        self.assertIn("react hooks", normalized)

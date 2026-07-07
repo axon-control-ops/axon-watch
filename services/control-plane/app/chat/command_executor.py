@@ -23,6 +23,12 @@ _RESUME_FROM_REVIEW = re.compile(
     r"^(?:resume(?:\s+from)?(?:\s+review|\s+review-ready)|resume-from-review)\b",
     re.IGNORECASE,
 )
+_DASHPRO_CANARY_OTA_RE = re.compile(r"\bnpm\s+run\s+ota(?::canary)?\b", re.IGNORECASE)
+_PRODUCTION_OTA_RE = re.compile(
+    r"\bota:production\b|RELEASE_GUARD_ALLOW_PRODUCTION_OTA\s*=\s*1",
+    re.IGNORECASE,
+)
+_DASHPRO_WORKSPACE_ID = "workspace_dashpro"
 
 
 @dataclass(frozen=True)
@@ -211,6 +217,26 @@ def execute_resume_from_review(workspace_id: str) -> CommandExecutionResult:
 
 
 def execute_shell_command_intent(workspace_id: str, content: str) -> CommandExecutionResult:
+    if _PRODUCTION_OTA_RE.search(content):
+        return CommandExecutionResult(
+            intent="shell_command",
+            success=False,
+            output=_truncate_output(
+                "Production OTA is blocked in KAIRO. Use the DashPro canary runtime shortcut "
+                "`ota canary` (operator-canary branch) or switch to a manually approved release flow."
+            ),
+            receipt_summary="Shell command failed (production OTA blocked)",
+        )
+    if _DASHPRO_CANARY_OTA_RE.search(content) and workspace_id != _DASHPRO_WORKSPACE_ID:
+        return CommandExecutionResult(
+            intent="shell_command",
+            success=False,
+            output=_truncate_output(
+                "DashPro OTA canary commands must run from workspace_dashpro "
+                "(/home/edp/Projectx/product/dashpro). Switch to the DashPro workspace and retry."
+            ),
+            receipt_summary="Shell command failed (wrong workspace for DashPro OTA)",
+        )
     success, output, detail = execute_shell_command(workspace_id=workspace_id, content=content)
     return CommandExecutionResult(
         intent="shell_command",
@@ -228,6 +254,7 @@ def execute_unsupported(content: str) -> CommandExecutionResult:
         "• read README.md / cat notes.txt — read a workspace file\n"
         "• git status — show git status in the workspace root\n"
         "• resume from review — resume the primary review_ready run\n"
+        "• ota canary — run DashPro operator-canary OTA from workspace_dashpro\n"
         "• verify — run production-operator smoke gate\n"
         "• check-health — run ./scripts/dev/check-health.sh\n"
         "• run npm test — run a bounded shell command in the workspace root"

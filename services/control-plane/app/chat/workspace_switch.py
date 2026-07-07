@@ -40,7 +40,7 @@ def _workspace_aliases(workspace_id: str, display_name: str | None) -> set[str]:
     if workspace_id == "workspace_dashpro":
         aliases.update({"dashpro", "dash pro"})
     if workspace_id == "workspace_axon_watch":
-        aliases.update({"axon watch", "axon x", "axon x watch"})
+        aliases.update({"axon watch", "axon-watch", "axon x", "axon x watch"})
     if workspace_id == "workspace_axon_local":
         aliases.update({"axon local"})
     return {alias for alias in aliases if alias}
@@ -52,8 +52,9 @@ def _looks_like_workspace_switch(content: str) -> bool:
         return False
     if not any(verb in text for verb in _SWITCH_VERBS):
         return False
+    normalized = _normalize_alias(content)
     return "workspace" in text or any(
-        alias in text
+        alias in normalized
         for binding in load_workspace_project_bindings().values()
         for alias in _workspace_aliases(binding.workspace_id, binding.display_name)
     )

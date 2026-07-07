@@ -26,7 +26,7 @@ class ChatOrchestrationTests(unittest.TestCase):
             content="check health",
             run_record={
                 "run_id": "run_test",
-                "phase": "review_ready",
+                "phase": "completed",
                 "summary": "check health",
             },
             dispatched=True,
@@ -34,7 +34,58 @@ class ChatOrchestrationTests(unittest.TestCase):
         )
         self.assertIn("Executed `health_probe`", content)
         self.assertIn('{"status":"ok"}', content)
-        self.assertIn("review_ready", content)
+        self.assertIn("completed", content)
+        self.assertNotIn("Review when ready.", content)
+
+    def test_build_agent_reply_omits_review_prompt_when_completed(self) -> None:
+        execution = CommandExecutionResult(
+            intent="git_status",
+            success=True,
+            output="On branch dev",
+            receipt_summary="Git status succeeded",
+        )
+        content = build_agent_command_reply(
+            content="git status",
+            run_record={
+                "run_id": "run_test",
+                "phase": "completed",
+                "summary": "Git status",
+            },
+            dispatched=True,
+            execution=execution,
+        )
+        self.assertIn("Phase is now completed", content)
+        self.assertNotIn("Review when ready.", content)
+
+    def test_orchestrate_auto_completes_read_only_intents(self) -> None:
+        execution = CommandExecutionResult(
+            intent="git_status",
+            success=True,
+            output="On branch dev",
+            receipt_summary="Git status succeeded",
+        )
+        from unittest.mock import patch
+
+        with patch("app.chat.orchestration.execute_command", return_value=execution), patch(
+            "app.chat.orchestration.append_run_execution_receipt",
+            return_value={"run_id": "run_test", "phase": "executing", "summary": "Git status"},
+        ) as append_mock, patch(
+            "app.chat.orchestration.complete_run",
+            return_value={"run_id": "run_test", "phase": "completed", "summary": "Git status"},
+        ) as complete_mock, patch(
+            "app.chat.orchestration.mark_review_ready",
+        ) as review_mock:
+            record, exec_result = orchestrate_command_run(
+                workspace_id="workspace_alpha",
+                content="git status",
+                run_record={"run_id": "run_test", "phase": "executing", "summary": "Git status"},
+                dispatched=True,
+            )
+            append_mock.assert_called_once()
+            complete_mock.assert_called_once_with("run_test")
+            review_mock.assert_not_called()
+            self.assertEqual(record["phase"], "completed")
+            self.assertIs(exec_result, execution)
 
     def test_build_agent_reply_for_attach_notes_active_run(self) -> None:
         content = build_agent_command_reply(

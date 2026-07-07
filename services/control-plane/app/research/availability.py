@@ -23,7 +23,9 @@ def format_capability_line(snapshot: dict[str, object]) -> str:
         provider = str(snapshot.get("provider") or "configured")
         return (
             f"Online research: available via audited Axon-X research tools ({provider}). "
-            "Use axon_research_search / axon_research_fetch and cite only URLs returned by those tools."
+            "Before citing any live web fact, call axon_research_search or axon_research_fetch. "
+            "Do not use built-in webSearch/webFetch tools — they are unavailable in this headless runtime. "
+            "Cite only URLs returned by the audited tools."
         )
     return (
         "Online research: unavailable in this runtime. Do not claim live web lookups. "

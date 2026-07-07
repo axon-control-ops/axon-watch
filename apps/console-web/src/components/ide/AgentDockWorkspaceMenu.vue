@@ -5,12 +5,14 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const menuOpen = ref(false);
+const menuRef = ref<HTMLElement | null>(null);
 
 const currentWorkspaceId = computed(
   () => shell.currentWorkspace?.workspace_id ?? 'No workspace selected',
 );
 
-function toggleMenu(): void {
+function toggleMenu(event: MouseEvent): void {
+  event.stopPropagation();
   menuOpen.value = !menuOpen.value;
 }
 
@@ -19,7 +21,11 @@ function selectWorkspace(workspaceId: string): void {
   menuOpen.value = false;
 }
 
-function handleDocumentClick(): void {
+function handleDocumentClick(event: MouseEvent): void {
+  const target = event.target;
+  if (target instanceof Node && menuRef.value?.contains(target)) {
+    return;
+  }
   menuOpen.value = false;
 }
 
@@ -33,13 +39,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="agent-dock-workspace-menu" @click.stop>
+  <div ref="menuRef" class="agent-dock-workspace-menu">
     <button
       type="button"
       class="agent-dock-workspace-menu__trigger"
       :aria-expanded="menuOpen ? 'true' : 'false'"
       aria-haspopup="listbox"
-      @click="toggleMenu"
+      @click.stop="toggleMenu"
     >
       <span class="agent-dock-workspace-menu__label">{{ currentWorkspaceId }}</span>
       <span

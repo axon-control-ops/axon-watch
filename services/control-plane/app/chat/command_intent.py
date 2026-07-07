@@ -29,6 +29,10 @@ def is_question(content: str) -> bool:
 _SHORTCUT_SHELL_COMMANDS = {
     "check-health": "./scripts/dev/check-health.sh",
     "check health": "./scripts/dev/check-health.sh",
+    "ota": "npm run ota:canary",
+    "ota canary": "npm run ota:canary",
+    "dashpro ota": "npm run ota:canary",
+    "dashpro ota canary": "npm run ota:canary",
     "verify": "npm run verify:production-operator",
 }
 

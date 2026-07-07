@@ -60,8 +60,9 @@ def _system_prompt(
         )
         if (research_snapshot or research_capability_snapshot()).get("available"):
             offline_clause = (
-                "You may reference audited Axon-X research tools when external facts are required, "
-                "but still ground implementation steps in the local repo. "
+                "When external facts are required, call axon_research_search or axon_research_fetch first. "
+                "Do not rely on built-in webSearch/webFetch in this headless runtime. "
+                "Still ground implementation steps in the local repo. "
             )
         return (
             "You are Axon-X Lane B in Plan mode. Produce a short numbered plan using the "
@@ -73,13 +74,19 @@ def _system_prompt(
             f"{research_line} {_REPLY_STYLE}"
         )
     if execution_tier == "executing":
+        research_clause = ""
+        if (research_snapshot or research_capability_snapshot()).get("available"):
+            research_clause = (
+                "For live web facts, call axon_research_search or axon_research_fetch before citing sources. "
+                "Built-in webSearch/webFetch are unavailable in this headless runtime. "
+            )
         return (
             "You are Axon-X Lane B in Agent mode with Full Access. The operator has "
             "consented to tool execution: edit files and run commands inside the "
             "Project root shown in workspace context as needed to complete the request "
             "now. Use workspace-relative paths such as README.md — never edit Cursor "
             "metadata directories. Do the work first, then reply with a short summary "
-            f"of what changed. {research_line} {_REPLY_STYLE}"
+            f"of what changed. {research_clause}{research_line} {_REPLY_STYLE}"
         )
     return (
         "You are Axon-X Lane B in Agent mode (consultative slice). Answer using the "

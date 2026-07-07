@@ -501,7 +501,7 @@
   flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: visible;
   padding: 0.45rem 0.65rem 0.4rem;
   border-bottom: 1px solid rgba(138, 154, 173, 0.14);
 }
@@ -536,6 +536,7 @@
 
 .agent-dock-workspace-menu {
   position: relative;
+  z-index: 24;
   flex: 0 1 auto;
   min-width: 0;
   max-width: 8.5rem;
@@ -1692,4 +1693,20 @@
 .console-shell--mockup[data-layout-mode='ide'] .conversation-seam__content--agent {
   font-size: 0.68rem;
   line-height: 1.4;
+}
+
+.console-shell--mockup[data-layout-mode='ide'] .editor-tabbar__markdown-toggle {
+  margin-right: 0.35rem;
+}
+
+.console-shell--mockup[data-layout-mode='ide'] .center-workbench__editor--markdown-preview {
+  overflow: auto;
+}
+
+.console-shell--mockup[data-layout-mode='ide'] .editor-markdown-preview {
+  height: 100%;
+  overflow: auto;
+  padding: 1rem 1.15rem 1.25rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
 }

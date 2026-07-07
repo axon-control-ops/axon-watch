@@ -5,7 +5,8 @@ import AgentResearchBlock from './ide/AgentResearchBlock.vue';
 import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
 import { useConversationSeamScroll } from '../composables/useConversationSeamScroll';
 import {
-  shouldOfferMarkdownPreview,
+  shouldHideAgentReportInThread,
+  shouldUseAgentMarkdownBlock,
 } from '../lib/agent-message-markdown';
 import {
   agentContentLooksLikeErrorDump,
@@ -17,6 +18,11 @@ import {
   systemMessagePreview,
 } from '../lib/thread-message-view';
 import {
+  buildOperatorConversationDisplay,
+  prepareOperatorConversationDock,
+  type ConversationDisplayItem,
+} from '../lib/operator-conversation-view';
+import {
   agentContentHasTranscriptBlocks,
   diffLineTone,
   parseAgentTranscriptBlocks,
@@ -27,6 +33,21 @@ import { useShellStore } from '../stores/shell';
 const shell = useShellStore();
 const conversationMessages = computed(() =>
   shell.layoutMode === 'ide' ? shell.threadMessages : shell.operatorThreadMessages,
+);
+const conversationDisplayItems = computed((): ConversationDisplayItem[] => {
+  if (shell.layoutMode === 'ide') {
+    return conversationMessages.value.map((message) => ({
+      kind: 'message' as const,
+      message,
+    }));
+  }
+  return prepareOperatorConversationDock(conversationMessages.value).items;
+});
+
+const conversationDockHint = computed(() =>
+  shell.layoutMode === 'operator'
+    ? 'Recent command results. Run queue lives in Mission Control — not here.'
+    : null,
 );
 const showAgentWorking = computed(
   () =>
@@ -62,8 +83,12 @@ function toggleErrorExpanded(messageId: string): void {
   };
 }
 
-function isMarkdownBlock(content: string): boolean {
-  return shouldOfferMarkdownPreview(content) && !isErrorDump(content);
+function isMarkdownBlock(content: string, isComplete = true): boolean {
+  return shouldUseAgentMarkdownBlock(content, isComplete) && !isErrorDump(content);
+}
+
+function shouldShowEditorStub(messageId: string, content: string): boolean {
+  return Boolean(shell.agentReportEditorLink(messageId)) && shouldHideAgentReportInThread(content);
 }
 
 function isErrorDump(content: string): boolean {
@@ -132,8 +157,23 @@ function diffLines(diff: string): Array<{ text: string; tone: string }> {
     .map((line) => ({ text: line, tone: diffLineTone(line) }));
 }
 
-function restoreMessageToComposer(content: string): void {
-  shell.restoreComposerDraft(content);
+function displayItemKey(item: ConversationDisplayItem): string {
+  if (item.kind === 'command_turn' || item.kind === 'dock_banner') {
+    return item.messageId;
+  }
+  return item.message.message_id;
+}
+
+function compactCommandSummary(output: string): string {
+  const line = output.split('\n').map((part) => part.trim()).find(Boolean);
+  if (!line) {
+    return 'No output';
+  }
+  return line.length <= 96 ? line : `${line.slice(0, 93)}…`;
+}
+
+function restoreCommandToComposer(command: string): void {
+  shell.restoreComposerDraft(command);
 }
 
 function isEmptyStreamingAgent(message: { role: string; message_id: string; content: string }): boolean {
@@ -141,7 +181,7 @@ function isEmptyStreamingAgent(message: { role: string; message_id: string; cont
 }
 
 watch(
-  conversationMessages,
+  conversationDisplayItems,
   () => {
     handleContentChange();
   },
@@ -151,35 +191,110 @@ watch(
 
 <template>
   <div ref="rootRef" class="conversation-seam" @wheel.capture="handleWheel">
+    <p v-if="conversationDockHint" class="conversation-seam__dock-hint">{{ conversationDockHint }}</p>
     <ul
-      v-if="conversationMessages.length"
+      v-if="conversationDisplayItems.length"
       ref="listRef"
       class="conversation-seam__list"
     >
       <li
-        v-for="message in conversationMessages"
-        :key="message.message_id"
+        v-for="item in conversationDisplayItems"
+        :key="displayItemKey(item)"
         class="conversation-seam__item"
-        :class="`conversation-seam__item--${message.role}`"
+        :class="
+          item.kind === 'dock_banner'
+            ? 'conversation-seam__item--dock-banner'
+            : item.kind === 'command_turn'
+              ? 'conversation-seam__item--command-turn'
+              : `conversation-seam__item--${item.message.role}`
+        "
       >
-        <div class="conversation-seam__meta">
-          <span class="conversation-seam__role">{{ formatThreadRole(message.role) }}</span>
-          <span
-            v-if="message.run_id"
-            class="conversation-seam__run-chip"
-            :title="message.run_id"
+        <p v-if="item.kind === 'dock_banner'" class="conversation-seam__dock-banner">
+          {{ item.text }}
+        </p>
+
+        <template v-else-if="item.kind === 'command_turn'">
+          <div class="conversation-seam__meta">
+            <span class="conversation-seam__role">COMMAND</span>
+            <span class="conversation-seam__command-label">{{ item.command }}</span>
+            <span
+              v-if="item.repeatCount && item.repeatCount > 1"
+              class="conversation-seam__repeat-chip"
+            >
+              {{ item.repeatCount }}×
+            </span>
+            <span
+              v-if="item.runId"
+              class="conversation-seam__run-chip"
+              :title="item.runId"
+            >
+              run {{ shortenRunId(item.runId) }}
+            </span>
+            <span
+              class="conversation-seam__status-chip"
+              :class="`conversation-seam__status-chip--${item.execution.status}`"
+            >
+              {{ item.execution.status }}
+            </span>
+            <time class="conversation-seam__time" :datetime="item.createdAt">
+              {{ formatThreadTimestamp(item.createdAt) }}
+            </time>
+            <div class="conversation-seam__meta-actions">
+              <button
+                type="button"
+                class="conversation-seam__meta-button"
+                title="Load this command back into the composer"
+                @click="restoreCommandToComposer(item.command)"
+              >
+                Resend
+              </button>
+            </div>
+          </div>
+          <p
+            v-if="item.compact"
+            class="conversation-seam__content conversation-seam__content--command-compact"
           >
-            run {{ shortenRunId(message.run_id) }}
+            Latest of {{ item.repeatCount }} identical verification runs.
+            {{ compactCommandSummary(item.execution.output) }}
+          </p>
+          <pre
+            v-else-if="item.execution.output"
+            class="conversation-seam__content conversation-seam__content--command-output"
+          >{{ item.execution.output }}</pre>
+          <p
+            v-else
+            class="conversation-seam__content conversation-seam__content--command-empty"
+          >
+            Command finished with no output.
+          </p>
+          <p
+            v-if="item.execution.footer && !item.compact"
+            class="conversation-seam__command-footer"
+          >
+            {{ item.execution.footer }}
+          </p>
+        </template>
+
+        <template v-else>
+          <template v-if="item.message">
+        <div class="conversation-seam__meta">
+          <span class="conversation-seam__role">{{ formatThreadRole(item.message.role) }}</span>
+          <span
+            v-if="item.message.run_id"
+            class="conversation-seam__run-chip"
+            :title="item.message.run_id"
+          >
+            run {{ shortenRunId(item.message.run_id) }}
           </span>
-          <time class="conversation-seam__time" :datetime="message.created_at">
-            {{ formatThreadTimestamp(message.created_at) }}
+          <time class="conversation-seam__time" :datetime="item.message.created_at">
+            {{ formatThreadTimestamp(item.message.created_at) }}
           </time>
-          <div v-if="message.role === 'operator'" class="conversation-seam__meta-actions">
+          <div v-if="item.message.role === 'operator'" class="conversation-seam__meta-actions">
             <button
               type="button"
               class="conversation-seam__meta-button"
               title="Load this request back into the composer"
-              @click="restoreMessageToComposer(message.content)"
+              @click="restoreCommandToComposer(item.message.content)"
             >
               Resend
             </button>
@@ -187,41 +302,41 @@ watch(
         </div>
 
         <p
-          v-if="message.role === 'system' && shouldCollapseSystemMessage(message.content) && !isSystemExpanded(message.message_id)"
+          v-if="item.message.role === 'system' && shouldCollapseSystemMessage(item.message.content) && !isSystemExpanded(item.message.message_id)"
           class="conversation-seam__content conversation-seam__content--system-collapsed"
         >
-          {{ systemMessagePreview(message.content) }}
+          {{ systemMessagePreview(item.message.content) }}
           <button
             type="button"
             class="conversation-seam__expand-toggle conversation-seam__expand-toggle--inline"
-            @click="toggleSystemExpanded(message.message_id)"
+            @click="toggleSystemExpanded(item.message.message_id)"
           >
             Show
           </button>
         </p>
 
-        <template v-else-if="message.role === 'system' && shouldCollapseSystemMessage(message.content)">
+        <template v-else-if="item.message.role === 'system' && shouldCollapseSystemMessage(item.message.content)">
           <p class="conversation-seam__content">
-            {{ message.content }}
+            {{ item.message.content }}
           </p>
           <button
             type="button"
             class="conversation-seam__expand-toggle"
-            @click="toggleSystemExpanded(message.message_id)"
+            @click="toggleSystemExpanded(item.message.message_id)"
           >
             Collapse
           </button>
         </template>
 
         <p
-          v-else-if="message.role !== 'agent'"
+          v-else-if="item.message.role !== 'agent'"
           class="conversation-seam__content"
         >
-          {{ message.content }}
+          {{ item.message.content }}
         </p>
 
         <p
-          v-else-if="isEmptyStreamingAgent(message)"
+          v-else-if="isEmptyStreamingAgent(item.message)"
           class="conversation-seam__content conversation-seam__content--agent conversation-seam__content--typing"
         >
           <span class="conversation-seam__typing-dot" aria-hidden="true" />
@@ -229,27 +344,27 @@ watch(
         </p>
 
         <div
-          v-else-if="hasTranscriptBlocks(message.content)"
+          v-else-if="hasTranscriptBlocks(item.message.content)"
           class="conversation-seam__blocks"
         >
           <template
-            v-for="(segment, segmentIndex) in transcriptSegments(message.content)"
-            :key="segmentKey(message.message_id, segmentIndex)"
+            v-for="(segment, segmentIndex) in transcriptSegments(item.message.content)"
+            :key="segmentKey(item.message.message_id, segmentIndex)"
           >
             <div
               v-if="segment.kind === 'thinking'"
               class="agent-block agent-block--thinking"
-              :class="{ 'agent-block--thinking-live': segment.open && isStreamingMessage(message.message_id) }"
+              :class="{ 'agent-block--thinking-live': segment.open && isStreamingMessage(item.message.message_id) }"
             >
               <button
                 type="button"
                 class="agent-block__thinking-toggle"
-                @click="toggleThinking(segmentKey(message.message_id, segmentIndex), segment.open)"
+                @click="toggleThinking(segmentKey(item.message.message_id, segmentIndex), segment.open)"
               >
                 <span class="agent-block__thinking-icon" aria-hidden="true">
-                  {{ isThinkingExpanded(segmentKey(message.message_id, segmentIndex), segment.open) ? '▾' : '▸' }}
+                  {{ isThinkingExpanded(segmentKey(item.message.message_id, segmentIndex), segment.open) ? '▾' : '▸' }}
                 </span>
-                <span v-if="segment.open && isStreamingMessage(message.message_id)">
+                <span v-if="segment.open && isStreamingMessage(item.message.message_id)">
                   {{ segment.text.trim() ? thinkingPreview(segment.text, 120) : 'Thinking…' }}
                 </span>
                 <span v-else class="agent-block__thinking-preview">
@@ -257,7 +372,7 @@ watch(
                 </span>
               </button>
               <p
-                v-if="isThinkingExpanded(segmentKey(message.message_id, segmentIndex), segment.open)"
+                v-if="isThinkingExpanded(segmentKey(item.message.message_id, segmentIndex), segment.open)"
                 class="agent-block__thinking-body"
               >
                 {{ segment.text }}
@@ -273,7 +388,9 @@ watch(
               v-else-if="segment.kind === 'research'"
               :query="segment.query"
               :items="segment.items"
-              :live="segment.open && isStreamingMessage(message.message_id)"
+              :provider="segment.provider"
+              :kind="segment.kindLabel"
+              :live="segment.open && isStreamingMessage(item.message.message_id)"
             />
 
             <div v-else-if="segment.kind === 'terminal'" class="agent-block agent-block--terminal">
@@ -281,7 +398,7 @@ watch(
                 <span class="agent-block__terminal-prompt" aria-hidden="true">$</span>
                 <code class="agent-block__terminal-command">{{ segment.command }}</code>
                 <span
-                  v-if="segment.open && isStreamingMessage(message.message_id)"
+                  v-if="segment.open && isStreamingMessage(item.message.message_id)"
                   class="agent-block__terminal-running"
                 >running…</span>
               </div>
@@ -292,20 +409,29 @@ watch(
             </div>
 
             <div v-else-if="segment.kind === 'edit'" class="agent-block agent-block--edit">
-              <button
-                type="button"
-                class="agent-block__edit-header"
-                @click="toggleEdit(segmentKey(message.message_id, segmentIndex))"
-              >
-                <span class="agent-block__edit-icon" aria-hidden="true">
-                  {{ isEditExpanded(segmentKey(message.message_id, segmentIndex)) ? '▾' : '▸' }}
-                </span>
-                <span class="agent-block__edit-path">{{ segment.path }}</span>
+              <div class="agent-block__edit-header">
+                <button
+                  type="button"
+                  class="agent-block__edit-toggle"
+                  @click="toggleEdit(segmentKey(item.message.message_id, segmentIndex))"
+                >
+                  <span class="agent-block__edit-icon" aria-hidden="true">
+                    {{ isEditExpanded(segmentKey(item.message.message_id, segmentIndex)) ? '▾' : '▸' }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="agent-block__edit-path agent-block__edit-path--link"
+                  :title="`Open ${segment.path} in editor`"
+                  @click="shell.openWorkspaceFile(segment.path)"
+                >
+                  {{ segment.path }}
+                </button>
                 <span class="agent-block__edit-stat agent-block__edit-stat--add">+{{ segment.added }}</span>
                 <span class="agent-block__edit-stat agent-block__edit-stat--remove">-{{ segment.removed }}</span>
-              </button>
+              </div>
               <pre
-                v-if="isEditExpanded(segmentKey(message.message_id, segmentIndex)) && segment.diff"
+                v-if="isEditExpanded(segmentKey(item.message.message_id, segmentIndex)) && segment.diff"
                 class="agent-block__edit-diff"
               ><span
                 v-for="(diffLine, diffIndex) in diffLines(segment.diff)"
@@ -316,63 +442,95 @@ watch(
 </span></pre>
             </div>
 
+            <div
+              v-else-if="shouldShowEditorStub(item.message.message_id, segment.text)"
+              class="conversation-seam__editor-stub"
+            >
+              <span class="conversation-seam__editor-stub-label">Opened in editor:</span>
+              <button
+                type="button"
+                class="conversation-seam__editor-stub-link"
+                @click="shell.focusAgentReportEditor(item.message.message_id)"
+              >
+                {{ shell.agentReportEditorLink(item.message.message_id)?.title }}
+              </button>
+            </div>
+
             <AgentMarkdownBlock
-              v-else-if="isMarkdownBlock(segment.text)"
-              :block-id="segmentKey(message.message_id, segmentIndex)"
+              v-else-if="isMarkdownBlock(segment.text, !isStreamingMessage(item.message.message_id))"
+              :block-id="segmentKey(item.message.message_id, segmentIndex)"
               :content="segment.text"
+              :allow-open-in-editor="!isStreamingMessage(item.message.message_id)"
             />
 
             <p
-              v-else
+              v-else-if="segment.text.trim()"
               class="agent-block agent-block--text conversation-seam__content conversation-seam__content--agent"
             >
               {{ segment.text }}
             </p>
           </template>
           <span
-            v-if="isStreamingMessage(message.message_id)"
+            v-if="isStreamingMessage(item.message.message_id)"
             class="conversation-seam__stream-cursor"
             aria-hidden="true"
           >▍</span>
         </div>
 
-        <template v-else-if="isErrorDump(message.content) && !isStreamingMessage(message.message_id)">
+        <template v-else-if="isErrorDump(item.message.content) && !isStreamingMessage(item.message.message_id)">
           <p class="conversation-seam__content conversation-seam__content--agent conversation-seam__content--error">
-            {{ summarizeAgentErrorContent(message.content) }}
+            {{ summarizeAgentErrorContent(item.message.content) }}
           </p>
           <button
             type="button"
             class="conversation-seam__expand-toggle"
-            @click="toggleErrorExpanded(message.message_id)"
+            @click="toggleErrorExpanded(item.message.message_id)"
           >
-            {{ isErrorExpanded(message.message_id) ? 'Hide details' : 'Show details' }}
+            {{ isErrorExpanded(item.message.message_id) ? 'Hide details' : 'Show details' }}
           </button>
           <pre
-            v-if="isErrorExpanded(message.message_id)"
+            v-if="isErrorExpanded(item.message.message_id)"
             class="conversation-seam__content conversation-seam__content--agent conversation-seam__content--error-detail"
-          >{{ message.content }}</pre>
+          >{{ item.message.content }}</pre>
         </template>
 
+        <div
+          v-else-if="shouldShowEditorStub(item.message.message_id, item.message.content)"
+          class="conversation-seam__editor-stub"
+        >
+          <span class="conversation-seam__editor-stub-label">Opened in editor:</span>
+          <button
+            type="button"
+            class="conversation-seam__editor-stub-link"
+            @click="shell.focusAgentReportEditor(item.message.message_id)"
+          >
+            {{ shell.agentReportEditorLink(item.message.message_id)?.title }}
+          </button>
+        </div>
+
         <AgentMarkdownBlock
-          v-else-if="isMarkdownBlock(message.content)"
-          :block-id="message.message_id"
-          :content="message.content"
+          v-else-if="isMarkdownBlock(item.message.content, !isStreamingMessage(item.message.message_id))"
+          :block-id="item.message.message_id"
+          :content="item.message.content"
+          :allow-open-in-editor="!isStreamingMessage(item.message.message_id)"
         />
 
         <pre
-          v-else
+          v-else-if="item.message.content.trim()"
           class="conversation-seam__content conversation-seam__content--agent"
           :class="{
-            'conversation-seam__content--streaming': isStreamingMessage(message.message_id),
+            'conversation-seam__content--streaming': isStreamingMessage(item.message.message_id),
             'conversation-seam__content--streaming-full-access':
-              isStreamingMessage(message.message_id) &&
+              isStreamingMessage(item.message.message_id) &&
               shell.ideComposerActivity?.executionAccess === 'full',
           }"
-        >{{ message.content }}<span
-          v-if="isStreamingMessage(message.message_id)"
+        >{{ item.message.content }}<span
+          v-if="isStreamingMessage(item.message.message_id)"
           class="conversation-seam__stream-cursor"
           aria-hidden="true"
         >▍</span></pre>
+          </template>
+        </template>
       </li>
       <li
         v-if="showAgentWorking && !shell.agentStreamMessageId"

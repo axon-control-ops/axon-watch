@@ -25,6 +25,14 @@ import os
 from pathlib import Path
 from typing import Any, Callable
 
+from app.cli_runtime.research_stream_blocks import (
+    normalize_transcript_content,
+    research_completed_block_from_event,
+    research_items_from_result,
+    research_query_from_tool_call,
+    research_started_block_from_event,
+)
+
 
 def parse_stream_event(line: str) -> dict[str, Any] | None:
     stripped = line.strip()
@@ -92,90 +100,6 @@ def _relative_path(path: str, workspace_root: str) -> str:
 
 
 _TERMINAL_OUTPUT_LIMIT = 4000
-_RESEARCH_ITEM_LIMIT = 8
-
-
-def _research_items_from_result(result: Any) -> list[dict[str, str]]:
-    if not isinstance(result, dict):
-        return []
-
-    containers: list[dict[str, Any]] = []
-    success = result.get("success")
-    if isinstance(success, dict):
-        containers.append(success)
-    containers.append(result)
-
-    raw_results: Any = None
-    for container in containers:
-        for key in ("results", "items", "sources", "citations", "matches"):
-            candidate = container.get(key)
-            if isinstance(candidate, list) and candidate:
-                raw_results = candidate
-                break
-        if raw_results is not None:
-            break
-
-    if not isinstance(raw_results, list):
-        return []
-
-    items: list[dict[str, str]] = []
-    for entry in raw_results:
-        if not isinstance(entry, dict):
-            continue
-        title = str(entry.get("title") or entry.get("name") or entry.get("label") or "").strip()
-        url = str(entry.get("url") or entry.get("link") or entry.get("href") or "").strip()
-        snippet = str(
-            entry.get("snippet")
-            or entry.get("summary")
-            or entry.get("description")
-            or entry.get("content")
-            or ""
-        ).strip()
-        if not title and not url and not snippet:
-            continue
-        items.append(
-            {
-                "title": title or (url or "Source"),
-                "url": url,
-                "snippet": snippet,
-            }
-        )
-        if len(items) >= _RESEARCH_ITEM_LIMIT:
-            break
-    return items
-
-
-def _research_block(query: str, items: list[dict[str, str]]) -> str:
-    trimmed_query = query.strip() or "Research"
-    lines = [f"\n:::research {trimmed_query}"]
-    for item in items:
-        title = str(item.get("title") or "Source").strip()
-        url = str(item.get("url") or "").strip()
-        snippet = str(item.get("snippet") or "").strip()
-        lines.append(f"- {title} | {url or 'about:blank'}")
-        if snippet:
-            lines.append(snippet)
-    lines.append(":::\n")
-    return "\n".join(lines)
-
-
-def _research_block_from_tool_call(tool_call: dict[str, Any]) -> str:
-    for key in ("webSearchToolCall", "webFetchToolCall", "searchToolCall", "fetchToolCall"):
-        call = tool_call.get(key)
-        if not isinstance(call, dict):
-            continue
-        args = call.get("args") if isinstance(call.get("args"), dict) else {}
-        query = str(
-            args.get("query")
-            or args.get("search_term")
-            or args.get("url")
-            or args.get("prompt")
-            or ""
-        ).strip()
-        items = _research_items_from_result(call.get("result"))
-        if items or query:
-            return _research_block(query or key.replace("ToolCall", ""), items)
-    return ""
 
 
 def _shell_output_from_result(result: Any) -> str:
@@ -203,13 +127,22 @@ def _terminal_block(command: str, output: str) -> str:
     return f"\n:::terminal {command}{body}:::\n"
 
 
-def _tool_block_from_event(event: dict[str, Any], workspace_root: str) -> str:
+def _tool_block_from_event(
+    event: dict[str, Any],
+    workspace_root: str,
+    *,
+    open_query: str | None = None,
+) -> str:
     """Render a completed tool_call event as a transcript block, or ''."""
     if event.get("type") != "tool_call" or event.get("subtype") != "completed":
         return ""
     tool_call = event.get("tool_call")
     if not isinstance(tool_call, dict):
         return ""
+
+    research_block = research_completed_block_from_event(event, open_query=open_query)
+    if research_block:
+        return research_block
 
     edit = tool_call.get("editToolCall")
     if isinstance(edit, dict):
@@ -229,12 +162,6 @@ def _tool_block_from_event(event: dict[str, Any], workspace_root: str) -> str:
         path = _relative_path(str(args.get("path") or ""), workspace_root)
         return f"\n:::tool Read {path}\n"
 
-    research_block = _research_block_from_tool_call(tool_call)
-    if research_block:
-        return research_block
-
-    # Shell commands render as a terminal block (command + captured output),
-    # mirroring how Cursor surfaces agent-run commands in its own terminal.
     for shell_key in ("shellToolCall", "runTerminalCommandToolCall", "terminalToolCall"):
         shell_call = tool_call.get(shell_key)
         if not isinstance(shell_call, dict):
@@ -291,8 +218,6 @@ def assistant_text_delta(accumulated: str, incoming: str) -> str:
         suffix = incoming[len(accumulated) :]
         if not suffix:
             return ""
-        # Cursor occasionally emits cumulative assistant text that repeats the
-        # already-delivered prefix verbatim (e.g. "sentence A" -> "sentence A" + "sentence A").
         if suffix == accumulated or suffix.strip() == accumulated.strip():
             return ""
         return suffix
@@ -316,6 +241,8 @@ class CursorStreamAssembler:
         self._thinking_open = False
         self._saw_assistant_text = False
         self._assistant_accumulated = ""
+        self._research_open_query: str | None = None
+        self._research_open_active = False
         self.result_text = ""
         self.error_text = ""
 
@@ -334,6 +261,12 @@ class CursorStreamAssembler:
         if self._thinking_open:
             self._append("\n:::\n")
             self._thinking_open = False
+
+    def _close_open_research(self) -> None:
+        if self._research_open_active:
+            self._append("\n:::\n")
+            self._research_open_query = None
+            self._research_open_active = False
 
     def feed_line(self, line: str) -> None:
         event = parse_stream_event(line)
@@ -366,7 +299,29 @@ class CursorStreamAssembler:
 
         if event_type == "tool_call":
             self._close_thinking()
-            self._append(_tool_block_from_event(event, self._workspace_root))
+            subtype = str(event.get("subtype") or "")
+            if subtype == "started":
+                started = research_started_block_from_event(event)
+                if started:
+                    self._close_open_research()
+                    self._append(started)
+                    tool_call = event.get("tool_call")
+                    if isinstance(tool_call, dict):
+                        self._research_open_query = research_query_from_tool_call(tool_call) or "Research"
+                        self._research_open_active = True
+                    return
+            if subtype == "completed":
+                open_query = self._research_open_query if self._research_open_active else None
+                block = _tool_block_from_event(
+                    event,
+                    self._workspace_root,
+                    open_query=open_query,
+                )
+                if block:
+                    self._append(block)
+                    self._research_open_query = None
+                    self._research_open_active = False
+                return
             return
 
         result = result_from_event(event)
@@ -378,7 +333,13 @@ class CursorStreamAssembler:
 
     def finalize(self) -> str:
         self._close_thinking()
-        content = self.content.strip()
+        self._close_open_research()
+        content = normalize_transcript_content(self.content.strip())
         if not self._saw_assistant_text and self.result_text and not content:
-            return self.result_text.strip()
+            return normalize_transcript_content(self.result_text.strip())
         return content
+
+
+# Backward-compatible exports for tests.
+def _research_items_from_result(result: Any) -> list[dict[str, str]]:
+    return research_items_from_result(result)

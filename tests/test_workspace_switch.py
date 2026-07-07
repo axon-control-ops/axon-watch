@@ -22,6 +22,14 @@ class WorkspaceSwitchIntentTests(unittest.TestCase):
         self.assertEqual("workspace_dashpro", intent.target_workspace_id)
         self.assertEqual("DashPro", intent.display_name)
 
+    def test_resolves_hyphenated_axon_watch_prompt(self) -> None:
+        intent = resolve_workspace_switch_intent("switch to axon-watch")
+        self.assertIsNotNone(intent)
+        assert intent is not None
+        self.assertEqual("workspace_axon_watch", intent.target_workspace_id)
+        self.assertEqual("axon-watch", intent.display_name)
+        self.assertEqual("README.md", intent.open_file_path)
+
     def test_ignores_unrelated_prompts(self) -> None:
         self.assertIsNone(resolve_workspace_switch_intent("explain README.md"))
         self.assertIsNone(resolve_workspace_switch_intent("git status"))

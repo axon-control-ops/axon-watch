@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentMessageLooksLikeMarkdown,
+  isInterimAgentStatus,
+  isMarkdownFileAgentResponse,
   renderAgentMessageMarkdown,
+  shouldAutoOpenAgentReportInEditor,
   shouldOfferMarkdownPreview,
+  shouldOfferOpenInEditor,
+  shouldUseAgentMarkdownBlock,
   splitAgentMessageForPreview,
 } from './agent-message-markdown';
 
@@ -53,5 +58,64 @@ describe('agent-message-markdown', () => {
   it('does not offer preview for git status fenced output', () => {
     const content = 'Executed `git_status` (ok) for run x.\n\n```\n## main\n M file.py\n```\n\nDone.';
     expect(shouldOfferMarkdownPreview(content)).toBe(false);
+  });
+
+  it('renders all non-empty agent prose blocks', () => {
+    expect(shouldUseAgentMarkdownBlock('')).toBe(false);
+    expect(shouldUseAgentMarkdownBlock('Search returned no results — trying Cursor docs.')).toBe(
+      false,
+    );
+    expect(shouldUseAgentMarkdownBlock('## Summary\n\n- item one')).toBe(true);
+    expect(shouldUseAgentMarkdownBlock('Plain prose without markdown syntax still formats.')).toBe(
+      true,
+    );
+  });
+
+  it('keeps interim status lines out of markdown preview', () => {
+    expect(shouldUseAgentMarkdownBlock('Searching the docs…', false)).toBe(false);
+    expect(shouldUseAgentMarkdownBlock('Searching the docs…', true)).toBe(false);
+  });
+
+  it('does not treat multi-line prose as interim status', () => {
+    expect(isInterimAgentStatus('Done.\n\nMore details follow.')).toBe(false);
+    expect(isInterimAgentStatus('**Summary**\n\n- item one')).toBe(false);
+  });
+
+  it('detects markdown file read responses for editor open', () => {
+    const content = [
+      'Executed `read_file` (ok) for run run_abc.',
+      '',
+      '```',
+      '# README.md',
+      '',
+      '**Axon-X** is the product.',
+      '```',
+    ].join('\n');
+    expect(isMarkdownFileAgentResponse(content)).toBe(true);
+    expect(shouldAutoOpenAgentReportInEditor(content)).toBe(true);
+  });
+
+  it('detects report markdown eligible for editor open', () => {
+    const report = ['# Cursor vs EduDash Pro', '', '## Images', '', '| Method | How |', '| --- | --- |'].join(
+      '\n',
+    );
+    expect(shouldOfferOpenInEditor(report, true)).toBe(true);
+    const longReport = `${report}\n\n${'Additional findings about image upload.\n'.repeat(20)}`;
+    expect(shouldAutoOpenAgentReportInEditor(longReport)).toBe(true);
+    expect(shouldAutoOpenAgentReportInEditor('# Short report\n\nOne paragraph.')).toBe(true);
+  });
+
+  it('does not auto-open block-structured agent transcripts in the editor', () => {
+    const content = [
+      ':::research Web search',
+      '- Example | https://example.com/',
+      'Snippet text',
+      ':::',
+      '',
+      '# Final report',
+      '',
+      'This should stay in the lane.',
+    ].join('\n');
+    expect(shouldAutoOpenAgentReportInEditor(content)).toBe(false);
   });
 });

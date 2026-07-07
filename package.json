@@ -41,6 +41,7 @@
     "verify:voice-cockpit": "./scripts/verify/test23-voice-cockpit.sh",
     "verify:agent-dock-parity": "./scripts/verify/test24-agent-dock-parity.sh",
     "verify:signal-parity-matrix": "./scripts/verify/test26-signal-parity-matrix.sh",
+    "verify:research-lane": "./scripts/verify/research-lane-smoke.sh",
     "verify:headed-browser-smoke": "./scripts/verify/headed-browser-smoke.sh",
     "verify:retirement-readiness": "./scripts/verify/test17-full-retirement-readiness.sh",
     "verify:operator-data": "./scripts/verify/test15-operator-data.sh",

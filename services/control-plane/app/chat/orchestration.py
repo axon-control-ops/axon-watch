@@ -9,7 +9,17 @@ from app.chat.command_executor import (
     execute_command,
     execute_resume_from_review,
 )
-from app.runs.service import RunLifecycleError, append_run_execution_receipt, get_run, list_runs, mark_review_ready
+from app.runs.service import RunLifecycleError, append_run_execution_receipt, complete_run, get_run, list_runs, mark_review_ready
+
+# Read-only operator commands that should not clog Mission Control in review_ready.
+AUTO_COMPLETE_COMMAND_INTENTS = frozenset(
+    {
+        "git_status",
+        "health_probe",
+        "list_files",
+        "read_file",
+    }
+)
 
 
 def build_agent_command_reply(
@@ -34,7 +44,8 @@ def build_agent_command_reply(
         return (
             f"Executed `{execution.intent}` ({status}) for run {run_id}.\n\n"
             f"```\n{execution.output}\n```\n\n"
-            f"Phase is now {phase}. Review when ready."
+            f"Phase is now {phase}."
+            + ("" if phase == "completed" else " Review when ready.")
         )
 
     if dispatched:
@@ -99,7 +110,10 @@ def orchestrate_command_run(
     )
 
     try:
-        run_record = mark_review_ready(run_id)
+        if execution.success and execution.intent in AUTO_COMPLETE_COMMAND_INTENTS:
+            run_record = complete_run(run_id)
+        else:
+            run_record = mark_review_ready(run_id)
     except RunLifecycleError:
         pass
 

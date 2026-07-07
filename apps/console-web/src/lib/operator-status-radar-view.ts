@@ -169,6 +169,7 @@ export function operatorStatusHeadline(input: {
   briefing: OperatorBriefing | null;
   loadState: OperatorStatusLoadState;
   primaryActiveRun: RunRecord | null;
+  workspaceReviewReadyCount?: number;
 }): string {
   if (input.loadState === 'loading') {
     return 'Loading operator status…';
@@ -176,6 +177,15 @@ export function operatorStatusHeadline(input: {
 
   if (input.loadState === 'error') {
     return 'Runtime status unavailable';
+  }
+
+  const workspaceReviewReadyCount = input.workspaceReviewReadyCount ?? 0;
+  if (workspaceReviewReadyCount > 0) {
+    if (workspaceReviewReadyCount === 1 && input.primaryActiveRun?.phase === 'review_ready') {
+      return `${formatRunDisplayName(input.primaryActiveRun)} is ready for operator review.`;
+    }
+    const noun = workspaceReviewReadyCount === 1 ? 'run is' : 'runs are';
+    return `${workspaceReviewReadyCount} ${noun} ready for operator review in this workspace.`;
   }
 
   if (input.briefing?.notice) {
@@ -396,6 +406,7 @@ export function operatorExecutionStage(input: {
   briefing: OperatorBriefing | null;
   loadState: OperatorStatusLoadState;
   primaryActiveRun: RunRecord | null;
+  workspaceReviewReadyCount?: number;
 }): OperatorExecutionStage {
   const mission = operatorMissionSummary({
     workspaceId: input.workspaceId,
@@ -418,6 +429,7 @@ export function operatorExecutionStage(input: {
       briefing: input.briefing,
       loadState: input.loadState,
       primaryActiveRun: run,
+      workspaceReviewReadyCount: input.workspaceReviewReadyCount,
     }),
     advise: operatorStatusAdvise({
       briefing: input.briefing,

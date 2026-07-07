@@ -18,17 +18,13 @@ export interface TopbarRuntimeVersionChip {
 }
 
 export function buildMockupTopbarBreadcrumb(): string {
-  return 'Axon-X Bootstrap / bootstrap-model';
+  return '';
 }
 
 export function buildTopbarRuntimeVersionChips(
   _runtimeSummary: RuntimeSummary | null,
 ): TopbarRuntimeVersionChip[] {
-  return [
-    { id: 'kairo-code', label: 'KAIRO.CODE', version: 'v1.4.2', icon: 'code' },
-    { id: 'policy', label: 'POLICY', version: 'v2.1.0', icon: 'policy' },
-    { id: 'axon-x', label: 'AXON-X', version: 'v0.9.8', icon: 'axon' },
-  ];
+  return [];
 }
 
 export interface StatusBarZoneItem {

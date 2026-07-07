@@ -110,10 +110,88 @@ describe('parseAgentTranscriptBlocks', () => {
     ]);
   });
 
-  it('marks streaming research blocks as open', () => {
-    const segments = parseAgentTranscriptBlocks(':::research react hooks');
+  it('parses provider and kind metadata on research blocks', () => {
+    const content = [
+      ':::research react hooks',
+      '@kind search',
+      '@provider duckduckgo_instant',
+      '- React docs | https://react.dev/',
+      'Hooks reference.',
+      ':::',
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(content);
     expect(segments).toEqual([
-      { kind: 'research', query: 'react hooks', items: [], open: true },
+      {
+        kind: 'research',
+        query: 'react hooks',
+        provider: 'duckduckgo_instant',
+        kindLabel: 'search',
+        items: [
+          {
+            title: 'React docs',
+            url: 'https://react.dev/',
+            snippet: 'Hooks reference.',
+          },
+        ],
+        open: false,
+      },
+    ]);
+  });
+
+  it('infers research kind from query label when metadata is absent', () => {
+    const segments = parseAgentTranscriptBlocks(':::research Page fetch\n- docs | https://example.com\n:::');
+    const block = segments[0];
+    if (block.kind !== 'research') throw new Error('expected research');
+    expect(block.kindLabel).toBe('fetch');
+  });
+
+  it('dedupes duplicate prose after thinking blocks', () => {
+    const line =
+      'Running the August billing dry-run and verifying deployment state from the prior session.';
+    const content = [
+      ':::thinking',
+      'Planning next steps.',
+      ':::',
+      line,
+      line,
+      '',
+      ':::tool Read scripts/backfill.ts',
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments.map((segment) => segment.kind)).toEqual(['thinking', 'text', 'tool']);
+    const prose = segments[1];
+    if (prose.kind !== 'text') throw new Error('expected text segment');
+    expect(prose.text).toBe(line);
+  });
+
+  it('merges adjacent duplicate research segments', () => {
+    const content = [
+      ':::research vite configuration',
+      '- Vite Guide | https://vitejs.dev/guide/',
+      ':::',
+      ':::research vite configuration',
+      '- Rollup | https://rollupjs.org/',
+      ':::',
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments).toEqual([
+      {
+        kind: 'research',
+        query: 'vite configuration',
+        items: [
+          {
+            title: 'Vite Guide',
+            url: 'https://vitejs.dev/guide/',
+            snippet: '',
+          },
+          {
+            title: 'Rollup',
+            url: 'https://rollupjs.org/',
+            snippet: '',
+          },
+        ],
+        open: false,
+      },
     ]);
   });
 

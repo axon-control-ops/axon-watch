@@ -27,16 +27,12 @@ const runtimeSummary = exampleRuntimeSummary as RuntimeSummary;
 const briefing = exampleBriefing as unknown as OperatorBriefing;
 
 describe('mockup shell view helpers', () => {
-  it('builds mockup topbar breadcrumb for UX-0 parity', () => {
-    expect(buildMockupTopbarBreadcrumb()).toBe('Axon-X Bootstrap / bootstrap-model');
+  it('omits the legacy mockup topbar breadcrumb', () => {
+    expect(buildMockupTopbarBreadcrumb()).toBe('');
   });
 
-  it('builds mockup runtime version chips for UX-0 parity', () => {
-    expect(buildTopbarRuntimeVersionChips(runtimeSummary)).toEqual([
-      { id: 'kairo-code', label: 'KAIRO.CODE', version: 'v1.4.2', icon: 'code' },
-      { id: 'policy', label: 'POLICY', version: 'v2.1.0', icon: 'policy' },
-      { id: 'axon-x', label: 'AXON-X', version: 'v0.9.8', icon: 'axon' },
-    ]);
+  it('omits the legacy runtime version chips', () => {
+    expect(buildTopbarRuntimeVersionChips(runtimeSummary)).toEqual([]);
   });
 
   it('builds topbar meta pills from runtime summary', () => {

@@ -4,6 +4,7 @@ import {
   agentContentLooksLikeErrorDump,
   formatThreadTimestamp,
   shortenRunId,
+  shouldCollapseSystemMessage,
   summarizeAgentErrorContent,
 } from './thread-message-view';
 
@@ -21,5 +22,14 @@ describe('thread-message-view', () => {
     const content = '401 Unauthorized\n{"error":{"message":"Incorrect API key"}}';
     expect(agentContentLooksLikeErrorDump(content)).toBe(true);
     expect(summarizeAgentErrorContent(content)).toContain('401 Unauthorized');
+  });
+
+  it('collapses noisy dispatch system acks', () => {
+    expect(
+      shouldCollapseSystemMessage('Run run_abc123 dispatched for workspace bootstrap-model'),
+    ).toBe(true);
+    expect(
+      shouldCollapseSystemMessage('Command linked to run run_abc123 (phase executing).'),
+    ).toBe(true);
   });
 });

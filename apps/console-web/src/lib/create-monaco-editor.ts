@@ -34,6 +34,8 @@ export interface MonacoEditorController {
   getValue: () => string;
   getSelection: () => EditorSelectionSnapshot | null;
   focus: () => void;
+  revealLine: (line: number, column?: number) => void;
+  findAndReveal: (searchText: string) => boolean;
 }
 
 let monacoPromise: Promise<typeof Monaco> | null = null;
@@ -161,6 +163,28 @@ export async function createMonacoEditor(
     },
     focus() {
       editor.focus();
+    },
+    revealLine(line: number, column = 1) {
+      const safeLine = Math.max(1, Math.min(line, model.getLineCount()));
+      const safeColumn = Math.max(1, column);
+      editor.revealLineInCenter(safeLine);
+      editor.setPosition({ lineNumber: safeLine, column: safeColumn });
+      editor.focus();
+    },
+    findAndReveal(searchText: string) {
+      const needle = searchText.trim();
+      if (!needle) {
+        return false;
+      }
+      const matches = model.findMatches(needle, false, false, false, null, false);
+      if (!matches.length) {
+        return false;
+      }
+      const match = matches[0];
+      editor.revealRangeInCenter(match.range);
+      editor.setSelection(match.range);
+      editor.focus();
+      return true;
     },
   };
 }

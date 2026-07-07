@@ -20,6 +20,12 @@ import {
   readShellFooterGapPx,
 } from '../../lib/shell-column-layout';
 import { useShellStore } from '../../stores/shell';
+import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
+import {
+  persistEditorMarkdownPreviewEnabled,
+  resolveEditorMarkdownPreviewEnabled,
+} from '../../lib/editor-markdown-preview-prefs';
+import { editorTabLabelForDocument, editorTabLabelsForDocuments } from '../../lib/editor-tab-labels';
 
 const shell = useShellStore();
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
@@ -61,7 +67,16 @@ const bottomTabs = computed(() => [
 
 const editorBreadcrumb = computed(() => {
   const workspace = shell.currentWorkspace?.workspace_id ?? 'workspace_smoke';
-  const file = shell.activeEditorDocument?.title ?? 'README.md';
+  const document = shell.activeEditorDocument;
+  if (!document) {
+    return { workspace, file: 'README.md' };
+  }
+
+  const labels = editorTabLabelsForDocuments(editorTabDocuments.value);
+  const file =
+    document.source === 'file' && document.filePath
+      ? document.filePath
+      : labels.get(document.id) ?? document.title;
   return { workspace, file };
 });
 
@@ -103,6 +118,61 @@ const editorAccessLabel = computed(() => {
   }
   return shell.activeEditorDocument.dirty ? 'Unsaved' : 'Saved';
 });
+const isMarkdownEditorDocument = computed(
+  () => shell.activeEditorDocument?.language === 'markdown',
+);
+const editorPreviewEnabled = ref(false);
+
+watch(
+  () => shell.activeEditorDocument?.id,
+  (documentId) => {
+    if (!documentId) {
+      editorPreviewEnabled.value = false;
+      return;
+    }
+    editorPreviewEnabled.value = resolveEditorMarkdownPreviewEnabled(
+      documentId,
+      shell.activeEditorDocument?.language === 'markdown',
+      shell.activeEditorDocument?.source === 'draft',
+    );
+  },
+  { immediate: true },
+);
+
+const editorPreviewHtml = computed(() => {
+  if (!isMarkdownEditorDocument.value) {
+    return '';
+  }
+  return renderAgentMessageMarkdown(activeEditorValue.value);
+});
+
+function setEditorPreviewMode(enabled: boolean): void {
+  const documentId = shell.activeEditorDocument?.id;
+  if (!documentId || !isMarkdownEditorDocument.value) {
+    return;
+  }
+  editorPreviewEnabled.value = enabled;
+  persistEditorMarkdownPreviewEnabled(documentId, enabled);
+}
+
+const editorTabDocuments = computed(() =>
+  shell.editorDocuments.filter((document) => document.source === 'file' || document.source === 'draft'),
+);
+const editorTabLabels = computed(() => editorTabLabelsForDocuments(editorTabDocuments.value));
+
+function editorTabLabel(documentId: string, document: { title: string }): string {
+  return editorTabLabelForDocument(
+    editorTabDocuments.value.find((entry) => entry.id === documentId) ?? {
+      id: documentId,
+      title: document.title,
+      language: 'markdown',
+      value: '',
+      description: '',
+      source: 'draft',
+    },
+    editorTabLabels.value,
+  );
+}
 const outputLines = computed(() => {
   const document = shell.activeEditorDocument;
   return [
@@ -365,7 +435,7 @@ watch(
       <div class="editor-tabbar editor-tabbar--mockup">
         <div class="editor-tabbar__tabs">
           <button
-            v-for="document in shell.editorDocuments.filter((doc) => doc.source === 'file')"
+            v-for="document in editorTabDocuments"
             :key="document.id"
             type="button"
             class="editor-tabbar__tab hud-active-chip hud-active-chip--tab"
@@ -373,11 +443,36 @@ watch(
             @click="shell.setActiveEditorDocument(document.id)"
           >
             <WorkbenchIcon name="file" />
-            <span class="editor-tabbar__label">{{ document.title }}</span>
+            <span class="editor-tabbar__label">{{ editorTabLabel(document.id, document) }}</span>
             <WorkbenchIcon name="close" class="editor-tabbar__close-icon" />
           </button>
         </div>
         <div class="editor-tabbar__tools">
+          <div
+            v-if="isMarkdownEditorDocument"
+            class="conversation-seam__markdown-mode-toggle editor-tabbar__markdown-toggle"
+            role="group"
+            aria-label="Editor markdown view mode"
+          >
+            <button
+              type="button"
+              class="conversation-seam__markdown-mode-button"
+              :class="{ 'conversation-seam__markdown-mode-button--active': editorPreviewEnabled }"
+              :aria-pressed="editorPreviewEnabled"
+              @click="setEditorPreviewMode(true)"
+            >
+              Preview
+            </button>
+            <button
+              type="button"
+              class="conversation-seam__markdown-mode-button"
+              :class="{ 'conversation-seam__markdown-mode-button--active': !editorPreviewEnabled }"
+              :aria-pressed="!editorPreviewEnabled"
+              @click="setEditorPreviewMode(false)"
+            >
+              Raw
+            </button>
+          </div>
           <button
             type="button"
             class="editor-tabbar__tool-button"
@@ -411,9 +506,12 @@ watch(
         </span>
       </p>
 
-      <section class="center-workbench__editor">
+      <section
+        class="center-workbench__editor"
+        :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }"
+      >
         <EditorHost
-          v-if="shell.activeEditorDocument"
+          v-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled)"
           variant="mockup"
           :title="shell.activeEditorDocument.title"
           :value="shell.activeEditorDocument.value"
@@ -421,10 +519,16 @@ watch(
           :description="shell.activeEditorDocument.description"
           :read-only="shell.activeEditorDocument.readOnly"
           :dirty="shell.activeEditorDocument.dirty"
+          :reveal-request="shell.editorRevealRequest"
           @cursor-change="handleEditorCursorChange"
           @selection-change="shell.setEditorSelection"
           @value-change="shell.updateActiveFileContent"
           @save="shell.saveActiveFileDocument"
+        />
+        <div
+          v-else-if="shell.activeEditorDocument && isMarkdownEditorDocument && editorPreviewEnabled"
+          class="editor-markdown-preview conversation-seam__content conversation-seam__content--markdown"
+          v-html="editorPreviewHtml"
         />
         <div class="editor-statusbar editor-statusbar--mockup">
           <button

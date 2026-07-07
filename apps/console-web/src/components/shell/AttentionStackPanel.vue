@@ -40,6 +40,20 @@ const otherReviewReadyRuns = computed(() =>
   ),
 );
 
+const otherReviewReadyRunsShown = computed(() => otherReviewReadyRuns.value.slice(0, 3));
+const otherReviewReadyRunsOverflow = computed(() =>
+  Math.max(0, otherReviewReadyRuns.value.length - otherReviewReadyRunsShown.value.length),
+);
+
+const reviewReadyRunCount = computed(
+  () =>
+    shell.runs.filter(
+      (run) =>
+        run.phase === 'review_ready' &&
+        run.workspace_id === shell.currentWorkspace?.workspace_id,
+    ).length,
+);
+
 const showStopAction = computed(
   () =>
     Boolean(activeRun.value?.can_stop) || activeRun.value?.phase === 'executing',
@@ -135,17 +149,34 @@ function signalHint(signal: {
         </ul>
 
         <div v-if="otherReviewReadyRuns.length" class="dock-run-seam__also-waiting">
-          <span class="dock-run-seam__also-label">Also waiting</span>
+          <div class="dock-run-seam__also-header">
+            <span class="dock-run-seam__also-label">
+              Also waiting
+              <span v-if="reviewReadyRunCount > 1">({{ reviewReadyRunCount }})</span>
+            </span>
+            <button
+              v-if="reviewReadyRunCount > 1"
+              type="button"
+              class="dock-run-seam__clear-queue"
+              :disabled="shell.runMutationPending"
+              @click="shell.completeAllReviewReadyRuns()"
+            >
+              {{ shell.runMutationState === 'completing' ? 'Clearing…' : 'Complete all' }}
+            </button>
+          </div>
           <ul class="dock-run-seam__also-list">
-            <li v-for="run in otherReviewReadyRuns" :key="run.run_id">
+            <li v-for="run in otherReviewReadyRunsShown" :key="run.run_id">
               {{ formatRunDisplayName(run) }}
             </li>
           </ul>
+          <p v-if="otherReviewReadyRunsOverflow > 0" class="dock-run-seam__also-more">
+            + {{ otherReviewReadyRunsOverflow }} more — use Complete all
+          </p>
         </div>
 
         <div v-if="showReviewActions || showStopAction" class="run-actions run-actions--sidebar">
           <button
-            v-if="activeRun.can_resume"
+            v-if="activeRun.can_resume && activeRun.phase !== 'review_ready'"
             type="button"
             class="run-actions__button run-actions__button--warning"
             :disabled="!shell.canResumePrimaryRun"

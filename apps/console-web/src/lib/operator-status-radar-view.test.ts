@@ -62,6 +62,20 @@ describe('operator status radar view', () => {
     ).toBe(briefing.notice);
   });
 
+  it('prefers workspace-scoped review-ready counts over global briefing notice', () => {
+    expect(
+      operatorStatusHeadline({
+        briefing: {
+          ...briefing,
+          notice: '52 runs are ready for operator review.',
+        },
+        loadState: 'loaded',
+        primaryActiveRun: activeRun,
+        workspaceReviewReadyCount: 17,
+      }),
+    ).toBe('17 runs are ready for operator review in this workspace.');
+  });
+
   it('builds DTO-backed metrics for the operator panel', () => {
     const metrics = operatorStatusMetrics({
       workspaceId: 'workspace_smoke',

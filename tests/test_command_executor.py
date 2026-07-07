@@ -100,6 +100,34 @@ class CommandExecutorTests(unittest.TestCase):
             self.assertTrue(result.success)
             self.assertTrue(result.output.strip())
 
+    def test_dashpro_ota_shortcut_requires_dashpro_workspace(self) -> None:
+        result = execute_command(workspace_id="workspace_alpha", content="ota canary")
+        self.assertFalse(result.success)
+        self.assertIn("workspace_dashpro", result.output)
+
+    def test_dashpro_ota_shortcut_dispatches_canary_command(self) -> None:
+        with patch(
+            "app.chat.command_executor.execute_shell_command",
+            return_value=(True, "published to operator-canary", "exit 0"),
+        ) as mocked:
+            result = execute_command(workspace_id="workspace_dashpro", content="ota canary")
+
+        self.assertTrue(result.success)
+        self.assertEqual("shell_command", result.intent)
+        self.assertIn("operator-canary", result.output)
+        mocked.assert_called_once_with(
+            workspace_id="workspace_dashpro",
+            content="run npm run ota:canary",
+        )
+
+    def test_production_ota_is_blocked(self) -> None:
+        result = execute_command(
+            workspace_id="workspace_dashpro",
+            content="run npm run ota:production",
+        )
+        self.assertFalse(result.success)
+        self.assertIn("Production OTA is blocked", result.output)
+
     def test_execute_resume_from_review_resumes_primary_review_ready_run(self) -> None:
         from app.main import app  # noqa: WPS433
         from fastapi.testclient import TestClient

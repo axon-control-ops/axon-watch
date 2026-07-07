@@ -48,7 +48,21 @@
   --motion-emphasis: 260ms;
 
   --font-display: Inter, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-ui: var(--font-display);
+  --font-sans: var(--font-display);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Cursor-aligned typography (editor 14px, chat/agent 13px, meta 12px, caption 11px) */
+  --font-size-caption: 11px;
+  --font-size-meta: 12px;
+  --font-size-chat: 13px;
+  --font-size-ui: 13px;
+  --font-size-editor: 14px;
+  --font-size-editor-lg: 15px;
+  --leading-tight: 1.35;
+  --leading-prose: 1.5;
+  --leading-code: 1.5;
+  --leading-relaxed: 1.6;
 }
 
 @media (prefers-reduced-motion: reduce) {

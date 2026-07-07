@@ -1,5 +1,7 @@
 import { marked } from 'marked';
 
+import { agentContentHasTranscriptBlocks } from './agent-transcript-blocks';
+
 marked.setOptions({
   breaks: true,
   gfm: true,
@@ -10,6 +12,9 @@ const MARKDOWN_HINT_PATTERN =
 
 const EXECUTION_WRAPPER_PATTERN =
   /^(Executed `([^`]+)` \([^)]+\)[^\n]*)\n\n```(?:[^\n]*\n)?([\s\S]*?)```(?:\n\n([\s\S]+))?$/;
+
+const INTERIM_STATUS_PATTERN =
+  /^(?:i(?:'ll| will)\b|search(?:ing)?\b|trying\b|looking\b|checking\b|gathering\b|let me\b)/i;
 
 export type AgentMessagePreviewParts = {
   preamble: string | null;
@@ -26,6 +31,39 @@ export function agentMessageLooksLikeMarkdown(content: string): boolean {
   }
 
   return MARKDOWN_HINT_PATTERN.test(trimmed);
+}
+
+export function isInterimAgentStatus(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed || trimmed.length > 280) {
+    return false;
+  }
+  if (/^#{1,6}\s/m.test(trimmed)) {
+    return false;
+  }
+  if (agentMessageLooksLikeMarkdown(trimmed)) {
+    return false;
+  }
+  const lineCount = trimmed.split('\n').filter((line) => line.trim()).length;
+  if (lineCount > 1) {
+    return false;
+  }
+  const firstLine = trimmed.split('\n').map((line) => line.trim()).find(Boolean) ?? '';
+  return INTERIM_STATUS_PATTERN.test(firstLine);
+}
+
+export function isAgentReportMarkdown(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed || isInterimAgentStatus(trimmed)) {
+    return false;
+  }
+  if (/^#{1,3}\s+/m.test(trimmed)) {
+    return true;
+  }
+  if (trimmed.length >= 500 && agentMessageLooksLikeMarkdown(trimmed)) {
+    return true;
+  }
+  return false;
 }
 
 export function splitAgentMessageForPreview(content: string): AgentMessagePreviewParts {
@@ -67,4 +105,107 @@ export function renderAgentMessageMarkdown(content: string): string {
 
 export function shouldOfferMarkdownPreview(content: string): boolean {
   return splitAgentMessageForPreview(content).hasMarkdownPreview;
+}
+
+/** Rich agent prose gets Preview/Raw in the lane — not interim search status lines. */
+export function shouldUseAgentMarkdownBlock(content: string, isComplete = true): boolean {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (!isComplete && isInterimAgentStatus(trimmed)) {
+    return false;
+  }
+  if (isInterimAgentStatus(trimmed)) {
+    return false;
+  }
+  return true;
+}
+
+const MD_FILENAME_HEADING_RE = /^#{1,6}\s+([^\s/\\]+\.md)\s*$/im;
+
+export function isMarkdownFileAgentResponse(content: string): boolean {
+  const parts = splitAgentMessageForPreview(content);
+  if (MD_FILENAME_HEADING_RE.test(parts.markdownSource)) {
+    return true;
+  }
+  if (parts.executionIntent === 'read_file' && /\.md\b/i.test(parts.preamble ?? '')) {
+    return true;
+  }
+  return false;
+}
+
+export function shouldHideAgentReportInThread(content: string): boolean {
+  return shouldAutoOpenAgentReportInEditor(content);
+}
+
+export function shouldOfferOpenInEditor(content: string, isComplete = true): boolean {
+  if (!isComplete) {
+    return false;
+  }
+  return shouldAutoOpenAgentReportInEditor(content) || isAgentReportMarkdown(content);
+}
+
+export function shouldAutoOpenAgentReportInEditor(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  // Cursor-style: tool/research/edit transcripts stay in the agent lane.
+  if (agentContentHasTranscriptBlocks(trimmed)) {
+    return false;
+  }
+
+  if (isMarkdownFileAgentResponse(content)) {
+    return true;
+  }
+  if (!isAgentReportMarkdown(content)) {
+    return false;
+  }
+  if (/^#{1,3}\s+/m.test(content.trim())) {
+    return true;
+  }
+  return content.trim().length >= 300;
+}
+
+/** @deprecated use shouldUseAgentMarkdownBlock */
+export function shouldRenderAgentTextBlock(content: string): boolean {
+  return shouldUseAgentMarkdownBlock(content);
+}
+
+export function extractAgentReportMarkdown(content: string): string | null {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (!/^:::(thinking|edit|terminal|tool|research)\b/m.test(trimmed)) {
+    if (shouldAutoOpenAgentReportInEditor(trimmed)) {
+      return splitAgentMessageForPreview(trimmed).markdownSource;
+    }
+    return null;
+  }
+
+  const segments = trimmed.split(/\n(?=:::)/);
+  let lastReport: string | null = null;
+  for (const segment of segments) {
+    if (/^:::(thinking|edit|terminal|tool|research)\b/m.test(segment.trim())) {
+      continue;
+    }
+    const prose = segment.trim();
+    if (shouldAutoOpenAgentReportInEditor(prose)) {
+      lastReport = splitAgentMessageForPreview(prose).markdownSource;
+    }
+  }
+  return lastReport;
+}
+
+export function deriveAgentReportTitle(content: string): string {
+  const heading = content.match(/^#{1,6}\s+(.+)$/m);
+  if (heading?.[1]) {
+    return heading[1].trim().slice(0, 72);
+  }
+  const firstLine = content.split('\n').map((line) => line.trim()).find(Boolean);
+  return firstLine ? firstLine.slice(0, 72) : 'Agent report';
 }

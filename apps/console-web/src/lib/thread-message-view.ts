@@ -92,5 +92,14 @@ export function shouldCollapseSystemMessage(content: string): boolean {
   if (!trimmed) {
     return false;
   }
-  return trimmed.startsWith('Lane B (') || trimmed.length > 120;
+  if (trimmed.startsWith('Lane B (')) {
+    return true;
+  }
+  if (/^Run run_\S+ dispatched/i.test(trimmed)) {
+    return true;
+  }
+  if (/^Command linked to run run_/i.test(trimmed)) {
+    return true;
+  }
+  return trimmed.length > 120;
 }

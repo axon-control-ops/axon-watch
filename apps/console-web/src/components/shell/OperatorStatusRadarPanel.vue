@@ -45,6 +45,14 @@ const radarTone = computed(() =>
   }),
 );
 
+const reviewReadyRuns = computed(() =>
+  shell.runs.filter(
+    (run) =>
+      run.phase === 'review_ready' &&
+      run.workspace_id === shell.currentWorkspace?.workspace_id,
+  ),
+);
+
 const executionStage = computed(() =>
   operatorExecutionStage({
     workspaceId: workspaceId.value,
@@ -52,6 +60,7 @@ const executionStage = computed(() =>
     briefing: shell.operatorBriefing,
     loadState: shell.briefingLoadState,
     primaryActiveRun: shell.primaryActiveRun,
+    workspaceReviewReadyCount: reviewReadyRuns.value.length,
   }),
 );
 
@@ -130,13 +139,6 @@ const quickGuide = computed(() =>
   }),
 );
 
-const reviewReadyRuns = computed(() =>
-  shell.runs.filter(
-    (run) =>
-      run.phase === 'review_ready' &&
-      run.workspace_id === shell.currentWorkspace?.workspace_id,
-  ),
-);
 const reviewReadyRunsShown = computed(() => reviewReadyRuns.value.slice(0, 5));
 const reviewReadyRunsOverflow = computed(() =>
   Math.max(0, reviewReadyRuns.value.length - reviewReadyRunsShown.value.length),
@@ -247,9 +249,19 @@ function toggleTerminal(): void {
         class="operator-status-radar-panel__run-queue"
         aria-label="Runs waiting for review"
       >
-        <p class="operator-status-radar-panel__run-queue-title">
-          {{ reviewReadyRuns.length }} paused tasks — complete each when done
-        </p>
+        <div class="operator-status-radar-panel__run-queue-header">
+          <p class="operator-status-radar-panel__run-queue-title">
+            {{ reviewReadyRuns.length }} tasks waiting — complete each when done
+          </p>
+          <button
+            type="button"
+            class="operator-status-radar-panel__run-queue-clear"
+            :disabled="shell.runMutationPending"
+            @click="shell.completeAllReviewReadyRuns()"
+          >
+            {{ shell.runMutationState === 'completing' ? 'Completing…' : 'Complete all' }}
+          </button>
+        </div>
         <ul class="operator-status-radar-panel__run-queue-list">
           <li
             v-for="run in reviewReadyRunsShown"
@@ -324,7 +336,7 @@ function toggleTerminal(): void {
           {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP RUN' }}
         </button>
         <button
-          v-if="shell.primaryActiveRun?.can_resume"
+          v-if="shell.primaryActiveRun?.can_resume && shell.primaryActiveRun?.phase !== 'review_ready'"
           type="button"
           class="run-actions__button run-actions__button--warning"
           :disabled="!shell.canResumePrimaryRun"

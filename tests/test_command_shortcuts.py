@@ -26,9 +26,16 @@ class CommandShortcutTests(unittest.TestCase):
             "run npm run verify:production-operator",
         )
 
+    def test_expand_dashpro_ota_shortcut(self) -> None:
+        self.assertEqual(
+            expand_command_shortcuts("ota canary"),
+            "run npm run ota:canary",
+        )
+
     def test_classify_shortcuts_as_shell_command(self) -> None:
         self.assertEqual(classify_command("check-health"), "shell_command")
         self.assertEqual(classify_command("verify"), "shell_command")
+        self.assertEqual(classify_command("ota canary"), "shell_command")
 
     def test_questions_are_not_commands(self) -> None:
         for prompt in (

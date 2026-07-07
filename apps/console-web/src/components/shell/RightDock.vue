@@ -36,10 +36,14 @@ const { resizing, resetDockWidth, startDockResize } = useRightDockResize({ dockR
     <div class="dock-stack__upper dock-stack__upper--conversation">
       <HudSeamCard
         seam-id="dock-seam-thread"
-        :title="shell.dockSeamState('thread')?.title ?? 'Conversation'"
+        :title="shell.layoutMode === 'operator' ? 'Command results' : 'Conversation'"
         seam-class="dock-seam dock-seam--thread"
         :collapsed="shell.dockSeamState('thread')?.collapsed ?? false"
-        :compact-summary="shell.dockSeamState('thread')?.compactSummary"
+        :compact-summary="
+          shell.layoutMode === 'operator'
+            ? 'Recent command output — not the run queue'
+            : shell.dockSeamState('thread')?.compactSummary
+        "
         :collapsible="true"
         @toggle="shell.toggleDockSeam('thread')"
       >

@@ -799,17 +799,27 @@ def get_chat_thread(thread_id: str) -> dict[str, object]:
 
 
 def get_chat_thread_history(thread_id: str) -> dict[str, object]:
+    from app.cli_runtime.research_stream_blocks import normalize_transcript_content
+
     thread = chat_store.get_thread(thread_id)
     if thread is None:
         raise chat_store.ChatThreadNotFoundError(f"thread not found: {thread_id}")
 
     items = chat_store.list_thread_messages(thread_id)
+    normalized_items: list[dict[str, object]] = []
+    for item in items:
+        record = dict(item)
+        if record.get("role") == "agent":
+            content = str(record.get("content") or "")
+            if content.strip():
+                record["content"] = normalize_transcript_content(content)
+        normalized_items.append(record)
     return {
         "thread_id": thread["thread_id"],
         "workspace_id": thread["workspace_id"],
         "run_id": thread["run_id"],
-        "items": items,
-        "count": len(items),
+        "items": normalized_items,
+        "count": len(normalized_items),
     }
 
 

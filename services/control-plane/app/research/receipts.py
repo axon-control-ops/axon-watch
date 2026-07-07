@@ -53,8 +53,18 @@ def append_research_receipt(run_id: str, receipt: dict[str, object]) -> None:
         return
 
 
-def format_research_block(query: str, items: list[dict[str, str]]) -> str:
+def format_research_block(
+    query: str,
+    items: list[dict[str, str]],
+    *,
+    provider: str = "",
+    kind: str = "",
+) -> str:
     lines = [f"\n:::research {query.strip() or 'Research'}"]
+    if kind.strip():
+        lines.append(f"@kind {kind.strip()}")
+    if provider.strip():
+        lines.append(f"@provider {provider.strip()}")
     for item in items:
         title = str(item.get("title") or "Source").strip()
         url = str(item.get("url") or "").strip()

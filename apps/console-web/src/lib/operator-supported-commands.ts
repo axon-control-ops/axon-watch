@@ -37,6 +37,7 @@ export const OPERATOR_SUPPORTED_COMMANDS: OperatorSupportedCommand[] = [
       'run npm test',
       'run ./scripts/dev/check-health.sh',
       'check-health',
+      'ota canary',
       'verify',
       'run npm run verify:production-operator',
     ],

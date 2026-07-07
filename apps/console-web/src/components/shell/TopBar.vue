@@ -3,10 +3,6 @@ import { computed } from 'vue';
 
 import KairoPresenceBar from './KairoPresenceBar.vue';
 import OperatorPresenceSettingsPanel from './OperatorPresenceSettingsPanel.vue';
-import {
-  buildMockupTopbarBreadcrumb,
-  buildTopbarRuntimeVersionChips,
-} from '../../lib/mockup-shell-view';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
 import { useShellStore } from '../../stores/shell';
@@ -17,24 +13,12 @@ const { appSurface: activeSurface } = useAppSurface();
 const isFoundationSurface = computed(
   () => activeSurface.value === 'vault' || activeSurface.value === 'data',
 );
-const mockupBreadcrumb = computed(() => {
-  if (activeSurface.value === 'vault') {
-    return 'Axon-X / Vault';
-  }
-  if (activeSurface.value === 'data') {
-    return 'Axon-X / Data';
-  }
-  return buildMockupTopbarBreadcrumb();
-});
 const topbarSubtitle = computed(() => {
   if (isFoundationSurface.value) {
     return 'OPERATOR CONSOLE';
   }
   return shell.layoutMode === 'ide' ? 'IDE WORKSPACE' : 'OPERATOR CONSOLE';
 });
-const runtimeVersionChips = computed(() =>
-  buildTopbarRuntimeVersionChips(shell.runtimeSummary),
-);
 const showTopbarKairoPresence = computed(() => !isFoundationSurface.value);
 
 function openSurface(surface: AppSurface): void {
@@ -47,39 +31,7 @@ function openSurface(surface: AppSurface): void {
     <div class="topbar-mockup__grid">
       <div class="topbar-mockup__identity-zone">
         <div class="topbar-mockup__brand">
-          <p class="topbar-mockup__logo">AXON-X</p>
           <p class="topbar-mockup__subtitle">{{ topbarSubtitle }}</p>
-        </div>
-
-        <div class="topbar-mockup__context-panel">
-          <div class="topbar-mockup__breadcrumb">
-            <span>{{ mockupBreadcrumb }}</span>
-            <span v-if="!isFoundationSurface" class="topbar-mockup__external" aria-hidden="true">↗</span>
-          </div>
-          <div class="topbar-mockup__runtime-bar">
-            <span class="topbar-mockup__runtime-label">RUNTIME</span>
-            <div class="topbar-mockup__runtime-chips">
-              <span
-                v-for="chip in runtimeVersionChips"
-                :key="chip.id"
-                class="topbar-runtime-chip"
-              >
-                <span
-                  v-if="chip.icon === 'axon'"
-                  class="topbar-runtime-chip__dot"
-                  aria-hidden="true"
-                />
-                <span
-                  v-else
-                  class="topbar-runtime-chip__icon"
-                  :class="`topbar-runtime-chip__icon--${chip.icon}`"
-                  aria-hidden="true"
-                />
-                <span class="topbar-runtime-chip__label">{{ chip.label }}</span>
-                <span class="topbar-runtime-chip__version">{{ chip.version }}</span>
-              </span>
-            </div>
-          </div>
         </div>
       </div>
 

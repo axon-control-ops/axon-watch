@@ -1,38 +1,38 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import {
+  deriveAgentReportTitle,
   renderAgentMessageMarkdown,
+  shouldOfferOpenInEditor,
   splitAgentMessageForPreview,
 } from '../../lib/agent-message-markdown';
 import {
   persistAgentMessagePreviewEnabled,
-  resolveAgentMessagePreviewEnabled,
+  readAgentMessagePreviewEnabled,
 } from '../../lib/agent-message-preview-prefs';
+import { useShellStore } from '../../stores/shell';
 
-const props = defineProps<{
-  blockId: string;
-  content: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    blockId: string;
+    content: string;
+    allowOpenInEditor?: boolean;
+  }>(),
+  {
+    allowOpenInEditor: true,
+  },
+);
 
+const shell = useShellStore();
 const copied = ref(false);
 let copiedTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const parts = computed(() => splitAgentMessageForPreview(props.content));
-const previewEnabled = ref(
-  resolveAgentMessagePreviewEnabled(props.blockId, parts.value.hasMarkdownPreview),
+const previewEnabled = ref(readAgentMessagePreviewEnabled(props.blockId) ?? true);
+const canOpenInEditor = computed(
+  () => props.allowOpenInEditor && shouldOfferOpenInEditor(props.content, true),
 );
-
-watch(
-  () => props.blockId,
-  (blockId) => {
-    previewEnabled.value = resolveAgentMessagePreviewEnabled(
-      blockId,
-      parts.value.hasMarkdownPreview,
-    );
-  },
-);
-
 const previewHtml = computed(() => renderAgentMessageMarkdown(props.content));
 
 function setPreviewMode(enabled: boolean): void {
@@ -57,6 +57,17 @@ async function copyMarkdownSource(): Promise<void> {
   } catch {
     copied.value = false;
   }
+}
+
+function openInEditor(): void {
+  if (!canOpenInEditor.value) {
+    return;
+  }
+  shell.openAgentContentInEditor({
+    title: deriveAgentReportTitle(parts.value.markdownSource),
+    content: parts.value.markdownSource,
+    preferPreview: true,
+  });
 }
 </script>
 
@@ -87,6 +98,15 @@ async function copyMarkdownSource(): Promise<void> {
           Raw
         </button>
       </div>
+      <button
+        v-if="canOpenInEditor"
+        type="button"
+        class="conversation-seam__block-button"
+        title="Open this report in the center editor"
+        @click="openInEditor"
+      >
+        Open in editor
+      </button>
       <button
         type="button"
         class="conversation-seam__block-button"

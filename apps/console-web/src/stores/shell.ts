@@ -50,6 +50,9 @@ import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
 import {
   editedFilePathsFromTranscript,
 } from '../lib/agent-transcript-blocks';
+import { buildResearchEditorContent } from '../lib/prove-research-source';
+import { resolveResearchFlyToTarget } from '../lib/research-fly-to-source';
+import type { ResearchBlockKind } from '../lib/research-provider';
 import {
   narrationForCompletion,
   narrationMilestonesForDelta,
@@ -61,6 +64,7 @@ import {
   shouldNarrateAgentEvent,
 } from '../lib/kairo-narration-policy';
 import { postKairoSpeak } from '../lib/kairo-speak-client';
+import type { EditorRevealRequest } from '../components/EditorHost.vue';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
 import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
@@ -81,6 +85,15 @@ import {
   resolveIdeAgentLinkedRunId,
   resolveIdeAgentLinkedRunIdFromMessages,
 } from '../lib/ide-agent-run-link';
+import {
+  shouldClearIdeAgentRunLink,
+  shouldShowIdeAgentStop,
+} from '../lib/ide-agent-run-active';
+import {
+  defaultWorkspaceStreamUi,
+  shouldSyncWorkspaceStreamGlobals,
+  workspaceStreamGlobalsFromState,
+} from '../lib/workspace-stream-ui';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
   readViewportWidth,
@@ -154,6 +167,13 @@ import {
   type EditorDocumentLanguage,
   type WorkspaceDocumentDescriptor,
 } from '../lib/workspace-documents';
+import { persistEditorMarkdownPreviewEnabled } from '../lib/editor-markdown-preview-prefs';
+import {
+  deriveAgentReportTitle,
+  extractAgentReportMarkdown,
+  shouldAutoOpenAgentReportInEditor,
+} from '../lib/agent-message-markdown';
+import { formatAgentDraftTitle } from '../lib/editor-tab-labels';
 import {
   selectPrimaryApprovalRun,
   selectPrimaryRun,
@@ -296,7 +316,21 @@ export const useShellStore = defineStore('shell', () => {
   const cursorCatalogError = ref<string | null>(null);
   const agentStreamActive = ref(false);
   const agentStreamMessageId = ref<string | null>(null);
-  let chatStreamSession: ChatStreamSession | null = null;
+  type AgentReportEditorLink = {
+    title: string;
+    documentId: string;
+  };
+  const agentReportEditorLinksByMessageId = ref<Record<string, AgentReportEditorLink>>({});
+  const editorRevealRequest = ref<EditorRevealRequest | null>(null);
+  type WorkspaceStreamUiState = {
+    active: boolean;
+    messageId: string | null;
+    activity: IdeComposerActivity | null;
+    ideAgentRunId: string | null;
+  };
+  const workspaceStreamUiById = ref<Record<string, WorkspaceStreamUiState>>({});
+  const workspaceIdeThreadMessagesById = ref<Record<string, OperatorThreadEntry[]>>({});
+  const chatStreamSessionsByWorkspace = new Map<string, ChatStreamSession>();
   const composerRuntimePrefsRevision = ref(0);
   const cursorPickerVisibleRevision = ref(0);
   const activeRun = ref<RunRecord | null>(null);
@@ -344,6 +378,7 @@ export const useShellStore = defineStore('shell', () => {
     Record<string, Partial<Record<ThreadSurface, string>>>
   >({});
   const operatorCommandDraft = ref('');
+  const ideComposerDraft = ref('');
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
   const ideAgentRunId = ref<string | null>(null);
   const ideComposerActivity = ref<IdeComposerActivity | null>(null);
@@ -363,6 +398,7 @@ export const useShellStore = defineStore('shell', () => {
   const fileSavedContents = ref<Record<string, string>>({});
   const fileContentLoadStates = ref<Record<string, FileContentLoadState>>({});
   const openedFilePaths = ref<string[]>([]);
+  const draftDocuments = ref<WorkspaceDocumentDescriptor[]>([]);
   const fileSaveState = ref<'idle' | 'saving'>('idle');
   const fileSaveError = ref<string | null>(null);
 
@@ -505,6 +541,7 @@ export const useShellStore = defineStore('shell', () => {
   );
   const editorDocuments = computed<WorkspaceDocumentDescriptor[]>(() => [
     ...fileDocuments.value,
+    ...draftDocuments.value,
     ...dtoDocuments.value,
   ]);
   const activeEditorDocument = computed(() => {
@@ -545,10 +582,10 @@ export const useShellStore = defineStore('shell', () => {
     if (runMutationPending.value) {
       return false;
     }
-    if (agentStreamActive.value) {
-      return Boolean(ideAgentLinkedRun.value?.run_id ?? ideAgentRunId.value);
-    }
-    return Boolean(ideAgentLinkedRun.value?.can_stop);
+    return shouldShowIdeAgentStop({
+      agentStreamActive: agentStreamActive.value,
+      run: ideAgentLinkedRun.value,
+    });
   });
   const canStopPrimaryRun = computed(
     () => Boolean(primaryActiveRun.value?.can_stop) && !runMutationPending.value,
@@ -761,10 +798,90 @@ export const useShellStore = defineStore('shell', () => {
     expandedDockSeams.value = next;
   }
 
+  function getWorkspaceStreamUi(workspaceId: string): WorkspaceStreamUiState {
+    return workspaceStreamUiById.value[workspaceId] ?? defaultWorkspaceStreamUi();
+  }
+
+  function applyWorkspaceStreamUiToGlobals(workspaceId: string): void {
+    if (!shouldSyncWorkspaceStreamGlobals(currentWorkspace.value?.workspace_id, workspaceId)) {
+      return;
+    }
+    const next = getWorkspaceStreamUi(workspaceId);
+    const globals = workspaceStreamGlobalsFromState(next);
+    agentStreamActive.value = globals.agentStreamActive;
+    agentStreamMessageId.value = globals.agentStreamMessageId;
+    ideComposerActivity.value = globals.ideComposerActivity as IdeComposerActivity | null;
+    ideAgentRunId.value = globals.ideAgentRunId;
+  }
+
+  function setWorkspaceStreamUi(
+    workspaceId: string,
+    partial: Partial<WorkspaceStreamUiState>,
+  ): void {
+    workspaceStreamUiById.value = {
+      ...workspaceStreamUiById.value,
+      [workspaceId]: {
+        ...getWorkspaceStreamUi(workspaceId),
+        ...partial,
+      },
+    };
+    applyWorkspaceStreamUiToGlobals(workspaceId);
+  }
+
+  function stashWorkspaceIdeView(workspaceId: string): void {
+    workspaceIdeThreadMessagesById.value = {
+      ...workspaceIdeThreadMessagesById.value,
+      [workspaceId]: [...threadMessages.value],
+    };
+    setWorkspaceStreamUi(workspaceId, {
+      active: agentStreamActive.value,
+      messageId: agentStreamMessageId.value,
+      activity: ideComposerActivity.value,
+      ideAgentRunId: ideAgentRunId.value,
+    });
+    if (activeThreadId.value) {
+      setWorkspaceSurfaceThreadId(workspaceId, currentThreadSurface(), activeThreadId.value);
+    }
+  }
+
+  async function restoreWorkspaceIdeView(workspaceId: string): Promise<void> {
+    const streamUi = getWorkspaceStreamUi(workspaceId);
+    agentStreamActive.value = streamUi.active;
+    agentStreamMessageId.value = streamUi.messageId;
+    ideComposerActivity.value = streamUi.activity;
+    ideAgentRunId.value = streamUi.ideAgentRunId;
+
+    const cached = workspaceIdeThreadMessagesById.value[workspaceId];
+    const threadId = getWorkspaceSurfaceThreadId(workspaceId, currentThreadSurface());
+    if (cached?.length) {
+      threadMessages.value = cached;
+      activeThreadId.value = threadId;
+      commandMutationState.value = 'idle';
+      commandMutationError.value = null;
+      return;
+    }
+
+    await loadWorkspaceThread(workspaceId, currentThreadSurface());
+  }
+
   function resetThreadContext(): void {
-    disconnectChatStreamSession();
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (workspaceId) {
+      disconnectChatStreamSession(workspaceId);
+      setWorkspaceStreamUi(workspaceId, {
+        active: false,
+        messageId: null,
+        activity: null,
+      });
+      const nextThreadCache = { ...workspaceIdeThreadMessagesById.value };
+      delete nextThreadCache[workspaceId];
+      workspaceIdeThreadMessagesById.value = nextThreadCache;
+    } else {
+      disconnectAllChatStreamSessions();
+    }
     agentStreamActive.value = false;
     agentStreamMessageId.value = null;
+    agentReportEditorLinksByMessageId.value = {};
     threadMessages.value = [];
     activeThreadId.value = null;
     operatorCommandDraft.value = '';
@@ -885,6 +1002,13 @@ export const useShellStore = defineStore('shell', () => {
         threadMessages.value = mapped;
         commandMutationState.value = 'idle';
         commandMutationError.value = null;
+        if (surface === 'ide') {
+          workspaceIdeThreadMessagesById.value = {
+            ...workspaceIdeThreadMessagesById.value,
+            [workspaceId]: mapped,
+          };
+          hydrateLatestAgentReportEditorLink(mapped);
+        }
       }
       if (surface === 'operator') {
         operatorThreadMessages.value = mapped;
@@ -948,17 +1072,46 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  function disconnectChatStreamSession(): void {
-    if (chatStreamSession) {
-      chatStreamSession.disconnect();
-      chatStreamSession = null;
+  function disconnectChatStreamSession(workspaceId?: string): void {
+    if (workspaceId) {
+      const session = chatStreamSessionsByWorkspace.get(workspaceId);
+      if (session) {
+        session.disconnect();
+        chatStreamSessionsByWorkspace.delete(workspaceId);
+      }
+      return;
     }
+    disconnectAllChatStreamSessions();
   }
 
-  function patchThreadMessageContent(messageId: string, content: string): void {
-    threadMessages.value = threadMessages.value.map((message) =>
-      message.message_id === messageId ? { ...message, content } : message,
-    );
+  function disconnectAllChatStreamSessions(): void {
+    for (const session of chatStreamSessionsByWorkspace.values()) {
+      session.disconnect();
+    }
+    chatStreamSessionsByWorkspace.clear();
+  }
+
+  function patchThreadMessageContent(
+    workspaceId: string,
+    messageId: string,
+    content: string,
+  ): void {
+    const updateMessages = (messages: OperatorThreadEntry[]) =>
+      messages.map((message) =>
+        message.message_id === messageId ? { ...message, content } : message,
+      );
+
+    if (currentWorkspace.value?.workspace_id === workspaceId) {
+      threadMessages.value = updateMessages(threadMessages.value);
+    }
+
+    const cached = workspaceIdeThreadMessagesById.value[workspaceId];
+    if (cached) {
+      workspaceIdeThreadMessagesById.value = {
+        ...workspaceIdeThreadMessagesById.value,
+        [workspaceId]: updateMessages(cached),
+      };
+    }
   }
 
   function kairoSpeechSessionId(): string {
@@ -1122,10 +1275,18 @@ export const useShellStore = defineStore('shell', () => {
     };
   }
 
-  function attachChatStream(threadId: string, messageId: string): void {
-    disconnectChatStreamSession();
-    agentStreamActive.value = true;
-    agentStreamMessageId.value = messageId;
+  function attachChatStream(workspaceId: string, threadId: string, messageId: string): void {
+    disconnectChatStreamSession(workspaceId);
+    setWorkspaceStreamUi(workspaceId, {
+      active: true,
+      messageId,
+      activity: ideComposerActivity.value,
+      ideAgentRunId: ideAgentRunId.value,
+    });
+    workspaceIdeThreadMessagesById.value = {
+      ...workspaceIdeThreadMessagesById.value,
+      [workspaceId]: [...threadMessages.value],
+    };
     const narrationEnabled = ideComposerActivity.value?.mode === 'agent';
     const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
     const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
@@ -1139,87 +1300,135 @@ export const useShellStore = defineStore('shell', () => {
       });
     }
 
-    chatStreamSession = startChatStreamSession({
-      threadId,
-      messageId,
-      onDelta: (content) => {
-        patchThreadMessageContent(messageId, content);
-        if (ideComposerActivity.value) {
-          ideComposerActivity.value = {
-            ...ideComposerActivity.value,
-            label: streamingActivityLabel(content, fullAccessNarration),
-          };
-        }
-        if (!narrationEnabled) {
-          return;
-        }
-        const milestones = narrationMilestonesForDelta(narratedContent, content);
-        narratedContent = content;
-        for (const milestone of milestones) {
-          const context: Record<string, unknown> = { operator_prompt: operatorPrompt };
-          if (milestone.toolLabel) {
-            context.tool_label = milestone.toolLabel;
+    chatStreamSessionsByWorkspace.set(
+      workspaceId,
+      startChatStreamSession({
+        threadId,
+        messageId,
+        onDelta: (content) => {
+          patchThreadMessageContent(workspaceId, messageId, content);
+          const activity = getWorkspaceStreamUi(workspaceId).activity;
+          if (activity) {
+            const nextActivity = {
+              ...activity,
+              label: streamingActivityLabel(content, fullAccessNarration),
+            };
+            setWorkspaceStreamUi(workspaceId, { activity: nextActivity });
           }
-          if (milestone.editPath) {
-            context.file_name = milestone.editPath;
+          if (!narrationEnabled) {
+            return;
           }
-          void narrateAgentStreamMilestone(
-            messageId,
-            milestone.key,
-            mapMilestoneToSpeakEvent(milestone.key),
-            context,
-          );
-        }
-      },
-      onDone: (payload) => {
-        if (payload.system_message_id && payload.system_content) {
-          patchThreadMessageContent(payload.system_message_id, payload.system_content);
-        }
-        const uiAction = parseChatUiAction(payload.ui_action);
-        if (uiAction) {
-          applyChatUiAction(
-            {
-              setCurrentWorkspace,
-              openWorkspaceFile,
-            },
-            uiAction,
-          );
-        }
-        const finalContent = payload.content ?? narratedContent;
-        if (narrationEnabled) {
-          const done = narrationForCompletion(finalContent);
-          const doneContext: Record<string, unknown> = { operator_prompt: operatorPrompt };
-          if (done.editCount) {
-            doneContext.edit_count = done.editCount;
+          const milestones = narrationMilestonesForDelta(narratedContent, content);
+          narratedContent = content;
+          for (const milestone of milestones) {
+            const context: Record<string, unknown> = { operator_prompt: operatorPrompt };
+            if (milestone.toolLabel) {
+              context.tool_label = milestone.toolLabel;
+            }
+            if (milestone.editPath) {
+              context.file_name = milestone.editPath;
+            }
+            void narrateAgentStreamMilestone(
+              messageId,
+              milestone.key,
+              mapMilestoneToSpeakEvent(milestone.key),
+              context,
+            );
           }
-          if (done.editPath) {
-            doneContext.file_name = done.editPath;
+        },
+        onDone: (payload) => {
+          if (payload.system_message_id && payload.system_content) {
+            patchThreadMessageContent(
+              workspaceId,
+              payload.system_message_id,
+              payload.system_content,
+            );
           }
-          void narrateAgentStreamMilestone(messageId, done.key, mapMilestoneToSpeakEvent(done.key), doneContext);
-        }
-        for (const path of editedFilePathsFromTranscript(finalContent)) {
-          if (openedFilePaths.value.includes(path)) {
-            void reloadWorkspaceFile(path);
+          const uiAction = parseChatUiAction(payload.ui_action);
+          if (uiAction) {
+            applyChatUiAction(
+              {
+                setCurrentWorkspace,
+                openWorkspaceFile,
+              },
+              uiAction,
+            );
           }
-        }
-        agentStreamActive.value = false;
-        agentStreamMessageId.value = null;
-        ideComposerActivity.value = null;
-        disconnectChatStreamSession();
-        void refreshRunSurfaces();
-      },
-      onError: (message, payload) => {
-        if (payload?.system_message_id && payload.system_content) {
-          patchThreadMessageContent(payload.system_message_id, payload.system_content);
-        }
-        commandMutationError.value = message;
-        agentStreamActive.value = false;
-        agentStreamMessageId.value = null;
-        ideComposerActivity.value = null;
-        disconnectChatStreamSession();
-        void refreshRunSurfaces();
-      },
-    });
+          const finalContent = payload.content ?? narratedContent;
+          if (narrationEnabled) {
+            const done = narrationForCompletion(finalContent);
+            const doneContext: Record<string, unknown> = { operator_prompt: operatorPrompt };
+            if (done.editCount) {
+              doneContext.edit_count = done.editCount;
+            }
+            if (done.editPath) {
+              doneContext.file_name = done.editPath;
+            }
+            void narrateAgentStreamMilestone(
+              messageId,
+              done.key,
+              mapMilestoneToSpeakEvent(done.key),
+              doneContext,
+            );
+          }
+          if (currentWorkspace.value?.workspace_id === workspaceId) {
+            for (const path of editedFilePathsFromTranscript(finalContent)) {
+              if (openedFilePaths.value.includes(path)) {
+                void reloadWorkspaceFile(path);
+              }
+            }
+            const reportMarkdown = extractAgentReportMarkdown(finalContent);
+            if (reportMarkdown && shouldAutoOpenAgentReportInEditor(reportMarkdown)) {
+              const documentId = openAgentContentInEditor({
+                title: deriveAgentReportTitle(reportMarkdown),
+                content: reportMarkdown,
+                preferPreview: true,
+              });
+              if (documentId) {
+                recordAgentReportEditorLink(messageId, {
+                  title: deriveAgentReportTitle(reportMarkdown),
+                  documentId,
+                });
+              }
+            }
+          }
+          setWorkspaceStreamUi(workspaceId, {
+            active: false,
+            messageId: null,
+            activity: null,
+          });
+          disconnectChatStreamSession(workspaceId);
+          void refreshRunSurfaces().then(() => {
+            const linkedRunId = getWorkspaceStreamUi(workspaceId).ideAgentRunId;
+            const linked = linkedRunId
+              ? runs.value.find((run) => run.run_id === linkedRunId) ?? null
+              : null;
+            if (shouldClearIdeAgentRunLink(linked)) {
+              setWorkspaceStreamUi(workspaceId, { ideAgentRunId: null });
+            }
+          });
+        },
+        onError: (message, payload) => {
+          if (payload?.system_message_id && payload.system_content) {
+            patchThreadMessageContent(
+              workspaceId,
+              payload.system_message_id,
+              payload.system_content,
+            );
+          }
+          if (currentWorkspace.value?.workspace_id === workspaceId) {
+            commandMutationError.value = message;
+          }
+          setWorkspaceStreamUi(workspaceId, {
+            active: false,
+            messageId: null,
+            activity: null,
+          });
+          disconnectChatStreamSession(workspaceId);
+          void refreshRunSurfaces();
+        },
+      }),
+    );
   }
 
   function clearIdeAgentRunLink(): void {
@@ -1227,12 +1436,18 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function restoreComposerDraft(content: string): void {
-    operatorCommandDraft.value = content.trim();
+    const trimmed = content.trim();
     commandMutationError.value = null;
     if (layoutMode.value === 'operator') {
+      operatorCommandDraft.value = trimmed;
       setDockHeroMode('command');
+      commandFocusToken.value += 1;
+      return;
     }
-    commandFocusToken.value += 1;
+    ideComposerDraft.value = trimmed;
+    agentDockCollapsed.value = false;
+    persistAgentDockCollapsed(false);
+    ideActivityView.value = 'agent';
   }
 
   function latestIdeOperatorPromptForRun(runId: string | null | undefined): string | null {
@@ -1264,7 +1479,7 @@ export const useShellStore = defineStore('shell', () => {
     } = {},
   ): Promise<boolean> {
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    const content = (options.contentOverride ?? operatorCommandDraft.value).trim();
+    const content = (options.contentOverride ?? ideComposerDraft.value).trim();
     if (
       commandMutationState.value === 'submitting' ||
       agentStreamActive.value ||
@@ -1321,7 +1536,7 @@ export const useShellStore = defineStore('shell', () => {
       );
       threadMessages.value = filterThreadMessagesForSurface(merged, 'ide');
       if (options.clearDraftOnSuccess !== false) {
-        operatorCommandDraft.value = '';
+        ideComposerDraft.value = '';
       }
       if (composerMode === 'agent' && response.run_id) {
         ideAgentRunId.value = response.run_id;
@@ -1344,7 +1559,7 @@ export const useShellStore = defineStore('shell', () => {
           executionAccess: agentExecutionAccess.value,
           operatorPrompt: content,
         };
-        attachChatStream(response.thread_id, response.stream_agent_message_id);
+        attachChatStream(workspaceId, response.thread_id, response.stream_agent_message_id);
         const next = new Set(expandedDockSeams.value);
         next.add('thread');
         if (response.run_id) {
@@ -1573,6 +1788,9 @@ export const useShellStore = defineStore('shell', () => {
     applyOperatorDockDefaults();
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
+      if (mode === 'operator') {
+        threadMessages.value = operatorThreadMessages.value;
+      }
       void loadWorkspaceThread(workspaceId, threadSurfaceForLayout(mode));
     }
     if (mode === 'ide' && workspaceId) {
@@ -1748,13 +1966,172 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function openWorkspaceFile(path: string): Promise<void> {
-    if (!openedFilePaths.value.includes(path)) {
-      openedFilePaths.value = [...openedFilePaths.value, path];
+  async function openWorkspaceFile(
+    path: string,
+    reveal: { line?: number; searchText?: string } | null = null,
+  ): Promise<void> {
+    const normalizedPath = normalizeWorkspaceFilePath(path);
+    if (!openedFilePaths.value.includes(normalizedPath)) {
+      openedFilePaths.value = [...openedFilePaths.value, normalizedPath];
     }
 
-    activeEditorDocumentId.value = workspaceFileDocumentId(path);
-    await ensureWorkspaceFileLoaded(path);
+    editorRevealRequest.value = reveal
+      ? {
+          line: reveal.line,
+          searchText: reveal.searchText?.trim() || undefined,
+          nonce: Date.now(),
+        }
+      : null;
+
+    activeEditorDocumentId.value = workspaceFileDocumentId(normalizedPath);
+    await ensureWorkspaceFileLoaded(normalizedPath);
+  }
+
+  function proveResearchSource(options: {
+    title: string;
+    url: string;
+    snippet: string;
+    query?: string;
+    kind?: ResearchBlockKind;
+  }): void {
+    const target = resolveResearchFlyToTarget({
+      title: options.title,
+      url: options.url,
+      snippet: options.snippet,
+      query: options.query,
+    });
+    if (target) {
+      void openWorkspaceFile(target.path, {
+        line: target.line,
+        searchText: target.searchText,
+      });
+      return;
+    }
+    const url = options.url.trim();
+    if (url && url !== 'about:blank') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  function openResearchInEditor(options: {
+    title: string;
+    url: string;
+    snippet: string;
+  }): void {
+    const title = options.title.trim() || 'Research source';
+    const snippet = options.snippet.trim();
+    if (!snippet) {
+      return;
+    }
+    openAgentContentInEditor({
+      title,
+      content: buildResearchEditorContent(title, options.url.trim(), snippet),
+      preferPreview: true,
+    });
+  }
+
+  function openAgentContentInEditor(options: {
+    title: string;
+    content: string;
+    preferPreview?: boolean;
+    focus?: boolean;
+  }): string | null {
+    const title = formatAgentDraftTitle(options.title.trim() || 'Agent response');
+    const content = options.content.trim();
+    if (!content) {
+      return null;
+    }
+    const shouldFocus = options.focus !== false;
+
+    const normalizedTitle = title.toLowerCase();
+    const existing = draftDocuments.value.find(
+      (document) => document.source === 'draft' && document.title.toLowerCase() === normalizedTitle,
+    );
+
+    if (existing) {
+      draftDocuments.value = draftDocuments.value.map((document) =>
+        document.id === existing.id
+          ? { ...document, value: content, dirty: document.value !== content }
+          : document,
+      );
+      if (shouldFocus) {
+        activeEditorDocumentId.value = existing.id;
+      }
+      return existing.id;
+    }
+
+    const slug = normalizedTitle.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
+    const id = `draft:agent-${slug || 'response'}-${Date.now().toString(36)}`;
+    draftDocuments.value = [
+      ...draftDocuments.value,
+      {
+        id,
+        title,
+        language: 'markdown',
+        value: content,
+        description: 'Agent response opened in the editor. Raw/Preview toggle is in the tab bar.',
+        source: 'draft',
+        readOnly: false,
+        dirty: false,
+      },
+    ];
+    if (shouldFocus) {
+      activeEditorDocumentId.value = id;
+    }
+
+    if (options.preferPreview !== false) {
+      persistEditorMarkdownPreviewEnabled(id, true);
+    }
+
+    return id;
+  }
+
+  function hydrateLatestAgentReportEditorLink(messages: OperatorThreadEntry[]): void {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role !== 'agent') {
+        continue;
+      }
+      if (agentReportEditorLink(message.message_id)) {
+        return;
+      }
+      const reportMarkdown = extractAgentReportMarkdown(message.content);
+      if (!reportMarkdown || !shouldAutoOpenAgentReportInEditor(reportMarkdown)) {
+        return;
+      }
+      const title = deriveAgentReportTitle(reportMarkdown);
+      const documentId = openAgentContentInEditor({
+        title,
+        content: reportMarkdown,
+        preferPreview: true,
+        focus: false,
+      });
+      if (documentId) {
+        recordAgentReportEditorLink(message.message_id, { title, documentId });
+      }
+      return;
+    }
+  }
+
+  function recordAgentReportEditorLink(
+    messageId: string,
+    link: AgentReportEditorLink,
+  ): void {
+    agentReportEditorLinksByMessageId.value = {
+      ...agentReportEditorLinksByMessageId.value,
+      [messageId]: link,
+    };
+  }
+
+  function agentReportEditorLink(messageId: string): AgentReportEditorLink | null {
+    return agentReportEditorLinksByMessageId.value[messageId] ?? null;
+  }
+
+  function focusAgentReportEditor(messageId: string): void {
+    const link = agentReportEditorLink(messageId);
+    if (link) {
+      activeEditorDocumentId.value = link.documentId;
+    }
   }
 
   async function createWorkspaceFile(): Promise<void> {
@@ -1888,10 +2265,11 @@ export const useShellStore = defineStore('shell', () => {
     persistOperatorWorkspaceId(workspaceId);
     syncCurrentWorkspace(workspaceId);
     if (previousWorkspaceId !== workspaceId) {
-      resetThreadContext();
-      clearIdeAgentRunLink();
+      if (previousWorkspaceId) {
+        stashWorkspaceIdeView(previousWorkspaceId);
+      }
       void refreshOperatorThreadMessages(workspaceId);
-      void loadWorkspaceThread(workspaceId, currentThreadSurface());
+      void restoreWorkspaceIdeView(workspaceId);
       void loadRunHistory(selectWorkspacePrimaryRun(
         runs.value.filter((run) => run.workspace_id === workspaceId),
       )?.run_id ?? null);
@@ -1937,6 +2315,13 @@ export const useShellStore = defineStore('shell', () => {
 
   function updateActiveFileContent(value: string): void {
     const document = activeEditorDocument.value;
+    if (document?.source === 'draft') {
+      draftDocuments.value = draftDocuments.value.map((entry) =>
+        entry.id === document.id ? { ...entry, value, dirty: entry.value !== value } : entry,
+      );
+      return;
+    }
+
     if (document?.source !== 'file' || !document.filePath) {
       return;
     }
@@ -1996,18 +2381,24 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadRuntimeSummary(): Promise<void> {
-    runtimeSummaryLoadState.value = 'loading';
-    runtimeSummaryError.value = null;
+  async function loadRuntimeSummary(options?: { background?: boolean }): Promise<void> {
+    const background =
+      options?.background === true && runtimeSummaryLoadState.value === 'loaded';
+    if (!background) {
+      runtimeSummaryLoadState.value = 'loading';
+      runtimeSummaryError.value = null;
+    }
 
     try {
       const summary = await fetchRuntimeSummary();
       runtimeSummary.value = summary;
       runtimeSummaryLoadState.value = 'loaded';
     } catch (error) {
-      runtimeSummaryLoadState.value = 'error';
-      runtimeSummaryError.value =
-        error instanceof Error ? error.message : 'runtime summary request failed';
+      if (!background) {
+        runtimeSummaryLoadState.value = 'error';
+        runtimeSummaryError.value =
+          error instanceof Error ? error.message : 'runtime summary request failed';
+      }
     }
   }
 
@@ -2434,15 +2825,45 @@ export const useShellStore = defineStore('shell', () => {
 
   async function refreshRunSurfaces(): Promise<void> {
     const briefingBackground = briefingLoadState.value === 'loaded';
+    const runtimeBackground = runtimeSummaryLoadState.value === 'loaded';
     await Promise.all([
       loadRuns(),
       loadRuntimeStatus(),
-      loadRuntimeSummary(),
+      loadRuntimeSummary({ background: runtimeBackground }),
       loadInbox(),
       loadConnectors(),
       loadOperatorBriefing({ background: briefingBackground }),
     ]);
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
+  }
+
+  async function completeAllReviewReadyRuns(): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    const targets = runs.value.filter(
+      (run) =>
+        run.phase === 'review_ready' &&
+        isOperatorCompletablePhase(run.phase) &&
+        (!workspaceId || run.workspace_id === workspaceId),
+    );
+    if (!targets.length || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'completing';
+    runMutationError.value = null;
+
+    try {
+      for (const run of targets) {
+        await completeRun(run.run_id);
+      }
+      await refreshRunSurfaces();
+      afterRunLifecycleMutation();
+    } catch (error) {
+      runMutationError.value =
+        error instanceof Error ? error.message : 'complete all review-ready runs failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
   }
 
   async function stopIdeAgentRun(): Promise<void> {
@@ -2453,7 +2874,7 @@ export const useShellStore = defineStore('shell', () => {
 
     runMutationState.value = 'stopping';
     runMutationError.value = null;
-    disconnectChatStreamSession();
+    disconnectChatStreamSession(currentWorkspace.value?.workspace_id);
     agentStreamActive.value = false;
     agentStreamMessageId.value = null;
     ideComposerActivity.value = null;
@@ -2706,8 +3127,13 @@ export const useShellStore = defineStore('shell', () => {
     await loadWorkspaceFiles();
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
-      await refreshOperatorThreadMessages(workspaceId);
-      await loadWorkspaceThread(workspaceId, currentThreadSurface());
+      await Promise.all([
+        loadWorkspaceThread(workspaceId, 'operator'),
+        loadWorkspaceThread(workspaceId, 'ide'),
+      ]);
+      if (layoutMode.value === 'operator') {
+        threadMessages.value = operatorThreadMessages.value;
+      }
     }
     applyOperatorDockDefaults();
   }
@@ -2777,6 +3203,8 @@ export const useShellStore = defineStore('shell', () => {
     kairoPresenceState,
     agentStreamActive,
     agentStreamMessageId,
+    agentReportEditorLink,
+    focusAgentReportEditor,
     agentDockCollapsed,
     ideActivityView,
     ideExplorerCollapsed,
@@ -2790,6 +3218,7 @@ export const useShellStore = defineStore('shell', () => {
     viewportWidth,
     clearActiveSignals,
     completePrimaryRun,
+    completeAllReviewReadyRuns,
     connectorMutationPending,
     connectorsError,
     connectorsItems,
@@ -2811,6 +3240,7 @@ export const useShellStore = defineStore('shell', () => {
     markPrimaryRunReviewReady,
     operatorBriefing,
     operatorCommandDraft,
+    ideComposerDraft,
     operatorPresenceSettings,
     operatorPresenceSettingsOpen,
     operatorPresenceSettingsSaving,
@@ -2891,6 +3321,7 @@ export const useShellStore = defineStore('shell', () => {
     topbarMetaPills,
     fileSaveError,
     fileSaveState,
+    editorRevealRequest,
     focusCommandSeam,
     restoreComposerDraft,
     focusAttentionSidebar,
@@ -2899,7 +3330,10 @@ export const useShellStore = defineStore('shell', () => {
     deliverKairoSpokenAlert,
     maybeSpeakBootGreeting,
     loadWorkspaceFiles,
+    openAgentContentInEditor,
     openWorkspaceFile,
+    openResearchInEditor,
+    proveResearchSource,
     saveActiveFileDocument,
     saveOperatorPresenceSettingsPatch,
     updateActiveFileContent,

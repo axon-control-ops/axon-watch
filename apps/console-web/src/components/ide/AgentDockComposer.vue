@@ -390,13 +390,13 @@ function setTokenEnabled(token: string | null, enabled: boolean): void {
   if (!token) return;
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, 'g');
-  let draft = shell.operatorCommandDraft;
+  let draft = shell.ideComposerDraft;
   draft = draft.replace(pattern, ' ').replace(/[ ]{2,}/g, ' ');
   draft = normalizeDraft(draft);
   if (enabled) {
     draft = draft ? `${token}\n${draft}` : token;
   }
-  shell.operatorCommandDraft = draft;
+  shell.ideComposerDraft = draft;
 }
 
 function toggleContext(kind: 'workspace' | 'file' | 'selection' | 'terminal' | 'ide' | 'pin'): void {
@@ -560,7 +560,7 @@ function handleHistory(direction: 'previous' | 'next'): void {
     entries: composerHistory.value,
     index: composerHistoryIndex.value,
     scratch: composerHistoryScratch.value,
-    currentDraft: shell.operatorCommandDraft,
+    currentDraft: shell.ideComposerDraft,
     direction,
   });
   composerHistoryIndex.value = step.index;
@@ -570,9 +570,9 @@ function handleHistory(direction: 'previous' | 'next'): void {
 
 async function handleSubmit(event?: Event): Promise<void> {
   event?.preventDefault();
-  const draft = shell.operatorCommandDraft.trim();
+  const draft = shell.ideComposerDraft.trim();
   await shell.submitIdeComposer(composerMode.value);
-  if (draft && !shell.operatorCommandDraft.trim() && shell.commandMutationState === 'idle') {
+  if (draft && !shell.ideComposerDraft.trim() && shell.commandMutationState === 'idle') {
     composerHistory.value = recordAgentComposerHistoryEntry(composerHistory.value, draft);
     persistAgentComposerHistory(composerHistory.value);
     composerHistoryIndex.value = -1;
@@ -637,7 +637,7 @@ function handleDocumentClick(): void {
 }
 
 function syncContextFromDraft(): void {
-  const draft = shell.operatorCommandDraft;
+  const draft = shell.ideComposerDraft;
   if (workspaceToken.value) {
     contextWorkspace.value = composerDraftIncludesToken(draft, workspaceToken.value);
   }
@@ -651,7 +651,7 @@ function syncContextFromDraft(): void {
 }
 
 watch(
-  () => shell.operatorCommandDraft,
+  () => shell.ideComposerDraft,
   () => {
     const fromHistory = applyingHistoryDraft.value;
     if (fromHistory) {
@@ -797,7 +797,7 @@ onUnmounted(() => {
           <textarea
             id="agent-dock-composer-input"
             ref="inputRef"
-            v-model="shell.operatorCommandDraft"
+            v-model="shell.ideComposerDraft"
             class="agent-dock-composer__input"
             rows="1"
             aria-label="Agent composer"
