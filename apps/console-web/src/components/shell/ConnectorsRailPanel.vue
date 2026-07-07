@@ -18,6 +18,10 @@ const summaryLabel = computed(() => {
 function openLegacyFallback(url: string): void {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
+
+function openTunnelUrl(url: string): void {
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
 </script>
 
 <template>
@@ -57,6 +61,32 @@ function openLegacyFallback(url: string): void {
             @click="shell.reprobeConnector(row.connectorId)"
           >
             Reprobe
+          </button>
+          <button
+            v-if="row.isTunnelConnector && row.tunnelStartAllowed"
+            type="button"
+            class="connectors-rail-panel__action connectors-rail-panel__action--primary"
+            :disabled="shell.connectorMutationPending"
+            @click="shell.startCloudflareTunnel()"
+          >
+            Start tunnel
+          </button>
+          <button
+            v-if="row.isTunnelConnector && row.tunnelRunning"
+            type="button"
+            class="connectors-rail-panel__action"
+            :disabled="shell.connectorMutationPending"
+            @click="shell.stopCloudflareTunnel()"
+          >
+            Stop tunnel
+          </button>
+          <button
+            v-if="row.isTunnelConnector && row.tunnelUrl"
+            type="button"
+            class="connectors-rail-panel__action"
+            @click="openTunnelUrl(row.tunnelUrl)"
+          >
+            Open tunnel URL
           </button>
           <button
             v-if="row.isLegacyFallback && row.fallbackUrl"

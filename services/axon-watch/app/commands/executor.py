@@ -5,6 +5,8 @@ from __future__ import annotations
 from app.connectors.catalog import load_watch_connector_definitions
 from app.connectors.probe import probe_connector
 from app.signals.suppression_store import acknowledge_signals
+from app.tunnel.slice_registry import load_tunnel_slice
+from app.tunnel.tunnel_probe import probe_cloudflare_tunnel
 from app.watch_summary import build_watch_summary
 
 
@@ -20,6 +22,17 @@ def execute_reprobe_connector(*, connector_id: str) -> dict[str, object]:
     definitions = load_watch_connector_definitions()
     definition = definitions.get(normalized_id)
     if definition is None:
+        tunnel_config = load_tunnel_slice()
+        tunnel_id = str((tunnel_config or {}).get("connector_id") or "cloudflare_tunnel").strip()
+        if normalized_id == tunnel_id and tunnel_config is not None:
+            record = probe_cloudflare_tunnel(tunnel_config)
+            return {
+                "connector_id": normalized_id,
+                "connector_status": record.get("status"),
+                "detail": record.get("detail", ""),
+                "latency_ms": record.get("latency_ms"),
+                "last_checked_at": record.get("last_checked_at"),
+            }
         raise WatchCommandError(f"connector not found: {normalized_id}")
 
     record = probe_connector(definition)

@@ -12,6 +12,10 @@ export interface ConnectorRailRow {
   detail: string;
   isLegacyFallback: boolean;
   fallbackUrl: string | null;
+  isTunnelConnector: boolean;
+  tunnelUrl: string | null;
+  tunnelRunning: boolean;
+  tunnelStartAllowed: boolean;
 }
 
 export function connectorRailTone(status: string): ConnectorRailTone {
@@ -31,6 +35,11 @@ export function buildConnectorRailRows(items: ConnectorProbeRecord[]): Connector
   return items.map((item) => {
     const connectorId = String(item.connector_id ?? '').trim();
     const isLegacy = connectorId === 'axon_local';
+    const isTunnel = connectorId === 'cloudflare_tunnel';
+    const tunnelMeta = item.tunnel;
+    const tunnelUrl = String(tunnelMeta?.tunnel_url ?? '').trim() || null;
+    const tunnelRunning = Boolean(tunnelMeta?.process_running);
+    const tunnelStartAllowed = isTunnel && Boolean(tunnelMeta?.auth_ready) && !tunnelRunning;
     return {
       connectorId,
       label: String(item.display_name ?? connectorId),
@@ -40,6 +49,10 @@ export function buildConnectorRailRows(items: ConnectorProbeRecord[]): Connector
       detail: String(item.detail ?? '').trim(),
       isLegacyFallback: isLegacy,
       fallbackUrl: isLegacy ? LEGACY_AXON_LOCAL_FALLBACK_URL : null,
+      isTunnelConnector: isTunnel,
+      tunnelUrl,
+      tunnelRunning,
+      tunnelStartAllowed,
     };
   });
 }

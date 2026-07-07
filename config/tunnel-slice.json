@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "connector_id": "cloudflare_tunnel",
+  "display_name": "Cloudflare tunnel",
+  "required": false,
+  "workspace_id": "workspace_axon_watch",
+  "tunnel_mode": "named",
+  "public_base_url": "https://axon.edudashpro.org.za",
+  "stable_domain": "axon.edudashpro.org.za",
+  "axon_local_root": "${AXON_LOCAL_ROOT}",
+  "binary_candidates": [
+    "${AXON_WATCH_STATE_DIR}/cloudflared",
+    "${AXON_LOCAL_ROOT}/cloudflared",
+    "cloudflared"
+  ],
+  "tunnel_log_paths": [
+    "${AXON_STATE_HOME}/logs/axon-tunnel.log",
+    "${HOME}/.local/share/axon/logs/axon-tunnel.log",
+    "${HOME}/.devbrain/axon-tunnel.log"
+  ],
+  "local_health_url": "http://127.0.0.1:7734/api/health"
+}

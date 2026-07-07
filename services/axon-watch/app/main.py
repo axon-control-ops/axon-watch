@@ -17,6 +17,7 @@ from app.events.store import list_events
 from app.events.stream import watch_events_stream_response
 from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.signals.store import get_inbox_snapshot
+from app.tunnel.tunnel_control import TunnelControlError, tunnel_start, tunnel_status, tunnel_stop
 from app.vault.api import (
     VaultExportBody,
     VaultMonitorImportBody,
@@ -130,6 +131,27 @@ def summary() -> dict[str, object]:
 @app.get("/internal/watch/connectors")
 def connectors() -> dict[str, object]:
     return build_connectors_response()
+
+
+@app.get("/internal/watch/tunnel")
+def tunnel_index() -> dict[str, object]:
+    return tunnel_status()
+
+
+@app.post("/internal/watch/tunnel/start")
+def tunnel_start_route() -> dict[str, object]:
+    try:
+        return tunnel_start()
+    except TunnelControlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/internal/watch/tunnel/stop")
+def tunnel_stop_route() -> dict[str, object]:
+    try:
+        return tunnel_stop()
+    except TunnelControlError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/internal/watch/inbox")

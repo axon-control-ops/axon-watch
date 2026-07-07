@@ -29,7 +29,9 @@ import {
   resumeRun,
   saveWorkspaceFile,
   saveOperatorPresenceSettings,
+  startTunnel,
   stopRun,
+  stopTunnel,
 } from '../api/control-plane';
 import type { ConnectorProbeRecord, CursorRuntimeStatusSnapshot, RuntimeMcpToolsSnapshot } from '../api/control-plane';
 import type { RuntimeStatusSnapshot } from '../api/control-plane';
@@ -2146,6 +2148,36 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function startCloudflareTunnel(): Promise<void> {
+    connectorMutationPending.value = true;
+    connectorsError.value = null;
+
+    try {
+      await startTunnel();
+      await Promise.all([loadConnectors(), loadRuntimeSummary(), loadInbox()]);
+    } catch (error) {
+      connectorsError.value =
+        error instanceof Error ? error.message : 'tunnel start failed';
+    } finally {
+      connectorMutationPending.value = false;
+    }
+  }
+
+  async function stopCloudflareTunnel(): Promise<void> {
+    connectorMutationPending.value = true;
+    connectorsError.value = null;
+
+    try {
+      await stopTunnel();
+      await Promise.all([loadConnectors(), loadRuntimeSummary(), loadInbox()]);
+    } catch (error) {
+      connectorsError.value =
+        error instanceof Error ? error.message : 'tunnel stop failed';
+    } finally {
+      connectorMutationPending.value = false;
+    }
+  }
+
   async function loadOperatorPresenceSettings(): Promise<void> {
     const cached = readPersistedOperatorPresenceSettings();
     if (cached) {
@@ -2642,6 +2674,8 @@ export const useShellStore = defineStore('shell', () => {
     rejectIdeAgentRun,
     rejectPrimaryRun,
     reprobeConnector,
+    startCloudflareTunnel,
+    stopCloudflareTunnel,
     runOperatorCommand,
     resumePrimaryRun,
     runs,

@@ -60,6 +60,44 @@ def fetch_watch_connectors(timeout_seconds: float = 0.75) -> dict[str, object] |
     return payload
 
 
+def fetch_watch_tunnel(timeout_seconds: float = 1.0) -> dict[str, object] | None:
+    url = f"{watch_base_url()}/internal/watch/tunnel"
+
+    try:
+        request = Request(url, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def post_watch_tunnel_action(action: str, timeout_seconds: float = 90.0) -> dict[str, object] | None:
+    normalized = action.strip().lower()
+    if normalized not in {"start", "stop"}:
+        return None
+    url = f"{watch_base_url()}/internal/watch/tunnel/{normalized}"
+
+    try:
+        request = Request(
+            url,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            method="POST",
+            data=b"{}",
+        )
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
 def post_watch_command(body: dict[str, object], timeout_seconds: float = 2.0) -> dict[str, object] | None:
     url = f"{watch_base_url()}/internal/watch/commands"
     encoded = json.dumps(body).encode("utf-8")

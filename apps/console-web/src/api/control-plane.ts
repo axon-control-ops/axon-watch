@@ -951,6 +951,25 @@ export interface ConnectorProbeRecord {
   detail?: string;
   latency_ms?: number;
   last_checked_at?: string;
+  tunnel?: {
+    mode?: string;
+    tunnel_url?: string;
+    process_running?: boolean;
+    auth_ready?: boolean;
+    binary_path?: string;
+  };
+}
+
+export interface TunnelStatusSnapshot {
+  running: boolean;
+  url: string;
+  mode: string;
+  named_tunnel_ready: boolean;
+  auth_source: string;
+  binary_path: string;
+  status: string;
+  detail: string;
+  msg?: string;
 }
 
 export interface ConnectorsSnapshot {
@@ -976,6 +995,44 @@ export async function fetchConnectors(): Promise<ConnectorsSnapshot> {
   }
 
   return response.json() as Promise<ConnectorsSnapshot>;
+}
+
+export async function fetchTunnelStatus(): Promise<TunnelStatusSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/tunnel/status` : '/api/tunnel/status';
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`tunnel status request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<TunnelStatusSnapshot>;
+}
+
+export async function startTunnel(): Promise<TunnelStatusSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/tunnel/start` : '/api/tunnel/start';
+  const response = await fetch(url, { method: 'POST' });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `tunnel start failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<TunnelStatusSnapshot>;
+}
+
+export async function stopTunnel(): Promise<TunnelStatusSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/tunnel/stop` : '/api/tunnel/stop';
+  const response = await fetch(url, { method: 'POST' });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `tunnel stop failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<TunnelStatusSnapshot>;
 }
 
 export interface PostWatchCommandRequest {

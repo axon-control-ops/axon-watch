@@ -177,7 +177,7 @@ Per `config/parity-snapshot.json` → `blockers_for_full_retirement` and `docs/L
 
 - [x] **G4.1** Inventory each unmigrated connector with owner, probe, and fallback removal criteria
 - [ ] **G4.2** WhatsApp / external messaging — bounded watch integration or explicit discard with operator approval
-- [ ] **G4.3** Tunnel / remote control — auth + binary + live status in connectors rail (operator foundation rule)
+- [x] **G4.3** Tunnel / remote control — auth + binary + live status in connectors rail (operator foundation rule)
 - [ ] **G4.4** Voice deck / mobile cockpit — event-driven presence (`IMPORT_MATRIX` KAIRO section)
 - [ ] **G4.5** Remaining Agent Dock parity items from `parity-snapshot.json`
 - [ ] **G4.6** Gate script per connector or bundled `verify:connector-parity`
@@ -228,6 +228,12 @@ Same as Phase F:
 | F6 retirement | Deferred | G6 with evidence |
 
 ## Append log
+
+### 2026-07-07 — G4.3 tunnel remote control slice
+
+- Watch tunnel probe reports binary, auth source, process state, and public health in connectors rail.
+- Control-plane `/api/tunnel/status|start|stop` proxies watch; console Connectors rail exposes tunnel actions.
+- Gate: `npm run verify:tunnel-remote-control`.
 
 ### 2026-07-07 — G4.1 legacy connector inventory
 

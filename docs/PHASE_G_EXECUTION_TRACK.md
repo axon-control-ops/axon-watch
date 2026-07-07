@@ -63,7 +63,8 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 | # | Slice | Deliverable | Blocks |
 |---|---|---|---|
 | 14 | **G4.1** | Connector inventory with probe + removal criteria | `verify:connector-inventory` | **Done** |
-| 15 | **G4.2–G4.5** | WhatsApp / tunnel / voice / dock parity (or explicit discard) | DashPro `:7734` fallback |
+| 15 | **G4.3** | Tunnel / remote control — binary + auth + live status in connectors rail | `verify:tunnel-remote-control` | **Done** |
+| 16 | **G4.2–G4.5** | WhatsApp (deferred) / voice / dock parity (or explicit discard) | DashPro `:7734` fallback |
 | 16 | **G4.6** | `verify:connector-parity` | — |
 | 17 | **G5** | Capability matrix + extended regression | — |
 | 18 | **G6** | One week `:4173` only + operator sign-off | **Retirement** |
@@ -87,20 +88,26 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 4):** **G4.2** WhatsApp / external messaging, or **G4.3** tunnel / remote control.
+**Next up (Wave 4):** **G4.4** voice deck / mobile cockpit, or **G4.5** Agent Dock parity gaps. **G4.2 WhatsApp deferred.**
 
 ---
 
 ## What still forces `:7734`
 
 1. Agent loop with file edits → Wave 1–2 (**done** on axon-watch)  
-2. Child-project connectors (WhatsApp, tunnel) → G4  
+2. Child-project connectors (WhatsApp deferred, tunnel partial on Axon-X) → G4  
 3. Voice / mobile cockpit → G4.4 or explicit discard  
 4. Legacy settings / storage paths → G5 matrix  
 
 ---
 
 ## Append log
+
+### 2026-07-07 — G4.3 tunnel remote control on Axon-X
+
+- `services/axon-watch/app/tunnel/*` probes cloudflared binary, auth sources (env/vault/legacy), process state, and public health.
+- Connectors rail shows `cloudflare_tunnel` with Start/Stop (via axon-local `tunnel.sh`) and Open tunnel URL.
+- Gate: `npm run verify:tunnel-remote-control` (`test22-tunnel-remote-control.sh`).
 
 ### 2026-07-07 — G4.1 legacy connector inventory
 

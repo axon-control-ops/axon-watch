@@ -26,8 +26,10 @@ from app.adapters.watch_client import (
     fetch_watch_connectors,
     fetch_watch_delivery_receipts,
     fetch_watch_events,
+    fetch_watch_tunnel,
     get_watch_command,
     post_watch_command,
+    post_watch_tunnel_action,
 )
 from app.persistence import chat_store, operator_presence_settings_store
 from app.operator_briefing import build_operator_briefing
@@ -486,6 +488,30 @@ def connectors_index() -> dict[str, object]:
     payload = fetch_watch_connectors()
     if payload is None:
         raise HTTPException(status_code=503, detail="watch connectors unavailable")
+    return payload
+
+
+@app.get("/api/tunnel/status")
+def tunnel_status_index() -> dict[str, object]:
+    payload = fetch_watch_tunnel()
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch tunnel status unavailable")
+    return payload
+
+
+@app.post("/api/tunnel/start")
+def tunnel_start_index() -> dict[str, object]:
+    payload = post_watch_tunnel_action("start")
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch tunnel start unavailable")
+    return payload
+
+
+@app.post("/api/tunnel/stop")
+def tunnel_stop_index() -> dict[str, object]:
+    payload = post_watch_tunnel_action("stop")
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch tunnel stop unavailable")
     return payload
 
 

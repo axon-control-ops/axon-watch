@@ -99,19 +99,19 @@
       "id": "cloudflare_tunnel",
       "display_name": "Cloudflare tunnel / remote public URL",
       "category": "child_project_integration",
-      "axon_x_status": "unmigrated",
-      "owner": "axon-local tunnel + cloudflare settings",
+      "axon_x_status": "partial",
+      "owner": "services/axon-watch/app/tunnel",
       "phase_g_slice": "G4.3",
       "probe": {
-        "kind": "manual",
-        "donor_path": "axon-local cloudflare_tunnel_token + tunnel status routes",
-        "note": "Operator foundation rule: binary + auth + live diagnostics required before 'ready'."
+        "kind": "gate",
+        "gate": "verify:tunnel-remote-control",
+        "note": "Binary + auth probe and connectors rail status; start/stop via axon-local tunnel.sh when AXON_LOCAL_ROOT is set."
       },
       "fallback": {
         "url": "http://127.0.0.1:7734",
         "ui_entry": "axon-local tunnel / remote control settings"
       },
-      "removal_criteria": "Tunnel binary on PATH, vault/config present, live status in connectors rail, and verify:connector-parity gate for tunnel slice."
+      "removal_criteria": "Tunnel slice stays green on operator host with live connectors rail status; axon-local fallback only needed when start/stop or auth paths regress."
     },
     {
       "id": "voice_deck_mobile_cockpit",
