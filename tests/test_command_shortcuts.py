@@ -30,6 +30,20 @@ class CommandShortcutTests(unittest.TestCase):
         self.assertEqual(classify_command("check-health"), "shell_command")
         self.assertEqual(classify_command("verify"), "shell_command")
 
+    def test_questions_are_not_commands(self) -> None:
+        for prompt in (
+            "Did you commit and push",
+            "what does the readme say?",
+            "is the health check passing?",
+            "how do I run git status?",
+        ):
+            self.assertEqual(classify_command(prompt), "unsupported", prompt)
+
+    def test_imperative_commands_still_classify(self) -> None:
+        self.assertEqual(classify_command("read README.md"), "read_file")
+        self.assertEqual(classify_command("show the readme"), "read_file")
+        self.assertEqual(classify_command("git status"), "git_status")
+
     def test_dispatch_ack_includes_execution_summary(self) -> None:
         execution = CommandExecutionResult(
             intent="shell_command",

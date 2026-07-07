@@ -13,6 +13,20 @@ _COMMIT_INTENT_RE = re.compile(
     re.IGNORECASE,
 )
 _PUSH_INTENT_RE = re.compile(r"\bpush\b", re.IGNORECASE)
+# Interrogative prompts ("did you commit and push?") are questions, not
+# instructions — they must go to the runtime for an answer, never execute git.
+_QUESTION_RE = re.compile(
+    r"^\s*(?:did|do|does|have|has|had|is|are|was|were|can|could|will|would|"
+    r"should|shall|what|when|where|which|who|why|how)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_question(prompt: str) -> bool:
+    stripped = prompt.strip()
+    if stripped.endswith("?"):
+        return True
+    return bool(_QUESTION_RE.match(stripped))
 _COMMIT_MESSAGE_PATTERNS = (
     re.compile(r'commit(?:\s+message)?[\s:=-]+["\']([^"\']+)["\']', re.IGNORECASE),
     re.compile(r'git\s+commit\s+-m\s+["\']([^"\']+)["\']', re.IGNORECASE),
@@ -38,6 +52,8 @@ def try_lane_b_git_commit_dispatch(
     execution_access: str | None,
 ) -> dict[str, object] | None:
     if not full_access_requested(execution_access):
+        return None
+    if _is_question(user_prompt):
         return None
     if not _COMMIT_INTENT_RE.search(user_prompt):
         return None

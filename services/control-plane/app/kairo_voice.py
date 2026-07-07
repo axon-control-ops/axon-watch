@@ -27,7 +27,7 @@ _FALLBACK_POOLS: dict[str, list[str]] = {
         "Right — leave it with me.",
         "Very good — I'll see to it now.",
         "At once — I'll handle that.",
-        "Consider it in hand, sir.",
+        "Consider it in hand.",
     ],
     "thinking": [
         "One moment — I'm working out the best approach.",
@@ -167,12 +167,7 @@ def _fallback_for_event(
         return line.replace("that file", file_name).replace("the file", file_name)
 
     if event_type == "agent_start":
-        file_name = str(context.get("active_file") or "").strip()
-        line = _pick_pool_line("agent_start", recent, persona_enabled=persona_enabled)
-        if file_name:
-            short = file_name.split("/")[-1]
-            return f"{line.rstrip('.')} in {short}."
-        return line
+        return _pick_pool_line("agent_start", recent, persona_enabled=persona_enabled)
 
     pool_key = event_type if event_type in _FALLBACK_POOLS else "done"
     return _pick_pool_line(pool_key, recent, persona_enabled=persona_enabled)
@@ -227,7 +222,8 @@ def _try_runtime_line(
 def should_use_runtime_for_event(event_type: str, narration: NarrationLevel) -> bool:
     if narration == "off":
         return False
-    return event_type in {"agent_start", "done", "greeting", "chat_summary", "alert", "thinking", "tool", "edit"}
+    # Narration is bookend-only (agent_start + done) plus alerts/greetings.
+    return event_type in {"agent_start", "done", "greeting", "chat_summary", "alert"}
 
 
 def generate_spoken_line(
@@ -276,7 +272,7 @@ def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:
     if narration == "off":
         return False
     if narration == "conversational":
-        return True
+        return event_type in {"agent_start", "done", "alert", "approval_literal", "greeting", "chat_summary"}
     return event_type in {"agent_start", "done", "alert", "approval_literal", "greeting"}
 
 

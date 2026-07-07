@@ -64,6 +64,20 @@ class LaneBGitDispatchTests(unittest.TestCase):
         )
         self.assertIsNone(payload)
 
+    def test_skips_questions_about_commits(self) -> None:
+        for prompt in (
+            "Did you commit and push",
+            "did you commit and push?",
+            "have the changes been committed?",
+            "what did you commit?",
+        ):
+            payload = try_lane_b_git_commit_dispatch(
+                workspace_id="workspace_alpha",
+                user_prompt=prompt,
+                execution_access="full",
+            )
+            self.assertIsNone(payload, prompt)
+
     def test_skips_without_commit_intent(self) -> None:
         payload = try_lane_b_git_commit_dispatch(
             workspace_id="workspace_alpha",

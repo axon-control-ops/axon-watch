@@ -1,4 +1,4 @@
-/** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool). */
+/** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
 export type AgentTranscriptSegment =
   | { kind: 'text'; text: string }
@@ -11,13 +11,15 @@ export type AgentTranscriptSegment =
       diff: string;
       open: boolean;
     }
-  | { kind: 'tool'; label: string };
+  | { kind: 'tool'; label: string }
+  | { kind: 'terminal'; command: string; output: string; open: boolean };
 
 const EDIT_HEADER_RE = /^:::edit\s+(.+?)\s+\+(\d+)\s+-(\d+)\s*$/;
 const TOOL_HEADER_RE = /^:::tool\s+(.+)$/;
+const TERMINAL_HEADER_RE = /^:::terminal\s+(.+)$/;
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
-  return /^:::(thinking|edit|tool)\b/m.test(content);
+  return /^:::(thinking|edit|tool|terminal)\b/m.test(content);
 }
 
 export function parseAgentTranscriptBlocks(content: string): AgentTranscriptSegment[] {
@@ -90,6 +92,30 @@ export function parseAgentTranscriptBlocks(content: string): AgentTranscriptSegm
       flushText();
       segments.push({ kind: 'tool', label: toolMatch[1].trim() });
       index += 1;
+      continue;
+    }
+
+    const terminalMatch = line.match(TERMINAL_HEADER_RE);
+    if (terminalMatch) {
+      flushText();
+      const body: string[] = [];
+      let closed = false;
+      index += 1;
+      while (index < lines.length) {
+        if (lines[index].trimEnd() === ':::') {
+          closed = true;
+          index += 1;
+          break;
+        }
+        body.push(lines[index]);
+        index += 1;
+      }
+      segments.push({
+        kind: 'terminal',
+        command: terminalMatch[1].trim(),
+        output: body.join('\n').replace(/^\n+|\n+$/g, ''),
+        open: !closed,
+      });
       continue;
     }
 

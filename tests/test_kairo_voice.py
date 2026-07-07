@@ -43,8 +43,19 @@ class KairoVoicePolicyTests(unittest.TestCase):
     def test_narration_allows_event_respects_levels(self) -> None:
         self.assertFalse(narration_allows_event("agent_start", "off"))
         self.assertTrue(narration_allows_event("agent_start", "minimal"))
-        self.assertTrue(narration_allows_event("tool", "conversational"))
+        self.assertFalse(narration_allows_event("tool", "conversational"))
+        self.assertTrue(narration_allows_event("done", "conversational"))
         self.assertFalse(narration_allows_event("tool", "minimal"))
+
+    def test_agent_start_fallback_ignores_active_file(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="agent_start",
+                context={"active_file": "README.md", "operator_prompt": "fix the terminal"},
+                session_id="fallback-readme-test",
+            )
+        self.assertNotIn("README", payload["line"])
+        self.assertEqual(payload["source"], "fallback")
 
     def test_approval_literal_bypasses_runtime(self) -> None:
         with patch("app.kairo_voice._try_runtime_line", return_value="Model paraphrase."):

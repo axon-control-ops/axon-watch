@@ -58,6 +58,10 @@ describe('kairo-narration-policy', () => {
 
     expect(
       shouldNarrateAgentEvent({ eventKey: 'tool:0', narration: 'conversational' }),
+    ).toBe(false);
+
+    expect(
+      shouldNarrateAgentEvent({ eventKey: 'start', narration: 'conversational' }),
     ).toBe(true);
   });
 

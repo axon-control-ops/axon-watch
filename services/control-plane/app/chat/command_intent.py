@@ -11,6 +11,21 @@ _RESUME_FROM_REVIEW = re.compile(
     re.IGNORECASE,
 )
 _RUN_PREFIX = re.compile(r"^run\s+.+", re.IGNORECASE)
+# Questions must be answered by the runtime, never executed as commands.
+# "did you commit?" or "what does the README say?" are conversation, while
+# "read README.md" or "git status" are imperative operator commands.
+_QUESTION_PREFIX = re.compile(
+    r"^\s*(?:did|do|does|have|has|had|is|are|was|were|can|could|will|would|"
+    r"should|shall|what|when|where|which|who|why|how)\b",
+    re.IGNORECASE,
+)
+
+
+def is_question(content: str) -> bool:
+    stripped = content.strip()
+    if stripped.endswith("?"):
+        return True
+    return bool(_QUESTION_PREFIX.match(stripped))
 _SHORTCUT_SHELL_COMMANDS = {
     "check-health": "./scripts/dev/check-health.sh",
     "check health": "./scripts/dev/check-health.sh",
@@ -32,6 +47,9 @@ def classify_command(content: str) -> str:
     if not lowered:
         return "unsupported"
 
+    if is_question(content):
+        return "unsupported"
+
     if lowered in _SHORTCUT_SHELL_COMMANDS:
         return "shell_command"
     if _RUN_PREFIX.match(content.strip()):
@@ -41,7 +59,9 @@ def classify_command(content: str) -> str:
         return "health_probe"
     if lowered.startswith("ls") or "list files" in lowered or lowered == "dir":
         return "list_files"
-    if _READ_PREFIX.match(content.strip()) or "readme" in lowered:
+    if _READ_PREFIX.match(content.strip()) or re.match(
+        r"^(?:open|show)\s+(?:the\s+)?readme\b", lowered
+    ):
         return "read_file"
     if _GIT_STATUS_PREFIX.match(content.strip()) or lowered == "git status":
         return "git_status"

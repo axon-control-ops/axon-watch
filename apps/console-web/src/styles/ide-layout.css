@@ -135,8 +135,8 @@
 .ide-explorer-panel__action {
   display: grid;
   place-items: center;
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 22px;
+  height: 22px;
   border: 0;
   border-radius: 2px;
   background: transparent;
@@ -152,7 +152,7 @@
 
 .ide-explorer-panel__refresh,
 .ide-explorer-panel__collapse-all {
-  font-size: 0.82rem;
+  font-size: 15px;
   line-height: 1;
 }
 

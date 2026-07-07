@@ -310,6 +310,21 @@ watch(
               <span>{{ segment.label }}</span>
             </div>
 
+            <div v-else-if="segment.kind === 'terminal'" class="agent-block agent-block--terminal">
+              <div class="agent-block__terminal-header">
+                <span class="agent-block__terminal-prompt" aria-hidden="true">$</span>
+                <code class="agent-block__terminal-command">{{ segment.command }}</code>
+                <span
+                  v-if="segment.open && isStreamingMessage(message.message_id)"
+                  class="agent-block__terminal-running"
+                >running…</span>
+              </div>
+              <pre
+                v-if="segment.output"
+                class="agent-block__terminal-output"
+              >{{ segment.output }}</pre>
+            </div>
+
             <div v-else-if="segment.kind === 'edit'" class="agent-block agent-block--edit">
               <button
                 type="button"

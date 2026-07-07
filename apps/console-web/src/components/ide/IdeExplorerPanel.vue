@@ -75,7 +75,7 @@ function createNewFolder(): void {
           aria-label="New File"
           @click="createNewFile"
         >
-          <WorkbenchIcon name="new-file" :size="13" />
+          <WorkbenchIcon name="new-file" :size="16" />
         </button>
         <button
           type="button"
@@ -84,7 +84,7 @@ function createNewFolder(): void {
           aria-label="New Folder"
           @click="createNewFolder"
         >
-          <WorkbenchIcon name="folder" :size="13" />
+          <WorkbenchIcon name="folder" :size="16" />
         </button>
         <button
           type="button"
@@ -115,7 +115,7 @@ function createNewFolder(): void {
             :aria-expanded="showExplorerMenu"
             @click="toggleExplorerMenu"
           >
-            <WorkbenchIcon name="more" :size="13" />
+            <WorkbenchIcon name="more" :size="16" />
           </button>
           <div
             v-if="showExplorerMenu"

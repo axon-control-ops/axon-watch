@@ -4120,6 +4120,52 @@ body:has(.console-shell--mockup) {
   overflow: hidden;
 }
 
+.agent-block--terminal {
+  border: 1px solid rgba(120, 140, 170, 0.24);
+  border-radius: 0.45rem;
+  background: rgba(4, 8, 14, 0.85);
+  overflow: hidden;
+  font-family: var(--font-mono, monospace);
+}
+
+.agent-block__terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  background: rgba(120, 140, 170, 0.08);
+  font-size: 0.62rem;
+}
+
+.agent-block__terminal-prompt {
+  color: rgba(120, 220, 160, 0.95);
+}
+
+.agent-block__terminal-command {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(226, 236, 248, 0.94);
+}
+
+.agent-block__terminal-running {
+  color: rgba(0, 210, 255, 0.8);
+  font-style: italic;
+  font-size: 0.58rem;
+}
+
+.agent-block__terminal-output {
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  max-height: 14rem;
+  overflow: auto;
+  font-size: 0.58rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  color: rgba(178, 196, 216, 0.92);
+}
+
 .agent-block__edit-header {
   display: flex;
   align-items: center;

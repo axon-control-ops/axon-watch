@@ -4,6 +4,8 @@ export type IdeComposerActivity = {
   label: string;
   mode: 'ask' | 'plan' | 'agent';
   executionAccess: AgentExecutionAccess;
+  /** Operator message that started the current composer turn (for KAIRO narration). */
+  operatorPrompt?: string;
 };
 
 export function buildIdeComposerActivityLabel(

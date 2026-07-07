@@ -86,16 +86,16 @@ defineExpose({
             'workspace-file-tree__row--file': row.kind === 'file',
             'workspace-file-tree__row--active': row.kind === 'file' && activePath === row.path,
           }"
-          :style="{ paddingLeft: `${0.35 + row.depth * 0.75}rem` }"
+          :style="{ paddingLeft: `${6 + row.depth * 8}px` }"
           @click="handleRowClick(row)"
         >
           <span v-if="row.kind === 'directory'" class="workspace-file-tree__chevron">
             <WorkbenchIcon
               :name="isExpanded(row.path) ? 'folder-open' : 'folder'"
-              :size="13"
+              :size="16"
             />
           </span>
-          <WorkbenchIcon v-else name="file" :size="13" class="workspace-file-tree__file-icon" />
+          <WorkbenchIcon v-else name="file" :size="16" class="workspace-file-tree__file-icon" />
           <span>{{ row.name }}</span>
         </button>
       </li>

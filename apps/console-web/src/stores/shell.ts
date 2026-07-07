@@ -1084,12 +1084,13 @@ export const useShellStore = defineStore('shell', () => {
     agentStreamMessageId.value = messageId;
     const narrationEnabled = ideComposerActivity.value?.mode === 'agent';
     const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
+    const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
     let narratedContent = '';
     const voiceContext = kairoVoiceContext();
 
     if (narrationEnabled) {
       void narrateAgentStreamMilestone(messageId, 'start', 'agent_start', {
-        active_file: voiceContext.activeFile ?? '',
+        operator_prompt: operatorPrompt,
         full_access: voiceContext.fullAccess,
       });
     }
@@ -1111,15 +1112,18 @@ export const useShellStore = defineStore('shell', () => {
         const milestones = narrationMilestonesForDelta(narratedContent, content);
         narratedContent = content;
         for (const milestone of milestones) {
+          const context: Record<string, unknown> = { operator_prompt: operatorPrompt };
+          if (milestone.toolLabel) {
+            context.tool_label = milestone.toolLabel;
+          }
+          if (milestone.editPath) {
+            context.file_name = milestone.editPath;
+          }
           void narrateAgentStreamMilestone(
             messageId,
             milestone.key,
             mapMilestoneToSpeakEvent(milestone.key),
-            {
-              tool_label: milestone.toolLabel ?? '',
-              file_name: milestone.editPath ?? '',
-              active_file: voiceContext.activeFile ?? '',
-            },
+            context,
           );
         }
       },
@@ -1140,11 +1144,14 @@ export const useShellStore = defineStore('shell', () => {
         const finalContent = payload.content ?? narratedContent;
         if (narrationEnabled) {
           const done = narrationForCompletion(finalContent);
-          void narrateAgentStreamMilestone(messageId, done.key, mapMilestoneToSpeakEvent(done.key), {
-            edit_count: done.editCount ?? 0,
-            file_name: done.editPath ?? '',
-            active_file: voiceContext.activeFile ?? '',
-          });
+          const doneContext: Record<string, unknown> = { operator_prompt: operatorPrompt };
+          if (done.editCount) {
+            doneContext.edit_count = done.editCount;
+          }
+          if (done.editPath) {
+            doneContext.file_name = done.editPath;
+          }
+          void narrateAgentStreamMilestone(messageId, done.key, mapMilestoneToSpeakEvent(done.key), doneContext);
         }
         for (const path of editedFilePathsFromTranscript(finalContent)) {
           if (openedFilePaths.value.includes(path)) {
@@ -1207,6 +1214,7 @@ export const useShellStore = defineStore('shell', () => {
       label: buildIdeComposerActivityLabel(composerMode, agentExecutionAccess.value),
       mode: composerMode,
       executionAccess: agentExecutionAccess.value,
+      operatorPrompt: content,
     };
 
     try {
@@ -1252,6 +1260,7 @@ export const useShellStore = defineStore('shell', () => {
           label: buildIdeStreamActivityLabel(agentExecutionAccess.value),
           mode: composerMode,
           executionAccess: agentExecutionAccess.value,
+          operatorPrompt: content,
         };
         attachChatStream(response.thread_id, response.stream_agent_message_id);
         const next = new Set(expandedDockSeams.value);

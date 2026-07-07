@@ -52,6 +52,32 @@ describe('parseAgentTranscriptBlocks', () => {
     expect(segments).toEqual([{ kind: 'thinking', text: 'Still reasoning', open: true }]);
   });
 
+  it('parses terminal blocks with command and output', () => {
+    const content = [
+      ':::terminal npm test',
+      '> vitest run',
+      'Tests 227 passed',
+      ':::',
+    ].join('\n');
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments).toEqual([
+      {
+        kind: 'terminal',
+        command: 'npm test',
+        output: '> vitest run\nTests 227 passed',
+        open: false,
+      },
+    ]);
+  });
+
+  it('marks streaming terminal blocks as open', () => {
+    const segments = parseAgentTranscriptBlocks(':::terminal git status');
+    expect(segments).toEqual([
+      { kind: 'terminal', command: 'git status', output: '', open: true },
+    ]);
+  });
+
   it('passes plain replies through as one text segment', () => {
     expect(agentContentHasTranscriptBlocks('Just a reply')).toBe(false);
     expect(parseAgentTranscriptBlocks('Just a reply')).toEqual([

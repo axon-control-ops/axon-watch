@@ -86,6 +86,34 @@ def _relative_path(path: str, workspace_root: str) -> str:
     return resolved.name or path
 
 
+_TERMINAL_OUTPUT_LIMIT = 4000
+
+
+def _shell_output_from_result(result: Any) -> str:
+    """Best-effort extraction of command output from a shell tool result."""
+    if not isinstance(result, dict):
+        return ""
+    for container in (result.get("success"), result):
+        if not isinstance(container, dict):
+            continue
+        parts: list[str] = []
+        for key in ("stdout", "output", "stderr"):
+            value = container.get(key)
+            if isinstance(value, str) and value.strip():
+                parts.append(value.rstrip())
+        if parts:
+            return "\n".join(parts)
+    return ""
+
+
+def _terminal_block(command: str, output: str) -> str:
+    trimmed = output.strip()
+    if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
+        trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
+    body = f"\n{trimmed}\n" if trimmed else "\n"
+    return f"\n:::terminal {command}{body}:::\n"
+
+
 def _tool_block_from_event(event: dict[str, Any], workspace_root: str) -> str:
     """Render a completed tool_call event as a transcript block, or ''."""
     if event.get("type") != "tool_call" or event.get("subtype") != "completed":
@@ -111,6 +139,19 @@ def _tool_block_from_event(event: dict[str, Any], workspace_root: str) -> str:
         args = read.get("args") if isinstance(read.get("args"), dict) else {}
         path = _relative_path(str(args.get("path") or ""), workspace_root)
         return f"\n:::tool Read {path}\n"
+
+    # Shell commands render as a terminal block (command + captured output),
+    # mirroring how Cursor surfaces agent-run commands in its own terminal.
+    for shell_key in ("shellToolCall", "runTerminalCommandToolCall", "terminalToolCall"):
+        shell_call = tool_call.get(shell_key)
+        if not isinstance(shell_call, dict):
+            continue
+        args = shell_call.get("args") if isinstance(shell_call.get("args"), dict) else {}
+        command = str(args.get("command") or args.get("commandLine") or "").strip()
+        if not command:
+            break
+        output = _shell_output_from_result(shell_call.get("result"))
+        return _terminal_block(command, output)
 
     for key, value in tool_call.items():
         if not key.endswith("ToolCall") or not isinstance(value, dict):
