@@ -66,8 +66,8 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 | 15 | **G4.3** | Tunnel / remote control — binary + auth + live status in connectors rail | `verify:tunnel-remote-control` | **Done** |
 | 16 | **G4.4** | Voice deck / mobile cockpit — event-driven presence | `verify:voice-cockpit` | **Done** |
 | 17 | **G4.5** | Agent Dock parity gaps (hero persist, thread meta, collapsible seam) | `verify:agent-dock-parity` | **Done** |
-| 18 | **G4.2–G4.6** | WhatsApp (deferred) / connector parity gate | DashPro `:7734` fallback | — |
-| 19 | **G4.6** | `verify:connector-parity` | — | — |
+| 18 | **G4.2** | WhatsApp — bounded watch integration or explicit discard | DashPro `:7734` fallback | **Deferred** |
+| 19 | **G4.6** | `verify:connector-parity` bundled gate | `test25-connector-parity-bundle.sh` | **Done** |
 | 20 | **G5** | Capability matrix + extended regression | — | — |
 | 21 | **G6** | One week `:4173` only + operator sign-off | **Retirement** | — |
 
@@ -90,7 +90,9 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 4):** **G4.6** `verify:connector-parity` bundle, then **G5** capability matrix. **G4.2 WhatsApp deferred.**
+**Wave 4 exit:** G4.1–G4.6 gates green (G4.2 WhatsApp deferred with operator approval). **Next:** **G5** capability matrix.
+
+**Next up:** **G5** capability matrix, then **G6** retirement dry-run. **G4.2 WhatsApp deferred.**
 
 ---
 
@@ -104,6 +106,14 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-07 — G4.6 connector parity bundle (Wave 4 exit)
+
+- Added `scripts/verify/test25-connector-parity-bundle.sh` — scoped bundle for G4.1 inventory + TEST-3 connector slices + G4.3–G4.5 gates (no full-repo `npm run verify`).
+- `npm run verify:connector-parity` now runs TEST-25.
+- Runtime proof: Playwright visual smoke at `.local/verify/g4-visual-proof/` (IDE thread meta, operator thread collapse, mobile strip stability).
+- Fixed operator thread seam collapse (`dock-seam-layout` + default `expandedDockSeams` includes `thread`).
+- Briefing fetch coalescing removes duplicate `/api/briefing` at the 10s presence/runtime overlap.
 
 ### 2026-07-07 — G4.4 + G4.5 voice cockpit and Agent Dock parity
 

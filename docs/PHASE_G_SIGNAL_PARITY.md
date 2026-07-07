@@ -180,7 +180,7 @@ Per `config/parity-snapshot.json` → `blockers_for_full_retirement` and `docs/L
 - [x] **G4.3** Tunnel / remote control — auth + binary + live status in connectors rail (operator foundation rule)
 - [x] **G4.4** Voice deck / mobile cockpit — event-driven presence (`IMPORT_MATRIX` KAIRO section)
 - [x] **G4.5** Remaining Agent Dock parity items from `parity-snapshot.json`
-- [ ] **G4.6** Gate script per connector or bundled `verify:connector-parity`
+- [x] **G4.6** Gate script per connector or bundled `verify:connector-parity` (`test25-connector-parity-bundle.sh`)
 
 **Exit gate:** `npm run verify:connector-parity` (or per-connector gates documented in G4.1)
 
@@ -228,6 +228,13 @@ Same as Phase F:
 | F6 retirement | Deferred | G6 with evidence |
 
 ## Append log
+
+### 2026-07-07 — G4.6 connector parity bundle (Wave 4 exit)
+
+- `verify:connector-parity` → `test25-connector-parity-bundle.sh` (TEST-3 connector slices + G4.1/G4.3–G4.5 gates).
+- Runtime proof: Playwright checks + screenshots under `.local/verify/g4-visual-proof/`.
+- Performance guards: hidden-tab skip, presence in-flight dedupe, background briefing refresh, briefing fetch coalescing.
+- Operator thread seam collapse fixed in `dock-seam-layout`.
 
 ### 2026-07-07 — G4.4 + G4.5 voice cockpit and Agent Dock parity
 

@@ -372,7 +372,7 @@ export const useShellStore = defineStore('shell', () => {
   const terminalSessions = ref<TerminalSessionDescriptor[]>(DEFAULT_TERMINAL_SESSIONS);
   const activeTerminalSessionId = ref<string>(DEFAULT_TERMINAL_SESSIONS[0].id);
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
-  const expandedDockSeams = ref<Set<DockSeamId>>(new Set());
+  const expandedDockSeams = ref<Set<DockSeamId>>(new Set(['thread']));
   const briefingSeamEmphasized = ref(false);
   const missionControlEmphasized = ref(false);
   const signalsSeamEmphasized = ref(false);

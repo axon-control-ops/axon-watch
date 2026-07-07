@@ -47,8 +47,19 @@ describe('dock seam layout', () => {
     expect(layout.find((seam) => seam.id === 'approvals')?.collapsed).toBe(true);
     expect(layout.find((seam) => seam.id === 'signals')?.collapsed).toBe(true);
     expect(layout.find((seam) => seam.id === 'run')?.collapsed).toBe(true);
-    expect(layout.find((seam) => seam.id === 'thread')?.collapsed).toBe(false);
+    expect(layout.find((seam) => seam.id === 'thread')?.collapsed).toBe(true);
     expect(layout.find((seam) => seam.id === 'thread')?.hero).toBe(true);
+
+    const expandedThread = buildDockSeamLayout({
+      layoutMode: 'operator',
+      briefing,
+      approvalsSummary: '1 pending approval',
+      signalsSummary: 'Watch summary degraded',
+      runSummary: 'run_contract_baseline · awaiting_approval',
+      threadSummary: 'No active conversation',
+      expandedSeams: new Set(['thread']),
+    });
+    expect(expandedThread.find((seam) => seam.id === 'thread')?.collapsed).toBe(false);
   });
 
   it('allows manual expansion of collapsed seams', () => {

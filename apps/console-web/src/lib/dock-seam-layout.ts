@@ -85,7 +85,7 @@ export function buildDockSeamLayout(input: {
       id: 'thread',
       title: 'Conversation',
       hero: operatorMode,
-      collapsed: operatorMode ? false : !input.expandedSeams.has('thread'),
+      collapsed: !input.expandedSeams.has('thread'),
       compactSummary: input.threadSummary,
     },
     {
