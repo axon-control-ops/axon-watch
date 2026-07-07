@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 WATCH_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
-import sys
-
 sys.path.insert(0, str(WATCH_ROOT))
 
 from app.vault.backup import (  # noqa: E402

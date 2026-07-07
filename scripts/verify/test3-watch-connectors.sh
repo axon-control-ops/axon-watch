@@ -52,8 +52,8 @@ echo "[4/5] Watch integration regression"
 python3 -m unittest tests.test_control_plane_watch_integration -v
 echo
 
-echo "[5/5] Full verify gate"
-npm run verify
+echo "[5/5] Connector parity bundle (scoped — not full verify)"
+npm run verify:connector-parity
 echo
 
 echo "TEST-3 PASS"

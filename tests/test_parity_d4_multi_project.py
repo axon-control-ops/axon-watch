@@ -66,8 +66,9 @@ class ParityD4MultiProjectTests(unittest.TestCase):
         self.addCleanup(self.client.close)
 
     def test_default_verify_wiring_includes_parity_d4_tests(self) -> None:
-        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        verify_script = package["scripts"]["verify:contracts"]
+        from tests.verify_contract_wiring import contract_verify_wiring_surface
+
+        verify_script = contract_verify_wiring_surface()
         self.assertIn("tests.test_parity_d4_multi_project", verify_script)
 
     def test_default_bindings_include_watch_local_and_plans_workspaces(self) -> None:

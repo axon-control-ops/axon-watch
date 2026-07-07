@@ -41,8 +41,9 @@ class ParityC4SpokenHighValueAlertsTests(unittest.TestCase):
         return response.json()
 
     def test_default_verify_wiring_includes_parity_c4_tests(self) -> None:
-        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        verify_script = package["scripts"]["verify:contracts"]
+        from tests.verify_contract_wiring import contract_verify_wiring_surface
+
+        verify_script = contract_verify_wiring_surface()
         self.assertIn("tests.test_parity_c4_spoken_high_value_alerts", verify_script)
 
     def test_pending_approval_marks_spoken_alert_eligible(self) -> None:

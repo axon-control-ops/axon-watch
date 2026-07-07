@@ -22,8 +22,9 @@ from app.main import app  # noqa: E402
 
 class ParityD3DedicatedHostSmokeTests(unittest.TestCase):
     def test_default_verify_wiring_includes_parity_d3_tests(self) -> None:
-        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        verify_script = package["scripts"]["verify:contracts"]
+        from tests.verify_contract_wiring import contract_verify_wiring_surface
+
+        verify_script = contract_verify_wiring_surface()
         self.assertIn("tests.test_parity_d3_dedicated_host_smoke", verify_script)
 
     def test_bootstrap_readiness_includes_public_base_url(self) -> None:

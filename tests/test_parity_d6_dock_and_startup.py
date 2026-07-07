@@ -13,8 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 class ParityD6DockAndStartupTests(unittest.TestCase):
     def test_default_verify_wiring_includes_parity_d6_tests(self) -> None:
-        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        verify_script = package["scripts"]["verify:contracts"]
+        from tests.verify_contract_wiring import contract_verify_wiring_surface
+
+        verify_script = contract_verify_wiring_surface()
         self.assertIn("tests.test_parity_d6_dock_and_startup", verify_script)
 
     def test_snapshot_rows_promoted_to_verified(self) -> None:

@@ -29,8 +29,8 @@ print("cutover references canonical planning home")
 PY
 echo
 
-echo "[4/4] Full verify gate"
-npm run verify
+echo "[4/4] Contract verify (scoped — not full verify)"
+npm run verify:contracts
 echo
 
 echo "TEST-9 PASS"

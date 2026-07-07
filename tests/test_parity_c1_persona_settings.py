@@ -41,8 +41,9 @@ class ParityC1PersonaSettingsTests(unittest.TestCase):
         return response.json()
 
     def test_default_verify_wiring_includes_parity_c1_tests(self) -> None:
-        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        verify_script = package["scripts"]["verify:contracts"]
+        from tests.verify_contract_wiring import contract_verify_wiring_surface
+
+        verify_script = contract_verify_wiring_surface()
         self.assertIn("tests.test_parity_c1_persona_settings", verify_script)
 
     def test_persisted_persona_disable_changes_tone_not_truth(self) -> None:

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-05",
-  "file_count": 29,
+  "generated_on": "2026-07-07",
+  "file_count": 32,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -46,16 +46,24 @@
       "bytes": 5292
     },
     "IMPLEMENTATION_ROADMAP.md": {
-      "sha256": "c6a3824cd6d08ae45d2838c57c5e7f3b4b2ffdd6cbffce6fd4e80c424ffc7bab",
-      "bytes": 10210
+      "sha256": "7820b3914f828578aa50e0503e73ce374a81129a43209a291db13c85aabaad25",
+      "bytes": 10386
     },
     "IMPORT_MATRIX.md": {
-      "sha256": "195dcae86f065f8b9b9a89d07f8ef095d87b8279f62546d94f3a7d176887d95a",
-      "bytes": 7972
+      "sha256": "4c0e450fef5db7c7cc9dcf6ec0bfcde32d996ff3a7b6a4bb0f6337ab832bf093",
+      "bytes": 8038
+    },
+    "KAIRO_BRAIN_UI_ARCHITECTURE.md": {
+      "sha256": "948643a7376c7acf09688e53a6efde5a1f5de73514337ea321d1ff8e7d254841",
+      "bytes": 8225
     },
     "KAIRO_MODE.md": {
       "sha256": "bb4b5d187d5b91a9a9a4b8c419122a8f1080f96a73cc54df055ff53547c7e8a4",
       "bytes": 13053
+    },
+    "OPERATOR_REFRESH_POLICY.md": {
+      "sha256": "005fcb07f2ba778d3519ef7088abbfae4c5127b8305f57fed989bd77785ba7ae",
+      "bytes": 4592
     },
     "PARITY_LEDGER.md": {
       "sha256": "922c4abe8719d267cc09d91c2ac89d5afaf5d1e20ea0ff10c8c9758e3533f171",
@@ -66,8 +74,8 @@
       "bytes": 3178
     },
     "README.md": {
-      "sha256": "122f918737de574697ce49c25d7ea3e1bc917f934007218bd9c4df853a5bad1a",
-      "bytes": 2938
+      "sha256": "d7fad07d09492e36994c61234e946d7791aa438f057cd531e6809859ba345843",
+      "bytes": 3286
     },
     "REPO_BOOTSTRAP_SPEC.md": {
       "sha256": "b8617bb75e4b9224f5a6970dc4c43daed46701bd9f7417bfde6b5cfcac5050c9",
@@ -100,6 +108,10 @@
     "UI_VISUAL_DIRECTION.md": {
       "sha256": "c34035844ef68227f5c7f54828e233c2c39f03e6f0aaec3d2f9c1fbd1d31e4e4",
       "bytes": 7904
+    },
+    "agent-orchestration-contract.md": {
+      "sha256": "5704453d7d53a94979b14738eba55625e53b92a2db604e34f36d44c82f9ed62f",
+      "bytes": 1830
     },
     "control-api.md": {
       "sha256": "7c83fa54cde2afb0d2be094eec582fbaefb857ba23354d1ff36053b2e5a6678c",

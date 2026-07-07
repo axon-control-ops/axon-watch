@@ -31,8 +31,9 @@ class ParityC3MobileCompactViewportTests(unittest.TestCase):
         self.addCleanup(self.client.close)
 
     def test_default_verify_wiring_includes_parity_c3_tests(self) -> None:
-        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        verify_script = package["scripts"]["verify:contracts"]
+        from tests.verify_contract_wiring import contract_verify_wiring_surface
+
+        verify_script = contract_verify_wiring_surface()
         self.assertIn("tests.test_parity_c3_mobile_compact_viewport", verify_script)
 
     def test_viewport_compact_query_toggles_server_compact_layout(self) -> None:

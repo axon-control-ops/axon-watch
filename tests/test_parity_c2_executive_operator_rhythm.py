@@ -42,8 +42,9 @@ class ParityC2ExecutiveOperatorRhythmTests(unittest.TestCase):
         return response.json()
 
     def test_default_verify_wiring_includes_parity_c2_tests(self) -> None:
-        package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
-        verify_script = package["scripts"]["verify:contracts"]
+        from tests.verify_contract_wiring import contract_verify_wiring_surface
+
+        verify_script = contract_verify_wiring_surface()
         self.assertIn("tests.test_parity_c2_executive_operator_rhythm", verify_script)
 
     def test_briefing_executive_rhythm_has_full_contract(self) -> None:
