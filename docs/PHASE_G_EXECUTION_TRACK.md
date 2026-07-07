@@ -53,7 +53,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 | 9 | **UX-IDE-2** | `IdeInterruptPanel` (approvals + critical signals) | IDE refocus + G3.3 | **Done** |
 | 10 | **KAIRO Ask** | Ask mode + KAIRO persona prompt | JARVIS video personality | **Done** |
 | 11 | **UX-IDE-3** | Research cards in agent transcript | JARVIS video | **Done** |
-| 12 | **UX-IDE-4** | `@selection`, `@terminal` context tokens | JARVIS “pull up notes” |
+| 12 | **UX-IDE-4** | `@selection`, `@terminal` context tokens | JARVIS “pull up notes” | **Done** |
 | 13 | **UX-IDE-5** | Opt-in IDE voice strip | JARVIS hands-free (later) |
 
 ---
@@ -87,7 +87,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 3):** **UX-IDE-4** `@selection` / `@terminal` context tokens, or Wave 4 **G4.1** connector inventory.
+**Next up (Wave 3):** **UX-IDE-5** opt-in IDE voice strip, or Wave 4 **G4.1** connector inventory.
 
 ---
 
@@ -101,6 +101,11 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-07 — UX-IDE-4 composer `@selection` and `@terminal` context tokens
+
+- IDE composer Context menu adds `@selection` (Monaco highlight) and `@terminal` (recent scrollback).
+- Lane B dispatch receives `editor_selection` and `terminal_snippet` and injects them into workspace context.
 
 ### 2026-07-07 — UX-IDE-3 research cards in agent transcript
 

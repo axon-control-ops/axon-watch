@@ -100,6 +100,13 @@ class CreateRunRequest(BaseModel):
     requires_approval: bool = False
 
 
+class EditorSelectionContextRequest(BaseModel):
+    file_path: str
+    start_line: int
+    end_line: int
+    text: str
+
+
 class PostChatMessageRequest(BaseModel):
     workspace_id: str
     content: str
@@ -107,6 +114,8 @@ class PostChatMessageRequest(BaseModel):
     run_id: str | None = None
     composer_mode: str | None = None
     active_file_path: str | None = None
+    editor_selection: EditorSelectionContextRequest | None = None
+    terminal_snippet: str | None = None
     runtime_target: str | None = None
     runtime_model: str | None = None
     execution_access: str | None = None
@@ -568,6 +577,10 @@ def chat_messages_create(
             run_id=body.run_id,
             composer_mode=body.composer_mode,
             active_file_path=body.active_file_path,
+            editor_selection=(
+                body.editor_selection.model_dump() if body.editor_selection is not None else None
+            ),
+            terminal_snippet=body.terminal_snippet,
             runtime_target=body.runtime_target,
             runtime_model=body.runtime_model,
             execution_access=body.execution_access,

@@ -422,6 +422,7 @@ watch(
           :read-only="shell.activeEditorDocument.readOnly"
           :dirty="shell.activeEditorDocument.dirty"
           @cursor-change="handleEditorCursorChange"
+          @selection-change="shell.setEditorSelection"
           @value-change="shell.updateActiveFileContent"
           @save="shell.saveActiveFileDocument"
         />

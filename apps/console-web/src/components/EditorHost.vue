@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { createMonacoEditor } from '../lib/create-monaco-editor';
 import type { EditorDocumentLanguage } from '../lib/workspace-documents';
+import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
 
 const props = defineProps<{
   title: string;
@@ -18,6 +19,7 @@ const emit = defineEmits<{
   valueChange: [value: string];
   save: [];
   cursorChange: [position: { line: number; column: number }];
+  selectionChange: [selection: EditorSelectionSnapshot | null];
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -49,6 +51,9 @@ onMounted(async () => {
       },
       onCursorChange: (position) => {
         emit('cursorChange', position);
+      },
+      onSelectionChange: (selection) => {
+        emit('selectionChange', selection);
       },
     });
     loadState.value = 'ready';

@@ -12,10 +12,20 @@ from app.workspace_files import WorkspaceFileError, list_workspace_files
 
 
 @dataclass(frozen=True)
+class EditorSelectionContext:
+    file_path: str
+    start_line: int
+    end_line: int
+    text: str
+
+
+@dataclass(frozen=True)
 class LaneBContext:
     workspace_id: str
     composer_mode: str
     active_file_path: str | None = None
+    editor_selection: EditorSelectionContext | None = None
+    terminal_snippet: str | None = None
 
 
 def _read_file_preview(workspace_id: str, path: str, *, max_chars: int = 1200) -> str:
@@ -47,6 +57,19 @@ def build_lane_b_context_block(context: LaneBContext) -> str:
         lines.append(f"Active file: {context.active_file_path}")
         if preview:
             lines.append(f"Active file preview:\n{preview}")
+
+    if context.editor_selection is not None:
+        selection = context.editor_selection
+        lines.append(
+            "Editor selection "
+            f"({selection.file_path} L{selection.start_line}-L{selection.end_line}):"
+        )
+        if selection.text.strip():
+            lines.append(selection.text.strip())
+
+    if context.terminal_snippet and context.terminal_snippet.strip():
+        lines.append("Terminal output (recent):")
+        lines.append(context.terminal_snippet.strip())
 
     try:
         files = list_workspace_files(context.workspace_id)

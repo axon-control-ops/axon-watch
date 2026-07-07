@@ -833,6 +833,13 @@ export interface ChatMessageRecord {
   created_at: string;
 }
 
+export interface EditorSelectionContext {
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  text: string;
+}
+
 export interface PostChatMessageRequest {
   workspace_id: string;
   content: string;
@@ -840,6 +847,8 @@ export interface PostChatMessageRequest {
   run_id?: string | null;
   composer_mode?: 'ask' | 'plan' | 'agent' | 'command' | string | null;
   active_file_path?: string | null;
+  editor_selection?: EditorSelectionContext | null;
+  terminal_snippet?: string | null;
   runtime_target?: string | null;
   runtime_model?: string | null;
   execution_access?: 'consultative' | 'full' | string | null;

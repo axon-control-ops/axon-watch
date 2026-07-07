@@ -33,6 +33,12 @@ import {
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { shouldSubmitAgentDockComposer } from '../../lib/agent-dock-composer-input';
 import {
+  composerDraftIncludesToken,
+  readStoredTerminalSnippet,
+  SELECTION_CONTEXT_TOKEN,
+  TERMINAL_CONTEXT_TOKEN,
+} from '../../lib/ide-composer-context-tokens';
+import {
   filterMcpToolsForComposerMode,
   mcpToolDetail,
 } from '../../lib/composer-mcp-tools-view';
@@ -67,6 +73,8 @@ const showRuntimeTargetsPanel = ref(false);
 const modelSearchQuery = ref('');
 const contextWorkspace = ref(false);
 const contextActiveFile = ref(false);
+const contextSelection = ref(false);
+const contextTerminal = ref(false);
 const contextIde = ref(false);
 const contextPinned = ref(false);
 
@@ -210,6 +218,23 @@ const workspaceToken = computed(() =>
 );
 const ideToken = '@ide-context';
 const pinnedToken = '@pin-context';
+const selectionToken = SELECTION_CONTEXT_TOKEN;
+const terminalToken = TERMINAL_CONTEXT_TOKEN;
+const hasTerminalSnippet = computed(() =>
+  shell.currentWorkspace?.workspace_id
+    ? Boolean(readStoredTerminalSnippet(shell.currentWorkspace.workspace_id))
+    : false,
+);
+const selectionChipLabel = computed(() => {
+  const selection = shell.editorSelection;
+  if (!selection?.text.trim()) {
+    return 'Selection';
+  }
+  if (selection.startLine === selection.endLine) {
+    return `L${selection.startLine}`;
+  }
+  return `L${selection.startLine}-${selection.endLine}`;
+});
 const mcpToolsForMode = computed(() =>
   filterMcpToolsForComposerMode(shell.runtimeMcpTools, composerMode.value),
 );
@@ -253,6 +278,20 @@ const attachmentChips = computed(() => {
       key: 'file',
       kind: 'file',
       label: shell.activeWorkspaceFilePath,
+    });
+  }
+  if (contextSelection.value && shell.hasEditorSelection) {
+    chips.push({
+      key: 'selection',
+      kind: 'selection',
+      label: selectionChipLabel.value,
+    });
+  }
+  if (contextTerminal.value && hasTerminalSnippet.value) {
+    chips.push({
+      key: 'terminal',
+      kind: 'terminal',
+      label: 'Terminal output',
     });
   }
   if (contextIde.value) {
@@ -328,7 +367,7 @@ function setTokenEnabled(token: string | null, enabled: boolean): void {
   shell.operatorCommandDraft = draft;
 }
 
-function toggleContext(kind: 'workspace' | 'file' | 'ide' | 'pin'): void {
+function toggleContext(kind: 'workspace' | 'file' | 'selection' | 'terminal' | 'ide' | 'pin'): void {
   if (kind === 'workspace') {
     contextWorkspace.value = !contextWorkspace.value;
     setTokenEnabled(workspaceToken.value, contextWorkspace.value);
@@ -337,6 +376,16 @@ function toggleContext(kind: 'workspace' | 'file' | 'ide' | 'pin'): void {
   if (kind === 'file') {
     contextActiveFile.value = !contextActiveFile.value;
     setTokenEnabled(activeFileToken.value, contextActiveFile.value);
+    return;
+  }
+  if (kind === 'selection') {
+    contextSelection.value = !contextSelection.value;
+    setTokenEnabled(selectionToken, contextSelection.value);
+    return;
+  }
+  if (kind === 'terminal') {
+    contextTerminal.value = !contextTerminal.value;
+    setTokenEnabled(terminalToken, contextTerminal.value);
     return;
   }
   if (kind === 'ide') {
@@ -357,6 +406,16 @@ function removeChip(key: string): void {
   if (key === 'file') {
     contextActiveFile.value = false;
     setTokenEnabled(activeFileToken.value, false);
+    return;
+  }
+  if (key === 'selection') {
+    contextSelection.value = false;
+    setTokenEnabled(selectionToken, false);
+    return;
+  }
+  if (key === 'terminal') {
+    contextTerminal.value = false;
+    setTokenEnabled(terminalToken, false);
     return;
   }
   if (key === 'ide') {
@@ -468,15 +527,31 @@ function handleDocumentClick(): void {
   closeMenus();
 }
 
+function syncContextFromDraft(): void {
+  const draft = shell.operatorCommandDraft;
+  if (workspaceToken.value) {
+    contextWorkspace.value = composerDraftIncludesToken(draft, workspaceToken.value);
+  }
+  if (activeFileToken.value) {
+    contextActiveFile.value = composerDraftIncludesToken(draft, activeFileToken.value);
+  }
+  contextSelection.value = composerDraftIncludesToken(draft, selectionToken);
+  contextTerminal.value = composerDraftIncludesToken(draft, terminalToken);
+  contextIde.value = composerDraftIncludesToken(draft, ideToken);
+  contextPinned.value = composerDraftIncludesToken(draft, pinnedToken);
+}
+
 watch(
   () => shell.operatorCommandDraft,
   () => {
     void nextTick(syncComposerHeight);
+    syncContextFromDraft();
   },
 );
 
 onMounted(() => {
   syncComposerHeight();
+  syncContextFromDraft();
   document.addEventListener('click', handleDocumentClick);
 });
 
@@ -649,6 +724,26 @@ onUnmounted(() => {
                 >
                   <span>Active file</span>
                   <small>{{ shell.activeWorkspaceFilePath ?? 'Open a file first' }}</small>
+                </button>
+                <button
+                  type="button"
+                  class="agent-dock-composer__menu-item"
+                  :class="{ 'is-active': contextSelection }"
+                  :disabled="!shell.hasEditorSelection"
+                  @click="toggleContext('selection')"
+                >
+                  <span>Selection</span>
+                  <small>{{ shell.hasEditorSelection ? selectionChipLabel : 'Highlight code in the editor' }}</small>
+                </button>
+                <button
+                  type="button"
+                  class="agent-dock-composer__menu-item"
+                  :class="{ 'is-active': contextTerminal }"
+                  :disabled="!hasTerminalSnippet"
+                  @click="toggleContext('terminal')"
+                >
+                  <span>Terminal</span>
+                  <small>{{ hasTerminalSnippet ? 'Recent terminal output' : 'Run a command first' }}</small>
                 </button>
                 <button
                   type="button"

@@ -59,6 +59,8 @@ import {
   shouldNarrateAgentEvent,
 } from '../lib/kairo-narration-policy';
 import { postKairoSpeak } from '../lib/kairo-speak-client';
+import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
+import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
 import { languageForFilePath } from '../lib/workspace-file-language';
 import {
   normalizeAgentExecutionAccess,
@@ -358,6 +360,7 @@ export const useShellStore = defineStore('shell', () => {
   const editorTabs = ref<EditorTabDescriptor[]>(DEFAULT_EDITOR_TABS);
   const activeEditorTabId = ref<string>(DEFAULT_EDITOR_TABS[0].id);
   const activeEditorDocumentId = ref<string>('file:README.md');
+  const editorSelection = ref<EditorSelectionSnapshot | null>(null);
   const terminalSessions = ref<TerminalSessionDescriptor[]>(DEFAULT_TERMINAL_SESSIONS);
   const activeTerminalSessionId = ref<string>(DEFAULT_TERMINAL_SESSIONS[0].id);
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
@@ -1222,6 +1225,18 @@ export const useShellStore = defineStore('shell', () => {
         composerMode === 'agent'
           ? resolveIdeAgentLinkedRunId(ideAgentRunId.value, runs.value)
           : null;
+      const contextPayload = resolveComposerContextPayload({
+        draft: content,
+        workspaceId,
+        activeFilePath: activeWorkspaceFilePath.value,
+        editorSelection: editorSelection.value
+          ? {
+              startLine: editorSelection.value.startLine,
+              endLine: editorSelection.value.endLine,
+              text: editorSelection.value.text,
+            }
+          : null,
+      });
       const response = await postChatMessage({
         workspace_id: workspaceId,
         content,
@@ -1229,6 +1244,8 @@ export const useShellStore = defineStore('shell', () => {
         run_id: linkedRunId,
         composer_mode: composerMode,
         active_file_path: activeWorkspaceFilePath.value,
+        editor_selection: contextPayload.editor_selection,
+        terminal_snippet: contextPayload.terminal_snippet,
         runtime_target: selectedRuntimeTargetId.value || null,
         runtime_model: selectedComposerModel.value || null,
         execution_access: composerMode === 'agent' ? agentExecutionAccess.value : undefined,
@@ -1526,6 +1543,11 @@ export const useShellStore = defineStore('shell', () => {
     const path = filePathFromDocumentId(activeEditorDocumentId.value);
     return path && openedFilePaths.value.includes(path) ? path : null;
   });
+  const hasEditorSelection = computed(() => Boolean(editorSelection.value?.text.trim()));
+
+  function setEditorSelection(selection: EditorSelectionSnapshot | null): void {
+    editorSelection.value = selection;
+  }
 
   function setActiveEditorTab(id: string): void {
     activeEditorTabId.value = id;
@@ -1533,6 +1555,7 @@ export const useShellStore = defineStore('shell', () => {
 
   function setActiveEditorDocument(id: string): void {
     activeEditorDocumentId.value = id;
+    editorSelection.value = null;
     const path = filePathFromDocumentId(id);
     if (path) {
       void openWorkspaceFile(path);
@@ -2494,6 +2517,9 @@ export const useShellStore = defineStore('shell', () => {
     activeEditorTabId,
     activeEditorDocument,
     activeEditorDocumentId,
+    editorSelection,
+    hasEditorSelection,
+    setEditorSelection,
     activeRun,
     agentExecutionAccess,
     activeTerminalSessionId,

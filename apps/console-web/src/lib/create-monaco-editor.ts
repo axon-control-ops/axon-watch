@@ -14,7 +14,16 @@ export interface MonacoEditorOptions {
   readOnly?: boolean;
   onValueChange?: (value: string) => void;
   onCursorChange?: (position: { line: number; column: number }) => void;
+  onSelectionChange?: (selection: EditorSelectionSnapshot | null) => void;
   variant?: 'default' | 'mockup';
+}
+
+export interface EditorSelectionSnapshot {
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
+  text: string;
 }
 
 export interface MonacoEditorController {
@@ -23,6 +32,7 @@ export interface MonacoEditorController {
   setReadOnly: (readOnly: boolean) => void;
   setValue: (value: string) => void;
   getValue: () => string;
+  getSelection: () => EditorSelectionSnapshot | null;
   focus: () => void;
 }
 
@@ -77,10 +87,30 @@ export async function createMonacoEditor(
     });
   };
 
+  const emitSelection = () => {
+    if (!options.onSelectionChange) {
+      return;
+    }
+    const selection = editor.getSelection();
+    if (!selection || selection.isEmpty()) {
+      options.onSelectionChange(null);
+      return;
+    }
+    const text = model.getValueInRange(selection);
+    options.onSelectionChange({
+      startLine: selection.startLineNumber,
+      startColumn: selection.startColumn,
+      endLine: selection.endLineNumber,
+      endColumn: selection.endColumn,
+      text,
+    });
+  };
+
   if (options.onValueChange) {
     editor.onDidChangeModelContent(() => {
       options.onValueChange?.(model.getValue());
       emitCursor();
+      emitSelection();
     });
   }
 
@@ -89,6 +119,13 @@ export async function createMonacoEditor(
       emitCursor();
     });
     emitCursor();
+  }
+
+  if (options.onSelectionChange) {
+    editor.onDidChangeCursorSelection(() => {
+      emitSelection();
+    });
+    emitSelection();
   }
 
   return {
@@ -108,6 +145,19 @@ export async function createMonacoEditor(
     },
     getValue() {
       return model.getValue();
+    },
+    getSelection() {
+      const selection = editor.getSelection();
+      if (!selection || selection.isEmpty()) {
+        return null;
+      }
+      return {
+        startLine: selection.startLineNumber,
+        startColumn: selection.startColumn,
+        endLine: selection.endLineNumber,
+        endColumn: selection.endColumn,
+        text: model.getValueInRange(selection),
+      };
     },
     focus() {
       editor.focus();

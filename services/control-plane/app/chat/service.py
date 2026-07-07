@@ -9,7 +9,12 @@ from uuid import uuid4
 
 from app.chat.command_intent import classify_command, expand_command_shortcuts
 from app.chat.dispatch import build_command_dispatch_ack, resolve_command_dispatch
-from app.chat.lane_b_agent import LaneBContext, generate_lane_b_result, should_use_lane_b
+from app.chat.lane_b_agent import (
+    EditorSelectionContext,
+    LaneBContext,
+    generate_lane_b_result,
+    should_use_lane_b,
+)
 from app.cli_runtime.approval_gate import normalize_execution_access
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
 from app.chat.orchestration import (
@@ -48,6 +53,8 @@ class LaneBStreamJob:
     content: str
     composer_mode: str
     active_file_path: str | None
+    editor_selection: EditorSelectionContext | None
+    terminal_snippet: str | None
     runtime_target: str | None
     runtime_model: str | None
     execution_access: str
@@ -116,6 +123,28 @@ def _validate_workspace(workspace_id: str) -> None:
         raise ChatValidationError(str(exc)) from exc
 
 
+def _coerce_editor_selection(raw: dict[str, object] | None) -> EditorSelectionContext | None:
+    if not raw:
+        return None
+    text = str(raw.get("text") or "").strip()
+    file_path = str(raw.get("file_path") or "").strip()
+    if not text or not file_path:
+        return None
+    return EditorSelectionContext(
+        file_path=file_path,
+        start_line=max(1, int(raw.get("start_line") or 1)),
+        end_line=max(1, int(raw.get("end_line") or 1)),
+        text=text[:4000],
+    )
+
+
+def _coerce_terminal_snippet(raw: str | None) -> str | None:
+    snippet = str(raw or "").strip()
+    if not snippet:
+        return None
+    return snippet[:4000]
+
+
 def post_chat_message(
     *,
     workspace_id: str,
@@ -124,6 +153,8 @@ def post_chat_message(
     run_id: str | None = None,
     composer_mode: str | None = None,
     active_file_path: str | None = None,
+    editor_selection: dict[str, object] | None = None,
+    terminal_snippet: str | None = None,
     runtime_target: str | None = None,
     runtime_model: str | None = None,
     execution_access: str | None = None,
@@ -144,6 +175,8 @@ def post_chat_message(
             run_id=run_id,
             composer_mode=str(composer_mode or "agent"),
             active_file_path=active_file_path,
+            editor_selection=_coerce_editor_selection(editor_selection),
+            terminal_snippet=_coerce_terminal_snippet(terminal_snippet),
             runtime_target=runtime_target,
             runtime_model=runtime_model,
             execution_access=normalize_execution_access(execution_access),
@@ -313,6 +346,8 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
         workspace_id=job.workspace_id,
         composer_mode=job.composer_mode,
         active_file_path=job.active_file_path,
+        editor_selection=job.editor_selection,
+        terminal_snippet=job.terminal_snippet,
     )
     dispatched = False
     run_record = None
@@ -506,6 +541,8 @@ def _post_lane_b_message(
     run_id: str | None,
     composer_mode: str,
     active_file_path: str | None,
+    editor_selection: EditorSelectionContext | None,
+    terminal_snippet: str | None,
     runtime_target: str | None,
     runtime_model: str | None,
     execution_access: str,
@@ -528,6 +565,8 @@ def _post_lane_b_message(
         workspace_id=workspace_id,
         composer_mode=composer_mode,
         active_file_path=active_file_path,
+        editor_selection=editor_selection,
+        terminal_snippet=terminal_snippet,
     )
     dispatch_run_id = ""
     dispatched = False
@@ -599,6 +638,8 @@ def _post_lane_b_message(
             content=content,
             composer_mode=composer_mode,
             active_file_path=active_file_path,
+            editor_selection=editor_selection,
+            terminal_snippet=terminal_snippet,
             runtime_target=runtime_target,
             runtime_model=runtime_model,
             execution_access=execution_access,
