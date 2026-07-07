@@ -4038,6 +4038,115 @@ body:has(.console-shell--mockup) {
   font-size: 0.85rem;
 }
 
+.kairo-conversation-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.kairo-conversation-bar__form {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  background: rgba(0, 8, 14, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.kairo-conversation-bar__glyph {
+  color: rgba(0, 242, 255, 0.85);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.kairo-conversation-bar__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  outline: none;
+}
+
+.kairo-conversation-bar__input::placeholder {
+  color: var(--text-muted);
+}
+
+.kairo-conversation-bar__mic,
+.kairo-conversation-bar__send {
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 0.22rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.kairo-conversation-bar__send:not(:disabled) {
+  border-color: rgba(0, 242, 255, 0.35);
+  color: rgba(0, 242, 255, 0.95);
+}
+
+.kairo-conversation-bar__mic:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kairo-conversation-bar__reply {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+}
+
+.kairo-conversation-bar__reply strong {
+  color: rgba(0, 242, 255, 0.9);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kairo-conversation-bar__error {
+  margin: 0;
+  padding: 0 0.35rem;
+  color: #ff8a80;
+  font-size: 0.64rem;
+}
+
+.kairo-conversation-bar__run-orbit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0 0.2rem;
+}
+
+.kairo-galaxy-orb--thinking .kairo-galaxy-orb__core-ring {
+  animation: kairo-orb-think 1.1s ease-in-out infinite;
+}
+
+@keyframes kairo-orb-think {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
 .brain-galaxy-stage__status-row {
   display: flex;
   flex-wrap: wrap;

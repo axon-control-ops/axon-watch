@@ -3,19 +3,17 @@ import { computed, onMounted, ref } from 'vue';
 
 import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
+import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
 import {
   galaxyInspectorCopy,
   galaxyLegendItems,
   galaxyNodeCounts,
-  galaxyOmnibarHint,
   galaxyTopHubs,
 } from '../../features/brain-galaxy/brain-galaxy-hud-view';
 import {
   brainGraphHeadline,
   layoutBrainGraph,
 } from '../../lib/operator-brain-graph-view';
-import { operatorExecutionStage } from '../../lib/operator-status-radar-view';
-import { formatRunShortId } from '../../lib/run-display';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
@@ -45,47 +43,6 @@ const headline = computed(() => brainGraphHeadline(snapshot.value));
 const legend = computed(() => galaxyLegendItems());
 const topHubs = computed(() => galaxyTopHubs(snapshot.value));
 const nodeCounts = computed(() => galaxyNodeCounts(snapshot.value));
-
-const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
-const pendingApprovals = computed(
-  () =>
-    shell.operatorBriefing?.pending_approvals.count ??
-    shell.runtimeSummary?.approvals.pending_count ??
-    0,
-);
-
-const executionStage = computed(() =>
-  operatorExecutionStage({
-    workspaceId: workspaceId.value,
-    runtimeSummary: shell.runtimeSummary,
-    briefing: shell.operatorBriefing,
-    loadState: shell.briefingLoadState,
-    primaryActiveRun: shell.primaryActiveRun,
-    workspaceReviewReadyCount: 0,
-  }),
-);
-
-const omnibarHint = computed(() =>
-  galaxyOmnibarHint({
-    hasActiveRun: executionStage.value.hasActiveRun,
-    runSummary: shell.primaryActiveRun?.summary ?? null,
-    pendingApprovals: pendingApprovals.value,
-  }),
-);
-
-const showRunOrbit = computed(
-  () =>
-    executionStage.value.hasActiveRun ||
-    shell.canCompletePrimaryRun ||
-    Boolean(shell.primaryActiveRun?.can_stop) ||
-    pendingApprovals.value > 0,
-);
-
-const showStopAction = computed(
-  () =>
-    Boolean(shell.primaryActiveRun?.can_stop) ||
-    shell.primaryActiveRun?.phase === 'executing',
-);
 
 function handleNodeClick(node: { kind: string; workspace_id: string | null; node_id: string }): void {
   if (node.kind === 'workspace' && node.workspace_id) {
@@ -243,44 +200,7 @@ function handleHubClick(hub: { node_id: string; workspace_id: string | null }): 
     <KairoGalaxyOrb />
 
     <footer class="brain-galaxy-stage__hud brain-galaxy-stage__hud--bottom">
-      <div class="brain-galaxy-stage__omnibar" :class="{ 'brain-galaxy-stage__omnibar--active': showRunOrbit }">
-        <span class="brain-galaxy-stage__omnibar-glyph" aria-hidden="true">◎</span>
-        <span class="brain-galaxy-stage__omnibar-copy">{{ omnibarHint }}</span>
-        <div v-if="showRunOrbit" class="brain-galaxy-stage__omnibar-actions">
-          <span v-if="executionStage.hasActiveRun" class="brain-galaxy-stage__run-phase">
-            {{ executionStage.phase }}
-          </span>
-          <span v-if="shell.primaryActiveRun" class="brain-galaxy-stage__run-id">
-            #{{ formatRunShortId(shell.primaryActiveRun.run_id) }}
-          </span>
-          <button
-            v-if="showStopAction"
-            type="button"
-            class="brain-galaxy-stage__run-btn brain-galaxy-stage__run-btn--stop"
-            :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun?.phase !== 'executing'"
-            @click="shell.stopPrimaryRun()"
-          >
-            Stop
-          </button>
-          <button
-            v-if="shell.canCompletePrimaryRun"
-            type="button"
-            class="brain-galaxy-stage__run-btn"
-            :disabled="shell.runMutationPending"
-            @click="shell.completePrimaryRun()"
-          >
-            Complete
-          </button>
-          <button
-            v-if="pendingApprovals > 0"
-            type="button"
-            class="brain-galaxy-stage__run-btn brain-galaxy-stage__run-btn--warn"
-            @click="shell.focusAttentionSidebar()"
-          >
-            Attention · {{ pendingApprovals }}
-          </button>
-        </div>
-      </div>
+      <KairoConversationBar />
     </footer>
   </section>
 </template>

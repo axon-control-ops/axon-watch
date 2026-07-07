@@ -41,9 +41,19 @@ export function galaxyOrbBeads(): GalaxyOrbBead[] {
   }));
 }
 
-export function galaxyOrbStateClass(state: KairoPresenceState, speaking: boolean): string {
-  if (speaking) {
+export function galaxyOrbStateClass(
+  state: KairoPresenceState,
+  speaking: boolean,
+  conversationPhase: 'idle' | 'listening' | 'thinking' | 'speaking' = 'idle',
+): string {
+  if (speaking || conversationPhase === 'speaking') {
     return 'kairo-galaxy-orb--speaking';
+  }
+  if (conversationPhase === 'thinking') {
+    return 'kairo-galaxy-orb--thinking';
+  }
+  if (conversationPhase === 'listening') {
+    return 'kairo-galaxy-orb--listening';
   }
   if (state === 'alerting') {
     return 'kairo-galaxy-orb--alerting';
@@ -68,8 +78,18 @@ export function galaxyOrbModelLabel(modelId: string | null | undefined): string 
   return `${normalized.slice(0, 11)}…`;
 }
 
-export function galaxyOrbHint(state: KairoPresenceState, speaking: boolean): string {
-  if (speaking) {
+export function galaxyOrbHint(
+  state: KairoPresenceState,
+  speaking: boolean,
+  conversationPhase: 'idle' | 'listening' | 'thinking' | 'speaking' = 'idle',
+): string {
+  if (conversationPhase === 'thinking') {
+    return 'Working through your request';
+  }
+  if (conversationPhase === 'listening') {
+    return 'Listening — ask or dispatch below';
+  }
+  if (speaking || conversationPhase === 'speaking') {
     return 'Briefing in progress';
   }
   if (state === 'privacy_blocked') {
@@ -78,5 +98,5 @@ export function galaxyOrbHint(state: KairoPresenceState, speaking: boolean): str
   if (state === 'alerting') {
     return 'Attention needed — tap orb for briefing';
   }
-  return 'Tap orb to speak briefing';
+  return 'Tap orb to speak briefing · type below to converse';
 }

@@ -65,6 +65,7 @@ from app.workspace_handoffs import (
     list_workspace_handoffs,
 )
 from app.kairo_voice import generate_spoken_line, narration_allows_event
+from app.kairo_conversation import converse_turn
 from app.live_events import live_events_response
 from app.cli_runtime.routes import get_cursor_runtime_status, get_runtime_mcp_tools, get_runtime_status
 from app.vault.routes import (
@@ -210,6 +211,13 @@ class KairoSpeakRequest(BaseModel):
     workspace_id: str = ""
     use_runtime: bool = True
     narration: str | None = None
+
+
+class KairoConverseRequest(BaseModel):
+    content: str
+    session_id: str = "default"
+    workspace_id: str = ""
+    use_runtime: bool = False
 
 
 def _watch_base_url() -> str:
@@ -631,6 +639,22 @@ def kairo_speak(body: KairoSpeakRequest) -> dict[str, str]:
         workspace_id=body.workspace_id,
         use_runtime=body.use_runtime,
     )
+
+
+@app.post("/api/kairo/converse")
+def kairo_converse(body: KairoConverseRequest) -> dict[str, object]:
+    trimmed = body.content.strip()
+    if not trimmed:
+        raise HTTPException(status_code=400, detail="content must not be empty")
+    try:
+        return converse_turn(
+            content=trimmed,
+            session_id=body.session_id,
+            workspace_id=body.workspace_id or None,
+            use_runtime=body.use_runtime,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/live/events")

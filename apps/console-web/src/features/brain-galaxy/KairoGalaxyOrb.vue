@@ -11,6 +11,7 @@ import {
 import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import { isSpeechQueueSpeaking } from '../../lib/speech-queue';
+import { kairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -44,9 +45,13 @@ const presenceState = computed(() => {
 });
 
 const parts = computed(() => kairoPresenceModuleParts(presenceState.value));
-const orbClass = computed(() => galaxyOrbStateClass(presenceState.value, speaking.value));
+const orbClass = computed(() =>
+  galaxyOrbStateClass(presenceState.value, speaking.value, kairoConversationPhase.value),
+);
 const modelLabel = computed(() => galaxyOrbModelLabel(shell.selectedComposerModel));
-const hint = computed(() => galaxyOrbHint(presenceState.value, speaking.value));
+const hint = computed(() =>
+  galaxyOrbHint(presenceState.value, speaking.value, kairoConversationPhase.value),
+);
 
 const voiceBlocked = computed(
   () =>

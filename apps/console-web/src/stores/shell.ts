@@ -1435,6 +1435,15 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function submitOperatorCommandContent(content: string): Promise<void> {
+    const trimmed = content.trim();
+    if (!trimmed) {
+      return;
+    }
+    operatorCommandDraft.value = trimmed;
+    await submitOperatorCommand();
+  }
+
   function disconnectChatStreamSession(workspaceId?: string): void {
     if (workspaceId) {
       const session = chatStreamSessionsByWorkspace.get(workspaceId);
@@ -3805,6 +3814,7 @@ export const useShellStore = defineStore('shell', () => {
     stopPrimaryRun,
     stopIdeAgentRun,
     submitOperatorCommand,
+    submitOperatorCommandContent,
     submitIdeComposer,
     terminalSessions,
     threadMessages,
