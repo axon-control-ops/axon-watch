@@ -20,8 +20,8 @@ Axon-X production operator is `:4173`; axon-local remains explicit fallback only
 | `agent_orchestration` | **replaced** | `cli_runtime` + run store | `verify:agent-orchestration-parity` | G3 | Blocker cleared when orchestration gate stays green; no `:7734` needed for agent file edits. |
 | `whatsapp_web_monitor` | **unmigrated** | axon-local `whatsapp_web_monitor.py` | Manual (scheduler job on `:7734`) | G4.2 | Bounded watch slice + vault auth + inbox signals, or explicit operator discard (G5.4). |
 | `cloudflare_tunnel` | **partial** | `services/axon-watch/app/tunnel` | `verify:tunnel-remote-control` · connectors rail | G4.3 | Live binary/auth/process probe on Axon-X; start/stop delegates to axon-local `tunnel.sh` when `AXON_LOCAL_ROOT` is set. |
-| `voice_deck_mobile_cockpit` | **partial** | `console-web/features/voice-deck` | `verify:parity-d5` (browser TTS v1) | G4.4 | Event-driven presence replaces Alpine polling, or operator approves foreground-only ceiling. |
-| `agent_dock_legacy_parity` | **partial** | `RightDock` + `AgentDock` | `config/dock-behavior-contract.json` · `verify:parity-d6` | G4.5 | Remaining dock gaps closed or documented as intentional v1 degradation. |
+| `voice_deck_mobile_cockpit` | **partial** | `console-web/features/voice-deck` | `verify:voice-cockpit` | G4.4 | Event-driven presence on Axon-X; foreground-only mobile strip; no background listening. |
+| `agent_dock_legacy_parity` | **partial** | `RightDock` + `AgentDock` | `verify:agent-dock-parity` · `dock-behavior-contract.json` | G4.5 | Hero mode persistence, collapsible operator thread seam, IDE transcript meta; thread-deck richness still reduced vs axon-local. |
 | `dashpro_external_monitors` | **partial** | `axon-watch/app/monitors` | `verify:dashpro-monitors` · `dashpro-monitor-slice.json` | G4.2 | Sentry/PostHog on watch; WhatsApp/tunnel remain separate rows. |
 | `legacy_settings_storage` | **unmigrated** | axon-local settings/SQLite | Manual (G5.1 capability matrix) | G5 | Every operator-needed key has Axon-X owner or documented discard; no silent truth merge. |
 

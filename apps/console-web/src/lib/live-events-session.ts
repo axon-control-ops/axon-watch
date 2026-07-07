@@ -1,4 +1,4 @@
-export type LiveEventType = 'connected' | 'runtime_refresh';
+export type LiveEventType = 'connected' | 'runtime_refresh' | 'presence_refresh';
 
 export interface LiveEventPayload {
   type: LiveEventType;
@@ -28,7 +28,7 @@ export function parseLiveEventData(raw: string): LiveEventPayload | null {
 
   try {
     const parsed = JSON.parse(trimmed) as LiveEventPayload;
-    if (parsed.type === 'connected' || parsed.type === 'runtime_refresh') {
+    if (parsed.type === 'connected' || parsed.type === 'runtime_refresh' || parsed.type === 'presence_refresh') {
       return parsed;
     }
   } catch {
@@ -42,8 +42,13 @@ export function shouldTriggerRefresh(event: LiveEventPayload): boolean {
   return event.type === 'runtime_refresh';
 }
 
+export function shouldTriggerPresenceRefresh(event: LiveEventPayload): boolean {
+  return event.type === 'presence_refresh';
+}
+
 export interface LiveEventsSessionOptions {
   onRefresh: () => void | Promise<void>;
+  onPresenceRefresh?: () => void | Promise<void>;
   pollIntervalMs?: number;
   EventSourceImpl?: typeof EventSource;
   documentRef?: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>;
@@ -51,6 +56,12 @@ export interface LiveEventsSessionOptions {
 
 export interface LiveEventsSession {
   disconnect: () => void;
+}
+
+function isDocumentVisible(
+  documentRef: Pick<Document, 'visibilityState'>,
+): boolean {
+  return documentRef.visibilityState === 'visible';
 }
 
 export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveEventsSession {
@@ -61,10 +72,11 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
   let eventSource: EventSource | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let refreshInFlight = false;
+  let presenceRefreshInFlight = false;
   let disconnected = false;
 
   async function invokeRefresh(): Promise<void> {
-    if (refreshInFlight || disconnected) {
+    if (refreshInFlight || disconnected || !isDocumentVisible(documentRef)) {
       return;
     }
 
@@ -73,6 +85,24 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
       await options.onRefresh();
     } finally {
       refreshInFlight = false;
+    }
+  }
+
+  async function invokePresenceRefresh(): Promise<void> {
+    if (
+      presenceRefreshInFlight ||
+      disconnected ||
+      !options.onPresenceRefresh ||
+      !isDocumentVisible(documentRef)
+    ) {
+      return;
+    }
+
+    presenceRefreshInFlight = true;
+    try {
+      await options.onPresenceRefresh();
+    } finally {
+      presenceRefreshInFlight = false;
     }
   }
 
@@ -97,15 +127,27 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
 
   function handleMessage(raw: string): void {
     const event = parseLiveEventData(raw);
-    if (event && shouldTriggerRefresh(event)) {
+    if (!event) {
+      return;
+    }
+    if (shouldTriggerPresenceRefresh(event)) {
+      void invokePresenceRefresh();
+      return;
+    }
+    if (shouldTriggerRefresh(event)) {
       void invokeRefresh();
     }
   }
 
   function onVisibilityChange(): void {
-    if (documentRef.visibilityState === 'visible' && pollTimer !== null) {
-      void invokeRefresh();
+    if (!isDocumentVisible(documentRef)) {
+      return;
     }
+    if (pollTimer !== null) {
+      void invokeRefresh();
+      return;
+    }
+    void invokePresenceRefresh();
   }
 
   function disconnectEventSource(): void {

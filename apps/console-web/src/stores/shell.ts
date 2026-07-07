@@ -169,6 +169,10 @@ import {
   type DockSeamId,
 } from '../lib/dock-seam-layout';
 import {
+  persistDockHeroMode,
+  readStoredDockHeroMode,
+} from '../lib/dock-hero-prefs';
+import {
   resolveDefaultDockHeroMode,
   type DockHeroMode,
 } from '../lib/dock-hero-mode';
@@ -326,6 +330,7 @@ export const useShellStore = defineStore('shell', () => {
   const operatorPresenceSettingsSaving = ref(false);
   const viewportWidth = ref(readViewportWidth());
   let lastViewportCompactRequested: boolean | null = null;
+  let operatorBriefingFetchInFlight: Promise<void> | null = null;
   let viewportCompactListenerBound = false;
   const briefingLoadState = ref<BriefingLoadState>('idle');
   const briefingError = ref<string | null>(null);
@@ -372,8 +377,8 @@ export const useShellStore = defineStore('shell', () => {
   const missionControlEmphasized = ref(false);
   const signalsSeamEmphasized = ref(false);
   const highlightedSignalId = ref<string | null>(null);
-  const dockHeroMode = ref<DockHeroMode>('command');
-  const dockHeroModeTouched = ref(false);
+  const dockHeroMode = ref<DockHeroMode>(readStoredDockHeroMode() ?? 'command');
+  const dockHeroModeTouched = ref(readStoredDockHeroMode() !== null);
   const commandFocusToken = ref(0);
   const leftSidebarMode = ref<LeftSidebarMode>(readStoredLeftSidebarMode() ?? 'workspaces');
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
@@ -1376,6 +1381,7 @@ export const useShellStore = defineStore('shell', () => {
   function setDockHeroMode(mode: DockHeroMode): void {
     dockHeroModeTouched.value = true;
     dockHeroMode.value = mode;
+    persistDockHeroMode(mode);
     if (mode === 'briefing') {
       briefingSeamEmphasized.value = false;
     }
@@ -2223,31 +2229,49 @@ export const useShellStore = defineStore('shell', () => {
       typeof forceOpen === 'boolean' ? forceOpen : !operatorPresenceSettingsOpen.value;
   }
 
-  async function loadOperatorBriefing(options?: { viewportCompact?: boolean }): Promise<void> {
-    briefingLoadState.value = 'loading';
-    briefingError.value = null;
+  async function loadOperatorBriefing(options?: {
+    viewportCompact?: boolean;
+    background?: boolean;
+  }): Promise<void> {
+    if (operatorBriefingFetchInFlight) {
+      return operatorBriefingFetchInFlight;
+    }
 
-    const viewportCompact =
-      options?.viewportCompact ??
-      shouldRequestViewportCompactBriefing(
-        viewportWidth.value,
-        operatorBriefing.value?.operator_presence ?? null,
-        operatorPresenceSettings.value,
-      );
+    operatorBriefingFetchInFlight = (async () => {
+      const backgroundRefresh =
+        options?.background === true && briefingLoadState.value === 'loaded';
+      if (!backgroundRefresh) {
+        briefingLoadState.value = 'loading';
+        briefingError.value = null;
+      }
+
+      const viewportCompact =
+        options?.viewportCompact ??
+        shouldRequestViewportCompactBriefing(
+          viewportWidth.value,
+          operatorBriefing.value?.operator_presence ?? null,
+          operatorPresenceSettings.value,
+        );
+
+      try {
+        operatorBriefing.value = await fetchOperatorBriefing({ viewportCompact });
+        lastViewportCompactRequested = viewportCompact;
+        approvals.value = operatorBriefing.value.pending_approvals.items;
+        briefingLoadState.value = 'loaded';
+        applyOperatorDockDefaults();
+      } catch (error) {
+        if (!backgroundRefresh) {
+          briefingLoadState.value = 'error';
+          briefingError.value =
+            error instanceof Error ? error.message : 'operator briefing request failed';
+        }
+      }
+    })();
 
     try {
-      operatorBriefing.value = await fetchOperatorBriefing({ viewportCompact });
-      lastViewportCompactRequested = viewportCompact;
-      approvals.value = operatorBriefing.value.pending_approvals.items;
-      briefingLoadState.value = 'loaded';
-      if (operatorBriefing.value.operator_presence?.spoken_alert) {
-        void deliverKairoSpokenAlert(operatorBriefing.value.operator_presence.spoken_alert);
-      }
-      applyOperatorDockDefaults();
-    } catch (error) {
-      briefingLoadState.value = 'error';
-      briefingError.value =
-        error instanceof Error ? error.message : 'operator briefing request failed';
+      await operatorBriefingFetchInFlight;
+    } finally {
+      operatorBriefingFetchInFlight = null;
     }
   }
 
@@ -2320,14 +2344,19 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function refreshOperatorPresence(): Promise<void> {
+    await loadOperatorBriefing({ background: true });
+  }
+
   async function refreshRunSurfaces(): Promise<void> {
+    const briefingBackground = briefingLoadState.value === 'loaded';
     await Promise.all([
       loadRuns(),
       loadRuntimeStatus(),
       loadRuntimeSummary(),
       loadInbox(),
       loadConnectors(),
-      loadOperatorBriefing(),
+      loadOperatorBriefing({ background: briefingBackground }),
     ]);
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
   }
@@ -2670,6 +2699,7 @@ export const useShellStore = defineStore('shell', () => {
     primaryApprovalRun,
     primaryInboxItem,
     refreshRunSurfaces,
+    refreshOperatorPresence,
     refreshWatchSummary,
     rejectIdeAgentRun,
     rejectPrimaryRun,
@@ -2742,6 +2772,7 @@ export const useShellStore = defineStore('shell', () => {
     focusAttentionSidebar,
     focusMissionControl,
     focusKairoBriefing,
+    deliverKairoSpokenAlert,
     maybeSpeakBootGreeting,
     loadWorkspaceFiles,
     openWorkspaceFile,

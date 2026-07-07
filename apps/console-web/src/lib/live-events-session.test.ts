@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildLiveEventsUrl,
   parseLiveEventData,
+  shouldTriggerPresenceRefresh,
   shouldTriggerRefresh,
   startLiveEventsSession,
 } from './live-events-session';
@@ -18,18 +19,23 @@ describe('live events session helpers', () => {
     );
   });
 
-  it('parses connected and runtime_refresh payloads', () => {
+  it('parses connected, runtime_refresh, and presence_refresh payloads', () => {
     expect(parseLiveEventData('{"type":"connected"}')).toEqual({ type: 'connected' });
     expect(parseLiveEventData('{"type":"runtime_refresh"}')).toEqual({
       type: 'runtime_refresh',
+    });
+    expect(parseLiveEventData('{"type":"presence_refresh"}')).toEqual({
+      type: 'presence_refresh',
     });
     expect(parseLiveEventData('{"type":"unknown"}')).toBeNull();
     expect(parseLiveEventData('not-json')).toBeNull();
   });
 
-  it('only triggers refresh for runtime_refresh events', () => {
+  it('routes refresh kinds to the correct handlers', () => {
     expect(shouldTriggerRefresh({ type: 'connected' })).toBe(false);
     expect(shouldTriggerRefresh({ type: 'runtime_refresh' })).toBe(true);
+    expect(shouldTriggerPresenceRefresh({ type: 'presence_refresh' })).toBe(true);
+    expect(shouldTriggerPresenceRefresh({ type: 'runtime_refresh' })).toBe(false);
   });
 });
 
@@ -40,6 +46,163 @@ describe('startLiveEventsSession', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('invokes presence refresh separately from runtime refresh', () => {
+    const onRefresh = vi.fn();
+    const onPresenceRefresh = vi.fn().mockResolvedValue(undefined);
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+
+    class MockEventSource {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_url: string) {
+        messageHandler = (event) => {
+          this.onmessage?.(event);
+        };
+      }
+
+      close(): void {}
+    }
+
+    const session = startLiveEventsSession({
+      onRefresh,
+      onPresenceRefresh,
+      EventSourceImpl: MockEventSource as unknown as typeof EventSource,
+      documentRef: {
+        visibilityState: 'visible',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    messageHandler!({ data: '{"type":"presence_refresh"}' } as MessageEvent);
+    expect(onPresenceRefresh).toHaveBeenCalledTimes(1);
+    expect(onRefresh).not.toHaveBeenCalled();
+
+    messageHandler!({ data: '{"type":"runtime_refresh"}' } as MessageEvent);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+
+    session.disconnect();
+  });
+
+  it('skips presence refresh while the document is hidden', async () => {
+    const onPresenceRefresh = vi.fn().mockResolvedValue(undefined);
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+
+    class MockEventSource {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_url: string) {
+        messageHandler = (event) => {
+          this.onmessage?.(event);
+        };
+      }
+
+      close(): void {}
+    }
+
+    const session = startLiveEventsSession({
+      onRefresh: vi.fn(),
+      onPresenceRefresh,
+      EventSourceImpl: MockEventSource as unknown as typeof EventSource,
+      documentRef: {
+        visibilityState: 'hidden',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    messageHandler!({ data: '{"type":"presence_refresh"}' } as MessageEvent);
+    await Promise.resolve();
+    expect(onPresenceRefresh).not.toHaveBeenCalled();
+
+    session.disconnect();
+  });
+
+  it('dedupes overlapping presence refresh handlers', async () => {
+    let resolveRefresh: () => void = () => {};
+    const onPresenceRefresh = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+
+    class MockEventSource {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_url: string) {
+        messageHandler = (event) => {
+          this.onmessage?.(event);
+        };
+      }
+
+      close(): void {}
+    }
+
+    const session = startLiveEventsSession({
+      onRefresh: vi.fn(),
+      onPresenceRefresh,
+      EventSourceImpl: MockEventSource as unknown as typeof EventSource,
+      documentRef: {
+        visibilityState: 'visible',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    messageHandler!({ data: '{"type":"presence_refresh"}' } as MessageEvent);
+    messageHandler!({ data: '{"type":"presence_refresh"}' } as MessageEvent);
+    await Promise.resolve();
+    expect(onPresenceRefresh).toHaveBeenCalledTimes(1);
+
+    resolveRefresh();
+    await Promise.resolve();
+
+    messageHandler!({ data: '{"type":"presence_refresh"}' } as MessageEvent);
+    await Promise.resolve();
+    expect(onPresenceRefresh).toHaveBeenCalledTimes(2);
+
+    session.disconnect();
+  });
+
+  it('skips runtime refresh while the document is hidden', async () => {
+    const onRefresh = vi.fn();
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+
+    class MockEventSource {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_url: string) {
+        messageHandler = (event) => {
+          this.onmessage?.(event);
+        };
+      }
+
+      close(): void {}
+    }
+
+    const session = startLiveEventsSession({
+      onRefresh,
+      EventSourceImpl: MockEventSource as unknown as typeof EventSource,
+      documentRef: {
+        visibilityState: 'hidden',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    messageHandler!({ data: '{"type":"runtime_refresh"}' } as MessageEvent);
+    await Promise.resolve();
+    expect(onRefresh).not.toHaveBeenCalled();
+
+    session.disconnect();
   });
 
   it('invokes refresh on runtime_refresh SSE messages', () => {

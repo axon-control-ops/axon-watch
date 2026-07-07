@@ -178,8 +178,8 @@ Per `config/parity-snapshot.json` → `blockers_for_full_retirement` and `docs/L
 - [x] **G4.1** Inventory each unmigrated connector with owner, probe, and fallback removal criteria
 - [ ] **G4.2** WhatsApp / external messaging — bounded watch integration or explicit discard with operator approval
 - [x] **G4.3** Tunnel / remote control — auth + binary + live status in connectors rail (operator foundation rule)
-- [ ] **G4.4** Voice deck / mobile cockpit — event-driven presence (`IMPORT_MATRIX` KAIRO section)
-- [ ] **G4.5** Remaining Agent Dock parity items from `parity-snapshot.json`
+- [x] **G4.4** Voice deck / mobile cockpit — event-driven presence (`IMPORT_MATRIX` KAIRO section)
+- [x] **G4.5** Remaining Agent Dock parity items from `parity-snapshot.json`
 - [ ] **G4.6** Gate script per connector or bundled `verify:connector-parity`
 
 **Exit gate:** `npm run verify:connector-parity` (or per-connector gates documented in G4.1)
@@ -228,6 +228,12 @@ Same as Phase F:
 | F6 retirement | Deferred | G6 with evidence |
 
 ## Append log
+
+### 2026-07-07 — G4.4 + G4.5 voice cockpit and Agent Dock parity
+
+- G4.4: `presence_refresh` live events, reactive voice-cockpit spoken-alert delivery, mobile compact strip (foreground-only).
+- G4.5: dock hero mode persistence, operator thread seam collapse, IDE agent transcript summary header.
+- Gates: `verify:voice-cockpit`, `verify:agent-dock-parity`.
 
 ### 2026-07-07 — G4.3 tunnel remote control slice
 

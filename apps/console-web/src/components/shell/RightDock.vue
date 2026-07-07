@@ -38,9 +38,10 @@ const { resizing, resetDockWidth, startDockResize } = useRightDockResize({ dockR
         seam-id="dock-seam-thread"
         :title="shell.dockSeamState('thread')?.title ?? 'Conversation'"
         seam-class="dock-seam dock-seam--thread"
-        :collapsed="false"
+        :collapsed="shell.dockSeamState('thread')?.collapsed ?? false"
         :compact-summary="shell.dockSeamState('thread')?.compactSummary"
-        :collapsible="false"
+        :collapsible="true"
+        @toggle="shell.toggleDockSeam('thread')"
       >
         <ConversationSeamPanel />
       </HudSeamCard>

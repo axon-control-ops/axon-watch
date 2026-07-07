@@ -96,6 +96,10 @@ onMounted(() => {
     </header>
 
     <section class="agent-dock__thread">
+      <div class="agent-dock__section-header agent-dock__section-header--compact">
+        <p class="agent-dock__section-title">Agent transcript</p>
+        <p class="agent-dock__section-meta">{{ shell.threadStateLabel }}</p>
+      </div>
       <div class="agent-dock__transcript">
         <ConversationSeamPanel />
       </div>

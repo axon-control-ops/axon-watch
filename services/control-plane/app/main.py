@@ -56,6 +56,7 @@ from app.workspace_handoffs import (
     list_workspace_handoffs,
 )
 from app.kairo_voice import generate_spoken_line, narration_allows_event
+from app.live_events import live_events_response
 from app.cli_runtime.routes import get_cursor_runtime_status, get_runtime_mcp_tools, get_runtime_status
 from app.vault.routes import (
     create_vault_secret,

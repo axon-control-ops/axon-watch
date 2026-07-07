@@ -16,11 +16,14 @@ import { useAppSurface } from './composables/useAppSurface';
 import { startLiveEventsSession } from './lib/live-events-session';
 import { useIdeLayoutShortcuts } from './composables/useIdeLayoutShortcuts';
 import { useVoiceDeckOnBoot } from './features/voice-deck/use-voice-deck';
+import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit-presence';
+import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
 useIdeLayoutShortcuts();
 useVoiceDeckOnBoot();
+useVoiceCockpitPresence();
 let liveEventsSession: ReturnType<typeof startLiveEventsSession> | null = null;
 const { appSurface } = useAppSurface();
 const isVaultSurface = computed(() => appSurface.value === 'vault');
@@ -66,6 +69,7 @@ watch(
     liveEventsSession?.disconnect();
     liveEventsSession = startLiveEventsSession({
       onRefresh: () => shell.refreshRunSurfaces(),
+      onPresenceRefresh: () => shell.refreshOperatorPresence(),
     });
   },
   { immediate: true },
@@ -107,6 +111,7 @@ onUnmounted(() => {
       :data-layout-mode="shell.layoutMode"
     >
       <TopBar />
+      <MobileVoiceCockpitStrip v-show="!isFoundationSurface" />
       <IdeInterruptPanel v-show="!isFoundationSurface" />
       <LeftSidebar v-show="!isFoundationSurface" />
       <VaultSurface v-show="isVaultSurface" />

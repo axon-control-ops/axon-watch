@@ -122,8 +122,8 @@
       "phase_g_slice": "G4.4",
       "probe": {
         "kind": "gate",
-        "gate": "verify:parity-d5",
-        "note": "Axon-X v1: browser TTS spoken alerts + compact viewport. Full mobile listening deferred per IMPORT_MATRIX."
+        "gate": "verify:voice-cockpit",
+        "note": "Event-driven spoken alerts via briefing watch + presence_refresh SSE; mobile compact strip is foreground-only."
       },
       "fallback": {
         "url": "http://127.0.0.1:7734",
@@ -139,9 +139,9 @@
       "owner": "apps/console-web RightDock + AgentDock",
       "phase_g_slice": "G4.5",
       "probe": {
-        "kind": "contract",
-        "contract": "config/dock-behavior-contract.json",
-        "gate": "verify:parity-d6"
+        "kind": "gate",
+        "gate": "verify:agent-dock-parity",
+        "contract": "config/dock-behavior-contract.json"
       },
       "fallback": {
         "url": "http://127.0.0.1:7734",
