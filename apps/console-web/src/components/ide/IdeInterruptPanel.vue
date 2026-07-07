@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import {
+  isIdeInterruptStopDisabled,
+  resolveIdeInterruptStopTarget,
+  shouldShowIdeInterruptStop,
+} from '../../lib/ide-interrupt-panel-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -61,13 +66,39 @@ const showAttentionAction = computed(
     Boolean(shell.runtimeSummary?.degraded.active),
 );
 
-const showStopAction = computed(
-  () =>
-    Boolean(shell.primaryActiveRun?.can_stop) ||
-    shell.primaryActiveRun?.phase === 'executing',
+const showStopAction = computed(() =>
+  shouldShowIdeInterruptStop({
+    canStopIdeAgentRun: shell.canStopIdeAgentRun,
+    canStopPrimaryRun: shell.canStopPrimaryRun,
+    primaryRunPhase: shell.primaryActiveRun?.phase,
+    agentStreamActive: shell.agentStreamActive,
+  }),
+);
+
+const stopDisabled = computed(() =>
+  isIdeInterruptStopDisabled({
+    runMutationStopping: shell.runMutationState === 'stopping',
+    canStopIdeAgentRun: shell.canStopIdeAgentRun,
+    canStopPrimaryRun: shell.canStopPrimaryRun,
+    primaryRunPhase: shell.primaryActiveRun?.phase,
+  }),
 );
 
 const showResumeAction = computed(() => Boolean(shell.primaryActiveRun?.can_resume));
+
+function stopActiveRun(): void {
+  if (
+    resolveIdeInterruptStopTarget({
+      canStopIdeAgentRun: shell.canStopIdeAgentRun,
+      agentStreamActive: shell.agentStreamActive,
+    }) === 'ide-agent'
+  ) {
+    void shell.stopIdeAgentRun();
+    return;
+  }
+
+  void shell.stopPrimaryRun();
+}
 </script>
 
 <template>
@@ -111,8 +142,8 @@ const showResumeAction = computed(() => Boolean(shell.primaryActiveRun?.can_resu
         v-if="showStopAction"
         type="button"
         class="ide-interrupt-panel__button ide-interrupt-panel__button--ghost"
-        :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun?.phase !== 'executing'"
-        @click="shell.stopPrimaryRun()"
+        :disabled="stopDisabled"
+        @click="stopActiveRun()"
       >
         {{ shell.runMutationState === 'stopping' ? 'Stopping…' : 'Stop run' }}
       </button>

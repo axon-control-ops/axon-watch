@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import KairoChip from '../KairoChip.vue';
 import KairoPresenceBar from './KairoPresenceBar.vue';
 import OperatorPresenceSettingsPanel from './OperatorPresenceSettingsPanel.vue';
 import {
   buildMockupTopbarBreadcrumb,
   buildTopbarRuntimeVersionChips,
 } from '../../lib/mockup-shell-view';
-import { ideUseKairoChip } from '../../lib/ide-presence-profile';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
 import { useShellStore } from '../../stores/shell';
@@ -37,9 +35,7 @@ const topbarSubtitle = computed(() => {
 const runtimeVersionChips = computed(() =>
   buildTopbarRuntimeVersionChips(shell.runtimeSummary),
 );
-const showKairoChip = computed(
-  () => shell.layoutMode === 'ide' && ideUseKairoChip(shell.idePresenceProfile),
-);
+const showTopbarKairoPresence = computed(() => !isFoundationSurface.value);
 
 function openSurface(surface: AppSurface): void {
   navigateToAppSurface(surface);
@@ -98,13 +94,8 @@ function openSurface(surface: AppSurface): void {
         </span>
       </div>
 
-      <KairoChip
-        v-if="showKairoChip"
-        :state="shell.ideDisplayKairoPresenceState"
-        @open-briefing="shell.focusKairoBriefing()"
-      />
       <KairoPresenceBar
-        v-else
+        v-if="showTopbarKairoPresence"
         :state="shell.kairoPresenceState"
         @open-briefing="shell.focusKairoBriefing()"
       />

@@ -50,7 +50,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 | # | Slice | Deliverable | Source |
 |---|---|---|---|
 | 8 | **UX-IDE-1** | Quiet IDE: chip not radar; no watch in status bar (healthy) | IDE refocus plan | **Done** |
-| 9 | **UX-IDE-2** | `IdeInterruptPanel` (approvals + critical signals) | IDE refocus + G3.3 |
+| 9 | **UX-IDE-2** | `IdeInterruptPanel` (approvals + critical signals) | IDE refocus + G3.3 | **Done** |
 | 10 | **KAIRO Ask** | Ask mode + KAIRO persona prompt | JARVIS video personality |
 | 11 | **UX-IDE-3** | Research cards in agent transcript | JARVIS video |
 | 12 | **UX-IDE-4** | `@selection`, `@terminal` context tokens | JARVIS “pull up notes” |
@@ -87,7 +87,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Next up (Wave 3):** UX-IDE-2 `IdeInterruptPanel`, or Wave 4 **G4.1** connector inventory.
+**Next up (Wave 3):** **KAIRO Ask** (slice 10), or Wave 4 **G4.1** connector inventory.
 
 ---
 
@@ -101,6 +101,11 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-07 — UX-IDE-2 interrupt panel + IDE layout polish
+
+- `IdeInterruptPanel` surfaces approvals, signals, and degraded runtime in IDE interrupt tier.
+- IDE uses the same topbar `KairoPresenceBar` as operator; interrupt stop routes to `stopIdeAgentRun` when the IDE agent stream is active (G3.4 parity).
 
 ### 2026-07-06 — Execution track opened + G3.8 started
 

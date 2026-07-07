@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import IdeActivityBar from '../ide/IdeActivityBar.vue';
 import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
-import IdeKairoFooter from '../ide/IdeKairoFooter.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
@@ -274,10 +273,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div v-if="isIdeMode" class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
-      <IdeKairoFooter />
-    </div>
-    <div v-else class="left-sidebar-mockup__status-anchor">
+    <div v-if="!isIdeMode" class="left-sidebar-mockup__status-anchor">
       <section class="workspace-status-card hud-panel-frame">
         <p class="workspace-status-card__title">WORKSPACE STATUS</p>
         <div class="workspace-status-card__body">
