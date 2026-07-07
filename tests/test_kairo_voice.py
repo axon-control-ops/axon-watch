@@ -57,6 +57,21 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertNotIn("README", payload["line"])
         self.assertEqual(payload["source"], "fallback")
 
+    def test_contextual_fallback_uses_operator_prompt(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            start = generate_spoken_line(
+                event_type="agent_start",
+                context={"operator_prompt": "it seems like your report was cut short - please continue"},
+                session_id="contextual-fallback",
+            )
+            done = generate_spoken_line(
+                event_type="done",
+                context={"operator_prompt": "What do you think the project needs?"},
+                session_id="contextual-fallback",
+            )
+        self.assertIn("report", start["line"].lower())
+        self.assertIn("answer", done["line"].lower())
+
     def test_approval_literal_bypasses_runtime(self) -> None:
         with patch("app.kairo_voice._try_runtime_line", return_value="Model paraphrase."):
             payload = generate_spoken_line(

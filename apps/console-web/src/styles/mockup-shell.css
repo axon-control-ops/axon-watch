@@ -90,7 +90,6 @@
 
 .console-shell--mockup .region-left-sidebar,
 .console-shell--mockup .region-center-workbench,
-.console-shell--mockup .region-right-dock,
 .console-shell--mockup .region-status-bar {
   border-top: 0;
   overflow: visible;
@@ -115,11 +114,17 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   align-self: stretch;
   height: 100%;
   max-height: 100%;
   padding: 0;
   gap: var(--shell-gutter);
+  overflow: hidden;
+}
+
+.console-shell--mockup .region-right-dock.agent-dock {
+  overflow: visible;
 }
 
 .console-shell--mockup .region-center-workbench.center-workbench--mockup {
@@ -3927,6 +3932,8 @@ body:has(.console-shell--mockup) {
 .conversation-seam {
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -3945,7 +3952,10 @@ body:has(.console-shell--mockup) {
   list-style: none;
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   overflow: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
 }
 
@@ -3954,6 +3964,9 @@ body:has(.console-shell--mockup) {
   border-radius: 2px;
   padding: 0.45rem 0.55rem;
   background: rgba(4, 18, 28, 0.72);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .conversation-seam__item--system {
@@ -4046,10 +4059,16 @@ body:has(.console-shell--mockup) {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   white-space: normal;
 }
 
 .agent-block--text {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   font-size: 0.68rem;
   line-height: 1.55;
   color: rgba(226, 236, 248, 0.94);
@@ -4062,8 +4081,11 @@ body:has(.console-shell--mockup) {
 
 .agent-block__thinking-toggle {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.35rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 0;
   border: none;
   background: none;
@@ -4072,6 +4094,8 @@ body:has(.console-shell--mockup) {
   font-style: italic;
   cursor: pointer;
   text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .agent-block--thinking-live .agent-block__thinking-toggle {
@@ -4102,8 +4126,13 @@ body:has(.console-shell--mockup) {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
   font-size: 0.6rem;
   color: rgba(150, 168, 190, 0.9);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .agent-block__tool-dot {
@@ -4380,10 +4409,20 @@ body:has(.console-shell--mockup) {
   justify-content: space-between;
   gap: 0.35rem 0.55rem;
   margin-bottom: 0.25rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
-.conversation-seam__preview-toggle {
+.conversation-seam__meta-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin-left: auto;
+}
+
+.conversation-seam__meta-button {
+  display: inline-flex;
+  align-items: center;
   padding: 0.08rem 0.38rem;
   border: 1px solid rgba(0, 210, 255, 0.28);
   border-radius: 2px;
@@ -4395,10 +4434,122 @@ body:has(.console-shell--mockup) {
   cursor: pointer;
 }
 
-.conversation-seam__preview-toggle:hover,
-.conversation-seam__preview-toggle[aria-pressed='true'] {
+.conversation-seam__meta-button:hover {
   border-color: rgba(0, 210, 255, 0.55);
   color: var(--accent-brand);
+}
+
+.conversation-seam__markdown-block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(4, 18, 28, 0.72);
+}
+
+.conversation-seam__markdown-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.conversation-seam__markdown-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.12rem;
+  padding: 0.1rem;
+  border: 1px solid rgba(0, 210, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(0, 12, 20, 0.55);
+}
+
+.conversation-seam__markdown-mode-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(0, 210, 255, 0.72);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.conversation-seam__markdown-mode-button:hover {
+  color: rgba(0, 242, 255, 0.92);
+}
+
+.conversation-seam__markdown-mode-button--active {
+  background: rgba(0, 242, 255, 0.14);
+  color: rgba(0, 242, 255, 0.96);
+}
+
+.conversation-seam__block-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.38rem;
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  border-radius: 2px;
+  background: rgba(0, 12, 20, 0.65);
+  color: rgba(0, 210, 255, 0.82);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.conversation-seam__block-button:hover {
+  border-color: rgba(0, 210, 255, 0.55);
+  color: var(--accent-brand);
+}
+
+.conversation-seam__block-button--overlay {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 1;
+}
+
+.conversation-seam__markdown-block .conversation-seam__content--markdown,
+.conversation-seam__markdown-block .conversation-seam__content--raw {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.conversation-seam__content--raw {
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.48;
+  color: var(--text-secondary);
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.conversation-seam__item > .conversation-seam__blocks,
+.conversation-seam__item > .conversation-seam__markdown-block {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .conversation-seam__content--markdown {
@@ -4406,6 +4557,10 @@ body:has(.console-shell--mockup) {
   font-family: var(--font-sans, system-ui, sans-serif);
   font-size: 0.78rem;
   line-height: 1.5;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .conversation-seam__content--markdown :is(h1, h2, h3, h4) {
@@ -4543,6 +4698,10 @@ body:has(.console-shell--mockup) {
   font-size: 0.78rem;
   line-height: 1.45;
   white-space: pre-wrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .conversation-seam__content--agent {
@@ -4553,7 +4712,9 @@ body:has(.console-shell--mockup) {
   border: 1px solid rgba(0, 242, 255, 0.12);
   border-radius: 2px;
   padding: 0.45rem 0.55rem;
-  overflow-x: auto;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .conversation-seam__content--agent.conversation-seam__content--markdown {
@@ -4562,7 +4723,9 @@ body:has(.console-shell--mockup) {
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--text-primary);
-  overflow-x: visible;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .conversation-seam__preamble,

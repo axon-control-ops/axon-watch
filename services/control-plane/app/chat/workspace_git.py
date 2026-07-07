@@ -91,6 +91,15 @@ def git_status(workspace_id: str) -> GitCommandResult:
     return run_git(workspace_id, ["git", "status", "--short", "--branch"])
 
 
+def git_working_tree_is_clean(status_output: str) -> bool:
+    """True when ``git status --short --branch`` shows only the branch header."""
+    lines = [line.strip() for line in status_output.splitlines() if line.strip()]
+    if not lines:
+        return True
+    file_status_lines = [line for line in lines if not line.startswith("##")]
+    return not file_status_lines
+
+
 def git_add_all(workspace_id: str) -> GitCommandResult:
     return run_git(workspace_id, ["git", "add", "-A"])
 
@@ -104,3 +113,45 @@ def git_commit(workspace_id: str, message: str) -> GitCommandResult:
 
 def git_push(workspace_id: str) -> GitCommandResult:
     return run_git(workspace_id, ["git", "push"])
+
+
+def derive_commit_message(workspace_id: str) -> str:
+    """Build a descriptive commit subject from pending changes when none was given."""
+    files: list[str] = []
+    for args in (
+        ["git", "diff", "--name-only", "HEAD"],
+        ["git", "diff", "--name-only", "--cached"],
+        ["git", "ls-files", "--others", "--exclude-standard"],
+    ):
+        result = run_git(workspace_id, args)
+        if not result.success or result.output in {"", "(no output)"}:
+            continue
+        for line in result.output.splitlines():
+            cleaned = line.strip()
+            if cleaned:
+                files.append(cleaned)
+
+    files = list(dict.fromkeys(files))
+    if not files:
+        return "Update via Axon-X"
+
+    blob = " ".join(files).lower()
+    themes: list[str] = []
+    if any(token in blob for token in ("kairo", "voice", "narration", "spoken")):
+        themes.append("KAIRO voice")
+    if any(token in blob for token in ("terminal", "xterm", "websocket")):
+        themes.append("IDE terminal")
+    if any(token in blob for token in ("explorer", "file-tree", "file_tree", "workspace-file")):
+        themes.append("explorer")
+    if any(token in blob for token in ("git_dispatch", "workspace_git", "lane_b_git")):
+        themes.append("git dispatch")
+    if any(token in blob for token in ("transcript", "conversation-seam")):
+        themes.append("agent transcript")
+
+    if themes:
+        return f"Polish {', '.join(dict.fromkeys(themes))}"
+
+    areas = sorted({path.split("/")[0] for path in files if "/" in path})
+    if areas:
+        return f"Update {'/'.join(areas[:2])} ({len(files)} files)"
+    return f"Update {len(files)} workspace files"

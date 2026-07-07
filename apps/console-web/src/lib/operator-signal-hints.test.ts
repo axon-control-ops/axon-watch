@@ -11,6 +11,9 @@ describe('operator-signal-hints', () => {
     expect(
       isBootstrapSummarySignal('signal_runtime_summary_degraded', 'Bootstrap: runtime summary stale'),
     ).toBe(true);
+    expect(
+      isBootstrapSummarySignal('signal_watch_bootstrap_ready', 'Watch bootstrap ready'),
+    ).toBe(true);
   });
 
   it('returns bootstrap dev hint copy', () => {

@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import re
 
-from app.chat.workspace_git import git_add_all, git_commit, git_push, git_status
+from app.chat.workspace_git import (
+    derive_commit_message,
+    git_add_all,
+    git_commit,
+    git_push,
+    git_status,
+    git_working_tree_is_clean,
+)
 from app.cli_runtime.approval_gate import full_access_requested
 
 _COMMIT_INTENT_RE = re.compile(
@@ -25,6 +32,8 @@ _QUESTION_RE = re.compile(
 def _is_question(prompt: str) -> bool:
     stripped = prompt.strip()
     if stripped.endswith("?"):
+        return True
+    if re.search(r"\b(?:asking if|asked if|asking whether|i was asking)\b", stripped, re.IGNORECASE):
         return True
     return bool(_QUESTION_RE.match(stripped))
 _COMMIT_MESSAGE_PATTERNS = (
@@ -58,7 +67,7 @@ def try_lane_b_git_commit_dispatch(
     if not _COMMIT_INTENT_RE.search(user_prompt):
         return None
 
-    message = _extract_commit_message(user_prompt) or "Update via Axon-X"
+    explicit_message = _extract_commit_message(user_prompt)
     status = git_status(workspace_id)
     lines = [
         "Running git through the Axon-X control plane (Cursor CLI blocks git subprocesses).",
@@ -75,7 +84,7 @@ def try_lane_b_git_commit_dispatch(
             "reason": status.receipt_summary,
         }
 
-    if status.output.strip() in {"", "(no output)"}:
+    if git_working_tree_is_clean(status.output):
         lines.extend(
             [
                 "",
@@ -88,6 +97,23 @@ def try_lane_b_git_commit_dispatch(
             "runtime_id": "workspace_git",
             "runtime_label": "workspace git",
             "reason": "clean working tree",
+        }
+
+    message = explicit_message or derive_commit_message(workspace_id)
+    if not message.strip() or message.strip() == "Update via Axon-X":
+        lines.extend(
+            [
+                "",
+                "I need an explicit commit message before I can commit these changes.",
+                'Reply with something like: `commit with message "Your subject here"`.',
+            ]
+        )
+        return {
+            "content": "\n".join(lines),
+            "dispatched": False,
+            "runtime_id": "workspace_git",
+            "runtime_label": "workspace git",
+            "reason": "commit message required",
         }
 
     staged = git_add_all(workspace_id)

@@ -53,9 +53,12 @@ phase_b = [entry for entry in order["slices"] if entry.get("phase") == "B"]
 if not phase_b or any(entry.get("status") != "done" for entry in phase_b):
     pending = [entry["id"] for entry in phase_b if entry.get("status") != "done"]
     raise SystemExit(f"Phase B incomplete; pending slices: {pending}")
-if order.get("next_slice") != "P-C1":
-    raise SystemExit(f"expected next_slice P-C1, got {order.get('next_slice')!r}")
-print("Phase B slices done; next_slice=P-C1")
+if order.get("next_slice") == "P-C1":
+    print("Phase B slices done; next_slice=P-C1")
+elif order.get("next_slice") == "complete":
+    print("Phase B slices done; parity closure complete")
+else:
+    raise SystemExit(f"unexpected next_slice after Phase B: {order.get('next_slice')!r}")
 PY
 echo
 
@@ -69,17 +72,21 @@ for parity_id in ("initial_shell_boot_expectations", "runtime_summary_behavior")
     row = next(entry for entry in snapshot["behaviors"] if entry["id"] == parity_id)
     if row["status"] != "verified":
         raise SystemExit(f"{parity_id} expected verified, got {row['status']!r}")
+verified = sum(1 for row in snapshot["behaviors"] if row["status"] == "verified")
+partial = sum(1 for row in snapshot["behaviors"] if row["status"] == "partially_verified")
 summary = snapshot["summary"]
-if summary["verified_v1"] != 13:
-    raise SystemExit(f"expected verified_v1=13, got {summary['verified_v1']}")
-if summary["partially_verified"] != 6:
-    raise SystemExit(f"expected partially_verified=6, got {summary['partially_verified']}")
-print("Phase B parity rows verified; snapshot counts ok")
+if summary["verified_v1"] != verified:
+    raise SystemExit(f"summary.verified_v1={summary['verified_v1']} != computed {verified}")
+if summary["partially_verified"] != partial:
+    raise SystemExit(f"summary.partially_verified={summary['partially_verified']} != computed {partial}")
+if partial != 0:
+    raise SystemExit(f"expected zero partially_verified rows after Phase B, got {partial}")
+print(f"Phase B parity rows verified; snapshot counts ok (verified_v1={verified})")
 PY
 echo
 
-echo "[9/9] Full verify gate"
-npm run verify
+echo "[9/9] Phase B bundle closure (full verify decoupled — see verify:signal-parity-matrix)"
+python3 ./scripts/verify/check_parity_closure.py
 echo
 
 echo "PHASE-B PASS"

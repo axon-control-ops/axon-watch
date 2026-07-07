@@ -11,7 +11,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.chat.lane_b_git_dispatch import try_lane_b_git_commit_dispatch  # noqa: E402
-from app.chat.workspace_git import git_commit, git_status  # noqa: E402
+from app.chat.workspace_git import derive_commit_message, git_commit, git_status, git_working_tree_is_clean  # noqa: E402
 
 
 class WorkspaceGitTests(unittest.TestCase):
@@ -64,12 +64,29 @@ class LaneBGitDispatchTests(unittest.TestCase):
         )
         self.assertIsNone(payload)
 
+    def test_derive_commit_message_from_pending_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            (root / "services" / "control-plane").mkdir(parents=True)
+            (root / "services" / "control-plane" / "kairo_voice.py").write_text("# kairo\n")
+            (root / "apps" / "console-web").mkdir(parents=True)
+            (root / "apps" / "console-web" / "terminal.ts").write_text("// terminal\n")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                message = derive_commit_message("workspace_alpha")
+
+            self.assertIn("KAIRO", message)
+            self.assertIn("IDE terminal", message)
+
     def test_skips_questions_about_commits(self) -> None:
         for prompt in (
             "Did you commit and push",
             "did you commit and push?",
             "have the changes been committed?",
             "what did you commit?",
+            "I was asking if you did?",
         ):
             payload = try_lane_b_git_commit_dispatch(
                 workspace_id="workspace_alpha",
@@ -85,6 +102,10 @@ class LaneBGitDispatchTests(unittest.TestCase):
             execution_access="full",
         )
         self.assertIsNone(payload)
+
+    def test_git_working_tree_is_clean_with_branch_header_only(self) -> None:
+        self.assertTrue(git_working_tree_is_clean("## dev...origin/dev"))
+        self.assertFalse(git_working_tree_is_clean("## dev...origin/dev\n M notes.txt"))
 
     def test_full_access_commit_dispatch(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -116,6 +137,29 @@ class LaneBGitDispatchTests(unittest.TestCase):
             assert payload is not None
             self.assertTrue(payload["dispatched"])
             self.assertIn("Ship notes", str(payload["content"]))
+
+    def test_requires_explicit_message_when_generic_fallback_would_be_used(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            (root / "misc.py").write_text("x = 1\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                with patch(
+                    "app.chat.lane_b_git_dispatch.derive_commit_message",
+                    return_value="Update via Axon-X",
+                ):
+                    payload = try_lane_b_git_commit_dispatch(
+                        workspace_id="workspace_alpha",
+                        user_prompt="commit these changes",
+                        execution_access="full",
+                    )
+
+            self.assertIsNotNone(payload)
+            assert payload is not None
+            self.assertFalse(payload["dispatched"])
+            self.assertIn("explicit commit message", str(payload["content"]))
 
     def test_commit_and_push_dispatch_reports_push(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

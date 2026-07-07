@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.research.availability import research_capability_snapshot
+
 
 def runtime_mcp_tools_registry() -> dict[str, object]:
     items = [
@@ -36,6 +38,23 @@ def runtime_mcp_tools_registry() -> dict[str, object]:
             "mode_support": ["ask", "plan", "agent"],
         },
     ]
+    if research_capability_snapshot().get("available"):
+        items.extend(
+            [
+                {
+                    "id": "axon_research.search",
+                    "label": "Search the public web (audited)",
+                    "bounded_context": "research",
+                    "mode_support": ["ask", "plan", "agent"],
+                },
+                {
+                    "id": "axon_research.fetch",
+                    "label": "Fetch readable page text (audited)",
+                    "bounded_context": "research",
+                    "mode_support": ["ask", "plan", "agent"],
+                },
+            ]
+        )
     return {"count": len(items), "items": items}
 
 

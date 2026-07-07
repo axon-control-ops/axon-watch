@@ -79,6 +79,7 @@ import {
 } from '../lib/agent-dock-activity-view';
 import {
   resolveIdeAgentLinkedRunId,
+  resolveIdeAgentLinkedRunIdFromMessages,
 } from '../lib/ide-agent-run-link';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
@@ -115,6 +116,7 @@ import {
 import {
   buildCursorCatalogRows,
   cursorComposerRuntimeLabel,
+  resolveCursorComposerModel,
   type CursorCatalogRow,
 } from '../lib/cursor-catalog-view';
 import {
@@ -598,6 +600,9 @@ export const useShellStore = defineStore('shell', () => {
   const canApproveIdeAgentRun = computed(
     () => Boolean(ideAgentLinkedRun.value?.can_approve) && !runMutationPending.value,
   );
+  const canResumeIdeAgentRun = computed(
+    () => Boolean(ideAgentLinkedRun.value?.can_resume) && !runMutationPending.value,
+  );
   const canRejectPrimaryRun = computed(
     () => primaryApprovalRun.value?.phase === 'awaiting_approval' && !runMutationPending.value,
   );
@@ -842,6 +847,9 @@ export const useShellStore = defineStore('shell', () => {
           if (surface === currentThreadSurface()) {
             resetThreadContext();
           }
+          if (surface === 'ide') {
+            clearIdeAgentRunLink();
+          }
           if (surface === 'operator') {
             operatorThreadMessages.value = [];
           }
@@ -858,6 +866,9 @@ export const useShellStore = defineStore('shell', () => {
         if (surface === currentThreadSurface()) {
           resetThreadContext();
         }
+        if (surface === 'ide') {
+          clearIdeAgentRunLink();
+        }
         return;
       }
 
@@ -866,6 +877,9 @@ export const useShellStore = defineStore('shell', () => {
         history.items.map((item) => mapChatMessageRecord(item)),
         surface,
       );
+      if (surface === 'ide') {
+        ideAgentRunId.value = resolveIdeAgentLinkedRunIdFromMessages(mapped, runs.value);
+      }
       if (surface === currentThreadSurface()) {
         activeThreadId.value = history.thread_id;
         threadMessages.value = mapped;
@@ -882,6 +896,9 @@ export const useShellStore = defineStore('shell', () => {
         commandMutationState.value = 'error';
         commandMutationError.value =
           error instanceof Error ? error.message : 'Failed to load conversation history';
+      }
+      if (surface === 'ide') {
+        clearIdeAgentRunLink();
       }
       if (surface === 'operator') {
         operatorThreadMessages.value = [];
@@ -1194,11 +1211,8 @@ export const useShellStore = defineStore('shell', () => {
       onError: (message, payload) => {
         if (payload?.system_message_id && payload.system_content) {
           patchThreadMessageContent(payload.system_message_id, payload.system_content);
-        } else {
-          void refreshThreadHistory(threadId).catch(() => {
-            commandMutationError.value = message;
-          });
         }
+        commandMutationError.value = message;
         agentStreamActive.value = false;
         agentStreamMessageId.value = null;
         ideComposerActivity.value = null;
@@ -1212,27 +1226,52 @@ export const useShellStore = defineStore('shell', () => {
     ideAgentRunId.value = null;
   }
 
-  function setAgentExecutionAccess(value: AgentExecutionAccess): void {
-    const normalized = normalizeAgentExecutionAccess(value);
-    if (normalized === 'full') {
-      markFullAccessSessionConsent();
-    } else {
-      clearFullAccessSessionConsent();
-      persistAgentExecutionAccess('consultative');
-      agentExecutionAccess.value = 'consultative';
-      return;
+  function restoreComposerDraft(content: string): void {
+    operatorCommandDraft.value = content.trim();
+    commandMutationError.value = null;
+    if (layoutMode.value === 'operator') {
+      setDockHeroMode('command');
     }
-    agentExecutionAccess.value = normalized;
-    persistAgentExecutionAccess(normalized);
+    commandFocusToken.value += 1;
   }
 
-  async function submitIdeComposer(
+  function latestIdeOperatorPromptForRun(runId: string | null | undefined): string | null {
+    const targetRunId = String(runId ?? '').trim();
+    const messages = [...threadMessages.value].reverse();
+    if (targetRunId) {
+      const linked = messages.find(
+        (message) =>
+          message.role === 'operator' &&
+          String(message.run_id ?? '').trim() === targetRunId &&
+          message.content.trim(),
+      );
+      if (linked) {
+        return linked.content.trim();
+      }
+    }
+    const fallback = messages.find(
+      (message) => message.role === 'operator' && message.content.trim(),
+    );
+    return fallback?.content.trim() ?? null;
+  }
+
+  async function dispatchIdeComposerMessage(
     composerMode: 'ask' | 'plan' | 'agent',
-  ): Promise<void> {
+    options: {
+      contentOverride?: string;
+      linkedRunIdOverride?: string | null;
+      clearDraftOnSuccess?: boolean;
+    } = {},
+  ): Promise<boolean> {
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    const content = operatorCommandDraft.value.trim();
-    if (!canSubmitOperatorCommand.value || !workspaceId || !content) {
-      return;
+    const content = (options.contentOverride ?? operatorCommandDraft.value).trim();
+    if (
+      commandMutationState.value === 'submitting' ||
+      agentStreamActive.value ||
+      !workspaceId ||
+      !content
+    ) {
+      return false;
     }
 
     commandMutationState.value = 'submitting';
@@ -1247,7 +1286,7 @@ export const useShellStore = defineStore('shell', () => {
     try {
       const linkedRunId =
         composerMode === 'agent'
-          ? resolveIdeAgentLinkedRunId(ideAgentRunId.value, runs.value)
+          ? options.linkedRunIdOverride ?? resolveIdeAgentLinkedRunId(ideAgentRunId.value, runs.value)
           : null;
       const contextPayload = resolveComposerContextPayload({
         draft: content,
@@ -1281,7 +1320,9 @@ export const useShellStore = defineStore('shell', () => {
         response.messages.map((message) => mapChatMessageRecord(message)),
       );
       threadMessages.value = filterThreadMessagesForSurface(merged, 'ide');
-      operatorCommandDraft.value = '';
+      if (options.clearDraftOnSuccess !== false) {
+        operatorCommandDraft.value = '';
+      }
       if (composerMode === 'agent' && response.run_id) {
         ideAgentRunId.value = response.run_id;
       }
@@ -1310,7 +1351,7 @@ export const useShellStore = defineStore('shell', () => {
           next.add('run');
         }
         expandedDockSeams.value = next;
-        return;
+        return true;
       }
       commandMutationState.value = 'idle';
       if (response.run || response.run_id) {
@@ -1329,15 +1370,37 @@ export const useShellStore = defineStore('shell', () => {
         next.add('thread');
         expandedDockSeams.value = next;
       }
+      return true;
     } catch (error) {
       commandMutationState.value = 'error';
       commandMutationError.value =
         error instanceof Error ? error.message : 'Failed to submit IDE composer message';
+      return false;
     } finally {
       if (!agentStreamActive.value) {
         ideComposerActivity.value = null;
       }
     }
+  }
+
+  function setAgentExecutionAccess(value: AgentExecutionAccess): void {
+    const normalized = normalizeAgentExecutionAccess(value);
+    if (normalized === 'full') {
+      markFullAccessSessionConsent();
+    } else {
+      clearFullAccessSessionConsent();
+      persistAgentExecutionAccess('consultative');
+      agentExecutionAccess.value = 'consultative';
+      return;
+    }
+    agentExecutionAccess.value = normalized;
+    persistAgentExecutionAccess(normalized);
+  }
+
+  async function submitIdeComposer(
+    composerMode: 'ask' | 'plan' | 'agent',
+  ): Promise<void> {
+    await dispatchIdeComposerMessage(composerMode);
   }
 
   async function runOperatorCommand(content: string): Promise<void> {
@@ -1463,9 +1526,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function focusCommandSeam(example: string): void {
-    operatorCommandDraft.value = example;
-    setDockHeroMode('command');
-    commandFocusToken.value += 1;
+    restoreComposerDraft(example);
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
         document.getElementById('operator-command-input')?.focus();
@@ -1993,7 +2054,7 @@ export const useShellStore = defineStore('shell', () => {
   const selectedComposerModel = computed(() => {
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
     if (!workspaceId) {
-      return 'auto';
+      return 'composer-2.5-fast';
     }
     const prefs = composerRuntimePrefs.value;
     const target = selectedRuntimeTargetId.value;
@@ -2003,7 +2064,11 @@ export const useShellStore = defineStore('shell', () => {
     if (family === 'codex') {
       return prefs.codex_cli_model?.trim() || 'auto';
     }
-    return prefs.cursor_cli_model?.trim() || 'auto';
+    const stored = prefs.cursor_cli_model?.trim();
+    if (!stored || stored === 'auto') {
+      return stored || 'auto';
+    }
+    return resolveCursorComposerModel(stored, cursorCatalogRows.value);
   });
 
   const cursorCatalogRows = computed((): CursorCatalogRow[] =>
@@ -2041,11 +2106,30 @@ export const useShellStore = defineStore('shell', () => {
       const snapshot = await fetchCursorRuntimeStatus({ forceRefresh });
       cursorRuntimeStatus.value = snapshot;
       cursorCatalogLoadState.value = 'loaded';
+      migrateCursorComposerModelIfNeeded();
     } catch (error) {
       cursorCatalogLoadState.value = 'error';
       cursorCatalogError.value =
         error instanceof Error ? error.message : 'cursor catalog request failed';
     }
+  }
+
+  function migrateCursorComposerModelIfNeeded(): void {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+    const prefs = readComposerRuntimePrefs(workspaceId);
+    const stored = prefs.cursor_cli_model?.trim();
+    if (!stored || stored === 'auto') {
+      return;
+    }
+    const resolved = resolveCursorComposerModel(stored, cursorCatalogRows.value);
+    if (resolved === stored) {
+      return;
+    }
+    writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: resolved });
+    composerRuntimePrefsRevision.value += 1;
   }
 
   function setSelectedRuntimeTarget(runtimeTarget: string): void {
@@ -2425,6 +2509,43 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function resumeIdeAgentRun(): Promise<void> {
+    const run = ideAgentLinkedRun.value;
+    if (!run?.can_resume || runMutationPending.value) {
+      return;
+    }
+
+    runMutationState.value = 'resuming';
+    runMutationError.value = null;
+
+    try {
+      const latestPrompt = latestIdeOperatorPromptForRun(run.run_id);
+      if (latestPrompt) {
+        const dispatched = await dispatchIdeComposerMessage('agent', {
+          contentOverride: latestPrompt,
+          linkedRunIdOverride: run.run_id,
+          clearDraftOnSuccess: false,
+        });
+        if (dispatched) {
+          await refreshRunSurfaces();
+          const updated = ideAgentLinkedRun.value;
+          if (updated && updated.phase !== 'paused' && updated.phase !== 'review_ready') {
+            afterRunLifecycleMutation();
+            return;
+          }
+        }
+      }
+
+      await resumeRun(run.run_id);
+      await refreshRunSurfaces();
+      afterRunLifecycleMutation();
+    } catch (error) {
+      runMutationError.value = error instanceof Error ? error.message : 'resume run request failed';
+    } finally {
+      runMutationState.value = 'idle';
+    }
+  }
+
   async function markPrimaryRunReviewReady(): Promise<void> {
     const run = primaryActiveRun.value;
     if (run?.phase !== 'executing' || runMutationPending.value) {
@@ -2618,6 +2739,7 @@ export const useShellStore = defineStore('shell', () => {
     canCompletePrimaryRun,
     canMarkPrimaryRunReviewReady,
     canRejectPrimaryRun,
+    canResumeIdeAgentRun,
     currentWorkspace,
     editorDocuments,
     canResumePrimaryRun,
@@ -2708,6 +2830,7 @@ export const useShellStore = defineStore('shell', () => {
     stopCloudflareTunnel,
     runOperatorCommand,
     resumePrimaryRun,
+    resumeIdeAgentRun,
     runs,
     runsError,
     runsLoadState,
@@ -2769,6 +2892,7 @@ export const useShellStore = defineStore('shell', () => {
     fileSaveError,
     fileSaveState,
     focusCommandSeam,
+    restoreComposerDraft,
     focusAttentionSidebar,
     focusMissionControl,
     focusKairoBriefing,

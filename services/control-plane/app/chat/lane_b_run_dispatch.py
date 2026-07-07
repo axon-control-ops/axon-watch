@@ -35,20 +35,20 @@ def resolve_lane_b_agent_run(
             existing = None
         if existing is not None and str(existing.get("workspace_id") or "") == workspace_id:
             phase = str(existing.get("phase") or "")
-            if phase == "review_ready" and full_access_requested(execution_access):
+            if phase in {"review_ready", "paused"}:
                 try:
                     return resume_run(linked_run_id)
                 except RunLifecycleError:
-                    pass
+                    return existing
             elif phase == "awaiting_approval" and full_access_requested(execution_access):
                 # Full Access consent already covers execution; unblock the run.
                 try:
                     return approve_run(linked_run_id)
                 except RunLifecycleError:
                     return existing
-            elif phase in {"executing", "awaiting_approval", "paused"}:
+            elif phase in {"executing", "awaiting_approval"}:
                 return existing
-            elif not is_terminal_phase(phase) and phase != "review_ready":
+            elif not is_terminal_phase(phase):
                 return existing
 
     return create_run(

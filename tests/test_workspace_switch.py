@@ -25,13 +25,15 @@ class WorkspaceSwitchIntentTests(unittest.TestCase):
     def test_ignores_unrelated_prompts(self) -> None:
         self.assertIsNone(resolve_workspace_switch_intent("explain README.md"))
         self.assertIsNone(resolve_workspace_switch_intent("git status"))
+        self.assertIsNone(resolve_workspace_switch_intent("open README.md in the editor"))
 
     def test_builds_reply_and_ui_action(self) -> None:
         intent = resolve_workspace_switch_intent("switch to dashpro workspace")
         self.assertIsNotNone(intent)
         assert intent is not None
         reply = build_workspace_switch_reply(intent)
-        self.assertIn("workspace_dashpro", reply)
+        self.assertIn("Switching the console", reply)
+        self.assertNotIn("Switched to", reply)
         action = workspace_switch_ui_action(intent)
         self.assertEqual("switch_workspace", action["type"])
         self.assertEqual("workspace_dashpro", action["workspace_id"])

@@ -11,7 +11,11 @@ from typing import Any, Literal
 from app.cli_runtime.catalog import find_cursor_cli
 from app.cli_runtime.cursor_agent import run_cursor_local
 from app.kairo_persona import build_persona_voice_line
-from app.kairo_voice_prompt import KAIRO_VOICE_SYSTEM, build_speak_user_prompt
+from app.kairo_voice_prompt import (
+    KAIRO_VOICE_SYSTEM,
+    build_speak_user_prompt,
+    filter_speak_context,
+)
 
 NarrationLevel = Literal["off", "minimal", "conversational"]
 
@@ -105,6 +109,52 @@ def _normalize_spoken_line(raw: str) -> str:
     return text
 
 
+def _operator_prompt(context: dict[str, Any]) -> str:
+    return str(context.get("operator_prompt") or "").strip()
+
+
+def _contextual_agent_start_fallback(context: dict[str, Any]) -> str | None:
+    prompt = _operator_prompt(context)
+    if not prompt:
+        return None
+    lower = prompt.lower()
+    if "continue" in lower or "cut short" in lower:
+        return "Picking up the report from where it stopped."
+    if re.search(r"\bcommit\b", lower):
+        return "I'll commit those changes now."
+    if prompt.endswith("?") or _QUESTION_START_RE.match(lower):
+        return "Good question — I'll work through that now."
+    return "Understood — working on that now."
+
+
+def _contextual_done_fallback(context: dict[str, Any]) -> str | None:
+    prompt = _operator_prompt(context)
+    lower = prompt.lower()
+    edit_count = int(context.get("edit_count") or 0)
+
+    if "continue" in lower or "cut short" in lower:
+        return "That should complete the report — review when you're ready."
+    if prompt.endswith("?"):
+        return "There's my answer — say if you want to go deeper."
+    if re.search(r"\bcommit\b", lower):
+        return "Changes are committed — check the summary in the thread."
+    if edit_count == 1:
+        file_name = str(context.get("file_name") or "").strip()
+        short = file_name.split("/")[-1] if file_name else "the file"
+        return f"Done — {short} is updated."
+    if edit_count > 1:
+        return f"Done — {edit_count} files updated."
+    if prompt:
+        return "All set on my side — review when you're ready."
+    return None
+
+
+_QUESTION_START_RE = re.compile(
+    r"^(?:what|how|why|did|do|does|can|should|were|was|is|are)\b",
+    re.IGNORECASE,
+)
+
+
 def _pick_pool_line(pool_key: str, recent: list[str], *, persona_enabled: bool) -> str:
     pool = list(_FALLBACK_POOLS.get(pool_key, _FALLBACK_POOLS["done"]))
     if not persona_enabled:
@@ -167,7 +217,16 @@ def _fallback_for_event(
         return line.replace("that file", file_name).replace("the file", file_name)
 
     if event_type == "agent_start":
+        contextual = _contextual_agent_start_fallback(context)
+        if contextual:
+            return contextual
         return _pick_pool_line("agent_start", recent, persona_enabled=persona_enabled)
+
+    if event_type == "done":
+        contextual = _contextual_done_fallback(context)
+        if contextual:
+            return contextual
+        return _pick_pool_line("done", recent, persona_enabled=persona_enabled)
 
     pool_key = event_type if event_type in _FALLBACK_POOLS else "done"
     return _pick_pool_line(pool_key, recent, persona_enabled=persona_enabled)

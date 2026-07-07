@@ -31,9 +31,14 @@ CURSOR_CLI_MODEL_OPTIONS: list[ModelRecord] = [
         "description": "Balanced quality and speed — Cursor picks the best model per request.",
     },
     {
+        "id": "composer-2.5-fast",
+        "label": "Composer 2.5 Fast",
+        "description": "Cursor Composer model (subscription routing, default).",
+    },
+    {
         "id": "composer-2.5",
-        "label": "composer-2.5",
-        "description": "Cursor Composer model.",
+        "label": "Composer 2.5",
+        "description": "Cursor Composer model (subscription routing).",
     },
     {
         "id": "claude-fable-5-thinking-high",

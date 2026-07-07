@@ -11,7 +11,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run  # noqa: E402
 from app.persistence import run_store  # noqa: E402
-from app.runs.service import approve_run, create_run  # noqa: E402
+from app.runs.service import approve_run, create_run, stop_run  # noqa: E402
 from tests.support.control_plane_db import isolate_control_plane_db  # noqa: E402
 
 
@@ -91,6 +91,65 @@ class LaneBRunDispatchTests(unittest.TestCase):
             content="Follow-up after review",
             linked_run_id=str(created["run_id"]),
             execution_access="full",
+        )
+        self.assertEqual(str(created["run_id"]), str(resumed["run_id"]))
+        self.assertEqual("executing", resumed["phase"])
+
+    def test_full_access_resumes_paused_linked_run(self) -> None:
+        created = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="First turn",
+            linked_run_id=None,
+            execution_access="full",
+        )
+        paused = stop_run(str(created["run_id"]))
+        self.assertEqual("paused", paused["phase"])
+
+        resumed = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="Continue after stop",
+            linked_run_id=str(created["run_id"]),
+            execution_access="full",
+        )
+        self.assertEqual(str(created["run_id"]), str(resumed["run_id"]))
+        self.assertEqual("executing", resumed["phase"])
+
+    def test_consultative_resumes_review_ready_linked_run(self) -> None:
+        created = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="First turn",
+            linked_run_id=None,
+            execution_access="consultative",
+        )
+        from app.runs.service import mark_review_ready  # noqa: WPS433
+
+        review_ready = mark_review_ready(str(created["run_id"]))
+        self.assertEqual("review_ready", review_ready["phase"])
+
+        resumed = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="Follow-up after review",
+            linked_run_id=str(created["run_id"]),
+            execution_access="consultative",
+        )
+        self.assertEqual(str(created["run_id"]), str(resumed["run_id"]))
+        self.assertEqual("executing", resumed["phase"])
+
+    def test_consultative_resumes_paused_linked_run(self) -> None:
+        created = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="First turn",
+            linked_run_id=None,
+            execution_access="consultative",
+        )
+        paused = stop_run(str(created["run_id"]))
+        self.assertEqual("paused", paused["phase"])
+
+        resumed = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="Continue after stop",
+            linked_run_id=str(created["run_id"]),
+            execution_access="consultative",
         )
         self.assertEqual(str(created["run_id"]), str(resumed["run_id"]))
         self.assertEqual("executing", resumed["phase"])

@@ -1,7 +1,7 @@
 # Phase G5 — Gate Design (`verify:signal-parity-matrix`)
 
 **Opened:** 2026-07-07  
-**Status:** Design only — script stub optional after triage  
+**Status:** Implemented — `verify:signal-parity-matrix` (TEST-26) green on `dev` 2026-07-07
 
 ## Purpose
 
@@ -33,8 +33,15 @@ Define the **G5 exit gate** composition without requiring full `npm run verify` 
 **Explicitly excluded from G5 gate (until triaged):**
 
 - `npm run verify` monolith (runs `all.py` + full matrix)
-- TEST-3 step `[5/5]` and TEST-9 step `[4/4]` full verify hooks
 - Headed Playwright / visual proof scripts (`.local/verify/g4-visual-proof/`)
+
+**Resolved in G5.0-triage (2026-07-07):**
+
+- PLAN-MANIFEST: `docs/planning/MANIFEST.json` validates (32 files)
+- TEST-3 step `[5/5]` → scoped `verify:connector-parity`
+- TEST-9 step `[4/4]` → scoped `verify:contracts`
+
+**Headed browser smoke (Phase G6):** `npm run verify:headed-browser-smoke` — Playwright shell/operator/IDE checks + screenshots under `.local/verify/headed-smoke/`. Use `AXON_HEADED=1` for visible browser.
 
 ## Relationship to existing gates
 
@@ -52,18 +59,15 @@ verify:signal-parity-matrix
 
 ## Known failures blocking full `npm run verify`
 
-Verified read-only 2026-07-07 via `python3 scripts/ops/planning_bundle_manifest.py validate`:
+The G5 gate (`verify:signal-parity-matrix`) intentionally avoids the full monolith. Remaining `npm run verify` blockers should be triaged separately if full monolith green is required.
 
-| Blocker | Symptom | Owner | Fix slice | Notes |
-|---------|---------|-------|-----------|-------|
-| **PLAN-MANIFEST-001** | `hash mismatch` for `IMPORT_MATRIX.md`, `IMPLEMENTATION_ROADMAP.md` | planning | **G5.0-triage** | Regenerate `docs/planning/MANIFEST.json` after planning edits |
-| **PLAN-MANIFEST-002** | Untracked `agent-orchestration-contract.md` | planning | **G5.0-triage** | Add to MANIFEST or move under tracked path |
-| **TEST3-FULL-VERIFY** | TEST-3 `[5/5]` invokes `npm run verify` | verify scripts | **G5.0-triage** | Replace step 5 with scoped bundle or `verify:signal-parity-matrix` |
-| **TEST9-FULL-VERIFY** | TEST-9 `[4/4]` invokes `npm run verify` | verify scripts | **G5.0-triage** | Same as TEST-3 |
-| **VAULT-TEST-ISOLATION** | Host Cursor OAuth can flake vault integration tests | cli_runtime | G2 maintenance | Document env guard; already noted in G3.7 append log |
-| **DELIVERY-REGRESSION** | Operator reports delivery receipt failures in full verify | axon-watch + CP | **G5.0-triage** | Re-run `verify:test5` + `verify:parity-d2` in isolation; file ticket if red |
-
-**Triage order:** PLAN-MANIFEST → decouple TEST-3/9 from full verify → re-run `verify:signal-parity-matrix` candidate.
+| Blocker | Status (2026-07-07) | Notes |
+|---------|----------------------|-------|
+| **PLAN-MANIFEST-001/002** | **Resolved** | Manifest validates; `agent-orchestration-contract.md` tracked |
+| **TEST3-FULL-VERIFY** | **Resolved** | TEST-3 step 5 → `verify:connector-parity` |
+| **TEST9-FULL-VERIFY** | **Resolved** | TEST-9 step 4 → `verify:contracts` |
+| **VAULT-TEST-ISOLATION** | Open (env) | Host Cursor OAuth can flake vault tests — document env guard |
+| **DELIVERY-REGRESSION** | Triage if red | Re-run `verify:test5` + `verify:parity-d2` in isolation |
 
 ## G5.2 extended regression (manual + automated)
 

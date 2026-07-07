@@ -23,15 +23,27 @@ import {
   cursorCatalogCountLabel,
   cursorCatalogModelRows,
   cursorCatalogStatusLabel,
+  cursorComposerPickerRows,
   cursorManageModelRows,
   cursorModelLabel,
   cursorPrimaryModelRows,
   cursorStaleModelWarning,
   isCursorAutoModel,
+  isCursorComposerModel,
+  type CursorCatalogRow,
 } from '../../lib/cursor-catalog-view';
+import { CURSOR_PICKER_COMPOSER_IDS, CURSOR_PICKER_DEFAULT_MODEL } from '../../lib/cursor-picker-prefs';
 
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { shouldSubmitAgentDockComposer } from '../../lib/agent-dock-composer-input';
+import {
+  persistAgentComposerHistory,
+  readStoredAgentComposerHistory,
+  recordAgentComposerHistoryEntry,
+  shouldRecallNextAgentComposerHistory,
+  shouldRecallPreviousAgentComposerHistory,
+  stepAgentComposerHistory,
+} from '../../lib/agent-dock-composer-history';
 import {
   composerDraftIncludesToken,
   readStoredTerminalSnippet,
@@ -77,6 +89,10 @@ const contextSelection = ref(false);
 const contextTerminal = ref(false);
 const contextIde = ref(false);
 const contextPinned = ref(false);
+const composerHistory = ref<string[]>(readStoredAgentComposerHistory());
+const composerHistoryIndex = ref(-1);
+const composerHistoryScratch = ref('');
+const applyingHistoryDraft = ref(false);
 
 const activeMode = computed(
   () => MODE_OPTIONS.find((option) => option.key === composerMode.value) ?? MODE_OPTIONS[2],
@@ -128,12 +144,27 @@ const autoModelRow = computed(() =>
     available: true,
   },
 );
-const cursorPrimaryRows = computed(() =>
+const composerPickerRows = computed(() => {
+  const fromCatalog = cursorComposerPickerRows(shell.cursorCatalogRows);
+  if (fromCatalog.length) {
+    return fromCatalog;
+  }
+  return CURSOR_PICKER_COMPOSER_IDS.map((id): CursorCatalogRow => ({
+    id,
+    label: id,
+    description:
+      id === CURSOR_PICKER_DEFAULT_MODEL
+        ? 'Cursor Composer default — use when API quota models fail'
+        : 'Cursor Composer model',
+    available: true,
+  }));
+});
+const extraPinnedRows = computed(() =>
   cursorPrimaryModelRows({
     rows: shell.cursorCatalogRows,
     activeModelId: selectedModelId.value,
     visibleExtraModelIds: shell.cursorPickerVisibleModelIds,
-  }),
+  }).filter((row) => !isCursorComposerModel(row.id)),
 );
 const cursorManageRows = computed(() =>
   cursorManageModelRows({
@@ -176,13 +207,11 @@ const selectedRuntimeSummary = computed(() => {
   return `${target.label} · ${status}`;
 });
 const autoModelEnabled = computed(() => isCursorAutoModel(selectedModelId.value));
-const showAddModelsEntry = computed(
-  () => !autoModelEnabled.value && !showAddModelsPanel.value,
+const showAddModelsEntry = computed(() => !showAddModelsPanel.value);
+const autoToggleChecked = computed(() => autoModelEnabled.value && !showAddModelsPanel.value);
+const showExtraPinnedRows = computed(
+  () => extraPinnedRows.value.length > 0 && !showAddModelsPanel.value,
 );
-const autoToggleChecked = computed(
-  () => autoModelEnabled.value && !showAddModelsPanel.value,
-);
-const showCursorPrimaryRows = computed(() => !isCursorAutoModel(selectedModelId.value));
 const cursorCatalogTotal = computed(() => cursorCatalogModelRows(shell.cursorCatalogRows).length);
 const runtimeHint = computed(() => {
   if (shell.runtimeStatusError) {
@@ -238,7 +267,10 @@ const selectionChipLabel = computed(() => {
 const mcpToolsForMode = computed(() =>
   filterMcpToolsForComposerMode(shell.runtimeMcpTools, composerMode.value),
 );
-const showComposerStop = computed(() => shell.canStopIdeAgentRun);
+const showComposerResume = computed(() => shell.canResumeIdeAgentRun);
+const showComposerStop = computed(
+  () => shell.canStopIdeAgentRun && !shell.canResumeIdeAgentRun,
+);
 const showApprovalBanner = computed(
   () =>
     composerMode.value === 'agent' &&
@@ -485,7 +517,7 @@ function toggleRuntimeTargetsPanel(): void {
 function onAutoToggleClick(event: MouseEvent): void {
   event.preventDefault();
   if (autoModelEnabled.value && !showAddModelsPanel.value) {
-    openAddModelsPanel();
+    selectComposerModel(CURSOR_PICKER_DEFAULT_MODEL);
     return;
   }
   selectComposerModel('auto');
@@ -510,17 +542,94 @@ function handleStopRun(): void {
   void shell.stopIdeAgentRun();
 }
 
-function handleSubmit(event?: Event): void {
+function applyHistoryDraft(draft: string): void {
+  applyingHistoryDraft.value = true;
+  shell.restoreComposerDraft(draft);
+  void nextTick(() => {
+    syncComposerHeight();
+    if (!inputRef.value) {
+      return;
+    }
+    const caret = inputRef.value.value.length;
+    inputRef.value.setSelectionRange(caret, caret);
+  });
+}
+
+function handleHistory(direction: 'previous' | 'next'): void {
+  const step = stepAgentComposerHistory({
+    entries: composerHistory.value,
+    index: composerHistoryIndex.value,
+    scratch: composerHistoryScratch.value,
+    currentDraft: shell.operatorCommandDraft,
+    direction,
+  });
+  composerHistoryIndex.value = step.index;
+  composerHistoryScratch.value = step.scratch;
+  applyHistoryDraft(step.draft);
+}
+
+async function handleSubmit(event?: Event): Promise<void> {
   event?.preventDefault();
-  void shell.submitIdeComposer(composerMode.value);
+  const draft = shell.operatorCommandDraft.trim();
+  await shell.submitIdeComposer(composerMode.value);
+  if (draft && !shell.operatorCommandDraft.trim() && shell.commandMutationState === 'idle') {
+    composerHistory.value = recordAgentComposerHistoryEntry(composerHistory.value, draft);
+    persistAgentComposerHistory(composerHistory.value);
+    composerHistoryIndex.value = -1;
+    composerHistoryScratch.value = '';
+  }
+}
+
+function handleResumeRun(): void {
+  void shell.resumeIdeAgentRun();
 }
 
 function handleComposerKeydown(event: KeyboardEvent): void {
+  if (inputRef.value) {
+    if (
+      shouldRecallPreviousAgentComposerHistory({
+        key: event.key,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        selectionStart: inputRef.value.selectionStart,
+        selectionEnd: inputRef.value.selectionEnd,
+        value: inputRef.value.value,
+      }) &&
+      composerHistory.value.length > 0
+    ) {
+      event.preventDefault();
+      handleHistory('previous');
+      return;
+    }
+
+    if (
+      shouldRecallNextAgentComposerHistory(
+        {
+          key: event.key,
+          shiftKey: event.shiftKey,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          selectionStart: inputRef.value.selectionStart,
+          selectionEnd: inputRef.value.selectionEnd,
+          value: inputRef.value.value,
+        },
+        composerHistoryIndex.value >= 0,
+      )
+    ) {
+      event.preventDefault();
+      handleHistory('next');
+      return;
+    }
+  }
+
   if (!shouldSubmitAgentDockComposer(event)) {
     return;
   }
   event.preventDefault();
-  handleSubmit();
+  void handleSubmit();
 }
 
 function handleDocumentClick(): void {
@@ -544,8 +653,25 @@ function syncContextFromDraft(): void {
 watch(
   () => shell.operatorCommandDraft,
   () => {
+    const fromHistory = applyingHistoryDraft.value;
+    if (fromHistory) {
+      applyingHistoryDraft.value = false;
+    } else if (composerHistoryIndex.value >= 0) {
+      composerHistoryIndex.value = -1;
+      composerHistoryScratch.value = '';
+    }
     void nextTick(syncComposerHeight);
     syncContextFromDraft();
+  },
+);
+
+watch(
+  () => shell.commandFocusToken,
+  () => {
+    void nextTick(() => {
+      syncComposerHeight();
+      inputRef.value?.focus();
+    });
   },
 );
 
@@ -820,6 +946,7 @@ onUnmounted(() => {
                 :class="{ 'is-active': showModelMenu }"
                 :title="`Current runtime: ${runtimeDetail}`"
                 :aria-label="`Open model picker: ${runtimeLabel}`"
+                :aria-expanded="showModelMenu"
                 @click="toggleSection('model')"
               >
                 <span class="agent-dock-composer__tool-icon" aria-hidden="true">⚡</span>
@@ -883,7 +1010,7 @@ onUnmounted(() => {
                     </label>
 
                     <button
-                      v-for="row in cursorPrimaryRows"
+                      v-for="row in composerPickerRows"
                       :key="row.id"
                       type="button"
                       class="agent-dock-composer__menu-item"
@@ -898,23 +1025,33 @@ onUnmounted(() => {
                       <small>{{ row.description }}</small>
                     </button>
 
+                    <template v-if="showExtraPinnedRows">
+                      <p class="agent-dock-composer__menu-caption">Pinned models</p>
+                      <button
+                        v-for="row in extraPinnedRows"
+                        :key="row.id"
+                        type="button"
+                        class="agent-dock-composer__menu-item"
+                        :class="{ 'agent-dock-composer__menu-item--selected': row.id === selectedModelId }"
+                        :disabled="!row.available"
+                        @click="selectComposerModel(row.id)"
+                      >
+                        <span class="agent-dock-composer__model-label">
+                          {{ row.label }}
+                          <span v-if="row.badge" class="agent-dock-composer__model-badge">{{ row.badge }}</span>
+                        </span>
+                        <small>{{ row.description }}</small>
+                      </button>
+                    </template>
+
                     <button
-                      v-if="showAddModelsEntry && showCursorPrimaryRows && cursorCatalogTotal > cursorPrimaryRows.length"
+                      v-if="showAddModelsEntry"
                       type="button"
                       class="agent-dock-composer__menu-item agent-dock-composer__menu-item--add-models"
                       @click.stop="openAddModelsPanel"
                     >
                       <span>Add models</span>
                       <small>Browse {{ cursorCatalogTotal }} catalog models</small>
-                    </button>
-                    <button
-                      v-else-if="showAddModelsEntry && !showCursorPrimaryRows"
-                      type="button"
-                      class="agent-dock-composer__menu-item agent-dock-composer__menu-item--add-models"
-                      @click.stop="openAddModelsPanel"
-                    >
-                      <span>Add models</span>
-                      <small>Pin a specific Cursor model</small>
                     </button>
 
                     <p v-if="cursorStaleWarning" class="agent-dock-composer__menu-note agent-dock-composer__menu-note--warning">
@@ -1046,6 +1183,15 @@ onUnmounted(() => {
           </div>
 
           <div class="agent-dock-composer__actions">
+            <button
+              v-if="showComposerResume"
+              type="button"
+              class="agent-dock-composer__resume"
+              :disabled="shell.runMutationState === 'resuming'"
+              @click="handleResumeRun"
+            >
+              {{ shell.runMutationState === 'resuming' ? 'Resuming…' : 'Resume' }}
+            </button>
             <button
               v-if="showComposerStop"
               type="button"

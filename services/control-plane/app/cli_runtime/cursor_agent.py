@@ -6,6 +6,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app.cli_runtime.cursor_stream_events import CursorStreamAssembler
+from app.cli_runtime.research_mcp import ensure_workspace_research_mcp
+from app.research.availability import research_capability_snapshot
 from app.cli_runtime.subprocess_runner import (
     RuntimeProcessStoppedError,
     communicate_registered_process,
@@ -49,6 +51,12 @@ def run_cursor_local(
         "stream-json",
         "--stream-partial-output",
     ]
+    if research_capability_snapshot().get("available"):
+        # Cursor CLI rejects audited MCP tools unless --force is set alongside
+        # --approve-mcps in headless dispatch (verified against cursor 3.10.x).
+        command.extend(["--force", "--approve-mcps"])
+        if workspace_root:
+            ensure_workspace_research_mcp(workspace_root)
     mode_flag = _cursor_mode_flag(composer_mode, execution_tier)
     if mode_flag:
         command.extend(["--mode", mode_flag])

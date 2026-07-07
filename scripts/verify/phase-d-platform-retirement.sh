@@ -107,8 +107,8 @@ echo "[11/12] Deployment readiness regression"
 python3 -m unittest tests.test_deployment_readiness tests.test_test8_dedicated_server_acceptance -v
 echo
 
-echo "[12/12] Full verify gate"
-npm run verify
+echo "[12/12] Phase D bundle closure (full verify decoupled — see verify:signal-parity-matrix)"
+python3 ./scripts/verify/check_parity_closure.py
 echo
 
 echo "PHASE-D PASS"

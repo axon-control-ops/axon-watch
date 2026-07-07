@@ -56,6 +56,16 @@ class LaneBAgentTests(unittest.TestCase):
         )
         self.assertIn("Reply in first person", ask)
 
+        plan = _build_prompt(
+            composer_mode="plan",
+            user_prompt="figure out the next changes",
+            context_block="ctx",
+        )
+        self.assertIn("You may reference audited Axon-X research tools", plan)
+        self.assertIn("Online research", plan)
+        self.assertIn("discovery, implementation, verification", plan)
+        self.assertIn("Reply in first person", plan)
+
     def test_ide_modes_keep_lane_b_even_when_prompt_matches_command_keywords(self) -> None:
         # "Add a comment to README.md" must not become an operator read_file run.
         self.assertTrue(should_use_lane_b(composer_mode="ask", command_intent="git_status"))
@@ -88,7 +98,8 @@ class LaneBAgentTests(unittest.TestCase):
             user_prompt="What files are in this repo?",
         )
         self.assertIn("Lane B (ask)", reply)
-        self.assertIn("CLI runtime fabric is unavailable", reply)
+        self.assertIn("is unavailable", reply)
+        self.assertIn("Check Runtime or `/vault`, then retry.", reply)
 
     @patch(
         "app.chat.lane_b_agent.dispatch_ide_composer",

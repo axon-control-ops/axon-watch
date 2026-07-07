@@ -258,6 +258,49 @@ def _tool_block_from_event(event: dict[str, Any], workspace_root: str) -> str:
     return ""
 
 
+def _collapse_echo_text(text: str) -> str:
+    """Drop a single-chunk assistant payload that repeats itself back-to-back."""
+    if not text:
+        return text
+    stripped = text.strip()
+    if not stripped:
+        return text
+    if len(text) >= len(stripped) * 2:
+        mid = len(text) // 2
+        left = text[:mid].strip()
+        right = text[mid:].strip()
+        if left and left == right == stripped:
+            return stripped if text.startswith(stripped) else stripped
+    if text == stripped + stripped or text == f"{stripped}{stripped}":
+        return stripped
+    return text
+
+
+def assistant_text_delta(accumulated: str, incoming: str) -> str:
+    """Return only the suffix of *incoming* that is not already in *accumulated*.
+
+    Cursor CLI with ``--stream-partial-output`` emits incremental assistant chunks
+    (e.g. ``hello``, `` world``) and then a final aggregate event (``hello world``).
+    Appending every event verbatim duplicates the full reply.
+    """
+    if not incoming:
+        return ""
+    if incoming == accumulated:
+        return ""
+    if accumulated and incoming.startswith(accumulated):
+        suffix = incoming[len(accumulated) :]
+        if not suffix:
+            return ""
+        # Cursor occasionally emits cumulative assistant text that repeats the
+        # already-delivered prefix verbatim (e.g. "sentence A" -> "sentence A" + "sentence A").
+        if suffix == accumulated or suffix.strip() == accumulated.strip():
+            return ""
+        return suffix
+    if accumulated and accumulated.startswith(incoming):
+        return ""
+    return incoming
+
+
 class CursorStreamAssembler:
     """Assemble stream-json events into a block-annotated transcript."""
 
@@ -272,6 +315,7 @@ class CursorStreamAssembler:
         self._parts: list[str] = []
         self._thinking_open = False
         self._saw_assistant_text = False
+        self._assistant_accumulated = ""
         self.result_text = ""
         self.error_text = ""
 
@@ -311,10 +355,13 @@ class CursorStreamAssembler:
 
         if event_type == "assistant":
             self._close_thinking()
-            text = assistant_text_from_event(event)
+            text = _collapse_echo_text(assistant_text_from_event(event))
             if text:
-                self._saw_assistant_text = True
-                self._append(text)
+                delta = assistant_text_delta(self._assistant_accumulated, text)
+                if delta:
+                    self._saw_assistant_text = True
+                    self._assistant_accumulated += delta
+                    self._append(delta)
             return
 
         if event_type == "tool_call":

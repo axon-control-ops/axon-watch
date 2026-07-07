@@ -26,7 +26,6 @@ _SWITCH_VERBS = (
     "change to",
     "go to",
     "open and switch to",
-    "open",
 )
 
 
@@ -115,12 +114,12 @@ def build_workspace_switch_reply(intent: WorkspaceSwitchIntent) -> str:
     record = get_workspace_record(intent.target_workspace_id)
     project_root = record.get("project_root", "").strip()
     lines = [
-        f"Switched to **{intent.display_name}** (`{intent.target_workspace_id}`).",
+        f"Switching the console to **{intent.display_name}** (`{intent.target_workspace_id}`).",
     ]
     if project_root:
-        lines.append(f"Explorer and terminal now use `{project_root}`.")
+        lines.append(f"The explorer and terminal will use `{project_root}` once the switch applies.")
     if intent.open_file_path:
-        lines.append(f"Opened `{intent.open_file_path}`.")
+        lines.append(f"I will open `{intent.open_file_path}` after the switch.")
     return " ".join(lines)
 
 

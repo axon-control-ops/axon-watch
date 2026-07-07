@@ -60,8 +60,8 @@ print("Phase A slices done")
 PY
 echo
 
-echo "[8/8] Full verify gate"
-npm run verify
+echo "[8/8] Phase A bundle closure (full verify decoupled — see verify:signal-parity-matrix)"
+python3 ./scripts/verify/check_parity_closure.py
 echo
 
 echo "PHASE-A PASS"

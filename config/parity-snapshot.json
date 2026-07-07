@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "assessed_on": "2026-07-05",
-  "assessment_scope": "Axon-X thin-slice gates TEST-0 through TEST-9 on axon-watch/dev",
+  "assessed_on": "2026-07-07",
+  "assessment_scope": "Axon-X v1 parity (Phases A–D, TEST-0–TEST-10) plus Phase G gates TEST-18–TEST-26 on axon-watch/dev",
   "decision": "bounded_cutover_approved",
   "full_axon_local_retirement": false,
   "summary": {
@@ -20,7 +20,13 @@
     "TEST-6",
     "TEST-7",
     "TEST-8",
-    "TEST-9"
+    "TEST-9",
+    "TEST-10",
+    "TEST-18",
+    "TEST-19",
+    "TEST-20",
+    "TEST-25",
+    "TEST-26"
   ],
   "behaviors": [
     {
@@ -246,7 +252,11 @@
     }
   ],
   "blockers_for_full_retirement": [
-    "Child-project integration and legacy connector surfaces not yet migrated to Axon-X"
+    "WhatsApp Web monitor unmigrated (G4.2 deferred)",
+    "Legacy settings paths without Axon-X owner (G5.1 partial rows)",
+    "Tunnel start/stop dependency on axon-local script (G4.3 partial)",
+    "Operator has not completed one-week :4173-only dry-run (G6.2)",
+    "Operator has not signed PHASE_G5_INTENTIONAL_DISCARDS.md acknowledgments (G5.4)"
   ],
   "production_operator": {
     "status": "axon_x",
@@ -266,7 +276,9 @@
     "Cutover verification and planning on axon-watch/docs/planning/"
   ],
   "axon_local_remains_required_for": [
-    "Fallback operator surface and legacy connector paths when Axon-X capabilities regress",
-    "Child-project integration and legacy connector surfaces not yet migrated"
+    "Explicit fallback when Axon-X capability regresses (see docs/PHASE_G6_RETIREMENT_READINESS.md rollback criteria)",
+    "WhatsApp Web monitor until G4.2 ships or operator signs discard",
+    "Tunnel start/stop when AXON_LOCAL_ROOT script path is required",
+    "Legacy settings/storage paths not yet owned by Axon-X"
   ]
 }

@@ -120,9 +120,9 @@ Map every `docs/planning/IMPORT_MATRIX.md` row marked **`adopt`** or **`adapt`**
 ## G5 slice checklist
 
 - [x] **G5.1** This capability matrix published
-- [ ] **G5.2** Extended production operator regression (`verify:signal-parity-matrix` — see `PHASE_G5_GATE_DESIGN.md`)
-- [ ] **G5.3** Refresh `config/parity-snapshot.json` after G5.2 green
-- [ ] **G5.4** Operator acknowledgment of intentional discards (`PHASE_G5_INTENTIONAL_DISCARDS.md`)
+- [x] **G5.2** Extended production operator regression (`verify:signal-parity-matrix` — see `PHASE_G5_GATE_DESIGN.md`) — PASS verified 2026-07-07 (TEST-26 re-run on dev)
+- [x] **G5.3** Refresh `config/parity-snapshot.json` assessment scope + blockers (2026-07-07); `full_axon_local_retirement` stays false until G6
+- [ ] **G5.4** Operator acknowledgment of intentional discards (`PHASE_G5_INTENTIONAL_DISCARDS.md`) — doc published; ack boxes open
 
 ## References
 

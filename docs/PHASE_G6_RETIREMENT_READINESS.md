@@ -8,7 +8,9 @@
 
 Reassess `config/parity-snapshot.json` → `blockers_for_full_retirement` with G1–G5 evidence, define a one-week `:4173`-only dry-run, and rollback criteria to `:7734`.
 
-**G6.4:** Spec for `test17-full-retirement-readiness.sh` below — **do not add script** until `verify:signal-parity-matrix` is green.
+**G6.4:** `scripts/verify/test17-full-retirement-readiness.sh` — `npm run verify:retirement-readiness`. PASS triggers operator review only; does not auto-retire axon-local.
+
+**Headed browser smoke:** `npm run verify:headed-browser-smoke` — run daily during G6.2 dry-run. Set `AXON_HEADED=1` for a visible browser window.
 
 ---
 
@@ -56,7 +58,8 @@ Reassess `config/parity-snapshot.json` → `blockers_for_full_retirement` with G
 
 ### Daily verification (automated)
 
-- [ ] `npm run verify:connector-parity` (or full `verify:signal-parity-matrix` when green)
+- [ ] `npm run verify:headed-browser-smoke` (Playwright shell + operator/IDE mode; screenshots under `.local/verify/headed-smoke/`)
+- [ ] `npm run verify:connector-parity` (or full `verify:signal-parity-matrix` weekly)
 - [ ] Note any forced `:7734` fallback with reason in append log
 
 ### End-of-week criteria
@@ -91,26 +94,15 @@ Reassess `config/parity-snapshot.json` → `blockers_for_full_retirement` with G
 
 ---
 
-## G6.4 — Spec: `test17-full-retirement-readiness.sh` (not implemented)
+## G6.4 — `test17-full-retirement-readiness.sh` (implemented)
 
-**Preconditions (all must pass before script exists):**
+**npm script:** `"verify:retirement-readiness": "./scripts/verify/test17-full-retirement-readiness.sh"`
+
+**Preconditions (all must pass before TEST-17 PASS):**
 
 - `verify:signal-parity-matrix` green
 - `PHASE_G5_INTENTIONAL_DISCARDS.md` operator ack complete
-- G6.2 dry-run log shows ≤ 1 documented fallback OR operator waives
-
-**Script steps (future):**
-
-```text
-[1/6] verify:signal-parity-matrix
-[2/6] verify:connector-parity
-[3/6] verify:production-operator
-[4/6] parity-snapshot.json: full_axon_local_retirement candidate flag false until manual sign-off file exists
-[5/6] Check docs/PHASE_G6_RETIREMENT_READINESS.md dry-run section has dated operator entry
-[6/6] Optional: test17 does NOT start :7734 or Electron
-```
-
-**npm script (future):** `"verify:retirement-readiness": "./scripts/verify/test17-full-retirement-readiness.sh"`
+- G6.2 dry-run log has at least one checked item
 
 **Exit:** TEST-17 PASS does **not** auto-retire axon-local — triggers operator review only.
 

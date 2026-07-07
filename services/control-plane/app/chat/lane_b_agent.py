@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from app.cli_runtime.router import dispatch_ide_composer
 from app.chat.lane_b_git_dispatch import try_lane_b_git_commit_dispatch
+from app.research.availability import format_capability_line, research_capability_snapshot
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_files import WorkspaceFileError, list_workspace_files
 
@@ -79,19 +80,16 @@ def build_lane_b_context_block(context: LaneBContext) -> str:
     except (WorkspaceFileError, OSError):
         pass
 
+    snapshot = research_capability_snapshot()
+    lines.append(f"Capabilities: {format_capability_line(snapshot)}")
     return "\n".join(lines)
 
 
 def _fallback_reply(*, context: LaneBContext, user_prompt: str, reason: str) -> str:
-    context_block = build_lane_b_context_block(context)
+    del user_prompt
     return (
-        f"Lane B ({context.composer_mode}) is active, but the CLI runtime fabric is "
-        f"unavailable ({reason}).\n\n"
-        f"Operator request:\n{user_prompt.strip()}\n\n"
-        f"Workspace context:\n```\n{context_block}\n```\n\n"
-        "Sign in to Cursor or Codex locally, then use the runtime status route "
-        "(`/api/runtime/status`) to inspect readiness. Operator commands (`git status`, "
-        "`run …`) still work in Command mode."
+        f"Lane B ({context.composer_mode}) is unavailable: {reason}. "
+        "Check Runtime or `/vault`, then retry."
     )
 
 

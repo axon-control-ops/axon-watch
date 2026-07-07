@@ -3,7 +3,10 @@ import { computed } from 'vue';
 
 import {
   isIdeInterruptStopDisabled,
+  resolveIdeInterruptDetailLine,
+  resolveIdeInterruptHeadline,
   resolveIdeInterruptStopTarget,
+  shouldShowIdeInterruptAttentionAction,
   shouldShowIdeInterruptStop,
 } from '../../lib/ide-interrupt-panel-view';
 import { useShellStore } from '../../stores/shell';
@@ -14,56 +17,36 @@ const showPanel = computed(
   () => shell.layoutMode === 'ide' && shell.idePresenceProfile === 'interrupt',
 );
 
-const headline = computed(() => {
-  if (shell.pendingApprovalsCount > 0) {
-    const count = shell.pendingApprovalsCount;
-    return `${count} approval${count === 1 ? '' : 's'} waiting for your review`;
-  }
+const topSignal = computed(() => shell.operatorBriefing?.top_signals[0] ?? null);
 
-  const topSignal = shell.operatorBriefing?.top_signals[0];
-  if (topSignal?.title) {
-    return topSignal.title;
-  }
+const headline = computed(() =>
+  resolveIdeInterruptHeadline({
+    pendingApprovalsCount: shell.pendingApprovalsCount,
+    topSignal: topSignal.value,
+    watchConnected: Boolean(shell.runtimeSummary?.watch.connected),
+    degradedActive: Boolean(shell.runtimeSummary?.degraded.active),
+    primaryRunPhase: shell.primaryActiveRun?.phase,
+  }),
+);
 
-  if (shell.runtimeSummary && !shell.runtimeSummary.watch.connected) {
-    return 'Watch connector offline';
-  }
-
-  if (shell.runtimeSummary?.degraded.active) {
-    return 'Runtime degraded — attention required';
-  }
-
-  if (shell.primaryActiveRun?.phase === 'awaiting_approval') {
-    return 'Run blocked — awaiting approval';
-  }
-
-  return 'Attention required';
-});
-
-const detailLine = computed(() => {
-  if (shell.pendingApprovalsCount > 0) {
-    return 'Review before the agent can continue.';
-  }
-
-  const topSignal = shell.operatorBriefing?.top_signals[0];
-  if (topSignal?.summary) {
-    return topSignal.summary;
-  }
-
-  if (shell.primaryActiveRun?.current_step) {
-    return shell.primaryActiveRun.current_step;
-  }
-
-  return 'Open Attention to review signals, approvals, or run state.';
-});
+const detailLine = computed(() =>
+  resolveIdeInterruptDetailLine({
+    pendingApprovalsCount: shell.pendingApprovalsCount,
+    topSignal: topSignal.value,
+    watchConnected: Boolean(shell.runtimeSummary?.watch.connected),
+    degradedActive: Boolean(shell.runtimeSummary?.degraded.active),
+    primaryRunCurrentStep: shell.primaryActiveRun?.current_step,
+  }),
+);
 
 const showApprovalAction = computed(() => shell.pendingApprovalsCount > 0);
 
-const showAttentionAction = computed(
-  () =>
-    shell.pendingApprovalsCount > 0 ||
-    (shell.operatorBriefing?.top_signals.length ?? 0) > 0 ||
-    Boolean(shell.runtimeSummary?.degraded.active),
+const showAttentionAction = computed(() =>
+  shouldShowIdeInterruptAttentionAction({
+    pendingApprovalsCount: shell.pendingApprovalsCount,
+    topSignals: shell.operatorBriefing?.top_signals ?? [],
+    degradedActive: Boolean(shell.runtimeSummary?.degraded.active),
+  }),
 );
 
 const showStopAction = computed(() =>
@@ -84,7 +67,18 @@ const stopDisabled = computed(() =>
   }),
 );
 
-const showResumeAction = computed(() => Boolean(shell.primaryActiveRun?.can_resume));
+const showResumeAction = computed(
+  () => shell.canResumeIdeAgentRun || Boolean(shell.primaryActiveRun?.can_resume),
+);
+
+function resumeActiveRun(): void {
+  if (shell.canResumeIdeAgentRun) {
+    void shell.resumeIdeAgentRun();
+    return;
+  }
+
+  void shell.resumePrimaryRun();
+}
 
 function stopActiveRun(): void {
   if (
@@ -133,8 +127,8 @@ function stopActiveRun(): void {
         v-if="showResumeAction"
         type="button"
         class="ide-interrupt-panel__button ide-interrupt-panel__button--warning"
-        :disabled="!shell.canResumePrimaryRun"
-        @click="shell.resumePrimaryRun()"
+        :disabled="shell.runMutationState === 'resuming' || !(shell.canResumeIdeAgentRun || shell.canResumePrimaryRun)"
+        @click="resumeActiveRun()"
       >
         {{ shell.runMutationState === 'resuming' ? 'Resuming…' : 'Resume run' }}
       </button>

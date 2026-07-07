@@ -183,12 +183,14 @@
     }
   ],
   "retirement_blocker_map": {
-    "Child-project integration and legacy connector surfaces not yet migrated to Axon-X": [
-      "whatsapp_web_monitor",
+    "WhatsApp Web monitor unmigrated (G4.2 deferred)": [
+      "whatsapp_web_monitor"
+    ],
+    "Legacy settings paths without Axon-X owner (G5.1 partial rows)": [
+      "legacy_settings_storage"
+    ],
+    "Tunnel start/stop dependency on axon-local script (G4.3 partial)": [
       "cloudflare_tunnel",
-      "voice_deck_mobile_cockpit",
-      "agent_dock_legacy_parity",
-      "legacy_settings_storage",
       "axon_local"
     ]
   }

@@ -461,8 +461,11 @@
   flex-direction: column;
   position: relative;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   height: 100%;
   gap: 0;
+  overflow: visible;
   background: linear-gradient(180deg, rgba(8, 12, 18, 0.94), rgba(6, 10, 16, 0.98));
 }
 
@@ -496,6 +499,9 @@
 
 .agent-dock__header {
   flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   padding: 0.45rem 0.65rem 0.4rem;
   border-bottom: 1px solid rgba(138, 154, 173, 0.14);
 }
@@ -655,6 +661,7 @@
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .agent-dock__section-header {
@@ -686,22 +693,28 @@
 .agent-dock__transcript {
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   overflow: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   padding: 0 0.8rem 0.7rem;
 }
 
 .agent-dock__transcript .conversation-seam {
   min-height: min-content;
-  overflow: visible;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .agent-dock__transcript .conversation-seam__list {
   gap: 0.55rem;
-  overflow: visible;
-  flex: none;
-  height: auto;
-  min-height: auto;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .agent-dock__transcript .conversation-seam__item {
@@ -709,6 +722,9 @@
   border-radius: 10px;
   padding: 0.55rem 0.65rem;
   background: rgba(255, 255, 255, 0.025);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .agent-dock__transcript .conversation-seam__item--agent {
@@ -718,6 +734,32 @@
 
 .agent-dock__transcript .conversation-seam__meta {
   margin-bottom: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.agent-dock__transcript .conversation-seam__blocks {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.agent-dock__transcript .conversation-seam__markdown-block {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border-color: rgba(0, 242, 255, 0.16);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.agent-dock__transcript .conversation-seam__markdown-toolbar {
+  width: 100%;
+}
+
+.agent-dock__transcript .conversation-seam__content--markdown,
+.agent-dock__transcript .conversation-seam__content--raw {
+  width: 100%;
+  max-width: 100%;
 }
 
 .agent-dock__transcript .conversation-seam__role {
@@ -733,6 +775,10 @@
 .agent-dock__transcript .conversation-seam__content {
   font-size: 0.74rem;
   line-height: 1.48;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .agent-dock__transcript .conversation-seam__content--agent {
@@ -742,7 +788,10 @@
   color: rgba(228, 236, 243, 0.92);
   font-size: 0.68rem;
   max-height: none;
-  overflow: visible;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .agent-dock__transcript .conversation-seam__content--error {
@@ -775,10 +824,16 @@
 }
 
 .agent-dock-composer__menu--runtime {
-  width: 13.25rem;
-  max-height: min(20rem, 52vh);
+  right: 0;
+  left: auto;
+  z-index: 60;
+  width: 18rem;
+  max-height: min(28rem, 72vh);
   padding: 0.32rem;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .agent-dock-composer__menu--runtime .agent-dock-composer__menu-caption {
@@ -889,6 +944,9 @@
 
 .agent-dock__composer {
   flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
   padding: 0.55rem 0.8rem 0.8rem;
   border-top: 1px solid rgba(138, 154, 173, 0.1);
   background: rgba(6, 10, 16, 0.72);
@@ -1180,6 +1238,7 @@
   gap: 0.45rem;
   padding: 0.35rem 0.55rem 0.5rem;
   border-top: 1px solid rgba(15, 23, 42, 0.82);
+  overflow: visible;
 }
 
 .agent-dock-composer__tools {
@@ -1187,12 +1246,14 @@
   align-items: center;
   gap: 0.35rem;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  overflow: visible;
 }
 
 .agent-dock-composer__tool-group {
   position: relative;
   flex: 0 0 auto;
+  overflow: visible;
 }
 
 .agent-dock-composer__tool {
@@ -1460,6 +1521,29 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+.agent-dock-composer__resume {
+  min-height: 1.85rem;
+  padding: 0 0.7rem;
+  border: 1px solid rgba(56, 189, 248, 0.34);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.12);
+  color: rgba(224, 242, 254, 0.96);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-dock-composer__resume:hover:not(:disabled) {
+  border-color: rgba(125, 211, 252, 0.5);
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.agent-dock-composer__resume:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .agent-dock-composer__send {

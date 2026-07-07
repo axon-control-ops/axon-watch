@@ -68,7 +68,7 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 | 17 | **G4.5** | Agent Dock parity gaps (hero persist, thread meta, collapsible seam) | `verify:agent-dock-parity` | **Done** |
 | 18 | **G4.2** | WhatsApp — bounded watch integration or explicit discard | DashPro `:7734` fallback | **Deferred** |
 | 19 | **G4.6** | `verify:connector-parity` bundled gate | `test25-connector-parity-bundle.sh` | **Done** |
-| 20 | **G5** | Capability matrix + gate design + discards docs | `verify:signal-parity-matrix` (after triage) | **Planning done** |
+| 20 | **G5** | Capability matrix + gate design + discards docs | `verify:signal-parity-matrix` (TEST-26) | **Done** |
 | 21 | **G6** | One week `:4173` only + operator sign-off | **Retirement** | — |
 
 ---
@@ -90,11 +90,11 @@ KAIRO: `docs/planning/KAIRO_MODE.md`
 
 Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Access).
 
-**Wave 4 exit:** G4.1–G4.6 gates green (G4.2 WhatsApp deferred with operator approval). **Next:** **G5** gate triage + matrix, then **G6** dry-run.
+**Wave 4 exit:** G4.1–G4.6 gates green (G4.2 WhatsApp deferred with operator approval). **Wave 5 exit:** TEST-26 (`verify:signal-parity-matrix`) green on `dev`. **Next:** **G6** one-week `:4173`-only dry-run + operator sign-off.
 
 **UI deferred (planning handoff):** No new `apps/console-web/**` — see `docs/planning/KAIRO_BRAIN_UI_ARCHITECTURE.md` (`UX-DEF-*`). Backend/gates/orchestration only.
 
-**Next up:** **G5.0-triage** → **G5.2** `verify:signal-parity-matrix` → **G6.2** one-week `:4173`-only. **G4.2 WhatsApp deferred.**
+**Next up:** **G6.2** one-week `:4173`-only dry-run + sign-off. **G4.2 WhatsApp deferred.** **G5.3** retirement flag stays false until G6.
 
 ---
 
@@ -108,6 +108,31 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-07 — Phase 4/5 closure + resume bugfixes
+
+- Fixed IDE Resume: composer shows Resume over Stop when run is paused; consultative + full-access re-dispatch resumes `paused`/`review_ready` runs (no duplicate runs).
+- Fixed `IdeInterruptPanel` Resume to target IDE agent run (parity with Stop).
+- Fixed stream errors surfacing in composer; agent stream exceptions park runs at `review_ready`.
+- Aligned `legacy-connector-inventory.json` retirement_blocker_map with refreshed parity snapshot.
+- Gates green: `verify:connector-parity` (TEST-25), `verify:signal-parity-matrix` (TEST-26), `verify:headed-browser-smoke`.
+- **G5.4 operator acks still open** — human sign-off before Phase 6/7.
+
+### 2026-07-07 — G5.0-triage + G5.3 snapshot + headed browser smoke + TEST-17
+
+- Regenerated `docs/planning/MANIFEST.json`; TEST-3/9 decoupled from full `npm run verify`.
+- Refreshed `config/parity-snapshot.json` assessment scope + granular retirement blockers (G5.3).
+- Added `npm run verify:headed-browser-smoke` (Playwright shell/operator/IDE + screenshots).
+- Added `npm run verify:retirement-readiness` (TEST-17 spec; requires G6.2 + discard acks).
+- Reconciled stale docs: `PHASE_G_SIGNAL_PARITY.md`, `PHASE_G5_CAPABILITY_MATRIX.md`, `IMPLEMENTATION_ROADMAP.md`, `FINAL_PARITY_VERIFICATION.md`.
+- **Next:** G6.2 one-week `:4173`-only dry-run + operator discard acks.
+
+### 2026-07-07 — G5 gate green (TEST-26)
+
+- `npm run verify:signal-parity-matrix` PASS (12/12) — contracts, console-web, G1–G4 bundles, phase A/B/D, production-operator, planning manifest, G5.1 doc.
+- Phase A/B/D scripts decoupled from `npm run verify` monolith; Phase B snapshot counts now computed from `parity-snapshot.json` behaviors (verified_v1=19, partially_verified=0).
+- **G5.3 deferred:** `full_axon_local_retirement` stays `false` until G6 operator sign-off.
+- **Next:** G6.2 one-week `:4173`-only dry-run (human gate).
 
 ### 2026-07-07 — G5/G6 planning handoff (UI deferred)
 

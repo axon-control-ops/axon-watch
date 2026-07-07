@@ -1,15 +1,17 @@
 const VISIBLE_MODELS_KEY = 'axon-watch.cursorPickerVisibleModels';
 
-export const CURSOR_PICKER_CURATED_IDS = [
-  'composer-2.5',
+/** Composer models route through Cursor subscription — not OpenAI API quota. */
+export const CURSOR_PICKER_COMPOSER_IDS = [
   'composer-2.5-fast',
-  'claude-4.6-sonnet-medium-thinking',
+  'composer-2.5',
+] as const;
+
+export const CURSOR_PICKER_DEFAULT_MODEL = 'composer-2.5-fast';
+
+export const CURSOR_PICKER_CURATED_IDS = [
+  ...CURSOR_PICKER_COMPOSER_IDS,
   'claude-fable-5-thinking-high',
   'claude-opus-4-8-thinking-high',
-  'gpt-5.3-codex',
-  'gpt-5.4',
-  'gpt-5.4-high-fast',
-  'gpt-5.5-medium',
 ] as const;
 
 function uniqueStrings(values: string[]): string[] {

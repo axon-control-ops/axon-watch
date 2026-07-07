@@ -1,7 +1,9 @@
 import type { CursorRuntimeStatusSnapshot } from '../api/control-plane';
 
 import {
+  CURSOR_PICKER_COMPOSER_IDS,
   CURSOR_PICKER_CURATED_IDS,
+  CURSOR_PICKER_DEFAULT_MODEL,
   cursorPickerExplicitVisibleModelSet,
   isCursorPickerCuratedModel,
 } from './cursor-picker-prefs';
@@ -79,6 +81,40 @@ export function cursorCatalogModelRows(rows: CursorCatalogRow[]): CursorCatalogR
 export function isCursorAutoModel(modelId: string): boolean {
   const normalized = modelId.trim();
   return !normalized || normalized === 'auto';
+}
+
+export function isCursorComposerModel(modelId: string): boolean {
+  const normalized = modelId.trim().toLowerCase();
+  return normalized.startsWith('composer-');
+}
+
+export function cursorComposerPickerRows(rows: CursorCatalogRow[]): CursorCatalogRow[] {
+  const models = cursorCatalogModelRows(rows);
+  const byId = new Map(models.map((row) => [row.id, row]));
+  const ordered: CursorCatalogRow[] = [];
+  for (const id of CURSOR_PICKER_COMPOSER_IDS) {
+    const row = byId.get(id);
+    if (row) {
+      ordered.push(row);
+    }
+  }
+  return ordered;
+}
+
+export function resolveCursorComposerModel(modelId: string, rows: CursorCatalogRow[]): string {
+  const normalized = modelId.trim();
+  if (!normalized || normalized === 'auto') {
+    return normalized || 'auto';
+  }
+  if (isCursorComposerModel(normalized)) {
+    const available = rows.some((row) => row.id === normalized && row.available !== false);
+    if (available) {
+      return normalized;
+    }
+    return cursorComposerPickerRows(rows)[0]?.id ?? CURSOR_PICKER_DEFAULT_MODEL;
+  }
+  // Non-composer pins route through API quota; prefer Composer subscription routing.
+  return cursorComposerPickerRows(rows)[0]?.id ?? CURSOR_PICKER_DEFAULT_MODEL;
 }
 
 export function cursorPrimaryDisplayIds(input: {
@@ -218,6 +254,7 @@ export function cursorComposerRuntimeLabel(input: {
   modelId: string;
   rows: CursorCatalogRow[];
 }): string {
-  const modelLabel = cursorModelLabel(input.modelId, input.rows);
+  const normalized = input.modelId.trim();
+  const modelLabel = cursorModelLabel(normalized || CURSOR_PICKER_DEFAULT_MODEL, input.rows);
   return `${input.family} ${input.scope} · ${modelLabel}`;
 }

@@ -316,48 +316,32 @@ The roadmap is being followed when:
 - every major feature lands against an existing contract
 - the first real end-to-end flows arrive before broad feature sprawl
 
-## Implementation Status (2026-07-04)
+## Implementation Status (2026-07-07)
 
-Verified in `/home/edp/axon-nvme/repos/axon-watch` (`dev` branch). Gates:
-`npm run verify` (104 Python + 75 Vitest), manual operator acceptance on
-`workspace_smoke`.
+**Authoritative execution track:** `docs/PHASE_G_EXECUTION_TRACK.md` and `docs/PHASE_G_SIGNAL_PARITY.md`.
 
-| Phase | Status | Notes |
+Historical bootstrap phases 0–11 and Phase F are **complete**. Current work is **Phase G** (G1–G5 gates green per append log; **G6 dry-run open**).
+
+| Track | Status | Gate / doc |
 |---|---|---|
-| Phase 0 — Planning lock | **complete** | This bundle + ADR-005 KAIRO presence |
-| Phase 1 — Repo bootstrap | **complete** | Three-service dev stack on 4173/8787/8788 |
-| Phase 2 — Shared contracts | **partial** | Core DTOs + fixtures; not all contracts migrated |
-| Phase 3 — UI shell | **partial** | UX-0–UX-2 largely landed; UX-3/UX-4 incomplete |
-| Phase 4 — Control-plane skeleton | **verified (API E2E)** | Runs/workspaces/runtime summary proven via `test_control_plane_skeleton_e2e.py` against live watch |
-| Phase 5 — Watch skeleton | **verified (contract E2E)** | CP→watch health/inbox/summary projection via `test_control_plane_watch_integration.py`; summary/events/command stubs still deferred |
-| Phase 6 — First E2E thin slice | **partial** | Bootstrap signals render in dock; watch degraded in dev |
-| Phase 7 — Canonical run flow | **partial** | review_ready + stop/resume paths tested |
-| Phase 8 — IDE surfaces | **partial** | Monaco file tree, PTY terminal (zsh ZDOTDIR fix), scrollback |
+| Initial bootstrap (Phases 0–11) | **complete** | TEST-0 … TEST-10, parity A–D |
+| Phase F — Operator foundation | **complete** | F0–F5 |
+| Phase G — Signal parity | **G1–G5.3 done**; G5.4 acks + G6 open | `verify:signal-parity-matrix` (TEST-26) |
+| Retirement readiness | **open** | G6.2 dry-run + `verify:retirement-readiness` (TEST-17) |
 
-## Next Execution Track (2026-07-05)
+For day-to-day verification use scoped gates (`verify:signal-parity-matrix`, `verify:headed-browser-smoke`) rather than the full `npm run verify` monolith unless triaging regressions.
 
-The next execution track is **Phase F — Operator Foundation II**:
+## Next Execution Track (2026-07-07)
 
-1. F0 close out Initial Progress and lock the new checklist
-2. F1 build runtime fabric (Cursor/Codex, local + cloud)
-3. F2 add dedicated vault surface
-4. F3 add dedicated data / DB surface
-5. F4 complete DashPro monitors through watch signals
-6. F5 close polish
-7. F6 revisit full axon-local retirement readiness
+The active track is **Phase G6 — Retirement dry-run**:
 
-**Recent verified slices (Lane B / control-plane):**
+1. One week on `:4173` only (`docs/PHASE_G6_RETIREMENT_READINESS.md` G6.2)
+2. Daily `npm run verify:headed-browser-smoke` + connector or matrix gate
+3. Sign `docs/PHASE_G5_INTENTIONAL_DISCARDS.md` acknowledgments
+4. Operator sign-off → `npm run verify:retirement-readiness` (TEST-17) → retirement decision
 
-- Locked five-region shell + ADR-004 layout (`RightDock`, `DockHeroPanel`, etc.)
-- Operator seam titles (`Active Run`, `Approvals`, `Signals`, `Conversation`, `Command`)
-- Chat command dispatch attach vs new run (`chat/dispatch.py` + frontend `refreshRunSurfaces`)
-- Silent empty workspace thread lookup (HTTP 200, `thread_id: null`)
-- Bootstrap workspace catalog trim (`mergeMockupWorkspaceCatalog`, `workspace_smoke` default)
-- Interactive PTY terminal with workspace-scoped zsh via `ZDOTDIR` (not `--rcfile`)
+**Deferred / partial (documented, not blocking dry-run start):**
 
-**Not started / blocked:**
-
-- KAIRO operator-presence integration (ADR-005) — coordinator assignment required
-- Real chat/agent orchestration beyond system ack stub
-- Fitness timing gates (`shell_boot_readiness`, latency budgets) — still PENDING
-- Remote deployment / dedicated-server phase
+- G4.2 WhatsApp — explicit discard or future slice
+- Cloud runtime execution adapters — partial
+- UI polish (`UX-DEF-*` in `docs/planning/KAIRO_BRAIN_UI_ARCHITECTURE.md`)

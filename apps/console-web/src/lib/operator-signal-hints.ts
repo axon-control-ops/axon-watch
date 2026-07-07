@@ -2,6 +2,7 @@
 
 const BOOTSTRAP_SUMMARY_SIGNAL_IDS = new Set([
   'signal_runtime_summary_degraded',
+  'signal_watch_bootstrap_ready',
 ]);
 
 export function isBootstrapSummarySignal(signalId: string, title: string): boolean {

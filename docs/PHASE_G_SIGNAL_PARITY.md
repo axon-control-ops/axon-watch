@@ -76,7 +76,7 @@ Phase G slice **G2** replaces the remaining `:7734` agent loop dependency with r
 4. Full axon-local retirement (G6) requires **all** G1–G5 gates green **and** operator sign-off.
 5. New discoveries go into the append log; they do not silently reshuffle the order.
 
-## Current state (2026-07-06)
+## Current state (2026-07-07)
 
 | Area | Status |
 |---|---|
@@ -84,19 +84,22 @@ Phase G slice **G2** replaces the remaining `:7734` agent loop dependency with r
 | F6 retirement review | **Deferred to G6** |
 | Vault II (full crypto) | **Complete** (`verify:vault-parity`) |
 | Runtime-fed LLM provider keys | **Complete** (`verify:runtime-vault-integration`) |
-| Agent loop parity (no `:7734` ReAct) | **In progress** (persisted runs + runtime stop wiring landing) |
-| Legacy connectors (WhatsApp, tunnel, voice) | **Unmigrated** (`docs/LEGACY_CONNECTOR_INVENTORY.md`) |
-| Full axon-local retirement | **Not approved** |
+| Agent loop parity (no `:7734` ReAct) | **Complete** (`verify:agent-orchestration-parity`, G3) |
+| Legacy connectors | **G4.1–G4.6 green**; **G4.2 WhatsApp deferred** |
+| G5 signal parity matrix (TEST-26) | **Documented PASS 2026-07-07** — re-run after commits |
+| G5.3 parity snapshot refresh | **Partial** — blockers updated 2026-07-07; `full_axon_local_retirement` stays false |
+| G5.4 operator discard acks | **Open** — doc published; checkboxes unsigned |
+| Full axon-local retirement | **Not approved** — G6 dry-run + sign-off required |
 
 ## Locked order
 
 ### G0 — Governance and parity baseline
 
-- [ ] **G0.1** Publish this checklist (Phase G lock)
-- [ ] **G0.2** Extend `docs/LEGACY_CONNECTOR_INVENTORY.md` with Vault II + orchestration rows
-- [ ] **G0.3** Add Phase G track to `docs/planning/IMPLEMENTATION_ROADMAP.md`
-- [ ] **G0.4** Refresh `config/parity-snapshot.json` assessment scope for post–Phase F state
-- [ ] **G0.5** Sync planning mirror to axon-local `Plans/Axon-Watch/`
+- [x] **G0.1** Publish this checklist (Phase G lock)
+- [x] **G0.2** Extend `docs/LEGACY_CONNECTOR_INVENTORY.md` with Vault II + orchestration rows
+- [x] **G0.3** Add Phase G track to `docs/planning/IMPLEMENTATION_ROADMAP.md`
+- [x] **G0.4** Refresh `config/parity-snapshot.json` assessment scope for post–Phase F/G state (2026-07-07)
+- [ ] **G0.5** Sync planning mirror to axon-local `Plans/Axon-Watch/` (operator-run: `python3 scripts/ops/sync_planning_mirror_to_axon_local.py`)
 
 **Exit gate:** docs updated, mirror synced, parity baseline explicit.
 
@@ -191,9 +194,9 @@ Per `config/parity-snapshot.json` → `blockers_for_full_retirement` and `docs/L
 Prove Axon-X ≥ Signal for operator daily work, not just thin-slice behaviors.
 
 - [x] **G5.1** Generate capability matrix: every `IMPORT_MATRIX` row marked `adapt`/`adopt` has Axon-X owner + gate → `docs/PHASE_G5_CAPABILITY_MATRIX.md`
-- [ ] **G5.2** Run extended production operator regression (F5 gate + G1–G4 gates) → see `docs/PHASE_G5_GATE_DESIGN.md`
-- [ ] **G5.3** Update `config/parity-snapshot.json`: `full_axon_local_retirement` candidate flag only if all gates green
-- [x] **G5.4** Document known intentional discards (`IMPORT_MATRIX` `discard` rows) with operator acknowledgment → `docs/PHASE_G5_INTENTIONAL_DISCARDS.md`
+- [x] **G5.2** Run extended production operator regression (F5 gate + G1–G4 gates) → `npm run verify:signal-parity-matrix` PASS 2026-07-07
+- [x] **G5.3** Update `config/parity-snapshot.json` assessment scope + blockers (2026-07-07); `full_axon_local_retirement` stays false until G6 sign-off
+- [x] **G5.4** Document known intentional discards (`IMPORT_MATRIX` `discard` rows) with operator acknowledgment → `docs/PHASE_G5_INTENTIONAL_DISCARDS.md` (**operator ack boxes still open**)
 
 **Exit gate:** `npm run verify:signal-parity-matrix` (design: `docs/PHASE_G5_GATE_DESIGN.md` — **not** full `npm run verify` until triage)
 
@@ -203,10 +206,10 @@ Prove Axon-X ≥ Signal for operator daily work, not just thin-slice behaviors.
 
 ### G6 — Retirement readiness (was F6)
 
-- [ ] **G6.1** Reassess `blockers_for_full_retirement` with G1–G5 evidence → `docs/PHASE_G6_RETIREMENT_READINESS.md`
+- [x] **G6.1** Reassess `blockers_for_full_retirement` with G1–G5 evidence → `docs/PHASE_G6_RETIREMENT_READINESS.md`
 - [ ] **G6.2** Operator dry-run: one full week on `:4173` only for DashPro + Axon workspaces → checklist in G6 doc
 - [ ] **G6.3** Decide whether axon-local process can move to archive / explicit fallback-off mode
-- [ ] **G6.4** Add `test17-full-retirement-readiness.sh` only if G1–G5 gates are green → spec in G6 doc (no script yet)
+- [x] **G6.4** Add `test17-full-retirement-readiness.sh` spec + script → `npm run verify:retirement-readiness` (does not auto-retire)
 
 **Exit gate:** explicit operator sign-off only — no automated gate substitutes for this slice.
 
@@ -231,6 +234,12 @@ Same as Phase F:
 
 ## Append log
 
+### 2026-07-07 — G5 gate green (TEST-26)
+
+- `npm run verify:signal-parity-matrix` PASS — all 12 steps including phase A/B/D bundles and `verify:production-operator`.
+- Phase verify scripts no longer chain `npm run verify`; composite gate owns regression scope per `PHASE_G5_GATE_DESIGN.md`.
+- G5.3 (`full_axon_local_retirement`) blocked on G6 operator sign-off.
+
 ### 2026-07-07 — G5/G6 planning handoff (UI deferred)
 
 - **Wave 4 exit confirmed** on `dev`: G4.3 (`03739d7`), G4.4+G4.5 (`9f93051`), G4.6 (`0ece5bc`); `npm run verify:connector-parity` green (TEST-25 — not full `npm run verify`).
@@ -241,7 +250,7 @@ Same as Phase F:
 - **Electron:** not in scope — browser `:4173` + Playwright only.
 - **JARVIS pack review:** adopt loop, personality, prove-source, server-side briefing brain; reject 3D galaxy and markdown RAG as system truth (summary in KAIRO_BRAIN_UI doc).
 - **Full verify blockers triaged:** planning MANIFEST drift (`IMPORT_MATRIX`, `IMPLEMENTATION_ROADMAP`, untracked `agent-orchestration-contract.md`); TEST-3/9 step 5 hooks — see `PHASE_G5_GATE_DESIGN.md`.
-- **Next implementation slices:** G5.0-triage (manifest + decouple TEST-3/9), G5.2 regression, G6.2 dry-run — backend/gates only.
+- **Next implementation slices:** G6.2 dry-run + `verify:headed-browser-smoke`; G5.4 operator discard acks; G0.5 planning mirror sync.
 
 ### 2026-07-07 — G4.6 connector parity bundle (Wave 4 exit)
 

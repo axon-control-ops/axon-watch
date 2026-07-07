@@ -24,7 +24,9 @@ from app.cli_runtime.runtime_auth import (
     summarize_auth_error,
 )
 from app.cli_runtime.vault_keys import runtime_subprocess_env
+from app.cli_runtime.research_mcp import ensure_workspace_research_mcp
 from app.kairo_ask_prompt import build_ask_system_prompt
+from app.research.availability import format_capability_line, research_capability_snapshot
 from app.persistence.operator_presence_settings_store import load_settings
 from app.runs.service import RunNotFoundError, get_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
@@ -45,15 +47,30 @@ def _system_prompt(
     execution_tier: str = "consultative",
     *,
     persona_enabled: bool | None = None,
+    research_snapshot: dict[str, object] | None = None,
 ) -> str:
+    research_line = format_capability_line(research_snapshot or research_capability_snapshot())
     if composer_mode == "ask":
         enabled = persona_enabled if persona_enabled is not None else _operator_persona_enabled()
-        return build_ask_system_prompt(persona_enabled=enabled)
+        return f"{build_ask_system_prompt(persona_enabled=enabled)} {research_line}"
     if composer_mode == "plan":
+        offline_clause = (
+            "Ground the plan in the local repo and provided context. "
+            "If online research is unavailable, do not suggest web search as a required step. "
+        )
+        if (research_snapshot or research_capability_snapshot()).get("available"):
+            offline_clause = (
+                "You may reference audited Axon-X research tools when external facts are required, "
+                "but still ground implementation steps in the local repo. "
+            )
         return (
             "You are Axon-X Lane B in Plan mode. Produce a short numbered plan using the "
-            "supplied workspace context. Do not claim execution happened. "
-            f"{_REPLY_STYLE}"
+            f"supplied workspace context. {offline_clause}"
+            "If key detail is missing, state the assumption plainly and identify the local files, "
+            "symbols, or tests that should be checked next. Keep the plan practical: cover "
+            "discovery, implementation, verification, and any material risks or open questions. "
+            "Never invent source names, publications, or dates. Do not claim execution happened. "
+            f"{research_line} {_REPLY_STYLE}"
         )
     if execution_tier == "executing":
         return (
@@ -62,12 +79,12 @@ def _system_prompt(
             "Project root shown in workspace context as needed to complete the request "
             "now. Use workspace-relative paths such as README.md — never edit Cursor "
             "metadata directories. Do the work first, then reply with a short summary "
-            f"of what changed. {_REPLY_STYLE}"
+            f"of what changed. {research_line} {_REPLY_STYLE}"
         )
     return (
         "You are Axon-X Lane B in Agent mode (consultative slice). Answer using the "
         "supplied workspace context, propose concrete next steps, and do not claim you "
-        f"edited files or ran commands. {_REPLY_STYLE}"
+        f"edited files or ran commands. {research_line} {_REPLY_STYLE}"
     )
 
 
@@ -77,22 +94,21 @@ def _build_prompt(
     user_prompt: str,
     context_block: str,
     execution_tier: str = "consultative",
+    research_snapshot: dict[str, object] | None = None,
 ) -> str:
+    snapshot = research_snapshot or research_capability_snapshot()
     return (
-        f"{_system_prompt(composer_mode, execution_tier)}\n\n"
+        f"{_system_prompt(composer_mode, execution_tier, research_snapshot=snapshot)}\n\n"
         f"Workspace context:\n{context_block}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
 
 
 def _fallback_reply(*, composer_mode: str, user_prompt: str, context_block: str, reason: str) -> str:
+    del user_prompt, context_block
     return (
-        f"Lane B ({composer_mode}) is active, but no approved CLI runtime is ready ({reason}).\n\n"
-        f"Operator request:\n{user_prompt.strip()}\n\n"
-        f"Workspace context:\n```\n{context_block}\n```\n\n"
-        "Open `/vault` to unlock provider keys, then refresh runtime status. You can also sign in to "
-        "Cursor or Codex locally. Axon-X treats Cursor as the primary interactive runtime "
-        "and Codex as the scripted/runtime fallback."
+        f"Lane B ({composer_mode}) cannot start because no CLI runtime is ready: {reason}. "
+        "Open Runtime or `/vault`, then retry."
     )
 
 
@@ -193,11 +209,15 @@ def dispatch_ide_composer(
         run_phase=run_phase,
         execution_access=execution_access,
     )
+    research_snapshot = research_capability_snapshot()
+    if workspace_root is not None:
+        ensure_workspace_research_mcp(workspace_root)
     prompt = _build_prompt(
         composer_mode=composer_mode,
         user_prompt=user_prompt,
         context_block=context_block,
         execution_tier=execution_tier,
+        research_snapshot=research_snapshot,
     )
     approval_notice = consultative_only_notice(
         composer_mode=composer_mode,

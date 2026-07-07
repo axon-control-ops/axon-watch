@@ -2,24 +2,17 @@
 import { computed, ref, watch } from 'vue';
 
 import AgentResearchBlock from './ide/AgentResearchBlock.vue';
+import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
 import { useConversationSeamScroll } from '../composables/useConversationSeamScroll';
 import {
-  renderAgentMessageMarkdown,
   shouldOfferMarkdownPreview,
-  splitAgentMessageForPreview,
 } from '../lib/agent-message-markdown';
-import {
-  persistAgentMarkdownPreviewDefault,
-  persistAgentMessagePreviewEnabled,
-  resolveAgentMessagePreviewEnabled,
-} from '../lib/agent-message-preview-prefs';
 import {
   agentContentLooksLikeErrorDump,
   formatThreadRole,
   formatThreadTimestamp,
   shouldCollapseSystemMessage,
   shortenRunId,
-  shouldDefaultAgentPreview,
   summarizeAgentErrorContent,
   systemMessagePreview,
 } from '../lib/thread-message-view';
@@ -53,50 +46,14 @@ const agentWorkingLabel = computed(() => {
 });
 const rootRef = ref<HTMLElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
-const previewByMessageId = ref<Record<string, boolean>>({});
 const expandedErrorByMessageId = ref<Record<string, boolean>>({});
 const expandedSystemByMessageId = ref<Record<string, boolean>>({});
-
-function syncPreviewStateFromStorage(): void {
-  const next: Record<string, boolean> = {};
-  for (const message of conversationMessages.value) {
-    if (message.role !== 'agent' || !shouldOfferMarkdownPreview(message.content)) {
-      continue;
-    }
-    next[message.message_id] = resolveAgentMessagePreviewEnabled(
-      message.message_id,
-      shouldDefaultAgentPreview(message.content),
-    );
-  }
-  previewByMessageId.value = next;
-}
 
 const { handleWheel, handleContentChange } = useConversationSeamScroll({
   rootRef,
   listRef,
-  onContentChange: syncPreviewStateFromStorage,
+  onContentChange: () => undefined,
 });
-
-function isPreviewMode(messageId: string, content: string): boolean {
-  if (previewByMessageId.value[messageId] !== undefined) {
-    return previewByMessageId.value[messageId];
-  }
-
-  return resolveAgentMessagePreviewEnabled(
-    messageId,
-    shouldDefaultAgentPreview(content) && shouldOfferMarkdownPreview(content),
-  );
-}
-
-function togglePreview(messageId: string, content: string): void {
-  const next = !isPreviewMode(messageId, content);
-  previewByMessageId.value = {
-    ...previewByMessageId.value,
-    [messageId]: next,
-  };
-  persistAgentMessagePreviewEnabled(messageId, next);
-  persistAgentMarkdownPreviewDefault(next);
-}
 
 function toggleErrorExpanded(messageId: string): void {
   expandedErrorByMessageId.value = {
@@ -105,12 +62,8 @@ function toggleErrorExpanded(messageId: string): void {
   };
 }
 
-function previewHtml(content: string): string {
-  return renderAgentMessageMarkdown(content);
-}
-
-function previewParts(content: string) {
-  return splitAgentMessageForPreview(content);
+function isMarkdownBlock(content: string): boolean {
+  return shouldOfferMarkdownPreview(content) && !isErrorDump(content);
 }
 
 function isErrorDump(content: string): boolean {
@@ -179,6 +132,10 @@ function diffLines(diff: string): Array<{ text: string; tone: string }> {
     .map((line) => ({ text: line, tone: diffLineTone(line) }));
 }
 
+function restoreMessageToComposer(content: string): void {
+  shell.restoreComposerDraft(content);
+}
+
 function isEmptyStreamingAgent(message: { role: string; message_id: string; content: string }): boolean {
   return message.role === 'agent' && !message.content.trim() && isStreamingMessage(message.message_id);
 }
@@ -217,15 +174,16 @@ watch(
           <time class="conversation-seam__time" :datetime="message.created_at">
             {{ formatThreadTimestamp(message.created_at) }}
           </time>
-          <button
-            v-if="message.role === 'agent' && shouldOfferMarkdownPreview(message.content) && !isErrorDump(message.content)"
-            type="button"
-            class="conversation-seam__preview-toggle"
-            :aria-pressed="isPreviewMode(message.message_id, message.content)"
-            @click="togglePreview(message.message_id, message.content)"
-          >
-            {{ isPreviewMode(message.message_id, message.content) ? 'Raw' : 'Preview' }}
-          </button>
+          <div v-if="message.role === 'operator'" class="conversation-seam__meta-actions">
+            <button
+              type="button"
+              class="conversation-seam__meta-button"
+              title="Load this request back into the composer"
+              @click="restoreMessageToComposer(message.content)"
+            >
+              Resend
+            </button>
+          </div>
         </div>
 
         <p
@@ -272,7 +230,7 @@ watch(
 
         <div
           v-else-if="hasTranscriptBlocks(message.content)"
-          class="conversation-seam__content conversation-seam__content--agent conversation-seam__blocks"
+          class="conversation-seam__blocks"
         >
           <template
             v-for="(segment, segmentIndex) in transcriptSegments(message.content)"
@@ -358,11 +316,18 @@ watch(
 </span></pre>
             </div>
 
-            <div
-              v-else
-              class="agent-block agent-block--text conversation-seam__content--markdown"
-              v-html="previewHtml(segment.text)"
+            <AgentMarkdownBlock
+              v-else-if="isMarkdownBlock(segment.text)"
+              :block-id="segmentKey(message.message_id, segmentIndex)"
+              :content="segment.text"
             />
+
+            <p
+              v-else
+              class="agent-block agent-block--text conversation-seam__content conversation-seam__content--agent"
+            >
+              {{ segment.text }}
+            </p>
           </template>
           <span
             v-if="isStreamingMessage(message.message_id)"
@@ -388,18 +353,11 @@ watch(
           >{{ message.content }}</pre>
         </template>
 
-        <template v-else-if="isPreviewMode(message.message_id, message.content)">
-          <p
-            v-if="previewParts(message.content).preamble"
-            class="conversation-seam__preamble"
-          >
-            {{ previewParts(message.content).preamble }}
-          </p>
-          <div
-            class="conversation-seam__content conversation-seam__content--agent conversation-seam__content--markdown"
-            v-html="previewHtml(message.content)"
-          />
-        </template>
+        <AgentMarkdownBlock
+          v-else-if="isMarkdownBlock(message.content)"
+          :block-id="message.message_id"
+          :content="message.content"
+        />
 
         <pre
           v-else

@@ -22,6 +22,7 @@ from app.chat.orchestration import (
     orchestrate_command_run,
     orchestrate_resume_from_review,
 )
+from app.chat.reply_verification import verify_lane_b_reply
 from app.chat.stream_hub import close_chat_stream, clear_chat_stream_buffer, publish_chat_stream_event
 from app.chat.workspace_switch import (
     WorkspaceSwitchError,
@@ -33,10 +34,13 @@ from app.persistence import chat_store
 from app.workspace_handoffs import create_workspace_handoff
 from app.runs.service import (
     RunLifecycleError,
+    RunNotFoundError,
     append_run_execution_receipt,
     complete_run,
+    get_run,
     mark_review_ready,
 )
+from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
 
 
@@ -382,6 +386,28 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             on_chunk=on_chunk,
         )
         agent_content = str(lane_b_result.get("content") or "")
+        execution_tier = str(lane_b_result.get("execution_tier") or "consultative")
+        try:
+            workspace_root = resolve_workspace_root(job.workspace_id)
+        except WorkspaceRootError:
+            workspace_root = None
+        run_started_epoch = None
+        if job.dispatch_run_id:
+            try:
+                run_record_for_verify = get_run(job.dispatch_run_id)
+                started_at = str(run_record_for_verify.get("started_at") or "")
+                if started_at.endswith("Z"):
+                    run_started_epoch = datetime.fromisoformat(
+                        started_at.replace("Z", "+00:00")
+                    ).timestamp()
+            except RunNotFoundError:
+                run_started_epoch = None
+        agent_content, verification_warnings = verify_lane_b_reply(
+            agent_content,
+            execution_tier=execution_tier,
+            workspace_root=workspace_root,
+            run_started_epoch=run_started_epoch,
+        )
         updated_at = _utc_now()
         chat_store.update_message_content(
             message_id=job.agent_message_id,
@@ -394,6 +420,15 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
                 dispatch_run_id=job.dispatch_run_id,
                 lane_b_result=lane_b_result,
             )
+            if verification_warnings:
+                append_run_execution_receipt(
+                    job.dispatch_run_id,
+                    receipt_type="reply_verification",
+                    receipt_summary="; ".join(verification_warnings),
+                    actor="reply_verification",
+                    success=False,
+                    intent="lane_b_agent",
+                )
             system_content = _lane_b_system_content(
                 composer_mode=job.composer_mode,
                 dispatch_run_id=job.dispatch_run_id,
@@ -434,6 +469,12 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             content=fallback,
             updated_at=updated_at,
         )
+        run_record = None
+        if job.composer_mode == "agent" and job.dispatch_run_id:
+            try:
+                run_record = mark_review_ready(job.dispatch_run_id)
+            except RunLifecycleError:
+                run_record = None
         publish_chat_stream_event(
             job.thread_id,
             {
@@ -442,6 +483,8 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
                 "message_id": job.agent_message_id,
                 "content": fallback,
                 "error": fallback,
+                "run_id": job.dispatch_run_id,
+                "run": run_record,
             },
         )
     finally:

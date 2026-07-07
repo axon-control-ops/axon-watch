@@ -64,9 +64,9 @@ npm run verify:test0   # … through …
 npm run verify:test9
 npm run verify:phase-a
 npm run verify:phase-b
-npm run verify:phase-c
+npm run verify:parity-c1   # … through verify:parity-c4 (no bundled verify:phase-c)
 npm run verify:phase-d
-npm run verify         # 253 Python + 131 Vitest at post Phase D assessment
+npm run verify         # full monolith — use verify:signal-parity-matrix for G5 regression instead
 ```
 
 TEST-10 validates this document, `docs/CUTOVER_DECISION.md`, and

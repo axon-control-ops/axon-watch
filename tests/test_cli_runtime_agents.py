@@ -70,6 +70,25 @@ class CliRuntimeAgentTests(unittest.TestCase):
         self.assertNotIn("--mode", command)
 
     @patch("app.cli_runtime.cursor_agent.communicate_registered_process")
+    @patch("app.cli_runtime.cursor_agent.research_capability_snapshot")
+    def test_cursor_adds_force_and_approve_mcps_when_research_available(
+        self,
+        mock_research_snapshot,
+        mock_communicate,
+    ) -> None:
+        mock_research_snapshot.return_value = {"available": True}
+        mock_communicate.return_value = (_stream_json_stdout("PONG"), "", 0)
+        run_cursor_local(
+            binary="/usr/bin/cursor",
+            prompt="ping",
+            workspace_root=Path("/tmp"),
+            composer_mode="agent",
+        )
+        command = mock_communicate.call_args.kwargs["command"]
+        self.assertIn("--force", command)
+        self.assertIn("--approve-mcps", command)
+
+    @patch("app.cli_runtime.cursor_agent.communicate_registered_process")
     def test_cursor_assembles_thinking_and_edit_blocks(self, mock_communicate) -> None:
         stdout = (
             '{"type":"thinking","subtype":"delta","text":"Checking the file."}\n'
