@@ -48,6 +48,7 @@ export function shouldSpeakAlert(
   return true;
 }
 
+/** Legacy browser-only path — prefer deliverSpokenOperatorAlert / speakKairoLine. */
 export function speakAlertMessage(message: string, speech: SpeechPort | null): void {
   if (!speech || !message.trim()) {
     return;
@@ -55,12 +56,9 @@ export function speakAlertMessage(message: string, speech: SpeechPort | null): v
   enqueueSpeech(message, speech);
 }
 
-export function maybeSpeakOperatorAlert(
+export async function maybeSpeakOperatorAlert(
   alert: SpokenAlertEligibility,
-  speech: SpeechPort | null = typeof speechSynthesis === 'undefined'
-    ? null
-    : speechSynthesis,
   storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
-): boolean {
-  return deliverSpokenOperatorAlert(alert, speech, storage) !== 'skipped';
+): Promise<boolean> {
+  return (await deliverSpokenOperatorAlert(alert, storage)) !== 'skipped';
 }

@@ -1,3 +1,5 @@
+import { personaStatusLabel } from './operator-persona-name';
+
 export type BriefingAttentionSeverity = 'high' | 'warning' | 'info';
 
 export interface KairoBriefingAttention {
@@ -71,5 +73,5 @@ export function briefingAttentionStatusLabel(attention: KairoBriefingAttention):
   if (!attention.active) {
     return '';
   }
-  return `KAIRO · ${attention.message}`;
+  return personaStatusLabel(attention.message);
 }

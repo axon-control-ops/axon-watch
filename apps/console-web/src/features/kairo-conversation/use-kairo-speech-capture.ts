@@ -1,66 +1,48 @@
-import { onBeforeUnmount, ref } from 'vue';
+import { onBeforeUnmount } from 'vue';
 
-import { isSpeechCaptureSupported, SpeechCaptureSession } from './speech-capture';
-import { setKairoConversationPhase } from './kairo-conversation-state';
+import {
+  isKairoSpeechCaptureSupported,
+  kairoCaptureCapturing,
+  kairoCaptureError,
+  kairoCaptureInterim,
+  canStartKairoSpeechCapture,
+  setKairoSpeechPrivacyBlocked,
+  startKairoSpeechCapture,
+  stopKairoSpeechCapture,
+} from './kairo-shared-speech-capture';
+import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 
 export function useKairoSpeechCapture(options: {
   privacyBlocked: () => boolean;
-  onFinalTranscript: (transcript: string) => Promise<void>;
+  captureMode?: KairoVoiceCaptureMode;
 }) {
-  const session = new SpeechCaptureSession();
-  const supported = isSpeechCaptureSupported();
-  const capturing = ref(false);
-  const interimTranscript = ref('');
+  setKairoSpeechPrivacyBlocked(options.privacyBlocked);
 
   function canCapture(): boolean {
-    return supported && !options.privacyBlocked() && !capturing.value;
+    return canStartKairoSpeechCapture();
   }
 
-  function startCapture(): boolean {
-    if (!canCapture()) {
-      return false;
-    }
-    capturing.value = true;
-    interimTranscript.value = '';
-    setKairoConversationPhase('listening');
-    return session.start({
-      onInterim: (transcript) => {
-        interimTranscript.value = transcript;
-      },
-      onFinal: (transcript) => {
-        interimTranscript.value = '';
-        capturing.value = false;
-        void options.onFinalTranscript(transcript);
-      },
-      onError: () => {
-        capturing.value = false;
-        interimTranscript.value = '';
-        setKairoConversationPhase('idle');
-      },
-      onEnd: () => {
-        capturing.value = false;
-        if (interimTranscript.value) {
-          void options.onFinalTranscript(interimTranscript.value);
-          interimTranscript.value = '';
-        }
-      },
-    });
+  function startCapture(mode?: KairoVoiceCaptureMode): boolean {
+    return startKairoSpeechCapture(mode ?? options.captureMode ?? 'manual');
   }
 
   function stopCapture(): void {
-    session.stop();
+    stopKairoSpeechCapture();
   }
 
   onBeforeUnmount(() => {
-    session.stop();
+    stopKairoSpeechCapture();
   });
 
   return {
-    supported,
-    capturing,
-    interimTranscript,
+    supported: isKairoSpeechCaptureSupported(),
+    capturing: kairoCaptureCapturing,
+    interimTranscript: kairoCaptureInterim,
+    captureError: kairoCaptureError,
     canCapture,
     startCapture,
     stopCapture,
   };
 }
+
+export type { KairoVoiceCaptureMode };

@@ -6,12 +6,22 @@ import {
   voiceCockpitStatusLine,
 } from '../../features/voice-deck/voice-cockpit-presence';
 import { briefingNotice, briefingAdvise } from '../../lib/briefing-panel-view';
-import { isSpeechQueueSpeaking } from '../../lib/speech-queue';
+import OperatorPersonaMark from '../../components/OperatorPersonaMark.vue';
+import PersonaTitle from '../../components/PersonaTitle.vue';
+import {
+  kairoVoiceDiagnosticsLabel,
+  kairoVoiceLastPreview,
+} from '../../lib/kairo-voice-diagnostics';
+import { fetchKairoVoiceLog, type KairoVoiceLogEntry } from '../../lib/kairo-voice-log-client';
+import { isKairoVoiceSpeaking, subscribeKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const speaking = ref(false);
+const voiceLog = ref<KairoVoiceLogEntry[]>([]);
 let pollTimer: number | null = null;
+let unsubscribeSpeaking: (() => void) | null = null;
+const showDevVoiceDiagnostics = import.meta.env.DEV;
 
 const presence = computed(() => shell.operatorBriefing?.operator_presence ?? null);
 const presenceState = computed(() => voiceCockpitPresenceState(presence.value));
@@ -44,18 +54,34 @@ const presenceLabel = computed(() => {
 });
 
 function refreshSpeakingState(): void {
-  speaking.value = isSpeechQueueSpeaking();
+  speaking.value = isKairoVoiceSpeaking();
+}
+
+async function refreshVoiceLog(): Promise<void> {
+  if (!showDevVoiceDiagnostics) {
+    return;
+  }
+  try {
+    voiceLog.value = await fetchKairoVoiceLog(5);
+  } catch {
+    voiceLog.value = [];
+  }
 }
 
 onMounted(() => {
   refreshSpeakingState();
+  unsubscribeSpeaking = subscribeKairoVoiceSpeaking((active) => {
+    speaking.value = active;
+  });
   pollTimer = window.setInterval(refreshSpeakingState, 300);
+  void refreshVoiceLog();
 });
 
 onBeforeUnmount(() => {
   if (pollTimer !== null) {
     window.clearInterval(pollTimer);
   }
+  unsubscribeSpeaking?.();
 });
 </script>
 
@@ -67,9 +93,11 @@ onBeforeUnmount(() => {
       { 'kairo-voice-deck--speaking': speaking },
       { 'kairo-voice-deck--galaxy-compact': shell.operatorBrainGalaxyActive },
     ]"
-    aria-label="KAIRO voice control"
+    aria-label="Operator voice control"
   >
-    <p class="kairo-voice-deck__title">KAIRO VOICE</p>
+    <p class="kairo-voice-deck__title">
+      <PersonaTitle suffix="Voice" mark-size="xs" />
+    </p>
 
     <div class="kairo-voice-deck__body">
       <div class="kairo-voice-deck__orb" aria-hidden="true">
@@ -77,7 +105,9 @@ onBeforeUnmount(() => {
         <span class="kairo-voice-deck__ring kairo-voice-deck__ring--mid" />
         <span class="kairo-voice-deck__ring kairo-voice-deck__ring--inner" />
         <span class="kairo-voice-deck__core">
-          <span class="kairo-voice-deck__core-label">KAIRO</span>
+          <span class="kairo-voice-deck__core-label-slot">
+            <OperatorPersonaMark size="sm" />
+          </span>
           <span class="kairo-voice-deck__core-status">{{ presenceLabel }}</span>
         </span>
       </div>
@@ -90,6 +120,18 @@ onBeforeUnmount(() => {
           <p class="kairo-voice-deck__hint">
             Foreground voice · tap to hear briefing · remote control ready
           </p>
+          <div v-if="showDevVoiceDiagnostics" class="kairo-voice-deck__dev-diagnostics">
+            <p class="kairo-voice-deck__dev-line">{{ kairoVoiceDiagnosticsLabel() }}</p>
+            <p v-if="kairoVoiceLastPreview" class="kairo-voice-deck__dev-line">
+              Last: {{ kairoVoiceLastPreview }}
+            </p>
+            <ul v-if="voiceLog.length" class="kairo-voice-deck__dev-log">
+              <li v-for="entry in voiceLog" :key="entry.entry_id">
+                <span>{{ entry.normalized_content }}</span>
+                <span> → {{ entry.reply }}</span>
+              </li>
+            </ul>
+          </div>
         </template>
       </div>
     </div>
@@ -99,7 +141,7 @@ onBeforeUnmount(() => {
         type="button"
         class="kairo-voice-deck__action kairo-voice-deck__action--primary"
         :disabled="voiceBlocked"
-        @click="shell.speakOperatorBriefing()"
+        @click="shell.speakOperatorBriefing().then(() => refreshVoiceLog())"
       >
         Speak briefing
       </button>

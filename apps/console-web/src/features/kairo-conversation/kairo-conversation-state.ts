@@ -10,6 +10,12 @@ export function setKairoConversationPhase(phase: KairoConversationPhase): void {
   kairoConversationPhase.value = phase;
 }
 
+export function isKairoConversationBusy(): boolean {
+  return (
+    kairoConversationPhase.value === 'thinking' || kairoConversationPhase.value === 'speaking'
+  );
+}
+
 export function resetKairoConversationSurface(): void {
   kairoConversationPhase.value = 'idle';
   kairoConversationError.value = null;

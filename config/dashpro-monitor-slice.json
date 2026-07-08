@@ -14,6 +14,11 @@
       "id": "dashpro_posthog_recent_events",
       "type": "posthog_recent_events",
       "service": "PostHog"
+    },
+    {
+      "id": "dashpro_supabase_storage_quota",
+      "type": "supabase_storage_quota",
+      "service": "Supabase Storage"
     }
   ]
 }

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { useShellStore } from '../../stores/shell';
 import SupportedCommandsFooter from './SupportedCommandsFooter.vue';
+import PersonaTitle from '../PersonaTitle.vue';
 
 const shell = useShellStore();
 const clockLabel = ref('00:00:00 UTC');
@@ -125,11 +126,13 @@ onUnmounted(() => {
           type="button"
           class="status-bar-mockup__kairo-cta"
           :class="`status-bar-mockup__kairo-cta--${shell.kairoBriefingAttention.severity}`"
-          :aria-label="`${shell.kairoBriefingAttentionLabel}. Open KAIRO briefing.`"
+          :aria-label="`${shell.kairoBriefingAttentionLabel}. Open operator briefing.`"
           @click="shell.focusKairoBriefing()"
         >
           <span class="status-bar-mockup__kairo-cta-glow" aria-hidden="true" />
-          <span class="status-bar-mockup__kairo-cta-label">Open KAIRO Briefing</span>
+          <span class="status-bar-mockup__kairo-cta-label">
+            Open <PersonaTitle suffix="Briefing" mark-size="xs" />
+          </span>
           <span class="status-bar-mockup__kairo-cta-badge" aria-hidden="true">
             {{ shell.kairoBriefingAttention.badgeCount }}
           </span>

@@ -1,0 +1,174 @@
+.persona-glyph {
+  display: inline-block;
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  background: linear-gradient(160deg, #d8f8ff 0%, #48c4ff 52%, #9ef0ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 6px rgba(72, 196, 255, 0.35));
+}
+
+.persona-glyph--xs {
+  font-size: 0.68rem;
+}
+
+.persona-glyph--sm {
+  font-size: 0.82rem;
+}
+
+.persona-glyph--md {
+  font-size: 1rem;
+}
+
+.persona-glyph--lg {
+  font-size: 1.28rem;
+  letter-spacing: 0.08em;
+}
+
+.persona-glyph--orb {
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  filter: drop-shadow(0 0 10px rgba(72, 196, 255, 0.5));
+}
+
+.persona-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.persona-title--uppercase .persona-title__suffix {
+  text-transform: uppercase;
+}
+
+.persona-title__suffix {
+  font: inherit;
+  letter-spacing: 0.16em;
+  color: inherit;
+}
+
+.topbar-mockup__logo {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.topbar-mockup__backronym {
+  margin: 0.12rem 0 0;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(158, 240, 255, 0.62);
+}
+
+.topbar-mockup__logo-prefix {
+  font-family: var(--font-display);
+  font-size: 1.44rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.topbar-mockup__logo-mark {
+  transform: translateY(1px);
+}
+
+.kairo-presence-module__title.persona-title {
+  gap: 0.22rem;
+}
+
+.hud-seam__title .persona-title__suffix,
+.dock-hero-panel__toggle-button .persona-title__suffix {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #d8f8ff;
+}
+
+.dock-hero-panel__toggle-button .persona-title {
+  gap: 0.28rem;
+}
+
+.kairo-conversation-bar__glyph-slot,
+.kairo-conversation-bar__reply-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.brain-galaxy-node-label--core {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(4, 16, 28, 0.72);
+  border: 1px solid rgba(72, 196, 255, 0.28);
+}
+
+.conversation-seam__thread-status-label .persona-title {
+  gap: 0.32rem;
+}
+
+.conversation-seam__thread-status-body {
+  letter-spacing: 0.04em;
+}
+
+.kairo-chip__label.persona-title {
+  gap: 0.28rem;
+}
+
+.kairo-chip__subtitle {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-brand);
+}
+
+.status-bar-mockup__kairo-cta-label .persona-title {
+  display: inline-flex;
+  gap: 0.28rem;
+}
+
+.status-bar-mockup__kairo-cta-label .persona-title__suffix {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+}
+
+.boot-wake__brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.boot-wake__brand .topbar-mockup__logo-prefix {
+  font-size: 1.55rem;
+}
+
+.agent-dock-composer__mode-chip .persona-title {
+  gap: 0.28rem;
+}
+
+.kairo-voice-deck__core-label-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kairo-galaxy-orb__core-text {
+  font-family: var(--font-display);
+  font-size: 7.8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  fill: url(#kairo-orb-persona-grad);
+  text-anchor: middle;
+  filter: drop-shadow(0 0 4px rgba(72, 196, 255, 0.45));
+}

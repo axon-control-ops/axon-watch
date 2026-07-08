@@ -1,3 +1,5 @@
+import { OPERATOR_PERSONA_NAME } from './operator-persona-name';
+
 export type DockHeroMode = 'command' | 'briefing';
 
 export function resolveDefaultDockHeroMode(input: {
@@ -17,7 +19,7 @@ export function resolveDefaultDockHeroMode(input: {
 }
 
 export function dockHeroModeLabel(mode: DockHeroMode): string {
-  return mode === 'command' ? 'Command' : 'KAIRO Briefing';
+  return mode === 'command' ? 'Command' : `${OPERATOR_PERSONA_NAME} Briefing`;
 }
 
 export function dockHeroModeTitle(mode: DockHeroMode): string {

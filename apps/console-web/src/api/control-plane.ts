@@ -130,9 +130,10 @@ export async function fetchRuntimeSummary(): Promise<RuntimeSummary> {
   return response.json() as Promise<RuntimeSummary>;
 }
 
-export async function fetchRuntimeStatus(): Promise<RuntimeStatusSnapshot> {
+export async function fetchRuntimeStatus(options: { forceRefresh?: boolean } = {}): Promise<RuntimeStatusSnapshot> {
   const baseUrl = controlPlaneBaseUrl();
-  const url = baseUrl ? `${baseUrl}/api/runtime/status` : '/api/runtime/status';
+  const query = options.forceRefresh ? '?force_refresh=1' : '';
+  const url = baseUrl ? `${baseUrl}/api/runtime/status${query}` : `/api/runtime/status${query}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -181,6 +182,61 @@ export async function fetchCursorRuntimeStatus(
   }
 
   return response.json() as Promise<CursorRuntimeStatusSnapshot>;
+}
+
+export interface RuntimeAuthActionResult {
+  status: 'completed' | 'browser_opened' | 'manual_required' | 'error' | string;
+  message: string;
+  command_preview?: string;
+  output?: string;
+  runtime_status?: RuntimeStatusSnapshot;
+  cursor_runtime?: CursorRuntimeStatusSnapshot;
+}
+
+async function postRuntimeAuthAction(path: string): Promise<RuntimeAuthActionResult> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}${path}` : path;
+  const response = await fetch(url, { method: 'POST' });
+  const payload = (await response.json().catch(() => ({}))) as RuntimeAuthActionResult;
+  if (!response.ok) {
+    throw new Error(payload.message || `runtime auth action failed with status ${response.status}`);
+  }
+  return payload;
+}
+
+export function logoutCursorRuntime(): Promise<RuntimeAuthActionResult> {
+  return postRuntimeAuthAction('/api/runtime/cursor/logout');
+}
+
+export function startCursorRuntimeLogin(): Promise<RuntimeAuthActionResult> {
+  return postRuntimeAuthAction('/api/runtime/cursor/login/start');
+}
+
+export function logoutCodexRuntime(): Promise<RuntimeAuthActionResult> {
+  return postRuntimeAuthAction('/api/runtime/codex/logout');
+}
+
+export function startCodexRuntimeLogin(): Promise<RuntimeAuthActionResult> {
+  return postRuntimeAuthAction('/api/runtime/codex/login/start');
+}
+
+export interface ReadinessSnapshot {
+  service: string;
+  status: string;
+  mode?: string;
+  watch_base_url?: string;
+  state_dir?: string;
+  public_base_url?: string;
+}
+
+export async function fetchReadiness(): Promise<ReadinessSnapshot> {
+  const baseUrl = controlPlaneBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/readiness` : '/api/readiness';
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`readiness request failed with status ${response.status}`);
+  }
+  return response.json() as Promise<ReadinessSnapshot>;
 }
 
 export interface VaultImportResult {

@@ -1,5 +1,6 @@
 import type { WorkspaceRecord } from '../contracts/canonical';
 
+import { canonicalWorkspaceLabel } from './kairo-entity-labels';
 import {
   DEFAULT_OPERATOR_WORKSPACE_ID,
   MOCKUP_WORKSPACE_IDS,
@@ -68,7 +69,7 @@ export function defaultOperatorWorkspaceId(items: WorkspaceRecord[]): string | n
 }
 
 export function workspaceDisplayLabel(workspace: WorkspaceRecord): string {
-  return workspace.display_name?.trim() || workspace.workspace_id;
+  return canonicalWorkspaceLabel(workspace.workspace_id, workspace.display_name);
 }
 
 export function workspaceCatalogMode(items: WorkspaceRecord[]): 'production' | 'mockup' {

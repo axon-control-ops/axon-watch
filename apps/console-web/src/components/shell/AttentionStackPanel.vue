@@ -17,12 +17,14 @@ import {
 } from '../../lib/operator-signal-hints';
 import { useShellStore } from '../../stores/shell';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     variant?: 'sidebar' | 'dock';
+    sections?: 'all' | 'run-only';
   }>(),
   {
     variant: 'dock',
+    sections: 'all',
   },
 );
 
@@ -30,7 +32,10 @@ const shell = useShellStore();
 
 const activeRun = computed(() => shell.primaryActiveRun);
 
-const recentReceipts = computed(() => shell.runHistoryRows.slice(-3).reverse());
+const recentReceipts = computed(() => {
+  const limit = props.variant === 'sidebar' ? 2 : 3;
+  return shell.runHistoryRows.slice(-limit).reverse();
+});
 
 const otherReviewReadyRuns = computed(() =>
   shell.runs.filter(
@@ -108,6 +113,7 @@ function signalHint(signal: {
     :class="{
       'attention-stack--sidebar': variant === 'sidebar',
       'attention-stack--dock': variant === 'dock',
+      'attention-stack--run-only': sections === 'run-only',
     }"
   >
     <HudSeamCard
@@ -139,7 +145,11 @@ function signalHint(signal: {
           />
         </div>
 
-        <p v-if="activeRun.current_step" class="dock-run-seam__step">
+        <p
+          v-if="activeRun.current_step"
+          class="dock-run-seam__step"
+          :title="activeRun.current_step"
+        >
           {{ activeRun.current_step }}
         </p>
 
@@ -209,6 +219,7 @@ function signalHint(signal: {
     </HudSeamCard>
 
     <HudSeamCard
+      v-if="sections === 'all'"
       seam-id="dock-seam-approvals"
       :title="shell.dockSeamState('approvals')?.title ?? 'Approvals'"
       seam-class="dock-seam dock-seam--approvals"
@@ -269,6 +280,7 @@ function signalHint(signal: {
     </HudSeamCard>
 
     <HudSeamCard
+      v-if="sections === 'all'"
       seam-id="dock-seam-signals"
       :title="shell.dockSeamState('signals')?.title ?? 'Signals'"
       seam-class="dock-seam dock-seam--signals"

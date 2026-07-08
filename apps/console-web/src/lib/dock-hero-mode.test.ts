@@ -38,6 +38,6 @@ describe('dock-hero-mode', () => {
   it('derives operator-facing labels', () => {
     expect(dockHeroModeLabel('command')).toBe('Command');
     expect(dockHeroModeTitle('command')).toBe('Command');
-    expect(dockHeroModeTitle('briefing')).toBe('KAIRO Briefing');
+    expect(dockHeroModeTitle('briefing')).toBe('VAXON Briefing');
   });
 });

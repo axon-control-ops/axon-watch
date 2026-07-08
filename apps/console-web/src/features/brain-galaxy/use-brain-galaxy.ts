@@ -1,6 +1,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue';
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
+import { isKairoConversationBusy, kairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
 import { BrainGalaxyScene } from './brain-galaxy-scene';
 
 export type UseBrainGalaxyOptions = {
@@ -62,6 +63,7 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
 
     sceneRef.value = scene;
     scene.setSnapshot(options.snapshot.value);
+    scene.setVaxonBusy(isKairoConversationBusy());
     webglReady.value = true;
   }
 
@@ -82,6 +84,14 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
         selectedNode.value = null;
       }
     },
+  );
+
+  watch(
+    kairoConversationPhase,
+    () => {
+      sceneRef.value?.setVaxonBusy(isKairoConversationBusy());
+    },
+    { immediate: true },
   );
 
   onBeforeUnmount(() => {

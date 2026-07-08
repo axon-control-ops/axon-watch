@@ -37,7 +37,7 @@ class Test7OperatorPresenceAcceptance(unittest.TestCase):
         status, payload = _request("GET", f"{CONTROL_PLANE_BASE}/api/briefing")
         self.assertEqual(200, status)
         presence = payload["operator_presence"]
-        self.assertTrue(presence["persona_voice_line"].startswith("KAIRO:"))
+        self.assertTrue(presence["persona_voice_line"].startswith("VAXON:"))
         self.assertIn(presence["presence_state"], {"idle", "observing", "alerting", "privacy_blocked"})
         self.assertTrue(presence["mobile"]["foreground_only"])
 

@@ -46,6 +46,6 @@ describe('kairo-briefing-attention', () => {
 
     expect(shouldShowBriefingAttentionInCommandMode('command', attention)).toBe(true);
     expect(shouldShowBriefingAttentionInCommandMode('briefing', attention)).toBe(false);
-    expect(briefingAttentionStatusLabel(attention)).toBe('KAIRO · 1 approval needs review');
+    expect(briefingAttentionStatusLabel(attention)).toBe('VAXON · 1 approval needs review');
   });
 });

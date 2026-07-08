@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import OperatorPersonaMark from '../../components/OperatorPersonaMark.vue';
 import {
   buildIdeAgentThreadStatusLabel,
+  parseIdeAgentThreadStatusLabel,
   shouldShowIdeAgentThreadStatusStrip,
 } from '../../lib/ide-agent-center-view';
 import { useShellStore } from '../../stores/shell';
@@ -22,6 +24,8 @@ const statusLabel = computed(() =>
     activityLabel: shell.ideComposerActivity?.label,
   }),
 );
+
+const statusBody = computed(() => parseIdeAgentThreadStatusLabel(statusLabel.value).body);
 </script>
 
 <template>
@@ -31,6 +35,11 @@ const statusLabel = computed(() =>
     role="status"
     aria-live="polite"
   >
-    <p class="conversation-seam__thread-status-label">{{ statusLabel }}</p>
+    <p class="conversation-seam__thread-status-label">
+      <span class="persona-title">
+        <OperatorPersonaMark size="xs" />
+        <span class="conversation-seam__thread-status-body">— {{ statusBody }}</span>
+      </span>
+    </p>
   </li>
 </template>

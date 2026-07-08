@@ -20,7 +20,7 @@ describe('liveThinkingText', () => {
 
 describe('streamingActivityLabel', () => {
   it('prefers live thinking text for KAIRO status', () => {
-    expect(streamingActivityLabel(STAGE_1)).toBe('KAIRO — Checking the file');
+    expect(streamingActivityLabel(STAGE_1)).toBe('VAXON — Checking the file');
   });
 });
 

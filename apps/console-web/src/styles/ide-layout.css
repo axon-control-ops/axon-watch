@@ -1616,9 +1616,31 @@
 
 .agent-dock-composer__kairo-reply {
   margin: 0.35rem 0.55rem 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(72, 196, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(4, 16, 28, 0.62);
+  max-height: 8.5rem;
+  overflow-y: auto;
+}
+
+.agent-dock-composer__kairo-reply-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+  color: rgba(150, 231, 255, 0.88);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__kairo-reply-text {
+  margin: 0;
   font-size: 0.68rem;
-  line-height: 1.35;
+  line-height: 1.45;
   color: rgba(214, 226, 240, 0.92);
+  white-space: pre-wrap;
 }
 
 .agent-dock-composer__kairo-reply strong {

@@ -2,6 +2,7 @@ import {
   normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
 } from './agent-transcript-blocks';
+import { OPERATOR_PERSONA_NAME, personaThreadPrefix } from './operator-persona-name';
 
 export type IdeAgentThreadMessage = {
   message_id: string;
@@ -104,15 +105,23 @@ export function shouldShowIdeAgentReviewStrip(input: {
   return input.editedFileCount > 0;
 }
 
+export function parseIdeAgentThreadStatusLabel(label: string): { body: string } {
+  const trimmed = label.trim();
+  const match = trimmed.match(
+    new RegExp(`^(?:${OPERATOR_PERSONA_NAME}|X|KAIRO)\\s*[—-]\\s*(.+)$`, 'i'),
+  );
+  return { body: match?.[1]?.trim() || trimmed };
+}
+
 export function buildIdeAgentThreadStatusLabel(input: {
   activityLabel: string | null | undefined;
 }): string {
   const label = String(input.activityLabel ?? 'Agent is working…').trim();
-  if (/^KAIRO\b/i.test(label)) {
+  if (new RegExp(`^${OPERATOR_PERSONA_NAME}\\b`, 'i').test(label)) {
     return label;
   }
-  const body = label.replace(/^KAIRO[:\s—-]+/i, '').trim() || 'Agent is working…';
-  return `KAIRO — ${body}`;
+  const body = label.replace(new RegExp(`^(?:${OPERATOR_PERSONA_NAME}|KAIRO)[:\\s—-]+`, 'i'), '').trim() || 'Agent is working…';
+  return personaThreadPrefix(body);
 }
 
 export function shouldShowIdeAgentThreadStatusStrip(input: {

@@ -5,6 +5,9 @@ from __future__ import annotations
 INTERRUPTIVE_MODES = frozenset({"approval", "execute"})
 
 
+from app.operator_persona_name import OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_PREFIX
+
+
 def default_operator_presence_settings() -> dict[str, bool | str]:
     return {
         "operator_persona_enabled": True,
@@ -13,6 +16,7 @@ def default_operator_presence_settings() -> dict[str, bool | str]:
         "mobile_compact_preferred": True,
         "kairo_narration": "conversational",
         "ide_voice_strip_enabled": False,
+        "hands_free_enabled": False,
     }
 
 
@@ -44,7 +48,7 @@ def resolve_spoken_alert(
             "eligible": True,
             "reason": "operator_approval_required",
             "signal_id": None,
-            "message": f"KAIRO: {pending_approvals} approval{suffix} waiting for your review.",
+            "message": f"{OPERATOR_PERSONA_PREFIX}{pending_approvals} approval{suffix} waiting for your review.",
         }
 
     if not isinstance(top_signal, dict):
@@ -68,7 +72,7 @@ def resolve_spoken_alert(
             "eligible": True,
             "reason": str(rule.get("reason") or "high_urgency_signal"),
             "signal_id": signal_id or None,
-            "message": f"KAIRO attention: {title}.",
+            "message": f"{OPERATOR_PERSONA_NAME} attention: {title}.",
         }
 
     return {

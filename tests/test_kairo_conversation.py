@@ -124,6 +124,115 @@ class KairoConversationUnitTests(unittest.TestCase):
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
     @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.dispatch_ide_composer")
+    @patch("app.kairo_conversation.build_lane_b_context_block", return_value="Workspace context")
+    def test_converse_open_question_sanitizes_runtime_agent_dump(
+        self,
+        _mock_context: object,
+        mock_dispatch,
+        *_mocks: object,
+    ) -> None:
+        mock_dispatch.return_value = {
+            "content": (
+                ":::thinking\nInvestigating.\n:::\n"
+                ":::tool Read scripts/ops/audit-supabase-storage.mjs\n\n"
+                "From my side right now, DashPro is not spiking — systems nominal."
+            ),
+            "dispatched": True,
+        }
+        payload = converse_turn(
+            content="why is dashpro spiking?",
+            session_id="sanitize-open-question",
+            use_runtime=True,
+        )
+        reply = str(payload["reply"])
+        self.assertNotIn(":::", reply)
+        self.assertNotIn("scripts/ops", reply)
+        self.assertIn("DashPro is not spiking", reply)
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.dispatch_ide_composer")
+    @patch("app.kairo_conversation.build_lane_b_context_block", return_value="Workspace context")
+    def test_converse_open_question_uses_runtime_assistant(
+        self,
+        _mock_context: object,
+        mock_dispatch,
+        *_mocks: object,
+    ) -> None:
+        mock_dispatch.return_value = {
+            "content": "The Sentry spike appears tied to the latest DashPro changes.",
+            "dispatched": True,
+        }
+        payload = converse_turn(
+            content="why is sentry spiking?",
+            session_id="open-question-session",
+            use_runtime=True,
+        )
+        self.assertEqual("open_question", payload["turn_kind"])
+        self.assertEqual("model", payload["source"])
+        self.assertIn("Sentry spike", str(payload["reply"]))
+        mock_dispatch.assert_called_once()
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.dispatch_ide_composer")
+    @patch("app.kairo_conversation.build_lane_b_context_block", return_value="Workspace context")
+    def test_converse_open_question_trims_run_on_runtime_tail(
+        self,
+        _mock_context: object,
+        mock_dispatch,
+        *_mocks: object,
+    ) -> None:
+        mock_dispatch.return_value = {
+            "content": (
+                "I'll check operational docs and recent monitoring signals in the workspace to see what "
+                "might explain a DashPro spike. If you are seeing a spike in Supabase or Axon quota, "
+                "the repo points at storage, not the database. Recent ops work was added because "
+                "storage is blowing the one-gigabyte free tier; cleanup notes call out the tts-audio "
+                "bucket at roughly four hundred twenty-seven megabytes as the main offender. "
+                "If you meant CPU, errors, or traffic instead, say which dashboard and I will narrow "
+                "it.From my side right now DashPro is not spiking — no active runs, no top signal, "
+                "systems nominal. If you are seeing a spike in Supabase or Axon quota, the repo "
+                "points at storage, not the database."
+            ),
+            "dispatched": True,
+        }
+        payload = converse_turn(
+            content="why is dashpro spiking?",
+            session_id="open-question-tail-trim",
+            use_runtime=True,
+        )
+        reply = str(payload["reply"])
+        self.assertLessEqual(len(reply), 1200)
+        self.assertIn("DashPro spike", reply)
+        self.assertEqual(reply.count("If you are seeing a spike in Supabase or Axon quota"), 1)
+        self.assertTrue(reply.endswith((".", "!", "?")))
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.dispatch_ide_composer")
+    def test_converse_status_question_stays_template_even_with_runtime_enabled(
+        self,
+        mock_dispatch,
+        *_mocks: object,
+    ) -> None:
+        payload = converse_turn(
+            content="any approvals?",
+            session_id="runtime-status-session",
+            use_runtime=True,
+        )
+        self.assertEqual("status_question", payload["turn_kind"])
+        self.assertEqual("template", payload["source"])
+        self.assertRegex(str(payload["reply"]).lower(), r"(approval|sign-?off)")
+        mock_dispatch.assert_not_called()
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
     def test_status_replies_vary_across_turns(
         self,
         *_mocks: object,

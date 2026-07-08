@@ -1,4 +1,11 @@
-type SubmitHandler = (content: string) => Promise<void>;
+type SubmitHandler = (
+  content: string,
+  options?: KairoConversationSubmitOptions,
+) => Promise<void>;
+
+export type KairoConversationSubmitOptions = {
+  voiceCaptureMode?: 'manual' | 'hands_free' | 'barge_in';
+};
 
 let submitHandler: SubmitHandler | null = null;
 
@@ -11,10 +18,13 @@ export function registerKairoConversationSubmit(handler: SubmitHandler): () => v
   };
 }
 
-export async function submitKairoConversationTranscript(content: string): Promise<void> {
+export async function submitKairoConversationTranscript(
+  content: string,
+  options?: KairoConversationSubmitOptions,
+): Promise<void> {
   const trimmed = content.trim();
   if (!trimmed || !submitHandler) {
     return;
   }
-  await submitHandler(trimmed);
+  await submitHandler(trimmed, options);
 }

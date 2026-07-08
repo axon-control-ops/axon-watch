@@ -2,9 +2,10 @@
 import { computed } from 'vue';
 
 import {
-  kairoPresenceLabel,
+  kairoPresenceSubtitle,
   type KairoPresenceState,
 } from '../lib/kairo-presence';
+import OperatorPersonaMark from './OperatorPersonaMark.vue';
 
 const props = defineProps<{
   state: KairoPresenceState;
@@ -14,12 +15,13 @@ const emit = defineEmits<{
   openBriefing: [];
 }>();
 
-const label = computed(() => kairoPresenceLabel(props.state));
+const subtitle = computed(() => kairoPresenceSubtitle(props.state));
 const showWaveform = computed(
   () =>
     props.state === 'observing' ||
     props.state === 'listening' ||
     props.state === 'speaking' ||
+    props.state === 'thinking' ||
     props.state === 'alerting',
 );
 </script>
@@ -29,8 +31,8 @@ const showWaveform = computed(
     type="button"
     class="kairo-chip"
     :class="`kairo-chip--${state}`"
-    :aria-label="label"
-    title="Open KAIRO briefing"
+    :aria-label="`${subtitle} operator presence`"
+    title="Open operator briefing"
     @click="emit('openBriefing')"
   >
     <span class="kairo-chip__pulse" aria-hidden="true" />
@@ -40,6 +42,9 @@ const showWaveform = computed(
       <span />
       <span />
     </span>
-    <span class="kairo-chip__label">{{ label }}</span>
+    <span class="kairo-chip__label persona-title">
+      <OperatorPersonaMark size="xs" />
+      <span class="kairo-chip__subtitle">{{ subtitle }}</span>
+    </span>
   </button>
 </template>

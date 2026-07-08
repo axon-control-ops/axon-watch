@@ -6,6 +6,8 @@ import hashlib
 import re
 from typing import Any, Literal
 
+from app.operator_briefing_signals import is_bootstrap_signal
+
 QuestionFocus = Literal[
     "approvals",
     "attention",
@@ -61,22 +63,13 @@ def detect_question_focus(content: str, *, recent_user_turns: list[str]) -> Ques
     return "general"
 
 
-def _bootstrap_signal(signal: dict[str, Any]) -> bool:
-    signal_id = str(signal.get("signal_id", ""))
-    title = str(signal.get("title", "")).lower()
-    return signal_id in {
-        "signal_runtime_summary_degraded",
-        "signal_watch_bootstrap_ready",
-    } or "bootstrap" in title
-
-
 def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
     briefing = pack["briefing"]
     fleet = pack.get("fleet", {})
     top_signals = [
         item
         for item in briefing.get("top_signals", [])
-        if isinstance(item, dict) and not _bootstrap_signal(item)
+        if isinstance(item, dict) and not is_bootstrap_signal(item)
     ]
     active_runs = [
         item for item in briefing.get("active_runs", []) if isinstance(item, dict)
@@ -296,8 +289,9 @@ def _general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
         chunks.append(facts["advise"])
     if not chunks:
         return [
-            f"{prefix}Systems nominal — standing by for your next command.".strip(),
-            f"{prefix}All quiet — what shall we tackle next?".strip(),
+            f"{prefix}All quiet on the board — standing by for your next move.".strip(),
+            f"{prefix}Nothing urgent from my scan — what shall we tackle?".strip(),
+            f"{prefix}Systems look nominal — I'm here when you need me.".strip(),
         ]
     body = "; ".join(chunks[:3])
     return [
@@ -324,9 +318,10 @@ def compose_smalltalk_reply(
     if _GREETING_RE.match(trimmed):
         return _select_line(
             [
-                "Good to hear from you — what shall we focus on?",
-                "Here and ready — what's on your mind?",
-                "At your service — where shall we start?",
+                "Good to have you — what shall we focus on?",
+                "Right here when you need me — what's on your mind?",
+                "Systems are live — where shall we start?",
+                "At your service — what would you like to tackle first?",
             ],
             session_id=session_id,
             salt=f"greeting:{trimmed.lower()}",

@@ -132,7 +132,7 @@ class OperatorPresenceSettingsApiTests(unittest.TestCase):
             enabled_briefing["operator_presence"]["settings"]["operator_persona_enabled"]
         )
         self.assertTrue(
-            enabled_briefing["operator_presence"]["persona_voice_line"].startswith("KAIRO:")
+            enabled_briefing["operator_presence"]["persona_voice_line"].startswith("VAXON:")
         )
 
         save = self.client.put(

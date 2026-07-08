@@ -57,7 +57,7 @@ class ParityC1PersonaSettingsTests(unittest.TestCase):
         enabled = self._briefing_with_probe()
         self.assertGreater(enabled["pending_approvals"]["count"], 0)
         self.assertTrue(
-            str(enabled["operator_presence"]["persona_voice_line"]).startswith("KAIRO:")
+            str(enabled["operator_presence"]["persona_voice_line"]).startswith("VAXON:")
         )
 
         response = self.client.put(

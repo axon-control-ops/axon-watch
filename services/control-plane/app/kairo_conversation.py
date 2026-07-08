@@ -12,19 +12,32 @@ from app.chat.command_intent import (
     expand_command_shortcuts,
     is_question,
 )
+from app.chat.lane_b_agent import LaneBContext, build_lane_b_context_block
+from app.cli_runtime.router import dispatch_ide_composer
 from app.kairo_conversation_reply import (
+    build_conversation_facts,
     compose_conversation_reply,
     compose_smalltalk_reply,
     is_open_style_question,
 )
+from app.kairo_voice import normalize_spoken_line
 from app.operator_briefing import build_operator_briefing
 from app.operator_brain_graph import build_operator_brain_graph
 from app.operator_fleet_health import build_operator_fleet_health
+from app.operator_persona_name import OPERATOR_PERSONA_BACKRONYM, OPERATOR_PERSONA_NAME
+from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
+from app.persistence.voice_transcript_store import append_voice_transcript
 
 ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
 ConversationSource = Literal["template", "model", "fallback"]
 
+_MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
 _MAX_TURN_MEMORY = 8
+
+_OPEN_DETAIL_RE = re.compile(
+    r"\b(walk me through|explain|tell me about|in detail|step by step|compare|tradeoffs?|everything)\b",
+    re.IGNORECASE,
+)
 
 _STATUS_HINT_RE = re.compile(
     r"\b("
@@ -121,6 +134,114 @@ def _resolve_followup_action(content: str, session_id: str) -> dict[str, object]
     return None
 
 
+def _runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
+    scoped = str(workspace_id or "").strip()
+    if scoped:
+        return scoped
+
+    briefing = pack.get("briefing", {})
+    scope = briefing.get("scope", {}) if isinstance(briefing, dict) else {}
+    scoped_from_briefing = str(scope.get("workspace_id") or "").strip()
+    if scoped_from_briefing:
+        return scoped_from_briefing
+
+    top_signals = briefing.get("top_signals", []) if isinstance(briefing, dict) else []
+    if top_signals and isinstance(top_signals[0], dict):
+        top_signal_workspace = str(top_signals[0].get("workspace_id") or "").strip()
+        if top_signal_workspace:
+            return top_signal_workspace
+
+    return "workspace_axon_watch"
+
+
+def _build_runtime_context_block(
+    *,
+    content: str,
+    workspace_id: str,
+    pack: dict[str, Any],
+    session_id: str,
+    recent_turns: list[dict[str, str]],
+) -> str:
+    facts = build_conversation_facts(pack)
+    base = build_lane_b_context_block(
+        LaneBContext(
+            workspace_id=workspace_id,
+            composer_mode="ask",
+        )
+    )
+    recent_lines = [
+        f'{turn.get("role", "unknown")}: {str(turn.get("content") or "").strip()}'
+        for turn in recent_turns[-6:]
+        if str(turn.get("content") or "").strip()
+    ]
+    extras = [
+        "Operator voice assistant contract (JARVIS-style):",
+        f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — dry, impeccably polite, confident.",
+        "- Razor wit when it fits; never sycophantic or chatbot-cheerful.",
+        '- No "sir", "madam", or honorifics unless the operator used one.',
+        "- First person, natural spoken language; ground answers in operator state and workspace context.",
+        "- No markdown, bullets, code fences, or raw path dumps unless the operator asked for implementation detail.",
+        (
+            "- For walkthrough, explain, compare, or in-detail requests: use 3-6 short paragraphs."
+            if _OPEN_DETAIL_RE.search(content)
+            else "- For quick questions: 1-3 short sentences."
+        ),
+        f"Voice session: {session_id}",
+        f"Pending approvals: {facts['pending_approvals']}",
+        f"Top signal: {facts['top_signal_title'] or 'none'}",
+        f"Top signal summary: {facts['top_signal_summary'] or 'none'}",
+        f"Active runs: {facts['active_run_count']}",
+        f"Primary run: {facts['primary_run_summary'] or 'none'}",
+        f"Degraded active: {'yes' if facts['degraded'] else 'no'}",
+        f"Notice: {facts['notice'] or 'none'}",
+        f"Advise: {facts['advise'] or 'none'}",
+    ]
+    if recent_lines:
+        extras.append("Recent conversation:")
+        extras.extend(recent_lines)
+    return f"{base}\n\n" + "\n".join(extras)
+
+
+def _runtime_assistant_reply(
+    *,
+    content: str,
+    session_id: str,
+    workspace_id: str | None,
+    pack: dict[str, Any],
+    recent_turns: list[dict[str, str]],
+) -> tuple[str, ConversationSource]:
+    resolved_workspace_id = _runtime_workspace_id(workspace_id=workspace_id, pack=pack)
+    context_block = _build_runtime_context_block(
+        content=content,
+        workspace_id=resolved_workspace_id,
+        pack=pack,
+        session_id=session_id,
+        recent_turns=recent_turns,
+    )
+    payload = dispatch_ide_composer(
+        workspace_id=resolved_workspace_id,
+        composer_mode="ask",
+        user_prompt=content,
+        context_block=context_block,
+        execution_access="consultative",
+    )
+    reply = normalize_spoken_line(
+        str(payload.get("content") or ""),
+        max_chars=_MAX_RUNTIME_VOICE_REPLY_CHARS,
+    )
+    if not reply:
+        return (
+            compose_conversation_reply(
+                content=content,
+                pack=pack,
+                session_id=session_id,
+                recent_turns=recent_turns,
+            ),
+            "fallback",
+        )
+    return reply, ("model" if bool(payload.get("dispatched")) else "fallback")
+
+
 def build_conversation_context_pack(*, workspace_id: str | None = None) -> dict[str, Any]:
     scoped = workspace_id.strip() if workspace_id else None
     briefing = build_operator_briefing(workspace_id=scoped)
@@ -179,23 +300,66 @@ def answer_status_question(content: str, pack: dict[str, Any]) -> str:
     )
 
 
-def _command_ack_line(content: str) -> str:
+def _workspace_short_label(pack: dict[str, Any]) -> str | None:
+    workspace = pack.get("workspace")
+    if not isinstance(workspace, dict):
+        return None
+    label = str(workspace.get("display_name") or workspace.get("workspace_id") or "").strip()
+    return label or None
+
+
+def _command_ack_line(content: str, *, workspace_label: str | None = None) -> str:
     normalized = expand_command_shortcuts(content.strip())
     intent = classify_command(normalized)
     label = command_display_name(normalized)
+    scope = f" for {workspace_label}" if workspace_label else ""
     if intent == "git_status":
-        return "Right — I'll pull git status now."
+        return (
+            f"On it — running git status{scope}. "
+            "I'll read branch and working tree, then put the full output in Command Results."
+        )
     if intent == "health_probe":
-        return "Running a health check now."
+        return (
+            f"Running a health probe{scope} now — "
+            "checking connectors, runtime, and service reachability."
+        )
     if intent == "list_files":
-        return "Listing workspace files for you."
+        return f"Listing workspace files{scope} — results will appear in Command Results."
     if intent == "read_file":
-        return f"Reading {label.replace('Read ', '')}."
+        target = label.replace("Read ", "").strip()
+        return f"Opening {target or 'that file'} now — I'll surface the contents in Command Results."
     if intent == "shell_command":
-        return f"On it — {label}."
+        return f"Executing now — {label}. Watch Command Results for output."
     if intent == "resume_from_review":
-        return "Resuming from review."
-    return f"Understood — {label}."
+        return "Resuming from review — picking up where we left off."
+    return f"Understood — {label}. I'll report back in Command Results."
+
+
+def _log_voice_turn(
+    *,
+    session_id: str,
+    workspace_id: str | None,
+    raw_content: str,
+    normalized_content: str,
+    payload: dict[str, object],
+) -> dict[str, object]:
+    try:
+        stt_note = None
+        if raw_content.strip().lower() != normalized_content.strip().lower():
+            stt_note = "stt_normalized"
+        append_voice_transcript(
+            session_id=session_id,
+            workspace_id=workspace_id,
+            raw_content=raw_content,
+            normalized_content=normalized_content,
+            reply=str(payload.get("reply") or ""),
+            turn_kind=str(payload.get("turn_kind") or "unknown"),
+            source=str(payload.get("source") or "unknown"),
+            stt_note=stt_note,
+        )
+    except Exception:
+        pass
+    return payload
 
 
 def converse_turn(
@@ -205,7 +369,8 @@ def converse_turn(
     workspace_id: str | None = None,
     use_runtime: bool = False,
 ) -> dict[str, object]:
-    trimmed = content.strip()
+    raw_content = content.strip()
+    trimmed = normalize_persona_stt_aliases(raw_content)
     if not trimmed:
         raise ValueError("content must not be empty")
 
@@ -217,26 +382,41 @@ def converse_turn(
             reply = "Handing this off to the IDE now."
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
-            return {
-                "turn_kind": "action",
-                "reply": reply,
-                "source": "template",
-                "command_content": None,
-                "action": followup,
-            }
+            return _log_voice_turn(
+                session_id=session_id,
+                workspace_id=workspace_id,
+                raw_content=raw_content,
+                normalized_content=trimmed,
+                payload={
+                    "turn_kind": "action",
+                    "reply": reply,
+                    "source": "template",
+                    "command_content": None,
+                    "action": followup,
+                },
+            )
         if action_type == "dispatch_command":
             command_content = str(followup.get("content", "")).strip()
-            reply = _command_ack_line(command_content)
+            reply = _command_ack_line(
+                command_content,
+                workspace_label=_workspace_short_label(pack),
+            )
             _remember_entities(session_id, pending_command="")
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
-            return {
-                "turn_kind": "action",
-                "reply": reply,
-                "source": "template",
-                "command_content": command_content,
-                "action": followup,
-            }
+            return _log_voice_turn(
+                session_id=session_id,
+                workspace_id=workspace_id,
+                raw_content=raw_content,
+                normalized_content=trimmed,
+                payload={
+                    "turn_kind": "action",
+                    "reply": reply,
+                    "source": "template",
+                    "command_content": command_content,
+                    "action": followup,
+                },
+            )
 
     turn_kind = classify_conversation_turn(trimmed)
     source: ConversationSource = "template"
@@ -246,7 +426,7 @@ def converse_turn(
     if turn_kind == "command":
         normalized = expand_command_shortcuts(trimmed)
         command_content = normalized
-        reply = _command_ack_line(normalized)
+        reply = _command_ack_line(normalized, workspace_label=_workspace_short_label(pack))
         source = "template"
         _remember_entities(session_id, pending_command=normalized)
     elif turn_kind == "status_question":
@@ -258,6 +438,16 @@ def converse_turn(
             recent_turns=recent,
         )
         source = "template"
+        _remember_top_signal(session_id, pack)
+    elif turn_kind == "open_question" and use_runtime:
+        recent = _recent_turns(session_id)
+        reply, source = _runtime_assistant_reply(
+            content=trimmed,
+            session_id=session_id,
+            workspace_id=workspace_id,
+            pack=pack,
+            recent_turns=recent,
+        )
         _remember_top_signal(session_id, pack)
     else:
         recent = _recent_turns(session_id)
@@ -278,16 +468,25 @@ def converse_turn(
             )
             source = "template"
 
+    if reply:
+        reply = normalize_spoken_line(reply)
+
     _remember_turn(session_id, "user", trimmed)
     _remember_turn(session_id, "assistant", reply)
 
-    return {
-        "turn_kind": turn_kind,
-        "reply": reply,
-        "source": source,
-        "command_content": command_content,
-        "action": None,
-    }
+    return _log_voice_turn(
+        session_id=session_id,
+        workspace_id=workspace_id,
+        raw_content=raw_content,
+        normalized_content=trimmed,
+        payload={
+            "turn_kind": turn_kind,
+            "reply": reply,
+            "source": source,
+            "command_content": command_content,
+            "action": None,
+        },
+    )
 
 
 __all__ = [

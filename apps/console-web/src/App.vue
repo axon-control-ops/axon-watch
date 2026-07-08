@@ -8,10 +8,10 @@ import LeftSidebar from './components/shell/LeftSidebar.vue';
 import RightDock from './components/shell/RightDock.vue';
 import StatusBar from './components/shell/StatusBar.vue';
 import TopBar from './components/shell/TopBar.vue';
-import OperatorPresenceSettingsPanel from './components/shell/OperatorPresenceSettingsPanel.vue';
 import VaultSurface from './components/vault/VaultSurface.vue';
 import DataSurface from './components/data/DataSurface.vue';
 import OperatorMobileShell from './components/shell/OperatorMobileShell.vue';
+import OperatorSettingsSurface from './components/settings/OperatorSettingsSurface.vue';
 import ScanHierarchyPreview from './dev/ScanHierarchyPreview.vue';
 import { useAppSurface } from './composables/useAppSurface';
 import { startLiveEventsSession } from './lib/live-events-session';
@@ -32,8 +32,13 @@ const { appSurface } = useAppSurface();
 const isVaultSurface = computed(() => appSurface.value === 'vault');
 const isDataSurface = computed(() => appSurface.value === 'data');
 const isMobileSurface = computed(() => appSurface.value === 'mobile');
+const isSettingsSurface = computed(() => appSurface.value === 'settings');
 const isFoundationSurface = computed(
-  () => isVaultSurface.value || isDataSurface.value || isMobileSurface.value,
+  () =>
+    isVaultSurface.value ||
+    isDataSurface.value ||
+    isMobileSurface.value ||
+    isSettingsSurface.value,
 );
 const showScanPreview = ref(
   typeof window !== 'undefined' &&
@@ -55,7 +60,10 @@ function completeBoot(): void {
 watch(
   appSurface,
   (surface, previous) => {
-    if (surface === 'console' && (previous === 'vault' || previous === 'data')) {
+    if (
+      surface === 'console' &&
+      (previous === 'vault' || previous === 'data' || previous === 'settings')
+    ) {
       void shell.refreshRunSurfaces();
       void shell.loadWorkspaceFiles();
     }
@@ -115,6 +123,7 @@ onUnmounted(() => {
         'console-shell--vault': isVaultSurface,
         'console-shell--data': isDataSurface,
         'console-shell--mobile': isMobileSurface,
+        'console-shell--settings': isSettingsSurface,
       }"
       :data-layout-mode="shell.layoutMode"
     >
@@ -129,15 +138,8 @@ onUnmounted(() => {
       <VaultSurface v-if="isVaultSurface" />
       <DataSurface v-if="isDataSurface" />
       <OperatorMobileShell v-if="isMobileSurface" />
+      <OperatorSettingsSurface v-if="isSettingsSurface" />
       <StatusBar />
     </div>
-
-    <OperatorPresenceSettingsPanel
-      :open="shell.operatorPresenceSettingsOpen"
-      :settings="shell.operatorPresenceSettings"
-      :saving="shell.operatorPresenceSettingsSaving"
-      @close="shell.toggleOperatorPresenceSettingsPanel(false)"
-      @save="shell.saveOperatorPresenceSettingsPatch($event)"
-    />
   </template>
 </template>

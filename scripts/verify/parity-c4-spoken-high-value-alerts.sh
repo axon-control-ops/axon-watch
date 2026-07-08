@@ -37,13 +37,13 @@ echo "[6/8] Voice-deck hook + settings panel wiring"
 python3 - <<'PY'
 from pathlib import Path
 text = Path("apps/console-web/src/lib/spoken-alert-delivery.ts").read_text(encoding="utf-8")
-panel = Path("apps/console-web/src/components/shell/OperatorPresenceSettingsPanel.vue").read_text(
+panel = Path("apps/console-web/src/components/settings/OperatorPresenceSettingsForm.vue").read_text(
     encoding="utf-8"
 )
 for needle in (
     "registerVoiceDeckSpokenAlertHandler",
     "deliverSpokenOperatorAlert",
-    "browser_tts",
+    "speakKairoLine",
 ):
     if needle not in text:
         raise SystemExit(f"missing spoken alert delivery hook: {needle}")

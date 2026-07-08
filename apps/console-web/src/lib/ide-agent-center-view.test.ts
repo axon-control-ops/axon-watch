@@ -95,21 +95,21 @@ describe('ide agent center view', () => {
     ).toBe(true);
   });
 
-  it('builds thread status labels with KAIRO prefix while streaming', () => {
+  it('builds thread status labels with VAXON prefix while streaming', () => {
     expect(
       buildIdeAgentThreadStatusLabel({
         activityLabel:
           'I need to review my previous answer for factual mistakes, missing steps, unsupported assumption…',
       }),
     ).toBe(
-      'KAIRO — I need to review my previous answer for factual mistakes, missing steps, unsupported assumption…',
+      'VAXON — I need to review my previous answer for factual mistakes, missing steps, unsupported assumption…',
     );
 
     expect(
       buildIdeAgentThreadStatusLabel({
-        activityLabel: 'KAIRO — Checking the file',
+        activityLabel: 'VAXON — Checking the file',
       }),
-    ).toBe('KAIRO — Checking the file');
+    ).toBe('VAXON — Checking the file');
   });
 
   it('shows thread status only while streaming in IDE mode', () => {
@@ -117,7 +117,7 @@ describe('ide agent center view', () => {
       shouldShowIdeAgentThreadStatusStrip({
         layoutMode: 'ide',
         agentStreamActive: true,
-        activityLabel: 'KAIRO — Thinking…',
+        activityLabel: 'VAXON — Thinking…',
       }),
     ).toBe(true);
 
@@ -125,12 +125,12 @@ describe('ide agent center view', () => {
       shouldShowIdeAgentThreadStatusStrip({
         layoutMode: 'operator',
         agentStreamActive: true,
-        activityLabel: 'KAIRO — Thinking…',
+        activityLabel: 'VAXON — Thinking…',
       }),
     ).toBe(false);
   });
 
-  it('builds composer review labels without KAIRO thinking text', () => {
+  it('builds composer review labels without VAXON thinking text', () => {
     expect(
       buildIdeAgentReviewComposerLabel({
         agentStreamActive: true,

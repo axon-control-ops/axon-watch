@@ -13,7 +13,7 @@ from app.kairo_ask_prompt import build_ask_system_prompt  # noqa: E402
 class KairoAskPromptTests(unittest.TestCase):
     def test_persona_enabled_uses_kairo_voice(self) -> None:
         prompt = build_ask_system_prompt(persona_enabled=True)
-        self.assertIn("You are KAIRO", prompt)
+        self.assertIn("You are VAXON", prompt)
         self.assertIn("read-only", prompt)
         self.assertNotIn("Lane B", prompt)
 

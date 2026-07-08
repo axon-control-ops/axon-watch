@@ -14,6 +14,7 @@ import {
 import { shouldHideLiveExecutionFeed, isAutoCompleteRunSummary } from '../../lib/operator-run-strip-view';
 import { leftSidebarAttentionBadgeCount } from '../../lib/left-sidebar-mode';
 import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
+import PersonaTitle from '../PersonaTitle.vue';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import {
   formatRunIdentityLabel,
@@ -423,7 +424,7 @@ function toggleTerminal(): void {
           class="operator-status-radar-panel__action operator-status-radar-panel__action--kairo"
           @click="shell.focusKairoBriefing()"
         >
-          Open KAIRO Briefing
+          Open <PersonaTitle suffix="Briefing" mark-size="xs" />
         </button>
       </div>
 

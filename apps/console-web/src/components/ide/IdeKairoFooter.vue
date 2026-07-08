@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 
 import KairoChip from '../KairoChip.vue';
+import OperatorPersonaMark from '../OperatorPersonaMark.vue';
+import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import {
   briefingAdvise,
   briefingNotice,
@@ -39,7 +41,7 @@ const signalBadge = computed(
 </script>
 
 <template>
-  <footer class="ide-kairo-footer" aria-label="KAIRO presence">
+  <footer class="ide-kairo-footer" :aria-label="`${OPERATOR_PERSONA_NAME} presence`">
     <KairoChip
       v-if="!showExpandedPanel"
       class="ide-kairo-footer__chip"
@@ -51,11 +53,13 @@ const signalBadge = computed(
       type="button"
       class="ide-kairo-footer__interrupt hud-panel-frame"
       :class="`ide-kairo-footer__interrupt--${shell.kairoPresenceState}`"
-      :aria-label="`KAIRO. ${shell.briefingSummaryLine}`"
+      :aria-label="`${OPERATOR_PERSONA_NAME}. ${shell.briefingSummaryLine}`"
       @click="shell.focusKairoBriefing()"
     >
       <div class="ide-kairo-footer__interrupt-head">
-        <span class="ide-kairo-footer__interrupt-title">KAIRO</span>
+        <span class="ide-kairo-footer__interrupt-title">
+          <OperatorPersonaMark size="sm" />
+        </span>
         <span class="ide-kairo-footer__interrupt-state">
           {{ kairoPresenceLabel(shell.kairoPresenceState) }}
         </span>

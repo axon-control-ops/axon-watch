@@ -7,6 +7,7 @@ describe('app surface route', () => {
     expect(readAppSurface('/vault')).toBe('vault');
     expect(readAppSurface('/data')).toBe('data');
     expect(readAppSurface('/mobile')).toBe('mobile');
+    expect(readAppSurface('/settings')).toBe('settings');
     expect(readAppSurface('/')).toBe('console');
   });
 });

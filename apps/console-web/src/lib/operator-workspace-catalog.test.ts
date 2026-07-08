@@ -75,7 +75,8 @@ describe('operator workspace catalog', () => {
     );
   });
 
-  it('shows display_name labels for bound workspaces', () => {
-    expect(workspaceDisplayLabel(productionItems[0]!)).toBe('axon-watch');
+  it('shows canonical labels for bound workspaces', () => {
+    expect(workspaceDisplayLabel(productionItems[0]!)).toBe('Axon Watch');
+    expect(workspaceDisplayLabel(productionItems[1]!)).toBe('Axon Local');
   });
 });

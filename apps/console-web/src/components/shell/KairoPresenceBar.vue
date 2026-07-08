@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import OperatorPersonaMark from '../../components/OperatorPersonaMark.vue';
 import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
 import type { KairoPresenceState } from '../../lib/kairo-presence';
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   state: KairoPresenceState;
   speechActive?: boolean;
   paused?: boolean;
+  compact?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -23,7 +25,7 @@ const actionHint = computed(() => {
   if (props.speechActive || props.state === 'speaking') {
     return 'Click to pause';
   }
-  return 'Open KAIRO briefing';
+  return 'Open operator briefing';
 });
 
 const ariaLabel = computed(
@@ -38,6 +40,7 @@ const ariaLabel = computed(
     :class="{
       [`kairo-presence-module--${state}`]: true,
       'kairo-presence-module--speech-live': speechActive && !paused,
+      'kairo-presence-module--compact': compact,
     }"
     :aria-label="ariaLabel"
     @click="emit('action')"
@@ -56,7 +59,9 @@ const ariaLabel = computed(
     </span>
 
     <span class="kairo-presence-module__copy">
-      <span class="kairo-presence-module__title">{{ parts.title }}</span>
+      <span class="kairo-presence-module__title persona-title">
+        <OperatorPersonaMark size="sm" />
+      </span>
       <span class="kairo-presence-module__subtitle">{{ parts.subtitle }}</span>
     </span>
 

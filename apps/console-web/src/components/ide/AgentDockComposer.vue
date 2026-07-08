@@ -72,6 +72,9 @@ import {
   kairoConversationReply,
 } from '../../features/kairo-conversation/kairo-conversation-state';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
+import OperatorPersonaMark from '../../components/OperatorPersonaMark.vue';
+import PersonaTitle from '../../components/PersonaTitle.vue';
+import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { useShellStore } from '../../stores/shell';
 
 type ComposerMode = 'agent' | 'plan' | 'ask' | 'kairo';
@@ -85,7 +88,7 @@ const MODE_OPTIONS: Array<{
   { key: 'ask', label: 'Ask', icon: '◯', hint: 'Read-only answers, no tool execution' },
   { key: 'plan', label: 'Plan', icon: '◈', hint: 'Map steps before executing' },
   { key: 'agent', label: 'Agent', icon: '◎', hint: 'Agent loop with tools and approvals' },
-  { key: 'kairo', label: 'KAIRO', icon: '◉', hint: 'Talk to KAIRO — spoken replies' },
+  { key: 'kairo', label: OPERATOR_PERSONA_NAME, icon: '◉', hint: `Talk to ${OPERATOR_PERSONA_NAME} — spoken replies` },
 ];
 
 const shell = useShellStore();
@@ -271,7 +274,7 @@ const runtimeHint = computed(() => {
 const showVaultAction = computed(() => runtimeNeedsVaultAction(shell.runtimeStatus));
 const composerPlaceholder = computed(() => {
   if (composerMode.value === 'kairo') {
-    return 'Talk to KAIRO — answers are spoken aloud';
+    return `Talk to ${OPERATOR_PERSONA_NAME} — answers are spoken aloud`;
   }
   if (composerAgentBusy.value && composerMode.value === 'agent') {
     return 'Queue a follow-up or steer with Ctrl+Enter…';
@@ -364,7 +367,7 @@ const canSubmitComposer = computed(() => {
 });
 const composerSubmitLabel = computed(() => {
   if (composerMode.value === 'kairo') {
-    return kairoPending.value ? 'Asking KAIRO' : 'Ask KAIRO';
+    return kairoPending.value ? `Asking ${OPERATOR_PERSONA_NAME}` : `Ask ${OPERATOR_PERSONA_NAME}`;
   }
   if (shell.commandMutationState === 'submitting') {
     return 'Sending command';
@@ -1079,7 +1082,7 @@ onUnmounted(() => {
             v-model="composerDraftModel"
             class="agent-dock-composer__input"
             rows="1"
-            :aria-label="composerMode === 'kairo' ? 'KAIRO composer' : 'Agent composer'"
+            :aria-label="composerMode === 'kairo' ? `${OPERATOR_PERSONA_NAME} composer` : 'Agent composer'"
             :placeholder="composerPlaceholder"
             :disabled="!shell.currentWorkspace"
             @input="syncComposerHeight"
@@ -1439,7 +1442,10 @@ onUnmounted(() => {
                 @click="toggleSection('mode')"
               >
                 <span class="agent-dock-composer__tool-icon" aria-hidden="true">{{ activeMode.icon }}</span>
-                <span class="agent-dock-composer__tool-label">{{ modeButtonLabel }}</span>
+                <span class="agent-dock-composer__tool-label agent-dock-composer__mode-chip">
+                  <PersonaTitle v-if="composerMode === 'kairo'" mark-size="xs" />
+                  <template v-else>{{ modeButtonLabel }}</template>
+                </span>
                 <span class="agent-dock-composer__tool-chevron" aria-hidden="true">▾</span>
               </button>
               <div v-if="showModeMenu" class="agent-dock-composer__menu">
@@ -1452,7 +1458,10 @@ onUnmounted(() => {
                   :class="{ 'is-active': composerMode === option.key }"
                   @click="selectMode(option.key)"
                 >
-                  <span>{{ option.icon }} {{ option.label }}</span>
+                  <span class="agent-dock-composer__menu-item-label">
+                    <PersonaTitle v-if="option.key === 'kairo'" mark-size="xs" />
+                    <template v-else>{{ option.icon }} {{ option.label }}</template>
+                  </span>
                   <small>{{ option.hint }}</small>
                 </button>
                 <template v-if="composerMode === 'agent'">
@@ -1542,15 +1551,18 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <p v-if="composerMode === 'kairo' && kairoConversationReply" class="agent-dock-composer__kairo-reply">
-      <strong>KAIRO</strong>
-      <span>{{ kairoConversationReply }}</span>
-    </p>
+    <div v-if="composerMode === 'kairo' && kairoConversationReply" class="agent-dock-composer__kairo-reply">
+      <span class="agent-dock-composer__kairo-reply-label">
+        <OperatorPersonaMark size="xs" />
+        <span>Reply</span>
+      </span>
+      <p class="agent-dock-composer__kairo-reply-text">{{ kairoConversationReply }}</p>
+    </div>
     <p v-if="composerMode === 'kairo' && kairoConversationError" class="agent-dock-composer__error" role="alert">
       {{ kairoConversationError }}
     </p>
     <p v-else-if="composerMode === 'kairo'" class="agent-dock-composer__kairo-hint">
-      Tap header KAIRO to pause or continue · Esc stops speech · Mic barge-in
+      Tap header {{ OPERATOR_PERSONA_NAME }} to pause or continue · Esc stops speech · Mic barge-in
     </p>
 
     <p v-if="!shell.currentWorkspace" class="agent-dock-composer__empty">

@@ -1,4 +1,6 @@
-/** KAIRO milestone narration for streaming agent turns.
+import { personaThreadPrefix } from './operator-persona-name';
+
+/** X milestone narration for streaming agent turns.
  *
  * Watches the block-annotated agent transcript as it streams and produces
  * short spoken/visual milestones instead of reading raw output aloud.
@@ -33,16 +35,16 @@ export function liveThinkingText(content: string): string {
 export function streamingActivityLabel(content: string, fullAccess = false): string {
   const thinking = liveThinkingText(content);
   if (thinking) {
-    return `KAIRO — ${truncate(thinking, 96)}`;
+    return personaThreadPrefix(truncate(thinking, 96));
   }
   const tools = matchAll(content, TOOL_RE);
   if (tools.length > 0) {
-    return `KAIRO — ${tools[tools.length - 1][1].trim()}`;
+    return personaThreadPrefix(tools[tools.length - 1][1].trim());
   }
   if (fullAccess) {
-    return 'KAIRO — Full Access agent running…';
+    return personaThreadPrefix('Full Access agent running…');
   }
-  return 'KAIRO — Agent running…';
+  return personaThreadPrefix('Agent running…');
 }
 
 function truncate(text: string, maxLength: number): string {
@@ -113,5 +115,5 @@ function fileBaseName(path: string): string {
 
 /** Short status-strip label for the most recent milestone. */
 export function narrationActivityLabel(milestone: NarrationMilestone): string {
-  return `KAIRO — ${milestone.message.replace(/\.$/, '')}`;
+  return personaThreadPrefix(milestone.message.replace(/\.$/, ''));
 }

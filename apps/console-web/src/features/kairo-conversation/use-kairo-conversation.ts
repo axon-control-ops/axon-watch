@@ -1,6 +1,17 @@
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { postKairoConverse } from '../../lib/kairo-converse-client';
+import { normalizeKairoCopy, normalizeVoiceTranscript, canonicalWorkspaceLabel } from '../../lib/kairo-entity-labels';
+import {
+  formatConversationDisplayReply,
+  sanitizeSpokenReply,
+} from '../../lib/sanitize-spoken-reply';
+import {
+  clearKairoVoiceFollowupWindow,
+  finalizeKairoVoiceFollowupWindow,
+  scheduleKairoVoiceFollowupWindowAfterSpeech,
+} from '../../lib/kairo-voice-followup-window';
+import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 import { useShellStore } from '../../stores/shell';
 import { resolveConversationNavigationIntent } from './conversation-intents';
 import {
@@ -9,25 +20,37 @@ import {
   kairoConversationReply,
   setKairoConversationPhase,
 } from './kairo-conversation-state';
+import {
+  RUNTIME_ASSISTANT_CUE_COPY,
+  RUNTIME_ASSISTANT_CUE_LINE,
+  shouldPrimeRuntimeAssistantCue,
+} from './runtime-assistant-heuristics';
 import { useKairoSpeechCapture } from './use-kairo-speech-capture';
+import { useKairoVoiceInterrupt } from './use-kairo-voice-interrupt';
 
 const HANDOFF_CLIENT_RE = /\b(hand\s*off|handoff|continue in ide|investigate in ide)\b/i;
+const RUNTIME_ASSISTANT_CUE_DELAY_MS = 1200;
 
 export function useKairoConversation() {
   const shell = useShellStore();
   const draft = ref('');
   const pending = ref(false);
+  let runtimeCueTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
-  const canSubmit = computed(() => draft.value.trim().length > 0 && !pending.value);
+  const canSubmit = computed(
+    () =>
+      draft.value.trim().length > 0 &&
+      !pending.value &&
+      kairoConversationPhase.value !== 'thinking',
+  );
   const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? '');
 
   const speechCapture = useKairoSpeechCapture({
     privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
-    onFinalTranscript: async (transcript) => {
-      draft.value = transcript;
-      await submitTurn(transcript);
-    },
+    captureMode: 'manual',
   });
+
+  useKairoVoiceInterrupt();
 
   function kairoSpeechSessionId(): string {
     const key = 'axon-x:kairo-speech-session';
@@ -42,9 +65,52 @@ export function useKairoConversation() {
     return id;
   }
 
-  function speakReply(line: string, operatorPrompt?: string): void {
-    shell.interruptKairoVoice();
-    void shell.speakKairoConversationLine(line, { operatorPrompt });
+  function speakReply(line: string): Promise<void> {
+    return shell.speakKairoConversationLine(line, { skipSpeakApi: true });
+  }
+
+  function clearRuntimeAssistantCue(): void {
+    if (runtimeCueTimer !== null) {
+      globalThis.clearTimeout(runtimeCueTimer);
+      runtimeCueTimer = null;
+    }
+  }
+
+  function scheduleRuntimeAssistantCue(content: string): void {
+    clearRuntimeAssistantCue();
+    if (!shouldPrimeRuntimeAssistantCue(content)) {
+      return;
+    }
+    kairoConversationReply.value = RUNTIME_ASSISTANT_CUE_COPY;
+    runtimeCueTimer = globalThis.setTimeout(() => {
+      runtimeCueTimer = null;
+      if (!pending.value) {
+        return;
+      }
+      kairoConversationReply.value = RUNTIME_ASSISTANT_CUE_COPY;
+      void shell.speakKairoConversationLine(RUNTIME_ASSISTANT_CUE_LINE, { skipSpeakApi: true });
+    }, RUNTIME_ASSISTANT_CUE_DELAY_MS);
+  }
+
+  function shouldScheduleHandsFreeFollowup(voiceCaptureMode?: KairoVoiceCaptureMode): boolean {
+    return (
+      shell.operatorPresenceSettings.hands_free_enabled === true &&
+      voiceCaptureMode === 'hands_free'
+    );
+  }
+
+  async function deliverVoiceReply(
+    reply: string,
+    voiceCaptureMode?: KairoVoiceCaptureMode,
+  ): Promise<void> {
+    const displayReply = formatConversationDisplayReply(reply);
+    const spokenReply = sanitizeSpokenReply(reply);
+    kairoConversationReply.value = normalizeKairoCopy(displayReply || spokenReply);
+    if (shouldScheduleHandsFreeFollowup(voiceCaptureMode)) {
+      scheduleKairoVoiceFollowupWindowAfterSpeech();
+    }
+    await speakReply(spokenReply || kairoConversationReply.value);
+    finalizeKairoVoiceFollowupWindow();
   }
 
   async function executeConverseAction(
@@ -85,26 +151,34 @@ export function useKairoConversation() {
     return true;
   }
 
-  async function submitTurn(rawContent?: string): Promise<void> {
-    const content = (rawContent ?? draft.value).trim();
+  async function submitTurn(
+    rawContent?: string,
+    options?: { voiceCaptureMode?: KairoVoiceCaptureMode },
+  ): Promise<void> {
+    const content = normalizeVoiceTranscript((rawContent ?? draft.value).trim());
     if (!content || pending.value) {
       return;
     }
 
-    shell.interruptKairoVoice();
     pending.value = true;
     kairoConversationError.value = null;
+    clearKairoVoiceFollowupWindow();
     setKairoConversationPhase('thinking');
+    scheduleRuntimeAssistantCue(content);
 
     const navIntent = resolveConversationNavigationIntent(
       content,
       shell.workspaces.map((workspace) => ({
         workspace_id: workspace.workspace_id,
-        display_name: workspace.display_name ?? workspace.workspace_id,
+        display_name: canonicalWorkspaceLabel(
+          workspace.workspace_id,
+          workspace.display_name ?? workspace.workspace_id,
+        ),
       })),
     );
 
     if (navIntent) {
+      clearRuntimeAssistantCue();
       if (navIntent.kind === 'focus_attention') {
         shell.focusAttentionSidebar();
       } else if (navIntent.kind === 'focus_workspace' && navIntent.workspaceId) {
@@ -112,18 +186,16 @@ export function useKairoConversation() {
       } else if (navIntent.kind === 'switch_center_view' && navIntent.centerView) {
         shell.setOperatorCenterView(navIntent.centerView);
       }
-      kairoConversationReply.value = navIntent.reply;
       draft.value = '';
-      speakReply(navIntent.reply);
       pending.value = false;
-      setKairoConversationPhase('idle');
+      await deliverVoiceReply(navIntent.reply, options?.voiceCaptureMode);
       return;
     }
 
     if (await tryClientHandoff(content)) {
+      clearRuntimeAssistantCue();
       draft.value = '';
       pending.value = false;
-      setKairoConversationPhase('idle');
       return;
     }
 
@@ -132,31 +204,40 @@ export function useKairoConversation() {
         content,
         session_id: kairoSpeechSessionId(),
         workspace_id: workspaceId.value,
+        use_runtime: true,
       });
-      kairoConversationReply.value = response.reply;
+      clearRuntimeAssistantCue();
+      kairoConversationReply.value = normalizeKairoCopy(
+        formatConversationDisplayReply(response.reply) || sanitizeSpokenReply(response.reply),
+      );
       draft.value = '';
-      speakReply(response.reply, content);
-
+      pending.value = false;
       if (response.action) {
-        await executeConverseAction(response.action);
+        void executeConverseAction(response.action);
       } else if (response.turn_kind === 'command' && response.command_content) {
-        await shell.submitOperatorCommandContent(response.command_content);
+        void shell.submitOperatorCommandContent(response.command_content);
       } else if (response.turn_kind === 'action' && response.command_content) {
-        await shell.submitOperatorCommandContent(response.command_content);
+        void shell.submitOperatorCommandContent(response.command_content);
       }
+      await deliverVoiceReply(response.reply, options?.voiceCaptureMode);
     } catch (error) {
+      clearRuntimeAssistantCue();
       kairoConversationError.value =
         error instanceof Error ? error.message : 'KAIRO conversation failed';
       setKairoConversationPhase('idle');
-    } finally {
       pending.value = false;
-      if (kairoConversationPhase.value === 'thinking') {
-        setKairoConversationPhase('idle');
+    } finally {
+      clearRuntimeAssistantCue();
+      if (pending.value) {
+        pending.value = false;
       }
     }
   }
 
   function handleFocus(): void {
+    if (kairoConversationPhase.value === 'thinking' || pending.value) {
+      return;
+    }
     if (!speechCapture.capturing.value) {
       setKairoConversationPhase('listening');
     }
@@ -176,6 +257,10 @@ export function useKairoConversation() {
   function stopVoiceCapture(): void {
     speechCapture.stopCapture();
   }
+
+  onBeforeUnmount(() => {
+    clearRuntimeAssistantCue();
+  });
 
   return {
     draft,

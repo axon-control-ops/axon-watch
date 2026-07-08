@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { IdeActivityView } from '../../lib/ide-layout-prefs';
 import IdeActivityIcon from './IdeActivityIcon.vue';
+import { navigateToAppSurface } from '../../lib/app-surface-route';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -54,10 +55,10 @@ function selectView(view: IdeActivityView): void {
     <button
       type="button"
       class="ide-activity-bar__button ide-activity-bar__button--settings"
-      :class="{ 'ide-activity-bar__button--active': shell.operatorPresenceSettingsOpen }"
-      aria-label="Operator presence settings"
+      :class="{ 'ide-activity-bar__button--active': false }"
+      aria-label="Operator settings"
       title="Settings (KAIRO narration, voice, persona)"
-      @click.stop="shell.openOperatorPresenceSettingsPanel()"
+      @click.stop="navigateToAppSurface('settings')"
     >
       <span class="ide-activity-bar__settings-icon" aria-hidden="true">⚙</span>
     </button>

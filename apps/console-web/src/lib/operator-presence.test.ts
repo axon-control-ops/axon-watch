@@ -6,12 +6,17 @@ import {
   shouldUseMobileCompactLayout,
   spokenAlertDedupeKey,
 } from './operator-presence';
+import { speakKairoLine } from './kairo-voice-playback';
+
+vi.mock('./kairo-voice-playback', () => ({
+  speakKairoLine: vi.fn(),
+}));
 
 describe('operator presence helpers', () => {
   it('prefers compact layout when viewport flag is set', () => {
     expect(
       shouldUseMobileCompactLayout(1200, {
-        persona_voice_line: 'KAIRO: ready',
+        persona_voice_line: 'VAXON: ready',
         presence_state: 'observing',
         settings: {
           operator_persona_enabled: true,
@@ -20,6 +25,7 @@ describe('operator presence helpers', () => {
           mobile_compact_preferred: true,
           kairo_narration: 'conversational',
           ide_voice_strip_enabled: false,
+          hands_free_enabled: false,
         },
         spoken_alert: {
           eligible: false,
@@ -41,7 +47,7 @@ describe('operator presence helpers', () => {
       eligible: true,
       reason: 'operator_approval_required',
       signal_id: null,
-      message: 'KAIRO: 1 approval waiting for your review.',
+      message: 'VAXON: 1 approval waiting for your review.',
     };
 
     expect(shouldSpeakAlert(alert, storage)).toBe(true);
@@ -49,23 +55,23 @@ describe('operator presence helpers', () => {
     expect(shouldSpeakAlert(alert, storage)).toBe(false);
   });
 
-  it('speaks eligible alerts once', () => {
+  it('speaks eligible alerts once', async () => {
+    vi.mocked(speakKairoLine).mockResolvedValue({ engine: 'azure', reason: null });
     const storage = {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
     };
-    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
-    const spoken = maybeSpeakOperatorAlert(
+    const spoken = await maybeSpeakOperatorAlert(
       {
         eligible: true,
         reason: 'high_urgency_signal',
         signal_id: 'signal_x',
-        message: 'KAIRO attention: Console web connector unavailable.',
+        message: 'VAXON attention: Console web connector unavailable.',
       },
-      speech,
       storage,
     );
     expect(spoken).toBe(true);
     expect(storage.setItem).toHaveBeenCalled();
+    expect(speakKairoLine).toHaveBeenCalledOnce();
   });
 });

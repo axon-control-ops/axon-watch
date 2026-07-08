@@ -1,4 +1,7 @@
 import type { KairoPresenceState } from '../../lib/kairo-presence';
+import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
+
+export type GalaxyOrbConversationPhase = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 export type GalaxyOrbTick = {
   x1: number;
@@ -41,16 +44,46 @@ export function galaxyOrbBeads(): GalaxyOrbBead[] {
   }));
 }
 
+export function galaxyOrbModeClass(handsFreeEnabled: boolean): string {
+  return handsFreeEnabled ? 'kairo-galaxy-orb--hands-free' : 'kairo-galaxy-orb--manual';
+}
+
+export function galaxyOrbStatusLabel(
+  conversationPhase: GalaxyOrbConversationPhase,
+  speaking: boolean,
+): string {
+  if (conversationPhase === 'thinking') {
+    return 'BUSY';
+  }
+  if (speaking || conversationPhase === 'speaking') {
+    return 'SPEAKING';
+  }
+  if (conversationPhase === 'listening') {
+    return 'LISTENING';
+  }
+  return 'READY';
+}
+
+export function galaxyOrbModeLabel(
+  handsFreeEnabled: boolean,
+  conversationPhase: GalaxyOrbConversationPhase,
+): string {
+  if (conversationPhase === 'thinking') {
+    return 'Checking…';
+  }
+  return handsFreeEnabled ? 'Hands-free' : 'Manual';
+}
+
 export function galaxyOrbStateClass(
   state: KairoPresenceState,
   speaking: boolean,
-  conversationPhase: 'idle' | 'listening' | 'thinking' | 'speaking' = 'idle',
+  conversationPhase: GalaxyOrbConversationPhase = 'idle',
 ): string {
+  if (conversationPhase === 'thinking') {
+    return 'kairo-galaxy-orb--thinking kairo-galaxy-orb--busy';
+  }
   if (speaking || conversationPhase === 'speaking') {
     return 'kairo-galaxy-orb--speaking';
-  }
-  if (conversationPhase === 'thinking') {
-    return 'kairo-galaxy-orb--thinking';
   }
   if (conversationPhase === 'listening') {
     return 'kairo-galaxy-orb--listening';
@@ -81,22 +114,26 @@ export function galaxyOrbModelLabel(modelId: string | null | undefined): string 
 export function galaxyOrbHint(
   state: KairoPresenceState,
   speaking: boolean,
-  conversationPhase: 'idle' | 'listening' | 'thinking' | 'speaking' = 'idle',
+  conversationPhase: GalaxyOrbConversationPhase = 'idle',
+  handsFreeEnabled = false,
 ): string {
   if (conversationPhase === 'thinking') {
-    return 'Working through your request';
-  }
-  if (conversationPhase === 'listening') {
-    return 'Listening — ask or dispatch below';
+    return `${OPERATOR_PERSONA_NAME} is checking — hold on or tap Interrupt`;
   }
   if (speaking || conversationPhase === 'speaking') {
-    return 'Briefing in progress';
+    return `${OPERATOR_PERSONA_NAME} speaking — say "stop" or "${OPERATOR_PERSONA_NAME} …" to barge in`;
   }
   if (state === 'privacy_blocked') {
     return 'Voice muted in privacy mode';
   }
-  if (state === 'alerting') {
-    return 'Attention needed — tap orb for briefing';
+  if (handsFreeEnabled) {
+    return `Say "${OPERATOR_PERSONA_NAME}" for commands`;
   }
-  return 'Tap orb to speak briefing · hold orb or Space to talk';
+  if (conversationPhase === 'listening') {
+    return 'Listening — release to send';
+  }
+  if (state === 'alerting') {
+    return 'Tap orb for hands-free · hold orb to talk';
+  }
+  return 'Tap orb for hands-free · hold orb or use Mic to talk';
 }

@@ -5,6 +5,9 @@ import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
 import {
+  isKairoConversationBusy,
+} from '../../features/kairo-conversation/kairo-conversation-state';
+import {
   galaxyInspectorCopy,
   galaxyLegendItems,
   galaxyNodeCounts,
@@ -63,6 +66,7 @@ const { webglReady, webglFailed, selectedNode, resetView, focusNode } = useBrain
 const inspector = computed(() => galaxyInspectorCopy(selectedNode.value));
 const showLoading = computed(() => !webglReady.value && !webglFailed.value);
 const showSvgFallback = computed(() => webglFailed.value);
+const vaxonBusy = computed(() => isKairoConversationBusy());
 
 function handleHubClick(hub: { node_id: string; workspace_id: string | null }): void {
   focusNode(hub.node_id);
@@ -73,7 +77,11 @@ function handleHubClick(hub: { node_id: string; workspace_id: string | null }): 
 </script>
 
 <template>
-  <section class="brain-galaxy-stage" aria-label="Brain galaxy mission control">
+  <section
+    class="brain-galaxy-stage"
+    :class="{ 'brain-galaxy-stage--vaxon-busy': vaxonBusy }"
+    aria-label="Brain galaxy mission control"
+  >
     <div
       ref="galaxyHost"
       class="brain-galaxy-stage__viewport"
@@ -197,10 +205,10 @@ function handleHubClick(hub: { node_id: string; workspace_id: string | null }): 
       </ul>
     </aside>
 
-    <KairoGalaxyOrb />
-
     <footer class="brain-galaxy-stage__hud brain-galaxy-stage__hud--bottom">
       <KairoConversationBar />
     </footer>
+
+    <KairoGalaxyOrb />
   </section>
 </template>

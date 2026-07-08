@@ -1,5 +1,6 @@
 import type { OperatorBriefing, RunRecord, RuntimeSummary, WorkspaceRecord } from '../contracts/canonical';
 import type { KairoPresenceState } from './kairo-presence';
+import { OPERATOR_PERSONA_NAME } from './operator-persona-name';
 import type { IdePresenceProfile } from './ide-presence-profile';
 import { ideShowWatchInStatusBar } from './ide-presence-profile';
 import type { RuntimeSummaryLoadState } from './runtime-strip';
@@ -92,19 +93,21 @@ export function kairoPresenceModuleParts(state: KairoPresenceState): {
 } {
   switch (state) {
     case 'listening':
-      return { title: 'KAIRO', subtitle: 'LISTENING' };
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'LISTENING' };
     case 'speaking':
-      return { title: 'KAIRO', subtitle: 'SPEAKING' };
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'SPEAKING' };
+    case 'thinking':
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'CHECKING' };
     case 'paused':
-      return { title: 'KAIRO', subtitle: 'PAUSED' };
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'PAUSED' };
     case 'alerting':
-      return { title: 'KAIRO', subtitle: 'ATTENTION' };
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'ATTENTION' };
     case 'observing':
-      return { title: 'KAIRO', subtitle: 'LISTENING' };
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'LISTENING' };
     case 'privacy_blocked':
-      return { title: 'KAIRO', subtitle: 'MUTED' };
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'MUTED' };
     default:
-      return { title: 'KAIRO', subtitle: 'STANDBY' };
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'STANDBY' };
   }
 }
 

@@ -3,10 +3,15 @@ import { computed, onMounted, onUnmounted } from 'vue';
 
 import {
   kairoConversationError,
+  kairoConversationPhase,
   kairoConversationReply,
+  setKairoConversationPhase,
 } from './kairo-conversation-state';
 import { useKairoConversation } from './use-kairo-conversation';
 import { registerKairoConversationSubmit } from './kairo-conversation-bus';
+import OperatorPersonaMark from '../../components/OperatorPersonaMark.vue';
+import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
+import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
 import { operatorExecutionStage } from '../../lib/operator-status-radar-view';
 import { formatRunShortId } from '../../lib/run-display';
 import { useShellStore } from '../../stores/shell';
@@ -49,19 +54,44 @@ const showStopAction = computed(
 );
 
 const inputPlaceholder = computed(() => {
+  if (pending.value || kairoConversationPhase.value === 'thinking') {
+    return `${OPERATOR_PERSONA_NAME} is checking — wait for the reply`;
+  }
   if (speechCapture.interimTranscript.value) {
     return speechCapture.interimTranscript.value;
   }
-  return 'Ask KAIRO or dispatch a command… (Space hold-to-talk)';
+  return `Ask ${OPERATOR_PERSONA_NAME} or dispatch a command… (Space hold-to-talk)`;
 });
 
 const micDisabled = computed(
   () =>
     pending.value ||
-    speechCapture.capturing.value ||
+    kairoConversationPhase.value === 'thinking' ||
     shell.operatorPresenceSettings.privacy_mode ||
     !speechCapture.supported,
 );
+
+const speechCaptureError = computed(
+  () => speechCapture.captureError.value,
+);
+
+const showInterrupt = computed(
+  () => shell.kairoSpeechActive || kairoConversationPhase.value === 'thinking',
+);
+
+function handleInterrupt(): void {
+  shell.interruptKairoVoice();
+  clearKairoVoiceFollowupWindow();
+  setKairoConversationPhase('idle');
+}
+
+function handleEscapeHotkey(event: KeyboardEvent): void {
+  if (event.key !== 'Escape' || !showInterrupt.value) {
+    return;
+  }
+  event.preventDefault();
+  handleInterrupt();
+}
 
 const micTitle = computed(() => {
   if (shell.operatorPresenceSettings.privacy_mode) {
@@ -77,14 +107,29 @@ async function handleSubmit(): Promise<void> {
   await submitTurn();
 }
 
-function handleMicPointerDown(): void {
+function handleMicPointerDown(event: PointerEvent): void {
   if (micDisabled.value) {
     return;
   }
-  speechCapture.startCapture();
+  const target = event.currentTarget;
+  if (target instanceof HTMLElement && target.setPointerCapture) {
+    target.setPointerCapture(event.pointerId);
+  }
+  shell.interruptKairoVoice();
+  speechCapture.startCapture('manual');
 }
 
-function handleMicPointerUp(): void {
+function handleMicPointerUp(event: PointerEvent): void {
+  const target = event.currentTarget;
+  if (target instanceof HTMLElement && target.releasePointerCapture) {
+    try {
+      if (target.hasPointerCapture(event.pointerId)) {
+        target.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // Pointer may already be released if the browser disabled the control mid-gesture.
+    }
+  }
   if (speechCapture.capturing.value) {
     speechCapture.stopCapture();
   }
@@ -104,11 +149,15 @@ function handleSpaceHotkey(event: KeyboardEvent): void {
   if (!shell.operatorBrainGalaxyActive || shell.layoutMode !== 'operator') {
     return;
   }
+  if (pending.value || kairoConversationPhase.value === 'thinking') {
+    return;
+  }
   event.preventDefault();
   if (speechCapture.capturing.value) {
     speechCapture.stopCapture();
   } else if (speechCapture.canCapture()) {
-    speechCapture.startCapture();
+    shell.interruptKairoVoice();
+    speechCapture.startCapture('manual');
   }
 }
 
@@ -126,93 +175,119 @@ let unregisterSubmit: (() => void) | null = null;
 onMounted(() => {
   window.addEventListener('keydown', handleSpaceHotkey);
   window.addEventListener('keyup', handleSpaceKeyup);
+  window.addEventListener('keydown', handleEscapeHotkey);
   unregisterSubmit = registerKairoConversationSubmit(submitTurn);
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleSpaceHotkey);
   window.removeEventListener('keyup', handleSpaceKeyup);
+  window.removeEventListener('keydown', handleEscapeHotkey);
   unregisterSubmit?.();
 });
 </script>
 
 <template>
-  <div class="kairo-conversation-bar">
-    <form class="kairo-conversation-bar__form" @submit.prevent="handleSubmit">
-      <span class="kairo-conversation-bar__glyph" aria-hidden="true">◎</span>
-      <input
-        v-model="draft"
-        class="kairo-conversation-bar__input"
-        type="text"
-        autocomplete="off"
-        spellcheck="false"
-        :placeholder="inputPlaceholder"
-        :disabled="pending || speechCapture.capturing.value"
-        @focus="handleFocus"
-        @blur="handleBlur"
-      />
-      <button
-        type="button"
-        class="kairo-conversation-bar__mic"
-        :class="{ 'kairo-conversation-bar__mic--active': speechCapture.capturing.value }"
-        :disabled="micDisabled"
-        :title="micTitle"
-        aria-label="Hold to talk"
-        @pointerdown.prevent="handleMicPointerDown"
-        @pointerup.prevent="handleMicPointerUp"
-        @pointerleave="handleMicPointerUp"
-      >
-        Mic
-      </button>
-      <button type="submit" class="kairo-conversation-bar__send" :disabled="!canSubmit">
-        Send
-      </button>
-    </form>
+  <div
+    class="kairo-conversation-bar"
+    :class="{ 'kairo-conversation-bar--busy': pending || kairoConversationPhase === 'thinking' }"
+  >
+    <div class="kairo-conversation-bar__command-row">
+      <form class="kairo-conversation-bar__form" @submit.prevent="handleSubmit">
+        <span class="kairo-conversation-bar__glyph-slot" aria-hidden="true">
+          <OperatorPersonaMark size="xs" />
+        </span>
+        <input
+          v-model="draft"
+          class="kairo-conversation-bar__input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          :placeholder="inputPlaceholder"
+          :disabled="pending || kairoConversationPhase === 'thinking' || speechCapture.capturing.value"
+          @focus="handleFocus"
+          @blur="handleBlur"
+        />
+        <button
+          v-if="showInterrupt"
+          type="button"
+          class="kairo-conversation-bar__interrupt"
+          :title="`Stop ${OPERATOR_PERSONA_NAME} (Esc)`"
+          :aria-label="`Interrupt ${OPERATOR_PERSONA_NAME}`"
+          @click="handleInterrupt"
+        >
+          Interrupt
+        </button>
+        <button
+          type="button"
+          class="kairo-conversation-bar__mic"
+          :class="{ 'kairo-conversation-bar__mic--active': speechCapture.capturing.value }"
+          :disabled="micDisabled"
+          :title="micTitle"
+          aria-label="Hold to talk"
+          @pointerdown.prevent="handleMicPointerDown"
+          @pointerup.prevent="handleMicPointerUp"
+          @pointercancel.prevent="handleMicPointerUp"
+          @pointerleave="handleMicPointerUp"
+        >
+          {{ speechCapture.capturing.value ? 'Listening…' : 'Mic' }}
+        </button>
+        <button type="submit" class="kairo-conversation-bar__send" :disabled="!canSubmit">
+          Send
+        </button>
+      </form>
+
+      <div v-if="showRunOrbit" class="kairo-conversation-bar__run-orbit">
+        <span v-if="executionStage.hasActiveRun" class="brain-galaxy-stage__run-phase">
+          {{ executionStage.phase }}
+        </span>
+        <span v-if="shell.primaryActiveRun" class="brain-galaxy-stage__run-id">
+          #{{ formatRunShortId(shell.primaryActiveRun.run_id) }}
+        </span>
+        <button
+          v-if="showStopAction"
+          type="button"
+          class="brain-galaxy-stage__run-btn brain-galaxy-stage__run-btn--stop"
+          :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun?.phase !== 'executing'"
+          @click="shell.stopPrimaryRun()"
+        >
+          Stop
+        </button>
+        <button
+          v-if="shell.canCompletePrimaryRun"
+          type="button"
+          class="brain-galaxy-stage__run-btn"
+          :disabled="shell.runMutationPending"
+          @click="shell.completePrimaryRun()"
+        >
+          Complete
+        </button>
+        <button
+          v-if="pendingApprovals > 0"
+          type="button"
+          class="brain-galaxy-stage__run-btn brain-galaxy-stage__run-btn--warn"
+          @click="shell.focusAttentionSidebar()"
+        >
+          Attention · {{ pendingApprovals }}
+        </button>
+      </div>
+    </div>
 
     <p v-if="speechCapture.interimTranscript" class="kairo-conversation-bar__interim">
       {{ speechCapture.interimTranscript }}
     </p>
-    <p v-if="kairoConversationReply" class="kairo-conversation-bar__reply">
-      <strong>KAIRO</strong>
-      <span>{{ kairoConversationReply }}</span>
+    <div v-if="kairoConversationReply" class="kairo-conversation-bar__reply">
+      <span class="kairo-conversation-bar__reply-heading">
+        <OperatorPersonaMark size="xs" />
+        <span class="kairo-conversation-bar__reply-label">Reply</span>
+      </span>
+      <p class="kairo-conversation-bar__reply-text">{{ kairoConversationReply }}</p>
+    </div>
+    <p v-if="speechCaptureError" class="kairo-conversation-bar__error" role="alert">
+      {{ speechCaptureError }}
     </p>
     <p v-if="kairoConversationError" class="kairo-conversation-bar__error" role="alert">
       {{ kairoConversationError }}
     </p>
-
-    <div v-if="showRunOrbit" class="kairo-conversation-bar__run-orbit">
-      <span v-if="executionStage.hasActiveRun" class="brain-galaxy-stage__run-phase">
-        {{ executionStage.phase }}
-      </span>
-      <span v-if="shell.primaryActiveRun" class="brain-galaxy-stage__run-id">
-        #{{ formatRunShortId(shell.primaryActiveRun.run_id) }}
-      </span>
-      <button
-        v-if="showStopAction"
-        type="button"
-        class="brain-galaxy-stage__run-btn brain-galaxy-stage__run-btn--stop"
-        :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun?.phase !== 'executing'"
-        @click="shell.stopPrimaryRun()"
-      >
-        Stop
-      </button>
-      <button
-        v-if="shell.canCompletePrimaryRun"
-        type="button"
-        class="brain-galaxy-stage__run-btn"
-        :disabled="shell.runMutationPending"
-        @click="shell.completePrimaryRun()"
-      >
-        Complete
-      </button>
-      <button
-        v-if="pendingApprovals > 0"
-        type="button"
-        class="brain-galaxy-stage__run-btn brain-galaxy-stage__run-btn--warn"
-        @click="shell.focusAttentionSidebar()"
-      >
-        Attention · {{ pendingApprovals }}
-      </button>
-    </div>
   </div>
 </template>

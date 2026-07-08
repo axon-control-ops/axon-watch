@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 
+import AxonProductLogo from './AxonProductLogo.vue';
+import { OPERATOR_PERSONA_BACKRONYM, OPERATOR_PERSONA_NAME } from '../lib/operator-persona-name';
+
 const emit = defineEmits<{
   complete: [];
 }>();
@@ -9,7 +12,7 @@ const BOOT_LINES = [
   'control-plane · linking',
   'axon-watch · linking',
   'runtime summary · ready',
-  'KAIRO · standing by',
+  'operator persona · standing by',
 ] as const;
 
 const visibleLines = ref(0);
@@ -60,8 +63,10 @@ onUnmounted(() => {
 <template>
   <div class="boot-wake" role="dialog" aria-label="AXON-X system wake">
     <div class="boot-wake__panel">
-      <p class="boot-wake__brand">AXON-X</p>
-      <p class="boot-wake__subtitle">Knowledge-Augmented Intelligence for Response and Oversight</p>
+      <p class="boot-wake__brand">
+        <AxonProductLogo />
+      </p>
+      <p class="boot-wake__subtitle">{{ OPERATOR_PERSONA_NAME }} · {{ OPERATOR_PERSONA_BACKRONYM }}</p>
 
       <ul class="boot-wake__lines">
         <li

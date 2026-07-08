@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 
+from app.operator_persona_name import OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_PREFIX
+
+
 def build_persona_voice_line(
     *,
     pending_approvals: int,
@@ -11,7 +14,7 @@ def build_persona_voice_line(
     load_state: str = "loaded",
     persona_enabled: bool = True,
 ) -> str:
-    prefix = "KAIRO: " if persona_enabled else ""
+    prefix = OPERATOR_PERSONA_PREFIX if persona_enabled else ""
 
     if load_state == "loading":
         return (

@@ -2,7 +2,7 @@
 import BriefingPanel from './BriefingPanel.vue';
 import CommandSeamPanel from './CommandSeamPanel.vue';
 import BriefingSeamIcon from './BriefingSeamIcon.vue';
-import { dockHeroModeTitle } from '../lib/dock-hero-mode';
+import PersonaTitle from './PersonaTitle.vue';
 import { useShellStore } from '../stores/shell';
 
 const shell = useShellStore();
@@ -27,7 +27,10 @@ const shell = useShellStore();
     <div class="hud-seam__header dock-hero-panel__header">
       <div class="hud-seam__title-block">
         <BriefingSeamIcon v-if="shell.dockHeroMode === 'briefing'" />
-        <p class="hud-seam__title">{{ dockHeroModeTitle(shell.dockHeroMode) }}</p>
+        <p v-if="shell.dockHeroMode === 'briefing'" class="hud-seam__title">
+          <PersonaTitle suffix="Briefing" mark-size="xs" />
+        </p>
+        <p v-else class="hud-seam__title">Command</p>
       </div>
       <div class="dock-hero-panel__toggle" role="tablist" aria-label="Dock hero mode">
         <button
@@ -53,7 +56,7 @@ const shell = useShellStore();
           :aria-selected="shell.dockHeroMode === 'briefing'"
           @click="shell.setDockHeroMode('briefing')"
         >
-          <span class="dock-hero-panel__toggle-label">KAIRO</span>
+          <PersonaTitle mark-size="xs" />
           <span
             v-if="shell.showKairoBriefingAttention"
             class="dock-hero-panel__toggle-badge"

@@ -1,91 +1,100 @@
-import { describe, expect, it, vi, afterEach, beforeAll } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 
 import {
   deliverSpokenOperatorAlert,
   registerVoiceDeckSpokenAlertHandler,
 } from './spoken-alert-delivery';
-import { resetSpeechQueue } from './speech-queue';
+import { speakKairoLine } from './kairo-voice-playback';
+
+vi.mock('./kairo-voice-playback', () => ({
+  speakKairoLine: vi.fn(),
+}));
 
 describe('spoken alert delivery', () => {
-  beforeAll(() => {
-    class MockSpeechSynthesisUtterance {
-      message: string;
-      rate = 1;
-
-      constructor(message: string) {
-        this.message = message;
-      }
-    }
-
-    vi.stubGlobal('SpeechSynthesisUtterance', MockSpeechSynthesisUtterance);
-  });
-
   afterEach(() => {
     registerVoiceDeckSpokenAlertHandler(null);
-    resetSpeechQueue();
+    vi.mocked(speakKairoLine).mockReset();
   });
 
-  it('uses voice deck hook when registered and handler accepts', () => {
-    const handler = vi.fn().mockReturnValue(true);
+  it('uses voice deck hook when registered and handler accepts', async () => {
+    const handler = vi.fn().mockResolvedValue(true);
     registerVoiceDeckSpokenAlertHandler(handler);
     const storage = {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
     };
-    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
 
-    const channel = deliverSpokenOperatorAlert(
+    const channel = await deliverSpokenOperatorAlert(
       {
         eligible: true,
         reason: 'operator_approval_required',
         signal_id: null,
-        message: 'KAIRO: 1 approval waiting for your review.',
+        message: 'VAXON: 1 approval waiting for your review.',
       },
-      speech,
       storage,
     );
 
     expect(channel).toBe('voice_deck');
     expect(handler).toHaveBeenCalledOnce();
-    expect(speech.speak).not.toHaveBeenCalled();
+    expect(speakKairoLine).not.toHaveBeenCalled();
   });
 
-  it('falls back to browser TTS when voice deck declines', () => {
-    registerVoiceDeckSpokenAlertHandler(vi.fn().mockReturnValue(false));
+  it('uses azure playback when voice deck declines', async () => {
+    registerVoiceDeckSpokenAlertHandler(vi.fn().mockResolvedValue(false));
+    vi.mocked(speakKairoLine).mockResolvedValue({ engine: 'azure', reason: null });
     const storage = {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
     };
-    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
 
-    const channel = deliverSpokenOperatorAlert(
+    const channel = await deliverSpokenOperatorAlert(
       {
         eligible: true,
         reason: 'high_urgency_signal',
         signal_id: 'signal_x',
-        message: 'KAIRO attention: Watch summary degraded.',
+        message: 'VAXON attention: Watch summary degraded.',
       },
-      speech,
       storage,
     );
 
-    expect(channel).toBe('browser_tts');
-    expect(speech.speak).toHaveBeenCalledOnce();
+    expect(channel).toBe('azure');
+    expect(speakKairoLine).toHaveBeenCalledOnce();
   });
 
-  it('skips ineligible alerts without invoking handlers', () => {
+  it('reports browser fallback channel', async () => {
+    vi.mocked(speakKairoLine).mockResolvedValue({
+      engine: 'browser',
+      reason: 'synthesis_failed',
+    });
+    const storage = {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+    };
+
+    const channel = await deliverSpokenOperatorAlert(
+      {
+        eligible: true,
+        reason: 'high_urgency_signal',
+        signal_id: 'signal_x',
+        message: 'VAXON attention: Watch summary degraded.',
+      },
+      storage,
+    );
+
+    expect(channel).toBe('browser');
+  });
+
+  it('skips ineligible alerts without invoking handlers', async () => {
     const handler = vi.fn();
     registerVoiceDeckSpokenAlertHandler(handler);
-    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
 
-    const channel = deliverSpokenOperatorAlert(
+    const channel = await deliverSpokenOperatorAlert(
       {
         eligible: false,
         reason: 'spoken_alerts_disabled',
         signal_id: null,
         message: '',
       },
-      speech,
       {
         getItem: vi.fn(),
         setItem: vi.fn(),
@@ -94,6 +103,6 @@ describe('spoken alert delivery', () => {
 
     expect(channel).toBe('skipped');
     expect(handler).not.toHaveBeenCalled();
-    expect(speech.speak).not.toHaveBeenCalled();
+    expect(speakKairoLine).not.toHaveBeenCalled();
   });
 });

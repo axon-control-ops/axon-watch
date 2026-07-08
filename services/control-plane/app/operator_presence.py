@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.kairo_persona import build_persona_voice_line
+from app.operator_briefing_signals import first_actionable_signal, is_bootstrap_signal
 from app.spoken_alert_policy import (
     default_operator_presence_settings,
     resolve_spoken_alert,
@@ -38,9 +39,13 @@ def build_operator_presence(
         resolved_settings.update(settings)
 
     top_signals = briefing.get("top_signals", [])
-    top_signal = top_signals[0] if isinstance(top_signals, list) and top_signals else None
-    if not isinstance(top_signal, dict):
-        top_signal = None
+    top_signal = first_actionable_signal(top_signals)
+    if top_signal is None and isinstance(top_signals, list) and top_signals:
+        # Fall back to first non-bootstrap signal for spoken-alert policy only.
+        for item in top_signals:
+            if isinstance(item, dict) and not is_bootstrap_signal(item):
+                top_signal = item
+                break
 
     pending_approvals = int(
         (briefing.get("pending_approvals") or {}).get("count", 0)  # type: ignore[union-attr]

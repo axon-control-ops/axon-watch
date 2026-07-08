@@ -16,6 +16,7 @@ from app.kairo_voice import (  # noqa: E402
     _HISTORY,
     generate_spoken_line,
     narration_allows_event,
+    normalize_spoken_line,
     should_use_runtime_for_event,
 )
 from app.main import app  # noqa: E402
@@ -103,6 +104,36 @@ class KairoVoicePolicyTests(unittest.TestCase):
             )
         self.assertIn("Two approvals", payload["line"])
         self.assertEqual(payload["source"], "fallback")
+
+    def test_normalize_spoken_line_strips_agent_stream_blocks(self) -> None:
+        raw = (
+            ":::thinking\nInvestigating the spike.\n:::\n"
+            ":::tool Read scripts/ops/audit-supabase-storage.mjs\n\n"
+            "From my side right now, DashPro is not spiking — systems nominal.\n\n"
+            "If you are seeing a spike in Axon, the repo points at Supabase storage."
+        )
+        line = normalize_spoken_line(raw)
+        self.assertNotIn(":::", line)
+        self.assertNotIn("scripts/ops", line)
+        self.assertIn("DashPro is not spiking", line)
+        self.assertIn("Supabase storage", line)
+
+    def test_normalize_spoken_line_dedupes_repeated_sentences(self) -> None:
+        raw = (
+            "I'll narrow it. From my side right now DashPro is not spiking. "
+            "If you are seeing a spike in Supabase or Axon quota, the repo points at storage, not the database. "
+            "If you are seeing a spike in Supabase or Axon quota, the repo points at storage, not the database."
+        )
+        line = normalize_spoken_line(raw)
+        self.assertEqual(line.count("If you are seeing a spike in Supabase"), 1)
+
+    def test_normalize_spoken_line_restores_missing_sentence_space(self) -> None:
+        raw = "I'll narrow it.From my side right now DashPro is not spiking."
+        line = normalize_spoken_line(raw)
+        self.assertEqual(
+            "I'll narrow it. From my side right now DashPro is not spiking.",
+            line,
+        )
 
 
 class KairoSpeakApiTests(unittest.TestCase):

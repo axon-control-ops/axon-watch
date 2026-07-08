@@ -16,6 +16,8 @@ describe('kairo voice playback', () => {
   });
 
   it('falls back to browser speech when azure is unavailable', async () => {
+    vi.useFakeTimers();
+
     class MockSpeechSynthesisUtterance {
       message: string;
       rate = 1;
@@ -28,11 +30,20 @@ describe('kairo voice playback', () => {
     vi.stubGlobal('SpeechSynthesisUtterance', MockSpeechSynthesisUtterance);
     const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
     vi.stubGlobal('speechSynthesis', speech);
-    vi.mocked(postKairoTts).mockResolvedValue({ available: false, provider: 'browser' });
+    vi.mocked(postKairoTts).mockResolvedValue({
+      available: false,
+      provider: 'browser',
+      reason: 'synthesis_failed',
+    });
 
-    const engine = await speakKairoLine('Hello operator');
+    const promise = speakKairoLine('Hello operator');
+    await vi.advanceTimersByTimeAsync(200);
+    const result = await promise;
 
-    expect(engine).toBe('browser');
+    expect(result.engine).toBe('browser');
+    expect(result.reason).toBe('synthesis_failed');
     expect(speech.speak).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
   });
 });

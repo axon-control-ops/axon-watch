@@ -1,26 +1,19 @@
 import type { SpokenAlertEligibility } from '../../contracts/canonical';
 
-import { speakAlertMessage, type SpeechPort } from '../../lib/operator-presence';
+import { speakKairoLine } from '../../lib/kairo-voice-playback';
 import { registerVoiceDeckSpokenAlertHandler } from '../../lib/spoken-alert-delivery';
 
-export function handleVoiceDeckSpokenAlert(
+export async function handleVoiceDeckSpokenAlert(
   alert: SpokenAlertEligibility,
-  speech: SpeechPort | null = typeof speechSynthesis === 'undefined'
-    ? null
-    : speechSynthesis,
-): boolean {
+): Promise<boolean> {
   if (!alert.eligible || !alert.message.trim()) {
     return false;
   }
 
-  speakAlertMessage(alert.message.trim(), speech);
+  await speakKairoLine(alert.message.trim());
   return true;
 }
 
-export function registerVoiceDeckOnBoot(
-  speech: SpeechPort | null = typeof speechSynthesis === 'undefined'
-    ? null
-    : speechSynthesis,
-): void {
-  registerVoiceDeckSpokenAlertHandler((alert) => handleVoiceDeckSpokenAlert(alert, speech));
+export function registerVoiceDeckOnBoot(): void {
+  registerVoiceDeckSpokenAlertHandler((alert) => handleVoiceDeckSpokenAlert(alert));
 }

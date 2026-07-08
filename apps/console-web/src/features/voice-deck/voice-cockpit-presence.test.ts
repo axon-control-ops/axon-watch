@@ -18,6 +18,7 @@ describe('voice cockpit presence', () => {
           mobile_compact_preferred: true,
           kairo_narration: 'conversational',
           ide_voice_strip_enabled: false,
+          hands_free_enabled: false,
         },
         spoken_alert: {
           eligible: true,

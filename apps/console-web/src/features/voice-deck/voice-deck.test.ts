@@ -1,84 +1,66 @@
-import { describe, expect, it, vi, afterEach, beforeAll } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 
+import { speakKairoLine } from '../../lib/kairo-voice-playback';
 import { deliverSpokenOperatorAlert, registerVoiceDeckSpokenAlertHandler } from '../../lib/spoken-alert-delivery';
-import { resetSpeechQueue } from '../../lib/speech-queue';
 
 import { handleVoiceDeckSpokenAlert, registerVoiceDeckOnBoot } from './voice-deck';
 
+vi.mock('../../lib/kairo-voice-playback', () => ({
+  speakKairoLine: vi.fn(),
+}));
+
 describe('voice deck', () => {
-  beforeAll(() => {
-    class MockSpeechSynthesisUtterance {
-      message: string;
-      rate = 1;
-
-      constructor(message: string) {
-        this.message = message;
-      }
-    }
-
-    vi.stubGlobal('SpeechSynthesisUtterance', MockSpeechSynthesisUtterance);
-  });
-
   afterEach(() => {
     registerVoiceDeckSpokenAlertHandler(null);
-    resetSpeechQueue();
+    vi.mocked(speakKairoLine).mockReset();
   });
 
-  it('speaks eligible alerts through the deck handler', () => {
-    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
+  it('speaks eligible alerts through the deck handler', async () => {
+    vi.mocked(speakKairoLine).mockResolvedValue({ engine: 'azure', reason: null });
 
-    const handled = handleVoiceDeckSpokenAlert(
-      {
-        eligible: true,
-        reason: 'operator_approval_required',
-        signal_id: 'signal_1',
-        message: 'KAIRO: 1 approval waiting for your review.',
-      },
-      speech,
-    );
+    const handled = await handleVoiceDeckSpokenAlert({
+      eligible: true,
+      reason: 'operator_approval_required',
+      signal_id: 'signal_1',
+      message: 'VAXON: 1 approval waiting for your review.',
+    });
 
     expect(handled).toBe(true);
-    expect(speech.speak).toHaveBeenCalledOnce();
+    expect(speakKairoLine).toHaveBeenCalledOnce();
   });
 
-  it('declines ineligible alerts without speaking', () => {
-    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
-
-    const handled = handleVoiceDeckSpokenAlert(
-      {
-        eligible: false,
-        reason: 'spoken_alerts_disabled',
-        signal_id: null,
-        message: '',
-      },
-      speech,
-    );
+  it('declines ineligible alerts without speaking', async () => {
+    const handled = await handleVoiceDeckSpokenAlert({
+      eligible: false,
+      reason: 'spoken_alerts_disabled',
+      signal_id: null,
+      message: '',
+    });
 
     expect(handled).toBe(false);
-    expect(speech.speak).not.toHaveBeenCalled();
+    expect(speakKairoLine).not.toHaveBeenCalled();
   });
 
-  it('registers boot handler that routes spoken alerts to voice deck channel', () => {
-    const speech = { speak: vi.fn(), getVoices: vi.fn().mockReturnValue([]) };
+  it('registers boot handler that routes spoken alerts to voice deck channel', async () => {
+    vi.mocked(speakKairoLine).mockResolvedValue({ engine: 'azure', reason: null });
     const storage = {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
     };
 
-    registerVoiceDeckOnBoot(speech);
+    registerVoiceDeckOnBoot();
 
-    const channel = deliverSpokenOperatorAlert(
+    const channel = await deliverSpokenOperatorAlert(
       {
         eligible: true,
         reason: 'high_urgency_signal',
         signal_id: 'signal_x',
-        message: 'KAIRO attention: Watch summary degraded.',
+        message: 'VAXON attention: Watch summary degraded.',
       },
-      speech,
       storage,
     );
 
     expect(channel).toBe('voice_deck');
-    expect(speech.speak).toHaveBeenCalledOnce();
+    expect(speakKairoLine).toHaveBeenCalledOnce();
   });
 });

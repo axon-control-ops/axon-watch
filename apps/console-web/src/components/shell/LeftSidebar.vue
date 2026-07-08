@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
       v-if="!isIdeMode && shell.operatorBrainGalaxyActive && shell.leftSidebarMode === 'workspaces'"
       class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--galaxy"
     >
-      <AttentionStackPanel variant="sidebar" />
+      <AttentionStackPanel variant="sidebar" sections="run-only" />
     </div>
 
     <div

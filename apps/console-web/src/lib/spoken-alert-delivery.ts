@@ -1,11 +1,13 @@
 import type { SpokenAlertEligibility } from '../contracts/canonical';
 
-import { shouldSpeakAlert, speakAlertMessage, spokenAlertDedupeKey } from './operator-presence';
-import type { SpeechPort } from './speech-queue';
+import { speakKairoLine } from './kairo-voice-playback';
+import { shouldSpeakAlert, spokenAlertDedupeKey } from './operator-presence';
 
-export type SpokenAlertDeliveryChannel = 'voice_deck' | 'browser_tts' | 'skipped';
+export type SpokenAlertDeliveryChannel = 'voice_deck' | 'azure' | 'browser' | 'skipped';
 
-export type VoiceDeckSpokenAlertHandler = (alert: SpokenAlertEligibility) => boolean;
+export type VoiceDeckSpokenAlertHandler = (
+  alert: SpokenAlertEligibility,
+) => boolean | Promise<boolean>;
 
 let voiceDeckSpokenAlertHandler: VoiceDeckSpokenAlertHandler | null = null;
 
@@ -19,23 +21,29 @@ export function getVoiceDeckSpokenAlertHandler(): VoiceDeckSpokenAlertHandler | 
   return voiceDeckSpokenAlertHandler;
 }
 
-export function deliverSpokenOperatorAlert(
+export async function deliverSpokenOperatorAlert(
   alert: SpokenAlertEligibility,
-  speech: SpeechPort | null = typeof speechSynthesis === 'undefined'
-    ? null
-    : speechSynthesis,
   storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
-): SpokenAlertDeliveryChannel {
+): Promise<SpokenAlertDeliveryChannel> {
   if (!shouldSpeakAlert(alert, storage)) {
     return 'skipped';
   }
 
-  if (voiceDeckSpokenAlertHandler?.(alert)) {
-    return 'voice_deck';
+  if (voiceDeckSpokenAlertHandler) {
+    const handled = await voiceDeckSpokenAlertHandler(alert);
+    if (handled) {
+      return 'voice_deck';
+    }
   }
 
-  speakAlertMessage(alert.message, speech);
-  return 'browser_tts';
+  const result = await speakKairoLine(alert.message);
+  if (result.engine === 'azure') {
+    return 'azure';
+  }
+  if (result.engine === 'browser') {
+    return 'browser';
+  }
+  return 'skipped';
 }
 
 export { spokenAlertDedupeKey };

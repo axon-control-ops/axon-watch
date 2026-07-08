@@ -30,4 +30,27 @@ describe('resolveConversationNavigationIntent', () => {
       reply: 'Focusing DashPro.',
     });
   });
+
+  it('does not treat fleet health questions as grid navigation', () => {
+    expect(
+      resolveConversationNavigationIntent(
+        'Explain the current operator fleet health in detail — which workspaces need attention and why.',
+        WORKSPACES,
+      ),
+    ).toBeNull();
+  });
+
+  it('switches to fleet grid on explicit fleet grid phrasing', () => {
+    expect(resolveConversationNavigationIntent('show fleet grid', WORKSPACES)).toEqual({
+      kind: 'switch_center_view',
+      centerView: 'grid',
+      reply: 'Switching to fleet grid view.',
+    });
+  });
+
+  it('does not treat descriptive galaxy mentions as brain navigation', () => {
+    expect(
+      resolveConversationNavigationIntent('what nodes are in the brain galaxy right now?', WORKSPACES),
+    ).toBeNull();
+  });
 });

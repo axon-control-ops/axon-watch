@@ -15,6 +15,7 @@ from app.domain.run_state import is_terminal_phase
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.runs.service import list_runs
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
+from app.operator_persona_name import OPERATOR_PERSONA_NAME
 from app.workspace_catalog import list_workspace_records
 
 ConnectorsFetcher = Callable[[], dict[str, object] | None]
@@ -120,7 +121,7 @@ def build_operator_brain_graph(
         {
             "node_id": _CORE_NODE_ID,
             "kind": "core",
-            "label": "KAIRO",
+            "label": OPERATOR_PERSONA_NAME,
             "tone": core_tone,
             "workspace_id": None,
             "detail": "Control plane + watch brain",

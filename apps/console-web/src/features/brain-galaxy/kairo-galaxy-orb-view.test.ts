@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
   galaxyOrbBeads,
+  galaxyOrbHint,
+  galaxyOrbModeClass,
+  galaxyOrbModeLabel,
   galaxyOrbModelLabel,
   galaxyOrbStateClass,
+  galaxyOrbStatusLabel,
   galaxyOrbTicks,
 } from './kairo-galaxy-orb-view';
+import {
+  clearKairoVoiceFollowupWindow,
+  openKairoVoiceFollowupWindow,
+} from '../../lib/kairo-voice-followup-window';
 
 describe('kairo-galaxy-orb-view', () => {
   it('builds tick marks around the orb', () => {
@@ -21,6 +29,25 @@ describe('kairo-galaxy-orb-view', () => {
   it('maps presence to orb classes', () => {
     expect(galaxyOrbStateClass('alerting', false)).toContain('alerting');
     expect(galaxyOrbStateClass('observing', true)).toContain('speaking');
+    expect(galaxyOrbStateClass('idle', false, 'thinking')).toContain('busy');
+    expect(galaxyOrbModeClass(true)).toContain('hands-free');
+    expect(galaxyOrbModeClass(false)).toContain('manual');
+  });
+
+  it('shows busy status while thinking', () => {
+    expect(galaxyOrbStatusLabel('thinking', false)).toBe('BUSY');
+    expect(galaxyOrbModeLabel(true, 'thinking')).toBe('Checking…');
+    expect(galaxyOrbHint('idle', false, 'thinking', true)).toContain('checking');
+  });
+
+  it('describes hands-free in orb hints', () => {
+    expect(galaxyOrbHint('observing', false, 'idle', true)).toBe('Say "VAXON" for commands');
+  });
+
+  it('uses the same hands-free hint during follow-up window', () => {
+    openKairoVoiceFollowupWindow();
+    expect(galaxyOrbHint('observing', false, 'idle', true)).toBe('Say "VAXON" for commands');
+    clearKairoVoiceFollowupWindow();
   });
 
   it('shortens model labels', () => {

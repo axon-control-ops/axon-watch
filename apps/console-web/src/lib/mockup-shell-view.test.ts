@@ -128,13 +128,14 @@ describe('mockup shell view helpers', () => {
   });
 
   it('uppercases KAIRO presence module labels', () => {
-    expect(kairoPresenceModuleLabel('observing')).toBe('KAIRO LISTENING');
-    expect(kairoPresenceModuleLabel('alerting')).toBe('KAIRO ATTENTION');
+    expect(kairoPresenceModuleLabel('observing')).toBe('VAXON LISTENING');
+    expect(kairoPresenceModuleLabel('thinking')).toBe('VAXON CHECKING');
+    expect(kairoPresenceModuleLabel('alerting')).toBe('VAXON ATTENTION');
   });
 
   it('splits KAIRO presence into title and subtitle', () => {
     expect(kairoPresenceModuleParts('alerting')).toEqual({
-      title: 'KAIRO',
+      title: 'VAXON',
       subtitle: 'ATTENTION',
     });
   });

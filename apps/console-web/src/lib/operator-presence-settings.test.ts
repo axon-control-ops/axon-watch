@@ -54,6 +54,7 @@ describe('operator-presence-settings', () => {
       mobile_compact_preferred: true,
       kairo_narration: 'conversational',
       ide_voice_strip_enabled: false,
+      hands_free_enabled: false,
     });
     expect(storage.getItem(OPERATOR_PRESENCE_SETTINGS_KEY)).toContain('"operator_persona_enabled":false');
   });
@@ -66,6 +67,7 @@ describe('operator-presence-settings', () => {
       mobile_compact_preferred: true,
       kairo_narration: 'conversational',
       ide_voice_strip_enabled: false,
+      hands_free_enabled: false,
     });
   });
 

@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import KairoPresenceBar from './KairoPresenceBar.vue';
+import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
 import { useShellStore } from '../../stores/shell';
@@ -10,22 +11,30 @@ const shell = useShellStore();
 const { appSurface: activeSurface } = useAppSurface();
 
 const isFoundationSurface = computed(
-  () => activeSurface.value === 'vault' || activeSurface.value === 'data',
+  () =>
+    activeSurface.value === 'vault' ||
+    activeSurface.value === 'data' ||
+    activeSurface.value === 'settings',
 );
 const topbarSubtitle = computed(() => {
+  if (activeSurface.value === 'settings') {
+    return 'SETTINGS';
+  }
   if (isFoundationSurface.value) {
     return 'OPERATOR CONSOLE';
   }
   return shell.layoutMode === 'ide' ? 'IDE WORKSPACE' : 'OPERATOR CONSOLE';
 });
-const showTopbarKairoPresence = computed(() => !isFoundationSurface.value);
+const showTopbarKairoPresence = computed(
+  () => activeSurface.value === 'console',
+);
 
 function openSurface(surface: AppSurface): void {
   navigateToAppSurface(surface);
 }
 
 function openSettings(): void {
-  shell.openOperatorPresenceSettingsPanel();
+  navigateToAppSurface('settings');
 }
 </script>
 
@@ -34,7 +43,7 @@ function openSettings(): void {
     <div class="topbar-mockup__grid">
       <div class="topbar-mockup__identity-zone">
         <div class="topbar-mockup__brand">
-          <p class="topbar-mockup__logo">AXON-X</p>
+          <AxonProductLogo />
           <p class="topbar-mockup__subtitle">{{ topbarSubtitle }}</p>
         </div>
       </div>
@@ -53,6 +62,7 @@ function openSettings(): void {
       <div class="topbar-mockup__kairo-slot">
         <KairoPresenceBar
           v-if="showTopbarKairoPresence"
+          compact
           :state="shell.kairoPresenceState"
           :speech-active="shell.kairoSpeechActive && !shell.kairoVoicePaused"
           :paused="shell.kairoVoicePaused"
@@ -69,11 +79,10 @@ function openSettings(): void {
           <button
             v-if="activeSurface !== 'console'"
             type="button"
-            class="layout-toggle__button layout-toggle__button--active"
-            aria-current="page"
+            class="layout-toggle__button"
             @click="openSurface('console')"
           >
-            ← CONSOLE
+            CONSOLE
           </button>
           <button
             v-if="activeSurface !== 'vault'"
@@ -121,9 +130,9 @@ function openSettings(): void {
           <button
             type="button"
             class="topbar-mockup__settings"
+            :class="{ 'topbar-mockup__settings--active': activeSurface === 'settings' }"
             aria-label="Settings"
-            aria-haspopup="dialog"
-            :aria-expanded="shell.operatorPresenceSettingsOpen"
+            :aria-current="activeSurface === 'settings' ? 'page' : undefined"
             @click.stop="openSettings()"
           >
             ⚙
@@ -143,6 +152,11 @@ function openSettings(): void {
 .topbar-mockup__settings-wrap {
   position: relative;
   z-index: 12;
+}
+
+.topbar-mockup__settings--active {
+  border-color: rgba(0, 242, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.22);
 }
 
 .topbar-mockup__surface-nav {

@@ -19,6 +19,11 @@ _SNAPSHOT_CACHE: dict[str, Any] = {"fetched_at": 0.0, "payload": None}
 _CACHE_TTL_SECONDS = 30.0
 
 
+def invalidate_runtime_snapshot_cache() -> None:
+    _SNAPSHOT_CACHE["fetched_at"] = 0.0
+    _SNAPSHOT_CACHE["payload"] = None
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 

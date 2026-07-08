@@ -1,0 +1,58 @@
+Axon-X preparation checklist (2026-07-07)
+=========================================
+
+Axon-X stack prep
+-----------------
+This checklist covers the best documented path to prepare Axon-X for daily
+operator use and the one-week :4173-only dry-run
+(docs/PHASE_G6_RETIREMENT_READINESS.md).
+
+One-time / after pull
+---------------------
+1. cd to repo root
+2. npm install
+3. Copy .env.example → .env only if you need custom ports or paths
+4. Python deps install automatically on first ./scripts/dev/up.sh (.venv)
+
+Start the stack
+---------------
+1. ./scripts/dev/up.sh          (or ./scripts/dev/up.sh --no-open)
+2. ./scripts/dev/check-health.sh
+3. Open http://127.0.0.1:4173 and hard-refresh (Ctrl+Shift+R)
+
+Confirm workspaces
+------------------
+Left sidebar should show axon-watch, axon-local, and DashPro (not demo names).
+Bindings: config/workspace-project-bindings.json
+
+Optional: vault + agent auth (IDE Full Access)
+----------------------------------------------
+1. Open /vault in browser — setup/unlock if you use secrets or Cursor API key
+2. cursor agent status — confirm Pro login if using CLI path
+3. See docs/HOW-TO-HANDBOOK.md → Runtime auth, CLI, and tools
+
+Automated verification (before trusting the stack)
+--------------------------------------------------
+npm run verify:production-operator     # fastest operator smoke
+npm run verify:connector-parity        # G4 connector bundle
+# Full gate (when green): npm run verify:signal-parity-matrix
+
+Manual smoke (5 minutes)
+------------------------
+1. workspace_smoke — operator command (git status), stop run, Attention inbox
+2. workspace_axon_watch — IDE agent turn, file edit, terminal
+3. workspace_dashpro — git status in child project (Thu focus in G6)
+
+One-week :4173-only dry-run prep (G6.2)
+---------------------------------------
+- Use :4173 as primary; avoid :7734 unless rollback needed
+- Rotate workspaces Mon–Fri per docs/PHASE_G6_RETIREMENT_READINESS.md
+- Daily: verify:connector-parity (or full matrix when green)
+- Log any forced :7734 fallback with reason
+- End of week: sign docs/PHASE_G5_INTENTIONAL_DISCARDS.md ack boxes
+
+Rollback (if :4173 fails you)
+-------------------------------
+1. ./scripts/dev/down.sh (optional)
+2. cd ../axon-local && ./start.sh → http://127.0.0.1:7734
+3. Log incident in docs/PHASE_G_EXECUTION_TRACK.md

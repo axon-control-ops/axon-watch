@@ -1,12 +1,13 @@
 export interface KairoTtsResponse {
   available: boolean;
   provider: 'azure' | 'browser';
+  reason?: string;
   audio_base64?: string;
   content_type?: string;
   voice?: string;
 }
 
-export async function postKairoTts(text: string, timeoutMs = 2500): Promise<KairoTtsResponse> {
+export async function postKairoTts(text: string, timeoutMs = 8000): Promise<KairoTtsResponse> {
   const baseUrl = import.meta.env.VITE_CONTROL_PLANE_BASE_URL ?? '';
   const url = baseUrl ? `${baseUrl}/api/kairo/tts` : '/api/kairo/tts';
   const controller = new AbortController();

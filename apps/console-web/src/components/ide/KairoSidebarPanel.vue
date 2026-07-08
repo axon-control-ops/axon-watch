@@ -9,6 +9,8 @@ import {
 import { kairoPresenceLabel } from '../../lib/kairo-presence';
 import { ideShowKairoSidebarExpanded } from '../../lib/ide-presence-profile';
 import { useShellStore } from '../../stores/shell';
+import OperatorPersonaMark from '../OperatorPersonaMark.vue';
+import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 
 const shell = useShellStore();
 
@@ -57,7 +59,7 @@ function handleStopSpeech(event: Event): void {
     type="button"
     class="kairo-sidebar-panel kairo-sidebar-panel--compact"
     :class="`kairo-sidebar-panel--${shell.ideDisplayKairoPresenceState}`"
-    :aria-label="`KAIRO. ${kairoPresenceLabel(shell.ideDisplayKairoPresenceState)}`"
+    :aria-label="`${OPERATOR_PERSONA_NAME}. ${kairoPresenceLabel(shell.ideDisplayKairoPresenceState)}`"
     @click="handleExpand"
   >
     <span class="kairo-sidebar-panel__compact-dot" aria-hidden="true" />
@@ -70,10 +72,12 @@ function handleStopSpeech(event: Event): void {
     type="button"
     class="kairo-sidebar-panel hud-panel-frame"
     :class="`kairo-sidebar-panel--${shell.kairoPresenceState}`"
-    :aria-label="`KAIRO. ${shell.briefingSummaryLine}`"
+    :aria-label="`${OPERATOR_PERSONA_NAME}. ${shell.briefingSummaryLine}`"
     @click="handleExpand"
   >
-    <p class="kairo-sidebar-panel__title">KAIRO</p>
+    <p class="kairo-sidebar-panel__title">
+      <OperatorPersonaMark size="sm" />
+    </p>
     <div class="kairo-sidebar-panel__body">
       <div class="kairo-sidebar-panel__radar" aria-hidden="true">
         <span class="kairo-sidebar-panel__ring kairo-sidebar-panel__ring--outer" />

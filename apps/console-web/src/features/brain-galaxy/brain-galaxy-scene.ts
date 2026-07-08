@@ -34,6 +34,7 @@ import {
   type BrainGraphLayout3D,
   type PositionedBrainNode3D,
 } from './layout-brain-graph-3d';
+import { createPersonaMarkElement } from '../../lib/operator-persona-mark-view';
 
 export type BrainGalaxyNodeClickHandler = (node: BrainGraphNode) => void;
 
@@ -64,6 +65,7 @@ export class BrainGalaxyScene {
   private readonly pointer = new Vector2();
   private resizeObserver: ResizeObserver | null = null;
   private selectedNodeId: string | null = null;
+  private vaxonBusy = false;
   private readonly defaultCameraPosition = new Vector3(2.4, 3.8, 7.2);
   private readonly defaultTarget = new Vector3(0, 0, 0);
 
@@ -185,6 +187,10 @@ export class BrainGalaxyScene {
     this.applySelectionHighlight(nodeId);
   }
 
+  setVaxonBusy(busy: boolean): void {
+    this.vaxonBusy = busy;
+  }
+
   private applySelectionHighlight(nodeId: string | null): void {
     for (const mesh of this.nodeMeshes) {
       const material = mesh.material as MeshStandardMaterial;
@@ -298,7 +304,12 @@ export class BrainGalaxyScene {
       if (node.tone === 'critical') {
         label.classList.add('brain-galaxy-node-label--critical');
       }
-      label.textContent = node.label;
+      if (node.kind === 'core') {
+        label.classList.add('brain-galaxy-node-label--core');
+        label.appendChild(createPersonaMarkElement('xs'));
+      } else {
+        label.textContent = node.label;
+      }
       const labelObject = new CSS2DObject(label);
       labelObject.position.set(0, node.radius + 0.18, 0);
       mesh.add(labelObject);
@@ -366,10 +377,14 @@ export class BrainGalaxyScene {
       mesh.position.y += (targetY - mesh.position.y) * 0.08;
 
       if (node.kind === 'core') {
-        const pulse = 1 + Math.sin(this.clock * 2.4) * 0.08;
+        const busyBoost = this.vaxonBusy ? 0.06 : 0;
+        const pulse = 1 + Math.sin(this.clock * (this.vaxonBusy ? 4.2 : 2.4)) * (0.08 + busyBoost);
         mesh.scale.setScalar(pulse);
       } else if (node.tone === 'attention' || node.tone === 'critical') {
         const pulse = 1 + Math.sin(this.clock * 3.2 + mesh.position.z) * 0.06;
+        mesh.scale.setScalar(pulse);
+      } else if (this.vaxonBusy) {
+        const pulse = 1 + Math.sin(this.clock * 2.8 + mesh.position.x) * 0.04;
         mesh.scale.setScalar(pulse);
       } else {
         mesh.scale.setScalar(1);
@@ -377,12 +392,14 @@ export class BrainGalaxyScene {
 
       const material = mesh.material as MeshStandardMaterial;
       if (node.kind === 'core') {
-        material.emissiveIntensity = 1.2 + Math.sin(this.clock * 2.4) * 0.35;
+        const base = this.vaxonBusy ? 1.55 : 1.2;
+        const swing = this.vaxonBusy ? 0.55 : 0.35;
+        material.emissiveIntensity = base + Math.sin(this.clock * (this.vaxonBusy ? 4.2 : 2.4)) * swing;
       }
     }
 
     if (this.graphGroup) {
-      this.graphGroup.rotation.y += 0.0005;
+      this.graphGroup.rotation.y += this.vaxonBusy ? 0.0018 : 0.0005;
     }
 
     if (this.renderer && this.scene && this.camera) {

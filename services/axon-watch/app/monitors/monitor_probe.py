@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.monitors.dashpro_posthog import check_posthog_recent_events
 from app.monitors.dashpro_sentry import check_sentry_recent_issues
+from app.monitors.dashpro_supabase_storage import check_supabase_storage_quota
 from app.vault.credential_resolver import merge_monitor_env
 
 
@@ -42,6 +43,8 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
             status, detail = check_sentry_recent_issues(env=env)
         elif check_type == "posthog_recent_events":
             status, detail = check_posthog_recent_events(env=env)
+        elif check_type == "supabase_storage_quota":
+            status, detail = check_supabase_storage_quota(env=env)
         else:
             continue
 

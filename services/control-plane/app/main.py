@@ -68,7 +68,15 @@ from app.workspace_handoffs import (
 from app.kairo_voice import generate_spoken_line, narration_allows_event
 from app.kairo_conversation import converse_turn
 from app.live_events import live_events_response
-from app.cli_runtime.routes import get_cursor_runtime_status, get_runtime_mcp_tools, get_runtime_status
+from app.cli_runtime.routes import (
+    get_cursor_runtime_status,
+    get_runtime_mcp_tools,
+    get_runtime_status,
+    post_codex_runtime_login_start,
+    post_codex_runtime_logout,
+    post_cursor_runtime_login_start,
+    post_cursor_runtime_logout,
+)
 from app.vault.routes import (
     create_vault_secret,
     delete_vault_secret,
@@ -203,6 +211,7 @@ class OperatorPresenceSettingsRequest(BaseModel):
     mobile_compact_preferred: bool | None = None
     kairo_narration: str | None = None
     ide_voice_strip_enabled: bool | None = None
+    hands_free_enabled: bool | None = None
 
 
 class KairoSpeakRequest(BaseModel):
@@ -315,8 +324,28 @@ def runtime_summary() -> dict[str, object]:
 
 
 @app.get("/api/runtime/status")
-def runtime_status() -> dict[str, object]:
-    return get_runtime_status()
+def runtime_status(force_refresh: bool = False) -> dict[str, object]:
+    return get_runtime_status(force_refresh=force_refresh)
+
+
+@app.post("/api/runtime/cursor/logout")
+def cursor_runtime_logout() -> dict[str, object]:
+    return post_cursor_runtime_logout()
+
+
+@app.post("/api/runtime/cursor/login/start")
+def cursor_runtime_login_start() -> dict[str, object]:
+    return post_cursor_runtime_login_start()
+
+
+@app.post("/api/runtime/codex/logout")
+def codex_runtime_logout() -> dict[str, object]:
+    return post_codex_runtime_logout()
+
+
+@app.post("/api/runtime/codex/login/start")
+def codex_runtime_login_start() -> dict[str, object]:
+    return post_codex_runtime_login_start()
 
 
 @app.get("/api/runtime/cursor/status")
@@ -688,6 +717,13 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         "content_type": content_type,
         "audio_base64": base64.b64encode(audio).decode("ascii"),
     }
+
+
+@app.get("/api/kairo/voice-log")
+def kairo_voice_log(limit: int = Query(default=20, ge=1, le=100)) -> dict[str, object]:
+    from app.persistence.voice_transcript_store import list_recent_voice_transcripts
+
+    return {"entries": list_recent_voice_transcripts(limit=limit)}
 
 
 @app.post("/api/kairo/converse")

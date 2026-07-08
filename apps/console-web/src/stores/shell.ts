@@ -68,6 +68,7 @@ import type {
   SpokenAlertEligibility,
   WorkspaceRecord,
 } from '../contracts/canonical';
+import { navigateToAppSurface, readAppSurface } from '../lib/app-surface-route';
 import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
 import {
   editedFilePathsFromTranscript,
@@ -254,6 +255,7 @@ import {
   selectWorkspacePrimaryRun,
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
+import { normalizeBrainGraphSnapshot } from '../lib/kairo-entity-labels';
 import {
   filterTopbarChipsForIde,
   ideDisplayKairoState,
@@ -468,6 +470,9 @@ export const useShellStore = defineStore('shell', () => {
   );
   const operatorPresenceSettingsOpen = ref(false);
   const operatorPresenceSettingsSaving = ref(false);
+  const operatorPresenceSettingsError = ref<string | null>(null);
+  const operatorPresenceSettingsSavedAt = ref<number | null>(null);
+  let operatorPresenceSettingsSaveQueue: Promise<void> = Promise.resolve();
   const viewportWidth = ref(readViewportWidth());
   let lastViewportCompactRequested: boolean | null = null;
   let operatorBriefingFetchInFlight: Promise<void> | null = null;
@@ -827,7 +832,7 @@ export const useShellStore = defineStore('shell', () => {
       return 'listening';
     }
     if (kairoConversationPhase.value === 'thinking') {
-      return 'listening';
+      return 'thinking';
     }
     if (agentStreamActive.value && ideComposerActivity.value?.mode === 'agent') {
       return 'speaking';
@@ -1692,7 +1697,7 @@ export const useShellStore = defineStore('shell', () => {
 
   async function speakKairoConversationLine(
     line: string,
-    options?: { operatorPrompt?: string },
+    options?: { operatorPrompt?: string; skipSpeakApi?: boolean },
   ): Promise<void> {
     const trimmed = line.trim();
     if (
@@ -1701,6 +1706,9 @@ export const useShellStore = defineStore('shell', () => {
       operatorPresenceSettings.value.privacy_mode ||
       effectiveKairoNarrationLevel.value === 'off'
     ) {
+      if (kairoConversationPhase.value === 'thinking') {
+        setKairoConversationPhase('idle');
+      }
       return;
     }
 
@@ -1709,48 +1717,64 @@ export const useShellStore = defineStore('shell', () => {
     let message = trimmed;
     const narration = effectiveKairoNarrationLevel.value;
     const operatorPrompt = options?.operatorPrompt?.trim() ?? '';
-    try {
-      const response = await postKairoSpeak({
-        event_type: 'conversation_reply',
-        context: {
-          fallback: trimmed,
-          reply: trimmed,
-          operator_prompt: operatorPrompt,
-          pending_approvals: pendingApprovalsCount.value,
-          top_signal_title: operatorBriefing.value?.top_signals[0]?.title ?? '',
-          active_run_count: operatorBriefing.value?.active_runs.length ?? 0,
-          degraded_active: operatorBriefing.value?.degraded.active ?? false,
-        },
-        session_id: kairoSpeechSessionId(),
-        workspace_id: currentWorkspace.value?.workspace_id ?? '',
-        narration,
-        use_runtime: narration === 'conversational',
-      });
-      if (response.line?.trim()) {
-        message = response.line.trim();
+    const skipSpeakApi = options?.skipSpeakApi === true;
+
+    if (!skipSpeakApi) {
+      try {
+        const response = await postKairoSpeak({
+          event_type: 'conversation_reply',
+          context: {
+            fallback: trimmed,
+            reply: trimmed,
+            operator_prompt: operatorPrompt,
+            pending_approvals: pendingApprovalsCount.value,
+            top_signal_title: operatorBriefing.value?.top_signals[0]?.title ?? '',
+            active_run_count: operatorBriefing.value?.active_runs.length ?? 0,
+            degraded_active: operatorBriefing.value?.degraded.active ?? false,
+          },
+          session_id: kairoSpeechSessionId(),
+          workspace_id: currentWorkspace.value?.workspace_id ?? '',
+          narration,
+          use_runtime: narration === 'conversational',
+        });
+        if (response.line?.trim()) {
+          message = response.line.trim();
+        }
+      } catch {
+        // Fall back to the raw reply when the speak endpoint is unavailable.
       }
-    } catch {
-      // Fall back to the raw reply when the speak endpoint is unavailable.
     }
 
     await speakKairoLine(message);
   }
 
   function handleKairoPresenceAction(): void {
+    if (kairoVoicePaused.value) {
+      resumeKairoSpeech();
+      return;
+    }
+
+    const voiceBusy =
+      kairoSpeechQueueActive.value ||
+      kairoVoiceEngineActive.value ||
+      kairoConversationPhase.value === 'speaking' ||
+      kairoConversationPhase.value === 'thinking';
+
     if (layoutMode.value === 'ide') {
-      if (kairoVoicePaused.value) {
-        resumeKairoSpeech();
-        return;
-      }
-      if (
-        kairoSpeechQueueActive.value ||
-        kairoVoiceEngineActive.value ||
-        kairoConversationPhase.value === 'speaking'
-      ) {
+      if (voiceBusy) {
         pauseKairoSpeech();
         return;
       }
+      focusKairoBriefing();
+      return;
     }
+
+    if (voiceBusy) {
+      interruptKairoVoice();
+      setKairoConversationPhase('idle');
+      return;
+    }
+
     focusKairoBriefing();
   }
 
@@ -1795,7 +1819,7 @@ export const useShellStore = defineStore('shell', () => {
       if (response.source === 'skipped' || !response.line?.trim()) {
         return;
       }
-      deliverSpokenOperatorAlert({
+      void deliverSpokenOperatorAlert({
         eligible: true,
         reason: `kairo-agent-narration:${eventKey}`,
         signal_id: `${messageId}:${eventKey}`,
@@ -1830,7 +1854,7 @@ export const useShellStore = defineStore('shell', () => {
 
     if (alert.reason === 'operator_approval_required') {
       eventType = 'approval_literal';
-      context.literal_line = alert.message.replace(/^KAIRO:\s*/i, '').trim();
+      context.literal_line = alert.message.replace(/^(?:VAXON|NAXON|X|KAIRO):\s*/i, '').trim();
     }
 
     let message = '';
@@ -1850,7 +1874,7 @@ export const useShellStore = defineStore('shell', () => {
       return;
     }
 
-    deliverSpokenOperatorAlert({
+    void deliverSpokenOperatorAlert({
       eligible: true,
       reason: alert.reason,
       signal_id: alert.signal_id,
@@ -1890,7 +1914,7 @@ export const useShellStore = defineStore('shell', () => {
       if (response.source === 'skipped' || !response.line?.trim()) {
         return;
       }
-      deliverSpokenOperatorAlert({
+      void deliverSpokenOperatorAlert({
         eligible: true,
         reason: 'operator_briefing_spoken',
         signal_id: null,
@@ -1937,7 +1961,7 @@ export const useShellStore = defineStore('shell', () => {
       sessionStorage.setItem(greetingKey, '1');
     }
 
-    deliverSpokenOperatorAlert({
+    void deliverSpokenOperatorAlert({
       eligible: true,
       reason: 'boot_greeting',
       signal_id: null,
@@ -3279,12 +3303,12 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadRuntimeStatus(): Promise<void> {
+  async function loadRuntimeStatus(forceRefresh = false): Promise<void> {
     runtimeStatusLoadState.value = 'loading';
     runtimeStatusError.value = null;
 
     try {
-      const status = await fetchRuntimeStatus();
+      const status = await fetchRuntimeStatus({ forceRefresh });
       runtimeStatus.value = status;
       runtimeStatusLoadState.value = 'loaded';
     } catch (error) {
@@ -3537,7 +3561,9 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadOperatorPresenceSettings(): Promise<void> {
+  async function loadOperatorPresenceSettings(options?: {
+    reportError?: boolean;
+  }): Promise<void> {
     const cached = readPersistedOperatorPresenceSettings();
     if (cached) {
       operatorPresenceSettings.value = cached;
@@ -3547,15 +3573,21 @@ export const useShellStore = defineStore('shell', () => {
       const snapshot = await fetchOperatorPresenceSettings();
       operatorPresenceSettings.value = normalizeOperatorPresenceSettings(snapshot.settings);
       persistOperatorPresenceSettings(operatorPresenceSettings.value);
-    } catch {
-      // Keep cached defaults when settings API is unavailable during bootstrap.
+      operatorPresenceSettingsError.value = null;
+    } catch (error) {
+      if (options?.reportError) {
+        operatorPresenceSettingsError.value =
+          error instanceof Error ? error.message : 'operator presence settings load failed';
+      }
     }
   }
 
-  async function saveOperatorPresenceSettingsPatch(
+  async function saveOperatorPresenceSettingsPatchImpl(
     patch: Partial<OperatorPresenceSettings>,
   ): Promise<void> {
     operatorPresenceSettingsSaving.value = true;
+    operatorPresenceSettingsError.value = null;
+    const previousSettings = operatorPresenceSettings.value;
     const nextSettings = normalizeOperatorPresenceSettings({
       ...operatorPresenceSettings.value,
       ...patch,
@@ -3567,23 +3599,63 @@ export const useShellStore = defineStore('shell', () => {
       const snapshot = await saveOperatorPresenceSettings(patch);
       operatorPresenceSettings.value = normalizeOperatorPresenceSettings(snapshot.settings);
       persistOperatorPresenceSettings(operatorPresenceSettings.value);
+      operatorPresenceSettingsSavedAt.value = Date.now();
+      operatorPresenceSettingsError.value = null;
       await loadOperatorBriefing();
     } catch (error) {
-      operatorPresenceSettings.value = nextSettings;
-      briefingError.value =
+      operatorPresenceSettings.value = previousSettings;
+      persistOperatorPresenceSettings(previousSettings);
+      operatorPresenceSettingsError.value =
         error instanceof Error ? error.message : 'operator presence settings save failed';
     } finally {
       operatorPresenceSettingsSaving.value = false;
     }
   }
 
+  function saveOperatorPresenceSettingsPatch(
+    patch: Partial<OperatorPresenceSettings>,
+  ): Promise<void> {
+    const run = (): Promise<void> => saveOperatorPresenceSettingsPatchImpl(patch);
+    operatorPresenceSettingsSaveQueue = operatorPresenceSettingsSaveQueue.then(run, run);
+    return operatorPresenceSettingsSaveQueue;
+  }
+
+  async function resetOperatorPresenceSettings(): Promise<void> {
+    const defaults = defaultOperatorPresenceSettings();
+    await saveOperatorPresenceSettingsPatch(defaults);
+  }
+
+  async function testKairoVoiceFromSettings(): Promise<'azure' | 'browser' | 'skipped'> {
+    if (
+      operatorPresenceSettings.value.privacy_mode ||
+      effectiveKairoNarrationLevel.value === 'off'
+    ) {
+      return 'skipped';
+    }
+    setKairoConversationPhase('speaking');
+    kairoVoicePaused.value = false;
+    try {
+      const result = await speakKairoLine('Systems are up — voice delivery looks good from here.');
+      return result.engine === 'idle' ? 'skipped' : result.engine;
+    } finally {
+      if (kairoConversationPhase.value === 'speaking') {
+        setKairoConversationPhase('idle');
+      }
+    }
+  }
+
   function openOperatorPresenceSettingsPanel(): void {
-    operatorPresenceSettingsOpen.value = true;
+    navigateToAppSurface('settings');
   }
 
   function toggleOperatorPresenceSettingsPanel(forceOpen?: boolean): void {
-    operatorPresenceSettingsOpen.value =
-      typeof forceOpen === 'boolean' ? forceOpen : !operatorPresenceSettingsOpen.value;
+    if (forceOpen === false) {
+      if (readAppSurface() === 'settings') {
+        navigateToAppSurface('console');
+      }
+      return;
+    }
+    openOperatorPresenceSettingsPanel();
   }
 
   async function loadOperatorBriefing(options?: {
@@ -3664,7 +3736,7 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     try {
-      operatorBrainGraph.value = await fetchOperatorBrainGraph();
+      operatorBrainGraph.value = normalizeBrainGraphSnapshot(await fetchOperatorBrainGraph());
       operatorBrainGraphLoadState.value = 'loaded';
     } catch (error) {
       if (!backgroundRefresh) {
@@ -4221,6 +4293,8 @@ export const useShellStore = defineStore('shell', () => {
     operatorPresenceSettings,
     operatorPresenceSettingsOpen,
     operatorPresenceSettingsSaving,
+    operatorPresenceSettingsError,
+    operatorPresenceSettingsSavedAt,
     createWorkspaceFile,
     createWorkspaceFolder,
     pendingApprovalsCount,
@@ -4336,6 +4410,8 @@ export const useShellStore = defineStore('shell', () => {
     proveResearchSource,
     saveActiveFileDocument,
     saveOperatorPresenceSettingsPatch,
+    resetOperatorPresenceSettings,
+    testKairoVoiceFromSettings,
     updateActiveFileContent,
     workspaceFileEntries,
     workspaceFilesError,

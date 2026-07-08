@@ -1,3 +1,5 @@
+import { pickBestSpeechTranscript } from '../../lib/operator-persona-stt-aliases';
+
 export type SpeechCaptureCallbacks = {
   onInterim?: (transcript: string) => void;
   onFinal: (transcript: string) => void;
@@ -34,6 +36,28 @@ export function isSpeechCaptureSupported(): boolean {
   return speechRecognitionCtor() !== null;
 }
 
+function resolveSpeechRecognitionLang(): string {
+  if (typeof navigator === 'undefined') {
+    return 'en-US';
+  }
+  const lang = navigator.language?.trim();
+  if (lang && /^en(-|$)/i.test(lang)) {
+    return lang;
+  }
+  return 'en-US';
+}
+
+function transcriptFromResult(result: SpeechRecognitionResult): string {
+  const alternatives: string[] = [];
+  for (let index = 0; index < result.length; index += 1) {
+    const transcript = result[index]?.transcript?.trim();
+    if (transcript) {
+      alternatives.push(transcript);
+    }
+  }
+  return pickBestSpeechTranscript(alternatives);
+}
+
 export class SpeechCaptureSession {
   private recognition: BrowserSpeechRecognition | null = null;
 
@@ -48,17 +72,20 @@ export class SpeechCaptureSession {
     this.stopRequested = false;
     const recognition = new Ctor();
     this.recognition = recognition;
-    recognition.lang = 'en-GB';
+    recognition.lang = resolveSpeechRecognitionLang();
     recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    recognition.continuous = false;
+    recognition.maxAlternatives = 5;
+    recognition.continuous = true;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
       let finalText = '';
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         const result = event.results[index];
-        const transcript = result?.[0]?.transcript?.trim() ?? '';
+        if (!result) {
+          continue;
+        }
+        const transcript = transcriptFromResult(result);
         if (!transcript) {
           continue;
         }

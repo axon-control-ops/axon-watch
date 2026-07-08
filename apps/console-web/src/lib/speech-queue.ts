@@ -108,7 +108,7 @@ function drainQueue(speech: SpeechPort): void {
 
   const finish = (): void => {
     notifySpeaking(false);
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       drainQueue(speech);
       notifyIdle();
     }, 220);
@@ -117,7 +117,9 @@ function drainQueue(speech: SpeechPort): void {
   utterance.onend = finish;
   utterance.onerror = finish;
 
-  speech.speak(utterance);
+  globalThis.setTimeout(() => {
+    speech.speak(utterance);
+  }, 60);
 }
 
 export function enqueueSpeech(message: string, speech: SpeechPort | null): void {
