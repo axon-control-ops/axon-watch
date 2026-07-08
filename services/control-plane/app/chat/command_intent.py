@@ -11,6 +11,22 @@ _RESUME_FROM_REVIEW = re.compile(
     re.IGNORECASE,
 )
 _RUN_PREFIX = re.compile(r"^run\s+.+", re.IGNORECASE)
+_QUESTION_COMMAND_OVERRIDES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"^\s*(?:what(?:'s| is)|show|give|tell)\s+(?:me\s+)?(?:the\s+)?git\s+status\b\??\s*$",
+            re.IGNORECASE,
+        ),
+        "git status",
+    ),
+    (
+        re.compile(
+            r"^\s*can\s+you\s+(?:run|check|show)\s+(?:me\s+)?(?:the\s+)?git\s+status\b\??\s*$",
+            re.IGNORECASE,
+        ),
+        "git status",
+    ),
+)
 # Questions must be answered by the runtime, never executed as commands.
 # "did you commit?" or "what does the README say?" are conversation, while
 # "read README.md" or "git status" are imperative operator commands.
@@ -47,8 +63,11 @@ _SHORTCUT_SHELL_COMMANDS = {
 
 
 def expand_command_shortcuts(content: str) -> str:
-    """Map allowlisted operator shortcuts to bounded `run …` shell commands."""
+    """Normalize allowlisted shortcuts and explicit question-commands."""
     trimmed = content.strip()
+    for pattern, replacement in _QUESTION_COMMAND_OVERRIDES:
+        if pattern.match(trimmed):
+            return replacement
     mapped = _SHORTCUT_SHELL_COMMANDS.get(trimmed.lower())
     if mapped is None:
         return trimmed

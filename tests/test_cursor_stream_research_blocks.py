@@ -299,6 +299,23 @@ class CursorStreamResearchBlockTests(unittest.TestCase):
         self.assertEqual(1, normalized.count(":::research news headlines today"))
         self.assertEqual(1, normalized.count("Same answer."))
 
+    def test_normalize_transcript_content_drops_repeated_prose_across_blocks(self) -> None:
+        raw = "\n".join(
+            [
+                "Here is the answer.",
+                "",
+                ":::tool Read README.md",
+                "",
+                "Here is the answer.",
+                "",
+                "More details.",
+            ]
+        )
+        normalized = normalize_transcript_content(raw)
+        self.assertEqual(1, normalized.count("Here is the answer."))
+        self.assertIn("More details.", normalized)
+        self.assertIn(":::tool Read README.md", normalized)
+
     def test_generic_tool_research_label_is_upgraded(self) -> None:
         content = "Answer\n:::tool Axon research search cursor cli\nMore text"
         upgraded = ensure_research_blocks_in_content(content)

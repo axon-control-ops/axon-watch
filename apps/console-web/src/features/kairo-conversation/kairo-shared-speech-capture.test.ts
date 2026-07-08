@@ -7,10 +7,15 @@ import {
 } from './kairo-shared-speech-capture';
 import { kairoConversationPhase, setKairoConversationPhase } from './kairo-conversation-state';
 
-const submitMock = vi.fn(async () => {});
+const submitMock = vi.fn<
+  (content: string, options?: { voiceCaptureMode?: string }) => Promise<void>
+>(async () => {});
 
 vi.mock('./kairo-conversation-bus', () => ({
-  submitKairoConversationTranscript: (...args: unknown[]) => submitMock(...args),
+  submitKairoConversationTranscript: (
+    content: string,
+    options?: { voiceCaptureMode?: string },
+  ) => submitMock(content, options),
 }));
 
 let captureCallbacks: {

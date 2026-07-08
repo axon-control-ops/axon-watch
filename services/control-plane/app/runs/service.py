@@ -212,6 +212,31 @@ def complete_run(run_id: str) -> dict[str, Any]:
     )
 
 
+def fail_run(
+    run_id: str,
+    *,
+    receipt_summary: str = "Run failed",
+    actor: str = "control-plane",
+) -> dict[str, Any]:
+    record = run_store.get_run(run_id)
+    if record is None:
+        raise RunNotFoundError(f"run not found: {run_id}")
+
+    if record["phase"] not in {"executing", "review_ready", "paused"}:
+        raise RunLifecycleError(
+            f"fail requires executing, review_ready, or paused phase, found {record['phase']}",
+        )
+
+    return _transition_record(
+        record,
+        to_phase="failed",
+        current_step="Run failed",
+        actor=actor,
+        receipt_type="run_failed",
+        receipt_summary=receipt_summary,
+    )
+
+
 def mark_review_ready(run_id: str) -> dict[str, Any]:
     record = run_store.get_run(run_id)
     if record is None:

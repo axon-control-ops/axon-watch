@@ -45,7 +45,7 @@ def _is_executable(path: str) -> bool:
     return bool(path) and os.path.isfile(path) and os.access(path, os.X_OK)
 
 
-def _run_command(parts: list[str], *, timeout: int = 8, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run_command(parts: list[str], *, timeout: int = 15, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         parts,
         capture_output=True,

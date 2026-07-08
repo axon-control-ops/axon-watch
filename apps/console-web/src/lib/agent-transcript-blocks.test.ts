@@ -196,6 +196,27 @@ describe('parseAgentTranscriptBlocks', () => {
     ]);
   });
 
+  it('drops repeated prose across tool blocks', () => {
+    const content = [
+      'Here is the answer.',
+      '',
+      ':::tool Read README.md',
+      '',
+      'Here is the answer.',
+      '',
+      'More details.',
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments.map((segment) => segment.kind)).toEqual(['text', 'tool', 'text']);
+    const intro = segments[0];
+    const outro = segments[2];
+    if (intro.kind !== 'text' || outro.kind !== 'text') {
+      throw new Error('expected text segments');
+    }
+    expect(intro.text).toBe('Here is the answer.');
+    expect(outro.text).toBe('More details.');
+  });
+
   it('passes plain replies through as one text segment', () => {
     expect(agentContentHasTranscriptBlocks('Just a reply')).toBe(false);
     expect(parseAgentTranscriptBlocks('Just a reply')).toEqual([

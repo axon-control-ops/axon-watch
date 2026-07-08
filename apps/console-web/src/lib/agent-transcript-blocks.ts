@@ -212,7 +212,105 @@ export function parseAgentTranscriptBlocks(content: string): AgentTranscriptSegm
   }
 
   flushText();
-  return mergeAdjacentDuplicateTextSegments(mergeAdjacentResearchSegments(segments));
+  return dedupeTextSegmentsGlobally(
+    mergeAdjacentDuplicateTextSegments(mergeAdjacentResearchSegments(segments)),
+  );
+}
+
+function filterSeenParagraphs(text: string, seen: Set<string>): string {
+  if (!text.trim()) {
+    return text;
+  }
+
+  const kept: string[] = [];
+  for (const paragraph of text
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)) {
+    if (seen.has(paragraph)) {
+      continue;
+    }
+    seen.add(paragraph);
+    kept.push(paragraph);
+  }
+  return kept.join('\n\n');
+}
+
+function dedupeTextSegmentsGlobally(segments: AgentTranscriptSegment[]): AgentTranscriptSegment[] {
+  const seenParagraphs = new Set<string>();
+  const deduped: AgentTranscriptSegment[] = [];
+
+  for (const segment of segments) {
+    if (segment.kind !== 'text') {
+      deduped.push(segment);
+      continue;
+    }
+
+    const filtered = filterSeenParagraphs(dedupeProseText(segment.text), seenParagraphs);
+    if (!filtered.trim()) {
+      continue;
+    }
+
+    const previous = deduped[deduped.length - 1];
+    if (previous?.kind === 'text' && previous.text === filtered) {
+      continue;
+    }
+
+    deduped.push({ kind: 'text', text: filtered });
+  }
+
+  return deduped;
+}
+
+function collapseDuplicatedBody(text: string): string {
+  const stripped = text.trim();
+  if (!stripped) {
+    return text;
+  }
+
+  const normalized = stripped.replace(/\r\n/g, '\n');
+
+  if (normalized.length >= 2 && normalized.length % 2 === 0) {
+    const half = normalized.length / 2;
+    if (normalized.slice(0, half) === normalized.slice(half)) {
+      return normalized.slice(0, half);
+    }
+  }
+
+  const mid = Math.floor(normalized.length / 2);
+  const left = normalized.slice(0, mid).trim();
+  const right = normalized.slice(mid).trim();
+  if (left && left === right) {
+    return left;
+  }
+
+  const lines = normalized.split('\n');
+  if (lines.length >= 2 && lines.length % 2 === 0) {
+    const half = lines.length / 2;
+    if (lines.slice(0, half).join('\n') === lines.slice(half).join('\n')) {
+      return lines.slice(0, half).join('\n');
+    }
+  }
+
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+  if (paragraphs.length >= 2 && paragraphs.length % 2 === 0) {
+    const half = paragraphs.length / 2;
+    if (paragraphs.slice(0, half).every((paragraph, index) => paragraph === paragraphs[half + index])) {
+      return paragraphs.slice(0, half).join('\n\n');
+    }
+  }
+
+  if (normalized.includes('\n\n')) {
+    const [leftPart, rightPart] = normalized.split('\n\n', 2);
+    if (leftPart.trim() && leftPart.trim() === rightPart.trim()) {
+      return leftPart.trim();
+    }
+  }
+
+  return text;
 }
 
 function dedupeProseText(text: string): string {
@@ -220,6 +318,7 @@ function dedupeProseText(text: string): string {
     return text;
   }
 
+  text = collapseDuplicatedBody(text);
   const dedupedLines: string[] = [];
   for (const line of text.split('\n')) {
     if (line.trim() && dedupedLines.length > 0 && dedupedLines[dedupedLines.length - 1].trim() === line.trim()) {

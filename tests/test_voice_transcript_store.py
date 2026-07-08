@@ -32,11 +32,15 @@ class VoiceTranscriptStoreTests(unittest.TestCase):
             source="template",
             workspace_id="workspace_axon_watch",
             stt_note="stt_normalized",
+            duration_ms=187,
+            runtime_dispatched=False,
         )
         entries = list_recent_voice_transcripts(limit=5)
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["normalized_content"], "hey VAXON check health")
         self.assertEqual(entries[0]["stt_note"], "stt_normalized")
+        self.assertEqual(entries[0]["duration_ms"], 187)
+        self.assertEqual(entries[0]["runtime_dispatched"], 0)
 
 
 if __name__ == "__main__":

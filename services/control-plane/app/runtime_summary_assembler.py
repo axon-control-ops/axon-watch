@@ -11,7 +11,8 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from app.adapters.watch_client import fetch_watch_inbox, fetch_watch_summary
-from app.cli_runtime.catalog import runtime_identity_snapshot
+from app.cli_runtime.catalog import runtime_identity_snapshot, runtime_status_snapshot
+from app.cli_runtime.readiness import cli_runtime_degraded_reasons, summarize_cli_runtime_readiness
 from app.runs.service import approval_summary, list_active_runs, to_runtime_summary_active_run
 
 _APP_VERSION = "0.1.0"
@@ -164,6 +165,10 @@ def assemble_runtime_summary(
             f"{connectors['required_unavailable']} required connector(s) unavailable",
         )
 
+    cli_status_snapshot = runtime_status_snapshot(force_refresh=False)
+    cli_runtime = summarize_cli_runtime_readiness(cli_status_snapshot)
+    degraded_reasons.extend(cli_runtime_degraded_reasons(cli_status_snapshot))
+
     approvals = approval_summary()
 
     return {
@@ -187,11 +192,13 @@ def assemble_runtime_summary(
         "approvals": approvals,
         "signals": _signals_summary_from_inbox(watch_inbox, generated_at),
         "connectors": connectors,
+        "cli_runtime": cli_runtime,
         "capabilities": {
             "editor": True,
             "terminal": True,
             "browser_preview": True,
             "watch_connected": watch_connected,
+            "cli_dispatch_ready": bool(cli_runtime.get("dispatch_ready")),
             "approvals_enabled": True,
             "notifications_enabled": False,
         },

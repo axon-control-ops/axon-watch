@@ -228,6 +228,10 @@ class KairoConverseRequest(BaseModel):
     session_id: str = "default"
     workspace_id: str = ""
     use_runtime: bool = False
+    answer_tier: str = "fast"
+    context_workspace_id: str = ""
+    context_signal_id: str = ""
+    context_node_id: str = ""
 
 
 class KairoTtsRequest(BaseModel):
@@ -737,6 +741,10 @@ def kairo_converse(body: KairoConverseRequest) -> dict[str, object]:
             session_id=body.session_id,
             workspace_id=body.workspace_id or None,
             use_runtime=body.use_runtime,
+            answer_tier=body.answer_tier,
+            context_workspace_id=body.context_workspace_id or None,
+            context_signal_id=body.context_signal_id or None,
+            context_node_id=body.context_node_id or None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

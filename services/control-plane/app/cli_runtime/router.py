@@ -111,6 +111,21 @@ def _build_prompt(
     )
 
 
+def _runtime_unready_reason(record: dict[str, object]) -> str:
+    runtime_id = str(record.get("id") or "runtime")
+    label = str(record.get("label") or runtime_id)
+    target_type = str(record.get("target_type") or "local")
+    if target_type == "cloud" or not record.get("available"):
+        return f"{label} unavailable"
+    auth = record.get("auth") if isinstance(record.get("auth"), dict) else {}
+    message = str(auth.get("message") or "").strip()
+    if message and not auth.get("logged_in"):
+        return message
+    if message and auth.get("logged_in"):
+        return f"{label} unavailable"
+    return f"{label} unavailable"
+
+
 def _fallback_reply(*, composer_mode: str, user_prompt: str, context_block: str, reason: str) -> str:
     del user_prompt, context_block
     return (
@@ -239,7 +254,7 @@ def dispatch_ide_composer(
     for record in _ordered_candidates_for_dispatch(snapshot, runtime_target):
         runtime_id = str(record.get("id") or "")
         if not record.get("ready"):
-            errors.append(str(record.get("auth", {}).get("message") or f"{runtime_id} unavailable"))
+            errors.append(_runtime_unready_reason(record))
             continue
         binary = str(record.get("binary") or "")
         family = str(record.get("family") or "")

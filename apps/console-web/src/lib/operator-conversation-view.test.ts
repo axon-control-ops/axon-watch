@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { OperatorThreadEntry } from './operator-thread';
+import type { OperatorArtifactRecord } from './operator-artifact-view';
 import {
   buildOperatorConversationDisplay,
   collapseRepeatedOperatorCommands,
@@ -132,5 +133,22 @@ describe('operator-conversation-view', () => {
     expect(dock.hiddenCount).toBe(2);
     expect(dock.items[0]?.kind).toBe('dock_banner');
     expect(dock.items.filter((item) => item.kind === 'command_turn')).toHaveLength(2);
+  });
+
+  it('merges artifact cards into the dock view', () => {
+    const artifact: OperatorArtifactRecord = {
+      artifactId: 'artifact_1',
+      title: 'DashPro analysis',
+      summary: 'Short summary',
+      body: 'Longer detail',
+      createdAt: '2026-07-08T17:10:00Z',
+      sources: [{ label: 'Top signal', detail: 'DashPro degraded' }],
+      actions: [],
+    };
+    const dock = prepareOperatorConversationDock([entry('operator', 'hello')], {
+      maxItems: 4,
+      artifacts: [artifact],
+    });
+    expect(dock.items.some((item) => item.kind === 'artifact')).toBe(true);
   });
 });

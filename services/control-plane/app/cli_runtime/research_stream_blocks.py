@@ -551,6 +551,54 @@ def dedupe_research_blocks(content: str) -> str:
     return "\n".join(out)
 
 
+def collapse_duplicated_body(content: str) -> str:
+    """Collapse assistant prose that was echoed back-to-back in full.
+
+    Cursor stream-json can emit a final aggregate assistant event that repeats
+    the entire markdown reply (common for bullet lists with single newlines).
+    """
+    if not content:
+        return content
+
+    stripped = content.strip()
+    if not stripped:
+        return content
+
+    text = stripped.replace("\r\n", "\n")
+
+    if len(text) >= 2 and len(text) % 2 == 0:
+        half = len(text) // 2
+        if text[:half] == text[half:]:
+            return text[:half]
+
+    if len(text) >= 2:
+        mid = len(text) // 2
+        left = text[:mid].strip()
+        right = text[mid:].strip()
+        if left and left == right:
+            return left
+
+    lines = text.split("\n")
+    if len(lines) >= 2 and len(lines) % 2 == 0:
+        half = len(lines) // 2
+        if lines[:half] == lines[half:]:
+            return "\n".join(lines[:half])
+
+    paragraphs = [chunk.strip() for chunk in re.split(r"\n{2,}", text) if chunk.strip()]
+    if len(paragraphs) >= 2 and len(paragraphs) % 2 == 0:
+        half = len(paragraphs) // 2
+        if paragraphs[:half] == paragraphs[half:]:
+            return "\n\n".join(paragraphs[:half])
+
+    # Two copies separated by a blank line.
+    if "\n\n" in text:
+        left, right = text.split("\n\n", 1)
+        if left.strip() and left.strip() == right.strip():
+            return left.strip()
+
+    return content
+
+
 def _dedupe_plain_paragraphs(content: str) -> str:
     paragraphs = [chunk.strip() for chunk in re.split(r"\n{2,}", content.strip()) if chunk.strip()]
     deduped: list[str] = []
@@ -559,6 +607,24 @@ def _dedupe_plain_paragraphs(content: str) -> str:
             continue
         deduped.append(paragraph)
     return "\n\n".join(deduped)
+
+
+def _paragraphs_from_prose(text: str) -> list[str]:
+    return [chunk.strip() for chunk in re.split(r"\n{2,}", text.strip()) if chunk.strip()]
+
+
+def _filter_seen_paragraphs(text: str, seen: set[str]) -> str:
+    """Drop prose paragraphs that already appeared earlier in the transcript."""
+    if not text.strip():
+        return text
+
+    kept: list[str] = []
+    for paragraph in _paragraphs_from_prose(text):
+        if paragraph in seen:
+            continue
+        seen.add(paragraph)
+        kept.append(paragraph)
+    return "\n\n".join(kept)
 
 
 _EDIT_HEADER_RE = re.compile(r"^:::edit\s+.+?\s+\+\d+\s+-\d+\s*$")
@@ -621,13 +687,17 @@ def _dedupe_block_structured_paragraphs(content: str) -> str:
     lines = content.split("\n")
     chunks: list[str] = []
     prose_buf: list[str] = []
+    seen_paragraphs: set[str] = set()
     index = 0
 
     def flush_prose() -> None:
         nonlocal prose_buf
         if not prose_buf:
             return
-        chunks.append(_dedupe_prose_segment("\n".join(prose_buf)))
+        local = _dedupe_prose_segment("\n".join(prose_buf))
+        filtered = _filter_seen_paragraphs(local, seen_paragraphs)
+        if filtered.strip():
+            chunks.append(filtered)
         prose_buf = []
 
     while index < len(lines):
@@ -727,7 +797,8 @@ def sanitize_research_block_bodies_in_content(content: str) -> str:
 
 
 def normalize_transcript_content(content: str) -> str:
-    normalized = ensure_research_blocks_in_content(content)
+    normalized = collapse_duplicated_body(content)
+    normalized = ensure_research_blocks_in_content(normalized)
     normalized = sanitize_research_block_bodies_in_content(normalized)
     normalized = dedupe_research_blocks(normalized)
     normalized = dedupe_assistant_paragraphs(normalized)

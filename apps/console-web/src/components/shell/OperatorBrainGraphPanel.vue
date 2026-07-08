@@ -13,6 +13,7 @@ import {
   galaxyNodeCounts,
   galaxyTopHubs,
 } from '../../features/brain-galaxy/brain-galaxy-hud-view';
+import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
 import {
   brainGraphHeadline,
   layoutBrainGraph,
@@ -48,6 +49,12 @@ const topHubs = computed(() => galaxyTopHubs(snapshot.value));
 const nodeCounts = computed(() => galaxyNodeCounts(snapshot.value));
 
 function handleNodeClick(node: { kind: string; workspace_id: string | null; node_id: string }): void {
+  setBrainGalaxyConversationFocus({
+    nodeId: node.node_id,
+    workspaceId: node.workspace_id,
+    signalId: node.kind === 'signal' ? node.node_id.replace(/^sig_/, '') : null,
+    label: node.node_id,
+  });
   if (node.kind === 'workspace' && node.workspace_id) {
     shell.setCurrentWorkspace(node.workspace_id);
     return;
@@ -70,6 +77,12 @@ const vaxonBusy = computed(() => isKairoConversationBusy());
 
 function handleHubClick(hub: { node_id: string; workspace_id: string | null }): void {
   focusNode(hub.node_id);
+  setBrainGalaxyConversationFocus({
+    nodeId: hub.node_id,
+    workspaceId: hub.workspace_id,
+    signalId: null,
+    label: hub.node_id,
+  });
   if (hub.workspace_id) {
     shell.setCurrentWorkspace(hub.workspace_id);
   }

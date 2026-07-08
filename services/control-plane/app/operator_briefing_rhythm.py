@@ -5,6 +5,13 @@ from __future__ import annotations
 EXECUTIVE_RHYTHM_KEYS = ("notice", "advise", "decide", "execute", "verify", "report")
 
 
+def _short_run_title(title: str, *, max_len: int = 72) -> str:
+    trimmed = str(title or "").strip()
+    if len(trimmed) <= max_len:
+        return trimmed
+    return f"{trimmed[: max_len - 1].rstrip()}…"
+
+
 def _review_ready_runs(active_runs: list[dict[str, object]]) -> list[dict[str, object]]:
     return [run for run in active_runs if run.get("phase") == "review_ready"]
 
@@ -16,15 +23,25 @@ def build_briefing_notice(
     pending_approvals_count: int,
     degraded: dict[str, object],
     watch_connected: bool,
+    cli_runtime: dict[str, object] | None = None,
 ) -> str:
     if pending_approvals_count > 0:
         noun = "run" if pending_approvals_count == 1 else "runs"
         return f"{pending_approvals_count} {noun} awaiting explicit approval."
 
+    cli = cli_runtime if isinstance(cli_runtime, dict) else {}
+    if not bool(cli.get("dispatch_ready", True)):
+        blockers = cli.get("blockers")
+        if isinstance(blockers, list) and blockers:
+            return f"CLI runtime blocked — {blockers[0]}."
+        return "CLI runtime blocked — no local CLI runtime is dispatch-ready."
+
     review_ready = _review_ready_runs(active_runs)
     if review_ready:
         if len(review_ready) == 1:
-            title = str(review_ready[0].get("title") or review_ready[0].get("run_id") or "Run")
+            title = _short_run_title(
+                str(review_ready[0].get("title") or review_ready[0].get("run_id") or "Run")
+            )
             return f"{title} is ready for operator review."
         return f"{len(review_ready)} runs are ready for operator review."
 
@@ -194,6 +211,7 @@ def build_operator_briefing_rhythm(
     degraded: dict[str, object],
     watch_connected: bool,
     next_safe_actions: list[dict[str, object]],
+    cli_runtime: dict[str, object] | None = None,
 ) -> dict[str, str]:
     notice = build_briefing_notice(
         active_runs=active_runs,
@@ -201,6 +219,7 @@ def build_operator_briefing_rhythm(
         pending_approvals_count=pending_approvals_count,
         degraded=degraded,
         watch_connected=watch_connected,
+        cli_runtime=cli_runtime,
     )
     advise = build_briefing_advise(
         next_safe_actions=next_safe_actions,

@@ -10,6 +10,7 @@ export type KairoConverseTurnKind =
   | 'chat'
   | 'action';
 export type KairoConverseSource = 'template' | 'model' | 'fallback';
+export type KairoConverseAnswerTier = 'fast' | 'deep';
 
 export type KairoConverseAction =
   | {
@@ -23,11 +24,34 @@ export type KairoConverseAction =
       content: string;
     };
 
+export interface KairoConverseArtifactAction {
+  label: string;
+  ui_action: Record<string, unknown> | null;
+}
+
+export interface KairoConverseArtifactSource {
+  label: string;
+  detail: string;
+}
+
+export interface KairoConverseArtifact {
+  artifact_id: string;
+  title: string;
+  summary: string;
+  body: string;
+  sources: KairoConverseArtifactSource[];
+  actions: KairoConverseArtifactAction[];
+}
+
 export interface KairoConverseRequest {
   content: string;
   session_id?: string;
   workspace_id?: string;
   use_runtime?: boolean;
+  answer_tier?: KairoConverseAnswerTier;
+  context_workspace_id?: string;
+  context_signal_id?: string;
+  context_node_id?: string;
 }
 
 export interface KairoConverseResponse {
@@ -36,6 +60,7 @@ export interface KairoConverseResponse {
   source: KairoConverseSource;
   command_content: string | null;
   action: KairoConverseAction | null;
+  artifacts: KairoConverseArtifact[];
 }
 
 export async function postKairoConverse(body: KairoConverseRequest): Promise<KairoConverseResponse> {

@@ -4187,6 +4187,12 @@ body:has(.console-shell--mockup) {
   filter: drop-shadow(0 0 22px rgba(72, 196, 255, 0.28));
 }
 
+.kairo-galaxy-orb--voice-beat .kairo-galaxy-orb__arc,
+.kairo-galaxy-orb--voice-beat .kairo-galaxy-orb__pulse {
+  filter: drop-shadow(0 0 14px rgba(72, 196, 255, 0.95));
+  transform: scale(1.015);
+}
+
 .kairo-galaxy-orb--alerting .kairo-galaxy-orb__arc {
   animation: kairo-orb-alert 1.2s ease-in-out infinite;
 }
@@ -4578,6 +4584,10 @@ body:has(.console-shell--mockup) {
   color: rgba(0, 242, 255, 0.75);
   font-size: 0.64rem;
   font-style: italic;
+}
+
+.kairo-conversation-bar__interim--thinking {
+  color: rgba(255, 214, 140, 0.88);
 }
 
 .handoff-to-ide-button {
@@ -7126,6 +7136,11 @@ body:has(.console-shell--mockup) {
   background: rgba(255, 159, 0, 0.04);
 }
 
+.conversation-seam__item--artifact {
+  border-color: rgba(255, 196, 72, 0.22);
+  background: rgba(255, 196, 72, 0.06);
+}
+
 .conversation-seam__command-label {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -7169,6 +7184,44 @@ body:has(.console-shell--mockup) {
 .conversation-seam__content--command-empty {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.conversation-seam__content--artifact-summary {
+  color: rgba(255, 232, 188, 0.95);
+}
+
+.conversation-seam__content--artifact-body {
+  margin: 0;
+  max-height: 12rem;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  line-height: 1.45;
+  color: rgba(241, 246, 250, 0.94);
+  background: rgba(20, 12, 0, 0.34);
+  border: 1px solid rgba(255, 196, 72, 0.16);
+  border-radius: 2px;
+  padding: 0.45rem 0.55rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.conversation-seam__artifact-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversation-seam__artifact-sources li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.64rem;
+  color: var(--text-secondary);
 }
 
 .conversation-seam__command-footer {

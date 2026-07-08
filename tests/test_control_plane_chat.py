@@ -418,8 +418,8 @@ class ControlPlaneChatTests(unittest.TestCase):
             "reason": "runtime unavailable",
         },
     )
-    def test_post_chat_message_lane_b_agent_failure_parks_for_review(self, _mock_runtime) -> None:
-        # Failed dispatches surface in Mission Control instead of auto-completing.
+    def test_post_chat_message_lane_b_agent_failure_marks_run_failed(self, _mock_runtime) -> None:
+        # Failed dispatches fail closed; the fallback error stays in the thread.
         response = self.client.post(
             "/api/chat/messages",
             json={
@@ -433,7 +433,7 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertFalse(payload["dispatched"])
-        self.assertEqual("review_ready", payload["run"]["phase"])
+        self.assertEqual("failed", payload["run"]["phase"])
 
     def test_post_chat_message_lane_b_streaming_returns_placeholder_agent(self) -> None:
         def _streaming_lane_b_result(**kwargs):

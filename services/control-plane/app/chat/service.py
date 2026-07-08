@@ -37,6 +37,7 @@ from app.runs.service import (
     RunNotFoundError,
     append_run_execution_receipt,
     complete_run,
+    fail_run,
     get_run,
     mark_review_ready,
 )
@@ -418,12 +419,15 @@ def _finalize_lane_b_agent_run(
     )
     # Successful agent turns auto-complete: Full Access consent already covers
     # them, so Mission Control should not queue routine runs for manual review.
-    # Failed dispatches park at review_ready to surface operator attention.
+    # Failed dispatches fail closed — the error is already in the thread.
     try:
         if dispatched:
             run_record = complete_run(dispatch_run_id)
         else:
-            run_record = mark_review_ready(dispatch_run_id)
+            run_record = fail_run(
+                dispatch_run_id,
+                receipt_summary=receipt_summary,
+            )
     except RunLifecycleError:
         pass
     return dispatched, run_record
@@ -443,10 +447,13 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
     lane_b_result: dict[str, object] = {}
 
     def on_chunk(accumulated: str, delta: str) -> None:
+        from app.cli_runtime.research_stream_blocks import normalize_transcript_content
+
+        normalized_accumulated = normalize_transcript_content(accumulated)
         updated_at = _utc_now()
         chat_store.update_message_content(
             message_id=job.agent_message_id,
-            content=accumulated,
+            content=normalized_accumulated,
             updated_at=updated_at,
         )
         publish_chat_stream_event(
@@ -455,7 +462,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
                 "type": "chat_stream_delta",
                 "thread_id": job.thread_id,
                 "message_id": job.agent_message_id,
-                "content": accumulated,
+                "content": normalized_accumulated,
                 "delta": delta,
             },
         )
@@ -493,6 +500,9 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             workspace_root=workspace_root,
             run_started_epoch=run_started_epoch,
         )
+        from app.cli_runtime.research_stream_blocks import normalize_transcript_content
+
+        agent_content = normalize_transcript_content(agent_content)
         updated_at = _utc_now()
         chat_store.update_message_content(
             message_id=job.agent_message_id,
@@ -557,7 +567,10 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
         run_record = None
         if job.composer_mode == "agent" and job.dispatch_run_id:
             try:
-                run_record = mark_review_ready(job.dispatch_run_id)
+                run_record = fail_run(
+                    job.dispatch_run_id,
+                    receipt_summary=f"Lane B stream failed: {fallback}",
+                )
             except RunLifecycleError:
                 run_record = None
         publish_chat_stream_event(

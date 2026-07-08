@@ -17,7 +17,7 @@ import { formatRunShortId } from '../../lib/run-display';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
-const { draft, pending, canSubmit, submitTurn, handleFocus, handleBlur, speechCapture } =
+const { draft, pending, thinkingLine, canSubmit, submitTurn, handleFocus, handleBlur, speechCapture } =
   useKairoConversation();
 
 const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
@@ -275,6 +275,12 @@ onUnmounted(() => {
 
     <p v-if="speechCapture.interimTranscript" class="kairo-conversation-bar__interim">
       {{ speechCapture.interimTranscript }}
+    </p>
+    <p
+      v-else-if="pending && thinkingLine"
+      class="kairo-conversation-bar__interim kairo-conversation-bar__interim--thinking"
+    >
+      {{ thinkingLine }}
     </p>
     <div v-if="kairoConversationReply" class="kairo-conversation-bar__reply">
       <span class="kairo-conversation-bar__reply-heading">

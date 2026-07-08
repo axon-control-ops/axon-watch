@@ -1,7 +1,12 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
 
-import { postKairoConverse } from '../../lib/kairo-converse-client';
+import {
+  postKairoConverse,
+  type KairoConverseAnswerTier,
+} from '../../lib/kairo-converse-client';
+import { parseChatUiAction } from '../../lib/chat-ui-action';
 import { normalizeKairoCopy, normalizeVoiceTranscript, canonicalWorkspaceLabel } from '../../lib/kairo-entity-labels';
+import { recordOperatorArtifacts } from '../../lib/operator-artifact-view';
 import {
   formatConversationDisplayReply,
   sanitizeSpokenReply,
@@ -25,6 +30,7 @@ import {
   RUNTIME_ASSISTANT_CUE_LINE,
   shouldPrimeRuntimeAssistantCue,
 } from './runtime-assistant-heuristics';
+import { brainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
 import { useKairoSpeechCapture } from './use-kairo-speech-capture';
 import { useKairoVoiceInterrupt } from './use-kairo-voice-interrupt';
 
@@ -35,6 +41,7 @@ export function useKairoConversation() {
   const shell = useShellStore();
   const draft = ref('');
   const pending = ref(false);
+  const thinkingLine = ref('');
   let runtimeCueTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
   const canSubmit = computed(
@@ -90,6 +97,26 @@ export function useKairoConversation() {
       kairoConversationReply.value = RUNTIME_ASSISTANT_CUE_COPY;
       void shell.speakKairoConversationLine(RUNTIME_ASSISTANT_CUE_LINE, { skipSpeakApi: true });
     }, RUNTIME_ASSISTANT_CUE_DELAY_MS);
+  }
+
+  function determineAnswerTier(content: string): KairoConverseAnswerTier {
+    return shouldPrimeRuntimeAssistantCue(content) ? 'deep' : 'fast';
+  }
+
+  function thinkingStatusLine(
+    content: string,
+    answerTier: KairoConverseAnswerTier,
+  ): string {
+    if (answerTier === 'deep') {
+      return 'Consulting runtime context and shaping a short spoken answer…';
+    }
+    if (brainGalaxyConversationFocus.value?.signalId) {
+      return 'Checking the selected signal against the current fleet state…';
+    }
+    if (/\b(approval|attention|signal|status|briefing|health)\b/i.test(content)) {
+      return 'Scanning live operator state and briefing signals…';
+    }
+    return 'Checking the current operator state…';
   }
 
   function shouldScheduleHandsFreeFollowup(voiceCaptureMode?: KairoVoiceCaptureMode): boolean {
@@ -159,12 +186,16 @@ export function useKairoConversation() {
     if (!content || pending.value) {
       return;
     }
+    const answerTier = determineAnswerTier(content);
 
     pending.value = true;
     kairoConversationError.value = null;
+    thinkingLine.value = thinkingStatusLine(content, answerTier);
     clearKairoVoiceFollowupWindow();
     setKairoConversationPhase('thinking');
-    scheduleRuntimeAssistantCue(content);
+    if (answerTier === 'deep') {
+      scheduleRuntimeAssistantCue(content);
+    }
 
     const navIntent = resolveConversationNavigationIntent(
       content,
@@ -188,6 +219,7 @@ export function useKairoConversation() {
       }
       draft.value = '';
       pending.value = false;
+      thinkingLine.value = '';
       await deliverVoiceReply(navIntent.reply, options?.voiceCaptureMode);
       return;
     }
@@ -196,6 +228,7 @@ export function useKairoConversation() {
       clearRuntimeAssistantCue();
       draft.value = '';
       pending.value = false;
+      thinkingLine.value = '';
       return;
     }
 
@@ -204,14 +237,22 @@ export function useKairoConversation() {
         content,
         session_id: kairoSpeechSessionId(),
         workspace_id: workspaceId.value,
-        use_runtime: true,
+        use_runtime: answerTier === 'deep',
+        answer_tier: answerTier,
+        context_workspace_id: brainGalaxyConversationFocus.value?.workspaceId ?? workspaceId.value,
+        context_signal_id: brainGalaxyConversationFocus.value?.signalId ?? '',
+        context_node_id: brainGalaxyConversationFocus.value?.nodeId ?? '',
       });
       clearRuntimeAssistantCue();
+      if (response.artifacts.length) {
+        recordOperatorArtifacts(response.artifacts, parseChatUiAction);
+      }
       kairoConversationReply.value = normalizeKairoCopy(
         formatConversationDisplayReply(response.reply) || sanitizeSpokenReply(response.reply),
       );
       draft.value = '';
       pending.value = false;
+      thinkingLine.value = '';
       if (response.action) {
         void executeConverseAction(response.action);
       } else if (response.turn_kind === 'command' && response.command_content) {
@@ -226,6 +267,7 @@ export function useKairoConversation() {
         error instanceof Error ? error.message : 'KAIRO conversation failed';
       setKairoConversationPhase('idle');
       pending.value = false;
+      thinkingLine.value = '';
     } finally {
       clearRuntimeAssistantCue();
       if (pending.value) {
@@ -265,6 +307,7 @@ export function useKairoConversation() {
   return {
     draft,
     pending,
+    thinkingLine,
     canSubmit,
     submitTurn,
     handleFocus,

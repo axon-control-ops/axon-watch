@@ -35,3 +35,10 @@ export function agentEditReviewDocumentTitle(path: string): string {
   const base = normalized.split('/').pop() || normalized;
   return `${base} · review`;
 }
+
+/** Open the workspace file when the transcript has no diff body yet (unless still streaming). */
+export function shouldOpenWorkspaceFileForEditReview(
+  edit: Pick<IdeAgentEditSummary, 'diff' | 'open'>,
+): boolean {
+  return !edit.diff.trim() && !edit.open;
+}

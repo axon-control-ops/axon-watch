@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.cli_runtime.research_stream_blocks import (
+    collapse_duplicated_body,
     normalize_transcript_content,
     research_completed_block_from_event,
     research_items_from_result,
@@ -187,20 +188,7 @@ def _tool_block_from_event(
 
 def _collapse_echo_text(text: str) -> str:
     """Drop a single-chunk assistant payload that repeats itself back-to-back."""
-    if not text:
-        return text
-    stripped = text.strip()
-    if not stripped:
-        return text
-    if len(text) >= len(stripped) * 2:
-        mid = len(text) // 2
-        left = text[:mid].strip()
-        right = text[mid:].strip()
-        if left and left == right == stripped:
-            return stripped if text.startswith(stripped) else stripped
-    if text == stripped + stripped or text == f"{stripped}{stripped}":
-        return stripped
-    return text
+    return collapse_duplicated_body(text)
 
 
 def assistant_text_delta(accumulated: str, incoming: str) -> str:
@@ -210,6 +198,7 @@ def assistant_text_delta(accumulated: str, incoming: str) -> str:
     (e.g. ``hello``, `` world``) and then a final aggregate event (``hello world``).
     Appending every event verbatim duplicates the full reply.
     """
+    incoming = collapse_duplicated_body(incoming)
     if not incoming:
         return ""
     if incoming == accumulated:
@@ -219,6 +208,9 @@ def assistant_text_delta(accumulated: str, incoming: str) -> str:
         if not suffix:
             return ""
         if suffix == accumulated or suffix.strip() == accumulated.strip():
+            return ""
+        collapsed_combined = collapse_duplicated_body(accumulated + suffix)
+        if collapsed_combined.strip() == accumulated.strip():
             return ""
         return suffix
     if accumulated and accumulated.startswith(incoming):

@@ -10,10 +10,6 @@ import {
   galaxyOrbStatusLabel,
   galaxyOrbTicks,
 } from './kairo-galaxy-orb-view';
-import {
-  clearKairoVoiceFollowupWindow,
-  openKairoVoiceFollowupWindow,
-} from '../../lib/kairo-voice-followup-window';
 
 describe('kairo-galaxy-orb-view', () => {
   it('builds tick marks around the orb', () => {
@@ -42,12 +38,7 @@ describe('kairo-galaxy-orb-view', () => {
 
   it('describes hands-free in orb hints', () => {
     expect(galaxyOrbHint('observing', false, 'idle', true)).toBe('Say "VAXON" for commands');
-  });
-
-  it('uses the same hands-free hint during follow-up window', () => {
-    openKairoVoiceFollowupWindow();
-    expect(galaxyOrbHint('observing', false, 'idle', true)).toBe('Say "VAXON" for commands');
-    clearKairoVoiceFollowupWindow();
+    expect(galaxyOrbModeLabel(true, 'idle')).toBe('');
   });
 
   it('shortens model labels', () => {

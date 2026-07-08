@@ -8,6 +8,18 @@ export function threadSurfaceForLayout(layoutMode: 'operator' | 'ide'): ThreadSu
   return layoutMode === 'ide' ? 'ide' : 'operator';
 }
 
+export function isActiveWorkspaceSurface(options: {
+  currentWorkspaceId: string | null | undefined;
+  targetWorkspaceId: string;
+  currentSurface: ThreadSurface;
+  targetSurface: ThreadSurface;
+}): boolean {
+  return (
+    (options.currentWorkspaceId ?? null) === options.targetWorkspaceId &&
+    options.currentSurface === options.targetSurface
+  );
+}
+
 function isLaneBSystemMessage(message: OperatorThreadEntry): boolean {
   return message.role === 'system' && LANE_B_SYSTEM_RE.test(message.content);
 }

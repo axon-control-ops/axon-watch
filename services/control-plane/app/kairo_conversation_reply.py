@@ -13,7 +13,10 @@ QuestionFocus = Literal[
     "attention",
     "signals",
     "runs",
+    "activity",
     "fleet",
+    "runtime",
+    "health",
     "degraded",
     "general",
     "followup",
@@ -29,12 +32,27 @@ _APPROVAL_RE = re.compile(r"\b(approval|approvals|approve|awaiting)\b", re.IGNOR
 _SIGNAL_RE = re.compile(r"\b(signal|signals|sentry|posthog|monitor|inbox|incident)\b", re.IGNORECASE)
 _RUN_RE = re.compile(r"\b(run|runs|running|executing|review|queue)\b", re.IGNORECASE)
 _FLEET_RE = re.compile(r"\b(fleet|workspace|workspaces|health|nominal)\b", re.IGNORECASE)
+_RUNTIME_RE = re.compile(
+    r"\b(runtime|cli|cursor|codex|agent dispatch|lane b|vault|auth|login|api key)\b",
+    re.IGNORECASE,
+)
+_HEALTH_RE = re.compile(
+    r"\b("
+    r"everything normal|all good|all clear|systems normal|anything wrong|"
+    r"how are things|status check|is everything|are we good|you ok|you okay"
+    r")\b",
+    re.IGNORECASE,
+)
 _ATTENTION_RE = re.compile(
     r"\b(on fire|attention|urgent|wrong|needs me|needs my|priority|priorities)\b",
     re.IGNORECASE,
 )
 _FOLLOWUP_RE = re.compile(
     r"\b(again|still|else|anything else|what about|and what|more detail|go on)\b",
+    re.IGNORECASE,
+)
+_ACTIVITY_RE = re.compile(
+    r"\b(just did|just do|doing|latest|recent|recently|last thing|last run|activity)\b",
     re.IGNORECASE,
 )
 
@@ -56,6 +74,12 @@ def detect_question_focus(content: str, *, recent_user_turns: list[str]) -> Ques
         return "signals"
     if _RUN_RE.search(lower):
         return "runs"
+    if _ACTIVITY_RE.search(lower):
+        return "activity"
+    if _RUNTIME_RE.search(lower):
+        return "runtime"
+    if _HEALTH_RE.search(lower):
+        return "health"
     if _FLEET_RE.search(lower):
         return "fleet"
     if "degraded" in lower or "connectivity" in lower or "offline" in lower:
@@ -80,6 +104,9 @@ def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
     ]
     top_signal = top_signals[0] if top_signals else {}
     primary_run = active_runs[0] if active_runs else {}
+    review_ready_count = sum(
+        1 for item in active_runs if str(item.get("phase") or "") == "review_ready"
+    )
     return {
         "pending_approvals": pending,
         "top_signal_title": str(top_signal.get("title", "")).strip(),
@@ -87,8 +114,13 @@ def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
         "top_signal_severity": str(top_signal.get("severity", "")).strip(),
         "signal_count": len(top_signals),
         "active_run_count": len(active_runs),
+        "review_ready_count": review_ready_count,
         "primary_run_summary": str(primary_run.get("summary", "")).strip(),
         "primary_run_phase": str(primary_run.get("phase", "")).strip(),
+        "workspace_label": (
+            str(pack.get("workspace", {}).get("display_name") or "").strip()
+            or str(pack.get("workspace", {}).get("workspace_id") or "").strip()
+        ),
         "notice": str(briefing.get("notice") or "").strip(),
         "advise": str(briefing.get("advise") or "").strip(),
         "degraded": bool(briefing.get("degraded", {}).get("active")),
@@ -98,6 +130,12 @@ def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
         "attention_workspaces": int(fleet.get("attention_count", 0)),
         "next_action_title": str(next_actions[0].get("title", "")).strip() if next_actions else "",
         "scope_mode": str(briefing.get("scope", {}).get("mode", "fleet")),
+        "cli_dispatch_ready": bool((briefing.get("cli_runtime") or {}).get("dispatch_ready", True)),
+        "cli_blockers": [
+            str(item).strip()
+            for item in (briefing.get("cli_runtime") or {}).get("blockers", [])
+            if str(item).strip()
+        ],
     }
 
 
@@ -245,6 +283,91 @@ def _run_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     return [f"{prefix}{count} active run{suffix}; lead item is {summary}.".strip()]
 
 
+def _activity_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
+    prefix = "Still " if followup else ""
+    workspace = facts["workspace_label"] or "that workspace"
+    parts: list[str] = []
+    if int(facts["active_run_count"]) > 0:
+        run_label = facts["primary_run_summary"] or "an active run"
+        phase = facts["primary_run_phase"]
+        if phase:
+            parts.append(f"latest run is {run_label} ({phase.replace('_', ' ')})")
+        else:
+            parts.append(f"latest run is {run_label}")
+    if facts["top_signal_title"]:
+        detail = facts["top_signal_title"]
+        if facts["top_signal_summary"]:
+            detail = f"{detail} — {facts['top_signal_summary']}"
+        parts.append(f"top signal is {detail}")
+    if not parts:
+        return [
+            f"{prefix}{workspace} looks quiet from here — no fresh runs or signals surfaced.".strip(),
+            f"{prefix}I do not see recent activity in {workspace} worth flagging.".strip(),
+        ]
+    joined = "; ".join(parts)
+    return [
+        f"{prefix}In {workspace}, {joined}.".strip(),
+        f"{prefix}{workspace} most recently shows this: {joined}.".strip(),
+    ]
+
+
+def _runtime_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
+    prefix = "Still " if followup else ""
+    if facts["cli_dispatch_ready"]:
+        return [
+            f"{prefix}CLI runtime looks dispatch-ready from my side.".strip(),
+            f"{prefix}Local CLI auth looks good — agent dispatch should be available.".strip(),
+        ]
+    blockers = facts["cli_blockers"]
+    lead = blockers[0] if blockers else "no local CLI runtime is dispatch-ready"
+    return [
+        f"{prefix}Not nominal — agent dispatch is blocked: {lead}.".strip(),
+        f"{prefix}CLI runtime is not ready — {lead}. Open Runtime or /vault, then retry.".strip(),
+        f"{prefix}I cannot start Lane B agents right now — {lead}.".strip(),
+    ]
+
+
+def _health_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
+    prefix = "Still " if followup else ""
+    if not facts["cli_dispatch_ready"]:
+        blockers = facts["cli_blockers"]
+        lead = blockers[0] if blockers else "CLI runtime is not dispatch-ready"
+        return [
+            f"{prefix}No — agent dispatch is blocked: {lead}.".strip(),
+            f"{prefix}Not nominal — {lead}.".strip(),
+        ]
+    if facts["degraded"]:
+        return [
+            f"{prefix}Not fully nominal — runtime is degraded.".strip(),
+            f"{prefix}We're degraded — check watch/runtime health first.".strip(),
+        ]
+    pending = int(facts["pending_approvals"])
+    if pending > 0:
+        suffix = "" if pending == 1 else "s"
+        return [
+            f"{prefix}Not fully nominal — {pending} approval{suffix} waiting.".strip(),
+        ]
+    severity = facts["top_signal_severity"]
+    if facts["top_signal_title"] and severity in {"high", "critical"}:
+        return [
+            f"{prefix}Mostly operational, but top signal is {facts['top_signal_title']}.".strip(),
+        ]
+    review_ready = int(facts.get("review_ready_count") or 0)
+    if review_ready > 0:
+        suffix = "" if review_ready == 1 else "s"
+        return [
+            f"{prefix}CLI is ready, but {review_ready} run{suffix} still need review in Mission Control.".strip(),
+        ]
+    if int(facts["active_run_count"]) > 0:
+        return [
+            f"{prefix}Yes — operational with {facts['active_run_count']} active run(s); nothing critical flagged.".strip(),
+        ]
+    return [
+        f"{prefix}Yes — systems look nominal from my side.".strip(),
+        f"{prefix}All clear here — CLI runtime is ready and nothing urgent is flagged.".strip(),
+    ]
+
+
 def _fleet_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     prefix = "Still " if followup else ""
     critical = int(facts["critical_workspaces"])
@@ -271,6 +394,13 @@ def _fleet_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
 
 def _general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     prefix = "Still " if followup else ""
+    if not facts["cli_dispatch_ready"]:
+        blockers = facts["cli_blockers"]
+        lead = blockers[0] if blockers else "CLI runtime is not dispatch-ready"
+        return [
+            f"{prefix}Not nominal on my side — {lead}.".strip(),
+            f"{prefix}Agent dispatch is blocked — {lead}. Check Runtime or /vault.".strip(),
+        ]
     if facts["degraded"]:
         return [
             f"{prefix}Runtime is degraded — I'd fix connectivity before dispatching more.".strip(),
@@ -365,7 +495,10 @@ def compose_conversation_reply(
         "attention": _attention_candidates,
         "signals": _signal_candidates,
         "runs": _run_candidates,
+        "activity": _activity_candidates,
         "fleet": _fleet_candidates,
+        "runtime": _runtime_candidates,
+        "health": _health_candidates,
         "degraded": lambda f, *, followup: _general_candidates(f, followup=followup),
         "general": _general_candidates,
         "followup": _general_candidates,

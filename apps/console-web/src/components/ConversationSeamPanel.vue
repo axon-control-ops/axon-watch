@@ -22,10 +22,11 @@ import {
   systemMessagePreview,
 } from '../lib/thread-message-view';
 import {
-  buildOperatorConversationDisplay,
   prepareOperatorConversationDock,
   type ConversationDisplayItem,
 } from '../lib/operator-conversation-view';
+import { applyChatUiAction, type ChatUiAction } from '../lib/chat-ui-action';
+import { operatorArtifactRecords } from '../lib/operator-artifact-view';
 import {
   type OperatorThreadEntry,
   type ThreadMessageAttachment,
@@ -51,12 +52,14 @@ const conversationDisplayItems = computed((): ConversationDisplayItem[] => {
       message,
     }));
   }
-  return prepareOperatorConversationDock(conversationMessages.value).items;
+  return prepareOperatorConversationDock(conversationMessages.value, {
+    artifacts: operatorArtifactRecords.value,
+  }).items;
 });
 
 const conversationDockHint = computed(() =>
   shell.layoutMode === 'operator'
-    ? 'Recent command results. Run queue lives in Mission Control — not here.'
+    ? 'Recent command results and VAXON artifacts. Run queue lives in Mission Control — not here.'
     : null,
 );
 const showAgentWorking = computed(
@@ -183,13 +186,7 @@ function openEditedFile(segment: {
   diff: string;
   open: boolean;
 }): void {
-  shell.openAgentEditReview({
-    path: normalizeEditedFilePath(segment.path),
-    added: segment.added,
-    removed: segment.removed,
-    diff: segment.diff,
-    open: segment.open,
-  });
+  void shell.openWorkspaceFile(normalizeEditedFilePath(segment.path));
 }
 
 function diffLines(diff: string): Array<{ text: string; tone: string }> {
@@ -199,10 +196,17 @@ function diffLines(diff: string): Array<{ text: string; tone: string }> {
 }
 
 function displayItemKey(item: ConversationDisplayItem): string {
-  if (item.kind === 'command_turn' || item.kind === 'dock_banner') {
+  if (item.kind === 'command_turn' || item.kind === 'dock_banner' || item.kind === 'artifact') {
     return item.messageId;
   }
   return item.message.message_id;
+}
+
+function applyArtifactAction(action: { uiAction: ChatUiAction | null }): void {
+  if (!action.uiAction) {
+    return;
+  }
+  applyChatUiAction(shell, action.uiAction);
 }
 
 function messageImageAttachments(message: OperatorThreadEntry): ThreadMessageAttachment[] {
@@ -253,6 +257,8 @@ watch(
             ? 'conversation-seam__item--dock-banner'
             : item.kind === 'command_turn'
               ? 'conversation-seam__item--command-turn'
+              : item.kind === 'artifact'
+                ? 'conversation-seam__item--artifact'
               : `conversation-seam__item--${item.message.role}`
         "
       >
@@ -293,7 +299,7 @@ watch(
             v-if="item.compact"
             class="conversation-seam__content conversation-seam__content--command-compact"
           >
-            Latest of {{ item.repeatCount }} identical verification runs.
+            Repeated {{ item.repeatCount }}× — showing latest {{ item.command }} only.
             {{ compactCommandSummary(item.execution.output) }}
           </p>
           <pre
@@ -321,6 +327,41 @@ watch(
               @click="restoreCommandToComposer(item.command)"
             >
               <span aria-hidden="true">↻</span>
+            </button>
+          </div>
+        </template>
+
+        <template v-else-if="item.kind === 'artifact'">
+          <div class="conversation-seam__meta">
+            <div class="conversation-seam__meta-leading">
+              <span class="conversation-seam__role">ARTIFACT</span>
+              <span class="conversation-seam__command-label">{{ item.artifact.title }}</span>
+            </div>
+            <time class="conversation-seam__time" :datetime="item.createdAt">
+              {{ formatThreadTimestamp(item.createdAt) }}
+            </time>
+          </div>
+          <p class="conversation-seam__content conversation-seam__content--artifact-summary">
+            {{ item.artifact.summary }}
+          </p>
+          <pre class="conversation-seam__content conversation-seam__content--artifact-body">{{
+            item.artifact.body
+          }}</pre>
+          <ul v-if="item.artifact.sources.length" class="conversation-seam__artifact-sources">
+            <li v-for="source in item.artifact.sources" :key="`${item.artifact.artifactId}:${source.label}`">
+              <strong>{{ source.label }}</strong>
+              <span>{{ source.detail }}</span>
+            </li>
+          </ul>
+          <div v-if="item.artifact.actions.length" class="conversation-seam__message-actions">
+            <button
+              v-for="action in item.artifact.actions"
+              :key="`${item.artifact.artifactId}:${action.label}`"
+              type="button"
+              class="conversation-seam__meta-button"
+              @click="applyArtifactAction(action)"
+            >
+              {{ action.label }}
             </button>
           </div>
         </template>

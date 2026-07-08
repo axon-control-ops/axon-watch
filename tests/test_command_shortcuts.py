@@ -51,6 +51,11 @@ class CommandShortcutTests(unittest.TestCase):
         self.assertEqual(classify_command("show the readme"), "read_file")
         self.assertEqual(classify_command("git status"), "git_status")
 
+    def test_question_style_git_status_normalizes_to_command(self) -> None:
+        self.assertEqual(expand_command_shortcuts("what is the git status?"), "git status")
+        self.assertEqual(classify_command(expand_command_shortcuts("what is the git status?")), "git_status")
+        self.assertEqual(expand_command_shortcuts("can you run git status?"), "git status")
+
     def test_dispatch_ack_includes_execution_summary(self) -> None:
         execution = CommandExecutionResult(
             intent="shell_command",

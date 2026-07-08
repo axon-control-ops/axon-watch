@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { OperatorThreadEntry } from './operator-thread';
-import { filterThreadMessagesForSurface } from './thread-surface-view';
+import { filterThreadMessagesForSurface, isActiveWorkspaceSurface } from './thread-surface-view';
 
 let counter = 0;
 function entry(role: OperatorThreadEntry['role'], content: string): OperatorThreadEntry {
@@ -41,5 +41,40 @@ describe('filterThreadMessagesForSurface (ide)', () => {
       'Real IDE prompt',
       'Real IDE reply',
     ]);
+  });
+});
+
+describe('isActiveWorkspaceSurface', () => {
+  it('matches only when workspace and surface both still align', () => {
+    expect(
+      isActiveWorkspaceSurface({
+        currentWorkspaceId: 'workspace_dashpro',
+        targetWorkspaceId: 'workspace_dashpro',
+        currentSurface: 'ide',
+        targetSurface: 'ide',
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects stale workspace responses', () => {
+    expect(
+      isActiveWorkspaceSurface({
+        currentWorkspaceId: 'workspace_dashpro',
+        targetWorkspaceId: 'workspace_axon_watch',
+        currentSurface: 'ide',
+        targetSurface: 'ide',
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects responses for the wrong surface', () => {
+    expect(
+      isActiveWorkspaceSurface({
+        currentWorkspaceId: 'workspace_dashpro',
+        targetWorkspaceId: 'workspace_dashpro',
+        currentSurface: 'operator',
+        targetSurface: 'ide',
+      }),
+    ).toBe(false);
   });
 });

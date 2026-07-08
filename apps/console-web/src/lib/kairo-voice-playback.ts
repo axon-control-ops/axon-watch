@@ -20,6 +20,7 @@ export type KairoVoicePlaybackResult = {
 
 const speakingListeners = new Set<(active: boolean) => void>();
 const idleListeners = new Set<() => void>();
+const chunkListeners = new Set<() => void>();
 let speaking = false;
 
 const AUDIO_PREROLL_MS = 40;
@@ -41,6 +42,12 @@ function notifyIdle(): void {
     return;
   }
   for (const listener of idleListeners) {
+    listener();
+  }
+}
+
+function notifyChunk(): void {
+  for (const listener of chunkListeners) {
     listener();
   }
 }
@@ -72,6 +79,13 @@ export function onKairoVoiceIdle(listener: () => void): () => void {
   idleListeners.add(listener);
   return () => {
     idleListeners.delete(listener);
+  };
+}
+
+export function subscribeKairoVoiceChunk(listener: () => void): () => void {
+  chunkListeners.add(listener);
+  return () => {
+    chunkListeners.delete(listener);
   };
 }
 
@@ -142,6 +156,7 @@ async function playAzureAudio(audio: HTMLAudioElement): Promise<void> {
 
 async function speakAzureChunks(chunks: string[]): Promise<KairoVoicePlaybackResult> {
   for (const chunk of chunks) {
+    notifyChunk();
     const response = await postKairoTts(chunk);
     if (!response.available || !response.audio_base64) {
       return speakWithBrowser(chunks.join(' '), resolveAzureFallbackReason(response));
@@ -187,6 +202,7 @@ async function speakWithBrowser(
   notifySpeaking(true);
   await delay(AUDIO_PREROLL_MS);
   for (const chunk of splitSpokenReplyChunks(text)) {
+    notifyChunk();
     enqueueSpeech(chunk, port);
   }
   return finishPlayback({ engine: 'browser', reason }, text);
@@ -212,6 +228,7 @@ export async function speakKairoLine(text: string): Promise<KairoVoicePlaybackRe
 
   try {
     if (chunks.length === 1) {
+      notifyChunk();
       const response = await postKairoTts(chunks[0]);
       if (response.available && response.audio_base64) {
         const audio = new Audio(

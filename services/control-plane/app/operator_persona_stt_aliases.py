@@ -1,4 +1,4 @@
-"""Normalize common STT mishears of the VAXON wake word."""
+"""Normalize common STT mishears of the VAXON wake word and key voice entities."""
 
 from __future__ import annotations
 
@@ -50,6 +50,9 @@ _PERSONA_STT_MISHEAR_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bnaxon\b", re.IGNORECASE), OPERATOR_PERSONA_NAME),
     (re.compile(r"\bvixon\b", re.IGNORECASE), OPERATOR_PERSONA_NAME),
     (re.compile(r"\bvyxon\b", re.IGNORECASE), OPERATOR_PERSONA_NAME),
+    (re.compile(r"\bvaccine\b", re.IGNORECASE), OPERATOR_PERSONA_NAME),
+    (re.compile(r"\bexcent\b", re.IGNORECASE), OPERATOR_PERSONA_NAME),
+    (re.compile(r"\baccent\b", re.IGNORECASE), OPERATOR_PERSONA_NAME),
 )
 
 _PERSONA_STT_PHONETIC_VAXON_RE = re.compile(
@@ -58,9 +61,47 @@ _PERSONA_STT_PHONETIC_VAXON_RE = re.compile(
     re.IGNORECASE,
 )
 
+_COMMON_STT_ENTITY_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bdash[\s-]*pro\b", re.IGNORECASE), "DashPro"),
+    (re.compile(r"\bprobox[\s-]*space\b", re.IGNORECASE), "DashPro workspace"),
+    (re.compile(r"\bworks?\s*based\b", re.IGNORECASE), "workspace"),
+    (
+        re.compile(
+            r"\b(?:best|this|test|desk|those|these)\s+pro\s+workspace\s+justick\b",
+            re.IGNORECASE,
+        ),
+        "DashPro workspace just did",
+    ),
+    (
+        re.compile(
+            r"\bthis\s+pro\s+workspace\s+use\s+it\b",
+            re.IGNORECASE,
+        ),
+        "DashPro workspace just did",
+    ),
+    (
+        re.compile(
+            r"\b(?:best|this|test|desk|those|these)\s+pro\s+workspace\b",
+            re.IGNORECASE,
+        ),
+        "DashPro workspace",
+    ),
+    (
+        re.compile(
+            r"\bthis\s+pro\s+workspace\b",
+            re.IGNORECASE,
+        ),
+        "DashPro workspace",
+    ),
+    (re.compile(r"\bjustick\b", re.IGNORECASE), "just did"),
+)
+
 
 def normalize_persona_stt_aliases(text: str) -> str:
     result = text
     for pattern, replacement in _PERSONA_STT_MISHEAR_REPLACEMENTS:
         result = pattern.sub(replacement, result)
-    return _PERSONA_STT_PHONETIC_VAXON_RE.sub(OPERATOR_PERSONA_NAME, result)
+    result = _PERSONA_STT_PHONETIC_VAXON_RE.sub(OPERATOR_PERSONA_NAME, result)
+    for pattern, replacement in _COMMON_STT_ENTITY_REPLACEMENTS:
+        result = pattern.sub(replacement, result)
+    return result

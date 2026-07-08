@@ -15,6 +15,11 @@ from app.monitors.slice_registry import list_monitor_slice_paths, load_monitor_s
 
 
 class MonitorSliceRegistryTests(unittest.TestCase):
+    def test_default_monitor_slice_dir_finds_dashpro_config(self) -> None:
+        paths = list_monitor_slice_paths()
+        names = [path.name for path in paths]
+        self.assertIn("dashpro-monitor-slice.json", names)
+
     def test_list_monitor_slice_paths_finds_dashpro_config(self) -> None:
         paths = list_monitor_slice_paths(WATCH_ROOT.parents[1] / "config")
         names = [path.name for path in paths]

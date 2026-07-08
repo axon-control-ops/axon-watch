@@ -16,7 +16,7 @@ import { rectsOverlap, resolveAutoAvoidOrbCandidates } from './kairo-galaxy-orb-
 import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
-import { subscribeKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
+import { subscribeKairoVoiceChunk, subscribeKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
 import { kairoConversationPhase, isKairoConversationBusy, kairoConversationReply, setKairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
 import { useKairoHandsFreeLoop } from '../kairo-conversation/use-kairo-hands-free-loop';
 import { useKairoSpeechCapture } from '../kairo-conversation/use-kairo-speech-capture';
@@ -38,6 +38,7 @@ const ORB_TOP_DOCK_OFFSET_PX = 48;
 
 const shell = useShellStore();
 const kairoSpeaking = ref(false);
+const voiceBeat = ref(false);
 const orbAnchor = ref<HTMLElement | null>(null);
 const orbPosition = ref<{ x: number; y: number } | null>(null);
 const orbDragging = ref(false);
@@ -50,6 +51,7 @@ let dragStartPointer: { x: number; y: number } | null = null;
 let orbUserPositioned = false;
 let orbAutoAvoidActive = false;
 let bottomHudObserver: ResizeObserver | null = null;
+let voiceBeatTimer: number | null = null;
 const handleWindowResize = (): void => {
   syncOrbPosition(false);
   resolveOrbOverlap();
@@ -458,10 +460,21 @@ function resetOrbPosition(): void {
 }
 
 let unsubscribeSpeaking: (() => void) | null = null;
+let unsubscribeVoiceChunk: (() => void) | null = null;
 
 onMounted(() => {
   unsubscribeSpeaking = subscribeKairoVoiceSpeaking((active) => {
     kairoSpeaking.value = active;
+  });
+  unsubscribeVoiceChunk = subscribeKairoVoiceChunk(() => {
+    voiceBeat.value = true;
+    if (voiceBeatTimer !== null) {
+      window.clearTimeout(voiceBeatTimer);
+    }
+    voiceBeatTimer = window.setTimeout(() => {
+      voiceBeat.value = false;
+      voiceBeatTimer = null;
+    }, 220);
   });
   window.requestAnimationFrame(() => {
     syncOrbPosition(true);
@@ -480,6 +493,11 @@ onBeforeUnmount(() => {
   bottomHudObserver?.disconnect();
   bottomHudObserver = null;
   unsubscribeSpeaking?.();
+  unsubscribeVoiceChunk?.();
+  if (voiceBeatTimer !== null) {
+    window.clearTimeout(voiceBeatTimer);
+    voiceBeatTimer = null;
+  }
   window.removeEventListener('resize', handleWindowResize);
 });
 </script>
@@ -513,6 +531,7 @@ onBeforeUnmount(() => {
         {
           'kairo-galaxy-orb--ptt': speechCapture.capturing.value,
           'kairo-galaxy-orb--voice-live': kairoSpeaking || shell.kairoSpeechActive,
+          'kairo-galaxy-orb--voice-beat': voiceBeat,
           'kairo-galaxy-orb--busy': orbBusy,
         },
       ]"
@@ -623,7 +642,7 @@ onBeforeUnmount(() => {
         <span class="kairo-galaxy-orb__status-label">{{ orbStatusLabel }}</span>
       </div>
 
-      <p class="kairo-galaxy-orb__mode-pill">{{ modeLabel }}</p>
+      <p v-if="modeLabel" class="kairo-galaxy-orb__mode-pill">{{ modeLabel }}</p>
       <button
         v-if="showInterrupt"
         type="button"

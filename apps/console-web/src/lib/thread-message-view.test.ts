@@ -31,6 +31,20 @@ describe('thread-message-view', () => {
     expect(summarizeAgentErrorContent(content)).toContain('401 Unauthorized');
   });
 
+  it('does not treat long markdown agent replies as error dumps', () => {
+    const content = ['## Summary', '', ...Array.from({ length: 120 }, () => '- [link](https://example.com)')].join(
+      '\n',
+    );
+    expect(content.length).toBeGreaterThan(1800);
+    expect(agentContentLooksLikeErrorDump(content)).toBe(false);
+  });
+
+  it('still flags large JSON array dumps as error dumps', () => {
+    const content = `[${Array.from({ length: 400 }, (_, index) => `"item-${index}"`).join(',')}]`;
+    expect(content.length).toBeGreaterThan(1800);
+    expect(agentContentLooksLikeErrorDump(content)).toBe(true);
+  });
+
   it('collapses noisy dispatch system acks', () => {
     expect(
       shouldCollapseSystemMessage('Run run_abc123 dispatched for workspace bootstrap-model'),

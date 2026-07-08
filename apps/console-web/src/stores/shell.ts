@@ -196,6 +196,7 @@ import {
 } from '../lib/operator-thread';
 import {
   filterThreadMessagesForSurface,
+  isActiveWorkspaceSurface,
   threadSurfaceForLayout,
   type ThreadSurface,
 } from '../lib/thread-surface-view';
@@ -247,6 +248,7 @@ import {
   agentEditReviewDocumentId,
   agentEditReviewDocumentTitle,
   formatAgentEditReviewContent,
+  shouldOpenWorkspaceFileForEditReview,
 } from '../lib/ide-agent-edit-review';
 import { normalizeEditedFilePath } from '../lib/agent-transcript-blocks';
 import {
@@ -1032,21 +1034,21 @@ export const useShellStore = defineStore('shell', () => {
     ideAgentRunId.value = streamUi.ideAgentRunId;
 
     const cached = workspaceIdeThreadMessagesById.value[workspaceId];
-    const threadId = getWorkspaceSurfaceThreadId(workspaceId, currentThreadSurface());
+    const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
     if (cached?.length) {
-      threadMessages.value = cached;
-      activeThreadId.value = threadId;
-      commandMutationState.value = 'idle';
-      commandMutationError.value = null;
+      if (isViewingWorkspaceSurface(workspaceId, 'ide')) {
+        threadMessages.value = cached;
+        activeThreadId.value = threadId;
+        commandMutationState.value = 'idle';
+        commandMutationError.value = null;
+      }
       await loadIdeThreads(workspaceId);
       return;
     }
 
-    await loadWorkspaceThread(workspaceId, currentThreadSurface());
-    if (currentThreadSurface() === 'ide') {
-      await loadIdeThreads(workspaceId);
-      applyIdeThreadMessagesToView(workspaceId);
-    }
+    await loadWorkspaceThread(workspaceId, 'ide');
+    await loadIdeThreads(workspaceId);
+    applyIdeThreadMessagesToView(workspaceId);
   }
 
   function resetThreadContext(): void {
@@ -1082,6 +1084,15 @@ export const useShellStore = defineStore('shell', () => {
 
   function currentThreadSurface(): ThreadSurface {
     return threadSurfaceForLayout(layoutMode.value);
+  }
+
+  function isViewingWorkspaceSurface(workspaceId: string, surface: ThreadSurface): boolean {
+    return isActiveWorkspaceSurface({
+      currentWorkspaceId: currentWorkspace.value?.workspace_id ?? null,
+      targetWorkspaceId: workspaceId,
+      currentSurface: currentThreadSurface(),
+      targetSurface: surface,
+    });
   }
 
   function getWorkspaceSurfaceThreadId(
@@ -1225,7 +1236,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function applyIdeThreadMessagesToView(workspaceId: string): void {
-    if (layoutMode.value !== 'ide') {
+    if (!isViewingWorkspaceSurface(workspaceId, 'ide')) {
       return;
     }
     const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
@@ -1398,19 +1409,26 @@ export const useShellStore = defineStore('shell', () => {
     try {
       const workspaceThread = await fetchWorkspaceChatThread(workspaceId, { surface: 'operator' });
       if (!hasWorkspaceChatThread(workspaceThread)) {
-        operatorThreadMessages.value = [];
+        if (currentWorkspace.value?.workspace_id === workspaceId) {
+          operatorThreadMessages.value = [];
+        }
         return;
       }
       const history = await fetchThreadHistory(workspaceThread.thread_id);
-      operatorThreadMessages.value = filterThreadMessagesForSurface(
+      const mapped = filterThreadMessagesForSurface(
         history.items.map((item) => mapChatMessageRecord(item)),
         'operator',
       );
+      if (currentWorkspace.value?.workspace_id === workspaceId) {
+        operatorThreadMessages.value = mapped;
+      }
       if (workspaceThread.thread_id) {
         setWorkspaceSurfaceThreadId(workspaceId, 'operator', workspaceThread.thread_id);
       }
     } catch {
-      operatorThreadMessages.value = [];
+      if (currentWorkspace.value?.workspace_id === workspaceId) {
+        operatorThreadMessages.value = [];
+      }
     }
   }
 
@@ -1423,13 +1441,13 @@ export const useShellStore = defineStore('shell', () => {
       if (!threadId) {
         const workspaceThread = await fetchWorkspaceChatThread(workspaceId, { surface });
         if (!hasWorkspaceChatThread(workspaceThread)) {
-          if (surface === currentThreadSurface()) {
+          if (isViewingWorkspaceSurface(workspaceId, surface)) {
             resetThreadContext();
           }
-          if (surface === 'ide') {
+          if (surface === 'ide' && currentWorkspace.value?.workspace_id === workspaceId) {
             clearIdeAgentRunLink();
           }
-          if (surface === 'operator') {
+          if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
             operatorThreadMessages.value = [];
           }
           return;
@@ -1442,10 +1460,10 @@ export const useShellStore = defineStore('shell', () => {
       }
 
       if (!threadId) {
-        if (surface === currentThreadSurface()) {
+        if (isViewingWorkspaceSurface(workspaceId, surface)) {
           resetThreadContext();
         }
-        if (surface === 'ide') {
+        if (surface === 'ide' && currentWorkspace.value?.workspace_id === workspaceId) {
           clearIdeAgentRunLink();
         }
         return;
@@ -1461,31 +1479,33 @@ export const useShellStore = defineStore('shell', () => {
           ...workspaceIdeThreadMessagesById.value,
           [workspaceId]: mapped,
         };
-        ideAgentRunId.value = resolveIdeAgentLinkedRunIdFromMessages(mapped, runs.value);
-        ensureIdeThreadTabOpen(history.thread_id);
+        if (currentWorkspace.value?.workspace_id === workspaceId) {
+          ideAgentRunId.value = resolveIdeAgentLinkedRunIdFromMessages(mapped, runs.value);
+          ensureIdeThreadTabOpen(history.thread_id);
+        }
         syncOpenIdeThreadTabs(workspaceId);
       }
-      if (surface === currentThreadSurface()) {
+      if (isViewingWorkspaceSurface(workspaceId, surface)) {
         activeThreadId.value = history.thread_id;
         threadMessages.value = mapped;
         commandMutationState.value = 'idle';
         commandMutationError.value = null;
       }
-      if (surface === 'operator') {
+      if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
         operatorThreadMessages.value = mapped;
       }
     } catch (error) {
       clearWorkspaceSurfaceThreadId(workspaceId, surface);
-      if (surface === currentThreadSurface()) {
+      if (isViewingWorkspaceSurface(workspaceId, surface)) {
         resetThreadContext();
         commandMutationState.value = 'error';
         commandMutationError.value =
           error instanceof Error ? error.message : 'Failed to load conversation history';
       }
-      if (surface === 'ide') {
+      if (surface === 'ide' && currentWorkspace.value?.workspace_id === workspaceId) {
         clearIdeAgentRunLink();
       }
-      if (surface === 'operator') {
+      if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
         operatorThreadMessages.value = [];
       }
     }
@@ -2976,6 +2996,23 @@ export const useShellStore = defineStore('shell', () => {
 
   function openAgentEditReview(edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'>): void {
     const path = normalizeEditedFilePath(edit.path);
+    if (shouldOpenWorkspaceFileForEditReview(edit)) {
+      if (layoutMode.value !== 'ide') {
+        setLayoutMode('ide');
+      }
+      void openWorkspaceFile(path);
+      return;
+    }
+
+    if (layoutMode.value !== 'ide') {
+      setLayoutMode('ide');
+    }
+
+    if (!openedFilePaths.value.includes(path)) {
+      openedFilePaths.value = [...openedFilePaths.value, path];
+      void ensureWorkspaceFileLoaded(path);
+    }
+
     const id = agentEditReviewDocumentId(path);
     const title = agentEditReviewDocumentTitle(path);
     const content = formatAgentEditReviewContent(edit);
@@ -3217,6 +3254,9 @@ export const useShellStore = defineStore('shell', () => {
   function updateActiveFileContent(value: string): void {
     const document = activeEditorDocument.value;
     if (document?.source === 'draft') {
+      if (document.readOnly && document.value.trim() && !value.trim()) {
+        return;
+      }
       draftDocuments.value = draftDocuments.value.map((entry) =>
         entry.id === document.id ? { ...entry, value, dirty: entry.value !== value } : entry,
       );

@@ -601,6 +601,7 @@ watch(
       >
         <EditorHost
           v-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled)"
+          :key="shell.activeEditorDocument.id"
           variant="mockup"
           :title="shell.activeEditorDocument.title"
           :value="shell.activeEditorDocument.value"

@@ -1,4 +1,5 @@
 import type { OperatorThreadEntry } from './operator-thread';
+import type { OperatorArtifactRecord } from './operator-artifact-view';
 
 const COMMAND_EXECUTION_RE =
   /^Executed `([^`]+)` \((ok|failed)\) for run (\S+)\.\n\n```(?:[^\n]*\n)?([\s\S]*?)```(?:\n\n([\s\S]+))?$/i;
@@ -21,6 +22,12 @@ export type ConversationDisplayItem =
       execution: CommandExecutionDisplay;
       compact?: boolean;
       repeatCount?: number;
+    }
+  | {
+      kind: 'artifact';
+      messageId: string;
+      createdAt: string;
+      artifact: OperatorArtifactRecord;
     }
   | {
       kind: 'message';
@@ -47,7 +54,11 @@ const REPEAT_COLLAPSE_COMMANDS = new Set([
 const DEFAULT_OPERATOR_CONVERSATION_LIMIT = 6;
 
 function normalizeCommandKey(command: string): string {
-  return command.trim().toLowerCase();
+  const trimmed = command.trim().toLowerCase().replace(/_/g, ' ');
+  if (trimmed === 'git status' || trimmed === 'health check' || trimmed === 'health probe') {
+    return trimmed === 'health probe' ? 'check-health' : trimmed;
+  }
+  return trimmed;
 }
 
 function shouldCollapseRepeatedCommand(command: string): boolean {
@@ -216,20 +227,41 @@ export function collapseRepeatedOperatorCommands(
 
 export function prepareOperatorConversationDock(
   messages: OperatorThreadEntry[],
-  options?: { maxItems?: number },
+  options?: { maxItems?: number; artifacts?: OperatorArtifactRecord[] },
 ): OperatorConversationDockView {
   const maxItems = options?.maxItems ?? DEFAULT_OPERATOR_CONVERSATION_LIMIT;
   const expanded = buildOperatorConversationDisplay(messages);
   const collapsed = collapseRepeatedOperatorCommands(expanded);
-  const hiddenCount = Math.max(0, collapsed.length - maxItems);
-  const visible = collapsed.slice(-maxItems);
+  const artifactItems: ConversationDisplayItem[] = (options?.artifacts ?? []).map((artifact) => ({
+    kind: 'artifact',
+    messageId: artifact.artifactId,
+    createdAt: artifact.createdAt,
+    artifact,
+  }));
+  const merged = [...collapsed, ...artifactItems].sort((left, right) => {
+    const leftTime =
+      left.kind === 'message'
+        ? left.message.created_at
+        : left.kind === 'dock_banner'
+          ? ''
+          : left.createdAt;
+    const rightTime =
+      right.kind === 'message'
+        ? right.message.created_at
+        : right.kind === 'dock_banner'
+          ? ''
+          : right.createdAt;
+    return leftTime.localeCompare(rightTime);
+  });
+  const hiddenCount = Math.max(0, merged.length - maxItems);
+  const visible = merged.slice(-maxItems);
 
   const items: ConversationDisplayItem[] = [];
   if (hiddenCount > 0) {
     items.push({
       kind: 'dock_banner',
       messageId: `dock_banner_${hiddenCount}`,
-      text: `${hiddenCount} earlier conversation entries hidden. Mission Control holds the run queue — use Complete all to clear verification backlog.`,
+      text: `${hiddenCount} earlier conversation entries hidden. Open Mission Control for the full run history.`,
     });
   }
 

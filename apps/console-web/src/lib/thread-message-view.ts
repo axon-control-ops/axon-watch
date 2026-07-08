@@ -1,3 +1,4 @@
+import { agentMessageLooksLikeMarkdown } from './agent-message-markdown';
 import type { ThreadMessageRole } from './operator-thread';
 
 export function formatThreadTimestamp(iso: string): string {
@@ -43,8 +44,14 @@ export function agentContentLooksLikeErrorDump(content: string): boolean {
   if (trimmed.startsWith('{') && /"error"\s*:/.test(trimmed)) {
     return true;
   }
-  if (trimmed.length > 1800 && /(\{|\[)/.test(trimmed)) {
-    return true;
+  // Large runtime JSON dumps — not long agent markdown with links or lists.
+  if (trimmed.length > 1800 && !agentMessageLooksLikeMarkdown(trimmed)) {
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      return true;
+    }
+    if (/\{[\s\S]*"error"\s*:/.test(trimmed)) {
+      return true;
+    }
   }
   return false;
 }

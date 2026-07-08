@@ -4,6 +4,7 @@ import {
   agentEditReviewDocumentId,
   agentEditReviewDocumentTitle,
   formatAgentEditReviewContent,
+  shouldOpenWorkspaceFileForEditReview,
 } from './ide-agent-edit-review';
 
 describe('ide-agent-edit-review', () => {
@@ -43,5 +44,26 @@ describe('ide-agent-edit-review', () => {
     expect(agentEditReviewDocumentTitle('apps/console-web/src/IdeAgentReviewStrip.vue')).toBe(
       'IdeAgentReviewStrip.vue · review',
     );
+  });
+
+  it('falls back to workspace files when no diff is captured yet', () => {
+    expect(
+      shouldOpenWorkspaceFileForEditReview({
+        diff: '',
+        open: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldOpenWorkspaceFileForEditReview({
+        diff: '',
+        open: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldOpenWorkspaceFileForEditReview({
+        diff: '--- a/README.md\n+++ b/README.md\n+line',
+        open: false,
+      }),
+    ).toBe(false);
   });
 });

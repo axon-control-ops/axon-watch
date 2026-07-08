@@ -71,7 +71,13 @@ export function galaxyOrbModeLabel(
   if (conversationPhase === 'thinking') {
     return 'Checking…';
   }
-  return handsFreeEnabled ? 'Hands-free' : 'Manual';
+  if (conversationPhase === 'speaking') {
+    return 'Voice live';
+  }
+  if (handsFreeEnabled) {
+    return '';
+  }
+  return 'Manual';
 }
 
 export function galaxyOrbStateClass(

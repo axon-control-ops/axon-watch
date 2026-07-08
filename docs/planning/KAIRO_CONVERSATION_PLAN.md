@@ -1,6 +1,6 @@
 # KAIRO Conversation Plan (OP-C) — JARVIS Dialogue Loop
 
-**Status:** Planned (2026-07-08)
+**Status:** Active skeleton (2026-07-08; updated 2026-07-08 PM)
 **Parent:** [`OPERATOR_BRAIN_PIVOT.md`](OPERATOR_BRAIN_PIVOT.md) — Wave 5
 **Inputs:** JARVIS Prompt Pack (operator PDF) conversational loop, [`KAIRO_MODE.md`](KAIRO_MODE.md) JX-4/JX-5, AI Workshop OS reference ("say Jarvis…", ask → answer → act)
 
@@ -33,11 +33,11 @@ channel (typed and spoken).
 | Conversational replies (Lane B, Cursor agent subprocess) | `chat/service.py` `should_use_lane_b` | Working but slow (CLI cold start 20 s+) |
 | Command intent classification; questions → not commands | `chat/command_intent.py` `is_question()` | Working |
 | Speak-briefing on demand | `shell.speakOperatorBriefing()` + orb tap | Working |
-| **Speech input (STT)** | — | **Missing** |
-| **Fast grounded Q&A** ("what's on fire?", "any approvals?") | — | **Missing** (Lane B too slow for dialogue) |
-| **Conversation surface in galaxy** (omnibar input) | — | **Missing** (omnibar is display-only) |
-| **Voice-initiated actions** ("run health check", "show me DashPro") | — | **Missing** |
-| **Turn memory** | `kairo_voice._HISTORY` (spoken lines only) | Partial — no Q&A context |
+| **Speech input (STT)** | `console-web/src/features/kairo-conversation/` | Working skeleton (hold orb / Space push-to-talk; no wake word) |
+| **Fast grounded Q&A** ("what's on fire?", "any approvals?") | `/api/kairo/converse` + `kairo_conversation_reply.py` | Working skeleton (fast DTO path; runtime reserved for deep turns) |
+| **Conversation surface in galaxy** (omnibar input) | `KairoConversationBar.vue` | Working skeleton |
+| **Voice-initiated actions** ("run health check", "show me DashPro") | local nav intents + command routing | Partial — navigation, command dispatch, and handoff follow-ups exist |
+| **Turn memory** | `kairo_conversation.py` (`_TURN_MEMORY`, `_ENTITY_MEMORY`) | Partial — session-scoped turn + entity memory exists |
 
 ---
 

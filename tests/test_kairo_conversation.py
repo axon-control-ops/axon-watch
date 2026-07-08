@@ -52,11 +52,20 @@ _MOCK_GRAPH = {"nodes": [{"node_id": "n1"}], "edges": []}
 class KairoConversationUnitTests(unittest.TestCase):
     def test_classify_command_turn(self) -> None:
         self.assertEqual("command", classify_conversation_turn("git status"))
+        self.assertEqual("command", classify_conversation_turn("what is the git status?"))
         self.assertEqual("command", classify_conversation_turn("run ./scripts/dev/check-health.sh"))
 
     def test_classify_status_question(self) -> None:
         self.assertEqual("status_question", classify_conversation_turn("any approvals?"))
         self.assertEqual("status_question", classify_conversation_turn("what needs my attention"))
+        self.assertEqual(
+            "status_question",
+            classify_conversation_turn("check what DashPro workspace just did"),
+        )
+        self.assertEqual(
+            "status_question",
+            classify_conversation_turn("pull up DashPro workspace and check what is doing"),
+        )
 
     def test_classify_open_question_not_status(self) -> None:
         self.assertEqual("open_question", classify_conversation_turn("why is sentry spiking?"))
@@ -79,6 +88,44 @@ class KairoConversationUnitTests(unittest.TestCase):
         reply = answer_status_question("what's on fire?", pack)
         self.assertIn("Sentry spike", reply)
 
+    def test_answer_general_surfaces_cli_blocker_instead_of_nominal(self) -> None:
+        pack = {
+            "briefing": {
+                **_MOCK_BRIEFING,
+                "pending_approvals": {"count": 0},
+                "active_runs": [],
+                "top_signals": [],
+                "notice": "No active runs. Systems nominal.",
+                "cli_runtime": {
+                    "dispatch_ready": False,
+                    "blockers": ["Cursor CLI (local): Cursor auth probe timed out."],
+                },
+            },
+            "fleet": {"critical_count": 0, "attention_count": 0, "workspace_count": 1},
+        }
+        reply = answer_status_question("is everything normal?", pack)
+        self.assertIn("agent dispatch is blocked", reply)
+        self.assertIn("Cursor auth probe timed out", reply)
+        self.assertNotIn("Systems look nominal", reply)
+
+    def test_answer_health_question_is_concise_when_operational(self) -> None:
+        pack = {
+            "briefing": {
+                **_MOCK_BRIEFING,
+                "pending_approvals": {"count": 0},
+                "active_runs": [],
+                "top_signals": [],
+                "notice": "No active runs. Systems nominal.",
+                "cli_runtime": {"dispatch_ready": True, "blockers": []},
+                "degraded": {"active": False, "reasons": []},
+            },
+            "fleet": {"critical_count": 0, "attention_count": 0, "workspace_count": 1},
+        }
+        reply = answer_status_question("is everything normal on your side?", pack)
+        self.assertIn("all clear", reply.lower())
+        self.assertLess(len(reply), 120)
+        self.assertNotIn("Resume Before we keep pushing OTAs", reply)
+
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
     @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
@@ -91,6 +138,19 @@ class KairoConversationUnitTests(unittest.TestCase):
         self.assertEqual("git status", payload["command_content"])
         self.assertIn("git status", str(payload["reply"]).lower())
         self.assertEqual("template", payload["source"])
+        self.assertEqual([], payload["artifacts"])
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_converse_question_style_git_status_routes_as_command(
+        self,
+        *_mocks: object,
+    ) -> None:
+        payload = converse_turn(content="what is the git status?", session_id="test-session")
+        self.assertEqual("command", payload["turn_kind"])
+        self.assertEqual("git status", payload["command_content"])
+        self.assertIn("git status", str(payload["reply"]).lower())
 
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
@@ -124,6 +184,39 @@ class KairoConversationUnitTests(unittest.TestCase):
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
     @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_converse_mangled_dashpro_workspace_activity_prompt_routes_to_status(
+        self,
+        mock_briefing,
+        *_mocks: object,
+    ) -> None:
+        payload = converse_turn(
+            content="hey vaccine can you check what this pro works based use it",
+            session_id="dashpro-voice-session",
+        )
+        self.assertEqual("status_question", payload["turn_kind"])
+        self.assertEqual("template", payload["source"])
+        self.assertIn("DashPro", str(payload["reply"]))
+        mock_briefing.assert_called_with(workspace_id="workspace_dashpro")
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_converse_probox_space_doing_prompt_routes_to_status(
+        self,
+        mock_briefing,
+        *_mocks: object,
+    ) -> None:
+        payload = converse_turn(
+            content="hey excent can you pull up those probox space and check what is doing",
+            session_id="dashpro-voice-session-2",
+        )
+        self.assertEqual("status_question", payload["turn_kind"])
+        self.assertIn("DashPro", str(payload["reply"]))
+        mock_briefing.assert_called_with(workspace_id="workspace_dashpro")
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
     @patch("app.kairo_conversation.dispatch_ide_composer")
     @patch("app.kairo_conversation.build_lane_b_context_block", return_value="Workspace context")
     def test_converse_open_question_sanitizes_runtime_agent_dump(
@@ -144,11 +237,14 @@ class KairoConversationUnitTests(unittest.TestCase):
             content="why is dashpro spiking?",
             session_id="sanitize-open-question",
             use_runtime=True,
+            answer_tier="deep",
         )
         reply = str(payload["reply"])
         self.assertNotIn(":::", reply)
         self.assertNotIn("scripts/ops", reply)
-        self.assertIn("DashPro is not spiking", reply)
+        self.assertTrue(payload["artifacts"])
+        artifact_body = str(payload["artifacts"][0]["body"])
+        self.assertIn("DashPro is not spiking", artifact_body)
 
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
@@ -169,11 +265,33 @@ class KairoConversationUnitTests(unittest.TestCase):
             content="why is sentry spiking?",
             session_id="open-question-session",
             use_runtime=True,
+            answer_tier="deep",
         )
         self.assertEqual("open_question", payload["turn_kind"])
         self.assertEqual("model", payload["source"])
-        self.assertIn("Sentry spike", str(payload["reply"]))
+        self.assertIn("Sentry spike", str(payload["artifacts"][0]["body"]))
+        self.assertTrue(payload["artifacts"])
         mock_dispatch.assert_called_once()
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    @patch("app.kairo_conversation.dispatch_ide_composer")
+    def test_converse_open_question_fast_tier_skips_runtime(
+        self,
+        mock_dispatch,
+        *_mocks: object,
+    ) -> None:
+        payload = converse_turn(
+            content="why is sentry spiking?",
+            session_id="fast-open-question",
+            use_runtime=True,
+            answer_tier="fast",
+        )
+        self.assertEqual("open_question", payload["turn_kind"])
+        self.assertEqual("template", payload["source"])
+        self.assertEqual([], payload["artifacts"])
+        mock_dispatch.assert_not_called()
 
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
@@ -204,11 +322,13 @@ class KairoConversationUnitTests(unittest.TestCase):
             content="why is dashpro spiking?",
             session_id="open-question-tail-trim",
             use_runtime=True,
+            answer_tier="deep",
         )
         reply = str(payload["reply"])
-        self.assertLessEqual(len(reply), 1200)
-        self.assertIn("DashPro spike", reply)
-        self.assertEqual(reply.count("If you are seeing a spike in Supabase or Axon quota"), 1)
+        artifact_body = str(payload["artifacts"][0]["body"])
+        self.assertLessEqual(len(reply), 280)
+        self.assertIn("DashPro spike", artifact_body)
+        self.assertEqual(artifact_body.count("If you are seeing a spike in Supabase or Axon quota"), 1)
         self.assertTrue(reply.endswith((".", "!", "?")))
 
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
@@ -278,7 +398,7 @@ class KairoConversationEndpointTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertEqual(
-            {"turn_kind", "reply", "source", "command_content", "action"},
+            {"turn_kind", "reply", "source", "command_content", "action", "artifacts"},
             set(payload),
         )
         self.assertEqual("status_question", payload["turn_kind"])

@@ -165,9 +165,9 @@ All graph layout (3D positions, clustering) is **client-derived** from `BrainGra
 |----|-------|-------|---------|--------|
 | **OP-B6a** | `BrainGraphDTO` schema + `/api/operator/brain-graph` | control-plane | OP-B1 fleet rollup | **Done** (`operator_brain_graph.py`, 4 tests) |
 | **OP-B6b** | 2D graph fallback (deterministic radial SVG) | console-web | OP-B6a | **Done** (`operator-brain-graph-view.ts`, `OperatorBrainGraphPanel.vue`) |
-| **OP-B6c** | 3D galaxy view (WebGL, bounded feature module) | console-web `brain-galaxy/` | OP-B6a | Pending |
+| **OP-B6c** | 3D galaxy view (WebGL, bounded feature module) | console-web `brain-galaxy/` | OP-B6a | **In progress** (WebGL stage + orb + galaxy HUD landed; prove-source wiring still thin) |
 | **OP-B6d** | View switcher: GRID \| BRAIN; persist preference | shell store | OP-B6b,c | **Done** (2D; galaxy joins switcher in OP-B6c) |
-| **OP-B6e** | Node click → prove-source panel (reuse OP-B5) | console-web | OP-B5 | Partial (workspace click focuses, signal click opens Attention) |
+| **OP-B6e** | Node click → prove-source panel (reuse OP-B5) | console-web | OP-B5 | Partial (workspace click focuses, signal click opens Attention, converse context + artifact handoff skeleton landed) |
 
 **Performance budget:** initial galaxy load <2s on dev machine; <100 animated nodes default; LOD beyond that.
 
@@ -254,7 +254,7 @@ Parallel safe: OP-B4 config work while OP-B6a is in flight.
 | **OP-V1c** | `scope=operator` workspace catalog (drop demo/bootstrap) | **Done** |
 | **OP-V1d** | `operator-run-cleanup.sh` for verification debt | **Done** |
 | **OP-V1e** | Voice capture → dispatch command (hands-free) | **Absorbed by OP-C3** (Wave 5) |
-| **OP-V1f** | Signal → IDE handoff card (OP-B5) | Pending |
+| **OP-V1f** | Signal → IDE handoff card (OP-B5) | Partial (conversation artifacts now carry a Continue in IDE handoff action) |
 | **OP-V1g** | KAIRO mobile shell (tunnel + compact voice UI) | Pending |
 | **OP-V1h** | Real monitor signals in inbox (Sentry/PostHog beyond bootstrap) | Pending (OP-B4) |
 
@@ -270,9 +270,9 @@ Full plan: [`KAIRO_CONVERSATION_PLAN.md`](KAIRO_CONVERSATION_PLAN.md).
 
 | ID | Slice | Status |
 |----|-------|--------|
-| **OP-C1** | `/api/kairo/converse` — context pack, turn router, grounded answers (fast status path, no CLI) | Pending |
-| **OP-C2** | Galaxy conversation bar (typed) — one input, command + question lanes, spoken replies | Pending |
-| **OP-C3** | Push-to-talk STT (hold orb / Space) — **absorbs OP-V1e** | Pending |
+| **OP-C1** | `/api/kairo/converse` — context pack, turn router, grounded answers (fast status path, no CLI) | **In progress** (fast/deep tiers, DTO fast path, artifacts, voice-log timings) |
+| **OP-C2** | Galaxy conversation bar (typed) — one input, command + question lanes, spoken replies | **In progress** (live omnibar, spoken replies, thinking line, command/results split) |
+| **OP-C3** | Push-to-talk STT (hold orb / Space) — **absorbs OP-V1e** | **In progress** (orb hold + Space PTT implemented; no wake word) |
 | **OP-C4** | Conversation actions — navigation intents, confirmed dispatch, handoff hook | Pending |
 | **OP-C5** | Turn memory + follow-ups (session-scoped, non-authoritative) | Pending |
 | **OP-C6** | Wake word "KAIRO…" (deferred until loop proven) | Deferred |

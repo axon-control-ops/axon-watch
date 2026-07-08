@@ -175,6 +175,7 @@ def build_operator_briefing(
         degraded=runtime_summary["degraded"],
         watch_connected=watch_connected,
         next_safe_actions=next_safe_actions,
+        cli_runtime=runtime_summary.get("cli_runtime"),
     )
 
     scope: dict[str, object] = (
@@ -197,6 +198,7 @@ def build_operator_briefing(
         "active_runs": active_runs,
         "next_safe_actions": next_safe_actions,
         "degraded": runtime_summary["degraded"],
+        "cli_runtime": runtime_summary.get("cli_runtime", {}),
         "connectivity": {
             "control_plane_ready": bool(runtime_summary["control_plane"]["ready"]),
             "watch_connected": bool(runtime_summary["watch"]["connected"]),
