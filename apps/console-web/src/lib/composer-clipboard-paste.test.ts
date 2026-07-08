@@ -59,8 +59,8 @@ describe('composer clipboard paste', () => {
     const images = readDroppedImages(event);
     expect(images).toHaveLength(1);
     expect(images[0]?.name).toBe('drop.png');
-    expect(shouldAcceptComposerFileDrop({ dataTransfer: { types: ['Files'] } } as DragEvent)).toBe(
-      true,
-    );
+    expect(
+      shouldAcceptComposerFileDrop({ dataTransfer: { types: ['Files'] } } as unknown as DragEvent),
+    ).toBe(true);
   });
 });

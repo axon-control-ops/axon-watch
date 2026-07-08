@@ -86,6 +86,23 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertTrue(should_use_runtime_for_event("done", "minimal"))
         self.assertTrue(should_use_runtime_for_event("agent_start", "conversational"))
         self.assertFalse(should_use_runtime_for_event("done", "off"))
+        self.assertFalse(should_use_runtime_for_event("conversation_reply", "minimal"))
+        self.assertTrue(should_use_runtime_for_event("conversation_reply", "conversational"))
+
+    def test_conversation_reply_fallback_uses_literal(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="conversation_reply",
+                context={
+                    "fallback": "Two approvals waiting — I'd open Attention first.",
+                    "reply": "Two approvals waiting — I'd open Attention first.",
+                    "operator_prompt": "any approvals?",
+                },
+                session_id="conversation-reply-fallback",
+                narration="minimal",
+            )
+        self.assertIn("Two approvals", payload["line"])
+        self.assertEqual(payload["source"], "fallback")
 
 
 class KairoSpeakApiTests(unittest.TestCase):

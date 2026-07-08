@@ -309,6 +309,15 @@ export function thinkingPreview(text: string, maxLength = 90): string {
   return `${flattened.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
+/** Map agent edit paths to workspace-relative paths the file API understands. */
+export function normalizeEditedFilePath(path: string): string {
+  const normalized = path.trim().replace(/\\/g, '/');
+  if (!normalized || normalized.startsWith('/')) {
+    return fileBaseName(normalized);
+  }
+  return normalized;
+}
+
 /** Workspace-relative paths mentioned in completed edit blocks. */
 export function editedFilePathsFromTranscript(content: string): string[] {
   const paths: string[] = [];
@@ -316,12 +325,7 @@ export function editedFilePathsFromTranscript(content: string): string[] {
     if (segment.kind !== 'edit' || segment.open) {
       continue;
     }
-    const normalized = segment.path.trim().replace(/\\/g, '/');
-    if (!normalized || normalized.startsWith('/')) {
-      paths.push(fileBaseName(normalized));
-      continue;
-    }
-    paths.push(normalized);
+    paths.push(normalizeEditedFilePath(segment.path));
   }
   return [...new Set(paths)];
 }

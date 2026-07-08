@@ -42,9 +42,9 @@ export function useKairoConversation() {
     return id;
   }
 
-  function speakReply(line: string): void {
-    shell.stopKairoSpeech();
-    void shell.speakKairoConversationLine(line);
+  function speakReply(line: string, operatorPrompt?: string): void {
+    shell.interruptKairoVoice();
+    void shell.speakKairoConversationLine(line, { operatorPrompt });
   }
 
   async function executeConverseAction(
@@ -91,7 +91,7 @@ export function useKairoConversation() {
       return;
     }
 
-    shell.stopKairoSpeech();
+    shell.interruptKairoVoice();
     pending.value = true;
     kairoConversationError.value = null;
     setKairoConversationPhase('thinking');
@@ -132,11 +132,10 @@ export function useKairoConversation() {
         content,
         session_id: kairoSpeechSessionId(),
         workspace_id: workspaceId.value,
-        use_runtime: false,
       });
       kairoConversationReply.value = response.reply;
       draft.value = '';
-      speakReply(response.reply);
+      speakReply(response.reply, content);
 
       if (response.action) {
         await executeConverseAction(response.action);
@@ -170,7 +169,7 @@ export function useKairoConversation() {
   }
 
   function startVoiceCapture(): boolean {
-    shell.stopKairoSpeech();
+    shell.interruptKairoVoice();
     return speechCapture.startCapture();
   }
 

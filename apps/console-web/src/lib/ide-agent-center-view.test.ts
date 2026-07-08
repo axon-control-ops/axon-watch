@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildIdeAgentReviewBar,
+  buildIdeAgentReviewComposerLabel,
+  buildIdeAgentThreadStatusLabel,
+  collectIdeAgentEditSummariesFromThread,
   extractIdeAgentEditSummaries,
   resolveActiveIdeAgentMessage,
-  shouldShowIdeAgentCenterPanel,
+  shouldShowIdeAgentReviewStrip,
+  shouldShowIdeAgentThreadStatusStrip,
 } from './ide-agent-center-view';
 
 describe('ide agent center view', () => {
@@ -30,9 +34,18 @@ describe('ide agent center view', () => {
     expect(edits[0]?.added).toBe(3);
   });
 
-  it('shows the center panel while the agent is busy or review is ready', () => {
+  it('normalizes absolute edit paths for workspace file open', () => {
+    const edits = extractIdeAgentEditSummaries(
+      ':::edit /home/edp/.cursor/projects/foo/README.md +1 -0\n+line\n:::\n',
+      'm1',
+    );
+    expect(edits).toHaveLength(1);
+    expect(edits[0]?.path).toBe('README.md');
+  });
+
+  it('shows the review strip while the agent is busy or review is ready', () => {
     expect(
-      shouldShowIdeAgentCenterPanel({
+      shouldShowIdeAgentReviewStrip({
         layoutMode: 'ide',
         agentStreamActive: true,
         composerAgentBusy: false,
@@ -42,7 +55,7 @@ describe('ide agent center view', () => {
     ).toBe(true);
 
     expect(
-      shouldShowIdeAgentCenterPanel({
+      shouldShowIdeAgentReviewStrip({
         layoutMode: 'operator',
         agentStreamActive: true,
         composerAgentBusy: false,
@@ -52,7 +65,7 @@ describe('ide agent center view', () => {
     ).toBe(false);
 
     expect(
-      shouldShowIdeAgentCenterPanel({
+      shouldShowIdeAgentReviewStrip({
         layoutMode: 'ide',
         agentStreamActive: false,
         composerAgentBusy: false,
@@ -60,6 +73,83 @@ describe('ide agent center view', () => {
         editedFileCount: 2,
       }),
     ).toBe(true);
+
+    expect(
+      shouldShowIdeAgentReviewStrip({
+        layoutMode: 'ide',
+        agentStreamActive: false,
+        composerAgentBusy: false,
+        reviewReadyCount: 1,
+        editedFileCount: 0,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowIdeAgentReviewStrip({
+        layoutMode: 'ide',
+        agentStreamActive: false,
+        composerAgentBusy: false,
+        reviewReadyCount: 0,
+        editedFileCount: 2,
+      }),
+    ).toBe(true);
+  });
+
+  it('builds thread status labels with KAIRO prefix while streaming', () => {
+    expect(
+      buildIdeAgentThreadStatusLabel({
+        activityLabel:
+          'I need to review my previous answer for factual mistakes, missing steps, unsupported assumption…',
+      }),
+    ).toBe(
+      'KAIRO — I need to review my previous answer for factual mistakes, missing steps, unsupported assumption…',
+    );
+
+    expect(
+      buildIdeAgentThreadStatusLabel({
+        activityLabel: 'KAIRO — Checking the file',
+      }),
+    ).toBe('KAIRO — Checking the file');
+  });
+
+  it('shows thread status only while streaming in IDE mode', () => {
+    expect(
+      shouldShowIdeAgentThreadStatusStrip({
+        layoutMode: 'ide',
+        agentStreamActive: true,
+        activityLabel: 'KAIRO — Thinking…',
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldShowIdeAgentThreadStatusStrip({
+        layoutMode: 'operator',
+        agentStreamActive: true,
+        activityLabel: 'KAIRO — Thinking…',
+      }),
+    ).toBe(false);
+  });
+
+  it('builds composer review labels without KAIRO thinking text', () => {
+    expect(
+      buildIdeAgentReviewComposerLabel({
+        agentStreamActive: true,
+        executionAccess: 'full',
+        editedFileCount: 46,
+        reviewReadyCount: 0,
+        expanded: false,
+      }),
+    ).toBe('▸ 46 files');
+
+    expect(
+      buildIdeAgentReviewComposerLabel({
+        agentStreamActive: true,
+        executionAccess: 'full',
+        editedFileCount: 0,
+        reviewReadyCount: 0,
+        expanded: false,
+      }),
+    ).toBe('Full Access — streaming runtime output…');
   });
 
   it('builds review bar labels from file and review counts', () => {

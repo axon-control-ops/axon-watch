@@ -51,5 +51,15 @@ function selectView(view: IdeActivityView): void {
     >
       <IdeActivityIcon :name="item.id" class="ide-activity-bar__icon" />
     </button>
+    <button
+      type="button"
+      class="ide-activity-bar__button ide-activity-bar__button--settings"
+      :class="{ 'ide-activity-bar__button--active': shell.operatorPresenceSettingsOpen }"
+      aria-label="Operator presence settings"
+      title="Settings (KAIRO narration, voice, persona)"
+      @click.stop="shell.openOperatorPresenceSettingsPanel()"
+    >
+      <span class="ide-activity-bar__settings-icon" aria-hidden="true">⚙</span>
+    </button>
   </nav>
 </template>

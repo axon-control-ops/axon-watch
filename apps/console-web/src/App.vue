@@ -4,11 +4,11 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import BootWakeOverlay from './components/BootWakeOverlay.vue';
 import CenterWorkbench from './components/shell/CenterWorkbench.vue';
 import IdeInterruptPanel from './components/ide/IdeInterruptPanel.vue';
-import IdeVoiceStrip from './components/ide/IdeVoiceStrip.vue';
 import LeftSidebar from './components/shell/LeftSidebar.vue';
 import RightDock from './components/shell/RightDock.vue';
 import StatusBar from './components/shell/StatusBar.vue';
 import TopBar from './components/shell/TopBar.vue';
+import OperatorPresenceSettingsPanel from './components/shell/OperatorPresenceSettingsPanel.vue';
 import VaultSurface from './components/vault/VaultSurface.vue';
 import DataSurface from './components/data/DataSurface.vue';
 import OperatorMobileShell from './components/shell/OperatorMobileShell.vue';
@@ -119,16 +119,25 @@ onUnmounted(() => {
       :data-layout-mode="shell.layoutMode"
     >
       <TopBar />
-      <MobileVoiceCockpitStrip v-show="!isFoundationSurface" />
-      <IdeInterruptPanel v-show="!isFoundationSurface" />
-      <LeftSidebar v-show="!isFoundationSurface" />
-      <VaultSurface v-show="isVaultSurface" />
-      <DataSurface v-show="isDataSurface" />
-      <OperatorMobileShell v-show="isMobileSurface" />
-      <CenterWorkbench v-show="!isFoundationSurface" />
-      <RightDock v-show="!isFoundationSurface" />
+      <template v-if="!isFoundationSurface">
+        <MobileVoiceCockpitStrip />
+        <IdeInterruptPanel />
+        <LeftSidebar />
+        <CenterWorkbench />
+        <RightDock />
+      </template>
+      <VaultSurface v-if="isVaultSurface" />
+      <DataSurface v-if="isDataSurface" />
+      <OperatorMobileShell v-if="isMobileSurface" />
       <StatusBar />
-      <IdeVoiceStrip v-show="!isFoundationSurface" :foundation-surface="isFoundationSurface" />
     </div>
+
+    <OperatorPresenceSettingsPanel
+      :open="shell.operatorPresenceSettingsOpen"
+      :settings="shell.operatorPresenceSettings"
+      :saving="shell.operatorPresenceSettingsSaving"
+      @close="shell.toggleOperatorPresenceSettingsPanel(false)"
+      @save="shell.saveOperatorPresenceSettingsPatch($event)"
+    />
   </template>
 </template>

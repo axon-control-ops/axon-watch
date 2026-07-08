@@ -2,10 +2,18 @@ import type { ThreadMessage } from '../contracts/canonical';
 
 export type ThreadMessageRole = 'operator' | 'system' | 'agent';
 
+export interface ThreadMessageAttachment {
+  attachment_id: string;
+  filename: string;
+  mime_type: string;
+  url: string;
+}
+
 export interface OperatorThreadEntry extends ThreadMessage {
   role: ThreadMessageRole;
   content: string;
   created_at: string;
+  attachments?: ThreadMessageAttachment[];
 }
 
 export function createLocalThreadId(workspaceId: string): string {
@@ -101,7 +109,17 @@ export function mapChatMessageRecord(record: {
   role: string;
   content: string;
   created_at: string;
+  attachments?: ThreadMessageAttachment[];
 }): OperatorThreadEntry {
+  const attachments = (record.attachments ?? [])
+    .map((item) => ({
+      attachment_id: String(item.attachment_id ?? '').trim(),
+      filename: String(item.filename ?? '').trim(),
+      mime_type: String(item.mime_type ?? '').trim(),
+      url: String(item.url ?? '').trim(),
+    }))
+    .filter((item) => item.attachment_id && item.url);
+
   return {
     message_id: record.message_id,
     thread_id: record.thread_id,
@@ -115,6 +133,7 @@ export function mapChatMessageRecord(record: {
           : 'operator',
     content: record.content,
     created_at: record.created_at,
+    ...(attachments.length ? { attachments } : {}),
   };
 }
 

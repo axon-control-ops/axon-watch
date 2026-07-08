@@ -2,6 +2,10 @@
 
 export type SpeechPort = Pick<SpeechSynthesis, 'speak' | 'getVoices'> & {
   cancel?: SpeechSynthesis['cancel'];
+  pause?: SpeechSynthesis['pause'];
+  resume?: SpeechSynthesis['resume'];
+  speaking?: boolean;
+  paused?: boolean;
   addEventListener?: SpeechSynthesis['addEventListener'];
 };
 

@@ -13,7 +13,7 @@ export function useIdeKairoInterrupt(): void {
       return;
     }
     event.preventDefault();
-    shell.stopKairoSpeech();
+    shell.interruptKairoVoice();
   }
 
   onMounted(() => {

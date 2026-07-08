@@ -54,6 +54,13 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         "label": "OpenAI provider fallback",
         "required_keys": ("OPENAI_API_KEY",),
     },
+    {
+        "id": "kairo_tts",
+        "label": "KAIRO Azure speech playback",
+        "required_keys": ("AZURE_SPEECH_KEY",),
+        "optional_keys": ("AZURE_SPEECH_REGION", "azure_speech_key", "azure_speech_region"),
+        "auth_note": "Store AZURE_SPEECH_KEY (or azure_speech_key) and optional region in /vault.",
+    },
 )
 
 

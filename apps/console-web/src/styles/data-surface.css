@@ -1,9 +1,18 @@
-.console-shell--mockup.console-shell--data {
+.console-shell--mockup.console-shell--data,
+.console-shell--mockup.console-shell--data[data-layout-mode='ide'],
+.console-shell--mockup.console-shell--data[data-layout-mode='operator'] {
   grid-template-areas:
     'topbar topbar topbar'
     'centerWorkbench centerWorkbench centerWorkbench'
     'statusBar statusBar statusBar';
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr) var(--statusbar-height);
+}
+
+.console-shell--mockup.console-shell--data .region-left-sidebar,
+.console-shell--mockup.console-shell--data .region-right-dock,
+.console-shell--mockup.console-shell--data .center-workbench:not(.data-surface) {
+  display: none !important;
 }
 
 .console-shell--mockup.console-shell--data .region-center-workbench.data-surface {

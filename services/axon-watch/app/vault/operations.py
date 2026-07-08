@@ -343,6 +343,18 @@ def vault_runtime_env() -> dict[str, str]:
             env[env_name] = value
     if "CODEX_API_KEY" not in env and env.get("OPENAI_API_KEY"):
         env["CODEX_API_KEY"] = env["OPENAI_API_KEY"]
+    azure_key_names = ("AZURE_SPEECH_KEY", "azure_speech_key")
+    azure_region_names = ("AZURE_SPEECH_REGION", "azure_speech_region")
+    for name in azure_key_names:
+        value = vault_resolve_named_secret(name)
+        if value:
+            env.setdefault("AZURE_SPEECH_KEY", value)
+            break
+    for name in azure_region_names:
+        value = vault_resolve_named_secret(name)
+        if value:
+            env.setdefault("AZURE_SPEECH_REGION", value)
+            break
     for _runtime_id, provider_id in RUNTIME_PROVIDER_IDS.items():
         if provider_id in {binding[1] for binding in named_bindings}:
             continue
@@ -368,6 +380,18 @@ def vault_runtime_posture() -> dict[str, object]:
         "CURSOR_API_KEY": bool(vault_resolve_named_secret("CURSOR_API_KEY")) if unlocked else False,
         "CODEX_API_KEY": bool(vault_resolve_named_secret("CODEX_API_KEY")) if unlocked else False,
         "OPENAI_API_KEY": bool(vault_resolve_named_secret("OPENAI_API_KEY")) if unlocked else False,
+        "AZURE_SPEECH_KEY": bool(
+            vault_resolve_named_secret("AZURE_SPEECH_KEY")
+            or vault_resolve_named_secret("azure_speech_key")
+        )
+        if unlocked
+        else False,
+        "AZURE_SPEECH_REGION": bool(
+            vault_resolve_named_secret("AZURE_SPEECH_REGION")
+            or vault_resolve_named_secret("azure_speech_region")
+        )
+        if unlocked
+        else False,
     }
     for env_name, present in named_keys.items():
         if present:

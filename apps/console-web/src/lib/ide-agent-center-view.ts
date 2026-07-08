@@ -1,4 +1,7 @@
-import { parseAgentTranscriptBlocks } from './agent-transcript-blocks';
+import {
+  normalizeEditedFilePath,
+  parseAgentTranscriptBlocks,
+} from './agent-transcript-blocks';
 
 export type IdeAgentThreadMessage = {
   message_id: string;
@@ -48,7 +51,7 @@ export function extractIdeAgentEditSummaries(
     }
     edits.push({
       id: `${messageId}:${index}`,
-      path: segment.path,
+      path: normalizeEditedFilePath(segment.path),
       added: segment.added,
       removed: segment.removed,
       diff: segment.diff,
@@ -58,7 +61,31 @@ export function extractIdeAgentEditSummaries(
   return edits;
 }
 
-export function shouldShowIdeAgentCenterPanel(input: {
+/** Collect edit summaries across the thread; later agent messages win on duplicate paths. */
+export function collectIdeAgentEditSummariesFromThread(
+  messages: readonly IdeAgentThreadMessage[],
+): IdeAgentEditSummary[] {
+  const byPath = new Map<string, IdeAgentEditSummary>();
+  const order: string[] = [];
+
+  for (const message of messages) {
+    if (message.role !== 'agent') {
+      continue;
+    }
+    for (const edit of extractIdeAgentEditSummaries(message.content, message.message_id)) {
+      if (!byPath.has(edit.path)) {
+        order.push(edit.path);
+      }
+      byPath.set(edit.path, edit);
+    }
+  }
+
+  return order
+    .map((path) => byPath.get(path))
+    .filter((edit): edit is IdeAgentEditSummary => Boolean(edit));
+}
+
+export function shouldShowIdeAgentReviewStrip(input: {
   layoutMode: 'operator' | 'ide';
   agentStreamActive: boolean;
   composerAgentBusy: boolean;
@@ -71,7 +98,61 @@ export function shouldShowIdeAgentCenterPanel(input: {
   if (input.agentStreamActive || input.composerAgentBusy) {
     return true;
   }
-  return input.reviewReadyCount > 0 && input.editedFileCount > 0;
+  if (input.reviewReadyCount > 0) {
+    return true;
+  }
+  return input.editedFileCount > 0;
+}
+
+export function buildIdeAgentThreadStatusLabel(input: {
+  activityLabel: string | null | undefined;
+}): string {
+  const label = String(input.activityLabel ?? 'Agent is working…').trim();
+  if (/^KAIRO\b/i.test(label)) {
+    return label;
+  }
+  const body = label.replace(/^KAIRO[:\s—-]+/i, '').trim() || 'Agent is working…';
+  return `KAIRO — ${body}`;
+}
+
+export function shouldShowIdeAgentThreadStatusStrip(input: {
+  layoutMode: 'operator' | 'ide';
+  agentStreamActive: boolean;
+  activityLabel: string | null | undefined;
+}): boolean {
+  if (input.layoutMode !== 'ide' || !input.agentStreamActive) {
+    return false;
+  }
+  return Boolean(String(input.activityLabel ?? '').trim());
+}
+
+export function buildIdeAgentReviewComposerLabel(input: {
+  agentStreamActive: boolean;
+  executionAccess: 'consultative' | 'full';
+  editedFileCount: number;
+  reviewReadyCount: number;
+  expanded: boolean;
+}): string {
+  if (input.agentStreamActive) {
+    if (input.editedFileCount > 0) {
+      const count = input.editedFileCount;
+      const chevron = input.expanded ? '▾' : '▸';
+      return `${chevron} ${count === 1 ? '1 file' : `${count} files`}`;
+    }
+    if (input.executionAccess === 'full') {
+      return 'Full Access — streaming runtime output…';
+    }
+    return 'Streaming agent reply…';
+  }
+  if (input.editedFileCount > 0) {
+    const count = input.editedFileCount;
+    const chevron = input.expanded ? '▾' : '▸';
+    return `${chevron} ${count === 1 ? '1 file' : `${count} files`}`;
+  }
+  if (input.reviewReadyCount > 0) {
+    return 'Review the agent changes, then apply or complete the run.';
+  }
+  return 'Agent finished — review file changes in the transcript or editor.';
 }
 
 export function buildIdeAgentReviewBar(input: {

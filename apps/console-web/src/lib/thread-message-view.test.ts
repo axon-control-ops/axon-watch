@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentContentLooksLikeErrorDump,
+  formatThreadRole,
   formatThreadTimestamp,
   shortenRunId,
   shouldCollapseSystemMessage,
@@ -9,6 +10,12 @@ import {
 } from './thread-message-view';
 
 describe('thread-message-view', () => {
+  it('formats thread roles for compact labels', () => {
+    expect(formatThreadRole('operator')).toBe('OP');
+    expect(formatThreadRole('agent')).toBe('AGENT');
+    expect(formatThreadRole('system')).toBe('SYSTEM');
+  });
+
   it('formats timestamps for display', () => {
     const formatted = formatThreadTimestamp('2026-07-06T10:53:00.000Z');
     expect(formatted).not.toContain('2026-07-06T10:53:00.000Z');

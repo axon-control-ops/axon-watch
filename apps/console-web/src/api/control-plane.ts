@@ -103,6 +103,21 @@ function controlPlaneBaseUrl(): string {
   return '';
 }
 
+export function resolveChatAttachmentUrl(url: string): string {
+  const normalized = String(url ?? '').trim();
+  if (!normalized) {
+    return '';
+  }
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized;
+  }
+  const baseUrl = controlPlaneBaseUrl();
+  if (!baseUrl) {
+    return normalized;
+  }
+  return normalized.startsWith('/') ? `${baseUrl}${normalized}` : `${baseUrl}/${normalized}`;
+}
+
 export async function fetchRuntimeSummary(): Promise<RuntimeSummary> {
   const baseUrl = controlPlaneBaseUrl();
   const url = baseUrl ? `${baseUrl}/api/runtime/summary` : '/api/runtime/summary';

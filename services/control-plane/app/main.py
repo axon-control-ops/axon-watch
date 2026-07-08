@@ -30,6 +30,7 @@ from app.terminal.session_registry import (
     serialize_session,
 )
 from app.inbox_signals import acknowledge_inbox_signals
+from app.inbox_projection import build_inbox_response
 from app.adapters.watch_client import (
     fetch_watch_connectors,
     fetch_watch_delivery_receipts,
@@ -218,6 +219,11 @@ class KairoConverseRequest(BaseModel):
     session_id: str = "default"
     workspace_id: str = ""
     use_runtime: bool = False
+
+
+class KairoTtsRequest(BaseModel):
+    text: str
+    voice: str | None = None
 
 
 def _watch_base_url() -> str:
@@ -639,6 +645,49 @@ def kairo_speak(body: KairoSpeakRequest) -> dict[str, str]:
         workspace_id=body.workspace_id,
         use_runtime=body.use_runtime,
     )
+
+
+@app.post("/api/kairo/tts")
+def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
+    import base64
+
+    from app.azure_tts import (
+        DEFAULT_AZURE_VOICE,
+        azure_speech_configured,
+        synthesize_azure_speech,
+    )
+    from app.cli_runtime.vault_keys import runtime_vault_posture
+
+    trimmed = body.text.strip()
+    if not trimmed:
+        raise HTTPException(status_code=400, detail="text must not be empty")
+
+    if not azure_speech_configured():
+        posture = runtime_vault_posture()
+        reason = "vault_locked" if not posture.get("unlocked") else "missing_key"
+        return {
+            "available": False,
+            "provider": "browser",
+            "reason": reason,
+        }
+
+    voice = str(body.voice or DEFAULT_AZURE_VOICE).strip() or DEFAULT_AZURE_VOICE
+    synthesized = synthesize_azure_speech(trimmed, voice=voice)
+    if not synthesized:
+        return {
+            "available": False,
+            "provider": "browser",
+            "reason": "synthesis_failed",
+        }
+
+    audio, content_type = synthesized
+    return {
+        "available": True,
+        "provider": "azure",
+        "voice": voice,
+        "content_type": content_type,
+        "audio_base64": base64.b64encode(audio).decode("ascii"),
+    }
 
 
 @app.post("/api/kairo/converse")

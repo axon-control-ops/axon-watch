@@ -24,6 +24,15 @@ _CONTEXT_KEYS_BY_EVENT: dict[str, frozenset[str]] = {
     "approval_literal": frozenset({"literal_line"}),
     "chat_summary": frozenset({"operator_prompt", "summary"}),
     "briefing": frozenset({"notice", "advise", "workspace_id", "pending_approvals", "top_signal_title"}),
+    "conversation_reply": frozenset({
+        "operator_prompt",
+        "reply",
+        "fallback",
+        "pending_approvals",
+        "top_signal_title",
+        "active_run_count",
+        "degraded_active",
+    }),
 }
 
 

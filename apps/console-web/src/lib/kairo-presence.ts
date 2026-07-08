@@ -3,6 +3,7 @@ export type KairoPresenceState =
   | 'observing'
   | 'listening'
   | 'speaking'
+  | 'paused'
   | 'alerting'
   | 'privacy_blocked';
 
@@ -37,6 +38,8 @@ export function kairoPresenceLabel(state: KairoPresenceState): string {
       return 'KAIRO · listening';
     case 'speaking':
       return 'KAIRO · speaking';
+    case 'paused':
+      return 'KAIRO · paused';
     case 'alerting':
       return 'KAIRO · attention';
     case 'privacy_blocked':

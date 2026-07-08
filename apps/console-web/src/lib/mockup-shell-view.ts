@@ -95,6 +95,8 @@ export function kairoPresenceModuleParts(state: KairoPresenceState): {
       return { title: 'KAIRO', subtitle: 'LISTENING' };
     case 'speaking':
       return { title: 'KAIRO', subtitle: 'SPEAKING' };
+    case 'paused':
+      return { title: 'KAIRO', subtitle: 'PAUSED' };
     case 'alerting':
       return { title: 'KAIRO', subtitle: 'ATTENTION' };
     case 'observing':

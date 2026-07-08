@@ -6,7 +6,7 @@ import { useRightDockResize } from '../../composables/useRightDockResize';
 import AgentDockComposer from './AgentDockComposer.vue';
 import AgentDockThreadTabbar from './AgentDockThreadTabbar.vue';
 import AgentDockWorkspaceMenu from './AgentDockWorkspaceMenu.vue';
-import IdeKairoConversationBar from './IdeKairoConversationBar.vue';
+import IdeAgentReviewStrip from './IdeAgentReviewStrip.vue';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -89,7 +89,7 @@ onMounted(() => {
     </section>
 
     <footer class="agent-dock__composer">
-      <IdeKairoConversationBar />
+      <IdeAgentReviewStrip />
       <AgentDockComposer />
     </footer>
   </div>

@@ -121,6 +121,37 @@ class VaultRuntimeEnvTests(unittest.TestCase):
         env = operations.vault_runtime_env()
         self.assertEqual("sk-runtime-test", env["CURSOR_API_KEY"])
 
+    @patch("app.vault.operations.verify_totp", return_value=True)
+    def test_vault_runtime_env_resolves_azure_speech_credentials(self, _mock_totp) -> None:
+        from app.vault import operations
+
+        operations.setup_vault("master-password-123")
+        operations.unlock_vault("master-password-123", "123456")
+        key = VaultSession.get_key()
+        self.assertIsNotNone(key)
+        operations.vault_add_secret(
+            key,
+            "azure_speech_key",
+            "key",
+            "",
+            "abc1234567890123456789012345678",
+            "",
+            "",
+        )
+        operations.vault_add_secret(
+            key,
+            "azure_speech_region",
+            "key",
+            "",
+            "eastus",
+            "",
+            "",
+        )
+
+        env = operations.vault_runtime_env()
+        self.assertEqual(env["AZURE_SPEECH_KEY"], "abc1234567890123456789012345678")
+        self.assertEqual(env["AZURE_SPEECH_REGION"], "eastus")
+
 
 if __name__ == "__main__":
     unittest.main()

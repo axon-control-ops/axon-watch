@@ -109,8 +109,16 @@ import {
 } from '../lib/ide-thread-tabs-prefs';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
 import {
+  onKairoVoiceIdle,
+  pauseKairoPlayback,
+  resumeKairoPlayback,
+  speakKairoLine,
+  stopKairoPlayback,
+  subscribeKairoVoiceSpeaking,
+  isKairoVoiceSpeaking,
+} from '../lib/kairo-voice-playback';
+import {
   onSpeechQueueIdle,
-  stopSpeech,
   subscribeSpeechQueueSpeaking,
 } from '../lib/speech-queue';
 import {
@@ -233,6 +241,13 @@ import {
 } from '../lib/workspace-documents';
 import { persistEditorMarkdownPreviewEnabled } from '../lib/editor-markdown-preview-prefs';
 import { formatAgentDraftTitle } from '../lib/editor-tab-labels';
+import type { IdeAgentEditSummary } from '../lib/ide-agent-center-view';
+import {
+  agentEditReviewDocumentId,
+  agentEditReviewDocumentTitle,
+  formatAgentEditReviewContent,
+} from '../lib/ide-agent-edit-review';
+import { normalizeEditedFilePath } from '../lib/agent-transcript-blocks';
 import {
   selectPrimaryApprovalRun,
   selectPrimaryRun,
@@ -470,6 +485,8 @@ export const useShellStore = defineStore('shell', () => {
   const ideComposerDraft = ref('');
   let ideComposerDraftPersistTimer: ReturnType<typeof setTimeout> | null = null;
   const kairoSpeechQueueActive = ref(false);
+  const kairoVoiceEngineActive = ref(false);
+  const kairoVoicePaused = ref(false);
   const ideComposerQueueByWorkspaceId = ref<Record<string, IdeComposerQueuedMessage[]>>({});
   let flushingIdeComposerQueue = false;
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
@@ -800,6 +817,9 @@ export const useShellStore = defineStore('shell', () => {
   );
 
   const kairoPresenceState = computed<KairoPresenceState>(() => {
+    if (kairoVoicePaused.value) {
+      return 'paused';
+    }
     if (kairoSpeechActive.value || kairoConversationPhase.value === 'speaking') {
       return 'speaking';
     }
@@ -888,7 +908,11 @@ export const useShellStore = defineStore('shell', () => {
   });
 
   const kairoSpeechActive = computed(
-    () => kairoSpeechQueueActive.value || kairoConversationPhase.value === 'speaking',
+    () =>
+      kairoSpeechQueueActive.value ||
+      kairoVoiceEngineActive.value ||
+      kairoConversationPhase.value === 'speaking' ||
+      kairoVoicePaused.value,
   );
 
   const ideDisplayKairoPresenceState = computed<KairoPresenceState>(() =>
@@ -1638,36 +1662,69 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function stopKairoSpeech(): void {
-    stopSpeech(typeof speechSynthesis === 'undefined' ? null : speechSynthesis);
+    stopKairoPlayback();
+    kairoVoicePaused.value = false;
     if (kairoConversationPhase.value === 'speaking') {
       setKairoConversationPhase('idle');
     }
   }
 
-  async function speakKairoConversationLine(line: string): Promise<void> {
+  function pauseKairoSpeech(): boolean {
+    const paused = pauseKairoPlayback();
+    kairoVoicePaused.value = paused;
+    return paused;
+  }
+
+  function resumeKairoSpeech(): boolean {
+    const resumed = resumeKairoPlayback();
+    if (resumed) {
+      kairoVoicePaused.value = false;
+      if (kairoConversationPhase.value === 'idle') {
+        setKairoConversationPhase('speaking');
+      }
+    }
+    return resumed;
+  }
+
+  function interruptKairoVoice(): void {
+    stopKairoSpeech();
+  }
+
+  async function speakKairoConversationLine(
+    line: string,
+    options?: { operatorPrompt?: string },
+  ): Promise<void> {
     const trimmed = line.trim();
     if (
       !trimmed ||
       !voiceDeliveryAllowed() ||
       operatorPresenceSettings.value.privacy_mode ||
-      !operatorPresenceSettings.value.spoken_alerts_enabled ||
       effectiveKairoNarrationLevel.value === 'off'
     ) {
       return;
     }
 
     setKairoConversationPhase('speaking');
+    kairoVoicePaused.value = false;
     let message = trimmed;
+    const narration = effectiveKairoNarrationLevel.value;
+    const operatorPrompt = options?.operatorPrompt?.trim() ?? '';
     try {
       const response = await postKairoSpeak({
         event_type: 'conversation_reply',
         context: {
           fallback: trimmed,
           reply: trimmed,
+          operator_prompt: operatorPrompt,
+          pending_approvals: pendingApprovalsCount.value,
+          top_signal_title: operatorBriefing.value?.top_signals[0]?.title ?? '',
+          active_run_count: operatorBriefing.value?.active_runs.length ?? 0,
+          degraded_active: operatorBriefing.value?.degraded.active ?? false,
         },
         session_id: kairoSpeechSessionId(),
         workspace_id: currentWorkspace.value?.workspace_id ?? '',
-        narration: effectiveKairoNarrationLevel.value,
+        narration,
+        use_runtime: narration === 'conversational',
       });
       if (response.line?.trim()) {
         message = response.line.trim();
@@ -1676,18 +1733,23 @@ export const useShellStore = defineStore('shell', () => {
       // Fall back to the raw reply when the speak endpoint is unavailable.
     }
 
-    deliverSpokenOperatorAlert({
-      eligible: true,
-      reason: 'kairo-conversation',
-      signal_id: `kairo-conversation-${Date.now()}`,
-      message,
-    });
+    await speakKairoLine(message);
   }
 
   function handleKairoPresenceAction(): void {
-    if (layoutMode.value === 'ide' && kairoSpeechActive.value) {
-      stopKairoSpeech();
-      return;
+    if (layoutMode.value === 'ide') {
+      if (kairoVoicePaused.value) {
+        resumeKairoSpeech();
+        return;
+      }
+      if (
+        kairoSpeechQueueActive.value ||
+        kairoVoiceEngineActive.value ||
+        kairoConversationPhase.value === 'speaking'
+      ) {
+        pauseKairoSpeech();
+        return;
+      }
     }
     focusKairoBriefing();
   }
@@ -1696,11 +1758,17 @@ export const useShellStore = defineStore('shell', () => {
     subscribeSpeechQueueSpeaking((active) => {
       kairoSpeechQueueActive.value = active;
     });
-    onSpeechQueueIdle(() => {
-      if (kairoConversationPhase.value === 'speaking' && !kairoSpeechQueueActive.value) {
+    subscribeKairoVoiceSpeaking((active) => {
+      kairoVoiceEngineActive.value = active;
+    });
+    const finishKairoSpeechPhase = (): void => {
+      kairoVoicePaused.value = false;
+      if (kairoConversationPhase.value === 'speaking' && !isKairoVoiceSpeaking()) {
         setKairoConversationPhase('idle');
       }
-    });
+    };
+    onSpeechQueueIdle(finishKairoSpeechPhase);
+    onKairoVoiceIdle(finishKairoSpeechPhase);
   }
 
   async function narrateAgentStreamMilestone(
@@ -2882,6 +2950,43 @@ export const useShellStore = defineStore('shell', () => {
     return id;
   }
 
+  function openAgentEditReview(edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'>): void {
+    const path = normalizeEditedFilePath(edit.path);
+    const id = agentEditReviewDocumentId(path);
+    const title = agentEditReviewDocumentTitle(path);
+    const content = formatAgentEditReviewContent(edit);
+    const existing = draftDocuments.value.find((document) => document.id === id);
+
+    if (existing) {
+      draftDocuments.value = draftDocuments.value.map((document) =>
+        document.id === id
+          ? {
+              ...document,
+              title,
+              value: content,
+              dirty: document.value !== content,
+            }
+          : document,
+      );
+    } else {
+      draftDocuments.value = [
+        ...draftDocuments.value,
+        {
+          id,
+          title,
+          language: 'plaintext' as EditorDocumentLanguage,
+          value: content,
+          description: 'Agent proposed changes from the transcript diff (read-only review).',
+          source: 'draft',
+          readOnly: true,
+          dirty: false,
+        },
+      ];
+    }
+
+    activeEditorDocumentId.value = id;
+  }
+
   function recordAgentReportEditorLink(
     messageId: string,
     link: AgentReportEditorLink,
@@ -3472,6 +3577,10 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  function openOperatorPresenceSettingsPanel(): void {
+    operatorPresenceSettingsOpen.value = true;
+  }
+
   function toggleOperatorPresenceSettingsPanel(forceOpen?: boolean): void {
     operatorPresenceSettingsOpen.value =
       typeof forceOpen === 'boolean' ? forceOpen : !operatorPresenceSettingsOpen.value;
@@ -4050,6 +4159,7 @@ export const useShellStore = defineStore('shell', () => {
     kairoAgentLiveLine,
     kairoBriefingAttentionLabel,
     kairoPresenceState,
+    effectiveKairoNarrationLevel,
     agentStreamActive,
     agentStreamMessageId,
     agentReportEditorLink,
@@ -4194,6 +4304,7 @@ export const useShellStore = defineStore('shell', () => {
     toggleDockSeam,
     toggleDockHeroMode,
     toggleOperatorPresenceSettingsPanel,
+    openOperatorPresenceSettingsPanel,
     toggleSignalDetails,
     topbarBreadcrumb,
     topbarChips,
@@ -4210,11 +4321,16 @@ export const useShellStore = defineStore('shell', () => {
     speakOperatorBriefing,
     speakKairoConversationLine,
     stopKairoSpeech,
+    pauseKairoSpeech,
+    resumeKairoSpeech,
+    interruptKairoVoice,
     handleKairoPresenceAction,
     kairoSpeechActive,
+    kairoVoicePaused,
     maybeSpeakBootGreeting,
     loadWorkspaceFiles,
     openAgentContentInEditor,
+    openAgentEditReview,
     openWorkspaceFile,
     openResearchInEditor,
     proveResearchSource,

@@ -105,6 +105,32 @@ describe('operator-thread', () => {
     });
     expect(mapped.role).toBe('operator');
 
+    const withAttachments = mapChatMessageRecord({
+      message_id: 'message_operator_2',
+      thread_id: 'thread_1',
+      run_id: null,
+      workspace_id: 'workspace_alpha',
+      role: 'operator',
+      content: 'see screenshot',
+      created_at: '2026-07-04T10:00:01.000Z',
+      attachments: [
+        {
+          attachment_id: 'attachment_1',
+          filename: 'review.png',
+          mime_type: 'image/png',
+          url: '/api/chat/attachments/attachment_1',
+        },
+      ],
+    });
+    expect(withAttachments.attachments).toEqual([
+      {
+        attachment_id: 'attachment_1',
+        filename: 'review.png',
+        mime_type: 'image/png',
+        url: '/api/chat/attachments/attachment_1',
+      },
+    ]);
+
     const agentMapped = mapChatMessageRecord({
       message_id: 'message_agent_1',
       thread_id: 'thread_1',

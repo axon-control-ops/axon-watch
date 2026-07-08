@@ -6,23 +6,41 @@ import type { KairoPresenceState } from '../../lib/kairo-presence';
 
 const props = defineProps<{
   state: KairoPresenceState;
+  speechActive?: boolean;
+  paused?: boolean;
 }>();
 
 const emit = defineEmits<{
-  openBriefing: [];
+  action: [];
 }>();
 
 const parts = computed(() => kairoPresenceModuleParts(props.state));
-const ariaLabel = computed(() => `${parts.value.title} ${parts.value.subtitle}`);
+
+const actionHint = computed(() => {
+  if (props.paused) {
+    return 'Click to continue speaking';
+  }
+  if (props.speechActive || props.state === 'speaking') {
+    return 'Click to pause';
+  }
+  return 'Open KAIRO briefing';
+});
+
+const ariaLabel = computed(
+  () => `${parts.value.title} ${parts.value.subtitle}. ${actionHint.value}`,
+);
 </script>
 
 <template>
   <button
     type="button"
     class="kairo-presence-module"
-    :class="`kairo-presence-module--${state}`"
+    :class="{
+      [`kairo-presence-module--${state}`]: true,
+      'kairo-presence-module--speech-live': speechActive && !paused,
+    }"
     :aria-label="ariaLabel"
-    @click="emit('openBriefing')"
+    @click="emit('action')"
   >
     <span class="kairo-presence-module__corner kairo-presence-module__corner--tl" aria-hidden="true" />
     <span class="kairo-presence-module__corner kairo-presence-module__corner--br" aria-hidden="true" />

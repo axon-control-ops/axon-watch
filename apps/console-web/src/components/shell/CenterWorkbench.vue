@@ -39,12 +39,6 @@ import {
   readEditorMinimapEnabled,
 } from '../../lib/editor-surface-prefs';
 import { terminalSessionTabLabel } from '../../lib/terminal-session-view';
-import {
-  extractIdeAgentEditSummaries,
-  resolveActiveIdeAgentMessage,
-  shouldShowIdeAgentCenterPanel,
-} from '../../lib/ide-agent-center-view';
-import IdeAgentCenterPanel from '../ide/IdeAgentCenterPanel.vue';
 
 const shell = useShellStore();
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
@@ -162,37 +156,6 @@ const editorAccessLabel = computed(() => {
 });
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
-);
-const reviewReadyRunCount = computed(
-  () =>
-    shell.runs.filter(
-      (run) =>
-        run.phase === 'review_ready' &&
-        run.workspace_id === shell.currentWorkspace?.workspace_id,
-    ).length,
-);
-const activeAgentMessage = computed(() =>
-  resolveActiveIdeAgentMessage(
-    shell.threadMessages,
-    shell.agentStreamActive,
-    shell.agentStreamMessageId,
-  ),
-);
-const activeAgentEditCount = computed(() => {
-  const message = activeAgentMessage.value;
-  if (!message) {
-    return 0;
-  }
-  return extractIdeAgentEditSummaries(message.content, message.message_id).length;
-});
-const showIdeAgentCenter = computed(() =>
-  shouldShowIdeAgentCenterPanel({
-    layoutMode: shell.layoutMode,
-    agentStreamActive: shell.agentStreamActive,
-    composerAgentBusy: shell.composerAgentBusy,
-    reviewReadyCount: reviewReadyRunCount.value,
-    editedFileCount: activeAgentEditCount.value,
-  }),
 );
 const editorPreviewEnabled = ref(false);
 
@@ -520,14 +483,7 @@ watch(
     <section
       v-if="!hideOperatorEditor"
       class="center-workbench__editor-stack center-workbench__editor-stack--surface"
-      :class="{ 'center-workbench__editor-stack--agent-active': showIdeAgentCenter }"
     >
-      <IdeAgentCenterPanel v-if="showIdeAgentCenter" class="center-workbench__agent-panel" />
-
-      <div
-        class="center-workbench__editor-pane"
-        :class="{ 'center-workbench__editor-pane--split': showIdeAgentCenter }"
-      >
         <div class="editor-tabbar editor-tabbar--mockup">
         <div class="editor-tabbar__tabs">
           <div
@@ -696,7 +652,6 @@ watch(
           </div>
         </div>
       </section>
-      </div>
     </section>
 
     <OperatorStatusRadarPanel

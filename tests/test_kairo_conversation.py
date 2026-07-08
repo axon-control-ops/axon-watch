@@ -17,6 +17,7 @@ from app.kairo_conversation import (  # noqa: E402
     classify_conversation_turn,
     converse_turn,
 )
+from app.kairo_conversation_reply import compose_conversation_reply  # noqa: E402
 from app.main import app  # noqa: E402
 from app.persistence import run_store  # noqa: E402
 
@@ -56,6 +57,14 @@ class KairoConversationUnitTests(unittest.TestCase):
     def test_classify_status_question(self) -> None:
         self.assertEqual("status_question", classify_conversation_turn("any approvals?"))
         self.assertEqual("status_question", classify_conversation_turn("what needs my attention"))
+
+    def test_classify_open_question_not_status(self) -> None:
+        self.assertEqual("open_question", classify_conversation_turn("why is sentry spiking?"))
+        self.assertEqual("open_question", classify_conversation_turn("how did this happen?"))
+
+    def test_classify_chat_greeting(self) -> None:
+        self.assertEqual("chat", classify_conversation_turn("hello there"))
+        self.assertEqual("chat", classify_conversation_turn("thanks"))
 
     def test_answer_approvals_from_dto(self) -> None:
         pack = {"briefing": _MOCK_BRIEFING, "fleet": {"critical_count": 0}}
@@ -111,6 +120,36 @@ class KairoConversationUnitTests(unittest.TestCase):
         self.assertEqual("status_question", payload["turn_kind"])
         self.assertEqual("template", payload["source"])
         self.assertIn("2 approval", str(payload["reply"]))
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_status_replies_vary_across_turns(
+        self,
+        *_mocks: object,
+    ) -> None:
+        pack = {
+            "briefing": _MOCK_BRIEFING,
+            "fleet": {"critical_count": 1, "attention_count": 0, "workspace_count": 2},
+        }
+        first = compose_conversation_reply(
+            content="any approvals?",
+            pack=pack,
+            session_id="variety-session",
+            recent_turns=[],
+        )
+        second = compose_conversation_reply(
+            content="any approvals?",
+            pack=pack,
+            session_id="variety-session",
+            recent_turns=[
+                {"role": "user", "content": "any approvals?"},
+                {"role": "assistant", "content": first},
+            ],
+        )
+        self.assertIn("2 approval", first)
+        self.assertIn("2 approval", second)
+        self.assertNotEqual(first, second)
 
 
 class KairoConversationEndpointTests(unittest.TestCase):

@@ -2,7 +2,6 @@
 import { computed } from 'vue';
 
 import KairoPresenceBar from './KairoPresenceBar.vue';
-import OperatorPresenceSettingsPanel from './OperatorPresenceSettingsPanel.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
 import { useShellStore } from '../../stores/shell';
@@ -23,6 +22,10 @@ const showTopbarKairoPresence = computed(() => !isFoundationSurface.value);
 
 function openSurface(surface: AppSurface): void {
   navigateToAppSurface(surface);
+}
+
+function openSettings(): void {
+  shell.openOperatorPresenceSettingsPanel();
 }
 </script>
 
@@ -47,11 +50,15 @@ function openSurface(surface: AppSurface): void {
         </span>
       </div>
 
-      <KairoPresenceBar
-        v-if="showTopbarKairoPresence"
-        :state="shell.kairoPresenceState"
-        @open-briefing="shell.handleKairoPresenceAction()"
-      />
+      <div class="topbar-mockup__kairo-slot">
+        <KairoPresenceBar
+          v-if="showTopbarKairoPresence"
+          :state="shell.kairoPresenceState"
+          :speech-active="shell.kairoSpeechActive && !shell.kairoVoicePaused"
+          :paused="shell.kairoVoicePaused"
+          @action="shell.handleKairoPresenceAction()"
+        />
+      </div>
 
       <div class="topbar-mockup__controls">
         <div
@@ -117,17 +124,10 @@ function openSurface(surface: AppSurface): void {
             aria-label="Settings"
             aria-haspopup="dialog"
             :aria-expanded="shell.operatorPresenceSettingsOpen"
-            @click="shell.toggleOperatorPresenceSettingsPanel()"
+            @click.stop="openSettings()"
           >
             ⚙
           </button>
-          <OperatorPresenceSettingsPanel
-            :open="shell.operatorPresenceSettingsOpen"
-            :settings="shell.operatorPresenceSettings"
-            :saving="shell.operatorPresenceSettingsSaving"
-            @close="shell.toggleOperatorPresenceSettingsPanel(false)"
-            @save="shell.saveOperatorPresenceSettingsPatch($event)"
-          />
         </div>
       </div>
     </div>
@@ -135,8 +135,14 @@ function openSurface(surface: AppSurface): void {
 </template>
 
 <style scoped>
+.topbar-mockup__kairo-slot {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .topbar-mockup__settings-wrap {
   position: relative;
+  z-index: 12;
 }
 
 .topbar-mockup__surface-nav {

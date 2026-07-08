@@ -15,6 +15,12 @@ export function formatThreadTimestamp(iso: string): string {
 }
 
 export function formatThreadRole(role: ThreadMessageRole): string {
+  if (role === 'operator') {
+    return 'OP';
+  }
+  if (role === 'agent') {
+    return 'AGENT';
+  }
   return role.toUpperCase();
 }
 

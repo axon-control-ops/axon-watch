@@ -4,6 +4,8 @@ import { computed, ref, watch } from 'vue';
 import AgentResearchBlock from './ide/AgentResearchBlock.vue';
 import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from './ide/AgentFileReadBlock.vue';
+import IdeActivityIcon from './ide/IdeActivityIcon.vue';
+import IdeAgentThreadStatusStrip from './ide/IdeAgentThreadStatusStrip.vue';
 import { useConversationSeamScroll } from '../composables/useConversationSeamScroll';
 import {
   isMarkdownFileAgentResponse,
@@ -25,11 +27,17 @@ import {
   type ConversationDisplayItem,
 } from '../lib/operator-conversation-view';
 import {
+  type OperatorThreadEntry,
+  type ThreadMessageAttachment,
+} from '../lib/operator-thread';
+import {
   agentContentHasTranscriptBlocks,
   diffLineTone,
+  normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
   thinkingPreview,
 } from '../lib/agent-transcript-blocks';
+import { resolveChatAttachmentUrl } from '../api/control-plane';
 import { useShellStore } from '../stores/shell';
 
 const shell = useShellStore();
@@ -168,6 +176,22 @@ function toggleEdit(key: string): void {
   };
 }
 
+function openEditedFile(segment: {
+  path: string;
+  added: number;
+  removed: number;
+  diff: string;
+  open: boolean;
+}): void {
+  shell.openAgentEditReview({
+    path: normalizeEditedFilePath(segment.path),
+    added: segment.added,
+    removed: segment.removed,
+    diff: segment.diff,
+    open: segment.open,
+  });
+}
+
 function diffLines(diff: string): Array<{ text: string; tone: string }> {
   return diff
     .split('\n')
@@ -179,6 +203,12 @@ function displayItemKey(item: ConversationDisplayItem): string {
     return item.messageId;
   }
   return item.message.message_id;
+}
+
+function messageImageAttachments(message: OperatorThreadEntry): ThreadMessageAttachment[] {
+  return (message.attachments ?? []).filter((attachment) =>
+    attachment.mime_type.startsWith('image/'),
+  );
 }
 
 function compactCommandSummary(output: string): string {
@@ -232,40 +262,32 @@ watch(
 
         <template v-else-if="item.kind === 'command_turn'">
           <div class="conversation-seam__meta">
-            <span class="conversation-seam__role">COMMAND</span>
-            <span class="conversation-seam__command-label">{{ item.command }}</span>
-            <span
-              v-if="item.repeatCount && item.repeatCount > 1"
-              class="conversation-seam__repeat-chip"
-            >
-              {{ item.repeatCount }}×
-            </span>
-            <span
-              v-if="item.runId"
-              class="conversation-seam__run-chip"
-              :title="item.runId"
-            >
-              run {{ shortenRunId(item.runId) }}
-            </span>
-            <span
-              class="conversation-seam__status-chip"
-              :class="`conversation-seam__status-chip--${item.execution.status}`"
-            >
-              {{ item.execution.status }}
-            </span>
+            <div class="conversation-seam__meta-leading">
+              <span class="conversation-seam__role">COMMAND</span>
+              <span class="conversation-seam__command-label">{{ item.command }}</span>
+              <span
+                v-if="item.repeatCount && item.repeatCount > 1"
+                class="conversation-seam__repeat-chip"
+              >
+                {{ item.repeatCount }}×
+              </span>
+              <span
+                v-if="item.runId"
+                class="conversation-seam__run-chip"
+                :title="item.runId"
+              >
+                run {{ shortenRunId(item.runId) }}
+              </span>
+              <span
+                class="conversation-seam__status-chip"
+                :class="`conversation-seam__status-chip--${item.execution.status}`"
+              >
+                {{ item.execution.status }}
+              </span>
+            </div>
             <time class="conversation-seam__time" :datetime="item.createdAt">
               {{ formatThreadTimestamp(item.createdAt) }}
             </time>
-            <div class="conversation-seam__meta-actions">
-              <button
-                type="button"
-                class="conversation-seam__meta-button"
-                title="Load this command back into the composer"
-                @click="restoreCommandToComposer(item.command)"
-              >
-                Resend
-              </button>
-            </div>
           </div>
           <p
             v-if="item.compact"
@@ -290,35 +312,59 @@ watch(
           >
             {{ item.execution.footer }}
           </p>
+          <div class="conversation-seam__message-actions">
+            <button
+              type="button"
+              class="conversation-seam__meta-icon-button conversation-seam__resend-button"
+              title="Load this command back into the composer"
+              aria-label="Resend"
+              @click="restoreCommandToComposer(item.command)"
+            >
+              <span aria-hidden="true">↻</span>
+            </button>
+          </div>
         </template>
 
         <template v-else>
           <template v-if="item.message">
-        <div
-          v-if="shell.layoutMode !== 'ide' || item.message.role !== 'agent'"
-          class="conversation-seam__meta"
-        >
-          <span class="conversation-seam__role">{{ formatThreadRole(item.message.role) }}</span>
-          <span
-            v-if="item.message.run_id"
-            class="conversation-seam__run-chip"
-            :title="item.message.run_id"
-          >
-            run {{ shortenRunId(item.message.run_id) }}
-          </span>
+        <div class="conversation-seam__meta">
+          <div class="conversation-seam__meta-leading">
+            <span
+              v-if="item.message.role === 'agent'"
+              class="conversation-seam__role-icon"
+              aria-label="Agent"
+              title="Agent"
+            >
+              <IdeActivityIcon name="agent" :size="14" />
+            </span>
+            <span v-else class="conversation-seam__role">{{ formatThreadRole(item.message.role) }}</span>
+          </div>
           <time class="conversation-seam__time" :datetime="item.message.created_at">
             {{ formatThreadTimestamp(item.message.created_at) }}
           </time>
-          <div v-if="item.message.role === 'operator'" class="conversation-seam__meta-actions">
-            <button
-              type="button"
-              class="conversation-seam__meta-button"
-              title="Load this request back into the composer"
-              @click="restoreCommandToComposer(item.message.content)"
+        </div>
+
+        <div
+          v-if="messageImageAttachments(item.message).length"
+          class="conversation-seam__attachments"
+          aria-label="Message attachments"
+        >
+          <a
+            v-for="attachment in messageImageAttachments(item.message)"
+            :key="attachment.attachment_id"
+            class="conversation-seam__attachment-card"
+            :href="resolveChatAttachmentUrl(attachment.url)"
+            target="_blank"
+            rel="noopener noreferrer"
+            :title="attachment.filename"
+          >
+            <img
+              class="conversation-seam__attachment-preview"
+              :src="resolveChatAttachmentUrl(attachment.url)"
+              :alt="attachment.filename"
+              loading="lazy"
             >
-              Resend
-            </button>
-          </div>
+          </a>
         </div>
 
         <p
@@ -459,9 +505,9 @@ watch(
                   type="button"
                   class="agent-block__edit-path agent-block__edit-path--link"
                   :title="`Open ${segment.path} in editor`"
-                  @click="shell.openWorkspaceFile(segment.path)"
+                  @click="openEditedFile(segment)"
                 >
-                  {{ segment.path }}
+                  {{ normalizeEditedFilePath(segment.path) }}
                 </button>
                 <span class="agent-block__edit-stat agent-block__edit-stat--add">+{{ segment.added }}</span>
                 <span class="agent-block__edit-stat agent-block__edit-stat--remove">-{{ segment.removed }}</span>
@@ -571,28 +617,44 @@ watch(
           class="conversation-seam__stream-cursor"
           aria-hidden="true"
         >▍</span></pre>
+        <div
+          v-if="item.message.role === 'operator'"
+          class="conversation-seam__message-actions"
+        >
+          <button
+            type="button"
+            class="conversation-seam__meta-icon-button conversation-seam__resend-button"
+            title="Load this request back into the composer"
+            aria-label="Resend"
+            @click="restoreCommandToComposer(item.message.content)"
+          >
+            <span aria-hidden="true">↻</span>
+          </button>
+        </div>
           </template>
         </template>
       </li>
+      <IdeAgentThreadStatusStrip v-if="shell.layoutMode === 'ide'" />
       <li
-        v-if="showAgentWorking && !shell.agentStreamMessageId"
+        v-else-if="showAgentWorking && !shell.agentStreamMessageId"
         class="conversation-seam__item conversation-seam__item--agent conversation-seam__item--typing"
         :class="{
           'conversation-seam__item--full-access':
             shell.ideComposerActivity?.executionAccess === 'full',
         }"
       >
-        <div
-          v-if="shell.layoutMode !== 'ide' || shell.ideComposerActivity?.executionAccess === 'full'"
-          class="conversation-seam__meta"
-        >
-          <span v-if="shell.layoutMode !== 'ide'" class="conversation-seam__role">AGENT</span>
-          <span
-            v-if="shell.ideComposerActivity?.executionAccess === 'full'"
-            class="conversation-seam__access-chip conversation-seam__access-chip--full"
-          >
-            Full Access
-          </span>
+        <div class="conversation-seam__meta">
+          <div class="conversation-seam__meta-leading">
+            <span class="conversation-seam__role-icon" aria-label="Agent" title="Agent">
+              <IdeActivityIcon name="agent" :size="14" />
+            </span>
+            <span
+              v-if="shell.ideComposerActivity?.executionAccess === 'full'"
+              class="conversation-seam__access-chip conversation-seam__access-chip--full"
+            >
+              Full Access
+            </span>
+          </div>
         </div>
         <p
           class="conversation-seam__content conversation-seam__content--agent conversation-seam__content--typing"

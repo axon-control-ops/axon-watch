@@ -67,9 +67,14 @@ import {
   filterMcpToolsForComposerMode,
   mcpToolDetail,
 } from '../../lib/composer-mcp-tools-view';
+import {
+  kairoConversationError,
+  kairoConversationReply,
+} from '../../features/kairo-conversation/kairo-conversation-state';
+import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
 import { useShellStore } from '../../stores/shell';
 
-type ComposerMode = 'agent' | 'plan' | 'ask';
+type ComposerMode = 'agent' | 'plan' | 'ask' | 'kairo';
 
 const MODE_OPTIONS: Array<{
   key: ComposerMode;
@@ -80,9 +85,19 @@ const MODE_OPTIONS: Array<{
   { key: 'ask', label: 'Ask', icon: '◯', hint: 'Read-only answers, no tool execution' },
   { key: 'plan', label: 'Plan', icon: '◈', hint: 'Map steps before executing' },
   { key: 'agent', label: 'Agent', icon: '◎', hint: 'Agent loop with tools and approvals' },
+  { key: 'kairo', label: 'KAIRO', icon: '◉', hint: 'Talk to KAIRO — spoken replies' },
 ];
 
 const shell = useShellStore();
+const {
+  draft: kairoDraft,
+  pending: kairoPending,
+  canSubmit: kairoCanSubmit,
+  submitTurn: submitKairoTurn,
+  speechCapture,
+  startVoiceCapture,
+  stopVoiceCapture,
+} = useKairoConversation();
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 const composerMode = ref<ComposerMode>(
   (shell.runtimeSummary?.runtime_identity.mode_default as ComposerMode) || 'agent',
@@ -255,6 +270,9 @@ const runtimeHint = computed(() => {
 });
 const showVaultAction = computed(() => runtimeNeedsVaultAction(shell.runtimeStatus));
 const composerPlaceholder = computed(() => {
+  if (composerMode.value === 'kairo') {
+    return 'Talk to KAIRO — answers are spoken aloud';
+  }
   if (composerAgentBusy.value && composerMode.value === 'agent') {
     return 'Queue a follow-up or steer with Ctrl+Enter…';
   }
@@ -291,11 +309,16 @@ const selectionChipLabel = computed(() => {
   }
   return `L${selection.startLine}-${selection.endLine}`;
 });
-const mcpToolsForMode = computed(() =>
-  filterMcpToolsForComposerMode(shell.runtimeMcpTools, composerMode.value),
-);
+const mcpToolsForMode = computed(() => {
+  if (composerMode.value === 'kairo') {
+    return [];
+  }
+  return filterMcpToolsForComposerMode(shell.runtimeMcpTools, composerMode.value);
+});
 const showComposerResume = computed(() => shell.canResumeIdeAgentRun);
-const showComposerStop = computed(() => shell.canStopIdeAgentRun);
+const showComposerStop = computed(
+  () => shell.canStopIdeAgentRun && composerMode.value !== 'kairo',
+);
 const composerAgentBusy = computed(() => shell.composerAgentBusy);
 const composerQueueHint = computed(() => {
   if (!composerAgentBusy.value || composerMode.value !== 'agent') {
@@ -320,8 +343,29 @@ const composerActivitySummary = computed(() => {
   }
   return summarizeIdeAgentActivity(message.content);
 });
-const composerActivityChips = computed(() => composerActivitySummary.value?.chips ?? []);
+const composerActivityChips = computed(() =>
+  composerMode.value === 'kairo' ? [] : composerActivitySummary.value?.chips ?? [],
+);
+const composerDraftModel = computed({
+  get: () => (composerMode.value === 'kairo' ? kairoDraft.value : shell.ideComposerDraft),
+  set: (value: string) => {
+    if (composerMode.value === 'kairo') {
+      kairoDraft.value = value;
+      return;
+    }
+    shell.ideComposerDraft = value;
+  },
+});
+const canSubmitComposer = computed(() => {
+  if (composerMode.value === 'kairo') {
+    return kairoCanSubmit.value && Boolean(shell.currentWorkspace);
+  }
+  return shell.canSubmitIdeComposer;
+});
 const composerSubmitLabel = computed(() => {
+  if (composerMode.value === 'kairo') {
+    return kairoPending.value ? 'Asking KAIRO' : 'Ask KAIRO';
+  }
   if (shell.commandMutationState === 'submitting') {
     return 'Sending command';
   }
@@ -624,6 +668,15 @@ function handleStopRun(): void {
   void shell.stopIdeAgentRun();
 }
 
+function toggleVoiceCapture(): void {
+  if (speechCapture.capturing.value) {
+    stopVoiceCapture();
+    return;
+  }
+  shell.interruptKairoVoice();
+  startVoiceCapture();
+}
+
 function applyHistoryDraft(draft: string): void {
   applyingHistoryDraft.value = true;
   shell.restoreComposerDraft(draft);
@@ -652,6 +705,11 @@ function handleHistory(direction: 'previous' | 'next'): void {
 
 async function handleSubmit(event?: Event): Promise<void> {
   event?.preventDefault();
+  if (composerMode.value === 'kairo') {
+    const draft = kairoDraft.value.trim();
+    await submitKairoTurn(draft);
+    return;
+  }
   const draft = shell.ideComposerDraft.trim();
   const attachmentFiles = composerImages.value.map((image) => image.file);
   await shell.submitIdeComposer(composerMode.value, { attachmentFiles });
@@ -660,6 +718,9 @@ async function handleSubmit(event?: Event): Promise<void> {
 
 async function handleSteer(event?: Event): Promise<void> {
   event?.preventDefault();
+  if (composerMode.value === 'kairo') {
+    return;
+  }
   const draft = shell.ideComposerDraft.trim();
   const attachmentFiles = composerImages.value.map((image) => image.file);
   await shell.steerIdeComposer(composerMode.value, { attachmentFiles });
@@ -1011,27 +1072,14 @@ onUnmounted(() => {
           </ul>
         </div>
 
-        <div
-          v-if="shell.ideComposerActivity || shell.agentStreamActive"
-          class="agent-dock-composer__activity"
-          :class="{
-            'agent-dock-composer__activity--full-access': isFullAccessAgent,
-          }"
-          role="status"
-          aria-live="polite"
-        >
-          <span class="agent-dock-composer__activity-dot" aria-hidden="true" />
-          <span>{{ shell.ideComposerActivity?.label ?? 'Agent is working…' }}</span>
-        </div>
-
         <div class="agent-dock-composer__input-row">
           <textarea
             id="agent-dock-composer-input"
             ref="inputRef"
-            v-model="shell.ideComposerDraft"
+            v-model="composerDraftModel"
             class="agent-dock-composer__input"
             rows="1"
-            aria-label="Agent composer"
+            :aria-label="composerMode === 'kairo' ? 'KAIRO composer' : 'Agent composer'"
             :placeholder="composerPlaceholder"
             :disabled="!shell.currentWorkspace"
             @input="syncComposerHeight"
@@ -1449,6 +1497,16 @@ onUnmounted(() => {
               {{ shell.runMutationState === 'resuming' ? 'Resuming…' : 'Resume' }}
             </button>
             <button
+              v-if="composerMode === 'kairo' && speechCapture.supported"
+              type="button"
+              class="agent-dock-composer__tool agent-dock-composer__tool--mic"
+              :class="{ 'is-active': speechCapture.capturing.value }"
+              :disabled="shell.operatorPresenceSettings.privacy_mode || kairoPending"
+              @click="toggleVoiceCapture"
+            >
+              {{ speechCapture.capturing.value ? 'Listening…' : 'Mic' }}
+            </button>
+            <button
               v-if="showComposerStop"
               type="button"
               class="agent-dock-composer__send agent-dock-composer__send--stop"
@@ -1467,20 +1525,33 @@ onUnmounted(() => {
               v-else
               type="submit"
               class="agent-dock-composer__send"
-              :disabled="!shell.canSubmitIdeComposer"
+              :disabled="!canSubmitComposer"
               :aria-label="composerSubmitLabel"
             >
               <span
-                v-if="shell.commandMutationState === 'submitting'"
+                v-if="shell.commandMutationState === 'submitting' || (composerMode === 'kairo' && kairoPending)"
                 class="agent-dock-composer__send-spinner"
                 aria-hidden="true"
               />
-              <span v-else class="agent-dock-composer__send-icon" aria-hidden="true">↑</span>
+              <span v-else class="agent-dock-composer__send-icon" aria-hidden="true">
+                {{ composerMode === 'kairo' ? 'Ask' : '↑' }}
+              </span>
             </button>
           </div>
         </div>
       </div>
     </div>
+
+    <p v-if="composerMode === 'kairo' && kairoConversationReply" class="agent-dock-composer__kairo-reply">
+      <strong>KAIRO</strong>
+      <span>{{ kairoConversationReply }}</span>
+    </p>
+    <p v-if="composerMode === 'kairo' && kairoConversationError" class="agent-dock-composer__error" role="alert">
+      {{ kairoConversationError }}
+    </p>
+    <p v-else-if="composerMode === 'kairo'" class="agent-dock-composer__kairo-hint">
+      Tap header KAIRO to pause or continue · Esc stops speech · Mic barge-in
+    </p>
 
     <p v-if="!shell.currentWorkspace" class="agent-dock-composer__empty">
       Select a workspace to send commands.

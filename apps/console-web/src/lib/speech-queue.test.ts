@@ -5,6 +5,7 @@ import {
   isSpeechQueueSpeaking,
   stopSpeech,
   subscribeSpeechQueueSpeaking,
+  type SpeechPort,
 } from './speech-queue';
 
 class MockUtterance {
@@ -12,12 +13,12 @@ class MockUtterance {
   onerror?: () => void;
 }
 
-function createSpeechPort() {
+function createSpeechPort(): SpeechPort & { utterances: MockUtterance[] } {
   const utterances: MockUtterance[] = [];
   return {
     utterances,
-    speak(utterance: MockUtterance) {
-      utterances.push(utterance);
+    speak(utterance: SpeechSynthesisUtterance) {
+      utterances.push(utterance as unknown as MockUtterance);
     },
     cancel: vi.fn(),
     getVoices: () => [],

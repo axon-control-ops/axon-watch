@@ -210,6 +210,15 @@ def _fallback_for_event(
             return advise
         return "Systems nominal — standing by for your next command."
 
+    if event_type == "conversation_reply":
+        literal = str(context.get("fallback") or context.get("reply") or "").strip()
+        if literal:
+            recent_lower = {item.lower() for item in recent}
+            if literal.lower() not in recent_lower:
+                return literal
+            return literal
+        return "Standing by for your next command."
+
     if event_type == "tool":
         tool_label = str(context.get("tool_label") or "").strip().lower()
         if tool_label.startswith("read"):
@@ -292,6 +301,8 @@ def _try_runtime_line(
 def should_use_runtime_for_event(event_type: str, narration: NarrationLevel) -> bool:
     if narration == "off":
         return False
+    if event_type == "conversation_reply":
+        return narration == "conversational"
     # Narration is bookend-only (agent_start + done) plus alerts/greetings.
     return event_type in {"agent_start", "done", "greeting", "chat_summary", "alert", "briefing"}
 
@@ -350,8 +361,9 @@ def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:
             "greeting",
             "chat_summary",
             "briefing",
+            "conversation_reply",
         }
-    return event_type in {"agent_start", "done", "alert", "approval_literal", "greeting", "briefing"}
+    return event_type in {"agent_start", "done", "alert", "approval_literal", "greeting", "briefing", "conversation_reply"}
 
 
 __all__ = [

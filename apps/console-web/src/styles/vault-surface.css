@@ -1,9 +1,18 @@
-.console-shell--mockup.console-shell--vault {
+.console-shell--mockup.console-shell--vault,
+.console-shell--mockup.console-shell--vault[data-layout-mode='ide'],
+.console-shell--mockup.console-shell--vault[data-layout-mode='operator'] {
   grid-template-areas:
     'topbar topbar topbar'
     'centerWorkbench centerWorkbench centerWorkbench'
     'statusBar statusBar statusBar';
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr) var(--statusbar-height);
+}
+
+.console-shell--mockup.console-shell--vault .region-left-sidebar,
+.console-shell--mockup.console-shell--vault .region-right-dock,
+.console-shell--mockup.console-shell--vault .center-workbench:not(.vault-surface) {
+  display: none !important;
 }
 
 .console-shell--mockup.console-shell--vault .region-center-workbench.vault-surface {

@@ -4,6 +4,7 @@ import {
   agentContentHasTranscriptBlocks,
   diffLineTone,
   editedFilePathsFromTranscript,
+  normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
   thinkingPreview,
 } from './agent-transcript-blocks';
@@ -228,5 +229,19 @@ describe('editedFilePathsFromTranscript', () => {
     const absolute =
       ':::edit /home/edp/.cursor/projects/foo/README.md +1 -0\n+line\n:::\n';
     expect(editedFilePathsFromTranscript(absolute)).toEqual(['README.md']);
+  });
+});
+
+describe('normalizeEditedFilePath', () => {
+  it('keeps workspace-relative paths', () => {
+    expect(normalizeEditedFilePath('apps/console-web/src/App.vue')).toBe(
+      'apps/console-web/src/App.vue',
+    );
+  });
+
+  it('maps absolute paths to their file name', () => {
+    expect(
+      normalizeEditedFilePath('/home/edp/.cursor/projects/foo/README.md'),
+    ).toBe('README.md');
   });
 });
