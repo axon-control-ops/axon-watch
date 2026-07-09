@@ -164,11 +164,11 @@
       "target": "tests/test_control_plane_chat_* slices"
     },
     "apps/console-web/src/composables/useAgentDockComposer.ts": {
-      "max_lines": 810,
+      "max_lines": 449,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/composables/agent-dock/*",
-      "note": "FS-005 follow-up: images/context/history extracted; further split menus/runtime/consent helpers"
+      "note": "FS-005 follow-up: model/runtime, menus/consent, and actions extracted under agent-dock/"
     }
   }
 }
