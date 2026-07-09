@@ -82,6 +82,14 @@ def is_auto_complete_run_summary(summary: str) -> bool:
     return classify_command(trimmed) in AUTO_COMPLETE_COMMAND_INTENTS
 
 
+def command_requires_confirmation(content: str) -> bool:
+    """True when an operator command must be confirmed before dispatch."""
+    normalized = expand_command_shortcuts(content.strip())
+    if not normalized:
+        return True
+    return classify_command(normalized) not in AUTO_COMPLETE_COMMAND_INTENTS
+
+
 def classify_command(content: str) -> str:
     lowered = content.strip().lower()
     if not lowered:

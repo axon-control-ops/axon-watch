@@ -215,6 +215,30 @@ function messageImageAttachments(message: OperatorThreadEntry): ThreadMessageAtt
   );
 }
 
+interface EnlargedAttachmentPreview {
+  url: string;
+  filename: string;
+}
+
+const enlargedAttachment = ref<EnlargedAttachmentPreview | null>(null);
+
+function openAttachmentPreview(attachment: ThreadMessageAttachment): void {
+  enlargedAttachment.value = {
+    url: resolveChatAttachmentUrl(attachment.url),
+    filename: attachment.filename,
+  };
+}
+
+function closeAttachmentLightbox(): void {
+  enlargedAttachment.value = null;
+}
+
+function handleAttachmentLightboxKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    closeAttachmentLightbox();
+  }
+}
+
 function compactCommandSummary(output: string): string {
   const line = output.split('\n').map((part) => part.trim()).find(Boolean);
   if (!line) {
@@ -390,14 +414,13 @@ watch(
           class="conversation-seam__attachments"
           aria-label="Message attachments"
         >
-          <a
+          <button
             v-for="attachment in messageImageAttachments(item.message)"
             :key="attachment.attachment_id"
+            type="button"
             class="conversation-seam__attachment-card"
-            :href="resolveChatAttachmentUrl(attachment.url)"
-            target="_blank"
-            rel="noopener noreferrer"
-            :title="attachment.filename"
+            :title="`Preview ${attachment.filename}`"
+            @click="openAttachmentPreview(attachment)"
           >
             <img
               class="conversation-seam__attachment-preview"
@@ -405,7 +428,7 @@ watch(
               :alt="attachment.filename"
               loading="lazy"
             >
-          </a>
+          </button>
         </div>
 
         <p
@@ -711,4 +734,36 @@ watch(
     </ul>
     <p v-else class="region-copy conversation-seam__empty">No active conversation</p>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="enlargedAttachment"
+      class="agent-dock-composer__image-lightbox"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="`Preview ${enlargedAttachment.filename}`"
+      tabindex="-1"
+      @click.self="closeAttachmentLightbox"
+      @keydown="handleAttachmentLightboxKeydown"
+    >
+      <figure class="agent-dock-composer__image-lightbox-body">
+        <img
+          class="agent-dock-composer__image-lightbox-img"
+          :src="enlargedAttachment.url"
+          :alt="enlargedAttachment.filename"
+        >
+        <figcaption class="agent-dock-composer__image-lightbox-caption">
+          {{ enlargedAttachment.filename }}
+        </figcaption>
+      </figure>
+      <button
+        type="button"
+        class="agent-dock-composer__image-lightbox-close"
+        aria-label="Close image preview"
+        @click="closeAttachmentLightbox"
+      >
+        ×
+      </button>
+    </div>
+  </Teleport>
 </template>

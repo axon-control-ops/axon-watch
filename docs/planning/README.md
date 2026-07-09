@@ -44,6 +44,8 @@ python3 scripts/ops/sync_planning_mirror_to_axon_local.py
 - `TRANSITION_ARCHITECTURE.md` — strangler seam and rollback model
 - `CONTRACT_TESTING_SPEC.md` — executable compatibility rules
 - `DELIVERY_PLAN.md` — reviewable slice sequencing
+- `EXECUTION_PLAN.md` — **locked follow-to-the-letter checklist** (Phase A–F, 2026-07-09+)
+- `KAIRO_VOICE_IMPROVEMENT_PLAN.md` — voice narration gaps + context/memory/continuation slices
 - `TEST_STRATEGY.md` — contract/UI/service/E2E test layers
 - `SERVER_DEPLOYMENT_SPEC.md` — dedicated-server topology
 

@@ -94,6 +94,8 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 
 **UI deferred (planning handoff):** No new `apps/console-web/**` — see `docs/planning/KAIRO_BRAIN_UI_ARCHITECTURE.md` (`UX-DEF-*`). Backend/gates/orchestration only.
 
+**Active plan:** `docs/planning/EXECUTION_PLAN.md` — follow to the letter (Phase A → F).
+
 **Next up:** **G6.2** one-week `:4173`-only dry-run + sign-off. **G4.2 WhatsApp deferred.** **G5.3** retirement flag stays false until G6.
 
 ---
@@ -108,6 +110,25 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ---
 
 ## Append log
+
+### 2026-07-09 — OP-C4 execute-tier confirm + conversation UX polish
+
+- `/api/kairo/converse` returns `requires_confirmation` for execute-tier commands;
+  read-only commands (`git status`, `check-health`, etc.) still auto-dispatch.
+- Client `conversation-command-policy` gates auto-dispatch; "yes" follow-up dispatches via action.
+- Galaxy nav intents focus workspace nodes; client-side handoff resolves top actionable signal.
+- Markdown links in agent transcript and editor preview open workspace files safely.
+- Image attachments preview inline (lightbox) instead of opening a new tab.
+- Gates: `tests.test_kairo_conversation`, vitest conversation/markdown tests, `vue-tsc` PASS.
+- **Next:** Phase C5 session turn memory; C6–C12 narration/memory slices per voice plan.
+
+### 2026-07-09 — KAIRO voice + context/memory plan
+
+- Vaxon narration audit (11 gaps) → `docs/planning/KAIRO_VOICE_IMPROVEMENT_PLAN.md`.
+- Extended locked `EXECUTION_PLAN.md` Phase C with C6–C12 (narration V1–V9, memory M1–M6).
+- Key blockers: conversational mode oversells agent-run speech; `_TURN_MEMORY` in RAM only;
+  IDE agent cold-starts without KAIRO conversation context.
+- **Next:** Phase B debt gate, then C1 + V5/V9 in parallel.
 
 ### 2026-07-07 — Phase 4/5 closure + resume bugfixes
 

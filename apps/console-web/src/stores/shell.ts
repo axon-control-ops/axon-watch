@@ -132,6 +132,7 @@ import {
   setKairoConversationPhase,
   kairoConversationPhase,
 } from '../features/kairo-conversation/kairo-conversation-state';
+import { scheduleBriefingSurfaceOffer } from '../features/kairo-conversation/conversation-briefing-surface';
 import {
   normalizeAgentExecutionAccess,
   persistAgentExecutionAccess,
@@ -177,6 +178,10 @@ import {
   resolveOperatorSignalCount,
 } from '../lib/operator-signal-count';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
+import {
+  resolveAttentionFocusScrollTarget,
+  resolveDefaultHighlightedSignalId,
+} from '../lib/ide-attention-focus';
 import {
   readViewportWidth,
   shouldRequestViewportCompactBriefing,
@@ -1980,6 +1985,7 @@ export const useShellStore = defineStore('shell', () => {
         signal_id: null,
         message: response.line.trim(),
       });
+      scheduleBriefingSurfaceOffer();
     } catch {
       // Voice line unavailable — operator can read briefing in dock.
     }

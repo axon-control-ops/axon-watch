@@ -136,9 +136,77 @@ class KairoConversationUnitTests(unittest.TestCase):
         payload = converse_turn(content="git status", session_id="test-session")
         self.assertEqual("command", payload["turn_kind"])
         self.assertEqual("git status", payload["command_content"])
+        self.assertFalse(payload["requires_confirmation"])
         self.assertIn("git status", str(payload["reply"]).lower())
         self.assertEqual("template", payload["source"])
         self.assertEqual([], payload["artifacts"])
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_converse_execute_tier_command_requires_confirmation(
+        self,
+        *_mocks: object,
+    ) -> None:
+        payload = converse_turn(
+            content="run ./scripts/dev/check-health.sh",
+            session_id="confirm-session",
+        )
+        self.assertEqual("command", payload["turn_kind"])
+        self.assertTrue(payload["requires_confirmation"])
+        self.assertIn("say yes", str(payload["reply"]).lower())
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_followup_yes_dispatches_pending_command(
+        self,
+        *_mocks: object,
+    ) -> None:
+        converse_turn(
+            content="run npm run verify",
+            session_id="yes-session",
+        )
+        payload = converse_turn(content="yes", session_id="yes-session")
+        self.assertEqual("action", payload["turn_kind"])
+        action = payload["action"]
+        assert isinstance(action, dict)
+        self.assertEqual("dispatch_command", action.get("type"))
+        self.assertEqual("run npm run verify", action.get("content"))
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_followup_yes_opens_briefing_surface(
+        self,
+        *_mocks: object,
+    ) -> None:
+        import app.kairo_conversation as kc
+
+        kc._remember_entities("briefing-surface-session", pending_briefing_surface="1")
+        payload = converse_turn(content="yes", session_id="briefing-surface-session")
+        self.assertEqual("action", payload["turn_kind"])
+        action = payload["action"]
+        assert isinstance(action, dict)
+        self.assertEqual("focus_briefing", action.get("type"))
+        self.assertIn("opening the briefing", str(payload["reply"]).lower())
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_note_briefing_surface_offer_sets_pending_surface(
+        self,
+        *_mocks: object,
+    ) -> None:
+        import app.kairo_conversation as kc
+
+        kc._remember_entities("briefing-offer-session", pending_briefing_surface="")
+        kc._note_briefing_surface_offer(
+            "briefing-offer-session",
+            "Two runs are active. Shall I pull it to the front?",
+        )
+        entity = kc._entity_context("briefing-offer-session")
+        self.assertEqual("1", entity.get("pending_briefing_surface"))
 
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
@@ -398,7 +466,7 @@ class KairoConversationEndpointTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertEqual(
-            {"turn_kind", "reply", "source", "command_content", "action", "artifacts"},
+            {"turn_kind", "reply", "source", "command_content", "requires_confirmation", "action", "artifacts"},
             set(payload),
         )
         self.assertEqual("status_question", payload["turn_kind"])

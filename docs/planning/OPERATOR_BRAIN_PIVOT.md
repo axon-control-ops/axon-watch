@@ -273,7 +273,7 @@ Full plan: [`KAIRO_CONVERSATION_PLAN.md`](KAIRO_CONVERSATION_PLAN.md).
 | **OP-C1** | `/api/kairo/converse` — context pack, turn router, grounded answers (fast status path, no CLI) | **In progress** (fast/deep tiers, DTO fast path, artifacts, voice-log timings) |
 | **OP-C2** | Galaxy conversation bar (typed) — one input, command + question lanes, spoken replies | **In progress** (live omnibar, spoken replies, thinking line, command/results split) |
 | **OP-C3** | Push-to-talk STT (hold orb / Space) — **absorbs OP-V1e** | **In progress** (orb hold + Space PTT implemented; no wake word) |
-| **OP-C4** | Conversation actions — navigation intents, confirmed dispatch, handoff hook | Pending |
+| **OP-C4** | Conversation actions — navigation intents, confirmed dispatch, handoff hook | Done |
 | **OP-C5** | Turn memory + follow-ups (session-scoped, non-authoritative) | Pending |
 | **OP-C6** | Wake word "KAIRO…" (deferred until loop proven) | Deferred |
 

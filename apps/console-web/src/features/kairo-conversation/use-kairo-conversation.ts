@@ -17,8 +17,16 @@ import {
   scheduleKairoVoiceFollowupWindowAfterSpeech,
 } from '../../lib/kairo-voice-followup-window';
 import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
+import { filterActionableOpenSignals } from '../../lib/operator-signal-count';
 import { useShellStore } from '../../stores/shell';
-import { resolveConversationNavigationIntent } from './conversation-intents';
+import { resolveConversationNavigationIntent, workspaceGalaxyNodeId } from './conversation-intents';
+import { shouldAutoDispatchConverseCommand } from './conversation-command-policy';
+import {
+  clearBriefingSurfaceOffer,
+  mentionsBriefingSurfaceOffer,
+  scheduleBriefingSurfaceOffer,
+  shouldOpenBriefingFromFollowup,
+} from './conversation-briefing-surface';
 import {
   kairoConversationError,
   kairoConversationPhase,
@@ -30,7 +38,7 @@ import {
   RUNTIME_ASSISTANT_CUE_LINE,
   shouldPrimeRuntimeAssistantCue,
 } from './runtime-assistant-heuristics';
-import { brainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
+import { brainGalaxyConversationFocus, setBrainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
 import { useKairoSpeechCapture } from './use-kairo-speech-capture';
 import { useKairoVoiceInterrupt } from './use-kairo-voice-interrupt';
 
@@ -133,6 +141,9 @@ export function useKairoConversation() {
     const displayReply = formatConversationDisplayReply(reply);
     const spokenReply = sanitizeSpokenReply(reply);
     kairoConversationReply.value = normalizeKairoCopy(displayReply || spokenReply);
+    if (mentionsBriefingSurfaceOffer(displayReply || spokenReply || reply)) {
+      scheduleBriefingSurfaceOffer();
+    }
     if (shouldScheduleHandsFreeFollowup(voiceCaptureMode)) {
       scheduleKairoVoiceFollowupWindowAfterSpeech();
     }
@@ -152,16 +163,57 @@ export function useKairoConversation() {
       });
       return;
     }
+    if (action.type === 'focus_briefing') {
+      clearBriefingSurfaceOffer();
+      shell.focusKairoBriefing();
+      return;
+    }
     if (action.type === 'dispatch_command') {
       await shell.submitOperatorCommandContent(action.content);
     }
+  }
+
+  async function tryBriefingSurfaceFollowup(
+    content: string,
+    options?: { voiceCaptureMode?: KairoVoiceCaptureMode },
+  ): Promise<boolean> {
+    if (!shouldOpenBriefingFromFollowup(content)) {
+      return false;
+    }
+    clearBriefingSurfaceOffer();
+    shell.focusKairoBriefing();
+    draft.value = '';
+    pending.value = false;
+    thinkingLine.value = '';
+    await deliverVoiceReply('Opening the briefing for you.', options?.voiceCaptureMode);
+    return true;
+  }
+
+  function resolveHandoffSignal() {
+    const actionableInboxSignal = filterActionableOpenSignals(shell.inboxItems)[0];
+    if (actionableInboxSignal) {
+      return (
+        shell.inboxItems.find((item) => item.signal_id === actionableInboxSignal.signal_id) ??
+        actionableInboxSignal
+      );
+    }
+    const briefingSignals = shell.operatorBriefing?.top_signals ?? [];
+    return filterActionableOpenSignals(
+      briefingSignals.map((signal) => ({
+        signal_id: signal.signal_id,
+        title: signal.title,
+        status: 'open',
+        workspace_id: signal.workspace_id,
+        severity: signal.severity,
+      })),
+    )[0];
   }
 
   async function tryClientHandoff(content: string): Promise<boolean> {
     if (!HANDOFF_CLIENT_RE.test(content)) {
       return false;
     }
-    const topSignal = shell.operatorBriefing?.top_signals[0];
+    const topSignal = resolveHandoffSignal();
     if (!topSignal) {
       kairoConversationReply.value = 'No signal in context to hand off yet.';
       speakReply(kairoConversationReply.value);
@@ -169,9 +221,9 @@ export function useKairoConversation() {
     }
     await shell.handoffSignalToIde({
       signal_id: topSignal.signal_id,
-      workspace_id: topSignal.workspace_id,
+      workspace_id: topSignal.workspace_id ?? shell.currentWorkspace?.workspace_id ?? '',
       title: topSignal.title,
-      summary: topSignal.summary,
+      summary: topSignal.summary ?? topSignal.title,
     });
     kairoConversationReply.value = 'Handing the top signal off to the IDE.';
     speakReply(kairoConversationReply.value);
@@ -212,8 +264,23 @@ export function useKairoConversation() {
       clearRuntimeAssistantCue();
       if (navIntent.kind === 'focus_attention') {
         shell.focusAttentionSidebar();
+      } else if (navIntent.kind === 'focus_briefing') {
+        clearBriefingSurfaceOffer();
+        shell.focusKairoBriefing();
       } else if (navIntent.kind === 'focus_workspace' && navIntent.workspaceId) {
+        shell.setOperatorCenterView('graph');
         shell.setCurrentWorkspace(navIntent.workspaceId);
+        const label = canonicalWorkspaceLabel(
+          navIntent.workspaceId,
+          shell.workspaces.find((workspace) => workspace.workspace_id === navIntent.workspaceId)
+            ?.display_name ?? navIntent.workspaceId,
+        );
+        setBrainGalaxyConversationFocus({
+          nodeId: workspaceGalaxyNodeId(navIntent.workspaceId),
+          workspaceId: navIntent.workspaceId,
+          signalId: null,
+          label,
+        });
       } else if (navIntent.kind === 'switch_center_view' && navIntent.centerView) {
         shell.setOperatorCenterView(navIntent.centerView);
       }
@@ -221,6 +288,11 @@ export function useKairoConversation() {
       pending.value = false;
       thinkingLine.value = '';
       await deliverVoiceReply(navIntent.reply, options?.voiceCaptureMode);
+      return;
+    }
+
+    if (await tryBriefingSurfaceFollowup(content, options)) {
+      clearRuntimeAssistantCue();
       return;
     }
 
@@ -255,10 +327,11 @@ export function useKairoConversation() {
       thinkingLine.value = '';
       if (response.action) {
         void executeConverseAction(response.action);
-      } else if (response.turn_kind === 'command' && response.command_content) {
-        void shell.submitOperatorCommandContent(response.command_content);
-      } else if (response.turn_kind === 'action' && response.command_content) {
-        void shell.submitOperatorCommandContent(response.command_content);
+      } else if (shouldAutoDispatchConverseCommand(response)) {
+        void shell.submitOperatorCommandContent(response.command_content!);
+      }
+      if (mentionsBriefingSurfaceOffer(response.reply)) {
+        scheduleBriefingSurfaceOffer();
       }
       await deliverVoiceReply(response.reply, options?.voiceCaptureMode);
     } catch (error) {

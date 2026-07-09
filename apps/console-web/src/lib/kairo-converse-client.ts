@@ -22,6 +22,9 @@ export type KairoConverseAction =
   | {
       type: 'dispatch_command';
       content: string;
+    }
+  | {
+      type: 'focus_briefing';
     };
 
 export interface KairoConverseArtifactAction {
@@ -59,6 +62,7 @@ export interface KairoConverseResponse {
   reply: string;
   source: KairoConverseSource;
   command_content: string | null;
+  requires_confirmation?: boolean | null;
   action: KairoConverseAction | null;
   artifacts: KairoConverseArtifact[];
 }

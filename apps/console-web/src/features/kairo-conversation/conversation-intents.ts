@@ -5,7 +5,7 @@ import {
 } from '../../lib/kairo-entity-labels';
 
 export type ConversationNavigationIntent = {
-  kind: 'focus_workspace' | 'focus_attention' | 'switch_center_view';
+  kind: 'focus_workspace' | 'focus_attention' | 'focus_briefing' | 'switch_center_view';
   workspaceId?: string;
   centerView?: 'graph' | 'grid';
   reply: string;
@@ -17,6 +17,8 @@ export type WorkspaceNavTarget = {
 };
 
 const ATTENTION_RE = /\b(open|show|focus)\s+attention\b/i;
+const BRIEFING_NAV_RE =
+  /\b(?:open|show|focus|pull up)\s+(?:me\s+)?(?:the\s+)?(?:(?:vaxon|kairo|operator)\s+)?briefing\b|\bbriefing\s+(?:view|panel|tab)\b/i;
 /** Explicit view switches only — bare "fleet" in "fleet health" must not match. */
 const GRID_NAV_RE =
   /\b(?:show|open|switch to|go to|return to)\s+(?:the\s+)?(?:fleet\s+)?grid(?:\s+(?:view|mode))?\b|\bgrid\s+(?:view|mode)\b|\bfleet\s+(?:grid|view|mode)\b/i;
@@ -69,6 +71,10 @@ function matchWorkspace(
   );
 }
 
+export function workspaceGalaxyNodeId(workspaceId: string): string {
+  return `ws_${workspaceId.trim()}`;
+}
+
 export function resolveConversationNavigationIntent(
   content: string,
   workspaces: WorkspaceNavTarget[],
@@ -82,6 +88,12 @@ export function resolveConversationNavigationIntent(
     return {
       kind: 'focus_attention',
       reply: 'Opening Attention for you.',
+    };
+  }
+  if (BRIEFING_NAV_RE.test(trimmed)) {
+    return {
+      kind: 'focus_briefing',
+      reply: 'Opening the briefing for you.',
     };
   }
   if (GRID_NAV_RE.test(trimmed)) {

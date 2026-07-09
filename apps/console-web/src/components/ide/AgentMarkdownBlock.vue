@@ -5,13 +5,22 @@ import {
   renderAgentMessageMarkdown,
   splitAgentMessageForPreview,
 } from '../../lib/agent-message-markdown';
+import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
+import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
   content: string;
 }>();
 
+const shell = useShellStore();
 const parts = computed(() => splitAgentMessageForPreview(props.content));
 const previewHtml = computed(() => renderAgentMessageMarkdown(props.content));
+
+function handleMarkdownClick(event: MouseEvent): void {
+  handleMarkdownContainerClick(event, {
+    openWorkspaceFile: (path) => shell.openWorkspaceFile(path),
+  });
+}
 </script>
 
 <template>
@@ -21,6 +30,7 @@ const previewHtml = computed(() => renderAgentMessageMarkdown(props.content));
   <div
     class="conversation-seam__content conversation-seam__content--markdown conversation-seam__content--agent"
     v-html="previewHtml"
+    @click="handleMarkdownClick"
   />
   <p v-if="parts.postamble" class="conversation-seam__postamble">
     {{ parts.postamble }}

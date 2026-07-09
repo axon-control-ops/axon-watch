@@ -1,5 +1,13 @@
-Axon-X preparation checklist (2026-07-07)
+Axon-X preparation checklist (2026-07-09)
 =========================================
+
+LOCKED PLAN (follow to the letter)
+----------------------------------
+docs/planning/EXECUTION_PLAN.md — Phase A baseline → B hygiene → C conversation
+→ D brain polish → E dry-run week → F retirement sign-off.
+
+Voice + context/memory detail (Phase C6–C12):
+docs/planning/KAIRO_VOICE_IMPROVEMENT_PLAN.md
 
 Axon-X stack prep
 -----------------

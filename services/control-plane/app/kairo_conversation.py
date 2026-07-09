@@ -10,6 +10,7 @@ from typing import Any, Literal
 from app.chat.command_intent import (
     classify_command,
     command_display_name,
+    command_requires_confirmation,
     expand_command_shortcuts,
     is_question,
     is_auto_complete_run_summary,
@@ -63,6 +64,11 @@ _HANDOFF_ACTION_RE = re.compile(
     re.IGNORECASE,
 )
 _CONFIRM_RE = re.compile(r"^(yes|yeah|yep|do it|confirm|go ahead)\.?$", re.IGNORECASE)
+_BRIEFING_SURFACE_OFFER_RE = re.compile(
+    r"\b(pull\s+(?:it\s+)?to\s+the\s+front|bring\s+(?:it\s+)?(?:up|forward)|"
+    r"open\s+the\s+briefing|shall\s+i\s+(?:pull|show|open))\b",
+    re.IGNORECASE,
+)
 
 _TURN_MEMORY: dict[str, list[dict[str, str]]] = {}
 _ENTITY_MEMORY: dict[str, dict[str, str]] = {}
@@ -164,6 +170,11 @@ def _remember_top_signal(session_id: str, pack: dict[str, Any]) -> None:
     )
 
 
+def _note_briefing_surface_offer(session_id: str, reply: str) -> None:
+    if _BRIEFING_SURFACE_OFFER_RE.search(str(reply or "")):
+        _remember_entities(session_id, pending_briefing_surface="1")
+
+
 def _resolve_followup_action(content: str, session_id: str) -> dict[str, object] | None:
     trimmed = content.strip()
     entity = _entity_context(session_id)
@@ -171,6 +182,8 @@ def _resolve_followup_action(content: str, session_id: str) -> dict[str, object]
         pending_command = entity.get("pending_command", "")
         if pending_command:
             return {"type": "dispatch_command", "content": pending_command}
+        if entity.get("pending_briefing_surface") == "1":
+            return {"type": "focus_briefing"}
     if _HANDOFF_ACTION_RE.search(trimmed):
         signal_id = entity.get("signal_id", "")
         target_workspace_id = entity.get("target_workspace_id", "")
@@ -537,9 +550,20 @@ def _command_ack_line(content: str, *, workspace_label: str | None = None) -> st
             f"{auto_complete_hint}"
         )
     if intent == "shell_command":
-        return f"Executing now — {label}. Watch Command Results for output."
+        return (
+            f"I can run {label}{scope}. "
+            "Say yes when you want me to dispatch it — output will land in Command Results."
+        )
     if intent == "resume_from_review":
-        return "Resuming from review — picking up where we left off."
+        return (
+            "I can resume from review and pick up where we left off. "
+            "Say yes when you want me to continue."
+        )
+    if command_requires_confirmation(normalized):
+        return (
+            f"I can run {label}{scope}. "
+            "Say yes when you want me to dispatch it — output will land in Command Results."
+        )
     return f"Understood — {label}. I'll report back in Command Results."
 
 
@@ -648,6 +672,26 @@ def converse_turn(
                 },
                 duration_ms=round((time.perf_counter() - started_at) * 1000),
             )
+        if action_type == "focus_briefing":
+            reply = "Opening the briefing for you."
+            _remember_entities(session_id, pending_briefing_surface="")
+            _remember_turn(session_id, "user", trimmed)
+            _remember_turn(session_id, "assistant", reply)
+            return _log_voice_turn(
+                session_id=session_id,
+                workspace_id=workspace_id,
+                raw_content=raw_content,
+                normalized_content=trimmed,
+                payload={
+                    "turn_kind": "action",
+                    "reply": reply,
+                    "source": "template",
+                    "command_content": None,
+                    "action": followup,
+                    "artifacts": [],
+                },
+                duration_ms=round((time.perf_counter() - started_at) * 1000),
+            )
 
     turn_kind = classify_conversation_turn(trimmed)
     source: ConversationSource = "template"
@@ -656,9 +700,11 @@ def converse_turn(
     artifacts: list[dict[str, object]] = []
     runtime_dispatched = False
 
+    requires_confirmation = False
     if turn_kind == "command":
         normalized = expand_command_shortcuts(trimmed)
         command_content = normalized
+        requires_confirmation = command_requires_confirmation(normalized)
         reply = _command_ack_line(normalized, workspace_label=_workspace_short_label(pack))
         source = "template"
         _remember_entities(session_id, pending_command=normalized)
@@ -721,6 +767,7 @@ def converse_turn(
     if reply:
         reply = normalize_spoken_line(reply)
 
+    _note_briefing_surface_offer(session_id, reply)
     _remember_turn(session_id, "user", trimmed)
     _remember_turn(session_id, "assistant", reply)
 
@@ -734,6 +781,7 @@ def converse_turn(
             "reply": reply,
             "source": source,
             "command_content": command_content,
+            "requires_confirmation": requires_confirmation if turn_kind == "command" else None,
             "action": None,
             "artifacts": artifacts,
         },

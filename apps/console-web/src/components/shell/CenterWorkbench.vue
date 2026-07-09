@@ -21,6 +21,7 @@ import {
 } from '../../lib/shell-column-layout';
 import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
+import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
 import {
   persistEditorMarkdownPreviewEnabled,
   resolveEditorMarkdownPreviewEnabled,
@@ -181,6 +182,17 @@ const editorPreviewHtml = computed(() => {
   }
   return renderAgentMessageMarkdown(activeEditorValue.value);
 });
+
+function handleEditorPreviewClick(event: MouseEvent): void {
+  const baseFilePath =
+    shell.activeEditorDocument?.source === 'file'
+      ? shell.activeEditorDocument.filePath
+      : null;
+  handleMarkdownContainerClick(event, {
+    openWorkspaceFile: (path) => shell.openWorkspaceFile(path),
+    baseFilePath,
+  });
+}
 
 function setEditorPreviewMode(enabled: boolean): void {
   const documentId = shell.activeEditorDocument?.id;
@@ -620,6 +632,7 @@ watch(
           v-else-if="shell.activeEditorDocument && isMarkdownEditorDocument && editorPreviewEnabled"
           class="editor-markdown-preview conversation-seam__content conversation-seam__content--markdown"
           v-html="editorPreviewHtml"
+          @click="handleEditorPreviewClick"
         />
         <div class="editor-statusbar editor-statusbar--mockup">
           <button

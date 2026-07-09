@@ -852,10 +852,12 @@ def chat_attachments_show(attachment_id: str) -> FileResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     storage_path = str(record["storage_path"])
+    mime_type = str(record["mime_type"])
     return FileResponse(
         storage_path,
-        media_type=str(record["mime_type"]),
+        media_type=mime_type,
         filename=str(record["filename"]),
+        content_disposition_type="inline" if mime_type.startswith("image/") else "attachment",
     )
 
 

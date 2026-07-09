@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveConversationNavigationIntent } from './conversation-intents';
+import { resolveConversationNavigationIntent, workspaceGalaxyNodeId } from './conversation-intents';
 
 const WORKSPACES = [
   { workspace_id: 'workspace_dashpro', display_name: 'DashPro' },
@@ -12,6 +12,13 @@ describe('resolveConversationNavigationIntent', () => {
     expect(resolveConversationNavigationIntent('open attention', WORKSPACES)).toEqual({
       kind: 'focus_attention',
       reply: 'Opening Attention for you.',
+    });
+  });
+
+  it('opens the operator briefing panel', () => {
+    expect(resolveConversationNavigationIntent('open VAXON briefing', WORKSPACES)).toEqual({
+      kind: 'focus_briefing',
+      reply: 'Opening the briefing for you.',
     });
   });
 
@@ -52,5 +59,9 @@ describe('resolveConversationNavigationIntent', () => {
     expect(
       resolveConversationNavigationIntent('what nodes are in the brain galaxy right now?', WORKSPACES),
     ).toBeNull();
+  });
+
+  it('maps workspace ids to galaxy node ids', () => {
+    expect(workspaceGalaxyNodeId('workspace_dashpro')).toBe('ws_workspace_dashpro');
   });
 });

@@ -72,6 +72,26 @@ class ChatParitySliceTests(unittest.TestCase):
         self.assertEqual(1, len(operator.get("attachments", [])))
         self.assertEqual(attachment_id, operator["attachments"][0]["attachment_id"])
 
+    def test_image_attachment_route_uses_inline_disposition(self) -> None:
+        png_bytes = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+            b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+            b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        upload = self.client.post(
+            "/api/chat/attachments",
+            data={"workspace_id": "workspace_alpha"},
+            files={"file": ("diagram.png", io.BytesIO(png_bytes), "image/png")},
+        )
+        self.assertEqual(200, upload.status_code)
+        attachment_id = upload.json()["attachment_id"]
+
+        response = self.client.get(f"/api/chat/attachments/{attachment_id}")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("image/png", response.headers.get("content-type"))
+        self.assertIn("inline", response.headers.get("content-disposition", "").lower())
+
     def test_list_and_create_workspace_chat_threads(self) -> None:
         with patch(
             "app.chat.service.generate_lane_b_result",
