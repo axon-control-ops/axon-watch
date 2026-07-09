@@ -349,6 +349,7 @@ export function buildStatusBarZones(input: {
   workspaceId: string | null;
   layoutMode?: 'operator' | 'ide';
   idePresenceProfile?: IdePresenceProfile;
+  activeSignalCount?: number | null;
 }): StatusBarZones {
   if (input.runtimeSummaryLoadState === 'loading') {
     return {
@@ -369,7 +370,7 @@ export function buildStatusBarZones(input: {
   const summary = input.runtimeSummary;
   const watchConnected = summary.watch.connected;
   const watchStatus = summary.watch.status.toUpperCase();
-  const openSignals = summary.signals.open_count;
+  const openSignals = input.activeSignalCount ?? summary.signals.open_count;
   const phase = input.primaryActiveRun?.phase ?? 'idle';
   const workspaceLabel = input.workspaceId ?? 'no workspace';
   const layoutMode = input.layoutMode ?? 'operator';

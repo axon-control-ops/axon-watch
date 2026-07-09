@@ -73,7 +73,7 @@ const showReviewActions = computed(
 );
 
 function signalCount(): number {
-  return shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0;
+  return shell.workspaceAttentionSignalCount;
 }
 
 function phaseTagClass(phase: string | undefined): string {

@@ -1,5 +1,9 @@
 import type { OperatorBriefing } from '../contracts/canonical';
 import { briefingHasInterruptiveSignals } from './dock-seam-layout';
+import {
+  filterActionableOpenSignals,
+  type OperatorSignalCountItem,
+} from './operator-signal-count';
 
 export type LeftSidebarMode = 'workspaces' | 'attention';
 
@@ -23,12 +27,24 @@ export function resolveDefaultLeftSidebarMode(input: {
 export function leftSidebarAttentionBadgeCount(input: {
   pendingApprovals: number;
   briefing: OperatorBriefing | null;
+  inboxItems?: OperatorSignalCountItem[];
+  inboxLoadState?: 'idle' | 'loading' | 'loaded' | 'error';
 }): number {
-  const signalCount = input.briefing?.top_signals.filter(
-    (signal) => signal.severity === 'high' || signal.severity === 'critical',
-  ).length;
+  let interruptiveSignals = 0;
 
-  return input.pendingApprovals + (signalCount ?? 0);
+  if (input.inboxLoadState === 'loaded' && input.inboxItems) {
+    interruptiveSignals = filterActionableOpenSignals(input.inboxItems).filter((signal) => {
+      const severity = (signal.severity ?? '').toLowerCase();
+      return severity === 'high' || severity === 'critical';
+    }).length;
+  } else {
+    interruptiveSignals =
+      input.briefing?.top_signals.filter(
+        (signal) => signal.severity === 'high' || signal.severity === 'critical',
+      ).length ?? 0;
+  }
+
+  return input.pendingApprovals + interruptiveSignals;
 }
 
 export function leftSidebarModeLabel(mode: LeftSidebarMode): string {

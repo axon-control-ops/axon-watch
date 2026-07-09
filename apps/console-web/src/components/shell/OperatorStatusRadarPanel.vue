@@ -103,6 +103,8 @@ const attentionBadgeCount = computed(() =>
   leftSidebarAttentionBadgeCount({
     pendingApprovals: pendingApprovals.value,
     briefing: shell.operatorBriefing,
+    inboxItems: shell.inboxItems,
+    inboxLoadState: shell.inboxLoadState,
   }),
 );
 

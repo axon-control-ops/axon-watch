@@ -1,0 +1,440 @@
+#!/usr/bin/env bash
+# sc - Axon-X Hot-Command: stage everything and commit (with safety rails).
+#
+# Usage:
+#   ./scripts/sc
+#   ./scripts/sc -m "fix: something"
+#   ./scripts/sc -n
+#   ./scripts/sc -q
+#   ./scripts/sc --help
+#
+# Optional shell alias (add to ~/.zshrc):
+#   alias sc='/home/edp/axon-nvme/repos/axon-watch/scripts/sc'
+#
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
+DRY_RUN=0
+SUGGEST_ONLY=0
+SKIP_PREFLIGHT=0
+COMMIT_MESSAGE=""
+ALLOW_SECRETS=0
+SC_TEMP_INDEX=""
+
+usage() {
+  cat <<'USAGE_EOF'
+sc - Axon-X Hot-Command (stage all + commit)
+
+Usage:
+  sc [-m MESSAGE] [-n] [--suggest-only] [-q] [--allow-secrets]
+
+Options:
+  -m MESSAGE       Commit message (required for non-interactive use)
+  -n, --dry-run    Stage in a temp index and show summary; no commit
+  --suggest-only   Analyze the staged preview and print a suggested message only
+  -q, --quick      Skip verify preflight hints
+  --allow-secrets  Do not abort when likely secret files would be staged
+  -h, --help       Show this help
+
+Examples:
+  sc
+  sc -m "fix(operator): align footer signal counts"
+  sc -n
+  sc --suggest-only
+USAGE_EOF
+}
+
+log() {
+  printf 'sc: %s\n' "$*"
+}
+
+die() {
+  printf 'sc: error: %s\n' "$*" >&2
+  exit 1
+}
+
+git_with_index() {
+  local index_file="${1:-}"
+  shift
+  if [[ -n "$index_file" ]]; then
+    GIT_INDEX_FILE="$index_file" git -C "$REPO_ROOT" "$@"
+  else
+    git -C "$REPO_ROOT" "$@"
+  fi
+}
+
+make_temp_index() {
+  local real_index temp_index
+  real_index="$(git -C "$REPO_ROOT" rev-parse --git-dir)/index"
+  temp_index="$(mktemp "${TMPDIR:-/tmp}/axon-sc.index.XXXXXX")"
+  if [[ -f "$real_index" ]]; then
+    cp "$real_index" "$temp_index"
+  else
+    : > "$temp_index"
+  fi
+  printf '%s\n' "$temp_index"
+}
+
+stage_all_in_index() {
+  local index_file="${1:-}"
+  git_with_index "$index_file" add -A
+}
+
+append_unique() {
+  local array_name="$1"
+  local seen_name="$2"
+  local value="${3:-}"
+  [[ -n "$value" ]] || return 0
+  local -n target_array="$array_name"
+  local -n target_seen="$seen_name"
+  if [[ -n "${target_seen[$value]:-}" ]]; then
+    return 0
+  fi
+  target_seen["$value"]=1
+  target_array+=("$value")
+}
+
+infer_topic_for_path() {
+  local path="${1:-}"
+  case "$path" in
+    apps/console-web/src/components/ide/*|apps/console-web/src/lib/ide-*)
+      printf 'IDE shell\n'
+      ;;
+    apps/console-web/src/components/shell/*|apps/console-web/src/lib/operator-*|apps/console-web/src/lib/mockup-shell-view.ts|apps/console-web/src/lib/left-sidebar-mode.ts|apps/console-web/src/lib/signal-*)
+      printf 'operator shell\n'
+      ;;
+    apps/console-web/src/features/kairo-conversation/*|services/control-plane/app/kairo_*)
+      printf 'KAIRO conversation\n'
+      ;;
+    apps/console-web/*|packages/shared-types/*)
+      printf 'console web\n'
+      ;;
+    services/axon-watch/app/monitors/*|services/axon-watch/app/signals/*|config/*monitor*)
+      printf 'watch monitors\n'
+      ;;
+    services/control-plane/*)
+      printf 'control plane\n'
+      ;;
+    services/axon-watch/*)
+      printf 'watch service\n'
+      ;;
+    scripts/*)
+      printf 'scripts\n'
+      ;;
+    docs/*)
+      printf 'docs\n'
+      ;;
+    tests/*)
+      printf 'tests\n'
+      ;;
+  esac
+}
+
+join_human_list() {
+  local items=("$@")
+  local count="${#items[@]}"
+  if [[ "$count" -eq 0 ]]; then
+    return 0
+  fi
+  if [[ "$count" -eq 1 ]]; then
+    printf '%s' "${items[0]}"
+    return 0
+  fi
+  if [[ "$count" -eq 2 ]]; then
+    printf '%s and %s' "${items[0]}" "${items[1]}"
+    return 0
+  fi
+  local joined="${items[0]}"
+  local i
+  for ((i=1; i<count-1; i+=1)); do
+    joined="${joined}, ${items[i]}"
+  done
+  joined="${joined}, and ${items[count-1]}"
+  printf '%s' "$joined"
+}
+
+suggest_commit_message() {
+  local index_file="${1:-}"
+  local -a topics=()
+  local -a fallback_roots=()
+  local -A topic_seen=()
+  local -A root_seen=()
+  local path status inferred root target_path
+  local added=0 modified=0 deleted=0 renamed=0 tests_changed=0
+  while IFS=$'\t' read -r status path _rest; do
+    [[ -n "$status" && -n "$path" ]] || continue
+    case "$status" in
+      A*) ((added+=1)) ;;
+      D*) ((deleted+=1)) ;;
+      R*) ((renamed+=1)) ;;
+      *) ((modified+=1)) ;;
+    esac
+    target_path="$path"
+    if [[ "$status" == R* && -n "${_rest:-}" ]]; then
+      target_path="$_rest"
+    fi
+    [[ "$target_path" == tests/* ]] && tests_changed=1
+    inferred="$(infer_topic_for_path "$target_path" || true)"
+    if [[ -n "$inferred" ]]; then
+      append_unique topics topic_seen "$inferred"
+    fi
+    root="${target_path%%/*}"
+    if [[ "$root" != "$target_path" ]]; then
+      append_unique fallback_roots root_seen "$root"
+    fi
+  done < <(git_with_index "$index_file" diff --cached --name-status --find-renames --diff-filter=ACDMRTUXB)
+
+  local action="Update"
+  if [[ "$added" -gt 0 && "$modified" -eq 0 && "$deleted" -eq 0 && "$renamed" -eq 0 ]]; then
+    action="Add"
+  elif [[ "$deleted" -gt 0 && "$added" -eq 0 && "$modified" -eq 0 && "$renamed" -eq 0 ]]; then
+    action="Remove"
+  elif [[ "$renamed" -gt 0 && "$added" -eq 0 && "$modified" -eq 0 && "$deleted" -eq 0 ]]; then
+    action="Rename"
+  fi
+
+  local subject=""
+  if [[ "${#topics[@]}" -gt 0 ]]; then
+    if [[ "${#topics[@]}" -gt 3 ]]; then
+      subject="$(join_human_list "${topics[@]:0:2}") and related Axon-X surfaces"
+    else
+      subject="$(join_human_list "${topics[@]}")"
+    fi
+  elif [[ "${#fallback_roots[@]}" -gt 0 ]]; then
+    if [[ "${#fallback_roots[@]}" -gt 3 ]]; then
+      subject="$(join_human_list "${fallback_roots[@]:0:2}") and related files"
+    else
+      subject="$(join_human_list "${fallback_roots[@]}")"
+    fi
+  else
+    subject="working tree changes"
+  fi
+
+  local suffix=""
+  if [[ "$tests_changed" -eq 1 && "$subject" != "tests" ]]; then
+    suffix=" with focused tests"
+  fi
+  printf '%s %s%s\n' "$action" "$subject" "$suffix"
+}
+
+print_change_area_summary() {
+  local index_file="${1:-}"
+  local path status root target_path area
+  local -A area_counts=()
+  while IFS=$'\t' read -r status path _rest; do
+    [[ -n "$status" && -n "$path" ]] || continue
+    target_path="$path"
+    if [[ "$status" == R* && -n "${_rest:-}" ]]; then
+      target_path="$_rest"
+    fi
+    area="$(infer_topic_for_path "$target_path" || true)"
+    if [[ -z "$area" ]]; then
+      root="${target_path%%/*}"
+      if [[ "$root" == "$target_path" ]]; then
+        area="repo root"
+      else
+        area="$root"
+      fi
+    fi
+    area_counts["$area"]=$(( ${area_counts["$area"]:-0} + 1 ))
+  done < <(git_with_index "$index_file" diff --cached --name-status --find-renames --diff-filter=ACDMRTUXB)
+
+  if [[ "${#area_counts[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  log "top changed areas:"
+  while IFS=$'\t' read -r count area; do
+    printf '  %s (%s)\n' "$area" "$count"
+  done < <(
+    for area in "${!area_counts[@]}"; do
+      printf '%s\t%s\n' "${area_counts[$area]}" "$area"
+    done | sort -t $'\t' -k1,1nr -k2,2 | awk -F '\t' 'NR<=5 { print $1 "\t" $2 }'
+  )
+}
+
+git_operation_in_progress() {
+  local git_dir
+  git_dir="$(git -C "$REPO_ROOT" rev-parse --git-dir)"
+  [[ -f "$git_dir/MERGE_HEAD" ]] \
+    || [[ -d "$git_dir/rebase-apply" ]] \
+    || [[ -d "$git_dir/rebase-merge" ]] \
+    || [[ -f "$git_dir/CHERRY_PICK_HEAD" ]] \
+    || [[ -f "$git_dir/REVERT_HEAD" ]]
+}
+
+has_unmerged_paths() {
+  [[ -n "$(git -C "$REPO_ROOT" diff --name-only --diff-filter=U 2>/dev/null || true)" ]]
+}
+
+secret_paths_in_tree() {
+  git -C "$REPO_ROOT" status --porcelain | awk '{print $2}' | while read -r path; do
+    [[ -z "$path" ]] && continue
+    case "$path" in
+      .env|.env.*|*/.env|*/.env.*)
+        printf '%s\n' "$path"
+        ;;
+      *credentials*.json|*secret*.json|*.pem|*.p12|*.key)
+        printf '%s\n' "$path"
+        ;;
+    esac
+  done
+}
+
+run_preflight() {
+  if [[ "$SKIP_PREFLIGHT" == "1" ]]; then
+    return 0
+  fi
+  log "preflight: dependency directions"
+  if ! python3 "$REPO_ROOT/scripts/verify/check_dependency_directions.py" >/dev/null 2>&1; then
+    log "warning: check_dependency_directions.py failed (commit will still proceed)"
+  fi
+  log "preflight: DTO size budget"
+  if ! python3 "$REPO_ROOT/scripts/verify/check_dto_sizes.py" >/dev/null 2>&1; then
+    log "warning: check_dto_sizes.py failed (commit will still proceed)"
+  fi
+}
+
+collect_message() {
+  local suggested_message="${1:-}"
+  if [[ -n "$COMMIT_MESSAGE" ]]; then
+    return 0
+  fi
+  if ! [[ -t 0 ]]; then
+    if [[ -n "$suggested_message" ]]; then
+      die "non-interactive shell requires -m MESSAGE (suggested: $suggested_message)"
+    fi
+    die "non-interactive shell requires -m MESSAGE"
+  fi
+  local branch files
+  branch="$(git -C "$REPO_ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null || echo "HEAD")"
+  files="$(git -C "$REPO_ROOT" status --porcelain | wc -l | tr -d ' ')"
+  if [[ -n "$suggested_message" ]]; then
+    printf '\nBranch: %s\nStaged/working entries: %s\nSuggested commit message:\n  %s\n\nPress Enter to accept it, or type a new message (empty line finishes; Ctrl-C aborts):\n' "$branch" "$files" "$suggested_message"
+  else
+    printf '\nBranch: %s\nStaged/working entries: %s\n\nEnter commit message (empty line finishes; Ctrl-C aborts):\n' "$branch" "$files"
+  fi
+  local line body=""
+  IFS= read -r line || true
+  if [[ -z "$line" && -n "$suggested_message" ]]; then
+    COMMIT_MESSAGE="$suggested_message"
+    return 0
+  fi
+  body="$line"
+  while IFS= read -r line; do
+    if [[ -z "$line" && -n "$body" ]]; then
+      break
+    fi
+    if [[ -n "$line" && -n "$body" ]]; then
+      body="${body}"$'\n'"${line}"
+    elif [[ -n "$line" ]]; then
+      body="$line"
+    fi
+  done
+  [[ -z "$body" ]] && die "empty commit message aborted"
+  COMMIT_MESSAGE="$body"
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -m)
+        shift
+        COMMIT_MESSAGE="${1:-}"
+        [[ -n "$COMMIT_MESSAGE" ]] || die "-m requires a message"
+        ;;
+      -n|--dry-run)
+        DRY_RUN=1
+        ;;
+      --suggest-only)
+        SUGGEST_ONLY=1
+        ;;
+      -q|--quick)
+        SKIP_PREFLIGHT=1
+        ;;
+      --allow-secrets)
+        ALLOW_SECRETS=1
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "unknown argument: $1 (try --help)"
+        ;;
+    esac
+    shift
+  done
+}
+
+main() {
+  parse_args "$@"
+
+  cd "$REPO_ROOT"
+
+  if git_operation_in_progress; then
+    die "git operation in progress (merge/rebase/cherry-pick)"
+  fi
+  if has_unmerged_paths; then
+    die "unmerged paths present; resolve conflicts first"
+  fi
+
+  if [[ -z "$(git status --porcelain)" ]]; then
+    log "nothing to commit (working tree clean)"
+    exit 0
+  fi
+
+  local secrets
+  secrets="$(secret_paths_in_tree || true)"
+  if [[ -n "$secrets" && "$ALLOW_SECRETS" != "1" ]]; then
+    log "refusing to stage likely secret files:"
+    printf '  %s\n' $secrets
+    die "pass --allow-secrets to override (not recommended)"
+  fi
+
+  run_preflight
+
+  log "status:"
+  git status --short | head -40
+  local total
+  total="$(git status --porcelain | wc -l | tr -d ' ')"
+  if [[ "$total" -gt 40 ]]; then
+    log "... and $((total - 40)) more paths"
+  fi
+
+  local temp_index suggested_message
+  temp_index="$(make_temp_index)"
+  SC_TEMP_INDEX="$temp_index"
+  trap 'rm -f "${SC_TEMP_INDEX:-}"' EXIT
+  stage_all_in_index "$temp_index"
+
+  log "proposed staged diff stat:"
+  git_with_index "$temp_index" diff --cached --stat
+  print_change_area_summary "$temp_index"
+  suggested_message="$(suggest_commit_message "$temp_index")"
+  if [[ -n "$suggested_message" ]]; then
+    log "suggested commit message:"
+    printf '  %s\n' "$suggested_message"
+  fi
+
+  if [[ "$DRY_RUN" == "1" || "$SUGGEST_ONLY" == "1" ]]; then
+    exit 0
+  fi
+
+  git add -A
+
+  if git diff --cached --quiet --ignore-submodules --; then
+    log "nothing to commit after staging"
+    exit 0
+  fi
+
+  collect_message "$suggested_message"
+
+  log "committing $(git diff --cached --name-only | wc -l | tr -d ' ') paths"
+  git commit -m "$COMMIT_MESSAGE"
+  log "done: $(git log -1 --oneline)"
+}
+
+main "$@"

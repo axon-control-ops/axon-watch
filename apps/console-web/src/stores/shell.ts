@@ -173,9 +173,8 @@ import {
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
 import {
-  resolveAttentionFocusScrollTarget,
-  resolveDefaultHighlightedSignalId,
-} from '../lib/ide-attention-focus';
+  resolveOperatorSignalCount,
+} from '../lib/operator-signal-count';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
   readViewportWidth,
@@ -596,6 +595,23 @@ export const useShellStore = defineStore('shell', () => {
   const topbarBreadcrumb = computed(() =>
     buildTopbarBreadcrumb(runtimeSummary.value, currentWorkspace.value),
   );
+  const activeOperatorSignalCount = computed(() =>
+    resolveOperatorSignalCount({
+      inboxItems: inboxItems.value,
+      inboxLoadState: inboxLoadState.value,
+      runtimeSummaryOpenCount: runtimeSummary.value?.signals.open_count,
+    }),
+  );
+
+  const workspaceAttentionSignalCount = computed(() =>
+    resolveOperatorSignalCount({
+      inboxItems: inboxItems.value,
+      inboxLoadState: inboxLoadState.value,
+      runtimeSummaryOpenCount: runtimeSummary.value?.signals.open_count,
+      workspaceId: currentWorkspace.value?.workspace_id ?? null,
+    }),
+  );
+
   const statusBarZones = computed(() =>
     buildStatusBarZones({
       runtimeSummary: runtimeSummary.value,
@@ -604,6 +620,7 @@ export const useShellStore = defineStore('shell', () => {
       workspaceId: currentWorkspace.value?.workspace_id ?? null,
       layoutMode: layoutMode.value,
       idePresenceProfile: idePresenceProfile.value,
+      activeSignalCount: activeOperatorSignalCount.value,
     }),
   );
 
@@ -951,6 +968,8 @@ export const useShellStore = defineStore('shell', () => {
     computeLeftSidebarAttentionBadgeCount({
       pendingApprovals: pendingApprovalsCount.value,
       briefing: operatorBriefing.value,
+      inboxItems: inboxItems.value,
+      inboxLoadState: inboxLoadState.value,
     }),
   );
 
@@ -4349,6 +4368,8 @@ export const useShellStore = defineStore('shell', () => {
     idePresenceProfile,
     inboxItems,
     inboxLoadState,
+    activeOperatorSignalCount,
+    workspaceAttentionSignalCount,
     inboxStateLabel,
     kairoBriefingAttention,
     kairoAgentLiveLine,
