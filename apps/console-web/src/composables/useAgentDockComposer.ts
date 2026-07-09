@@ -1,8 +1,6 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import {
-  buildIdeComposerActivityLabel,
-  buildIdeStreamActivityLabel,
   FULL_ACCESS_CONSENT_LINES,
 } from '../lib/agent-dock-activity-view';
 import {
@@ -35,40 +33,15 @@ import {
 import { CURSOR_PICKER_COMPOSER_IDS, CURSOR_PICKER_DEFAULT_MODEL } from '../lib/cursor-picker-prefs';
 
 import { resizeCommandComposer } from '../lib/command-composer-autosize';
-import {
-  type ComposerClipboardImage,
-  composerImageFromStored,
-  readClipboardImages,
-  readDroppedImages,
-  revokeComposerClipboardImages,
-  revokeComposerClipboardImagePreview,
-  shouldAcceptComposerFileDrop,
-  shouldInterceptComposerImagePaste,
-  storedComposerImageFromClipboard,
-} from '../lib/composer-clipboard-paste';
-import {
-  persistComposerAttachments,
-  readStoredComposerAttachments,
-} from '../lib/ide-composer-attachment-prefs';
 import { shouldSteerAgentDockComposer, shouldSubmitAgentDockComposer } from '../lib/agent-dock-composer-input';
 import {
   resolveActiveIdeAgentMessage,
 } from '../lib/ide-agent-center-view';
 import { summarizeIdeAgentActivity } from '../lib/ide-agent-activity-view';
 import {
-  persistAgentComposerHistory,
-  readStoredAgentComposerHistory,
-  recordAgentComposerHistoryEntry,
   shouldRecallNextAgentComposerHistory,
   shouldRecallPreviousAgentComposerHistory,
-  stepAgentComposerHistory,
 } from '../lib/agent-dock-composer-history';
-import {
-  composerDraftIncludesToken,
-  readStoredTerminalSnippet,
-  SELECTION_CONTEXT_TOKEN,
-  TERMINAL_CONTEXT_TOKEN,
-} from '../lib/ide-composer-context-tokens';
 import {
   filterMcpToolsForComposerMode,
   mcpToolDetail,
@@ -84,6 +57,9 @@ import {
 } from '../features/kairo-conversation/conversation-briefing-surface';
 import { OPERATOR_PERSONA_NAME } from '../lib/operator-persona-name';
 import { useShellStore } from '../stores/shell';
+import { useComposerContext } from './agent-dock/use-composer-context';
+import { useComposerHistory } from './agent-dock/use-composer-history';
+import { useComposerImages } from './agent-dock/use-composer-images';
 
 export type ComposerMode = 'agent' | 'plan' | 'ask' | 'kairo';
 
@@ -128,22 +104,61 @@ const fullAccessConsentChecked = ref(false);
 const showAddModelsPanel = ref(false);
 const showRuntimeTargetsPanel = ref(false);
 const modelSearchQuery = ref('');
-const contextWorkspace = ref(false);
-const contextActiveFile = ref(false);
-const contextSelection = ref(false);
-const contextTerminal = ref(false);
-const contextIde = ref(false);
-const contextPinned = ref(false);
-const composerHistory = ref<string[]>([]);
-const composerHistoryWorkspaceId = ref<string | null>(null);
-const composerHistoryIndex = ref(-1);
-const composerHistoryScratch = ref('');
-const applyingHistoryDraft = ref(false);
-const composerImages = ref<ComposerClipboardImage[]>([]);
-const composerImagesWorkspaceId = ref<string | null>(null);
-const composerImagesPersistTimer = ref<ReturnType<typeof setTimeout> | null>(null);
-const enlargedComposerImage = ref<ComposerClipboardImage | null>(null);
-const composerDragOver = ref(false);
+
+const {
+  contextWorkspace,
+  contextActiveFile,
+  contextSelection,
+  contextTerminal,
+  contextIde,
+  contextPinned,
+  hasTerminalSnippet,
+  selectionChipLabel,
+  attachmentChips,
+  toggleContext,
+  removeChip,
+  syncContextFromDraft,
+} = useComposerContext(shell);
+
+const {
+  composerImages,
+  enlargedComposerImage,
+  composerDragOver,
+  clearComposerImages,
+  persistCurrentComposerImages,
+  loadComposerImagesForWorkspace,
+  openComposerImage,
+  closeComposerImageLightbox,
+  handleComposerImageLightboxKeydown,
+  handleComposerPaste,
+  handleComposerDragOver,
+  handleComposerDragLeave,
+  handleComposerDrop,
+  removeComposerImage,
+  disposeComposerImagesPersistTimer,
+  revokeAllComposerImagePreviews,
+} = useComposerImages();
+
+function syncComposerHeight(): void {
+  if (!inputRef.value) return;
+  resizeCommandComposer(inputRef.value, { compact: true });
+}
+
+const {
+  composerHistory,
+  composerHistoryIndex,
+  composerHistoryScratch,
+  applyingHistoryDraft,
+  loadComposerHistoryForWorkspace,
+  handleHistory,
+  recordComposerHistoryIfSent,
+} = useComposerHistory({
+  shell,
+  inputRef,
+  syncComposerHeight,
+  clearComposerImages,
+  composerImages,
+});
 
 const activeMode = computed(
   () => MODE_OPTIONS.find((option) => option.key === composerMode.value) ?? MODE_OPTIONS[2],
@@ -304,31 +319,6 @@ const composerPlaceholder = computed(() => {
   }
   return 'Describe what you want to build or change…';
 });
-const activeFileToken = computed(() =>
-  shell.activeWorkspaceFilePath ? `@file:${shell.activeWorkspaceFilePath}` : null,
-);
-const workspaceToken = computed(() =>
-  shell.currentWorkspace?.workspace_id ? `@workspace:${shell.currentWorkspace.workspace_id}` : null,
-);
-const ideToken = '@ide-context';
-const pinnedToken = '@pin-context';
-const selectionToken = SELECTION_CONTEXT_TOKEN;
-const terminalToken = TERMINAL_CONTEXT_TOKEN;
-const hasTerminalSnippet = computed(() =>
-  shell.currentWorkspace?.workspace_id
-    ? Boolean(readStoredTerminalSnippet(shell.currentWorkspace.workspace_id))
-    : false,
-);
-const selectionChipLabel = computed(() => {
-  const selection = shell.editorSelection;
-  if (!selection?.text.trim()) {
-    return 'Selection';
-  }
-  if (selection.startLine === selection.endLine) {
-    return `L${selection.startLine}`;
-  }
-  return `L${selection.startLine}-${selection.endLine}`;
-});
 const mcpToolsForMode = computed(() => {
   if (composerMode.value === 'kairo') {
     return [];
@@ -420,68 +410,6 @@ const modeButtonLabel = computed(() => {
   }
   return activeMode.value.label;
 });
-const attachmentChips = computed(() => {
-  const chips: Array<{ key: string; label: string; kind: string }> = [];
-  if (contextWorkspace.value && shell.currentWorkspace?.workspace_id) {
-    chips.push({
-      key: 'workspace',
-      kind: 'workspace',
-      label: shell.currentWorkspace.workspace_id,
-    });
-  }
-  if (contextActiveFile.value && shell.activeWorkspaceFilePath) {
-    chips.push({
-      key: 'file',
-      kind: 'file',
-      label: shell.activeWorkspaceFilePath,
-    });
-  }
-  if (contextSelection.value && shell.hasEditorSelection) {
-    chips.push({
-      key: 'selection',
-      kind: 'selection',
-      label: selectionChipLabel.value,
-    });
-  }
-  if (contextTerminal.value && hasTerminalSnippet.value) {
-    chips.push({
-      key: 'terminal',
-      kind: 'terminal',
-      label: 'Terminal output',
-    });
-  }
-  if (contextIde.value) {
-    chips.push({ key: 'ide', kind: 'ide', label: 'IDE context' });
-  }
-  if (contextPinned.value) {
-    chips.push({ key: 'pin', kind: 'pin', label: 'Pinned' });
-  }
-  return chips;
-});
-
-function resetComposerHistoryNavigation(): void {
-  composerHistoryIndex.value = -1;
-  composerHistoryScratch.value = '';
-}
-
-function loadComposerHistoryForWorkspace(workspaceId: string | null | undefined): void {
-  const nextWorkspaceId = workspaceId?.trim() || null;
-  if (composerHistoryWorkspaceId.value === nextWorkspaceId) {
-    return;
-  }
-  composerHistoryWorkspaceId.value = nextWorkspaceId;
-  composerHistory.value = readStoredAgentComposerHistory(nextWorkspaceId);
-  resetComposerHistoryNavigation();
-}
-
-function persistCurrentComposerHistory(): void {
-  persistAgentComposerHistory(composerHistoryWorkspaceId.value, composerHistory.value);
-}
-
-function syncComposerHeight(): void {
-  if (!inputRef.value) return;
-  resizeCommandComposer(inputRef.value, { compact: true });
-}
 
 function closeMenus(): void {
   showContextMenu.value = false;
@@ -520,86 +448,6 @@ function openAddModelsPanel(): void {
 function closeAddModelsPanel(): void {
   showAddModelsPanel.value = false;
   modelSearchQuery.value = '';
-}
-
-function normalizeDraft(text: string): string {
-  return text
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function setTokenEnabled(token: string | null, enabled: boolean): void {
-  if (!token) return;
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, 'g');
-  let draft = shell.ideComposerDraft;
-  draft = draft.replace(pattern, ' ').replace(/[ ]{2,}/g, ' ');
-  draft = normalizeDraft(draft);
-  if (enabled) {
-    draft = draft ? `${token}\n${draft}` : token;
-  }
-  shell.ideComposerDraft = draft;
-}
-
-function toggleContext(kind: 'workspace' | 'file' | 'selection' | 'terminal' | 'ide' | 'pin'): void {
-  if (kind === 'workspace') {
-    contextWorkspace.value = !contextWorkspace.value;
-    setTokenEnabled(workspaceToken.value, contextWorkspace.value);
-    return;
-  }
-  if (kind === 'file') {
-    contextActiveFile.value = !contextActiveFile.value;
-    setTokenEnabled(activeFileToken.value, contextActiveFile.value);
-    return;
-  }
-  if (kind === 'selection') {
-    contextSelection.value = !contextSelection.value;
-    setTokenEnabled(selectionToken, contextSelection.value);
-    return;
-  }
-  if (kind === 'terminal') {
-    contextTerminal.value = !contextTerminal.value;
-    setTokenEnabled(terminalToken, contextTerminal.value);
-    return;
-  }
-  if (kind === 'ide') {
-    contextIde.value = !contextIde.value;
-    setTokenEnabled(ideToken, contextIde.value);
-    return;
-  }
-  contextPinned.value = !contextPinned.value;
-  setTokenEnabled(pinnedToken, contextPinned.value);
-}
-
-function removeChip(key: string): void {
-  if (key === 'workspace') {
-    contextWorkspace.value = false;
-    setTokenEnabled(workspaceToken.value, false);
-    return;
-  }
-  if (key === 'file') {
-    contextActiveFile.value = false;
-    setTokenEnabled(activeFileToken.value, false);
-    return;
-  }
-  if (key === 'selection') {
-    contextSelection.value = false;
-    setTokenEnabled(selectionToken, false);
-    return;
-  }
-  if (key === 'terminal') {
-    contextTerminal.value = false;
-    setTokenEnabled(terminalToken, false);
-    return;
-  }
-  if (key === 'ide') {
-    contextIde.value = false;
-    setTokenEnabled(ideToken, false);
-    return;
-  }
-  contextPinned.value = false;
-  setTokenEnabled(pinnedToken, false);
 }
 
 function selectMode(mode: ComposerMode): void {
@@ -697,32 +545,6 @@ function toggleVoiceCapture(): void {
   startVoiceCapture();
 }
 
-function applyHistoryDraft(draft: string): void {
-  applyingHistoryDraft.value = true;
-  shell.restoreComposerDraft(draft);
-  void nextTick(() => {
-    syncComposerHeight();
-    if (!inputRef.value) {
-      return;
-    }
-    const caret = inputRef.value.value.length;
-    inputRef.value.setSelectionRange(caret, caret);
-  });
-}
-
-function handleHistory(direction: 'previous' | 'next'): void {
-  const step = stepAgentComposerHistory({
-    entries: composerHistory.value,
-    index: composerHistoryIndex.value,
-    scratch: composerHistoryScratch.value,
-    currentDraft: shell.ideComposerDraft,
-    direction,
-  });
-  composerHistoryIndex.value = step.index;
-  composerHistoryScratch.value = step.scratch;
-  applyHistoryDraft(step.draft);
-}
-
 async function handleSubmit(event?: Event): Promise<void> {
   event?.preventDefault();
   const draft =
@@ -758,17 +580,6 @@ async function handleSteer(event?: Event): Promise<void> {
   recordComposerHistoryIfSent(draft);
 }
 
-function recordComposerHistoryIfSent(draft: string): void {
-  if (composerImages.value.length) {
-    clearComposerImages();
-  }
-  if (draft && !shell.ideComposerDraft.trim() && shell.commandMutationState === 'idle') {
-    composerHistory.value = recordAgentComposerHistoryEntry(composerHistory.value, draft);
-    persistCurrentComposerHistory();
-    resetComposerHistoryNavigation();
-  }
-}
-
 function removeQueuedMessage(messageId: string): void {
   shell.removeIdeComposerQueuedMessage(messageId);
 }
@@ -779,130 +590,6 @@ function revealComposerTerminalPanel(): void {
 
 function handleResumeRun(): void {
   void shell.resumeIdeAgentRun();
-}
-
-function clearComposerImages(options: { revokePreviews?: boolean } = {}): void {
-  if (options.revokePreviews !== false) {
-    revokeComposerClipboardImages(composerImages.value);
-  }
-  composerImages.value = [];
-  schedulePersistComposerImages();
-}
-
-function schedulePersistComposerImages(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  if (composerImagesPersistTimer.value) {
-    clearTimeout(composerImagesPersistTimer.value);
-  }
-  composerImagesPersistTimer.value = setTimeout(() => {
-    composerImagesPersistTimer.value = null;
-    void persistCurrentComposerImages();
-  }, 180);
-}
-
-async function persistCurrentComposerImages(): Promise<void> {
-  const workspaceId = composerImagesWorkspaceId.value;
-  if (!workspaceId) {
-    return;
-  }
-  if (!composerImages.value.length) {
-    persistComposerAttachments(workspaceId, []);
-    return;
-  }
-
-  const stored = await Promise.all(
-    composerImages.value.map((image) => storedComposerImageFromClipboard(image)),
-  );
-  persistComposerAttachments(workspaceId, stored);
-}
-
-function loadComposerImagesForWorkspace(workspaceId: string | null | undefined): void {
-  const nextWorkspaceId = workspaceId?.trim() || null;
-  if (composerImagesWorkspaceId.value === nextWorkspaceId) {
-    return;
-  }
-
-  revokeComposerClipboardImages(composerImages.value);
-  composerImagesWorkspaceId.value = nextWorkspaceId;
-  enlargedComposerImage.value = null;
-  composerImages.value = nextWorkspaceId
-    ? readStoredComposerAttachments(nextWorkspaceId).map(composerImageFromStored)
-    : [];
-}
-
-function openComposerImage(image: ComposerClipboardImage): void {
-  enlargedComposerImage.value = image;
-}
-
-function closeComposerImageLightbox(): void {
-  enlargedComposerImage.value = null;
-}
-
-function handleComposerImageLightboxKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    closeComposerImageLightbox();
-  }
-}
-
-function addComposerImages(images: ComposerClipboardImage[]): void {
-  if (!images.length) {
-    return;
-  }
-  composerImages.value = [...composerImages.value, ...images];
-  schedulePersistComposerImages();
-}
-
-function handleComposerPaste(event: ClipboardEvent): void {
-  const images = readClipboardImages(event);
-  if (!shouldInterceptComposerImagePaste(images)) {
-    return;
-  }
-
-  event.preventDefault();
-  addComposerImages(images);
-}
-
-function handleComposerDragOver(event: DragEvent): void {
-  if (!shouldAcceptComposerFileDrop(event)) {
-    return;
-  }
-  event.preventDefault();
-  if (event.dataTransfer) {
-    event.dataTransfer.dropEffect = 'copy';
-  }
-  composerDragOver.value = true;
-}
-
-function handleComposerDragLeave(event: DragEvent): void {
-  const nextTarget = event.relatedTarget as Node | null;
-  if (nextTarget && event.currentTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
-    return;
-  }
-  composerDragOver.value = false;
-}
-
-function handleComposerDrop(event: DragEvent): void {
-  event.preventDefault();
-  composerDragOver.value = false;
-  const images = readDroppedImages(event);
-  if (!shouldInterceptComposerImagePaste(images)) {
-    return;
-  }
-  addComposerImages(images);
-}
-
-function removeComposerImage(imageId: string): void {
-  const removed = composerImages.value.find((image) => image.id === imageId);
-  if (removed) {
-    revokeComposerClipboardImagePreview(removed);
-    if (enlargedComposerImage.value?.id === imageId) {
-      enlargedComposerImage.value = null;
-    }
-  }
-  composerImages.value = composerImages.value.filter((image) => image.id !== imageId);
-  schedulePersistComposerImages();
 }
 
 function handleComposerKeydown(event: KeyboardEvent): void {
@@ -963,20 +650,6 @@ function handleDocumentClick(): void {
   closeMenus();
 }
 
-function syncContextFromDraft(): void {
-  const draft = shell.ideComposerDraft;
-  if (workspaceToken.value) {
-    contextWorkspace.value = composerDraftIncludesToken(draft, workspaceToken.value);
-  }
-  if (activeFileToken.value) {
-    contextActiveFile.value = composerDraftIncludesToken(draft, activeFileToken.value);
-  }
-  contextSelection.value = composerDraftIncludesToken(draft, selectionToken);
-  contextTerminal.value = composerDraftIncludesToken(draft, terminalToken);
-  contextIde.value = composerDraftIncludesToken(draft, ideToken);
-  contextPinned.value = composerDraftIncludesToken(draft, pinnedToken);
-}
-
 watch(
   () => shell.ideComposerDraft,
   () => {
@@ -1019,12 +692,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick);
-  if (composerImagesPersistTimer.value) {
-    clearTimeout(composerImagesPersistTimer.value);
-    composerImagesPersistTimer.value = null;
-  }
+  disposeComposerImagesPersistTimer();
   void persistCurrentComposerImages();
-  revokeComposerClipboardImages(composerImages.value);
+  revokeAllComposerImagePreviews();
 });
 
 return {
