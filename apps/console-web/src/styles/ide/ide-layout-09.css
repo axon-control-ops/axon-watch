@@ -1,0 +1,14 @@
+.agent-dock-composer__activity-chip--file {
+  border-color: rgba(120, 220, 160, 0.28);
+  color: rgba(180, 255, 210, 0.92);
+}
+
+.agent-dock-composer__activity-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-bottom: 0.1rem;
+}
+

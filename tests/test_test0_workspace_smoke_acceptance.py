@@ -132,8 +132,11 @@ class Test0WorkspaceSmokeAcceptance(unittest.TestCase):
         self.assertIn("Open terminal", panel_source)
 
     def test_compact_layout_media_queries_present(self) -> None:
-        css_path = REPO_ROOT / "apps/console-web/src/styles/mockup-shell.css"
-        css_source = css_path.read_text(encoding="utf-8")
+        shell_dir = REPO_ROOT / "apps/console-web/src/styles/shell"
+        css_source = "".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(shell_dir.glob("mockup-shell-*.css"))
+        )
         self.assertIn("@media (max-width: 1280px)", css_source)
         self.assertIn("@media (max-width: 960px)", css_source)
 

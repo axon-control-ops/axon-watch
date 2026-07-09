@@ -8,6 +8,10 @@ export function agentEditReviewDocumentId(path: string): string {
   return `draft:agent-edit-review:${normalized || 'file'}`;
 }
 
+export function isAgentEditReviewDocumentId(id: string | null | undefined): boolean {
+  return Boolean(id?.startsWith('draft:agent-edit-review:'));
+}
+
 export function formatAgentEditReviewContent(
   edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'>,
 ): string {

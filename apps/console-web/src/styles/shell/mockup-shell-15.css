@@ -1,0 +1,315 @@
+.brain-galaxy-stage__inspector-body,
+.brain-galaxy-stage__inspector-hint {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.brain-galaxy-stage__hub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.brain-galaxy-stage__hub {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.32rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 0.32rem;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.brain-galaxy-stage__hub:hover {
+  border-color: rgba(0, 242, 255, 0.22);
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.brain-galaxy-stage__hub-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.2rem;
+  border-radius: 50%;
+  background: #3a9fd4;
+  box-shadow: 0 0 8px rgba(72, 196, 255, 0.45);
+}
+
+.brain-galaxy-stage__hub--attention .brain-galaxy-stage__hub-dot {
+  background: #ffa040;
+}
+
+.brain-galaxy-stage__hub--critical .brain-galaxy-stage__hub-dot {
+  background: #ff5050;
+}
+
+.brain-galaxy-stage__hub-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.brain-galaxy-stage__hub-copy strong {
+  color: var(--text-primary);
+  font-size: 0.72rem;
+}
+
+.brain-galaxy-stage__hub-copy span {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+
+.brain-galaxy-stage__legend {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.brain-galaxy-stage__legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.64rem;
+}
+
+.brain-galaxy-stage__legend li strong {
+  margin-left: auto;
+  color: var(--text-primary);
+  font-size: 0.62rem;
+}
+
+.brain-galaxy-stage__legend-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.brain-galaxy-stage__hud--bottom {
+  left: 0.65rem;
+  right: 0.65rem;
+  bottom: 0.55rem;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.brain-galaxy-stage__hud--bottom .kairo-conversation-bar__command-row {
+  padding-right: min(13rem, 34vw);
+}
+
+.brain-galaxy-stage__omnibar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.48rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  background: rgba(0, 8, 14, 0.76);
+  backdrop-filter: blur(12px);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.brain-galaxy-stage__omnibar--active {
+  border-color: rgba(255, 196, 72, 0.24);
+}
+
+.brain-galaxy-stage__omnibar-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.brain-galaxy-stage__omnibar-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.brain-galaxy-stage__run-id {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+}
+
+.brain-galaxy-stage__omnibar-glyph {
+  color: rgba(0, 242, 255, 0.85);
+  font-size: 0.85rem;
+}
+
+.kairo-conversation-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.kairo-conversation-bar--busy .kairo-conversation-bar__form {
+  border-color: rgba(255, 196, 72, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(255, 196, 72, 0.08);
+}
+
+.kairo-conversation-bar--busy .kairo-conversation-bar__input::placeholder {
+  color: rgba(255, 224, 170, 0.72);
+}
+
+.kairo-conversation-bar__command-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.kairo-conversation-bar__form {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.42rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  background: rgba(0, 8, 14, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.kairo-conversation-bar__glyph {
+  color: rgba(0, 242, 255, 0.85);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.kairo-conversation-bar__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  outline: none;
+}
+
+.kairo-conversation-bar__input::placeholder {
+  color: var(--text-muted);
+}
+
+.kairo-conversation-bar__mic,
+.kairo-conversation-bar__send,
+.kairo-conversation-bar__interrupt {
+  flex-shrink: 0;
+  touch-action: none;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 0.22rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.kairo-conversation-bar__send:not(:disabled) {
+  border-color: rgba(0, 242, 255, 0.35);
+  color: rgba(0, 242, 255, 0.95);
+}
+
+.kairo-conversation-bar__mic:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kairo-conversation-bar__mic--active {
+  border-color: rgba(0, 242, 255, 0.55);
+  color: rgba(0, 242, 255, 0.95);
+  box-shadow: 0 0 0.65rem rgba(0, 242, 255, 0.25);
+}
+
+.kairo-conversation-bar__interrupt {
+  border-color: rgba(255, 120, 96, 0.45);
+  color: rgba(255, 160, 130, 0.95);
+  background: rgba(255, 96, 72, 0.12);
+  animation: kairo-interrupt-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes kairo-interrupt-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(255, 120, 96, 0);
+  }
+  50% {
+    box-shadow: 0 0 0.55rem rgba(255, 120, 96, 0.35);
+  }
+}
+
+.kairo-conversation-bar__interim {
+  margin: 0;
+  padding: 0 0.35rem;
+  color: rgba(0, 242, 255, 0.75);
+  font-size: 0.64rem;
+  font-style: italic;
+}
+
+.kairo-conversation-bar__interim--thinking {
+  color: rgba(255, 214, 140, 0.88);
+}
+
+.handoff-to-ide-button {
+  margin-top: 0.35rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(0, 242, 255, 0.95);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  padding: 0.24rem 0.65rem;
+  text-transform: uppercase;
+}
+
+.handoff-to-ide-button--compact {
+  font-size: 0.58rem;
+  padding: 0.18rem 0.5rem;
+}
+
+.operator-incident-feed__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.operator-incident-feed__monitor-tag {
+  margin-left: 0.35rem;
+  color: rgba(255, 196, 72, 0.9);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kairo-galaxy-orb--ptt {
+  cursor: crosshair;
+}
+
+.operator-mobile-shell {
+  grid-column: 1 / -1;
+  grid-row: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.85rem;
+  overflow: auto;
+}
+

@@ -1,0 +1,318 @@
+.console-shell--mockup {
+  display: grid;
+  column-gap: var(--shell-gutter);
+  row-gap: 0;
+  gap: 0 var(--shell-gutter);
+  padding: var(--shell-gutter);
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  grid-template-areas:
+    "topbar topbar topbar"
+    "leftSidebar centerWorkbench rightDock"
+    "statusBar statusBar statusBar";
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr) var(--statusbar-height);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.console-shell--mockup.console-shell--mobile-compact {
+  --shell-gutter: 0.35rem;
+  --topbar-height: 2.4rem;
+  --statusbar-height: 1.6rem;
+  padding: var(--shell-gutter);
+}
+
+.console-shell--mockup.console-shell--mobile-compact .dock-tag {
+  font-size: 0.56rem;
+}
+
+.console-shell--mockup * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.32) transparent;
+}
+
+.console-shell--mockup *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.console-shell--mockup *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.console-shell--mockup *::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: rgba(148, 163, 184, 0.28);
+}
+
+.console-shell--mockup *::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.48);
+}
+
+.console-shell--mockup *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Cursor-thin scrollbars in editor / explorer / markdown surfaces */
+.console-shell--mockup .center-workbench__editor *::-webkit-scrollbar,
+.console-shell--mockup .ide-explorer-panel *::-webkit-scrollbar,
+.console-shell--mockup .editor-markdown-preview::-webkit-scrollbar,
+.console-shell--mockup .agent-edit-review-viewer::-webkit-scrollbar,
+.console-shell--mockup .editor-tabbar__tabs::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.console-shell--mockup .monaco-scrollable-element > .scrollbar > .slider {
+  border-radius: 999px !important;
+}
+
+.console-shell--mockup[data-layout-mode='operator'] {
+  grid-template-columns:
+    var(--shell-left-sidebar-width, 280px)
+    minmax(0, 1fr)
+    var(--shell-agent-dock-width, 380px);
+}
+
+.console-shell--mockup[data-layout-mode='ide'] {
+  grid-template-columns:
+    var(--shell-left-sidebar-width, 280px)
+    minmax(0, 1fr)
+    var(--shell-agent-dock-width, 380px);
+}
+
+.console-shell--mockup .region {
+  border-radius: var(--radius-shell);
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+.console-shell--mockup .region-topbar {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+  position: relative;
+  z-index: 50;
+}
+
+.console-shell--mockup .region-status-bar {
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.console-shell--mockup .region-left-sidebar,
+.console-shell--mockup .region-center-workbench,
+.console-shell--mockup .region-status-bar {
+  border-top: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  align-self: start;
+}
+
+.console-shell--mockup .region-left-sidebar {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+}
+
+.console-shell--mockup .region-right-dock {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  align-self: stretch;
+  height: 100%;
+  max-height: 100%;
+  padding: 0;
+  gap: var(--shell-gutter);
+  overflow: hidden;
+}
+
+.console-shell--mockup .region-right-dock.agent-dock {
+  overflow: visible;
+}
+
+.console-shell--mockup .region-center-workbench.center-workbench--mockup {
+  grid-area: centerWorkbench;
+  align-self: start;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--shell-gutter);
+  border-radius: 0;
+  background: transparent;
+}
+
+.console-shell--mockup .region-status-bar {
+  min-height: var(--statusbar-height);
+  padding: 0 0.85rem;
+  border-top: 1px solid var(--border-hud);
+  background: rgba(0, 8, 14, 0.98);
+  margin-top: 0;
+}
+
+body:has(.console-shell--mockup) {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(0, 210, 255, 0.08), transparent 24%),
+    radial-gradient(circle at 80% 0%, rgba(0, 210, 255, 0.05), transparent 20%),
+    linear-gradient(30deg, rgba(0, 210, 255, 0.03) 12%, transparent 12.5%, transparent 87%, rgba(0, 210, 255, 0.03) 87.5%),
+    linear-gradient(150deg, rgba(0, 210, 255, 0.03) 12%, transparent 12.5%, transparent 87%, rgba(0, 210, 255, 0.03) 87.5%),
+    linear-gradient(90deg, rgba(0, 210, 255, 0.03) 12%, transparent 12.5%, transparent 87%, rgba(0, 210, 255, 0.03) 87.5%),
+    var(--surface-shell);
+  background-size:
+    auto,
+    auto,
+    42px 72px,
+    42px 72px,
+    42px 72px,
+    auto;
+}
+
+.topbar-mockup {
+  padding: 0;
+  min-height: var(--topbar-height);
+  max-height: var(--topbar-height);
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(0, 18, 28, 0.98), rgba(0, 10, 18, 0.98));
+  border-bottom: 0;
+}
+
+.topbar-mockup__grid {
+  display: grid;
+  grid-template-columns:
+    minmax(22rem, 1.4fr)
+    minmax(140px, auto)
+    minmax(240px, 16rem)
+    auto;
+  align-items: center;
+  gap: 0.65rem;
+  height: var(--topbar-height);
+  min-height: var(--topbar-height);
+  max-height: var(--topbar-height);
+  padding: 0 0.85rem;
+  overflow: hidden;
+}
+
+.topbar-mockup__identity-zone {
+  display: grid;
+  grid-template-columns: 11.5rem minmax(0, 1fr);
+  align-items: stretch;
+  min-width: 0;
+  height: calc(var(--topbar-height) - 0.35rem);
+  margin-top: 0.2rem;
+  border-bottom: 0;
+}
+
+.topbar-mockup__context-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.24rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.32rem 0.62rem 0.28rem 0.72rem;
+  border: 1px solid rgba(0, 242, 255, 0.24);
+  border-left: 0;
+  background: rgba(0, 8, 14, 0.5);
+}
+
+.left-sidebar-mockup {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  gap: 0;
+}
+
+.left-sidebar-mockup__status-anchor {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-top: 2rem;
+  padding-bottom: 0;
+  width: 100%;
+}
+
+.left-sidebar-mockup::after {
+  content: '';
+  position: absolute;
+  top: 0.75rem;
+  right: 0;
+  z-index: 3;
+  width: 1px;
+  height: calc(100% - 1.5rem);
+  background: rgba(0, 242, 255, 0.14);
+  pointer-events: none;
+}
+
+.left-sidebar-mockup__resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 0.75rem;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  transform: translateX(50%);
+  touch-action: none;
+}
+
+.left-sidebar-mockup__resize-grip {
+  width: 3px;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 1px;
+  background: rgba(0, 242, 255, 0.18);
+  box-shadow: none;
+  opacity: 0.65;
+  transition: opacity var(--motion-fast), background var(--motion-fast);
+}
+
+.left-sidebar-mockup--resizing .left-sidebar-mockup__resize-grip,
+.left-sidebar-mockup__resize-handle:hover .left-sidebar-mockup__resize-grip {
+  opacity: 1;
+  background: rgba(0, 242, 255, 0.42);
+  box-shadow: 0 0 5px rgba(0, 242, 255, 0.1);
+}
+
+.hud-panel-frame,
+.dock-stack--mockup .hud-seam,
+.kairo-presence-module,
+.console-shell--mockup .center-workbench__editor-stack,
+.console-shell--mockup .center-workbench__operator-status,
+.console-shell--mockup .center-workbench__bottom-dock {
+  position: relative;
+  z-index: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  clip-path: none;
+  filter: none;
+  --hud-surface-border: rgba(0, 242, 255, 0.42);
+  --hud-surface-fill: rgba(0, 8, 14, 0.92);
+  isolation: isolate;
+}
+

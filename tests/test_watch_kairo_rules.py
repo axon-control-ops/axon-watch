@@ -4,6 +4,10 @@ import unittest
 
 from fastapi.testclient import TestClient
 
+from tests.support.stable_connector_probe import (
+    patch_stable_connector_probes,
+    reset_watch_ephemeral_stores,
+)
 from tests.support.watch_app_loader import load_watch_app, restore_app_modules
 from tests.support.watch_db import isolate_watch_db
 
@@ -12,11 +16,10 @@ class WatchKairoRuleTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_watch_db(self)
         watch_app, self._watch_modules = load_watch_app()
-        from app.delivery import store as delivery_store  # noqa: WPS433
-        from app.events import store as event_store  # noqa: WPS433
-
-        delivery_store.reset_store()
-        event_store.reset_store()
+        reset_watch_ephemeral_stores()
+        self._connector_patch = patch_stable_connector_probes()
+        self._connector_patch.start()
+        self.addCleanup(self._connector_patch.stop)
         self.client = TestClient(watch_app)
         self.addCleanup(self.client.close)
 
@@ -29,7 +32,28 @@ class WatchKairoRuleTests(unittest.TestCase):
         return next(row for row in response.json()["items"] if row["signal_id"] == signal_id)
 
     def test_summary_degraded_preserves_observe_watch_rule(self) -> None:
-        item = self._inbox_item("signal_runtime_summary_degraded")
+        from unittest.mock import patch
+
+        from tests.support.stable_connector_probe import STABLE_OK_CONNECTOR_RECORDS
+
+        degraded_connectors = [
+            {
+                **record,
+                "status": "unavailable" if record.get("required") else record.get("status"),
+            }
+            for record in STABLE_OK_CONNECTOR_RECORDS
+        ]
+        with patch(
+            "app.main.probe_all_connectors",
+            return_value=degraded_connectors,
+        ), patch(
+            "app.connectors.summary.probe_all_connectors",
+            return_value=degraded_connectors,
+        ), patch(
+            "app.watch_summary.probe_all_connectors",
+            return_value=degraded_connectors,
+        ):
+            item = self._inbox_item("signal_runtime_summary_degraded")
         rule = item["watch_rule"]
         self.assertEqual("observe", rule["mode"])
         self.assertEqual("bootstrap_summary_stale", rule["reason"])

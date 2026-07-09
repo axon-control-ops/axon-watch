@@ -1,4 +1,5 @@
 import type { WorkspaceDocumentDescriptor } from './workspace-documents';
+import { isAgentEditReviewDocumentId } from './ide-agent-edit-review';
 
 export type EditorTabLabelInput = {
   id: string;
@@ -30,11 +31,18 @@ function truncateTabLabel(label: string): string {
 
 /** Workspace-relative path for tab disambiguation (Cursor/VS Code-style). */
 export function editorDocumentResourcePath(document: WorkspaceDocumentDescriptor): string {
-  if (document.source === 'file' && document.filePath) {
+  if (document.filePath) {
     return document.filePath.replace(/\\/g, '/');
   }
 
+  if (document.source === 'file') {
+    return document.title.replace(/\\/g, '/');
+  }
+
   if (document.source === 'draft') {
+    if (isAgentEditReviewDocumentId(document.id)) {
+      return document.title.replace(/\s*·\s*review$/i, '').trim() || document.title;
+    }
     return `agent-reports/${document.id.replace(/^draft:/, '')}.md`;
   }
 
@@ -94,6 +102,10 @@ export function editorTabLabelsForDocuments(
 
   for (const document of documents) {
     if (document.source !== 'draft') {
+      continue;
+    }
+    if (isAgentEditReviewDocumentId(document.id)) {
+      labels.set(document.id, truncateTabLabel(document.title.trim() || 'Review'));
       continue;
     }
     const displayTitle = truncateTabLabel(

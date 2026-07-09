@@ -17,8 +17,8 @@ from app.cli_runtime.cursor_models import cursor_runtime_snapshot
 StatusRecord = dict[str, Any]
 
 
-def _runtime_target(family: str) -> dict[str, Any] | None:
-    snapshot = runtime_status_snapshot(force_refresh=True)
+def _runtime_target(family: str, *, force_refresh: bool = False) -> dict[str, Any] | None:
+    snapshot = runtime_status_snapshot(force_refresh=force_refresh)
     for record in [*snapshot.get("local", []), *snapshot.get("cloud", [])]:
         if str(record.get("family", "")).strip() == family:
             return record
@@ -31,9 +31,12 @@ def _action_result(
     message: str,
     command_preview: str = "",
     output: str = "",
+    force_refresh: bool = True,
 ) -> StatusRecord:
-    snapshot = runtime_status_snapshot(force_refresh=True)
-    cursor = cursor_runtime_snapshot(force_refresh=True)
+    # Login start should return quickly so the browser flow can open; callers
+    # refresh status after the operator completes auth.
+    snapshot = runtime_status_snapshot(force_refresh=force_refresh)
+    cursor = cursor_runtime_snapshot(force_refresh=force_refresh)
     return {
         "status": status,
         "message": message,
@@ -46,7 +49,7 @@ def _action_result(
 
 def logout_cursor_runtime() -> StatusRecord:
     binary = find_cursor_cli(os.environ.get("AXON_WATCH_CURSOR_CLI_PATH", "").strip())
-    target = _runtime_target("cursor")
+    target = _runtime_target("cursor", force_refresh=False)
     auth = dict((target or {}).get("auth") or {})
     if not binary:
         return _action_result(
@@ -106,7 +109,7 @@ def logout_cursor_runtime() -> StatusRecord:
 
 def logout_codex_runtime() -> StatusRecord:
     binary = find_codex_cli(os.environ.get("AXON_WATCH_CODEX_CLI_PATH", "").strip())
-    target = _runtime_target("codex")
+    target = _runtime_target("codex", force_refresh=False)
     auth = dict((target or {}).get("auth") or {})
     if not binary:
         return _action_result(
@@ -166,12 +169,15 @@ def logout_codex_runtime() -> StatusRecord:
 
 def start_cursor_runtime_login() -> StatusRecord:
     binary = find_cursor_cli(os.environ.get("AXON_WATCH_CURSOR_CLI_PATH", "").strip())
-    target = _runtime_target("cursor")
+    # Prefer cached status for the already-signed-in short-circuit; a forced
+    # probe here can take >15s and starve the login response.
+    target = _runtime_target("cursor", force_refresh=False)
     auth = dict((target or {}).get("auth") or {})
     if not binary:
         return _action_result(
             status="manual_required",
             message="Install Cursor CLI before signing in.",
+            force_refresh=False,
         )
     if auth.get("logged_in") and auth.get("auth_method") == "oauth":
         account = str(auth.get("account_label") or "").strip()
@@ -179,6 +185,7 @@ def start_cursor_runtime_login() -> StatusRecord:
             status="completed",
             message=f"Cursor CLI is already signed in{(': ' + account) if account else ''}.",
             command_preview=f"{binary} agent status",
+            force_refresh=False,
         )
     command = [binary, "agent", "login"]
     try:
@@ -194,22 +201,25 @@ def start_cursor_runtime_login() -> StatusRecord:
             status="manual_required",
             message=f"Could not start Cursor login on this host: {exc}. Run `{' '.join(command)}` in a terminal.",
             command_preview=" ".join(command),
+            force_refresh=False,
         )
     return _action_result(
         status="browser_opened",
         message="Cursor login started — complete the browser flow on this host, then refresh status.",
         command_preview=" ".join(command),
+        force_refresh=False,
     )
 
 
 def start_codex_runtime_login() -> StatusRecord:
     binary = find_codex_cli(os.environ.get("AXON_WATCH_CODEX_CLI_PATH", "").strip())
-    target = _runtime_target("codex")
+    target = _runtime_target("codex", force_refresh=False)
     auth = dict((target or {}).get("auth") or {})
     if not binary:
         return _action_result(
             status="manual_required",
             message="Install Codex CLI before signing in.",
+            force_refresh=False,
         )
     if auth.get("logged_in") and auth.get("auth_method") in {"oauth", "chatgpt"}:
         account = str(auth.get("account_label") or "").strip()
@@ -217,6 +227,7 @@ def start_codex_runtime_login() -> StatusRecord:
             status="completed",
             message=f"Codex CLI is already signed in{(': ' + account) if account else ''}.",
             command_preview=f"{binary} login status",
+            force_refresh=False,
         )
     command = [binary, "login"]
     try:
@@ -232,9 +243,11 @@ def start_codex_runtime_login() -> StatusRecord:
             status="manual_required",
             message=f"Could not start Codex login on this host: {exc}. Run `{' '.join(command)}` in a terminal.",
             command_preview=" ".join(command),
+            force_refresh=False,
         )
     return _action_result(
         status="browser_opened",
         message="Codex login started — complete the browser flow on this host, then refresh status.",
         command_preview=" ".join(command),
+        force_refresh=False,
     )

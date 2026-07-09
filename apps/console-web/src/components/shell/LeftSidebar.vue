@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import IdeActivityBar from '../ide/IdeActivityBar.vue';
 import IdeAttentionPanel from '../ide/IdeAttentionPanel.vue';
+import IdeBriefingPanel from '../ide/IdeBriefingPanel.vue';
 import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
 import KairoSidebarPanel from '../ide/KairoSidebarPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
@@ -157,6 +158,7 @@ onBeforeUnmount(() => {
         <IdeActivityBar />
         <div class="left-sidebar-mockup__ide-main">
           <IdeAttentionPanel v-if="shell.ideAttentionPanelOpen" />
+          <IdeBriefingPanel v-else-if="shell.ideBriefingPanelOpen" />
           <IdeExplorerPanel v-else />
         </div>
       </div>

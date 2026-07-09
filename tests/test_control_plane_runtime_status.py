@@ -18,7 +18,7 @@ class ControlPlaneRuntimeStatusTests(unittest.TestCase):
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 
-    @patch("app.main.get_runtime_status")
+    @patch("app.routes.runtime.get_runtime_status")
     def test_runtime_status_route_returns_catalog_snapshot(self, mock_status) -> None:
         mock_status.return_value = {
             "updated_at": "2026-07-05T20:00:00Z",
@@ -33,7 +33,7 @@ class ControlPlaneRuntimeStatusTests(unittest.TestCase):
         self.assertEqual(1, len(payload["local"]))
         self.assertEqual(1, len(payload["cloud"]))
 
-    @patch("app.main.get_runtime_mcp_tools")
+    @patch("app.routes.runtime.get_runtime_mcp_tools")
     def test_runtime_mcp_tools_route_returns_registry(self, mock_tools) -> None:
         mock_tools.return_value = {
             "count": 1,

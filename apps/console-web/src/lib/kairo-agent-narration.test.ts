@@ -63,4 +63,10 @@ describe('narrationForCompletion', () => {
     });
     expect(narrationForCompletion('plain reply')).toEqual({ key: 'done', message: 'Done' });
   });
+
+  it('marks Lane B runtime failures instead of done', () => {
+    const failure =
+      "Lane B (agent) cannot start because no CLI runtime is ready: ActionRequiredError: You're out of usage.";
+    expect(narrationForCompletion(failure)).toEqual({ key: 'failed', message: 'Failed' });
+  });
 });

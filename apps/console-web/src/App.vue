@@ -83,6 +83,7 @@ watch(
     liveEventsSession = startLiveEventsSession({
       onRefresh: () => shell.refreshRunSurfaces(),
       onPresenceRefresh: () => shell.refreshOperatorPresence(),
+      onSpokenBriefing: () => shell.speakOperatorBriefing(),
     });
   },
   { immediate: true },

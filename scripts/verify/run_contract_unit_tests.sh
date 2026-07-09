@@ -11,6 +11,7 @@ source "${repo_root}/scripts/dev/lib/common.sh"
 python_bin="$(resolve_python "${repo_root}")"
 
 main_tests=(
+  tests.test_guardrail_file_sizes
   tests.test_shared_contract_fixtures
   tests.test_runtime_summary_assembler
   tests.test_control_plane_runtime_summary

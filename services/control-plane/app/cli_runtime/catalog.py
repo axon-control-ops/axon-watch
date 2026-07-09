@@ -6,6 +6,7 @@ import copy
 import os
 import shutil
 import subprocess
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -17,6 +18,9 @@ StatusRecord = dict[str, Any]
 
 _SNAPSHOT_CACHE: dict[str, Any] = {"fetched_at": 0.0, "payload": None}
 _CACHE_TTL_SECONDS = 30.0
+_SNAPSHOT_BUILD_LOCK = threading.Lock()
+# `cursor agent status` commonly takes 6–8s on this host; keep headroom above that.
+_AUTH_PROBE_TIMEOUT_SECONDS = 15
 
 
 def invalidate_runtime_snapshot_cache() -> None:
@@ -45,7 +49,12 @@ def _is_executable(path: str) -> bool:
     return bool(path) and os.path.isfile(path) and os.access(path, os.X_OK)
 
 
-def _run_command(parts: list[str], *, timeout: int = 15, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run_command(
+    parts: list[str],
+    *,
+    timeout: int = _AUTH_PROBE_TIMEOUT_SECONDS,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         parts,
         capture_output=True,
@@ -397,80 +406,92 @@ def runtime_status_snapshot(*, force_refresh: bool = False) -> StatusRecord:
     if not force_refresh and cached is not None and (time.monotonic() - fetched_at) < _CACHE_TTL_SECONDS:
         return copy.deepcopy(cached)
 
-    context = fetch_runtime_context(force_refresh=force_refresh)
-    vault_posture = dict(context.get("vault_runtime") or {})
-    merged_env = dict(os.environ)
-    for key, value in dict(context.get("env") or {}).items():
-        if not str(merged_env.get(key, "")).strip():
-            merged_env[key] = value
-    vault_env_only = {
-        key: value
-        for key, value in merged_env.items()
-        if key in {"CURSOR_API_KEY", "CODEX_API_KEY", "OPENAI_API_KEY"}
-        and value
-        and not str(os.environ.get(key, "")).strip()
-    }
+    # Coalesce concurrent bootstrap callers (summary + status + fleet) so CLI
+    # auth probes run once per TTL window instead of stacking on the worker pool.
+    with _SNAPSHOT_BUILD_LOCK:
+        cached = _SNAPSHOT_CACHE.get("payload")
+        fetched_at = float(_SNAPSHOT_CACHE.get("fetched_at") or 0.0)
+        if (
+            not force_refresh
+            and cached is not None
+            and (time.monotonic() - fetched_at) < _CACHE_TTL_SECONDS
+        ):
+            return copy.deepcopy(cached)
 
-    cursor_path = find_cursor_cli(os.environ.get("AXON_WATCH_CURSOR_CLI_PATH", "").strip())
-    codex_path = find_codex_cli(os.environ.get("AXON_WATCH_CODEX_CLI_PATH", "").strip())
+        context = fetch_runtime_context(force_refresh=force_refresh)
+        vault_posture = dict(context.get("vault_runtime") or {})
+        merged_env = dict(os.environ)
+        for key, value in dict(context.get("env") or {}).items():
+            if not str(merged_env.get(key, "")).strip():
+                merged_env[key] = value
+        vault_env_only = {
+            key: value
+            for key, value in merged_env.items()
+            if key in {"CURSOR_API_KEY", "CODEX_API_KEY", "OPENAI_API_KEY"}
+            and value
+            and not str(os.environ.get(key, "")).strip()
+        }
 
-    local = [
-        _local_runtime_record(
-            "cursor_local",
-            family="cursor",
-            binary=cursor_path,
-            auth=_cursor_auth_status(
-                cursor_path,
+        cursor_path = find_cursor_cli(os.environ.get("AXON_WATCH_CURSOR_CLI_PATH", "").strip())
+        codex_path = find_codex_cli(os.environ.get("AXON_WATCH_CODEX_CLI_PATH", "").strip())
+
+        local = [
+            _local_runtime_record(
+                "cursor_local",
+                family="cursor",
+                binary=cursor_path,
+                auth=_cursor_auth_status(
+                    cursor_path,
+                    vault_posture=vault_posture,
+                    env_keys=vault_env_only,
+                    probe_env=merged_env,
+                ),
+                label="Cursor CLI (local)",
+            ),
+            _local_runtime_record(
+                "codex_local",
+                family="codex",
+                binary=codex_path,
+                auth=_codex_auth_status(
+                    codex_path,
+                    vault_posture=vault_posture,
+                    env_keys=vault_env_only,
+                    probe_env=merged_env,
+                ),
+                label="Codex CLI (local)",
+            ),
+        ]
+        cloud = [
+            _cloud_runtime_record(
+                "cursor_cloud",
+                family="cursor",
+                label="Cursor Cloud Agent",
                 vault_posture=vault_posture,
                 env_keys=vault_env_only,
-                probe_env=merged_env,
             ),
-            label="Cursor CLI (local)",
-        ),
-        _local_runtime_record(
-            "codex_local",
-            family="codex",
-            binary=codex_path,
-            auth=_codex_auth_status(
-                codex_path,
+            _cloud_runtime_record(
+                "codex_cloud",
+                family="codex",
+                label="Codex Cloud Task",
                 vault_posture=vault_posture,
                 env_keys=vault_env_only,
-                probe_env=merged_env,
             ),
-            label="Codex CLI (local)",
-        ),
-    ]
-    cloud = [
-        _cloud_runtime_record(
-            "cursor_cloud",
-            family="cursor",
-            label="Cursor Cloud Agent",
-            vault_posture=vault_posture,
-            env_keys=vault_env_only,
-        ),
-        _cloud_runtime_record(
-            "codex_cloud",
-            family="codex",
-            label="Codex Cloud Task",
-            vault_posture=vault_posture,
-            env_keys=vault_env_only,
-        ),
-    ]
-    default_runtime = _choose_default_runtime(local, cloud)
+        ]
+        default_runtime = _choose_default_runtime(local, cloud)
 
-    for record in [*local, *cloud]:
-        record["recommended"] = record["id"] == default_runtime
+        for record in [*local, *cloud]:
+            record["recommended"] = record["id"] == default_runtime
 
-    payload = {
-        "updated_at": _utc_now_iso(),
-        "default_runtime": default_runtime,
-        "vault_runtime": vault_posture,
-        "local": local,
-        "cloud": cloud,
-    }
-    _SNAPSHOT_CACHE["fetched_at"] = time.monotonic()
-    _SNAPSHOT_CACHE["payload"] = copy.deepcopy(payload)
-    return copy.deepcopy(payload)
+        payload = {
+            "updated_at": _utc_now_iso(),
+            "default_runtime": default_runtime,
+            "vault_runtime": vault_posture,
+            "local": local,
+            "cloud": cloud,
+        }
+        _SNAPSHOT_CACHE["fetched_at"] = time.monotonic()
+        _SNAPSHOT_CACHE["payload"] = copy.deepcopy(payload)
+        return copy.deepcopy(payload)
 
 
 def runtime_identity_snapshot() -> StatusRecord:

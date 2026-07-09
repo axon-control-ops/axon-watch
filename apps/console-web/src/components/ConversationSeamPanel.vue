@@ -186,7 +186,13 @@ function openEditedFile(segment: {
   diff: string;
   open: boolean;
 }): void {
-  void shell.openWorkspaceFile(normalizeEditedFilePath(segment.path));
+  shell.openAgentEditReview({
+    path: normalizeEditedFilePath(segment.path),
+    added: segment.added,
+    removed: segment.removed,
+    diff: segment.diff,
+    open: segment.open,
+  });
 }
 
 function diffLines(diff: string): Array<{ text: string; tone: string }> {

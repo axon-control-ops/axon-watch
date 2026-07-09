@@ -42,7 +42,7 @@ class ControlPlaneDeliveryReceiptTests(unittest.TestCase):
             "updated_at": "2026-07-05T08:00:00Z",
         }
         with patch(
-            "app.main.fetch_watch_delivery_receipts",
+            "app.routes.inbox_watch.fetch_watch_delivery_receipts",
             return_value=watch_payload,
         ):
             response = self.client.get("/api/delivery/receipts")

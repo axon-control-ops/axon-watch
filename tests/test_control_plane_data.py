@@ -99,7 +99,7 @@ class ControlPlaneDataTests(unittest.TestCase):
         self.assertEqual(1, payload["data"]["control_plane"]["chat_threads"]["total"])
         self.assertIn("commands", payload["data"]["watch"])
 
-    @patch("app.main.get_data_export")
+    @patch("app.routes.data.get_data_export")
     def test_data_export_route_sets_attachment_header(self, mock_export) -> None:
         mock_export.return_value = {"data": {"updated_at": "2026-07-06T05:02:00Z"}}
         response = self.client.get("/api/data/export")

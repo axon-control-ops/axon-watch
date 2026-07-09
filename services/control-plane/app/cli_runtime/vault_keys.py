@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import os
+import threading
 import time
 from typing import Any
 
@@ -11,6 +12,7 @@ from app.vault import watch_adapter
 
 _RUNTIME_CONTEXT_CACHE: dict[str, Any] = {"fetched_at": 0.0, "payload": None}
 _CACHE_TTL_SECONDS = 15.0
+_RUNTIME_CONTEXT_LOCK = threading.Lock()
 
 
 def _fetch_runtime_context(*, force_refresh: bool = False) -> dict[str, Any]:
@@ -19,47 +21,57 @@ def _fetch_runtime_context(*, force_refresh: bool = False) -> dict[str, Any]:
     if not force_refresh and cached is not None and (time.monotonic() - fetched_at) < _CACHE_TTL_SECONDS:
         return copy.deepcopy(cached)
 
-    runtime_posture: dict[str, Any] | None = None
-    try:
-        posture_payload = watch_adapter.request_json("GET", "/internal/watch/vault/runtime-posture")
-        candidate = posture_payload.get("vault_runtime")
-        if isinstance(candidate, dict):
-            runtime_posture = candidate
-    except RuntimeError as exc:
-        runtime_posture = {
-            "unlocked": False,
-            "posture": "vault_locked",
-            "hint": f"Vault runtime posture unavailable. {exc}",
-            "runtime_keys": {},
-            "provider_keys": {},
-        }
-    if runtime_posture is None:
-        runtime_posture = {
-            "unlocked": False,
-            "posture": "vault_locked",
-            "hint": "Vault runtime posture unavailable.",
-            "runtime_keys": {},
-            "provider_keys": {},
-        }
+    with _RUNTIME_CONTEXT_LOCK:
+        cached = _RUNTIME_CONTEXT_CACHE.get("payload")
+        fetched_at = float(_RUNTIME_CONTEXT_CACHE.get("fetched_at") or 0.0)
+        if (
+            not force_refresh
+            and cached is not None
+            and (time.monotonic() - fetched_at) < _CACHE_TTL_SECONDS
+        ):
+            return copy.deepcopy(cached)
 
-    env_payload: dict[str, str] = {}
-    if runtime_posture.get("unlocked"):
+        runtime_posture: dict[str, Any] | None = None
         try:
-            env_response = watch_adapter.request_json("GET", "/internal/watch/vault/runtime-env")
-            raw_env = env_response.get("env")
-            if isinstance(raw_env, dict):
-                env_payload = {
-                    str(key): str(value)
-                    for key, value in raw_env.items()
-                    if str(key).strip() and str(value).strip()
-                }
-        except RuntimeError:
-            env_payload = {}
+            posture_payload = watch_adapter.request_json("GET", "/internal/watch/vault/runtime-posture")
+            candidate = posture_payload.get("vault_runtime")
+            if isinstance(candidate, dict):
+                runtime_posture = candidate
+        except RuntimeError as exc:
+            runtime_posture = {
+                "unlocked": False,
+                "posture": "vault_locked",
+                "hint": f"Vault runtime posture unavailable. {exc}",
+                "runtime_keys": {},
+                "provider_keys": {},
+            }
+        if runtime_posture is None:
+            runtime_posture = {
+                "unlocked": False,
+                "posture": "vault_locked",
+                "hint": "Vault runtime posture unavailable.",
+                "runtime_keys": {},
+                "provider_keys": {},
+            }
 
-    payload = {"vault_runtime": runtime_posture, "env": env_payload}
-    _RUNTIME_CONTEXT_CACHE["fetched_at"] = time.monotonic()
-    _RUNTIME_CONTEXT_CACHE["payload"] = copy.deepcopy(payload)
-    return copy.deepcopy(payload)
+        env_payload: dict[str, str] = {}
+        if runtime_posture.get("unlocked"):
+            try:
+                env_response = watch_adapter.request_json("GET", "/internal/watch/vault/runtime-env")
+                raw_env = env_response.get("env")
+                if isinstance(raw_env, dict):
+                    env_payload = {
+                        str(key): str(value)
+                        for key, value in raw_env.items()
+                        if str(key).strip() and str(value).strip()
+                    }
+            except RuntimeError:
+                env_payload = {}
+
+        payload = {"vault_runtime": runtime_posture, "env": env_payload}
+        _RUNTIME_CONTEXT_CACHE["fetched_at"] = time.monotonic()
+        _RUNTIME_CONTEXT_CACHE["payload"] = copy.deepcopy(payload)
+        return copy.deepcopy(payload)
 
 
 def fetch_runtime_context(*, force_refresh: bool = False) -> dict[str, Any]:

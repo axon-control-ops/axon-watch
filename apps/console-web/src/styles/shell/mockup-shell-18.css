@@ -1,0 +1,319 @@
+.connectors-rail-panel__summary {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.connectors-rail-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.connectors-rail-panel__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.connectors-rail-panel__item--ok {
+  border-color: rgba(0, 255, 170, 0.18);
+}
+
+.connectors-rail-panel__item--degraded {
+  border-color: rgba(255, 196, 0, 0.22);
+}
+
+.connectors-rail-panel__item--unavailable {
+  border-color: rgba(255, 96, 96, 0.22);
+}
+
+.connectors-rail-panel__item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.connectors-rail-panel__item-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.connectors-rail-panel__required {
+  margin-left: 0.35rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.connectors-rail-panel__item-status {
+  font-size: 0.66rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.connectors-rail-panel__item-detail {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+
+.connectors-rail-panel__item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.connectors-rail-panel__action,
+.connectors-rail-panel__refresh {
+  border: 1px solid rgba(0, 242, 255, 0.24);
+  background: rgba(0, 18, 28, 0.72);
+  color: var(--text-primary);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.45rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.connectors-rail-panel__action--fallback {
+  border-color: rgba(255, 196, 0, 0.28);
+}
+
+.connectors-rail-panel__action:disabled,
+.connectors-rail-panel__refresh:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.connectors-rail-panel__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.connectors-rail-panel__error {
+  margin: 0;
+  font-size: 0.68rem;
+  color: #ff8f8f;
+}
+
+.operator-status-radar-panel__header,
+.operator-status-radar-panel__rail,
+.operator-status-radar-panel__utility-actions,
+.operator-status-radar-panel__controls,
+.operator-status-radar-panel__terminal-dock {
+  flex-shrink: 0;
+}
+
+.operator-status-radar-panel__stage,
+.operator-status-radar-panel__feed,
+.operator-fleet-grid,
+.operator-brain-graph,
+.operator-incident-feed,
+.operator-run-strip,
+.connectors-rail-panel {
+  flex-shrink: 1;
+  min-height: 0;
+}
+
+.operator-status-radar-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 0;
+  padding: 0.75rem 0.85rem 0.65rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  --hud-surface-fill: rgba(0, 8, 14, 0.82);
+}
+
+.operator-status-radar-panel__header-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.operator-status-radar-panel__terminal-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  background: rgba(0, 242, 255, 0.08);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.92);
+  cursor: pointer;
+}
+
+.operator-status-radar-panel__terminal-chip--collapsed {
+  border-color: rgba(255, 201, 120, 0.34);
+  background: rgba(255, 159, 0, 0.1);
+  color: rgba(255, 224, 170, 0.96);
+  box-shadow: 0 0 12px rgba(255, 159, 0, 0.12);
+}
+
+.operator-status-radar-panel--idle .operator-status-radar-panel__stage {
+  justify-content: center;
+  min-height: min(18rem, 42vh);
+  text-align: center;
+}
+
+.operator-status-radar-panel--idle .operator-status-radar-panel__stage-top,
+.operator-status-radar-panel--idle .operator-status-radar-panel__stage-identity {
+  justify-content: center;
+}
+
+.operator-status-radar-panel--idle .operator-status-radar-panel__stage-step {
+  font-size: clamp(0.95rem, 1.8vw, 1.2rem);
+  max-width: 28rem;
+  margin-inline: auto;
+}
+
+.operator-status-radar-panel--idle .operator-status-radar-panel__stage-notice,
+.operator-status-radar-panel--idle .operator-status-radar-panel__stage-advise {
+  max-width: 32rem;
+  margin-inline: auto;
+}
+
+.operator-status-radar-panel__stage-advise {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.55;
+  color: rgba(255, 214, 140, 0.9);
+}
+
+.operator-status-radar-panel--terminal-collapsed:not(.operator-status-radar-panel--idle) .operator-status-radar-panel__stage {
+  flex: 1 1 auto;
+}
+
+.operator-status-radar-panel__terminal-dock {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  width: 100%;
+  margin-top: auto;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(0, 242, 255, 0.05), rgba(0, 242, 255, 0.01)),
+    rgba(3, 12, 18, 0.82);
+  text-align: left;
+  cursor: pointer;
+}
+
+.operator-status-radar-panel__terminal-dock-label,
+.operator-status-radar-panel__terminal-dock-copy,
+.operator-status-radar-panel__terminal-dock-action {
+  font-family: var(--font-mono);
+}
+
+.operator-status-radar-panel__terminal-dock-label {
+  font-size: 0.48rem;
+  letter-spacing: 0.12em;
+  color: rgba(0, 242, 255, 0.58);
+  text-transform: uppercase;
+}
+
+.operator-status-radar-panel__terminal-dock-copy {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.56rem;
+  color: rgba(210, 228, 240, 0.92);
+}
+
+.operator-status-radar-panel__terminal-dock-action {
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  color: rgba(0, 242, 255, 0.92);
+  text-transform: uppercase;
+}
+
+.operator-status-radar-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.operator-status-radar-panel__header-copy {
+  min-width: 0;
+}
+
+.operator-status-radar-panel__eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+  color: rgba(0, 242, 255, 0.58);
+}
+
+.operator-status-radar-panel__title {
+  margin: 0.18rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-hud);
+}
+
+.operator-status-radar-panel__presence {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-mono);
+}
+
+.operator-status-radar-panel__presence-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.08rem;
+}
+
+.operator-status-radar-panel__status-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.92);
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.35);
+}
+
+.operator-status-radar-panel__status-dot--attention,
+.operator-status-radar-panel__status-dot--degraded {
+  background: rgba(255, 159, 0, 0.96);
+  box-shadow: 0 0 8px rgba(255, 159, 0, 0.35);
+}
+
+.operator-status-radar-panel__status-dot--watch {
+  background: rgba(255, 201, 120, 0.96);
+  box-shadow: 0 0 8px rgba(255, 201, 120, 0.28);
+}
+
+.operator-status-radar-panel__presence-title,
+.operator-status-radar-panel__presence-subtitle {
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+}
+

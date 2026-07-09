@@ -120,7 +120,25 @@ export function narrationMilestonesForDelta(
   return milestones;
 }
 
+/** True when the agent turn ended as a runtime/auth failure, not a successful reply. */
+export function isAgentTurnFailureContent(content: string): boolean {
+  const text = content.trim();
+  if (!text) {
+    return false;
+  }
+  return (
+    /Lane B \([^)]+\) cannot start because no CLI runtime is ready/i.test(text) ||
+    /cannot start because no CLI runtime is ready/i.test(text) ||
+    /\bActionRequiredError\b/i.test(text) ||
+    /You're out of usage/i.test(text) ||
+    /Codex\/OpenAI API key was rejected/i.test(text)
+  );
+}
+
 export function narrationForCompletion(content: string): NarrationMilestone {
+  if (isAgentTurnFailureContent(content)) {
+    return { key: 'failed', message: 'Failed' };
+  }
   const edits = matchAll(content, EDIT_RE);
   if (edits.length === 1) {
     return {

@@ -93,6 +93,17 @@ describe('ide agent center view', () => {
         editedFileCount: 2,
       }),
     ).toBe(true);
+
+    expect(
+      shouldShowIdeAgentReviewStrip({
+        layoutMode: 'ide',
+        agentStreamActive: false,
+        composerAgentBusy: false,
+        reviewReadyCount: 0,
+        editedFileCount: 53,
+        latestAgentTurnFailed: true,
+      }),
+    ).toBe(false);
   });
 
   it('builds thread status labels with VAXON prefix while streaming', () => {

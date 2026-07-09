@@ -31,16 +31,19 @@ describe('speech queue', () => {
   });
 
   it('serializes speech and supports interrupt', () => {
+    vi.useFakeTimers();
     const speech = createSpeechPort();
     stopSpeech(speech);
 
     enqueueSpeech('first line', speech);
     expect(isSpeechQueueSpeaking()).toBe(true);
+    vi.advanceTimersByTime(60);
     expect(speech.utterances).toHaveLength(1);
 
     stopSpeech(speech);
     expect(isSpeechQueueSpeaking()).toBe(false);
     expect(speech.cancel).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('notifies speaking subscribers', () => {

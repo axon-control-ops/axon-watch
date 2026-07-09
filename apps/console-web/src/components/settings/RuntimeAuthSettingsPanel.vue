@@ -112,9 +112,20 @@ function buildCard(family: RuntimeFamily, target: RuntimeTargetRecord | null): R
 async function refreshStatus(): Promise<void> {
   actionTone.value = 'pending';
   actionMessage.value = 'Refreshing runtime auth…';
-  await Promise.all([shell.loadRuntimeStatus(true), shell.loadCursorCatalog(true)]);
-  actionTone.value = 'ok';
-  actionMessage.value = 'Runtime auth refreshed.';
+  try {
+    await Promise.all([shell.loadRuntimeStatus(true), shell.loadCursorCatalog(true)]);
+    if (shell.runtimeStatusLoadState === 'error') {
+      actionTone.value = 'error';
+      actionMessage.value = shell.runtimeStatusError ?? 'Runtime status refresh failed.';
+      return;
+    }
+    actionTone.value = 'ok';
+    actionMessage.value = 'Runtime auth refreshed.';
+  } catch (error) {
+    actionTone.value = 'error';
+    actionMessage.value =
+      error instanceof Error ? error.message : 'Runtime status refresh failed.';
+  }
 }
 
 async function runAction(family: RuntimeFamily, action: 'login' | 'logout'): Promise<void> {

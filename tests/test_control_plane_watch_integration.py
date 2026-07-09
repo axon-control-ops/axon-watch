@@ -72,15 +72,21 @@ class ControlPlaneWatchIntegrationTests(unittest.TestCase):
         payload = response.json()
         self.assertTrue(payload["watch"]["connected"])
         self.assertFalse(payload["degraded"]["active"])
-        self.assertGreaterEqual(payload["signals"]["open_count"], 1)
-        self.assertTrue(payload["signals"]["top_items"])
+        # Bootstrap inbox noise is filtered from runtime summary signal counts.
+        self.assertEqual(0, payload["signals"]["open_count"])
+        self.assertEqual([], payload["signals"]["top_items"])
+        self.assertGreaterEqual(payload["connectors"]["configured"], 2)
 
     def test_inbox_and_runtime_summary_agree_on_ranked_top_signal(self) -> None:
-        inbox_item = self.client.get("/api/inbox").json()["items"][0]
-        summary_item = self.client.get("/api/runtime/summary").json()["signals"]["top_items"][0]
+        inbox = self.client.get("/api/inbox").json()
+        summary = self.client.get("/api/runtime/summary").json()
+        inbox_item = inbox["items"][0]
 
-        self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(summary_item))
         self.assertEqual(BOOTSTRAP_SIGNAL_ID, inbox_item["signal_id"])
+        self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(inbox["items"][0]))
+        # Runtime summary intentionally omits bootstrap-only signals from top_items.
+        self.assertEqual([], summary["signals"]["top_items"])
+        self.assertEqual(0, summary["signals"]["open_count"])
 
     def test_inbox_signals_acknowledge_clears_active_signals(self) -> None:
         before = self.client.get("/api/inbox").json()

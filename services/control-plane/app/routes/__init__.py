@@ -1,0 +1,29 @@
+"""Route registration for the control-plane FastAPI app."""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from app.routes import (
+    chat,
+    data,
+    health,
+    inbox_watch,
+    operator,
+    runs,
+    runtime,
+    vault_http,
+    workspaces,
+)
+
+
+def register_routes(app: FastAPI) -> None:
+    app.include_router(health.router)
+    app.include_router(runtime.router)
+    app.include_router(vault_http.router)
+    app.include_router(data.router)
+    app.include_router(inbox_watch.router)
+    app.include_router(operator.router)
+    app.include_router(chat.router)
+    app.include_router(runs.router)
+    app.include_router(workspaces.router)

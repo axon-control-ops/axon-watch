@@ -1,0 +1,317 @@
+.brain-galaxy-stage__error {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  margin: 0;
+  color: var(--state-critical);
+  font-size: 0.72rem;
+}
+
+.brain-galaxy-stage__hud {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.brain-galaxy-stage__hud > * {
+  pointer-events: auto;
+}
+
+.brain-galaxy-stage__hud--top {
+  top: 0.55rem;
+  left: 0.65rem;
+  right: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.brain-galaxy-stage__title-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  background: rgba(0, 8, 14, 0.55);
+  backdrop-filter: blur(10px);
+}
+
+.brain-galaxy-stage__brand {
+  max-width: 16rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  background: rgba(0, 8, 14, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.brain-galaxy-stage__eyebrow {
+  margin: 0;
+  color: var(--text-hud);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.brain-galaxy-stage__title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.brain-galaxy-stage__stats {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+
+.brain-galaxy-stage__top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.brain-galaxy-stage__chip {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 0.3rem;
+  background: rgba(0, 8, 14, 0.78);
+  backdrop-filter: blur(8px);
+  color: rgba(0, 242, 255, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.brain-galaxy-stage__chip--accent {
+  border-color: rgba(255, 159, 0, 0.38);
+  color: rgba(255, 224, 170, 0.96);
+}
+
+.brain-galaxy-stage__hud--left {
+  top: 3.4rem;
+  left: 0.65rem;
+  width: min(12.5rem, 26vw);
+  max-height: calc(100% - 7rem);
+  overflow: auto;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 242, 255, 0.12);
+  background: rgba(0, 8, 14, 0.52);
+  backdrop-filter: blur(12px);
+}
+
+.brain-galaxy-stage__hud--inspector {
+  left: 50%;
+  bottom: 5.75rem;
+  transform: translateX(-50%);
+  width: min(22rem, 72%);
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  background: rgba(0, 8, 14, 0.78);
+  backdrop-filter: blur(12px);
+  text-align: center;
+  max-height: 4.5rem;
+  overflow: hidden;
+}
+
+.brain-galaxy-stage__hud--right {
+  top: 3.4rem;
+  right: 0.65rem;
+  width: auto;
+  min-width: 5.5rem;
+  padding: 0.35rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 242, 255, 0.12);
+  background: rgba(0, 8, 14, 0.52);
+  backdrop-filter: blur(12px);
+}
+
+.brain-galaxy-stage__legend-toggle {
+  width: 100%;
+  padding: 0.25rem 0.45rem;
+  border: 0;
+  border-radius: 0.28rem;
+  background: transparent;
+  color: rgba(0, 242, 255, 0.88);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.brain-galaxy-stage__legend-toggle:hover {
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.brain-galaxy-stage__jarvis-float {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 12.5rem;
+  min-height: 12rem;
+  pointer-events: none;
+  padding: 0.35rem 0.25rem 0.15rem;
+  border-radius: 1rem;
+  transition: left 260ms ease, top 260ms ease;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 8, 14, 0.08) 0%,
+    rgba(0, 8, 14, 0.62) 42%,
+    rgba(0, 8, 14, 0.82) 100%
+  );
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(0, 242, 255, 0.04) inset,
+    0 0 1.4rem rgba(0, 242, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.brain-galaxy-stage__jarvis-float--dragging {
+  box-shadow:
+    0 0 0 1px rgba(0, 242, 255, 0.08) inset,
+    0 0 1.9rem rgba(0, 242, 255, 0.18);
+}
+
+.kairo-galaxy-orb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  filter: drop-shadow(0 0 18px rgba(72, 196, 255, 0.12));
+  transition: filter 220ms ease, transform 220ms ease;
+}
+
+.kairo-galaxy-orb__trigger,
+.kairo-galaxy-orb__model,
+.kairo-galaxy-orb__drag-handle {
+  pointer-events: auto;
+}
+
+.kairo-galaxy-orb__drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.1rem;
+  margin-bottom: 0.1rem;
+  padding: 0.16rem 0.48rem;
+  border: 1px solid rgba(72, 196, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(0, 8, 14, 0.84);
+  color: rgba(148, 222, 255, 0.86);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: grab;
+}
+
+.brain-galaxy-stage__jarvis-float--dragging .kairo-galaxy-orb__drag-handle {
+  cursor: grabbing;
+}
+
+.kairo-galaxy-orb__trigger {
+  display: grid;
+  place-items: center;
+  width: 11.5rem;
+  height: 11.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+  transition: transform 220ms ease;
+}
+
+.kairo-galaxy-orb__trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.kairo-galaxy-orb__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.kairo-galaxy-orb__halo {
+  opacity: 0.85;
+}
+
+.kairo-galaxy-orb__ticks line {
+  stroke: rgba(72, 196, 255, 0.42);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.kairo-galaxy-orb__tick--major {
+  stroke: rgba(72, 196, 255, 0.72);
+  stroke-width: 1.35;
+}
+
+.kairo-galaxy-orb__ring {
+  fill: none;
+  stroke: rgba(72, 196, 255, 0.55);
+}
+
+.kairo-galaxy-orb__ring--outer {
+  stroke-width: 1.1;
+  opacity: 0.45;
+}
+
+.kairo-galaxy-orb__ring--dashed {
+  stroke-width: 1.2;
+  stroke-dasharray: 3 5;
+  transform-origin: 100px 100px;
+  animation: kairo-orb-spin 18s linear infinite;
+}
+
+.kairo-galaxy-orb__ring--inner {
+  stroke-width: 1;
+  opacity: 0.35;
+}
+
+.kairo-galaxy-orb__ring--core {
+  stroke: rgba(72, 196, 255, 0.75);
+  stroke-width: 1.4;
+}
+
+.kairo-galaxy-orb__arc {
+  fill: none;
+  stroke: #ff9a3c;
+  stroke-width: 7;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(255, 154, 60, 0.55));
+}
+
+.kairo-galaxy-orb__bead {
+  fill: #ff9a3c;
+  filter: drop-shadow(0 0 4px rgba(255, 154, 60, 0.65));
+}
+
+.kairo-galaxy-orb__core-mark {
+  transform-origin: 100px 100px;
+}
+
+.kairo-galaxy-orb__pulse {
+  fill: none;
+  stroke: rgba(72, 196, 255, 0.22);
+  stroke-width: 1.2;
+  opacity: 0;
+  transform-origin: 100px 100px;
+}
+

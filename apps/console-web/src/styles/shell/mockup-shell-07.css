@@ -1,0 +1,319 @@
+.editor-tabbar__tab-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.42rem 0.2rem 0.42rem 0.7rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.editor-tabbar__file-icon {
+  flex: 0 0 auto;
+  opacity: 0.72;
+}
+
+.editor-tabbar__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-tabbar__dirty-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.88);
+  box-shadow: 0 0 4px rgba(0, 242, 255, 0.45);
+}
+
+.editor-tabbar--mockup .editor-tabbar__tab--active {
+  color: rgba(241, 245, 249, 0.98);
+  border-bottom-color: rgba(56, 189, 248, 0.85);
+  background: #0f1724;
+}
+
+.editor-tabbar--mockup .editor-tabbar__tab--dirty .editor-tabbar__label::after {
+  content: '';
+  display: inline-block;
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-left: 0.35rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.9);
+  vertical-align: middle;
+}
+
+.editor-tabbar--mockup .editor-tabbar__tools {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 0.2rem;
+  margin-left: auto;
+  padding: 0 0.35rem 0 0.2rem;
+}
+
+.editor-tabbar--mockup .editor-tabbar__tool {
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  cursor: default;
+}
+
+.editor-tabbar__tool {
+  display: inline-grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: rgba(148, 163, 184, 0.82);
+  font-size: 0.78rem;
+}
+
+.editor-tabbar__tab--active {
+  color: var(--text-primary);
+}
+
+.editor-tabbar__close {
+  display: inline-grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-right: 0.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.55);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.editor-tabbar__tab:hover .editor-tabbar__close,
+.editor-tabbar__tab--active .editor-tabbar__close {
+  opacity: 1;
+}
+
+.editor-tabbar__close:hover {
+  background: rgba(148, 163, 184, 0.14);
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.editor-tabbar__close-icon {
+  opacity: 0.85;
+}
+
+.editor-tabbar__close:hover .editor-tabbar__close-icon {
+  opacity: 1;
+}
+
+.center-workbench__editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+
+.editor-markdown-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  gap: 0.45rem;
+  padding: 0.35rem 0.75rem 0.2rem;
+  border-bottom: 1px solid rgba(138, 154, 173, 0.1);
+  background: #0a1018;
+}
+
+.editor-markdown-toolbar__toggle {
+  margin-left: auto;
+}
+
+.center-workbench__editor .surface-host--mockup {
+  flex: 1;
+  margin-top: 0;
+  min-height: 0;
+}
+
+.center-workbench__editor .surface-host--mockup .surface-host__body {
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-statusbar--mockup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: auto;
+  padding: 0.18rem 0.7rem;
+  border-top: 1px solid rgba(138, 154, 173, 0.12);
+  background: #0a1018;
+  color: rgba(148, 163, 184, 0.82);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-caption);
+  letter-spacing: 0.02em;
+}
+
+.editor-statusbar__meta {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-left: auto;
+}
+
+.editor-statusbar__panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.06);
+  color: rgba(0, 242, 255, 0.88);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.editor-statusbar__panel-toggle:hover {
+  border-color: rgba(0, 242, 255, 0.42);
+  background: rgba(0, 242, 255, 0.1);
+}
+
+
+.editor-statusbar__state {
+  color: rgba(0, 242, 255, 0.88);
+}
+
+.editor-statusbar__toggle {
+  padding: 0.08rem 0.42rem;
+  border: 1px solid rgba(0, 242, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(127, 148, 168, 0.88);
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.editor-statusbar__toggle--active,
+.editor-statusbar__toggle:hover {
+  border-color: rgba(0, 242, 255, 0.34);
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(0, 242, 255, 0.9);
+}
+
+.center-workbench__editor .surface-host__body--editor {
+  position: relative;
+  isolation: isolate;
+}
+
+.center-workbench__editor .agent-edit-review-viewer {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: 1rem 1.15rem 1.25rem;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: #05111b;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-editor, 0.78rem);
+  line-height: var(--leading-code, 1.45);
+  white-space: pre;
+}
+
+.center-workbench__editor .surface-host__frame--editor {
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.06);
+}
+
+.center-workbench__editor .surface-host__frame--editor .monaco-editor {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+}
+
+.console-shell--mockup .center-workbench__editor .monaco-editor .view-lines,
+.console-shell--mockup .center-workbench__editor .monaco-editor .view-line,
+.console-shell--mockup .center-workbench__editor .monaco-editor .view-line span {
+  color: #d8e8f4;
+}
+
+.center-workbench__editor .surface-host__frame--editor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 242, 255, 0.03) 0%, transparent 12%, transparent 88%, rgba(0, 242, 255, 0.02) 100%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 242, 255, 0.015) 0,
+      rgba(0, 242, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  opacity: 0.55;
+}
+
+.console-shell--mockup .monaco-editor .minimap,
+.console-shell--mockup .monaco-editor .minimap canvas {
+  opacity: 0.92;
+}
+
+.console-shell--mockup .monaco-editor .sticky-widget {
+  box-shadow: inset 0 -1px 0 rgba(0, 242, 255, 0.12);
+}
+
+.center-workbench__panel-surface {
+  flex: 1;
+  min-height: 0;
+  padding: 0.35rem 0.55rem 0.5rem;
+  overflow: auto;
+}
+
+.center-workbench__panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.center-workbench__panel-item {
+  padding: 0.38rem 0.5rem;
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  background: rgba(5, 17, 27, 0.72);
+  color: rgba(196, 218, 232, 0.9);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.center-workbench__panel-item--problem {
+  border-color: rgba(255, 159, 0, 0.28);
+  color: #ffd08a;
+}
+
+.center-workbench__panel-item--log {
+  color: rgba(168, 186, 204, 0.92);
+}
+
+.center-workbench__panel-empty {
+  margin: 0;
+  padding: 0.25rem 0.1rem;
+}
+

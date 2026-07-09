@@ -19,13 +19,16 @@ describe('live events session helpers', () => {
     );
   });
 
-  it('parses connected, runtime_refresh, and presence_refresh payloads', () => {
+  it('parses connected, runtime_refresh, presence_refresh, and spoken_briefing payloads', () => {
     expect(parseLiveEventData('{"type":"connected"}')).toEqual({ type: 'connected' });
     expect(parseLiveEventData('{"type":"runtime_refresh"}')).toEqual({
       type: 'runtime_refresh',
     });
     expect(parseLiveEventData('{"type":"presence_refresh"}')).toEqual({
       type: 'presence_refresh',
+    });
+    expect(parseLiveEventData('{"type":"spoken_briefing"}')).toEqual({
+      type: 'spoken_briefing',
     });
     expect(parseLiveEventData('{"type":"unknown"}')).toBeNull();
     expect(parseLiveEventData('not-json')).toBeNull();
@@ -168,6 +171,40 @@ describe('startLiveEventsSession', () => {
     await Promise.resolve();
     expect(onPresenceRefresh).toHaveBeenCalledTimes(2);
 
+    session.disconnect();
+  });
+
+  it('routes spoken_briefing events to the spoken briefing handler', async () => {
+    const onSpokenBriefing = vi.fn();
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+
+    class MockEventSource {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_url: string) {
+        messageHandler = (event) => {
+          this.onmessage?.(event);
+        };
+      }
+
+      close(): void {}
+    }
+
+    const session = startLiveEventsSession({
+      onRefresh: vi.fn(),
+      onSpokenBriefing,
+      EventSourceImpl: MockEventSource as unknown as typeof EventSource,
+      documentRef: {
+        visibilityState: 'visible',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    messageHandler!({ data: '{"type":"spoken_briefing"}' } as MessageEvent);
+    await Promise.resolve();
+    expect(onSpokenBriefing).toHaveBeenCalledTimes(1);
     session.disconnect();
   });
 

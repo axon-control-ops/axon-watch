@@ -245,7 +245,35 @@ def _contextual_agent_start_fallback(context: dict[str, Any]) -> str | None:
     return "Understood — working on that now."
 
 
+def _is_failed_outcome(context: dict[str, Any]) -> bool:
+    outcome = str(context.get("outcome") or "").strip().lower()
+    if outcome in {"failed", "error", "failure"}:
+        return True
+    summary = str(context.get("failure_summary") or "").strip()
+    if not summary:
+        return False
+    lowered = summary.lower()
+    return (
+        "cannot start because no cli runtime is ready" in lowered
+        or "actionrequirederror" in lowered
+        or "you're out of usage" in lowered
+        or "api key was rejected" in lowered
+    )
+
+
+def _contextual_failed_fallback(context: dict[str, Any]) -> str:
+    summary = str(context.get("failure_summary") or "").lower()
+    if "out of usage" in summary or "actionrequirederror" in summary:
+        return "That run couldn't start — Cursor usage is exhausted. Switch model or raise the limit."
+    if "api key was rejected" in summary or "vault" in summary:
+        return "That run couldn't start — fix the runtime keys in vault, then retry."
+    return "That run couldn't start — open Runtime or vault, then retry."
+
+
 def _contextual_done_fallback(context: dict[str, Any]) -> str | None:
+    if _is_failed_outcome(context):
+        return _contextual_failed_fallback(context)
+
     prompt = _operator_prompt(context)
     lower = prompt.lower()
     edit_count = int(context.get("edit_count") or 0)
@@ -360,6 +388,9 @@ def _fallback_for_event(
             return contextual
         return _pick_pool_line("agent_start", recent, persona_enabled=persona_enabled)
 
+    if event_type == "failed":
+        return _contextual_failed_fallback(context)
+
     if event_type == "done":
         contextual = _contextual_done_fallback(context)
         if contextual:
@@ -427,7 +458,15 @@ def should_use_runtime_for_event(event_type: str, narration: NarrationLevel) -> 
     if event_type == "conversation_reply":
         return narration == "conversational"
     # Narration is bookend-only (agent_start + done) plus alerts/greetings.
-    return event_type in {"agent_start", "done", "greeting", "chat_summary", "alert", "briefing"}
+    # Failures stay on deterministic fallback copy — do not let the model paraphrase them.
+    return event_type in {
+        "agent_start",
+        "done",
+        "greeting",
+        "chat_summary",
+        "alert",
+        "briefing",
+    }
 
 
 def generate_spoken_line(
@@ -479,6 +518,7 @@ def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:
         return event_type in {
             "agent_start",
             "done",
+            "failed",
             "alert",
             "approval_literal",
             "greeting",
@@ -486,7 +526,16 @@ def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:
             "briefing",
             "conversation_reply",
         }
-    return event_type in {"agent_start", "done", "alert", "approval_literal", "greeting", "briefing", "conversation_reply"}
+    return event_type in {
+        "agent_start",
+        "done",
+        "failed",
+        "alert",
+        "approval_literal",
+        "greeting",
+        "briefing",
+        "conversation_reply",
+    }
 
 
 __all__ = [

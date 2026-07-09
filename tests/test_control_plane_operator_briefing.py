@@ -70,6 +70,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "degraded",
                 "connectivity",
                 "operator_presence",
+                "cli_runtime",
             },
             set(payload),
         )

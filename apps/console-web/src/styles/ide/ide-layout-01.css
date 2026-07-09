@@ -1,0 +1,320 @@
+/* IDE mode: activity bar + explorer + KAIRO footer + agent dock (ADR-008) */
+
+.left-sidebar-mockup--ide {
+  gap: 0;
+}
+
+.left-sidebar-mockup__ide-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.left-sidebar-mockup__ide-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.left-sidebar-mockup--explorer-collapsed .left-sidebar-mockup__ide-main {
+  display: none;
+}
+
+.left-sidebar-mockup--ide.left-sidebar-mockup--explorer-collapsed {
+  width: var(--ide-activity-width, 42px);
+  min-width: var(--ide-activity-width, 42px);
+}
+
+.left-sidebar-mockup--ide.left-sidebar-mockup--explorer-collapsed .left-sidebar-mockup__resize-handle {
+  display: none;
+}
+
+.left-sidebar-mockup--explorer-collapsed .ide-kairo-footer__chip {
+  justify-content: center;
+  padding: 0.4rem 0.2rem;
+}
+
+.left-sidebar-mockup--explorer-collapsed .ide-kairo-footer__chip .kairo-chip__label,
+.left-sidebar-mockup--explorer-collapsed .ide-kairo-footer__chip .kairo-chip__waveform {
+  display: none;
+}
+
+.left-sidebar-mockup__status-anchor--ide {
+  margin-top: auto;
+  padding: 0.55rem 0.35rem 0.45rem;
+  border-top: 1px solid rgba(99, 102, 241, 0.16);
+  background: rgba(8, 10, 18, 0.72);
+}
+
+.ide-kairo-footer {
+  display: flex;
+  width: 100%;
+}
+
+.ide-kairo-footer__chip {
+  width: 100%;
+  justify-content: flex-start;
+  min-height: 2.1rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.45rem;
+}
+
+.ide-kairo-footer__interrupt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  border-radius: 0.45rem;
+  background: rgba(12, 14, 24, 0.9);
+  color: rgba(224, 231, 255, 0.92);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ide-kairo-footer__interrupt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ide-kairo-footer__interrupt-title,
+.ide-kairo-footer__interrupt-state {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ide-kairo-footer__interrupt-headline {
+  margin: 0;
+  font-size: 0.72rem;
+  color: rgba(199, 210, 254, 0.95);
+}
+
+.ide-kairo-footer__interrupt-copy {
+  margin: 0;
+  font-size: 0.68rem;
+  color: rgba(148, 163, 184, 0.92);
+}
+
+.ide-kairo-footer__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ide-kairo-footer__badge {
+  padding: 0.15rem 0.4rem;
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  border-radius: 999px;
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ide-kairo-footer__badge--signal {
+  border-color: rgba(56, 189, 248, 0.34);
+}
+
+.ide-explorer-panel__heading {
+  gap: 0.35rem;
+}
+
+.ide-explorer-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.ide-explorer-panel__action {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.92);
+  cursor: pointer;
+}
+
+.ide-explorer-panel__action:hover,
+.ide-explorer-panel__action--active {
+  color: rgba(224, 231, 255, 0.96);
+  background: rgba(99, 102, 241, 0.14);
+}
+
+.ide-explorer-panel__refresh,
+.ide-explorer-panel__collapse-all {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.ide-explorer-panel__menu-wrap {
+  position: relative;
+}
+
+.ide-explorer-panel__menu {
+  position: absolute;
+  top: calc(100% + 0.2rem);
+  right: 0;
+  z-index: 6;
+  min-width: 9.5rem;
+  padding: 0.25rem;
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  border-radius: 0.35rem;
+  background: rgba(10, 12, 20, 0.98);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.ide-explorer-panel__menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  border-radius: 0.2rem;
+  background: transparent;
+  color: rgba(224, 231, 255, 0.94);
+  font-size: 0.68rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ide-explorer-panel__menu-item:hover {
+  background: rgba(99, 102, 241, 0.16);
+}
+
+.ide-explorer-panel__collapse {
+  margin-left: 0.1rem;
+}
+
+.ide-activity-bar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: var(--ide-activity-width, 42px);
+  gap: 0.25rem;
+  padding: 0.45rem 0.2rem;
+  border-right: 1px solid rgba(0, 242, 255, 0.14);
+  background: rgba(0, 8, 14, 0.55);
+}
+
+.ide-activity-bar__button--settings {
+  margin-top: auto;
+}
+
+.ide-activity-bar__settings-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.ide-activity-bar__button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.ide-activity-bar__icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.ide-activity-bar__button--active,
+.ide-activity-bar__button:hover {
+  color: var(--text-hud);
+  background: rgba(0, 242, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.2);
+}
+
+.ide-explorer-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0.35rem 0.35rem 0 0.2rem;
+  background: transparent;
+}
+
+.ide-explorer-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ide-explorer-panel__stub-copy {
+  padding: 0.65rem;
+}
+
+
+.ide-panel-search {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0.55rem;
+  padding: 0.65rem;
+}
+
+.ide-panel-search__input {
+  width: 100%;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+  border-radius: 8px;
+  background: rgba(10, 14, 20, 0.9);
+  color: var(--text-primary);
+  padding: 0.45rem 0.55rem;
+}
+
+.ide-panel-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.ide-panel-list__button {
+  width: 100%;
+  border: 1px solid rgba(138, 154, 173, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(210, 220, 230, 0.94);
+  padding: 0.42rem 0.5rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ide-panel-list__button:hover {
+  border-color: rgba(0, 242, 255, 0.2);
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.ide-panel-caption {
+  margin: 0;
+}
+
+.ide-panel-action {
+  align-self: flex-start;
+  border: 1px solid rgba(255, 111, 111, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 111, 111, 0.08);
+  color: #ffb4b4;
+  padding: 0.28rem 0.65rem;
+  cursor: pointer;
+}
+

@@ -30,12 +30,14 @@ export interface EditorSelectionSnapshot {
 export interface MonacoEditorController {
   dispose: () => void;
   setLanguage: (language: string) => void;
+  replaceDocument: (value: string, language: string) => void;
   setReadOnly: (readOnly: boolean) => void;
   setMinimapEnabled: (enabled: boolean) => void;
   setValue: (value: string) => void;
   getValue: () => string;
   getSelection: () => EditorSelectionSnapshot | null;
   focus: () => void;
+  layout: () => void;
   revealLine: (line: number, column?: number) => void;
   findAndReveal: (searchText: string) => boolean;
 }
@@ -109,8 +111,12 @@ export async function createMonacoEditor(
     padding: { top: 16, bottom: 16 },
     overviewRulerBorder: false,
     scrollbar: {
-      verticalScrollbarSize: 10,
-      horizontalScrollbarSize: 10,
+      verticalScrollbarSize: 6,
+      horizontalScrollbarSize: 6,
+      arrowSize: 0,
+      useShadows: false,
+      verticalHasArrows: false,
+      horizontalHasArrows: false,
     },
     matchBrackets: 'always',
     wordWrap: 'off',
@@ -124,6 +130,8 @@ export async function createMonacoEditor(
     });
   };
 
+  let activeModel = model;
+
   const emitSelection = () => {
     if (!options.onSelectionChange) {
       return;
@@ -133,7 +141,7 @@ export async function createMonacoEditor(
       options.onSelectionChange(null);
       return;
     }
-    const text = model.getValueInRange(selection);
+    const text = activeModel.getValueInRange(selection);
     options.onSelectionChange({
       startLine: selection.startLineNumber,
       startColumn: selection.startColumn,
@@ -145,7 +153,7 @@ export async function createMonacoEditor(
 
   if (options.onValueChange) {
     editor.onDidChangeModelContent(() => {
-      options.onValueChange?.(model.getValue());
+      options.onValueChange?.(activeModel.getValue());
       emitCursor();
       emitSelection();
     });
@@ -165,13 +173,32 @@ export async function createMonacoEditor(
     emitSelection();
   }
 
+  const scheduleLayout = (): void => {
+    requestAnimationFrame(() => {
+      editor.layout();
+      requestAnimationFrame(() => {
+        editor.layout();
+      });
+    });
+  };
+  scheduleLayout();
+
   return {
     dispose() {
+      editor.setModel(null);
       editor.dispose();
-      model.dispose();
+      activeModel.dispose();
     },
     setLanguage(language: string) {
-      monaco.editor.setModelLanguage(model, language);
+      monaco.editor.setModelLanguage(activeModel, language);
+      scheduleLayout();
+    },
+    replaceDocument(value: string, language: string) {
+      const nextModel = monaco.editor.createModel(value, language);
+      editor.setModel(nextModel);
+      activeModel.dispose();
+      activeModel = nextModel;
+      scheduleLayout();
     },
     setReadOnly(readOnly: boolean) {
       editor.updateOptions({ readOnly });
@@ -180,11 +207,12 @@ export async function createMonacoEditor(
       editor.updateOptions({ minimap: { enabled } });
     },
     setValue(value: string) {
-      model.setValue(value);
+      activeModel.setValue(value);
       emitCursor();
+      scheduleLayout();
     },
     getValue() {
-      return model.getValue();
+      return activeModel.getValue();
     },
     getSelection() {
       const selection = editor.getSelection();
@@ -196,14 +224,17 @@ export async function createMonacoEditor(
         startColumn: selection.startColumn,
         endLine: selection.endLineNumber,
         endColumn: selection.endColumn,
-        text: model.getValueInRange(selection),
+        text: activeModel.getValueInRange(selection),
       };
     },
     focus() {
       editor.focus();
     },
+    layout() {
+      editor.layout();
+    },
     revealLine(line: number, column = 1) {
-      const safeLine = Math.max(1, Math.min(line, model.getLineCount()));
+      const safeLine = Math.max(1, Math.min(line, activeModel.getLineCount()));
       const safeColumn = Math.max(1, column);
       editor.revealLineInCenter(safeLine);
       editor.setPosition({ lineNumber: safeLine, column: safeColumn });
@@ -214,7 +245,7 @@ export async function createMonacoEditor(
       if (!needle) {
         return false;
       }
-      const matches = model.findMatches(needle, false, false, false, null, false);
+      const matches = activeModel.findMatches(needle, false, false, false, null, false);
       if (!matches.length) {
         return false;
       }

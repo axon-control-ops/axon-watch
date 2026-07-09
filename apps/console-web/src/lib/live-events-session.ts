@@ -1,4 +1,8 @@
-export type LiveEventType = 'connected' | 'runtime_refresh' | 'presence_refresh';
+export type LiveEventType =
+  | 'connected'
+  | 'runtime_refresh'
+  | 'presence_refresh'
+  | 'spoken_briefing';
 
 export interface LiveEventPayload {
   type: LiveEventType;
@@ -28,7 +32,7 @@ export function parseLiveEventData(raw: string): LiveEventPayload | null {
 
   try {
     const parsed = JSON.parse(trimmed) as LiveEventPayload;
-    if (parsed.type === 'connected' || parsed.type === 'runtime_refresh' || parsed.type === 'presence_refresh') {
+    if (parsed.type === 'connected' || parsed.type === 'runtime_refresh' || parsed.type === 'presence_refresh' || parsed.type === 'spoken_briefing') {
       return parsed;
     }
   } catch {
@@ -46,9 +50,14 @@ export function shouldTriggerPresenceRefresh(event: LiveEventPayload): boolean {
   return event.type === 'presence_refresh';
 }
 
+export function shouldTriggerSpokenBriefing(event: LiveEventPayload): boolean {
+  return event.type === 'spoken_briefing';
+}
+
 export interface LiveEventsSessionOptions {
   onRefresh: () => void | Promise<void>;
   onPresenceRefresh?: () => void | Promise<void>;
+  onSpokenBriefing?: () => void | Promise<void>;
   pollIntervalMs?: number;
   EventSourceImpl?: typeof EventSource;
   documentRef?: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>;
@@ -128,6 +137,10 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
   function handleMessage(raw: string): void {
     const event = parseLiveEventData(raw);
     if (!event) {
+      return;
+    }
+    if (shouldTriggerSpokenBriefing(event)) {
+      void options.onSpokenBriefing?.();
       return;
     }
     if (shouldTriggerPresenceRefresh(event)) {

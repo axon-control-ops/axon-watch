@@ -12,6 +12,7 @@ import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
 import AgentLiveLineHeadline from './AgentLiveLineHeadline.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
+import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 
 const shell = useShellStore();
 
@@ -54,9 +55,13 @@ function handleStopSpeech(event: Event): void {
 <template>
   <button
     v-if="!showExpandedPanel"
+    id="ide-kairo-sidebar-panel"
     type="button"
     class="kairo-sidebar-panel kairo-sidebar-panel--compact"
-    :class="`kairo-sidebar-panel--${shell.ideDisplayKairoPresenceState}`"
+    :class="[
+      `kairo-sidebar-panel--${shell.ideDisplayKairoPresenceState}`,
+      { 'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized },
+    ]"
     :aria-label="`${OPERATOR_PERSONA_NAME}. ${kairoPresenceLabel(shell.ideDisplayKairoPresenceState)}`"
     @click="handleExpand"
   >
@@ -67,9 +72,13 @@ function handleStopSpeech(event: Event): void {
   </button>
   <button
     v-else
+    id="ide-kairo-sidebar-panel"
     type="button"
     class="kairo-sidebar-panel hud-panel-frame"
-    :class="`kairo-sidebar-panel--${shell.kairoPresenceState}`"
+    :class="[
+      `kairo-sidebar-panel--${shell.kairoPresenceState}`,
+      { 'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized },
+    ]"
     :aria-label="`${OPERATOR_PERSONA_NAME}. ${shell.briefingSummaryLine}`"
     @click="handleExpand"
   >
@@ -112,6 +121,7 @@ function handleStopSpeech(event: Event): void {
           Stop speaking
         </button>
       </div>
+      <BriefingSurfaceFollowupPrompt />
     </div>
   </button>
 </template>

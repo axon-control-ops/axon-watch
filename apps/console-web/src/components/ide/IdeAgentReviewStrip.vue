@@ -6,6 +6,7 @@ import {
   buildIdeAgentReviewBar,
   buildIdeAgentReviewComposerLabel,
   collectIdeAgentEditSummariesFromThread,
+  latestIdeAgentTurnFailed,
   shouldShowIdeAgentReviewStrip,
 } from '../../lib/ide-agent-center-view';
 import { useShellStore } from '../../stores/shell';
@@ -33,6 +34,7 @@ const showReviewStrip = computed(() =>
     composerAgentBusy: shell.composerAgentBusy,
     reviewReadyCount: reviewReadyCount.value,
     editedFileCount: editSummaries.value.length,
+    latestAgentTurnFailed: latestIdeAgentTurnFailed(shell.threadMessages),
   }),
 );
 

@@ -2,6 +2,7 @@ import {
   normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
 } from './agent-transcript-blocks';
+import { isAgentTurnFailureContent } from './kairo-agent-narration';
 import { OPERATOR_PERSONA_NAME, personaThreadPrefix } from './operator-persona-name';
 
 export type IdeAgentThreadMessage = {
@@ -86,12 +87,26 @@ export function collectIdeAgentEditSummariesFromThread(
     .filter((edit): edit is IdeAgentEditSummary => Boolean(edit));
 }
 
+/** Latest agent turn failed — do not advertise prior-thread edits as "ready to review". */
+export function latestIdeAgentTurnFailed(
+  messages: readonly IdeAgentThreadMessage[],
+): boolean {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === 'agent' && message.content.trim()) {
+      return isAgentTurnFailureContent(message.content);
+    }
+  }
+  return false;
+}
+
 export function shouldShowIdeAgentReviewStrip(input: {
   layoutMode: 'operator' | 'ide';
   agentStreamActive: boolean;
   composerAgentBusy: boolean;
   reviewReadyCount: number;
   editedFileCount: number;
+  latestAgentTurnFailed?: boolean;
 }): boolean {
   if (input.layoutMode !== 'ide') {
     return false;
@@ -101,6 +116,9 @@ export function shouldShowIdeAgentReviewStrip(input: {
   }
   if (input.reviewReadyCount > 0) {
     return true;
+  }
+  if (input.latestAgentTurnFailed) {
+    return false;
   }
   return input.editedFileCount > 0;
 }

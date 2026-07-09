@@ -13,6 +13,7 @@ import {
 import { kairoPresenceLabel } from '../../lib/kairo-presence';
 import { ideShowKairoSidebarExpanded } from '../../lib/ide-presence-profile';
 import { useShellStore } from '../../stores/shell';
+import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 
 const shell = useShellStore();
 
@@ -46,11 +47,16 @@ const signalBadge = computed(
       :state="shell.ideDisplayKairoPresenceState"
       @open-briefing="shell.focusKairoBriefing()"
     />
+    <BriefingSurfaceFollowupPrompt v-if="!showExpandedPanel" compact />
     <button
       v-else
+      id="ide-kairo-footer-panel"
       type="button"
       class="ide-kairo-footer__interrupt hud-panel-frame"
-      :class="`ide-kairo-footer__interrupt--${shell.kairoPresenceState}`"
+      :class="[
+        `ide-kairo-footer__interrupt--${shell.kairoPresenceState}`,
+        { 'ide-kairo-footer__interrupt--emphasized': shell.briefingSeamEmphasized },
+      ]"
       :aria-label="`${OPERATOR_PERSONA_NAME}. ${shell.briefingSummaryLine}`"
       @click="shell.focusKairoBriefing()"
     >
@@ -77,6 +83,7 @@ const signalBadge = computed(
           {{ signalBadge }} signal{{ signalBadge === 1 ? '' : 's' }}
         </span>
       </div>
+      <BriefingSurfaceFollowupPrompt compact />
     </button>
   </footer>
 </template>

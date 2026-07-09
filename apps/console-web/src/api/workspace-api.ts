@@ -1,0 +1,193 @@
+import type { WorkspaceRecord } from '../contracts/canonical';
+
+import { fetchJson } from './client';
+
+export interface WorkspaceListSnapshot {
+  items: WorkspaceRecord[];
+  count: number;
+}
+
+export interface CreateWorkspaceHandoffRequest {
+  target_workspace_id: string;
+  task: string;
+  reason?: string;
+}
+
+export interface WorkspaceHandoffCreateResponse {
+  handoff: Record<string, unknown>;
+  target_workspace: WorkspaceRecord;
+  target_workspace_summary: Record<string, unknown>;
+}
+
+export interface WorkspaceFileEntry {
+  path: string;
+  size_bytes: number;
+}
+
+export interface WorkspaceFileListSnapshot {
+  workspace_id: string;
+  items: WorkspaceFileEntry[];
+  count: number;
+}
+
+export interface WorkspaceFileContent {
+  workspace_id: string;
+  path: string;
+  content: string;
+  size_bytes: number;
+}
+
+export interface WorkspaceFileRenameResponse {
+  workspace_id: string;
+  old_path: string;
+  path: string;
+  size_bytes: number;
+  renamed: boolean;
+}
+
+export interface TerminalSessionRecord {
+  session_id: string;
+  workspace_id: string;
+  role: 'operator' | 'agent' | string;
+  title: string;
+  run_id: string | null;
+  created_at: string;
+}
+
+function encodeWorkspaceFilePath(filePath: string): string {
+  return filePath
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
+export async function createWorkspaceHandoff(
+  sourceWorkspaceId: string,
+  body: CreateWorkspaceHandoffRequest,
+): Promise<WorkspaceHandoffCreateResponse> {
+  const encoded = encodeURIComponent(sourceWorkspaceId);
+  return fetchJson<WorkspaceHandoffCreateResponse>(
+    `/api/workspaces/${encoded}/handoffs`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'workspace handoff failed',
+  );
+}
+
+export async function fetchWorkspaces(options?: {
+  scope?: 'all' | 'operator';
+}): Promise<WorkspaceListSnapshot> {
+  const scope = options?.scope === 'operator' ? 'operator' : '';
+  const query = scope ? '?scope=operator' : '';
+  return fetchJson<WorkspaceListSnapshot>(
+    `/api/workspaces${query}`,
+    {},
+    'workspaces request failed',
+  );
+}
+
+export async function fetchWorkspace(workspaceId: string): Promise<WorkspaceRecord> {
+  return fetchJson<WorkspaceRecord>(
+    `/api/workspaces/${workspaceId}`,
+    {},
+    'workspace request failed',
+  );
+}
+
+export async function fetchWorkspaceFiles(workspaceId: string): Promise<WorkspaceFileListSnapshot> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<WorkspaceFileListSnapshot>(
+    `/api/workspaces/${encoded}/files`,
+    {},
+    'workspace files request failed',
+  );
+}
+
+export async function fetchWorkspaceFile(
+  workspaceId: string,
+  filePath: string,
+): Promise<WorkspaceFileContent> {
+  const encodedWorkspace = encodeURIComponent(workspaceId);
+  const encodedPath = encodeWorkspaceFilePath(filePath);
+  return fetchJson<WorkspaceFileContent>(
+    `/api/workspaces/${encodedWorkspace}/files/${encodedPath}`,
+    {},
+    'workspace file read failed',
+  );
+}
+
+export async function saveWorkspaceFile(
+  workspaceId: string,
+  filePath: string,
+  content: string,
+): Promise<{ saved: boolean; path: string; size_bytes: number }> {
+  const encodedWorkspace = encodeURIComponent(workspaceId);
+  const encodedPath = encodeWorkspaceFilePath(filePath);
+  return fetchJson<{ saved: boolean; path: string; size_bytes: number }>(
+    `/api/workspaces/${encodedWorkspace}/files/${encodedPath}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    },
+    'workspace file save failed',
+  );
+}
+
+export async function renameWorkspaceFile(
+  workspaceId: string,
+  filePath: string,
+  newPath: string,
+): Promise<WorkspaceFileRenameResponse> {
+  const encodedWorkspace = encodeURIComponent(workspaceId);
+  const encodedPath = encodeWorkspaceFilePath(filePath);
+  return fetchJson<WorkspaceFileRenameResponse>(
+    `/api/workspaces/${encodedWorkspace}/files/${encodedPath}/rename`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_path: newPath }),
+    },
+    'workspace file rename failed',
+  );
+}
+
+export async function fetchWorkspaceTerminalSessions(
+  workspaceId: string,
+): Promise<{ workspace_id: string; items: TerminalSessionRecord[]; count: number }> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  return fetchJson<{ workspace_id: string; items: TerminalSessionRecord[]; count: number }>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/sessions`,
+    {},
+    'workspace terminal sessions failed',
+  );
+}
+
+export async function createWorkspaceTerminalSession(
+  workspaceId: string,
+  options: {
+    role?: 'operator' | 'agent' | string;
+    title?: string | null;
+    runId?: string | null;
+    sessionId?: string | null;
+  } = {},
+): Promise<TerminalSessionRecord> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  return fetchJson<TerminalSessionRecord>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/sessions`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role: options.role ?? 'operator',
+        title: options.title ?? null,
+        run_id: options.runId ?? null,
+        session_id: options.sessionId ?? null,
+      }),
+    },
+    'workspace terminal session create failed',
+  );
+}

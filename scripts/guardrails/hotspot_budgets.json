@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "generated_on": "2026-07-09",
+  "note": "Baseline from Axon-X file-size audit. Ratchet budgets block growth until extraction lowers max_lines.",
+  "critical_hotspots": {
+    "apps/console-web/src/styles/mockup-shell.css": {
+      "max_lines": 31,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/* + feature co-located CSS",
+      "rule": "operator shell presentation only; split by surface"
+    },
+    "apps/console-web/src/stores/shell.ts": {
+      "max_lines": 4612,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/stores/shell/slices/*",
+      "rule": "FS-003 deferred: prior slice split was incomplete (void get, broken imports); restore monolith until a correct shared-state extraction"
+    },
+    "apps/console-web/src/styles/ide-layout.css": {
+      "max_lines": 11,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/ide/* + feature CSS",
+      "rule": "IDE chrome only; panel styles co-locate with components"
+    },
+    "services/control-plane/app/main.py": {
+      "max_lines": 37,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/routes/*",
+      "rule": "bootstrap, registration, and compatibility only"
+    },
+    "services/control-plane/app/chat/service.py": {
+      "max_lines": 1045,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/chat/* bounded slices",
+      "rule": "lane dispatch, threads, and attachments must stay split"
+    }
+  },
+  "ratcheted_oversize_files": {
+    "apps/console-web/src/components/ide/AgentDockComposer.vue": {
+      "max_lines": 292,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/ide/agent-dock/*",
+      "note": "FS-005 complete: orchestrator composing agent-dock subcomponents"
+    },
+    "apps/console-web/src/api/control-plane.ts": {
+      "max_lines": 12,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/api/*-api.ts",
+      "note": "FS-001 complete: re-export facade only"
+    },
+    "apps/console-web/src/styles/app.css": {
+      "max_lines": 1146,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/tokens/* + feature CSS"
+    },
+    "services/control-plane/app/kairo_conversation.py": {
+      "max_lines": 798,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/kairo/*"
+    },
+    "apps/console-web/src/components/ConversationSeamPanel.vue": {
+      "max_lines": 775,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/conversation/*"
+    },
+    "services/control-plane/app/cli_runtime/research_stream_blocks.py": {
+      "max_lines": 805,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
+    },
+    "apps/console-web/src/components/shell/CenterWorkbench.vue": {
+      "max_lines": 849,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/workbench/*"
+    },
+    "services/control-plane/app/kairo_conversation_reply.py": {
+      "max_lines": 543,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/kairo/replies/*"
+    },
+    "services/control-plane/app/cli_runtime/catalog.py": {
+      "max_lines": 509,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/cli_runtime/catalog/*"
+    },
+    "docs/HOW-TO-HANDBOOK.md": {
+      "max_lines": 1436,
+      "soft_limit": 400,
+      "hard_limit": 700,
+      "target": "docs/how-to/* chapters"
+    },
+    "docs/HOW-TO-HANDBOOK.html": {
+      "max_lines": 974,
+      "soft_limit": 250,
+      "hard_limit": 400,
+      "target": "docs/how-to/* generated HTML"
+    },
+    "apps/console-web/src/styles/settings-surface.css": {
+      "max_lines": 748,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/settings/*"
+    },
+    "apps/console-web/src/features/brain-galaxy/KairoGalaxyOrb.vue": {
+      "max_lines": 669,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/brain-galaxy/*"
+    },
+    "apps/console-web/src/styles/vault-surface.css": {
+      "max_lines": 649,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/vault/*"
+    },
+    "apps/console-web/src/lib/operator-status-radar-view.ts": {
+      "max_lines": 589,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/lib/operator-status-radar/*"
+    },
+    "apps/console-web/src/composables/useVaultSurface.ts": {
+      "max_lines": 585,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/vault/composables/*"
+    },
+    "docs/how-to-handbook-print.css": {
+      "max_lines": 568,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "docs/how-to/* print styles"
+    },
+    "apps/console-web/src/components/vault/VaultSurface.vue": {
+      "max_lines": 554,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/vault/components/*"
+    },
+    "docs/AXON-X-STARTER-GUIDE.html": {
+      "max_lines": 544,
+      "soft_limit": 250,
+      "hard_limit": 400,
+      "target": "docs/generated/*"
+    },
+    "tests/test_control_plane_chat.py": {
+      "max_lines": 526,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_control_plane_chat_* slices"
+    }
+  }
+}

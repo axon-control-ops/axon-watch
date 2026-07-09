@@ -52,9 +52,13 @@
     radial-gradient(circle at top right, rgba(99, 102, 241, 0.05), transparent 55%);
 }
 
+.console-shell--ide .editor-chrome--mockup {
+  border-color: rgba(99, 102, 241, 0.14);
+}
+
 .console-shell--ide .editor-tabbar--mockup,
 .console-shell--ide .editor-breadcrumb--mockup {
-  border-color: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.12);
 }
 
 .console-shell--ide .agent-dock {

@@ -204,6 +204,25 @@
   line-height: var(--leading-code);
 }
 
+/* ── Editor chrome (tabs + breadcrumb) ──────────────────────────── */
+
+.console-shell--mockup .editor-tabbar--mockup .editor-tabbar__tab {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-ui);
+  letter-spacing: 0;
+}
+
+.console-shell--mockup .editor-breadcrumb--mockup {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-meta);
+}
+
+.console-shell--mockup .editor-statusbar--mockup {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-caption);
+  letter-spacing: 0.02em;
+}
+
 /* ── Research cards (Phase 2) ───────────────────────────────────── */
 
 .console-shell--mockup .agent-block__research-card {

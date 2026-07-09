@@ -12,6 +12,7 @@ export type EditorRevealRequest = {
 };
 
 const props = defineProps<{
+  documentKey: string;
   title: string;
   value: string;
   language: EditorDocumentLanguage;
@@ -34,6 +35,28 @@ const containerRef = ref<HTMLElement | null>(null);
 const loadState = ref<'loading' | 'ready' | 'error'>('loading');
 let editorController: Awaited<ReturnType<typeof createMonacoEditor>> | null = null;
 let suppressChangeEmit = false;
+let mountedDocumentKey = '';
+
+function applyDocumentToEditor(): void {
+  if (!editorController) {
+    return;
+  }
+
+  if (mountedDocumentKey === props.documentKey) {
+    if (editorController.getValue() !== props.value) {
+      suppressChangeEmit = true;
+      editorController.setValue(props.value);
+      suppressChangeEmit = false;
+    }
+    editorController.setReadOnly(Boolean(props.readOnly));
+    editorController.layout();
+    return;
+  }
+
+  editorController.replaceDocument(props.value, props.language);
+  editorController.setReadOnly(Boolean(props.readOnly));
+  mountedDocumentKey = props.documentKey;
+}
 
 function focusEditor(): void {
   editorController?.focus();
@@ -78,7 +101,9 @@ onMounted(async () => {
         emit('selectionChange', selection);
       },
     });
+    mountedDocumentKey = props.documentKey;
     loadState.value = 'ready';
+    applyDocumentToEditor();
     applyRevealRequest(props.revealRequest);
   } catch {
     loadState.value = 'error';
@@ -93,20 +118,6 @@ watch(
 );
 
 watch(
-  () => props.language,
-  (language) => {
-    editorController?.setLanguage(language);
-  },
-);
-
-watch(
-  () => props.readOnly,
-  (readOnly) => {
-    editorController?.setReadOnly(Boolean(readOnly));
-  },
-);
-
-watch(
   () => props.minimapEnabled,
   (minimapEnabled) => {
     if (minimapEnabled !== undefined) {
@@ -116,21 +127,16 @@ watch(
 );
 
 watch(
-  () => props.value,
-  (value) => {
-    if (!editorController || editorController.getValue() === value) {
-      return;
-    }
-
-    suppressChangeEmit = true;
-    editorController.setValue(value);
-    suppressChangeEmit = false;
+  () => [props.documentKey, props.value, props.language, props.readOnly] as const,
+  () => {
+    applyDocumentToEditor();
   },
 );
 
 onBeforeUnmount(() => {
   editorController?.dispose();
   editorController = null;
+  mountedDocumentKey = '';
 });
 </script>
 

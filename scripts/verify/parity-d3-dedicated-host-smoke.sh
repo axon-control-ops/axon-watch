@@ -31,9 +31,14 @@ echo "[6/8] Readiness endpoint includes public_base_url"
 python3 - <<'PY'
 from pathlib import Path
 
-text = Path("services/control-plane/app/main.py").read_text(encoding="utf-8")
-for needle in ("public_base_url", "_public_base_url"):
-    if needle not in text:
+sources = [
+    Path("services/control-plane/app/routes/health.py"),
+    Path("services/control-plane/app/config.py"),
+    Path("services/control-plane/app/main.py"),
+]
+combined = "\n".join(path.read_text(encoding="utf-8") for path in sources if path.is_file())
+for needle in ("public_base_url", "_public_base_url", "/api/readiness"):
+    if needle not in combined:
         raise SystemExit(f"missing readiness field wiring: {needle}")
 print("readiness public_base_url wired")
 PY

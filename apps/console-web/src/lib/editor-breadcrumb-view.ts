@@ -14,6 +14,33 @@ export type MarkdownHeadingSymbol = {
 };
 
 const HEADING_PATTERN = /^(#{1,6})\s+(.+?)\s*$/;
+const AGENT_REVIEW_HEADER_PATTERN = /^#\s*Agent review ·\s+(.+?)\s*$/m;
+
+/** Workspace path shown in the editor breadcrumb (not virtual draft resource paths). */
+export function resolveEditorBreadcrumbFilePath(input: {
+  source: 'dto' | 'file' | 'draft';
+  filePath?: string;
+  id: string;
+  title: string;
+  value: string;
+  resourcePath: string;
+}): string {
+  if (input.source === 'file' && input.filePath) {
+    return input.filePath.replace(/\\/g, '/');
+  }
+
+  if (input.id.startsWith('draft:agent-edit-review:')) {
+    if (input.filePath) {
+      return input.filePath.replace(/\\/g, '/');
+    }
+    const fromHeader = AGENT_REVIEW_HEADER_PATTERN.exec(input.value)?.[1]?.trim();
+    if (fromHeader) {
+      return fromHeader.replace(/\\/g, '/');
+    }
+  }
+
+  return input.resourcePath.replace(/\\/g, '/');
+}
 
 /** Markdown headings for symbol breadcrumbs (VS Code / Cursor-style). */
 export function parseMarkdownHeadingSymbols(content: string): MarkdownHeadingSymbol[] {
@@ -62,6 +89,15 @@ function pathSegments(path: string): string[] {
     .filter(Boolean);
 }
 
+/** Short workspace root label for the breadcrumb (Cursor-style). */
+export function formatEditorWorkspaceBreadcrumbLabel(workspaceId: string): string {
+  const trimmed = workspaceId.trim();
+  if (!trimmed) {
+    return 'workspace';
+  }
+  return trimmed.replace(/^workspace[_-]/i, '') || trimmed;
+}
+
 /** Workspace-relative file path split into breadcrumb segments. */
 export function buildEditorPathSegments(
   workspaceId: string,
@@ -71,7 +107,7 @@ export function buildEditorPathSegments(
   const trail: EditorBreadcrumbSegment[] = [
     {
       id: `workspace:${workspaceId}`,
-      label: workspaceId,
+      label: formatEditorWorkspaceBreadcrumbLabel(workspaceId),
       kind: 'workspace',
     },
   ];

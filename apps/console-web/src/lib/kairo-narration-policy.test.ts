@@ -58,6 +58,10 @@ describe('kairo-narration-policy', () => {
     ).toBe(true);
 
     expect(
+      shouldNarrateAgentEvent({ eventKey: 'failed', narration: 'minimal' }),
+    ).toBe(true);
+
+    expect(
       shouldNarrateAgentEvent({ eventKey: 'tool:0', narration: 'conversational' }),
     ).toBe(false);
 
@@ -72,6 +76,7 @@ describe('kairo-narration-policy', () => {
     expect(mapMilestoneToSpeakEvent('tool:1')).toBe('tool');
     expect(mapMilestoneToSpeakEvent('edit:2')).toBe('edit');
     expect(mapMilestoneToSpeakEvent('done')).toBe('done');
+    expect(mapMilestoneToSpeakEvent('failed')).toBe('failed');
   });
 
   it('speaks live thinking once a sentence completes for minimal and conversational', () => {

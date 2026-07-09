@@ -52,8 +52,15 @@ def validate_browser_startup_contract(*, spec: dict[str, object] | None = None) 
         )
 
     readiness_endpoint = str(spec.get("readiness_endpoint", ""))
-    main_py = (REPO_ROOT / "services/control-plane/app/main.py").read_text(encoding="utf-8")
-    if readiness_endpoint not in main_py:
+    control_plane_sources = [
+        REPO_ROOT / "services/control-plane/app/main.py",
+        REPO_ROOT / "services/control-plane/app/routes/health.py",
+    ]
+    readiness_found = any(
+        path.is_file() and readiness_endpoint in path.read_text(encoding="utf-8")
+        for path in control_plane_sources
+    )
+    if not readiness_found:
         return CheckResult(
             name="desktop_and_browser_startup",
             status="fail",

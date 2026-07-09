@@ -73,6 +73,35 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertIn("report", start["line"].lower())
         self.assertIn("answer", done["line"].lower())
 
+    def test_failed_outcome_does_not_claim_all_set(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="failed",
+                context={
+                    "operator_prompt": "continue the dashpro work",
+                    "outcome": "failed",
+                    "failure_summary": (
+                        "Lane B (agent) cannot start because no CLI runtime is ready: "
+                        "ActionRequiredError: You're out of usage."
+                    ),
+                },
+                session_id="failed-outcome",
+            )
+            done_with_flag = generate_spoken_line(
+                event_type="done",
+                context={
+                    "operator_prompt": "continue the dashpro work",
+                    "outcome": "failed",
+                    "failure_summary": "Codex/OpenAI API key was rejected",
+                },
+                session_id="failed-outcome-done",
+            )
+        self.assertNotIn("all set", payload["line"].lower())
+        self.assertNotIn("review when", payload["line"].lower())
+        self.assertIn("couldn't start", payload["line"].lower())
+        self.assertNotIn("all set", done_with_flag["line"].lower())
+        self.assertIn("couldn't start", done_with_flag["line"].lower())
+
     def test_approval_literal_bypasses_runtime(self) -> None:
         with patch("app.kairo_voice._try_runtime_line", return_value="Model paraphrase."):
             payload = generate_spoken_line(

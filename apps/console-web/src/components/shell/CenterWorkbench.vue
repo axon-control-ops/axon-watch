@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import WorkbenchIcon from '../WorkbenchIcon.vue';
+import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
 import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import TerminalHost from '../TerminalHost.vue';
@@ -33,6 +34,7 @@ import {
 } from '../../lib/editor-tab-labels';
 import {
   buildEditorBreadcrumbTrail,
+  resolveEditorBreadcrumbFilePath,
   type EditorBreadcrumbSegment,
 } from '../../lib/editor-breadcrumb-view';
 import {
@@ -40,6 +42,7 @@ import {
   readEditorMinimapEnabled,
 } from '../../lib/editor-surface-prefs';
 import { terminalSessionTabLabel } from '../../lib/terminal-session-view';
+import { isAgentEditReviewDocumentId } from '../../lib/ide-agent-edit-review';
 
 const shell = useShellStore();
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
@@ -59,6 +62,7 @@ const terminalHeightCustomized = ref(false);
 const editorCursorLine = ref(1);
 const editorCursorColumn = ref(1);
 const editorMinimapEnabled = ref(readEditorMinimapEnabled());
+const editorTabsRef = ref<HTMLElement | null>(null);
 
 const problemItems = computed(() => {
   const items: string[] = [];
@@ -103,10 +107,14 @@ const editorBreadcrumbSegments = computed((): EditorBreadcrumbSegment[] => {
     });
   }
 
-  const filePath =
-    document.source === 'file' && document.filePath
-      ? document.filePath
-      : editorDocumentResourcePath(document);
+  const filePath = resolveEditorBreadcrumbFilePath({
+    source: document.source,
+    filePath: document.filePath,
+    id: document.id,
+    title: document.title,
+    value: activeEditorValue.value,
+    resourcePath: editorDocumentResourcePath(document),
+  });
 
   return buildEditorBreadcrumbTrail({
     workspaceId: workspace,
@@ -134,6 +142,9 @@ const editorLineCount = computed(() => {
 });
 const editorEol = computed(() => (activeEditorValue.value.includes('\r\n') ? 'CRLF' : 'LF'));
 const editorLanguageLabel = computed(() => {
+  if (isAgentEditReviewDocument.value) {
+    return 'Diff review';
+  }
   const language = shell.activeEditorDocument?.language ?? 'plaintext';
   const labels: Record<string, string> = {
     markdown: 'Markdown',
@@ -157,6 +168,9 @@ const editorAccessLabel = computed(() => {
 });
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
+);
+const isAgentEditReviewDocument = computed(() =>
+  isAgentEditReviewDocumentId(shell.activeEditorDocument?.id),
 );
 const editorPreviewEnabled = ref(false);
 
@@ -201,6 +215,20 @@ function setEditorPreviewMode(enabled: boolean): void {
   }
   editorPreviewEnabled.value = enabled;
   persistEditorMarkdownPreviewEnabled(documentId, enabled);
+}
+
+function handleEditorTabsWheel(event: WheelEvent): void {
+  const tabs = editorTabsRef.value;
+  if (!tabs) {
+    return;
+  }
+  const delta =
+    Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  if (delta === 0 || tabs.scrollWidth <= tabs.clientWidth) {
+    return;
+  }
+  event.preventDefault();
+  tabs.scrollLeft += delta;
 }
 
 const editorTabDocuments = computed(() =>
@@ -496,48 +524,100 @@ watch(
       v-if="!hideOperatorEditor"
       class="center-workbench__editor-stack center-workbench__editor-stack--surface"
     >
+      <header class="editor-chrome editor-chrome--mockup">
         <div class="editor-tabbar editor-tabbar--mockup">
-        <div class="editor-tabbar__tabs">
           <div
-            v-for="document in editorTabDocuments"
-            :key="document.id"
-            role="tab"
-            class="editor-tabbar__tab hud-active-chip hud-active-chip--tab"
-            :class="{
-              'editor-tabbar__tab--active hud-active-chip--active': shell.activeEditorDocumentId === document.id,
-              'editor-tabbar__tab--dirty': document.dirty,
-            }"
-            :aria-selected="shell.activeEditorDocumentId === document.id"
+            ref="editorTabsRef"
+            class="editor-tabbar__tabs"
+            role="tablist"
+            aria-label="Open editor tabs"
+            @wheel="handleEditorTabsWheel"
           >
+            <div
+              v-for="document in editorTabDocuments"
+              :key="document.id"
+              role="tab"
+              class="editor-tabbar__tab"
+              :class="{
+                'editor-tabbar__tab--active': shell.activeEditorDocumentId === document.id,
+                'editor-tabbar__tab--dirty': document.dirty,
+              }"
+              :aria-selected="shell.activeEditorDocumentId === document.id"
+            >
+              <button
+                type="button"
+                class="editor-tabbar__tab-select"
+                @click="shell.setActiveEditorDocument(document.id)"
+              >
+                <WorkbenchIcon name="file" class="editor-tabbar__file-icon" />
+                <span class="editor-tabbar__label">{{ editorTabLabel(document.id, document) }}</span>
+              </button>
+              <button
+                type="button"
+                class="editor-tabbar__close"
+                title="Close editor tab"
+                aria-label="Close editor tab"
+                @click="handleEditorTabClose($event, document.id)"
+              >
+                <WorkbenchIcon name="close" class="editor-tabbar__close-icon" />
+              </button>
+            </div>
+          </div>
+          <div class="editor-tabbar__tools" aria-label="Editor actions">
             <button
               type="button"
-              class="editor-tabbar__tab-select"
-              @click="shell.setActiveEditorDocument(document.id)"
+              class="editor-tabbar__tool-button"
+              title="New file"
+              aria-label="New file"
+              @click="shell.createWorkspaceFile()"
             >
-              <WorkbenchIcon name="file" />
-              <span class="editor-tabbar__label">{{ editorTabLabel(document.id, document) }}</span>
-              <span
-                v-if="document.dirty"
-                class="editor-tabbar__dirty-dot"
-                aria-label="Unsaved changes"
-                title="Unsaved changes"
-              />
+              <WorkbenchIcon name="new-file" class="editor-tabbar__tool" />
+            </button>
+            <button type="button" class="editor-tabbar__tool-button" title="Split editor" aria-label="Split editor">
+              <WorkbenchIcon name="split" class="editor-tabbar__tool" />
             </button>
             <button
               type="button"
-              class="editor-tabbar__close"
-              title="Close editor tab"
-              aria-label="Close editor tab"
-              @click="handleEditorTabClose($event, document.id)"
+              class="editor-tabbar__tool-button"
+              title="Rename active file"
+              aria-label="Rename active file"
+              :disabled="!shell.activeWorkspaceFilePath"
+              @click="shell.renameActiveWorkspaceFile()"
             >
-              <WorkbenchIcon name="close" class="editor-tabbar__close-icon" />
+              <WorkbenchIcon name="more" class="editor-tabbar__tool" />
             </button>
           </div>
         </div>
-        <div class="editor-tabbar__tools">
+
+        <nav class="editor-breadcrumb editor-breadcrumb--mockup" aria-label="Editor location">
+          <template v-for="(segment, index) in editorBreadcrumbSegments" :key="segment.id">
+            <span v-if="index > 0" class="editor-breadcrumb__sep" aria-hidden="true">›</span>
+            <button
+              type="button"
+              class="editor-breadcrumb__segment"
+              :class="{
+                'editor-breadcrumb__segment--symbol': segment.kind === 'symbol',
+                'editor-breadcrumb__segment--active': index === editorBreadcrumbSegments.length - 1,
+              }"
+              :disabled="!segment.revealLine"
+              @click="handleBreadcrumbSegmentClick(segment)"
+            >
+              <span>{{ segment.label }}</span>
+            </button>
+          </template>
+        </nav>
+      </header>
+
+      <section
+        class="center-workbench__editor"
+        :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }"
+      >
+        <div
+          v-if="isMarkdownEditorDocument && shell.activeEditorDocument"
+          class="editor-markdown-toolbar"
+        >
           <div
-            v-if="isMarkdownEditorDocument"
-            class="conversation-seam__markdown-mode-toggle editor-tabbar__markdown-toggle"
+            class="conversation-seam__markdown-mode-toggle editor-markdown-toolbar__toggle"
             role="group"
             aria-label="Editor markdown view mode"
           >
@@ -560,60 +640,14 @@ watch(
               Raw
             </button>
           </div>
-          <button
-            type="button"
-            class="editor-tabbar__tool-button"
-            title="New file"
-            aria-label="New file"
-            @click="shell.createWorkspaceFile()"
-          >
-            <WorkbenchIcon name="new-file" class="editor-tabbar__tool" />
-          </button>
-          <WorkbenchIcon name="split" class="editor-tabbar__tool" title="Split editor" />
-          <WorkbenchIcon name="book" class="editor-tabbar__tool" title="Open changes" />
-          <button
-            type="button"
-            class="editor-tabbar__tool-button"
-            title="Rename active file"
-            aria-label="Rename active file"
-            :disabled="!shell.activeWorkspaceFilePath"
-            @click="shell.renameActiveWorkspaceFile()"
-          >
-            <WorkbenchIcon name="more" class="editor-tabbar__tool" />
-          </button>
         </div>
-      </div>
-
-      <nav class="editor-breadcrumb editor-breadcrumb--mockup" aria-label="Editor location">
-        <template v-for="(segment, index) in editorBreadcrumbSegments" :key="segment.id">
-          <span v-if="index > 0" class="editor-breadcrumb__sep" aria-hidden="true">›</span>
-          <button
-            type="button"
-            class="editor-breadcrumb__segment"
-            :class="{
-              'editor-breadcrumb__segment--symbol': segment.kind === 'symbol',
-              'editor-breadcrumb__segment--active': index === editorBreadcrumbSegments.length - 1,
-            }"
-            :disabled="!segment.revealLine"
-            @click="handleBreadcrumbSegmentClick(segment)"
-          >
-            <WorkbenchIcon
-              v-if="segment.kind === 'file' || segment.kind === 'symbol'"
-              name="file"
-              :size="12"
-            />
-            <span>{{ segment.label }}</span>
-          </button>
-        </template>
-      </nav>
-
-      <section
-        class="center-workbench__editor"
-        :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }"
-      >
+        <AgentEditReviewViewer
+          v-if="shell.activeEditorDocument && isAgentEditReviewDocument"
+          :content="shell.activeEditorDocument.value"
+        />
         <EditorHost
-          v-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled)"
-          :key="shell.activeEditorDocument.id"
+          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled)"
+          :document-key="shell.activeEditorDocument.id"
           variant="mockup"
           :title="shell.activeEditorDocument.title"
           :value="shell.activeEditorDocument.value"
@@ -647,6 +681,7 @@ watch(
           </button>
           <div class="editor-statusbar__meta">
             <button
+              v-if="!isAgentEditReviewDocument"
               type="button"
               class="editor-statusbar__toggle"
               :class="{ 'editor-statusbar__toggle--active': editorMinimapEnabled }"

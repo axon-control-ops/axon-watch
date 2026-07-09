@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildEditorBreadcrumbTrail,
   buildEditorPathSegments,
+  formatEditorWorkspaceBreadcrumbLabel,
   parseMarkdownHeadingSymbols,
+  resolveEditorBreadcrumbFilePath,
   resolveMarkdownSymbolAtLine,
 } from './editor-breadcrumb-view';
 
@@ -11,12 +13,31 @@ describe('editor-breadcrumb-view', () => {
   it('splits file paths into workspace, folder, and file segments', () => {
     const segments = buildEditorPathSegments('workspace_smoke', 'apps/console-web/README.md');
     expect(segments.map((segment) => segment.label)).toEqual([
-      'workspace_smoke',
+      'smoke',
       'apps',
       'console-web',
       'README.md',
     ]);
     expect(segments.at(-1)?.kind).toBe('file');
+  });
+
+  it('shortens workspace breadcrumb labels', () => {
+    expect(formatEditorWorkspaceBreadcrumbLabel('workspace_axon_watch')).toBe('axon_watch');
+    expect(formatEditorWorkspaceBreadcrumbLabel('workspace-smoke')).toBe('smoke');
+  });
+
+  it('uses the real workspace path for agent edit review drafts', () => {
+    expect(
+      resolveEditorBreadcrumbFilePath({
+        source: 'draft',
+        filePath: 'apps/console-web/src/lib/ide-agent-edit-review.test.ts',
+        id: 'draft:agent-edit-review:apps-console-web-src-lib-ide-agent-edit-review.test.ts',
+        title: 'ide-agent-edit-review.test.ts · review',
+        value: '# Agent review · apps/console-web/src/lib/ide-agent-edit-review.test.ts\n',
+        resourcePath:
+          'agent-reports/agent-edit-review:apps-console-web-src-lib-ide-agent-edit-review.test.ts.md',
+      }),
+    ).toBe('apps/console-web/src/lib/ide-agent-edit-review.test.ts');
   });
 
   it('parses markdown headings for symbol breadcrumbs', () => {

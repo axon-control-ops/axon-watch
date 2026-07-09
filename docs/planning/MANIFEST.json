@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-07",
-  "file_count": 32,
+  "generated_on": "2026-07-09",
+  "file_count": 37,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -41,9 +41,13 @@
       "sha256": "8b5053cfaa554a7a650a7ceae4a1f7bcb01ef752d27a483ac88093b083e8975a",
       "bytes": 3278
     },
+    "EXECUTION_PLAN.md": {
+      "sha256": "5e3a557bf95fadbb4581832d779ed3a59a734960d94d9e98a75eae3dfa0deaed",
+      "bytes": 13557
+    },
     "FITNESS_FUNCTIONS.md": {
-      "sha256": "689eb3c0008eed8a20b297c7a6952211fb1046c6d0b0e38488be93c9a52ea50a",
-      "bytes": 5292
+      "sha256": "f688b05666210bf2d4fb5870adbd6f0e91e39ecfd8c2a7b4552d25e275af5e2f",
+      "bytes": 5594
     },
     "IMPLEMENTATION_ROADMAP.md": {
       "sha256": "04aa1e038da5cbde9cfaa0db19b146284b5bc6086a56a55de6fe2a20ff88567e",
@@ -54,12 +58,24 @@
       "bytes": 8038
     },
     "KAIRO_BRAIN_UI_ARCHITECTURE.md": {
-      "sha256": "948643a7376c7acf09688e53a6efde5a1f5de73514337ea321d1ff8e7d254841",
-      "bytes": 8225
+      "sha256": "23749051f39038334c00c0bdc799c17971fe2ed874e0225d7fdfa6a78587d994",
+      "bytes": 8503
+    },
+    "KAIRO_CONVERSATION_PLAN.md": {
+      "sha256": "12470d2e0dd5368c7f8757ee6762d7d180a2c9081820054fb56e006aa79c2638",
+      "bytes": 11123
     },
     "KAIRO_MODE.md": {
       "sha256": "bb4b5d187d5b91a9a9a4b8c419122a8f1080f96a73cc54df055ff53547c7e8a4",
       "bytes": 13053
+    },
+    "KAIRO_VOICE_IMPROVEMENT_PLAN.md": {
+      "sha256": "9ffb85b7027088f9e20e894bc311c05a5b4687af60429dc717e6b30cb0e70c36",
+      "bytes": 12077
+    },
+    "OPERATOR_BRAIN_PIVOT.md": {
+      "sha256": "111634fe98aebef4f4ac58e022c99d532adc93f9b5150093c186702c4cf4a18b",
+      "bytes": 17562
     },
     "OPERATOR_REFRESH_POLICY.md": {
       "sha256": "005fcb07f2ba778d3519ef7088abbfae4c5127b8305f57fed989bd77785ba7ae",
@@ -74,8 +90,8 @@
       "bytes": 3178
     },
     "README.md": {
-      "sha256": "d7fad07d09492e36994c61234e946d7791aa438f057cd531e6809859ba345843",
-      "bytes": 3286
+      "sha256": "94460d5f4563aa3af9c7641d8830689a2f3130f6d9e2db1906a3bf5ee7d513b7",
+      "bytes": 3688
     },
     "REPO_BOOTSTRAP_SPEC.md": {
       "sha256": "b8617bb75e4b9224f5a6970dc4c43daed46701bd9f7417bfde6b5cfcac5050c9",
@@ -84,6 +100,10 @@
     "SERVER_DEPLOYMENT_SPEC.md": {
       "sha256": "08076d29985abf962b6a84caf5d0440e9c92a424cd504d369c1c437f0353da4d",
       "bytes": 3240
+    },
+    "SLICE-FS-001-control-plane-api-split.md": {
+      "sha256": "89da802d3d29c5d141b853b62045e71a6907c0de044e552992ce047216391b64",
+      "bytes": 6018
     },
     "TEST_STRATEGY.md": {
       "sha256": "3f6d93a3076313249a031c1c4e8ddce1db5c6f7594f9974c64ec3369b9f1ef1f",

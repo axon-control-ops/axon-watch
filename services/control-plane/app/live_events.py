@@ -1,4 +1,4 @@
-"""SSE live-event stub for runtime refresh hints."""
+"""SSE live-event stream for runtime refresh hints and dev triggers."""
 
 from __future__ import annotations
 
@@ -9,8 +9,11 @@ from typing import Any
 
 from starlette.responses import StreamingResponse
 
+from app.live_event_hub import subscribe, unsubscribe
+
 REFRESH_INTERVAL_SECONDS = 10
 PRESENCE_REFRESH_INTERVAL_SECONDS = 5
+_TICK_SECONDS = 1
 
 
 def _format_sse(payload: dict[str, Any]) -> bytes:
@@ -18,15 +21,26 @@ def _format_sse(payload: dict[str, Any]) -> bytes:
 
 
 async def live_events_stream() -> AsyncIterator[bytes]:
-    yield _format_sse({"type": "connected"})
-    tick = 0
-    while True:
-        await asyncio.sleep(PRESENCE_REFRESH_INTERVAL_SECONDS)
-        tick += 1
-        yield _format_sse({"type": "presence_refresh"})
-        if tick * PRESENCE_REFRESH_INTERVAL_SECONDS >= REFRESH_INTERVAL_SECONDS:
-            tick = 0
-            yield _format_sse({"type": "runtime_refresh"})
+    queue = subscribe()
+    try:
+        yield _format_sse({"type": "connected"})
+        tick = 0
+        while True:
+            while True:
+                try:
+                    payload = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                yield _format_sse(payload)
+
+            await asyncio.sleep(_TICK_SECONDS)
+            tick += 1
+            if tick % PRESENCE_REFRESH_INTERVAL_SECONDS == 0:
+                yield _format_sse({"type": "presence_refresh"})
+            if tick % REFRESH_INTERVAL_SECONDS == 0:
+                yield _format_sse({"type": "runtime_refresh"})
+    finally:
+        unsubscribe(queue)
 
 
 def live_events_response() -> StreamingResponse:

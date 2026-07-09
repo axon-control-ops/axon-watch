@@ -42,6 +42,7 @@ tracked as a nightly or periodic gate until it can be tightened.
 | Delivery receipt completeness | Critical interruptive signals must produce at least one delivery receipt or explicit `delivery_failed` event | Contract/integration test on delivery lifecycle | CI gate |
 | Briefing API latency budget | `p95 <= 400ms` for operator briefing endpoint under normal load | Route timing test with seeded signals/runs/approvals | CI gate |
 | Privacy-mode gating correctness | Spoken alerts and interruptive delivery must be suppressed when privacy mode blocks them | Policy test matrix on presence + privacy settings | CI gate |
+| File-size ratchet | Ratcheted hotspots must not exceed `max_lines` in `scripts/guardrails/hotspot_budgets.json`; non-ratcheted source files must stay at or below hard limit | `python3 scripts/guardrails/check_file_sizes.py` on tracked py/js/ts/vue/css/html/md | CI gate (`verify:contracts`) | repo |
 
 ## Measurement Notes
 

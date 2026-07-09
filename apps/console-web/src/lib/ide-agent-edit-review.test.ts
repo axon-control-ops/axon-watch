@@ -4,6 +4,7 @@ import {
   agentEditReviewDocumentId,
   agentEditReviewDocumentTitle,
   formatAgentEditReviewContent,
+  isAgentEditReviewDocumentId,
   shouldOpenWorkspaceFileForEditReview,
 } from './ide-agent-edit-review';
 
@@ -12,6 +13,10 @@ describe('ide-agent-edit-review', () => {
     expect(agentEditReviewDocumentId('apps/console-web/src/lib/foo.ts')).toBe(
       'draft:agent-edit-review:apps-console-web-src-lib-foo.ts',
     );
+    expect(isAgentEditReviewDocumentId('draft:agent-edit-review:apps-console-web-src-lib-foo.ts')).toBe(
+      true,
+    );
+    expect(isAgentEditReviewDocumentId('draft:agent-other')).toBe(false);
   });
 
   it('formats review buffer content from transcript diffs', () => {

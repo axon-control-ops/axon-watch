@@ -1,0 +1,128 @@
+@media (max-width: 1280px) {
+  .console-shell--mockup {
+    --shell-gutter: 0.55rem;
+  }
+
+  .topbar-mockup__grid {
+    grid-template-columns:
+      minmax(18rem, 1.2fr)
+      minmax(120px, auto)
+      minmax(200px, 14rem)
+      auto;
+    gap: 0.45rem;
+  }
+
+  .topbar-mockup__identity-zone {
+    grid-template-columns: 10rem minmax(0, 1fr);
+  }
+
+  .topbar-mockup__runtime-chips .chip:nth-child(n + 4) {
+    display: none;
+  }
+
+  .console-shell--mockup[data-layout-mode='operator'],
+  .console-shell--mockup[data-layout-mode='ide'] {
+    grid-template-columns: 220px minmax(0, 1fr) 300px;
+  }
+
+  .dock-hero-panel__toggle-button {
+    padding: 0.28rem 0.55rem;
+    font-size: 0.58rem;
+  }
+
+  .briefing-panel--hero .briefing-panel__reactor {
+    transform: scale(0.88);
+    transform-origin: center center;
+  }
+}
+
+@media (max-width: 960px) {
+  .console-shell--mockup {
+    --topbar-height: 50px;
+    --statusbar-height: 34px;
+    --shell-gutter: 0.42rem;
+    min-width: 720px;
+    overflow-x: auto;
+  }
+
+  .console-shell--mockup[data-layout-mode='operator'],
+  .console-shell--mockup[data-layout-mode='ide'] {
+    grid-template-columns: 188px minmax(0, 1fr) 248px;
+  }
+
+  .topbar-mockup__subtitle,
+  .topbar-mockup__external {
+    display: none;
+  }
+
+  .topbar-mockup__grid {
+    grid-template-columns: minmax(14rem, 1fr) minmax(0, 1fr) auto;
+    padding: 0 0.55rem;
+  }
+
+  .topbar-mockup__identity-zone {
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+  }
+
+  .region-left-sidebar .workspace-card__detail,
+  .region-left-sidebar .workspace-card__meta-row:nth-child(n + 2) {
+    display: none;
+  }
+
+  .dock-stack--mockup .dock-hero-panel.hud-seam--hero {
+    min-height: var(--briefing-dock-height, 11.75rem);
+  }
+
+  .dock-hero-panel__attention-copy span {
+    display: none;
+  }
+
+  .status-bar-mockup__frame {
+    gap: 0.28rem;
+    padding: 0 0.45rem;
+  }
+
+  .status-bar-mockup__chip {
+    padding: 0.14rem 0.38rem;
+    font-size: 0.5rem;
+  }
+
+  .status-bar-mockup__chip-secondary {
+    display: none;
+  }
+
+  .status-bar-mockup__rail .status-bar-mockup__chip:nth-child(n + 3) {
+    display: none;
+  }
+
+  .operator-status-radar-panel__rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .briefing-panel__hero-body {
+    gap: 0.55rem;
+  }
+
+  .briefing-panel__section-label--hero,
+  .briefing-panel__kairo-subtitle,
+  .briefing-panel__kairo-advise {
+    font-size: 0.56rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kairo-presence-module__radar-arc,
+  .workspace-status-card__sweep,
+  .kairo-presence-module__waveform span:not(.kairo-presence-module__waveform-axis),
+  .dock-hero-panel--attention,
+  .dock-hero-panel__toggle-button--attention-high,
+  .dock-hero-panel__toggle-button--attention-warning,
+  .dock-hero-panel__attention-pulse,
+  .briefing-panel__avatar-ring--pulse,
+  .status-bar-mockup__kairo-cta,
+  .status-bar-mockup__kairo-cta-glow,
+  .status-bar-mockup__chip--kairo-briefing,
+  .status-bar-mockup__kairo-pulse {
+    animation: none;
+  }
+}

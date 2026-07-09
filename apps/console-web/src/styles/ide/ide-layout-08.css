@@ -1,0 +1,319 @@
+.agent-dock-composer__auto-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.42rem 0.55rem;
+  margin-bottom: 0.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.agent-dock-composer__auto-toggle strong {
+  display: block;
+  font-size: 0.74rem;
+  color: rgba(240, 244, 250, 0.95);
+}
+
+.agent-dock-composer__auto-toggle small {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.66rem;
+  color: rgba(180, 190, 205, 0.88);
+}
+
+.agent-dock-composer__model-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.agent-dock-composer__model-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 180, 255, 0.28);
+  background: rgba(80, 140, 220, 0.12);
+  color: rgba(170, 210, 255, 0.95);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__menu-item--add-models {
+  border-style: dashed;
+}
+
+.agent-dock-composer__menu-item--compact {
+  margin-top: -0.15rem;
+}
+
+.agent-dock-composer__model-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.agent-dock-composer__menu-back {
+  padding: 0.18rem 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(220, 228, 240, 0.88);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.agent-dock-composer__model-search {
+  flex: 1;
+  min-width: 0;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(240, 244, 250, 0.92);
+  font-size: 0.72rem;
+}
+
+.agent-dock-composer__menu-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.28rem 0.15rem;
+  color: rgba(220, 228, 240, 0.9);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.agent-dock-composer__menu-check small {
+  display: block;
+  margin-top: 0.12rem;
+  color: rgba(138, 154, 173, 0.88);
+}
+
+.agent-dock-composer__vault-action {
+  margin-top: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(56, 189, 248, 0.34);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.12);
+  color: rgba(224, 242, 254, 0.96);
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+.agent-dock-composer__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.agent-dock-composer__resume {
+  min-height: 1.85rem;
+  padding: 0 0.7rem;
+  border: 1px solid rgba(56, 189, 248, 0.34);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.12);
+  color: rgba(224, 242, 254, 0.96);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-dock-composer__resume:hover:not(:disabled) {
+  border-color: rgba(125, 211, 252, 0.5);
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.agent-dock-composer__resume:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agent-dock-composer__send {
+  display: inline-grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  min-width: 1.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(0, 245, 212, 0.96), rgba(0, 196, 167, 0.92));
+  color: rgba(2, 6, 23, 0.96);
+  box-shadow: 0 0 18px rgba(0, 245, 212, 0.22);
+  cursor: pointer;
+}
+
+.agent-dock-composer__send:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(0, 245, 212, 1), rgba(0, 196, 167, 0.98));
+}
+
+.agent-dock-composer__send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.agent-dock-composer__send--stop {
+  background: linear-gradient(180deg, rgba(255, 111, 111, 0.92), rgba(220, 70, 70, 0.92));
+  box-shadow: 0 0 14px rgba(255, 111, 111, 0.18);
+}
+
+.agent-dock-composer__send--stop:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 130, 130, 1), rgba(235, 85, 85, 0.98));
+}
+
+.agent-dock-composer__stop-icon {
+  display: block;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.agent-dock-composer__send-icon {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.agent-dock-composer__send-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid rgba(2, 6, 23, 0.2);
+  border-top-color: rgba(2, 6, 23, 0.9);
+  border-radius: 50%;
+  animation: agent-dock-composer-spin 0.8s linear infinite;
+}
+
+@keyframes agent-dock-composer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agent-dock-composer__approval-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(255, 196, 120, 0.35);
+  border-radius: 0.45rem;
+  background: rgba(255, 196, 120, 0.08);
+}
+
+.agent-dock-composer__approval-copy {
+  margin: 0;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: rgba(255, 220, 170, 0.95);
+}
+
+.agent-dock-composer__approval-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.agent-dock-composer__approval-btn {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(138, 154, 173, 0.22);
+  background: rgba(10, 14, 20, 0.72);
+  color: rgba(226, 236, 248, 0.92);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.agent-dock-composer__approval-btn--approve {
+  border-color: rgba(120, 220, 160, 0.45);
+  color: rgba(180, 255, 210, 0.95);
+}
+
+.agent-dock-composer__approval-btn--reject {
+  border-color: rgba(255, 140, 140, 0.35);
+  color: rgba(255, 190, 190, 0.92);
+}
+
+.agent-dock-composer__menu-item--full-access.is-active {
+  border-color: rgba(120, 220, 255, 0.45);
+}
+
+.agent-dock-composer__empty,
+.agent-dock-composer__error {
+  margin: 0;
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.agent-dock-composer__empty {
+  color: rgba(138, 154, 173, 0.88);
+}
+
+.agent-dock-composer__error {
+  color: #ffb4b4;
+}
+
+.agent-dock-reopen {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 100%;
+  border: 0;
+  border-left: 1px solid rgba(138, 154, 173, 0.14);
+  background: rgba(10, 14, 20, 0.94);
+  color: rgba(150, 231, 255, 0.96);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  writing-mode: vertical-rl;
+  cursor: pointer;
+}
+
+.console-shell--mockup[data-layout-mode='ide'] .conversation-seam__content--agent {
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.console-shell--mockup[data-layout-mode='ide'] .editor-markdown-toolbar {
+  padding-right: 0.85rem;
+}
+
+.console-shell--mockup[data-layout-mode='ide'] .center-workbench__editor--markdown-preview {
+  overflow: auto;
+}
+
+.console-shell--mockup[data-layout-mode='ide'] .editor-markdown-preview {
+  height: 100%;
+  overflow: auto;
+  padding: 1rem 1.15rem 1.25rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.agent-dock-composer__activity-chip {
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+  background: rgba(10, 14, 20, 0.72);
+  color: rgba(196, 210, 228, 0.92);
+  font-size: 0.56rem;
+  letter-spacing: 0.03em;
+  cursor: default;
+}
+
+.agent-dock-composer__activity-chip--terminal {
+  cursor: pointer;
+  border-color: rgba(150, 231, 255, 0.28);
+  color: rgba(180, 235, 255, 0.95);
+}
+

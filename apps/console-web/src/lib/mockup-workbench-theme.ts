@@ -11,6 +11,8 @@ export const MOCKUP_WORKBENCH_CHROME = '#031622';
 export const MOCKUP_MONACO_THEME_ID = 'axon-watch-mockup';
 
 const editorRules: Monaco.editor.ITokenThemeRule[] = [
+  { token: '', foreground: 'd8e8f4' },
+  { token: 'source', foreground: 'd8e8f4' },
   { token: 'comment', foreground: '5a7a94', fontStyle: 'italic' },
   { token: 'keyword', foreground: '00f2ff' },
   { token: 'string', foreground: 'e8f4fc' },

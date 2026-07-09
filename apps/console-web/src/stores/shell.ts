@@ -2157,6 +2157,10 @@ export const useShellStore = defineStore('shell', () => {
           if (narrationEnabled) {
             const done = narrationForCompletion(finalContent);
             const doneContext: Record<string, unknown> = { operator_prompt: operatorPrompt };
+            if (done.key === 'failed') {
+              doneContext.outcome = 'failed';
+              doneContext.failure_summary = finalContent.slice(0, 280);
+            }
             if (done.editCount) {
               doneContext.edit_count = done.editCount;
             }
@@ -4310,6 +4314,22 @@ export const useShellStore = defineStore('shell', () => {
 
   async function loadBootstrapData(): Promise<void> {
     await loadOperatorPresenceSettings();
+    // Select a workspace before the heavier runtime/fleet probes so the IDE
+    // explorer + terminal are not stuck on "No workspace selected" while a
+    // single-worker control-plane is busy with CLI auth probes.
+    await loadWorkspaces({ sync: false });
+    await loadRuns({ sync: false });
+    syncCurrentWorkspace(
+      operatorPinnedWorkspaceId.value ??
+        defaultOperatorWorkspaceId(workspaces.value),
+    );
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (workspaceId) {
+      await loadTerminalSessions(workspaceId);
+      void loadWorkspaceFiles();
+      syncIdeComposerDraftForWorkspace(workspaceId);
+    }
+
     await Promise.all([
       loadRuntimeStatus(),
       loadRuntimeSummary(),
@@ -4318,17 +4338,8 @@ export const useShellStore = defineStore('shell', () => {
       loadOperatorBriefing(),
       loadOperatorFleetHealth(),
     ]);
-    await loadWorkspaces({ sync: false });
-    await loadRuns({ sync: false });
-    syncCurrentWorkspace(
-      operatorPinnedWorkspaceId.value ??
-        defaultOperatorWorkspaceId(workspaces.value),
-    );
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
-    await loadWorkspaceFiles();
-    const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
-      syncIdeComposerDraftForWorkspace(workspaceId);
       await loadWorkspaceThread(workspaceId, 'operator');
       await hydrateWorkspaceIdeChat(workspaceId);
       if (layoutMode.value === 'operator') {

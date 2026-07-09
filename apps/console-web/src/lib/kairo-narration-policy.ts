@@ -25,7 +25,10 @@ export function shouldNarrateAgentEvent(input: {
   }
   // Bookends only — avoid narrating every tool/edit/thinking milestone.
   const isBookend =
-    input.eventKey === 'start' || input.eventKey === 'done' || input.eventKey.startsWith('alert');
+    input.eventKey === 'start' ||
+    input.eventKey === 'done' ||
+    input.eventKey === 'failed' ||
+    input.eventKey.startsWith('alert');
   if (input.narration === 'conversational') {
     return isBookend;
   }
@@ -58,6 +61,9 @@ export function mapMilestoneToSpeakEvent(milestoneKey: string): string {
   }
   if (milestoneKey === 'done') {
     return 'done';
+  }
+  if (milestoneKey === 'failed') {
+    return 'failed';
   }
   return 'thinking';
 }

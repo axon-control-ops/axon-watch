@@ -1,0 +1,319 @@
+.operator-status-radar-panel__presence-title {
+  color: rgba(0, 242, 255, 0.82);
+}
+
+.operator-status-radar-panel__presence-subtitle {
+  color: rgba(255, 201, 120, 0.88);
+}
+
+.operator-status-radar-panel__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(0, 242, 255, 0.07), rgba(0, 242, 255, 0.01)),
+    rgba(3, 12, 18, 0.78);
+  box-shadow: inset 0 1px 0 rgba(0, 242, 255, 0.08);
+  /* The stage may shrink (flex-shrink + min-height: 0); scroll instead of
+     letting guide/notice text bleed over the live execution feed below. */
+  overflow-y: auto;
+}
+
+.operator-status-radar-panel--attention .operator-status-radar-panel__stage,
+.operator-status-radar-panel--degraded .operator-status-radar-panel__stage {
+  border-color: rgba(255, 159, 0, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 159, 0, 0.08), rgba(255, 159, 0, 0.01)),
+    rgba(18, 10, 4, 0.78);
+}
+
+.operator-status-radar-panel__stage-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.operator-status-radar-panel__stage-identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.operator-status-radar-panel__phase-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.45rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  background: rgba(0, 242, 255, 0.08);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  color: rgba(0, 242, 255, 0.92);
+}
+
+.operator-status-radar-panel--attention .operator-status-radar-panel__phase-tag,
+.operator-status-radar-panel--degraded .operator-status-radar-panel__phase-tag {
+  border-color: rgba(255, 159, 0, 0.34);
+  background: rgba(255, 159, 0, 0.1);
+  color: rgba(255, 214, 140, 0.96);
+}
+
+.operator-status-radar-panel__run-id {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: rgba(232, 244, 252, 0.96);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operator-status-radar-panel__run-short-id {
+  margin-left: 0.35rem;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  color: rgba(127, 148, 168, 0.96);
+}
+
+.operator-status-radar-panel__run-queue {
+  margin-top: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(255, 159, 0, 0.18);
+  border-radius: 2px;
+  background: rgba(255, 159, 0, 0.04);
+}
+
+.operator-status-radar-panel__run-queue-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+  color: rgba(255, 214, 140, 0.92);
+}
+
+.operator-status-radar-panel__run-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.operator-status-radar-panel__run-queue-clear {
+  flex-shrink: 0;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid rgba(255, 159, 0, 0.35);
+  border-radius: 2px;
+  background: rgba(255, 159, 0, 0.08);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 214, 140, 0.95);
+  cursor: pointer;
+}
+
+.operator-status-radar-panel__run-queue-clear:hover:not(:disabled) {
+  background: rgba(255, 159, 0, 0.16);
+}
+
+.operator-status-radar-panel__run-queue-clear:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.operator-status-radar-panel__run-queue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: min(8rem, 18vh);
+  overflow: auto;
+}
+
+.operator-status-radar-panel__run-queue-more {
+  margin: 0.35rem 0 0;
+  font-size: 0.58rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.operator-status-radar-panel__run-queue-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: rgba(176, 198, 214, 0.92);
+}
+
+.operator-status-radar-panel__run-queue-item--primary {
+  color: rgba(150, 231, 255, 0.96);
+}
+
+.operator-status-radar-panel__run-queue-item span:last-child {
+  color: rgba(127, 148, 168, 0.9);
+}
+
+.operator-status-radar-panel__elapsed {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  color: rgba(0, 242, 255, 0.72);
+}
+
+.operator-status-radar-panel__progress {
+  position: relative;
+  height: 0.28rem;
+  border: 1px solid rgba(0, 242, 255, 0.16);
+  background: rgba(0, 8, 14, 0.72);
+}
+
+.operator-status-radar-panel__progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0, 242, 255, 0.35), rgba(0, 242, 255, 0.92));
+  transition: width 180ms ease;
+}
+
+.operator-status-radar-panel--attention .operator-status-radar-panel__progress-fill,
+.operator-status-radar-panel--degraded .operator-status-radar-panel__progress-fill {
+  background: linear-gradient(90deg, rgba(255, 159, 0, 0.35), rgba(255, 159, 0, 0.92));
+}
+
+.operator-status-radar-panel__stage-step {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(0.82rem, 1.35vw, 1.05rem);
+  line-height: 1.35;
+  font-weight: 600;
+  color: rgba(232, 244, 252, 0.98);
+}
+
+.operator-status-radar-panel__stage-summary {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.5;
+  color: rgba(176, 198, 214, 0.92);
+}
+
+.operator-status-radar-panel__stage-notice {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  line-height: 1.45;
+  color: rgba(255, 214, 140, 0.9);
+}
+
+.operator-status-radar-panel__guide {
+  margin-top: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  border-radius: 2px;
+  background: rgba(0, 242, 255, 0.04);
+}
+
+.operator-status-radar-panel__guide-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(150, 231, 255, 0.94);
+}
+
+.operator-status-radar-panel__guide-steps {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  line-height: 1.45;
+  color: rgba(176, 198, 214, 0.92);
+}
+
+.operator-status-radar-panel__guide-steps li + li {
+  margin-top: 0.25rem;
+}
+
+.operator-status-radar-panel__feed {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.42rem;
+  min-height: 5.5rem;
+  max-height: min(15rem, 34vh);
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(0, 242, 255, 0.1);
+  background: rgba(4, 12, 20, 0.56);
+}
+
+.operator-status-radar-panel__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.12em;
+  color: rgba(0, 242, 255, 0.58);
+  text-transform: uppercase;
+}
+
+.operator-status-radar-panel__feed-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+}
+
+.operator-status-radar-panel__feed-item {
+  display: grid;
+  grid-template-columns: 0.55rem minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: flex-start;
+  padding: 0.38rem 0.42rem;
+  border: 1px solid rgba(0, 242, 255, 0.08);
+  background: rgba(2, 10, 16, 0.52);
+}
+
+.operator-status-radar-panel__feed-marker {
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.18rem;
+  border-radius: 999px;
+  background: rgba(127, 148, 168, 0.72);
+}
+
+.operator-status-radar-panel__feed-item--active {
+  border-color: rgba(0, 242, 255, 0.24);
+  background: rgba(0, 242, 255, 0.05);
+}
+
+.operator-status-radar-panel__feed-item--active .operator-status-radar-panel__feed-marker {
+  background: rgba(0, 242, 255, 0.92);
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.35);
+}
+
+.operator-status-radar-panel__feed-item--pending {
+  border-color: rgba(255, 201, 120, 0.18);
+}
+
+.operator-status-radar-panel__feed-item--pending .operator-status-radar-panel__feed-marker {
+  background: rgba(255, 201, 120, 0.92);
+}
+

@@ -41,6 +41,8 @@ python3 scripts/ops/sync_planning_mirror_to_axon_local.py
 - `REPO_BOOTSTRAP_SPEC.md` — initial scaffold blueprint
 - `PARITY_LEDGER.md` — must-keep behaviors and verification status
 - `FITNESS_FUNCTIONS.md` — architecture guardrails and budgets
+- `SLICE-FS-001-control-plane-api-split.md` — first file-size extraction slice (`control-plane.ts` → domain API modules)
+- `scripts/guardrails/` — file-size ratchet checker (`npm run verify:file-sizes`)
 - `TRANSITION_ARCHITECTURE.md` — strangler seam and rollback model
 - `CONTRACT_TESTING_SPEC.md` — executable compatibility rules
 - `DELIVERY_PLAN.md` — reviewable slice sequencing

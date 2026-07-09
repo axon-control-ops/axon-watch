@@ -47,6 +47,15 @@ describe('editor-tab-labels', () => {
         description: 'draft',
         source: 'draft',
       },
+      {
+        id: 'draft:agent-edit-review:apps-console-web-src-lib-foo.ts',
+        title: 'foo.ts · review',
+        language: 'plaintext',
+        value: '# Agent review · apps/console-web/src/lib/foo.ts\n',
+        description: 'review',
+        source: 'draft',
+        filePath: 'apps/console-web/src/lib/foo.ts',
+      },
     ];
 
     const labels = editorTabLabelsForDocuments(documents);
@@ -54,9 +63,13 @@ describe('editor-tab-labels', () => {
     expect(labels.get('draft:agent-search-returned-no-results-abc123')).toBe(
       'Cursor vs EduDash Pro: Imag…',
     );
+    expect(labels.get('draft:agent-edit-review:apps-console-web-src-lib-foo.ts')).toBe(
+      'foo.ts · review',
+    );
     expect(editorDocumentResourcePath(documents[1])).toBe(
       'agent-reports/agent-search-returned-no-results-abc123.md',
     );
+    expect(editorDocumentResourcePath(documents[2])).toBe('apps/console-web/src/lib/foo.ts');
     expect(editorTabLabelForDocument(documents[1], labels)).toBe('Cursor vs EduDash Pro: Imag…');
   });
 

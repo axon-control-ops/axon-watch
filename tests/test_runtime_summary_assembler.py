@@ -68,7 +68,7 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
         self.assertTrue(payload["capabilities"]["watch_connected"])
 
     def test_assembler_populates_signals_from_watch_inbox(self) -> None:
-        watch_item = {
+        bootstrap_item = {
             "signal_id": "signal_watch_bootstrap_ready",
             "workspace_id": "workspace_bootstrap",
             "title": "Watch bootstrap ready",
@@ -79,12 +79,29 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
             "updated_at": "2026-07-03T16:00:00Z",
             "action_type": "open_dashboard",
         }
-        watch_inbox = {"items": [watch_item], "count": 1, "updated_at": "2026-07-03T16:00:00Z"}
+        watch_item = {
+            "signal_id": "signal_monitor_dashpro_storage",
+            "workspace_id": "workspace_dashpro",
+            "title": "DashPro storage probe failed",
+            "summary": "Child-project monitor reported a storage failure.",
+            "severity": "high",
+            "status": "open",
+            "source": "watch",
+            "updated_at": "2026-07-03T16:00:00Z",
+            "action_type": "open_dashboard",
+            "meta": {"signal_family": "child_project_monitor"},
+        }
+        watch_inbox = {
+            "items": [bootstrap_item, watch_item],
+            "count": 2,
+            "updated_at": "2026-07-03T16:00:00Z",
+        }
         payload = assemble_runtime_summary(
             watch_probe=_connected_probe,
             inbox_fetcher=lambda: watch_inbox,
         )
 
+        # Bootstrap noise is filtered; actionable monitor signals remain.
         self.assertEqual(1, payload["signals"]["open_count"])
         self.assertEqual(watch_item["signal_id"], payload["signals"]["top_items"][0]["signal_id"])
         self.assertEqual(watch_item["severity"], payload["signals"]["top_items"][0]["severity"])

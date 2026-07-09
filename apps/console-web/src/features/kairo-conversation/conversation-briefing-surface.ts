@@ -27,6 +27,9 @@ export function scheduleBriefingSurfaceOffer(now = Date.now()): void {
   briefingSurfaceOfferExpiresAt.value = now + BRIEFING_SURFACE_OFFER_WINDOW_MS;
 }
 
+export const BRIEFING_SURFACE_FOLLOWUP_HINT =
+  'Say yes or type open briefing to surface the written report.';
+
 export function clearBriefingSurfaceOffer(): void {
   briefingSurfaceOfferExpiresAt.value = null;
 }
