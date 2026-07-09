@@ -19,7 +19,7 @@ class CliRuntimeCatalogTests(unittest.TestCase):
     @patch("app.cli_runtime.catalog.fetch_runtime_context")
     @patch("app.cli_runtime.catalog.find_cursor_cli", return_value="/usr/bin/cursor")
     @patch("app.cli_runtime.catalog.find_codex_cli", return_value="/usr/bin/codex")
-    @patch("app.cli_runtime.catalog._run_command")
+    @patch("app.cli_runtime.auth_probes._run_command")
     def test_runtime_status_prefers_ready_cursor_local(
         self,
         mock_run,

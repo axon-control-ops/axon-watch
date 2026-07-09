@@ -56,6 +56,7 @@ const {
   handleSubmit,
   hasTerminalSnippet,
   inputRef,
+  setInputRef,
   isFullAccessAgent,
   kairoConversationError,
   kairoConversationReply,
@@ -107,10 +108,6 @@ const {
   toggleSection,
   toggleVoiceCapture,
 } = useAgentDockComposer();
-
-function setInputRef(el: HTMLTextAreaElement | null): void {
-  inputRef.value = el;
-}
 </script>
 
 <template>

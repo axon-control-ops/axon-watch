@@ -6,6 +6,7 @@ export type OperatorSignalCountItem = {
   status?: string | null;
   workspace_id?: string | null;
   severity?: string | null;
+  summary?: string | null;
 };
 
 export function isActionableOpenSignal(item: OperatorSignalCountItem): boolean {

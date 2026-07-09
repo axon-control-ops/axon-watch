@@ -559,6 +559,7 @@ export const useShellStore = defineStore('shell', () => {
   const ideActivityView = ref<IdeActivityView>('explorer');
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
   const ideAttentionPanelOpen = ref(false);
+  const ideBriefingPanelOpen = ref(false);
   const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
   const ideTerminalRevealToken = ref(0);
   const ideTerminalToggleToken = ref(0);
@@ -2611,6 +2612,7 @@ export const useShellStore = defineStore('shell', () => {
 
     if (layoutMode.value === 'ide') {
       ideAttentionPanelOpen.value = true;
+      ideBriefingPanelOpen.value = false;
       ideExplorerCollapsed.value = false;
       persistIdeExplorerCollapsed(false);
     } else {
@@ -2635,6 +2637,17 @@ export const useShellStore = defineStore('shell', () => {
   function closeIdeAttentionPanel(): void {
     ideAttentionPanelOpen.value = false;
     highlightedSignalId.value = null;
+  }
+
+  function closeIdeBriefingPanel(): void {
+    ideBriefingPanelOpen.value = false;
+  }
+
+  function openIdeBriefingPanel(): void {
+    ideBriefingPanelOpen.value = true;
+    ideAttentionPanelOpen.value = false;
+    ideExplorerCollapsed.value = false;
+    persistIdeExplorerCollapsed(false);
   }
 
   function toggleSignalDetails(signalId: string): void {
@@ -2672,11 +2685,17 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function focusKairoBriefing(): void {
-    setDockHeroMode('briefing');
+    if (layoutMode.value === 'ide') {
+      openIdeBriefingPanel();
+    } else {
+      setDockHeroMode('briefing');
+    }
     briefingSeamEmphasized.value = true;
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
-        document.getElementById('dock-seam-briefing')?.scrollIntoView({
+        const targetId =
+          layoutMode.value === 'ide' ? 'ide-briefing-panel' : 'dock-seam-briefing';
+        document.getElementById(targetId)?.scrollIntoView({
           behavior: 'smooth',
           block: 'nearest',
         });
@@ -2730,6 +2749,7 @@ export const useShellStore = defineStore('shell', () => {
     layoutMode.value = mode;
     persistLayoutMode(mode);
     ideAttentionPanelOpen.value = false;
+    ideBriefingPanelOpen.value = false;
     expandedDockSeams.value = new Set();
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
@@ -2762,6 +2782,7 @@ export const useShellStore = defineStore('shell', () => {
 
   function setIdeActivityView(view: IdeActivityView): void {
     ideAttentionPanelOpen.value = false;
+    ideBriefingPanelOpen.value = false;
     ideActivityView.value = view;
     if (view === 'explorer') {
       ideExplorerCollapsed.value = false;
@@ -4432,6 +4453,9 @@ export const useShellStore = defineStore('shell', () => {
     ideExplorerCollapsed,
     ideAttentionPanelOpen,
     closeIdeAttentionPanel,
+    ideBriefingPanelOpen,
+    closeIdeBriefingPanel,
+    openIdeBriefingPanel,
     ideTerminalRevealToken,
     ideTerminalToggleToken,
     layoutMode,

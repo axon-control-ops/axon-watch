@@ -46,7 +46,7 @@ apps/console-web/src/api/
   runs-api.ts            # /api/runs/*
   workspace-api.ts       # /api/workspaces/*, files, handoffs, terminal sessions
   chat-api.ts            # /api/chat/*, resolveChatAttachmentUrl
-  kairo-api.ts           # /api/kairo/*
+  # kairo-api.ts intentionally deferred — KAIRO clients remain in lib/kairo-*-client.ts
   connectors-api.ts      # /api/connectors, /api/tunnel/*, /api/watch/*
   live-events-api.ts     # /api/live/events (if not folded into operator-api)
   control-plane.ts       # re-export * from above + LEGACY_AXON_LOCAL_FALLBACK_URL
@@ -65,7 +65,7 @@ apps/console-web/src/api/
 | `runs-api.ts` | `fetchRuns`, `fetchRun`, history, create/complete/stop/resume/approve/reject |
 | `workspace-api.ts` | workspaces list/detail, files CRUD, handoffs, terminal sessions |
 | `chat-api.ts` | `postChatMessage`, threads, history, attachments, `resolveChatAttachmentUrl` |
-| `kairo-api.ts` | KAIRO speak/TTS/converse/voice-log endpoints |
+| *(deferred)* `kairo-api.ts` | Still in `lib/kairo-*-client.ts` — not part of this facade split |
 | `connectors-api.ts` | connectors, tunnel, watch commands |
 
 ## Implementation steps
@@ -124,7 +124,7 @@ Manual smoke on `:4173`:
 - Runtime status panel loads (runtime-api)
 - Vault unlock/import (vault-api)
 - IDE chat send + attachment preview (chat-api)
-- KAIRO converse health reply (kairo-api)
+- KAIRO converse health reply (`lib/kairo-converse-client.ts`)
 
 ## Rollback
 

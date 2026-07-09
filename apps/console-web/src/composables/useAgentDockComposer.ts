@@ -111,6 +111,11 @@ const {
   stopVoiceCapture,
 } = useKairoConversation();
 const inputRef = ref<HTMLTextAreaElement | null>(null);
+
+function setInputRef(el: HTMLTextAreaElement | null): void {
+  inputRef.value = el;
+}
+
 const composerMode = ref<ComposerMode>(
   (shell.runtimeSummary?.runtime_identity.mode_default as ComposerMode) || 'agent',
 );
@@ -1075,6 +1080,7 @@ return {
   handleSubmit,
   hasTerminalSnippet,
   inputRef,
+  setInputRef,
   isFullAccessAgent,
   kairoCanSubmit,
   kairoConversationError,

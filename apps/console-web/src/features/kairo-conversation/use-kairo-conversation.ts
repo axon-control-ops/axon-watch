@@ -205,6 +205,7 @@ export function useKairoConversation() {
         status: 'open',
         workspace_id: signal.workspace_id,
         severity: signal.severity,
+        summary: signal.summary,
       })),
     )[0];
   }
