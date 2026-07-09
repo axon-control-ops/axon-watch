@@ -4,6 +4,7 @@ import {
   effectiveKairoNarration,
   mapMilestoneToSpeakEvent,
   shouldNarrateAgentEvent,
+  shouldSpeakLiveThinkingBlock,
 } from './kairo-narration-policy';
 
 describe('kairo-narration-policy', () => {
@@ -71,5 +72,26 @@ describe('kairo-narration-policy', () => {
     expect(mapMilestoneToSpeakEvent('tool:1')).toBe('tool');
     expect(mapMilestoneToSpeakEvent('edit:2')).toBe('edit');
     expect(mapMilestoneToSpeakEvent('done')).toBe('done');
+  });
+
+  it('speaks live thinking only in minimal narration once a sentence completes', () => {
+    expect(
+      shouldSpeakLiveThinkingBlock({
+        narration: 'minimal',
+        spokenBlock: "I'm starting to analyze the rendering issues the user wants fixed.",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSpeakLiveThinkingBlock({
+        narration: 'conversational',
+        spokenBlock: "I'm starting to analyze the rendering issues the user wants fixed.",
+      }),
+    ).toBe(false);
+    expect(
+      shouldSpeakLiveThinkingBlock({
+        narration: 'minimal',
+        spokenBlock: 'They want table rendering to',
+      }),
+    ).toBe(false);
   });
 });

@@ -4,10 +4,14 @@ import {
   liveThinkingText,
   narrationForCompletion,
   narrationMilestonesForDelta,
+  resolveStreamingActivity,
   streamingActivityLabel,
 } from './kairo-agent-narration';
 
+const LONG_THINKING_BODY =
+  "I'm starting to analyze the rendering issues the user wants fixed. They want table rendering to work in markdown previews.";
 const STAGE_1 = ':::thinking\nChecking the file';
+const STAGE_1_LONG = `:::thinking\n${LONG_THINKING_BODY}`;
 const STAGE_2 = ':::thinking\nChecking the file.\n:::\n\n:::tool Read README.md\n';
 const STAGE_3 = `${STAGE_2}\n:::edit README.md +1 -0\n--- a\n+++ b\n+<!-- hi -->\n:::\nDONE`;
 
@@ -21,6 +25,19 @@ describe('liveThinkingText', () => {
 describe('streamingActivityLabel', () => {
   it('prefers live thinking text for KAIRO status', () => {
     expect(streamingActivityLabel(STAGE_1)).toBe('VAXON — Checking the file');
+  });
+});
+
+describe('resolveStreamingActivity', () => {
+  it('exposes full and spoken thinking bodies separately from display label', () => {
+    const view = resolveStreamingActivity(STAGE_1_LONG);
+    expect(view.label.startsWith('VAXON —')).toBe(true);
+    expect(view.label.endsWith('…')).toBe(true);
+    expect(view.liveBodyFull).toBe(LONG_THINKING_BODY);
+    expect(view.liveBodySpoken).toBe(
+      "I'm starting to analyze the rendering issues the user wants fixed.",
+    );
+    expect(view.liveBodyTruncated).toBe(true);
   });
 });
 

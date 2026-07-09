@@ -1,3 +1,10 @@
+import {
+  AGENT_LIVE_LINE_DISPLAY_MAX,
+  firstSpeakableAgentLiveBlock,
+  flattenLiveLineText,
+  isAgentLiveLineTruncated,
+  truncateAgentLiveLineForDisplay,
+} from './agent-live-line-view';
 import { personaThreadPrefix } from './operator-persona-name';
 
 /** X milestone narration for streaming agent turns.
@@ -31,27 +38,49 @@ export function liveThinkingText(content: string): string {
   return match?.[1]?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
+export type StreamingActivityView = {
+  label: string;
+  liveBodyFull: string | null;
+  liveBodySpoken: string | null;
+  liveBodyTruncated: boolean;
+};
+
 /** Status-strip label while the agent transcript streams. */
 export function streamingActivityLabel(content: string, fullAccess = false): string {
-  const thinking = liveThinkingText(content);
-  if (thinking) {
-    return personaThreadPrefix(truncate(thinking, 96));
-  }
-  const tools = matchAll(content, TOOL_RE);
-  if (tools.length > 0) {
-    return personaThreadPrefix(tools[tools.length - 1][1].trim());
-  }
-  if (fullAccess) {
-    return personaThreadPrefix('Full Access agent running…');
-  }
-  return personaThreadPrefix('Agent running…');
+  return resolveStreamingActivity(content, fullAccess).label;
 }
 
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
+export function resolveStreamingActivity(content: string, fullAccess = false): StreamingActivityView {
+  const thinking = liveThinkingText(content);
+  if (thinking) {
+    const flattened = flattenLiveLineText(thinking);
+    const displayBody = truncateAgentLiveLineForDisplay(flattened, AGENT_LIVE_LINE_DISPLAY_MAX);
+    return {
+      label: personaThreadPrefix(displayBody),
+      liveBodyFull: flattened,
+      liveBodySpoken: firstSpeakableAgentLiveBlock(flattened),
+      liveBodyTruncated: isAgentLiveLineTruncated(flattened, displayBody),
+    };
   }
-  return `${text.slice(0, maxLength - 1).trimEnd()}…`;
+
+  const tools = matchAll(content, TOOL_RE);
+  if (tools.length > 0) {
+    const toolLabel = tools[tools.length - 1][1].trim();
+    return {
+      label: personaThreadPrefix(toolLabel),
+      liveBodyFull: toolLabel,
+      liveBodySpoken: firstSpeakableAgentLiveBlock(toolLabel),
+      liveBodyTruncated: false,
+    };
+  }
+
+  const fallback = fullAccess ? 'Full Access agent running…' : 'Agent running…';
+  return {
+    label: personaThreadPrefix(fallback),
+    liveBodyFull: null,
+    liveBodySpoken: null,
+    liveBodyTruncated: false,
+  };
 }
 
 /** Milestones that newly appeared between the previous and current stream state. */

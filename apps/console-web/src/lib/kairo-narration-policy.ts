@@ -32,6 +32,16 @@ export function shouldNarrateAgentEvent(input: {
   return isBookend;
 }
 
+export function shouldSpeakLiveThinkingBlock(input: {
+  narration: KairoNarrationLevel;
+  spokenBlock: string;
+}): boolean {
+  if (input.narration !== 'minimal' || !input.spokenBlock.trim()) {
+    return false;
+  }
+  return /[.!?]$/.test(input.spokenBlock.trim());
+}
+
 export function mapMilestoneToSpeakEvent(milestoneKey: string): string {
   if (milestoneKey === 'start') {
     return 'agent_start';

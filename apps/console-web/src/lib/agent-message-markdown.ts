@@ -7,6 +7,17 @@ marked.setOptions({
   gfm: true,
 });
 
+marked.use({
+  hooks: {
+    postprocess(html) {
+      return html.replace(/<table>/g, '<div class="markdown-table-wrap"><table>').replace(
+        /<\/table>/g,
+        '</table></div>',
+      );
+    },
+  },
+});
+
 const MARKDOWN_HINT_PATTERN =
   /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|```|>\s|\|.+\|)|(\*\*|__|`[^`]+`|\[[^\]]+\]\([^)]+\))/;
 

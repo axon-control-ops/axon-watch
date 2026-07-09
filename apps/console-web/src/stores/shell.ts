@@ -84,12 +84,13 @@ import type { ResearchBlockKind } from '../lib/research-provider';
 import {
   narrationForCompletion,
   narrationMilestonesForDelta,
-  streamingActivityLabel,
+  resolveStreamingActivity,
 } from '../lib/kairo-agent-narration';
 import {
   effectiveKairoNarration,
   mapMilestoneToSpeakEvent,
   shouldNarrateAgentEvent,
+  shouldSpeakLiveThinkingBlock,
 } from '../lib/kairo-narration-policy';
 import { postKairoSpeak } from '../lib/kairo-speak-client';
 import type { EditorRevealRequest } from '../components/EditorHost.vue';
@@ -2054,6 +2055,7 @@ export const useShellStore = defineStore('shell', () => {
     const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
     const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
     let narratedContent = '';
+    let spokenLiveThinkingBlock = '';
     const voiceContext = kairoVoiceContext();
 
     if (narrationEnabled) {
@@ -2070,13 +2072,36 @@ export const useShellStore = defineStore('shell', () => {
         messageId,
         onDelta: (content) => {
           patchThreadMessageContent(workspaceId, messageId, content);
-          const activity = getWorkspaceStreamUi(workspaceId).activity;
+          const activity = getWorkspaceStreamUi(workspaceId).activity as IdeComposerActivity | null;
           if (activity) {
-            const nextActivity = {
+            const activityView = resolveStreamingActivity(content, fullAccessNarration);
+            const nextActivity: IdeComposerActivity = {
               ...activity,
-              label: streamingActivityLabel(content, fullAccessNarration),
+              label: activityView.label,
+              liveBodyFull: activityView.liveBodyFull,
+              liveBodySpoken: activityView.liveBodySpoken,
+              liveBodyTruncated: activityView.liveBodyTruncated,
             };
             setWorkspaceStreamUi(workspaceId, { activity: nextActivity });
+
+            const spokenBlock = activityView.liveBodySpoken?.trim() ?? '';
+            if (
+              narrationEnabled &&
+              spokenBlock &&
+              spokenBlock !== spokenLiveThinkingBlock &&
+              shouldSpeakLiveThinkingBlock({
+                narration: effectiveKairoNarrationLevel.value,
+                spokenBlock,
+              })
+            ) {
+              spokenLiveThinkingBlock = spokenBlock;
+              void deliverSpokenOperatorAlert({
+                eligible: true,
+                reason: 'kairo-agent-live-thinking',
+                signal_id: `${messageId}:thinking-spoken`,
+                message: spokenBlock,
+              });
+            }
           }
           if (!narrationEnabled) {
             return;

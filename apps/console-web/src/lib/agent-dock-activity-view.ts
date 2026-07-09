@@ -6,6 +6,11 @@ export type IdeComposerActivity = {
   executionAccess: AgentExecutionAccess;
   /** Operator message that started the current composer turn (for KAIRO narration). */
   operatorPrompt?: string;
+  /** Full streaming body behind a truncated live label (thinking/tool text). */
+  liveBodyFull?: string | null;
+  /** First complete sentence block for voice playback. */
+  liveBodySpoken?: string | null;
+  liveBodyTruncated?: boolean;
 };
 
 export function buildIdeComposerActivityLabel(

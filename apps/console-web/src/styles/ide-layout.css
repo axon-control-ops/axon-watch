@@ -1301,6 +1301,16 @@
   white-space: nowrap;
 }
 
+.agent-dock__transcript .conversation-seam__thread-status-label--expanded {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: unset;
+}
+
+.agent-dock__transcript .conversation-seam__thread-status-label--expanded .conversation-seam__thread-status-body {
+  white-space: pre-wrap;
+}
+
 .ide-agent-review-strip__bar {
   display: flex;
   align-items: center;
@@ -1847,6 +1857,8 @@
   justify-content: center;
   width: 1rem;
   height: 1rem;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
   background: rgba(8, 12, 18, 0.82);
   color: rgba(226, 232, 240, 0.94);
@@ -1854,11 +1866,78 @@
   line-height: 1;
   opacity: 0;
   transition: opacity 120ms ease;
+  cursor: pointer;
 }
 
 .agent-dock-composer__image-card:hover .agent-dock-composer__image-remove,
 .agent-dock-composer__image-card:focus-visible .agent-dock-composer__image-remove {
   opacity: 1;
+}
+
+.agent-dock-composer__image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right))
+    max(1.25rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+  background: rgba(4, 8, 14, 0.86);
+  backdrop-filter: blur(3px);
+}
+
+.agent-dock-composer__image-lightbox-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: min(96vw, 72rem);
+  max-height: min(92vh, 56rem);
+  margin: 0;
+}
+
+.agent-dock-composer__image-lightbox-img {
+  display: block;
+  max-width: 100%;
+  max-height: min(86vh, 52rem);
+  object-fit: contain;
+  border: 1px solid rgba(138, 154, 173, 0.28);
+  border-radius: 8px;
+  background: rgba(8, 12, 18, 0.92);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+
+.agent-dock-composer__image-lightbox-caption {
+  color: rgba(196, 210, 228, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.agent-dock-composer__image-lightbox-close {
+  position: absolute;
+  top: max(0.85rem, env(safe-area-inset-top));
+  right: max(0.85rem, env(safe-area-inset-right));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid rgba(138, 154, 173, 0.28);
+  border-radius: 999px;
+  background: rgba(10, 14, 20, 0.88);
+  color: rgba(226, 232, 240, 0.96);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-dock-composer__image-lightbox-close:hover {
+  border-color: rgba(0, 242, 255, 0.42);
+  color: rgba(0, 242, 255, 0.96);
 }
 
 .agent-dock-composer__input-row {

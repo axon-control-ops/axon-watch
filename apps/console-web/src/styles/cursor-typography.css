@@ -61,6 +61,54 @@
   font-size: var(--font-size-meta);
 }
 
+/* ── Markdown tables (Cursor-style) ─────────────────────────────── */
+
+.console-shell--mockup .conversation-seam__content--markdown .markdown-table-wrap,
+.console-shell--mockup .editor-markdown-preview .markdown-table-wrap {
+  margin: 0.65rem 0;
+  overflow-x: auto;
+  border: 1px solid rgba(138, 154, 173, 0.22);
+  border-radius: 6px;
+  background: rgba(8, 12, 18, 0.55);
+}
+
+.console-shell--mockup .conversation-seam__content--markdown table,
+.console-shell--mockup .editor-markdown-preview table {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: collapse;
+  font-size: var(--font-size-meta);
+  line-height: var(--leading-prose);
+}
+
+.console-shell--mockup .conversation-seam__content--markdown th,
+.console-shell--mockup .conversation-seam__content--markdown td,
+.console-shell--mockup .editor-markdown-preview th,
+.console-shell--mockup .editor-markdown-preview td {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(138, 154, 173, 0.16);
+  text-align: left;
+  vertical-align: top;
+}
+
+.console-shell--mockup .conversation-seam__content--markdown th,
+.console-shell--mockup .editor-markdown-preview th {
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.96);
+  background: rgba(18, 24, 34, 0.92);
+}
+
+.console-shell--mockup .conversation-seam__content--markdown td,
+.console-shell--mockup .editor-markdown-preview td {
+  color: rgba(196, 210, 228, 0.94);
+  background: rgba(10, 14, 20, 0.72);
+}
+
+.console-shell--mockup .conversation-seam__content--markdown tbody tr:nth-child(even) td,
+.console-shell--mockup .editor-markdown-preview tbody tr:nth-child(even) td {
+  background: rgba(12, 16, 24, 0.82);
+}
+
 .console-shell--mockup .conversation-seam__preamble,
 .console-shell--mockup .conversation-seam__postamble {
   font-size: var(--font-size-meta);

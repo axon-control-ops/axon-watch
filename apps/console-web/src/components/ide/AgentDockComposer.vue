@@ -38,12 +38,19 @@ import { CURSOR_PICKER_COMPOSER_IDS, CURSOR_PICKER_DEFAULT_MODEL } from '../../l
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import {
   type ComposerClipboardImage,
+  composerImageFromStored,
   readClipboardImages,
   readDroppedImages,
   revokeComposerClipboardImages,
+  revokeComposerClipboardImagePreview,
   shouldAcceptComposerFileDrop,
   shouldInterceptComposerImagePaste,
+  storedComposerImageFromClipboard,
 } from '../../lib/composer-clipboard-paste';
+import {
+  persistComposerAttachments,
+  readStoredComposerAttachments,
+} from '../../lib/ide-composer-attachment-prefs';
 import { shouldSteerAgentDockComposer, shouldSubmitAgentDockComposer } from '../../lib/agent-dock-composer-input';
 import {
   resolveActiveIdeAgentMessage,
@@ -126,6 +133,9 @@ const composerHistoryIndex = ref(-1);
 const composerHistoryScratch = ref('');
 const applyingHistoryDraft = ref(false);
 const composerImages = ref<ComposerClipboardImage[]>([]);
+const composerImagesWorkspaceId = ref<string | null>(null);
+const composerImagesPersistTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+const enlargedComposerImage = ref<ComposerClipboardImage | null>(null);
 const composerDragOver = ref(false);
 
 const activeMode = computed(
@@ -732,8 +742,7 @@ async function handleSteer(event?: Event): Promise<void> {
 
 function recordComposerHistoryIfSent(draft: string): void {
   if (composerImages.value.length) {
-    revokeComposerClipboardImages(composerImages.value);
-    composerImages.value = [];
+    clearComposerImages();
   }
   if (draft && !shell.ideComposerDraft.trim() && shell.commandMutationState === 'idle') {
     composerHistory.value = recordAgentComposerHistoryEntry(composerHistory.value, draft);
@@ -754,11 +763,77 @@ function handleResumeRun(): void {
   void shell.resumeIdeAgentRun();
 }
 
+function clearComposerImages(options: { revokePreviews?: boolean } = {}): void {
+  if (options.revokePreviews !== false) {
+    revokeComposerClipboardImages(composerImages.value);
+  }
+  composerImages.value = [];
+  schedulePersistComposerImages();
+}
+
+function schedulePersistComposerImages(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (composerImagesPersistTimer.value) {
+    clearTimeout(composerImagesPersistTimer.value);
+  }
+  composerImagesPersistTimer.value = setTimeout(() => {
+    composerImagesPersistTimer.value = null;
+    void persistCurrentComposerImages();
+  }, 180);
+}
+
+async function persistCurrentComposerImages(): Promise<void> {
+  const workspaceId = composerImagesWorkspaceId.value;
+  if (!workspaceId) {
+    return;
+  }
+  if (!composerImages.value.length) {
+    persistComposerAttachments(workspaceId, []);
+    return;
+  }
+
+  const stored = await Promise.all(
+    composerImages.value.map((image) => storedComposerImageFromClipboard(image)),
+  );
+  persistComposerAttachments(workspaceId, stored);
+}
+
+function loadComposerImagesForWorkspace(workspaceId: string | null | undefined): void {
+  const nextWorkspaceId = workspaceId?.trim() || null;
+  if (composerImagesWorkspaceId.value === nextWorkspaceId) {
+    return;
+  }
+
+  revokeComposerClipboardImages(composerImages.value);
+  composerImagesWorkspaceId.value = nextWorkspaceId;
+  enlargedComposerImage.value = null;
+  composerImages.value = nextWorkspaceId
+    ? readStoredComposerAttachments(nextWorkspaceId).map(composerImageFromStored)
+    : [];
+}
+
+function openComposerImage(image: ComposerClipboardImage): void {
+  enlargedComposerImage.value = image;
+}
+
+function closeComposerImageLightbox(): void {
+  enlargedComposerImage.value = null;
+}
+
+function handleComposerImageLightboxKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    closeComposerImageLightbox();
+  }
+}
+
 function addComposerImages(images: ComposerClipboardImage[]): void {
   if (!images.length) {
     return;
   }
   composerImages.value = [...composerImages.value, ...images];
+  schedulePersistComposerImages();
 }
 
 function handleComposerPaste(event: ClipboardEvent): void {
@@ -803,9 +878,13 @@ function handleComposerDrop(event: DragEvent): void {
 function removeComposerImage(imageId: string): void {
   const removed = composerImages.value.find((image) => image.id === imageId);
   if (removed) {
-    URL.revokeObjectURL(removed.previewUrl);
+    revokeComposerClipboardImagePreview(removed);
+    if (enlargedComposerImage.value?.id === imageId) {
+      enlargedComposerImage.value = null;
+    }
   }
   composerImages.value = composerImages.value.filter((image) => image.id !== imageId);
+  schedulePersistComposerImages();
 }
 
 function handleComposerKeydown(event: KeyboardEvent): void {
@@ -899,6 +978,7 @@ watch(
   () => shell.currentWorkspace?.workspace_id ?? null,
   (workspaceId) => {
     loadComposerHistoryForWorkspace(workspaceId);
+    loadComposerImagesForWorkspace(workspaceId);
   },
   { immediate: true },
 );
@@ -921,6 +1001,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick);
+  if (composerImagesPersistTimer.value) {
+    clearTimeout(composerImagesPersistTimer.value);
+    composerImagesPersistTimer.value = null;
+  }
+  void persistCurrentComposerImages();
   revokeComposerClipboardImages(composerImages.value);
 });
 </script>
@@ -964,6 +1049,38 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
+    </div>
+  </Teleport>
+
+  <Teleport to="body">
+    <div
+      v-if="enlargedComposerImage"
+      class="agent-dock-composer__image-lightbox"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="`Preview ${enlargedComposerImage.name}`"
+      tabindex="-1"
+      @click.self="closeComposerImageLightbox"
+      @keydown="handleComposerImageLightboxKeydown"
+    >
+      <figure class="agent-dock-composer__image-lightbox-body">
+        <img
+          class="agent-dock-composer__image-lightbox-img"
+          :src="enlargedComposerImage.previewUrl"
+          :alt="enlargedComposerImage.name"
+        >
+        <figcaption class="agent-dock-composer__image-lightbox-caption">
+          {{ enlargedComposerImage.name }}
+        </figcaption>
+      </figure>
+      <button
+        type="button"
+        class="agent-dock-composer__image-lightbox-close"
+        aria-label="Close image preview"
+        @click="closeComposerImageLightbox"
+      >
+        ×
+      </button>
     </div>
   </Teleport>
 
@@ -1035,15 +1152,22 @@ onUnmounted(() => {
             :key="image.id"
             type="button"
             class="agent-dock-composer__image-card"
-            :title="`Remove ${image.name}`"
-            @click="removeComposerImage(image.id)"
+            :title="`Open ${image.name}`"
+            @click="openComposerImage(image)"
           >
             <img
               class="agent-dock-composer__image-preview"
               :src="image.previewUrl"
               :alt="image.name"
             >
-            <span class="agent-dock-composer__image-remove" aria-hidden="true">×</span>
+            <button
+              type="button"
+              class="agent-dock-composer__image-remove"
+              :aria-label="`Remove ${image.name}`"
+              @click.stop="removeComposerImage(image.id)"
+            >
+              ×
+            </button>
           </button>
         </div>
 

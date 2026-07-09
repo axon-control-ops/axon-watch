@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import KairoChip from '../KairoChip.vue';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
+import AgentLiveLineHeadline from './AgentLiveLineHeadline.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import {
   briefingAdvise,
@@ -19,12 +20,9 @@ const showExpandedPanel = computed(() =>
   ideShowKairoSidebarExpanded(shell.idePresenceProfile),
 );
 
-const headline = computed(() => {
-  if (shell.kairoAgentLiveLine) {
-    return shell.kairoAgentLiveLine.replace(/^KAIRO —\s*/, '');
-  }
-  return briefingPanelHeadline(shell.operatorBriefing, shell.briefingLoadState);
-});
+const briefingHeadline = computed(() =>
+  briefingPanelHeadline(shell.operatorBriefing, shell.briefingLoadState),
+);
 const notice = computed(() => {
   if (shell.kairoAgentLiveLine) {
     return 'Streaming agent activity — thinking, tools, and edits appear here as they land.';
@@ -64,7 +62,11 @@ const signalBadge = computed(
           {{ kairoPresenceLabel(shell.kairoPresenceState) }}
         </span>
       </div>
-      <p class="ide-kairo-footer__interrupt-headline">{{ headline }}</p>
+      <AgentLiveLineHeadline
+        class="ide-kairo-footer__interrupt-headline"
+        :activity="shell.ideComposerActivity"
+        :fallback="briefingHeadline"
+      />
       <p v-if="notice" class="ide-kairo-footer__interrupt-copy">{{ notice }}</p>
       <p v-if="advise" class="ide-kairo-footer__interrupt-copy">{{ advise }}</p>
       <div v-if="approvalBadge || signalBadge" class="ide-kairo-footer__badges">

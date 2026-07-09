@@ -24,6 +24,13 @@ describe('agent-message-markdown', () => {
     expect(html).toContain('<strong>Health</strong>');
   });
 
+  it('wraps markdown tables for Cursor-style scrolling', () => {
+    const html = renderAgentMessageMarkdown('| Slot | Behavior |\n| --- | --- |\n| Top | Yes |');
+    expect(html).toContain('markdown-table-wrap');
+    expect(html).toContain('<table>');
+    expect(html).toContain('<th>Slot</th>');
+  });
+
   it('extracts read_file fenced markdown from agent execution wrapper', () => {
     const content = [
       'Executed `read_file` (ok) for run run_abc.',

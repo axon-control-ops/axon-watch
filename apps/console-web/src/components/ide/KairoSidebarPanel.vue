@@ -10,6 +10,7 @@ import { kairoPresenceLabel } from '../../lib/kairo-presence';
 import { ideShowKairoSidebarExpanded } from '../../lib/ide-presence-profile';
 import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
+import AgentLiveLineHeadline from './AgentLiveLineHeadline.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 
 const shell = useShellStore();
@@ -18,12 +19,9 @@ const showExpandedPanel = computed(() =>
   ideShowKairoSidebarExpanded(shell.idePresenceProfile),
 );
 
-const headline = computed(() => {
-  if (shell.kairoAgentLiveLine) {
-    return shell.kairoAgentLiveLine.replace(/^KAIRO —\s*/, '');
-  }
-  return briefingPanelHeadline(shell.operatorBriefing, shell.briefingLoadState);
-});
+const briefingHeadline = computed(() =>
+  briefingPanelHeadline(shell.operatorBriefing, shell.briefingLoadState),
+);
 const notice = computed(() => {
   if (shell.kairoAgentLiveLine) {
     return 'Streaming agent activity — thinking, tools, and edits appear here as they land.';
@@ -87,7 +85,11 @@ function handleStopSpeech(event: Event): void {
       </div>
       <div class="kairo-sidebar-panel__copy">
         <p class="kairo-sidebar-panel__state">{{ kairoPresenceLabel(shell.kairoPresenceState) }}</p>
-        <p class="kairo-sidebar-panel__headline">{{ headline }}</p>
+        <AgentLiveLineHeadline
+          class="kairo-sidebar-panel__headline"
+          :activity="shell.ideComposerActivity"
+          :fallback="briefingHeadline"
+        />
         <p v-if="shell.briefingSummaryLine" class="kairo-sidebar-panel__summary">
           {{ shell.briefingSummaryLine }}
         </p>
