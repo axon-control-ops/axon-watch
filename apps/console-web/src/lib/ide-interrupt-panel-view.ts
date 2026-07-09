@@ -127,6 +127,42 @@ export function resolveIdeInterruptStopTarget(input: {
   return 'primary';
 }
 
+export function truncateInterruptLabel(text: string, maxLength = 72): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, maxLength - 1)}…`;
+}
+
+export function resolveIdeInterruptCompactLabel(
+  headline: string,
+  detailLine: string,
+  maxLength = 72,
+): string {
+  const primary = headline.trim();
+  const detail = detailLine.trim();
+  const genericDetail = 'Open Attention to review signals, approvals, or run state.';
+
+  if (!detail || detail === primary || detail === genericDetail) {
+    return truncateInterruptLabel(primary, maxLength);
+  }
+
+  return truncateInterruptLabel(`${primary} · ${detail}`, maxLength);
+}
+
+export function resolveIdeInterruptTooltip(headline: string, detailLine: string): string {
+  const primary = headline.trim();
+  const detail = detailLine.trim();
+
+  if (!detail || detail === primary) {
+    return primary;
+  }
+
+  return `${primary}\n${detail}`;
+}
+
 export function isIdeInterruptStopDisabled(input: {
   runMutationStopping: boolean;
   canStopIdeAgentRun: boolean;

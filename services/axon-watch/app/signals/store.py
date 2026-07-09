@@ -11,7 +11,10 @@ from app.signals.iso_time import utc_now_iso
 from app.signals.ranking import rank_inbox_items
 from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.signals.summary_degraded_signal import summary_degraded_inbox_item
-from app.signals.suppression_store import is_signal_acknowledged
+from app.signals.suppression_store import (
+    is_signal_acknowledged,
+    release_resolved_monitor_acknowledgements,
+)
 from app.signals.watch_rule import watch_rule_for_inbox_item
 
 
@@ -24,7 +27,9 @@ def get_inbox_snapshot(
         items.append(summary_degraded_inbox_item())
     if connector_records is not None:
         items.extend(connector_inbox_items(connector_records))
-    items.extend(monitor_inbox_items(probe_monitor_records()))
+    monitor_records = probe_monitor_records()
+    release_resolved_monitor_acknowledgements(monitor_records)
+    items.extend(monitor_inbox_items(monitor_records))
 
     ranked = rank_inbox_items(items)
     delivered = enrich_inbox_with_delivery(ranked)

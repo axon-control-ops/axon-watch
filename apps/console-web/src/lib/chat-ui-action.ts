@@ -100,7 +100,7 @@ export interface WorkspaceSwitchShell {
     task: string;
     title: string;
     summary: string;
-  }) => Promise<void>;
+  }, options?: { autoSubmit?: boolean }) => Promise<void>;
   surfaceOperatorArtifact?: (artifactId: string) => void;
 }
 
@@ -130,7 +130,7 @@ export function applyChatUiAction(
       task: action.task,
       title: action.task,
       summary: action.task,
-    });
+    }, { autoSubmit: true });
     return;
   }
 

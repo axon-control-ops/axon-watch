@@ -56,6 +56,11 @@ import {
   type OperatorCenterView,
 } from '../lib/operator-brain-graph-view';
 import { resolveSignalHandoff, type SignalHandoffInput } from '../lib/signal-handoff-view';
+import {
+  canVerifyDismissHandoffSignal,
+  readPendingHandoffDismissSignalId,
+  writePendingHandoffDismissSignalId,
+} from '../lib/signal-handoff-dismiss';
 import type { RuntimeStatusSnapshot } from '../api/control-plane';
 import type {
   ApprovalRecord,
@@ -167,6 +172,10 @@ import {
   shouldSyncWorkspaceStreamGlobals,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
+import {
+  resolveAttentionFocusScrollTarget,
+  resolveDefaultHighlightedSignalId,
+} from '../lib/ide-attention-focus';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
   readViewportWidth,
@@ -441,6 +450,7 @@ export const useShellStore = defineStore('shell', () => {
   const handoffMutationState = ref<'idle' | 'submitting' | 'error'>('idle');
   const handoffMutationError = ref<string | null>(null);
   const lastDiscussedSignal = ref<SignalHandoffInput | null>(null);
+  const pendingHandoffDismissSignalId = ref<string | null>(readPendingHandoffDismissSignalId());
   const runHistorySnapshot = ref<RunHistorySnapshot | null>(null);
   const runHistoryLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const approvals = ref<ApprovalRecord[]>([]);
@@ -543,6 +553,7 @@ export const useShellStore = defineStore('shell', () => {
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
   const ideActivityView = ref<IdeActivityView>('explorer');
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
+  const ideAttentionPanelOpen = ref(false);
   const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
   const ideTerminalRevealToken = ref(0);
   const ideTerminalToggleToken = ref(0);
@@ -1579,7 +1590,10 @@ export const useShellStore = defineStore('shell', () => {
     await submitOperatorCommand();
   }
 
-  async function handoffSignalToIde(signal: SignalHandoffInput): Promise<void> {
+  async function handoffSignalToIde(
+    signal: SignalHandoffInput,
+    options: { autoSubmit?: boolean } = {},
+  ): Promise<void> {
     handoffMutationState.value = 'submitting';
     handoffMutationError.value = null;
     lastDiscussedSignal.value = signal;
@@ -1607,8 +1621,14 @@ export const useShellStore = defineStore('shell', () => {
         });
       }
       setCurrentWorkspace(resolved.targetWorkspaceId);
-      ideComposerDraft.value = resolved.task;
       setLayoutMode('ide');
+      ideComposerDraft.value = resolved.task;
+      await hydrateWorkspaceIdeChat(resolved.targetWorkspaceId);
+      if (options.autoSubmit) {
+        await submitIdeComposer('agent');
+      }
+      pendingHandoffDismissSignalId.value = resolved.reason;
+      writePendingHandoffDismissSignalId(resolved.reason);
       handoffMutationState.value = 'idle';
     } catch (error) {
       handoffMutationState.value = 'error';
@@ -2527,21 +2547,22 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function focusAttentionSidebar(signalId?: string | null): void {
-    setLeftSidebarMode('attention');
-    if (signalId) {
-      highlightedSignalId.value = signalId;
+    const topSignals = operatorBriefing.value?.top_signals ?? [];
+    highlightedSignalId.value = resolveDefaultHighlightedSignalId(topSignals, signalId);
+
+    if (layoutMode.value === 'ide') {
+      ideAttentionPanelOpen.value = true;
+      ideExplorerCollapsed.value = false;
+      persistIdeExplorerCollapsed(false);
     } else {
-      const signals = operatorBriefing.value?.top_signals ?? [];
-      const bootstrap = signals.find((signal) =>
-        isBootstrapSummarySignal(signal.signal_id, signal.title),
-      );
-      highlightedSignalId.value =
-        bootstrap?.signal_id ?? (signals.length === 1 ? signals[0]?.signal_id ?? null : null);
+      setLeftSidebarMode('attention');
     }
+
     signalsSeamEmphasized.value = true;
     if (typeof window !== 'undefined') {
+      const scrollTargetId = resolveAttentionFocusScrollTarget(layoutMode.value);
       window.requestAnimationFrame(() => {
-        document.getElementById('dock-seam-signals')?.scrollIntoView({
+        document.getElementById(scrollTargetId)?.scrollIntoView({
           behavior: 'smooth',
           block: 'nearest',
         });
@@ -2550,6 +2571,11 @@ export const useShellStore = defineStore('shell', () => {
         }, 1200);
       });
     }
+  }
+
+  function closeIdeAttentionPanel(): void {
+    ideAttentionPanelOpen.value = false;
+    highlightedSignalId.value = null;
   }
 
   function toggleSignalDetails(signalId: string): void {
@@ -2644,6 +2670,7 @@ export const useShellStore = defineStore('shell', () => {
   function setLayoutMode(mode: LayoutMode): void {
     layoutMode.value = mode;
     persistLayoutMode(mode);
+    ideAttentionPanelOpen.value = false;
     expandedDockSeams.value = new Set();
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
@@ -2675,6 +2702,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function setIdeActivityView(view: IdeActivityView): void {
+    ideAttentionPanelOpen.value = false;
     ideActivityView.value = view;
     if (view === 'explorer') {
       ideExplorerCollapsed.value = false;
@@ -3899,6 +3927,7 @@ export const useShellStore = defineStore('shell', () => {
         await completeRun(run.run_id);
       }
       await refreshRunSurfaces();
+      await dismissLinkedHandoffSignalAfterRunComplete();
       afterRunLifecycleMutation();
     } catch (error) {
       runMutationError.value =
@@ -4061,6 +4090,7 @@ export const useShellStore = defineStore('shell', () => {
     try {
       await completeRun(run.run_id);
       await refreshRunSurfaces();
+      await dismissLinkedHandoffSignalAfterRunComplete();
       afterRunLifecycleMutation();
     } catch (error) {
       runMutationError.value =
@@ -4147,6 +4177,60 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
+  async function dismissInboxSignalIds(signalIds: string[]): Promise<void> {
+    const normalized = [...new Set(signalIds.map((id) => id.trim()).filter(Boolean))];
+    if (!normalized.length) {
+      return;
+    }
+
+    await acknowledgeInboxSignals(normalized);
+    await Promise.all([loadInbox(), loadOperatorBriefing(), loadRuntimeSummary()]);
+  }
+
+  async function verifyAndDismissHandoffSignal(signalId: string): Promise<void> {
+    signalClearError.value = null;
+    await loadInbox();
+    const gate = canVerifyDismissHandoffSignal(
+      signalId,
+      inboxItems.value.map((item) => ({ signal_id: item.signal_id })),
+    );
+    if (!gate.allowed) {
+      signalClearError.value = gate.reason ?? 'Signal cannot be dismissed yet.';
+      return;
+    }
+
+    signalClearState.value = 'clearing';
+    try {
+      await dismissInboxSignalIds([signalId]);
+      if (pendingHandoffDismissSignalId.value === signalId) {
+        pendingHandoffDismissSignalId.value = null;
+        writePendingHandoffDismissSignalId(null);
+      }
+      highlightedSignalId.value = null;
+    } catch (error) {
+      signalClearError.value =
+        error instanceof Error ? error.message : 'verify and dismiss request failed';
+    } finally {
+      signalClearState.value = 'idle';
+    }
+  }
+
+  async function dismissLinkedHandoffSignalAfterRunComplete(): Promise<void> {
+    const signalId = pendingHandoffDismissSignalId.value?.trim();
+    if (!signalId) {
+      return;
+    }
+
+    try {
+      await dismissInboxSignalIds([signalId]);
+    } catch {
+      // Run completion should still succeed even if watch ack is temporarily unavailable.
+    } finally {
+      pendingHandoffDismissSignalId.value = null;
+      writePendingHandoffDismissSignalId(null);
+    }
+  }
+
   async function clearActiveSignals(): Promise<void> {
     const signalIds =
       operatorBriefing.value?.top_signals.map((signal) => signal.signal_id) ??
@@ -4160,8 +4244,7 @@ export const useShellStore = defineStore('shell', () => {
     highlightedSignalId.value = null;
 
     try {
-      await acknowledgeInboxSignals(signalIds);
-      await Promise.all([loadInbox(), loadOperatorBriefing(), loadRuntimeSummary()]);
+      await dismissInboxSignalIds(signalIds);
     } catch (error) {
       signalClearError.value =
         error instanceof Error ? error.message : 'clear signals request failed';
@@ -4279,6 +4362,8 @@ export const useShellStore = defineStore('shell', () => {
     agentDockCollapsed,
     ideActivityView,
     ideExplorerCollapsed,
+    ideAttentionPanelOpen,
+    closeIdeAttentionPanel,
     ideTerminalRevealToken,
     ideTerminalToggleToken,
     layoutMode,
@@ -4288,6 +4373,7 @@ export const useShellStore = defineStore('shell', () => {
     mobileCompactLayout,
     viewportWidth,
     clearActiveSignals,
+    verifyAndDismissHandoffSignal,
     completePrimaryRun,
     completeAllReviewReadyRuns,
     connectorMutationPending,
@@ -4407,6 +4493,7 @@ export const useShellStore = defineStore('shell', () => {
     handoffDiscussedSignalToIde,
     handoffMutationState,
     handoffMutationError,
+    pendingHandoffDismissSignalId,
     lastDiscussedSignal,
     submitIdeComposer,
     steerIdeComposer,

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import IdeInterruptPanel from '../ide/IdeInterruptPanel.vue';
 import KairoPresenceBar from './KairoPresenceBar.vue';
 import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
@@ -28,6 +29,12 @@ const topbarSubtitle = computed(() => {
 const showTopbarKairoPresence = computed(
   () => activeSurface.value === 'console',
 );
+const showIdeInterruptTopbar = computed(
+  () =>
+    activeSurface.value === 'console' &&
+    shell.layoutMode === 'ide' &&
+    shell.idePresenceProfile === 'interrupt',
+);
 
 function openSurface(surface: AppSurface): void {
   navigateToAppSurface(surface);
@@ -40,7 +47,10 @@ function openSettings(): void {
 
 <template>
   <header class="region region-topbar topbar-mockup">
-    <div class="topbar-mockup__grid">
+    <div
+      class="topbar-mockup__grid"
+      :class="{ 'topbar-mockup__grid--ide-interrupt': showIdeInterruptTopbar }"
+    >
       <div class="topbar-mockup__identity-zone">
         <div class="topbar-mockup__brand">
           <AxonProductLogo />
@@ -48,7 +58,11 @@ function openSettings(): void {
         </div>
       </div>
 
-      <div v-if="shell.topbarChips.length" class="topbar-mockup__runtime-strip chip-row">
+      <IdeInterruptPanel v-if="showIdeInterruptTopbar" class="topbar-mockup__runtime-strip" />
+      <div
+        v-else-if="shell.topbarChips.length"
+        class="topbar-mockup__runtime-strip chip-row"
+      >
         <span
           v-for="chip in shell.topbarChips"
           :key="chip.id"
@@ -161,5 +175,9 @@ function openSettings(): void {
 
 .topbar-mockup__surface-nav {
   margin-right: 0.35rem;
+}
+
+:deep(.topbar-mockup__runtime-strip.ide-interrupt-topbar) {
+  flex: 1 1 auto;
 }
 </style>

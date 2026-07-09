@@ -83,6 +83,56 @@ def list_acknowledgements(*, limit: int = 50) -> dict[str, object]:
     }
 
 
+def monitor_signal_ids_for_check(check_id: str) -> list[str]:
+    normalized = check_id.strip()
+    if not normalized:
+        return []
+
+    return [
+        f"signal_monitor_{normalized}_critical",
+        f"signal_monitor_{normalized}_warning",
+    ]
+
+
+def release_acknowledgements(signal_ids: list[str]) -> list[str]:
+    normalized_ids = [signal_id.strip() for signal_id in signal_ids if signal_id.strip()]
+    if not normalized_ids:
+        return []
+
+    released: list[str] = []
+    with _managed_connection() as connection:
+        for signal_id in normalized_ids:
+            cursor = connection.execute(
+                "DELETE FROM watch_signal_acknowledgements WHERE signal_id = ?",
+                (signal_id,),
+            )
+            if cursor.rowcount:
+                released.append(signal_id)
+        connection.commit()
+
+    cache = _load_acknowledged_cache()
+    for signal_id in released:
+        cache.discard(signal_id)
+    return released
+
+
+def release_resolved_monitor_acknowledgements(
+    monitor_records: list[dict[str, object]],
+) -> list[str]:
+    signal_ids: list[str] = []
+    for record in monitor_records:
+        status = str(record.get("status", "")).strip()
+        if status not in {"ok", "skipped"}:
+            continue
+        check_id = str(record.get("check_id", "")).strip()
+        if not check_id:
+            continue
+        signal_ids.extend(monitor_signal_ids_for_check(check_id))
+
+    deduped = list(dict.fromkeys(signal_ids))
+    return release_acknowledgements(deduped)
+
+
 def acknowledge_signals(
     signal_ids: list[str],
     *,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -88,6 +89,168 @@ def _probe_storage_api_restricted(headers: dict[str, str], *, timeout: float) ->
     return None
 
 
+def _storage_api_request(
+    headers: dict[str, str],
+    path: str,
+    *,
+    method: str,
+    timeout: float,
+    body: dict[str, object] | None = None,
+) -> tuple[int, str]:
+    base_url = headers["_base_url"].rstrip("/")
+    payload = json.dumps(body).encode("utf-8") if body is not None else None
+    request_headers = {
+        "apikey": headers["apikey"],
+        "Authorization": headers["Authorization"],
+        "Accept": "application/json",
+    }
+    if body is not None:
+        request_headers["Content-Type"] = "application/json"
+    req = Request(
+        f"{base_url}/storage/v1/{path.lstrip('/')}",
+        method=method,
+        data=payload,
+        headers=request_headers,
+    )
+    with urlopen(req, timeout=timeout) as response:
+        return int(response.status), response.read().decode("utf-8", errors="replace")
+
+
+def _object_size_bytes(row: dict[str, object]) -> int:
+    candidates = []
+    metadata = row.get("metadata")
+    if isinstance(metadata, dict):
+        candidates.append(metadata.get("size"))
+    candidates.append(row.get("size"))
+    for candidate in candidates:
+        try:
+            return int(candidate or 0)
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def _fetch_storage_bucket_totals_via_storage_api(
+    headers: dict[str, str],
+    *,
+    timeout: float,
+    page_size: int = 100,
+    max_requests: int = 200,
+) -> tuple[dict[str, dict[str, int]], str | None]:
+    deadline = time.monotonic() + min(timeout, 8.0)
+    request_timeout = max(1.0, min(timeout, 5.0))
+
+    try:
+        status, body = _storage_api_request(
+            headers,
+            "bucket",
+            method="GET",
+            timeout=request_timeout,
+        )
+    except HTTPError as exc:
+        status = int(exc.code)
+        body = exc.read().decode("utf-8", errors="replace")
+        if status == 402:
+            return {}, "402 exceed_storage_size_quota"
+    except (TimeoutError, URLError, OSError) as exc:
+        return {}, f"storage bucket list failed: {exc}"
+
+    if status == 402:
+        return {}, "402 exceed_storage_size_quota"
+    if status != 200:
+        return {}, f"storage bucket list HTTP {status}: {body[:200]}"
+
+    try:
+        buckets = json.loads(body)
+    except json.JSONDecodeError:
+        return {}, "storage bucket list returned non-JSON payload"
+    if not isinstance(buckets, list):
+        return {}, "storage bucket list response was not a list"
+
+    totals: dict[str, dict[str, int]] = {}
+    request_count = 0
+    for bucket in buckets:
+        if not isinstance(bucket, dict):
+            continue
+        bucket_id = str(bucket.get("id") or bucket.get("name") or "").strip()
+        if not bucket_id:
+            continue
+        totals[bucket_id] = {"bytes": 0, "count": 0}
+        prefixes = [""]
+        seen_prefixes = {""}
+        while prefixes:
+            if time.monotonic() >= deadline:
+                return totals, "storage API time budget exceeded"
+            prefix = prefixes.pop(0)
+            offset = 0
+            while True:
+                if time.monotonic() >= deadline:
+                    return totals, "storage API time budget exceeded"
+                request_count += 1
+                if request_count > max_requests:
+                    return totals, "storage API pagination limit exceeded"
+                try:
+                    status, body = _storage_api_request(
+                        headers,
+                        f"object/list/{bucket_id}",
+                        method="POST",
+                        timeout=request_timeout,
+                        body={
+                            "prefix": prefix,
+                            "limit": page_size,
+                            "offset": offset,
+                            "sortBy": {"column": "name", "order": "asc"},
+                        },
+                    )
+                except HTTPError as exc:
+                    status = int(exc.code)
+                    body = exc.read().decode("utf-8", errors="replace")
+                    if status == 402:
+                        return {}, "402 exceed_storage_size_quota"
+                except (TimeoutError, URLError, OSError) as exc:
+                    return totals, f"storage object list failed: {exc}"
+
+                if status == 402:
+                    return {}, "402 exceed_storage_size_quota"
+                if status != 200:
+                    return totals, f"storage object list HTTP {status}: {body[:200]}"
+
+                try:
+                    rows = json.loads(body)
+                except json.JSONDecodeError:
+                    return totals, "storage object list returned non-JSON payload"
+                if not isinstance(rows, list) or not rows:
+                    break
+
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    name = str(row.get("name") or "").strip().strip("/")
+                    if not name:
+                        continue
+                    metadata = row.get("metadata")
+                    is_folder = (
+                        not isinstance(metadata, dict)
+                        and row.get("id") in {None, ""}
+                    )
+                    if is_folder:
+                        child_prefix = f"{prefix}{name}/" if prefix else f"{name}/"
+                        if child_prefix not in seen_prefixes:
+                            seen_prefixes.add(child_prefix)
+                            prefixes.append(child_prefix)
+                        continue
+                    totals[bucket_id]["bytes"] += _object_size_bytes(row)
+                    totals[bucket_id]["count"] += 1
+
+                if len(rows) < page_size:
+                    break
+                offset += page_size
+
+    if totals:
+        return totals, None
+    return {}, "storage usage unavailable (no buckets or accessible objects)"
+
+
 def _fetch_storage_bucket_totals(
     headers: dict[str, str],
     *,
@@ -143,6 +306,11 @@ def _fetch_storage_bucket_totals(
         if status == 402:
             return {}, "402 exceed_storage_size_quota"
         if status != 200:
+            if status == 406:
+                return _fetch_storage_bucket_totals_via_storage_api(
+                    headers,
+                    timeout=timeout,
+                )
             if totals:
                 return totals, None
             return {}, f"storage.objects query HTTP {status}: {body[:200]}"
@@ -175,7 +343,10 @@ def _fetch_storage_bucket_totals(
         offset += page_size
 
     if not totals:
-        return {}, "storage usage unavailable (apply monitor_storage_bucket_usage migration or check service-role access)"
+        return _fetch_storage_bucket_totals_via_storage_api(
+            headers,
+            timeout=timeout,
+        )
     return totals, None
 
 
@@ -186,7 +357,7 @@ def check_supabase_storage_quota(
     warning_ratio: float = 0.80,
     critical_ratio: float = 0.90,
     rpc_name: str = "monitor_storage_bucket_usage",
-    timeout_seconds: float = 30,
+    timeout_seconds: float = 10,
 ) -> tuple[str, str]:
     headers = _supabase_rest_headers(env)
     if not headers:

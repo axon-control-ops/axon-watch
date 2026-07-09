@@ -87,6 +87,6 @@ describe('applyChatUiAction', () => {
       task: 'Investigate signal',
       title: 'Investigate signal',
       summary: 'Investigate signal',
-    });
+    }, { autoSubmit: true });
   });
 });

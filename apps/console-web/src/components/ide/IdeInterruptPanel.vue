@@ -3,9 +3,11 @@ import { computed } from 'vue';
 
 import {
   isIdeInterruptStopDisabled,
+  resolveIdeInterruptCompactLabel,
   resolveIdeInterruptDetailLine,
   resolveIdeInterruptHeadline,
   resolveIdeInterruptStopTarget,
+  resolveIdeInterruptTooltip,
   shouldShowIdeInterruptAttentionAction,
   shouldShowIdeInterruptStop,
 } from '../../lib/ide-interrupt-panel-view';
@@ -38,6 +40,12 @@ const detailLine = computed(() =>
     primaryRunCurrentStep: shell.primaryActiveRun?.current_step,
   }),
 );
+
+const compactLabel = computed(() =>
+  resolveIdeInterruptCompactLabel(headline.value, detailLine.value),
+);
+
+const tooltip = computed(() => resolveIdeInterruptTooltip(headline.value, detailLine.value));
 
 const showApprovalAction = computed(() => shell.pendingApprovalsCount > 0);
 
@@ -96,131 +104,124 @@ function stopActiveRun(): void {
 </script>
 
 <template>
-  <section
+  <div
     v-if="showPanel"
-    class="ide-interrupt-panel hud-panel-frame"
+    class="ide-interrupt-topbar"
+    role="status"
+    aria-live="polite"
     aria-label="IDE attention required"
   >
-    <div class="ide-interrupt-panel__copy">
-      <p class="ide-interrupt-panel__eyebrow">Attention required</p>
-      <p class="ide-interrupt-panel__headline">{{ headline }}</p>
-      <p class="ide-interrupt-panel__detail">{{ detailLine }}</p>
-    </div>
-    <div class="ide-interrupt-panel__actions">
+    <span class="ide-interrupt-topbar__badge">ATTN</span>
+    <p class="ide-interrupt-topbar__summary" :title="tooltip">{{ compactLabel }}</p>
+    <div class="ide-interrupt-topbar__actions">
       <button
         v-if="showApprovalAction"
         type="button"
-        class="ide-interrupt-panel__button ide-interrupt-panel__button--primary"
+        class="ide-interrupt-topbar__button ide-interrupt-topbar__button--primary"
         @click="shell.focusAttentionSidebar()"
       >
-        Review approvals
+        Approvals
       </button>
       <button
         v-if="showAttentionAction"
         type="button"
-        class="ide-interrupt-panel__button"
+        class="ide-interrupt-topbar__button"
         @click="shell.focusAttentionSidebar(shell.operatorBriefing?.top_signals[0]?.signal_id)"
       >
-        Open Attention
+        Attention
       </button>
       <button
         v-if="showResumeAction"
         type="button"
-        class="ide-interrupt-panel__button ide-interrupt-panel__button--warning"
+        class="ide-interrupt-topbar__button ide-interrupt-topbar__button--warning"
         :disabled="shell.runMutationState === 'resuming' || !(shell.canResumeIdeAgentRun || shell.canResumePrimaryRun)"
         @click="resumeActiveRun()"
       >
-        {{ shell.runMutationState === 'resuming' ? 'Resuming…' : 'Resume run' }}
+        {{ shell.runMutationState === 'resuming' ? '…' : 'Resume' }}
       </button>
       <button
         v-if="showStopAction"
         type="button"
-        class="ide-interrupt-panel__button ide-interrupt-panel__button--ghost"
+        class="ide-interrupt-topbar__button ide-interrupt-topbar__button--ghost"
         :disabled="stopDisabled"
         @click="stopActiveRun()"
       >
-        {{ shell.runMutationState === 'stopping' ? 'Stopping…' : 'Stop run' }}
+        {{ shell.runMutationState === 'stopping' ? '…' : 'Stop' }}
       </button>
     </div>
-  </section>
+  </div>
 </template>
 
 <style scoped>
-.ide-interrupt-panel {
-  position: fixed;
-  top: calc(var(--topbar-height) + var(--shell-gutter));
-  left: var(--shell-gutter);
-  right: var(--shell-gutter);
-  z-index: 25;
+.ide-interrupt-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid rgba(255, 120, 72, 0.35);
-  border-radius: 0.5rem;
-  background: rgba(18, 12, 10, 0.94);
-  box-shadow: 0 0.35rem 1.25rem rgba(0, 0, 0, 0.35);
-}
-
-.ide-interrupt-panel__copy {
-  min-width: 0;
-}
-
-.ide-interrupt-panel__eyebrow {
-  margin: 0;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 160, 120, 0.88);
-}
-
-.ide-interrupt-panel__headline {
-  margin: 0.15rem 0 0;
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.ide-interrupt-panel__detail {
-  margin: 0.2rem 0 0;
-  font-size: 0.78rem;
-  opacity: 0.78;
-}
-
-.ide-interrupt-panel__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+  height: calc(var(--topbar-height) - 0.42rem);
+  padding: 0 0.55rem;
+  border: 1px solid rgba(255, 120, 72, 0.38);
+  border-radius: 0.35rem;
+  background: rgba(24, 12, 8, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(255, 120, 72, 0.08);
+}
+
+.ide-interrupt-topbar__badge {
+  flex-shrink: 0;
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: rgba(255, 160, 120, 0.95);
+}
+
+.ide-interrupt-topbar__summary {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ide-interrupt-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   flex-shrink: 0;
 }
 
-.ide-interrupt-panel__button {
+.ide-interrupt-topbar__button {
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 0.35rem;
+  border-radius: 0.3rem;
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 0.78rem;
-  padding: 0.35rem 0.65rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 0.22rem 0.42rem;
+  white-space: nowrap;
 }
 
-.ide-interrupt-panel__button--primary {
+.ide-interrupt-topbar__button--primary {
   border-color: rgba(255, 120, 72, 0.45);
   background: rgba(255, 120, 72, 0.14);
 }
 
-.ide-interrupt-panel__button--warning {
+.ide-interrupt-topbar__button--warning {
   border-color: rgba(255, 196, 72, 0.45);
   background: rgba(255, 196, 72, 0.12);
 }
 
-.ide-interrupt-panel__button--ghost {
-  opacity: 0.82;
+.ide-interrupt-topbar__button--ghost {
+  opacity: 0.86;
 }
 
-.ide-interrupt-panel__button:disabled {
+.ide-interrupt-topbar__button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

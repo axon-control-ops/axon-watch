@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import HudSeamCard from '../HudSeamCard.vue';
 import HandoffToIdeButton from './HandoffToIdeButton.vue';
+import VerifyDismissSignalButton from './VerifyDismissSignalButton.vue';
 import {
   formatRunDisplayName,
   formatRunShortId,
@@ -369,6 +370,10 @@ function signalHint(signal: {
               :workspace-id="signal.workspace_id"
               :title="signal.title"
               :summary="signal.summary"
+              compact
+            />
+            <VerifyDismissSignalButton
+              :signal-id="signal.signal_id"
               compact
             />
           </div>

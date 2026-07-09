@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isIdeInterruptStopDisabled,
+  resolveIdeInterruptCompactLabel,
   resolveIdeInterruptDetailLine,
   resolveIdeInterruptHeadline,
   resolveIdeInterruptStopTarget,
+  resolveIdeInterruptTooltip,
   shouldShowIdeInterruptAttentionAction,
   shouldShowIdeInterruptStop,
+  truncateInterruptLabel,
 } from './ide-interrupt-panel-view';
 
 describe('ide interrupt panel view', () => {
@@ -99,6 +102,17 @@ describe('ide interrupt panel view', () => {
         agentStreamActive: false,
       }),
     ).toBe('primary');
+  });
+
+  it('builds compact and tooltip labels for long Sentry summaries', () => {
+    const headline = 'DashPro Sentry critical';
+    const detail =
+      "Sentry returned 5 unresolved issue(s), 330 event(s); latest=Error: cannot add 'postgres_changes' callbacks";
+
+    expect(resolveIdeInterruptCompactLabel(headline, detail).length).toBeLessThanOrEqual(72);
+    expect(resolveIdeInterruptCompactLabel(headline, detail)).toContain('DashPro Sentry critical');
+    expect(resolveIdeInterruptTooltip(headline, detail)).toContain('\n');
+    expect(truncateInterruptLabel('short')).toBe('short');
   });
 
   it('disables stop while mutation is in flight unless IDE agent stop is available', () => {

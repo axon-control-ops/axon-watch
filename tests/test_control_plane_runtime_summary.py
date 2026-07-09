@@ -26,6 +26,7 @@ _CANONICAL_TOP_LEVEL_KEYS = {
     "approvals",
     "signals",
     "connectors",
+    "cli_runtime",
     "capabilities",
     "degraded",
 }

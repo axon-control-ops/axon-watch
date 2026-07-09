@@ -15,7 +15,7 @@ for module_name in list(sys.modules):
         sys.modules.pop(module_name, None)
 sys.path.insert(0, str(WATCH_SERVICE_ROOT))
 
-from app.monitors.dashpro_supabase_storage import check_supabase_storage_quota  # noqa: E402
+import app.monitors.dashpro_supabase_storage as dashpro_supabase_storage  # noqa: E402
 
 
 class DashProSupabaseStorageMonitorTests(unittest.TestCase):
@@ -43,8 +43,8 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
                 return _FakeResponse(200, rows)
             raise AssertionError(req.full_url)
 
-        with patch("app.monitors.dashpro_supabase_storage.urlopen", side_effect=fake_urlopen):
-            status, detail = check_supabase_storage_quota(
+        with patch.object(dashpro_supabase_storage, "urlopen", side_effect=fake_urlopen):
+            status, detail = dashpro_supabase_storage.check_supabase_storage_quota(
                 env={
                     "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
                     "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
@@ -55,7 +55,7 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
         self.assertIn("tts-audio", detail)
 
     def test_storage_quota_skipped_without_credentials(self) -> None:
-        status, detail = check_supabase_storage_quota(env={})
+        status, detail = dashpro_supabase_storage.check_supabase_storage_quota(env={})
         self.assertEqual("skipped", status)
         self.assertIn("service-role", detail)
 
@@ -67,12 +67,19 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
                     402,
                     "Payment Required",
                     hdrs=None,
-                    fp=type("Body", (), {"read": lambda self: b'{"error":"exceed_storage_size_quota"}'})(),
+                    fp=type(
+                        "Body",
+                        (),
+                        {
+                            "read": lambda self: b'{"error":"exceed_storage_size_quota"}',
+                            "close": lambda self: None,
+                        },
+                    )(),
                 )
             raise AssertionError(req.full_url)
 
-        with patch("app.monitors.dashpro_supabase_storage.urlopen", side_effect=fake_urlopen):
-            status, detail = check_supabase_storage_quota(
+        with patch.object(dashpro_supabase_storage, "urlopen", side_effect=fake_urlopen):
+            status, detail = dashpro_supabase_storage.check_supabase_storage_quota(
                 env={
                     "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
                     "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
@@ -81,6 +88,70 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
 
         self.assertEqual("critical", status)
         self.assertIn("402", detail)
+
+    def test_storage_quota_falls_back_to_storage_api_when_storage_schema_is_blocked(self) -> None:
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(req, timeout=0):
+            url = req.full_url
+            if "/storage/v1/bucket" in url:
+                return _FakeResponse(200, [{"id": "tts-audio"}])
+            if "/rpc/monitor_storage_bucket_usage" in url:
+                raise HTTPError(
+                    url,
+                    404,
+                    "Not Found",
+                    hdrs=None,
+                    fp=type(
+                        "Body",
+                        (),
+                        {"read": lambda self: b'{"code":"PGRST202"}', "close": lambda self: None},
+                    )(),
+                )
+            if "/rest/v1/objects" in url:
+                raise HTTPError(
+                    url,
+                    406,
+                    "Not Acceptable",
+                    hdrs=None,
+                    fp=type(
+                        "Body",
+                        (),
+                        {
+                            "read": lambda self: b'{"message":"The schema must be one of the following: public, graphql_public"}',
+                            "close": lambda self: None,
+                        },
+                    )(),
+                )
+            if "/storage/v1/object/list/tts-audio" in url:
+                return _FakeResponse(
+                    200,
+                    [{"id": "file_1", "name": "clip.mp3", "metadata": {"size": 980_000_000}}],
+                )
+            raise AssertionError(url)
+
+        with patch.object(dashpro_supabase_storage, "urlopen", side_effect=fake_urlopen):
+            status, detail = dashpro_supabase_storage.check_supabase_storage_quota(
+                env={
+                    "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",
+                    "SUPABASE_SERVICE_ROLE_KEY": "service-role-key",
+                }
+            )
+
+        self.assertEqual("critical", status)
+        self.assertIn("tts-audio", detail)
 
 
 if __name__ == "__main__":
