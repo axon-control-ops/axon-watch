@@ -256,7 +256,7 @@ Parallel safe: OP-B4 config work while OP-B6a is in flight.
 | **OP-V1e** | Voice capture → dispatch command (hands-free) | **Absorbed by OP-C3** (Wave 5) |
 | **OP-V1f** | Signal → IDE handoff card (OP-B5) | Partial (conversation artifacts now carry a Continue in IDE handoff action) |
 | **OP-V1g** | KAIRO mobile shell (tunnel + compact voice UI) | Pending |
-| **OP-V1h** | Real monitor signals in inbox (Sentry/PostHog beyond bootstrap) | Pending (OP-B4) |
+| **OP-V1h** | Real monitor signals in inbox (Sentry/PostHog beyond bootstrap) | **In progress** (OP-B4: live monitor precedence, actionable counts, `/api/monitors`) |
 
 Mobile contract: reuse `/api/briefing`, `/api/operator/fleet-health`, `/api/operator/brain-graph`, `/api/kairo/speak`, `/api/chat/messages` — no second brain on the phone.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.chat.command_intent import humanize_run_summary, is_auto_complete_run_summary
+from app.operator_briefing_signals import filter_actionable_inbox_items, is_monitor_signal
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.runs.service import (
     list_active_runs,
@@ -127,6 +128,8 @@ def build_operator_briefing(
     top_signals = [
         item for item in inbox_snapshot.get("items", []) if isinstance(item, dict)
     ]
+    if any(is_monitor_signal(item) for item in top_signals):
+        top_signals = filter_actionable_inbox_items(top_signals)
     scoped_workspace_id = workspace_id.strip() if workspace_id else None
     if scoped_workspace_id:
         top_signals = [

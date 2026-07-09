@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import unittest
 
-from app.operator_briefing_signals import first_actionable_signal, is_bootstrap_signal
+from app.operator_briefing_signals import (
+    first_actionable_signal,
+    is_bootstrap_signal,
+    is_monitor_signal,
+    summarize_actionable_inbox,
+)
 from app.kairo_persona import build_persona_voice_line
 from app.operator_presence import build_operator_presence
 
@@ -65,6 +70,45 @@ class OperatorBriefingSignalsTests(unittest.TestCase):
         self.assertIsNotNone(signal)
         assert signal is not None
         self.assertEqual(signal["signal_id"], "signal_connector_console_web_unavailable")
+
+    def test_summarize_actionable_inbox(self) -> None:
+        summary = summarize_actionable_inbox(
+            [
+                {
+                    "signal_id": "signal_watch_bootstrap_ready",
+                    "title": "Watch bootstrap ready",
+                    "severity": "info",
+                    "status": "open",
+                },
+                {
+                    "signal_id": "signal_monitor_dashpro_sentry_recent_issues_critical",
+                    "title": "DashPro Sentry critical",
+                    "severity": "critical",
+                    "status": "open",
+                    "meta": {"signal_family": "child_project_monitor"},
+                },
+            ]
+        )
+        self.assertEqual(1, summary["open_count"])
+        self.assertEqual(1, summary["critical_count"])
+
+    def test_is_monitor_signal(self) -> None:
+        self.assertTrue(
+            is_monitor_signal(
+                {
+                    "signal_id": "signal_monitor_dashpro_sentry_recent_issues_critical",
+                    "meta": {"signal_family": "child_project_monitor"},
+                }
+            )
+        )
+        self.assertFalse(
+            is_monitor_signal(
+                {
+                    "signal_id": "signal_watch_bootstrap_ready",
+                    "title": "Watch bootstrap ready",
+                }
+            )
+        )
 
     def test_persona_uses_actionable_signal_title(self) -> None:
         line = build_persona_voice_line(

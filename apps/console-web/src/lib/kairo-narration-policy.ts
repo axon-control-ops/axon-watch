@@ -36,9 +36,10 @@ export function shouldSpeakLiveThinkingBlock(input: {
   narration: KairoNarrationLevel;
   spokenBlock: string;
 }): boolean {
-  if (input.narration !== 'minimal' || !input.spokenBlock.trim()) {
+  if (input.narration === 'off' || !input.spokenBlock.trim()) {
     return false;
   }
+  // Speak the first complete thinking sentence for minimal + conversational.
   return /[.!?]$/.test(input.spokenBlock.trim());
 }
 

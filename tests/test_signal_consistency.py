@@ -38,10 +38,8 @@ class SignalConsistencyTests(unittest.TestCase):
             watch_probe=lambda: (True, "ok", None, "2026-07-03T16:00:00Z"),
             inbox_fetcher=lambda: BOOTSTRAP_WATCH_INBOX,
         )
-        top_item = summary["signals"]["top_items"][0]
-
-        self.assertEqual(consistency_tuple(BOOTSTRAP_INBOX_ITEM), consistency_tuple(top_item))
-        self.assertEqual(1, summary["signals"]["open_count"])
+        self.assertEqual(0, summary["signals"]["open_count"])
+        self.assertEqual([], summary["signals"]["top_items"])
 
     def test_control_plane_inbox_and_runtime_summary_endpoints_agree(self) -> None:
         with patch(
@@ -55,10 +53,11 @@ class SignalConsistencyTests(unittest.TestCase):
             return_value=(True, "ok", None, "2026-07-03T16:00:00Z"),
         ):
             inbox_item = self.client.get("/api/inbox").json()["items"][0]
-            summary_item = self.client.get("/api/runtime/summary").json()["signals"]["top_items"][0]
+            summary = self.client.get("/api/runtime/summary").json()["signals"]
 
         self.assertEqual(consistency_tuple(BOOTSTRAP_INBOX_ITEM), consistency_tuple(inbox_item))
-        self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(summary_item))
+        self.assertEqual(0, summary["open_count"])
+        self.assertEqual([], summary["top_items"])
 
     def test_control_plane_inbox_and_runtime_summary_preserve_ranked_top_signal(self) -> None:
         ranked_watch_inbox = {
@@ -77,13 +76,14 @@ class SignalConsistencyTests(unittest.TestCase):
             return_value=(True, "ok", None, "2026-07-03T16:00:00Z"),
         ):
             inbox_item = self.client.get("/api/inbox").json()["items"][0]
-            summary_item = self.client.get("/api/runtime/summary").json()["signals"]["top_items"][0]
+            summary = self.client.get("/api/runtime/summary").json()["signals"]
 
         self.assertEqual(
             consistency_tuple(SUMMARY_DEGRADED_INBOX_ITEM),
             consistency_tuple(inbox_item),
         )
-        self.assertEqual(consistency_tuple(inbox_item), consistency_tuple(summary_item))
+        self.assertEqual(0, summary["open_count"])
+        self.assertEqual([], summary["top_items"])
 
 
 if __name__ == "__main__":

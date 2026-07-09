@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.domain.run_state import is_terminal_phase
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
+from app.operator_briefing_signals import filter_actionable_inbox_items
 from app.runs.service import list_runs
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
 from app.workspace_catalog import list_workspace_records
@@ -61,12 +62,14 @@ def build_operator_fleet_health(
         workspace_runs = [
             run for run in active_runs if str(run.get("workspace_id", "")) == workspace_id
         ]
-        workspace_signals = [
-            signal
-            for signal in inbox_items
-            if str(signal.get("workspace_id", "")).strip() in {"", workspace_id}
-            and signal.get("status") == "open"
-        ]
+        workspace_signals = filter_actionable_inbox_items(
+            [
+                signal
+                for signal in inbox_items
+                if str(signal.get("workspace_id", "")).strip() in {"", workspace_id}
+                and signal.get("status") == "open"
+            ]
+        )
         review_ready_count = sum(
             1 for run in workspace_runs if run.get("phase") == "review_ready"
         )

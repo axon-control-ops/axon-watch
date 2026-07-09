@@ -866,10 +866,10 @@ export const useShellStore = defineStore('shell', () => {
       return 'thinking';
     }
     if (agentStreamActive.value && ideComposerActivity.value?.mode === 'agent') {
-      return 'speaking';
+      return kairoSpeechActive.value ? 'speaking' : 'thinking';
     }
     if (agentStreamActive.value) {
-      return 'listening';
+      return kairoSpeechActive.value ? 'speaking' : 'thinking';
     }
     const summary = runtimeSummary.value;
     return resolveKairoPresenceState({
@@ -2095,12 +2095,17 @@ export const useShellStore = defineStore('shell', () => {
               })
             ) {
               spokenLiveThinkingBlock = spokenBlock;
-              void deliverSpokenOperatorAlert({
-                eligible: true,
-                reason: 'kairo-agent-live-thinking',
-                signal_id: `${messageId}:thinking-spoken`,
-                message: spokenBlock,
-              });
+              const narration = effectiveKairoNarrationLevel.value;
+              if (narration === 'conversational') {
+                void speakKairoConversationLine(spokenBlock, { operatorPrompt });
+              } else {
+                void deliverSpokenOperatorAlert({
+                  eligible: true,
+                  reason: 'kairo-agent-live-thinking',
+                  signal_id: `${messageId}:thinking-spoken`,
+                  message: spokenBlock,
+                });
+              }
             }
           }
           if (!narrationEnabled) {

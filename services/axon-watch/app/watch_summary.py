@@ -6,6 +6,7 @@ from app.connectors.summary import build_connectors_snapshot, probe_all_connecto
 from app.delivery.store import delivery_summary
 from app.commands.store import latest_command_snapshot
 from app.events.store import events_summary
+from app.signals.inbox_filters import summarize_actionable_inbox
 from app.signals.store import get_inbox_snapshot
 
 
@@ -18,15 +19,12 @@ def build_watch_summary() -> dict[str, object]:
     if not isinstance(signal_items, list):
         signal_items = []
 
-    open_count = sum(
-        1 for item in signal_items if isinstance(item, dict) and item.get("status") == "open"
+    signal_summary = summarize_actionable_inbox(
+        [item for item in signal_items if isinstance(item, dict)]
     )
-    critical_count = sum(
-        1 for item in signal_items if isinstance(item, dict) and item.get("severity") == "critical"
-    )
-    high_count = sum(
-        1 for item in signal_items if isinstance(item, dict) and item.get("severity") == "high"
-    )
+    open_count = int(signal_summary["open_count"])
+    critical_count = int(signal_summary["critical_count"])
+    high_count = int(signal_summary["high_count"])
 
     runtime_degraded = int(connectors.get("required_unavailable", 0)) > 0
     observation = {

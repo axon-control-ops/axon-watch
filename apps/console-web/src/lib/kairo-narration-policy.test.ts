@@ -74,17 +74,25 @@ describe('kairo-narration-policy', () => {
     expect(mapMilestoneToSpeakEvent('done')).toBe('done');
   });
 
-  it('speaks live thinking only in minimal narration once a sentence completes', () => {
+  it('speaks live thinking once a sentence completes for minimal and conversational', () => {
+    const spokenBlock =
+      "I'm starting to analyze the rendering issues the user wants fixed.";
     expect(
       shouldSpeakLiveThinkingBlock({
         narration: 'minimal',
-        spokenBlock: "I'm starting to analyze the rendering issues the user wants fixed.",
+        spokenBlock,
       }),
     ).toBe(true);
     expect(
       shouldSpeakLiveThinkingBlock({
         narration: 'conversational',
-        spokenBlock: "I'm starting to analyze the rendering issues the user wants fixed.",
+        spokenBlock,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSpeakLiveThinkingBlock({
+        narration: 'off',
+        spokenBlock,
       }),
     ).toBe(false);
     expect(

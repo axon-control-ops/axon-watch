@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 from app.adapters.watch_client import fetch_watch_inbox, fetch_watch_summary
 from app.cli_runtime.catalog import runtime_identity_snapshot, runtime_status_snapshot
 from app.cli_runtime.readiness import cli_runtime_degraded_reasons, summarize_cli_runtime_readiness
+from app.operator_briefing_signals import summarize_actionable_inbox
 from app.runs.service import approval_summary, list_active_runs, to_runtime_summary_active_run
 
 _APP_VERSION = "0.1.0"
@@ -96,18 +97,14 @@ def _signals_summary_from_inbox(
     if not isinstance(items, list):
         items = []
 
-    open_count = sum(1 for item in items if isinstance(item, dict) and item.get("status") == "open")
-    critical_count = sum(
-        1 for item in items if isinstance(item, dict) and item.get("severity") == "critical"
-    )
-    high_count = sum(1 for item in items if isinstance(item, dict) and item.get("severity") == "high")
-    top_items = [item for item in items if isinstance(item, dict)][:1]
+    items = [item for item in items if isinstance(item, dict)]
+    summary = summarize_actionable_inbox(items)
 
     return {
-        "open_count": open_count,
-        "critical_count": critical_count,
-        "high_count": high_count,
-        "top_items": top_items,
+        "open_count": int(summary["open_count"]),
+        "critical_count": int(summary["critical_count"]),
+        "high_count": int(summary["high_count"]),
+        "top_items": summary["top_items"],
         "last_updated_at": str(watch_inbox.get("updated_at", generated_at)),
     }
 

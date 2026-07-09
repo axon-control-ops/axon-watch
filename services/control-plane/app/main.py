@@ -33,6 +33,7 @@ from app.inbox_signals import acknowledge_inbox_signals
 from app.inbox_projection import build_inbox_response
 from app.adapters.watch_client import (
     fetch_watch_connectors,
+    fetch_watch_monitors,
     fetch_watch_delivery_receipts,
     fetch_watch_events,
     fetch_watch_tunnel,
@@ -561,6 +562,14 @@ def inbox_signals_acknowledge(body: AcknowledgeInboxSignalsRequest) -> dict[str,
             detail=str(result.get("error", "signal acknowledgement unavailable")),
         )
     return result
+
+
+@app.get("/api/monitors")
+def monitors_index() -> dict[str, object]:
+    payload = fetch_watch_monitors()
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch monitors unavailable")
+    return payload
 
 
 @app.get("/api/connectors")

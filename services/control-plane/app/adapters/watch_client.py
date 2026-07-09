@@ -45,6 +45,21 @@ def fetch_watch_summary(timeout_seconds: float = 5.0) -> dict[str, object] | Non
     return payload
 
 
+def fetch_watch_monitors(timeout_seconds: float = 5.0) -> dict[str, object] | None:
+    url = f"{watch_base_url()}/internal/watch/monitors"
+
+    try:
+        request = Request(url, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
 def fetch_watch_connectors(timeout_seconds: float = 5.0) -> dict[str, object] | None:
     url = f"{watch_base_url()}/internal/watch/connectors"
 

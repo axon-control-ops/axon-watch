@@ -139,7 +139,13 @@ _Appended by `scripts/ops/g6-dry-run-monitor.sh` during dry-run._
   - run_55a6c4d0dc workspace_smoke Git status
   - run_5bc9a1da90 workspace_smoke Git status
 
-### Tick 2026-07-07T16:35:23Z
+### Tick 2026-07-09 — OP-B4 live monitor inbox hardening
+
+- Watch inbox suppresses bootstrap signal when a child-project monitor emits warning/critical.
+- Actionable signal counts (runtime summary, watch summary, fleet health) exclude bootstrap noise.
+- Added `GET /internal/watch/monitors` and `GET /api/monitors` for probe diagnostics + vault hints on skipped checks.
+- Briefing `top_signals` drops bootstrap when live monitor signals are present.
+
 
 - runs: 132 | phases: {'completed': 88, 'review_ready': 35, 'executing': 9}
 - review_ready: 35 | executing: 9

@@ -46,6 +46,7 @@ from app.vault.api import (
 )
 from app.vault.operations import attempt_auto_unlock
 from app.watch_summary import build_connectors_response, build_watch_summary
+from app.monitors.monitor_snapshot import build_monitors_response
 
 
 def _state_dir() -> str:
@@ -152,6 +153,11 @@ def tunnel_stop_route() -> dict[str, object]:
         return tunnel_stop()
     except TunnelControlError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/internal/watch/monitors")
+def monitors() -> dict[str, object]:
+    return build_monitors_response()
 
 
 @app.get("/internal/watch/inbox")

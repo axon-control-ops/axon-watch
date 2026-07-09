@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.delivery.service import enrich_inbox_with_delivery
 from app.signals.bootstrap_signal import bootstrap_inbox_item
 from app.signals.connector_signal import connector_inbox_items
+from app.signals.inbox_filters import should_emit_bootstrap_signal
 from app.signals.monitor_signal import monitor_inbox_items
 from app.monitors.dashpro_monitor import probe_monitor_records
 from app.signals.iso_time import utc_now_iso
@@ -22,14 +23,17 @@ def get_inbox_snapshot(
     *,
     connector_records: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
-    items = [bootstrap_inbox_item()]
+    items: list[dict[str, object]] = []
     if include_summary_degraded_signal(connector_records=connector_records):
         items.append(summary_degraded_inbox_item())
     if connector_records is not None:
         items.extend(connector_inbox_items(connector_records))
     monitor_records = probe_monitor_records()
     release_resolved_monitor_acknowledgements(monitor_records)
-    items.extend(monitor_inbox_items(monitor_records))
+    monitor_items = monitor_inbox_items(monitor_records)
+    items.extend(monitor_items)
+    if should_emit_bootstrap_signal(monitor_items):
+        items.insert(0, bootstrap_inbox_item())
 
     ranked = rank_inbox_items(items)
     delivered = enrich_inbox_with_delivery(ranked)
