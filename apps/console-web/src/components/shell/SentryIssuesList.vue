@@ -16,6 +16,7 @@ const props = defineProps<{
 const shell = useShellStore();
 const resolvingId = ref<string | null>(null);
 const errorMessage = ref<string | null>(null);
+const statusMessage = ref<string | null>(null);
 const resolvedIds = ref<string[]>([]);
 const writeScopeHint = ref<string | null>(null);
 
@@ -25,11 +26,13 @@ const visibleIssues = computed(() =>
   issues.value.filter((issue) => !resolvedIds.value.includes(issue.id)),
 );
 
-async function refreshSignals(): Promise<void> {
+async function refreshSignalsQuietly(): Promise<void> {
+  // Background briefing refresh avoids a full Attention reload flash; the Axon
+  // aggregate signal correctly remains while other Sentry issues are still open.
   await Promise.all([
     shell.loadInbox(),
-    shell.loadOperatorBriefing(),
-    shell.loadRuntimeSummary(),
+    shell.loadOperatorBriefing({ background: true }),
+    shell.loadRuntimeSummary({ background: true }),
   ]);
 }
 
@@ -40,6 +43,8 @@ async function handleResolve(issue: SentrySignalIssue): Promise<void> {
   resolvingId.value = issue.id;
   errorMessage.value = null;
   writeScopeHint.value = null;
+  statusMessage.value = null;
+  const label = issue.shortId || issue.id;
   try {
     const result = await resolveSentryIssue(issue.id);
     if (!result.ok) {
@@ -50,11 +55,19 @@ async function handleResolve(issue: SentrySignalIssue): Promise<void> {
       errorMessage.value =
         result.detail ||
         result.reason ||
-        `Resolve failed for ${issue.shortId || issue.id}`;
+        `Resolve failed for ${label}`;
       return;
     }
     resolvedIds.value = [...resolvedIds.value, issue.id];
-    await refreshSignals();
+    const remaining = Math.max(0, visibleIssues.value.length - 1);
+    statusMessage.value =
+      remaining > 0
+        ? `Resolved ${label} in Sentry. Axon alert stays until the other ${remaining} issue${remaining === 1 ? '' : 's'} are resolved (or CLEAR locally).`
+        : `Resolved ${label} in Sentry. Refreshing monitor…`;
+    await refreshSignalsQuietly();
+    if (visibleIssues.value.length === 0) {
+      statusMessage.value = `Resolved ${label} in Sentry. If the Axon alert remains, wait for the next monitor poll or CLEAR locally.`;
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Sentry resolve failed';
     try {
@@ -74,9 +87,12 @@ async function handleResolve(issue: SentrySignalIssue): Promise<void> {
 </script>
 
 <template>
-  <div v-if="visibleIssues.length" class="sentry-issues-list">
+  <div v-if="issues.length || statusMessage" class="sentry-issues-list">
     <p class="sentry-issues-list__label">Sentry issues</p>
-    <ul class="sentry-issues-list__items">
+    <p class="sentry-issues-list__hint">
+      Resolve writes to Sentry per issue. The Axon critical signal stays while any unresolved issues remain — CLEAR only dismisses Axon locally.
+    </p>
+    <ul v-if="visibleIssues.length" class="sentry-issues-list__items">
       <li
         v-for="issue in visibleIssues"
         :key="issue.id"
@@ -106,13 +122,14 @@ async function handleResolve(issue: SentrySignalIssue): Promise<void> {
           class="sentry-issues-list__resolve"
           :class="{ 'sentry-issues-list__resolve--compact': compact }"
           :disabled="resolvingId !== null"
-          title="Resolve this issue in Sentry (does not CLEAR the local signal)"
+          title="Resolve this issue in Sentry (does not CLEAR the local Axon signal)"
           @click.stop="handleResolve(issue)"
         >
           {{ resolvingId === issue.id ? 'Resolving…' : 'Resolve' }}
         </button>
       </li>
     </ul>
+    <p v-if="statusMessage" class="sentry-issues-list__status" role="status">{{ statusMessage }}</p>
     <p v-if="errorMessage" class="sentry-issues-list__error" role="alert">{{ errorMessage }}</p>
     <p v-if="writeScopeHint" class="sentry-issues-list__hint">{{ writeScopeHint }}</p>
   </div>
@@ -195,7 +212,8 @@ a.sentry-issues-list__title:hover {
 }
 
 .sentry-issues-list__error,
-.sentry-issues-list__hint {
+.sentry-issues-list__hint,
+.sentry-issues-list__status {
   margin: 0;
   font-size: 0.66rem;
   line-height: 1.35;
@@ -203,6 +221,10 @@ a.sentry-issues-list__title:hover {
 
 .sentry-issues-list__error {
   color: #ff8f8f;
+}
+
+.sentry-issues-list__status {
+  color: rgba(72, 255, 196, 0.92);
 }
 
 .sentry-issues-list__hint {

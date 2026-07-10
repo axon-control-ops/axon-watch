@@ -49,6 +49,11 @@ def resolve_watch_sentry_issue(
     result = resolve_sentry_issue(issue_id, env=env, status=status)
     if isinstance(result, dict):
         result = {**result, "requested_by": str(requested_by or "operator").strip() or "operator"}
+        if result.get("ok"):
+            # Drop stale monitor samples so the next inbox/briefing poll omits this issue.
+            from app.monitors.dashpro_monitor import reset_monitor_probe_cache
+
+            reset_monitor_probe_cache()
     return result
 
 
