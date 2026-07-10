@@ -15,7 +15,7 @@ from app.cli_runtime.codex_agent import run_codex_local
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.recovery import ordered_runtime_candidates
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
-from app.cli_runtime.cursor_agent import run_cursor_local
+from app.cli_runtime.cursor_agent import CursorAgentReply, run_cursor_local
 from app.cli_runtime.runtime_auth import (
     env_has_api_key,
     env_without_api_keys,
@@ -194,6 +194,13 @@ def _attach_dispatch_metadata(result: dict[str, object], *, composer_mode: str) 
     return {**result, "mcp_tools": mcp_tools_for_composer_mode(composer_mode)}
 
 
+def _cursor_reply_content(reply: CursorAgentReply, approval_notice: str | None) -> str:
+    content = reply.content
+    if approval_notice:
+        content = f"{content.rstrip()}\n\n---\n{approval_notice}"
+    return content
+
+
 def dispatch_ide_composer(
     *,
     workspace_id: str,
@@ -268,7 +275,7 @@ def dispatch_ide_composer(
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
             if family == "cursor":
-                content = run_cursor_local(
+                cursor_reply = run_cursor_local(
                     binary=binary,
                     prompt=prompt,
                     workspace_root=workspace_root,
@@ -279,8 +286,7 @@ def dispatch_ide_composer(
                     run_id=run_id,
                     on_chunk=on_chunk,
                 )
-                if approval_notice:
-                    content = f"{content.rstrip()}\n\n---\n{approval_notice}"
+                content = _cursor_reply_content(cursor_reply, approval_notice)
                 return _finish({
                     "content": content,
                     "dispatched": True,
@@ -288,6 +294,7 @@ def dispatch_ide_composer(
                     "runtime_label": str(record.get("label") or runtime_id),
                     "reason": "",
                     "execution_tier": execution_tier,
+                    "generated_image_paths": list(cursor_reply.generated_image_paths),
                 })
             if family == "codex":
                 content = run_codex_local(
@@ -332,7 +339,7 @@ def dispatch_ide_composer(
                 if retry_env != dispatch_env:
                     try:
                         if family == "cursor":
-                            content = run_cursor_local(
+                            cursor_reply = run_cursor_local(
                                 binary=binary,
                                 prompt=prompt,
                                 workspace_root=workspace_root,
@@ -343,6 +350,7 @@ def dispatch_ide_composer(
                                 run_id=run_id,
                                 on_chunk=on_chunk,
                             )
+                            content = _cursor_reply_content(cursor_reply, approval_notice)
                         else:
                             content = run_codex_local(
                                 binary=binary,
@@ -357,14 +365,17 @@ def dispatch_ide_composer(
                             )
                         if approval_notice:
                             content = f"{content.rstrip()}\n\n---\n{approval_notice}"
-                        return _finish({
+                        payload = {
                             "content": content,
                             "dispatched": True,
                             "runtime_id": runtime_id,
                             "runtime_label": str(record.get("label") or runtime_id),
                             "reason": "",
                             "execution_tier": execution_tier,
-                        })
+                        }
+                        if family == "cursor":
+                            payload["generated_image_paths"] = list(cursor_reply.generated_image_paths)
+                        return _finish(payload)
                     except RuntimeError as retry_exc:
                         detail = str(retry_exc)
             errors.append(summarize_auth_error(family=family, detail=detail))

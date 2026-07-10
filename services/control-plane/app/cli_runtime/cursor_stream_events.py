@@ -6,6 +6,9 @@ The assembled reply uses fenced block markers the console renders specially:
     ...reasoning text...
     :::
 
+    :::image assets/mockup.png
+    :::
+
     :::edit path/to/file.md +3 -1
     ...unified diff...
     :::
@@ -33,6 +36,7 @@ from app.cli_runtime.research_stream_blocks import (
     research_query_from_tool_call,
     research_started_block_from_event,
 )
+from app.cli_runtime.generated_image_paths import image_paths_from_tool_call_event
 
 
 def parse_stream_event(line: str) -> dict[str, Any] | None:
@@ -91,7 +95,11 @@ def _relative_path(path: str, workspace_root: str) -> str:
         except ValueError:
             pass
         basename = resolved.name
-        if basename and (root / basename).is_file():
+        if basename:
+            if (root / basename).is_file():
+                return basename
+            if (root / "assets" / basename).is_file():
+                return f"assets/{basename}"
             return basename
 
     parts = resolved.as_posix().split("/")
@@ -128,6 +136,21 @@ def _terminal_block(command: str, output: str) -> str:
     return f"\n:::terminal {command}{body}:::\n"
 
 
+def _image_block_from_event(
+    event: dict[str, Any],
+    workspace_root: str,
+) -> str:
+    paths = image_paths_from_tool_call_event(event)
+    if not paths:
+        return ""
+    blocks: list[str] = []
+    for raw_path in paths:
+        path = _relative_path(raw_path, workspace_root)
+        if path:
+            blocks.append(f"\n:::image {path}\n:::\n")
+    return "".join(blocks)
+
+
 def _tool_block_from_event(
     event: dict[str, Any],
     workspace_root: str,
@@ -144,6 +167,10 @@ def _tool_block_from_event(
     research_block = research_completed_block_from_event(event, open_query=open_query)
     if research_block:
         return research_block
+
+    image_block = _image_block_from_event(event, workspace_root)
+    if image_block:
+        return image_block
 
     edit = tool_call.get("editToolCall")
     if isinstance(edit, dict):
@@ -235,8 +262,13 @@ class CursorStreamAssembler:
         self._assistant_accumulated = ""
         self._research_open_query: str | None = None
         self._research_open_active = False
+        self._generated_image_paths: list[str] = []
         self.result_text = ""
         self.error_text = ""
+
+    @property
+    def generated_image_paths(self) -> tuple[str, ...]:
+        return tuple(self._generated_image_paths)
 
     @property
     def content(self) -> str:
@@ -303,6 +335,9 @@ class CursorStreamAssembler:
                         self._research_open_active = True
                     return
             if subtype == "completed":
+                for image_path in image_paths_from_tool_call_event(event):
+                    if image_path not in self._generated_image_paths:
+                        self._generated_image_paths.append(image_path)
                 open_query = self._research_open_query if self._research_open_active else None
                 block = _tool_block_from_event(
                     event,

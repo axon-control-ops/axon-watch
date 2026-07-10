@@ -1,7 +1,8 @@
-"""List, read, and write UTF-8 files under workspace-scoped directories."""
+"""List, read, and write workspace-scoped files."""
 
 from __future__ import annotations
 
+import mimetypes
 import os
 from pathlib import Path
 
@@ -22,6 +23,19 @@ _SKIPPED_DIRECTORY_NAMES = {
     "venv",
 }
 _MAX_LISTED_FILES = 5000
+_IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".avif"})
+_MAX_RAW_FILE_BYTES = 16 * 1024 * 1024
+
+
+def is_image_workspace_file(file_path: str) -> bool:
+    return Path(str(file_path or "").strip()).suffix.lower() in _IMAGE_EXTENSIONS
+
+
+def workspace_file_media_type(file_path: str) -> str:
+    guessed, _ = mimetypes.guess_type(str(file_path or "").strip())
+    if guessed:
+        return guessed
+    return "application/octet-stream"
 
 
 def _safe_resolve(workspace_root: Path, relative_path: str) -> Path:
@@ -94,11 +108,18 @@ def list_workspace_files(workspace_id: str) -> list[dict[str, object]]:
     return items
 
 
-def read_workspace_file(workspace_id: str, file_path: str) -> dict[str, object]:
+def resolve_workspace_file_path(workspace_id: str, file_path: str) -> Path:
     root = resolve_workspace_root(workspace_id)
     target = _safe_resolve(root, file_path)
     if not target.is_file():
         raise WorkspaceFileError(f"file not found: {file_path}")
+    return target
+
+
+def read_workspace_file(workspace_id: str, file_path: str) -> dict[str, object]:
+    target = resolve_workspace_file_path(workspace_id, file_path)
+    if is_image_workspace_file(file_path):
+        raise WorkspaceFileError("binary image files must be fetched via the raw file endpoint")
     content = target.read_text(encoding="utf-8")
     return {
         "workspace_id": workspace_id,
@@ -106,6 +127,14 @@ def read_workspace_file(workspace_id: str, file_path: str) -> dict[str, object]:
         "content": content,
         "size_bytes": target.stat().st_size,
     }
+
+
+def read_workspace_file_bytes(workspace_id: str, file_path: str) -> tuple[bytes, str, int]:
+    target = resolve_workspace_file_path(workspace_id, file_path)
+    size_bytes = target.stat().st_size
+    if size_bytes > _MAX_RAW_FILE_BYTES:
+        raise WorkspaceFileError("file exceeds 16MB raw download limit")
+    return target.read_bytes(), workspace_file_media_type(file_path), size_bytes
 
 
 def write_workspace_file(workspace_id: str, file_path: str, content: str) -> dict[str, object]:

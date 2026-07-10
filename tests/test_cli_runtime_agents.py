@@ -9,7 +9,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.codex_agent import run_codex_local  # noqa: E402
-from app.cli_runtime.cursor_agent import _cursor_mode_flag, run_cursor_local  # noqa: E402
+from app.cli_runtime.cursor_agent import CursorAgentReply, _cursor_mode_flag, run_cursor_local  # noqa: E402
 
 
 def _stream_json_stdout(text: str) -> str:
@@ -38,7 +38,7 @@ class CliRuntimeAgentTests(unittest.TestCase):
             workspace_root=Path("/tmp"),
             composer_mode="agent",
         )
-        self.assertEqual("PONG", reply)
+        self.assertEqual("PONG", reply.content)
         command = mock_communicate.call_args.kwargs["command"]
         self.assertIn("stream-json", command)
         self.assertIn("plan", command)
@@ -64,7 +64,7 @@ class CliRuntimeAgentTests(unittest.TestCase):
             execution_tier="executing",
             on_chunk=lambda accumulated, delta: chunks.append(delta),
         )
-        self.assertEqual("Hello world", reply)
+        self.assertEqual("Hello world", reply.content)
         self.assertEqual(["Hello world"], chunks)
         command = mock_stream.call_args.kwargs["command"]
         self.assertNotIn("--mode", command)
@@ -109,10 +109,10 @@ class CliRuntimeAgentTests(unittest.TestCase):
             composer_mode="agent",
             execution_tier="executing",
         )
-        self.assertIn(":::thinking\nChecking the file.\n:::", reply)
-        self.assertIn(":::edit README.md +1 -0", reply)
-        self.assertIn("+<!-- hi -->", reply)
-        self.assertTrue(reply.endswith("DONE"))
+        self.assertIn(":::thinking\nChecking the file.\n:::", reply.content)
+        self.assertIn(":::edit README.md +1 -0", reply.content)
+        self.assertIn("+<!-- hi -->", reply.content)
+        self.assertTrue(reply.content.endswith("DONE"))
 
     @patch("app.cli_runtime.cursor_agent.communicate_registered_process")
     def test_cursor_error_result_raises(self, mock_communicate) -> None:

@@ -15,6 +15,12 @@ from app.chat.lane_b_agent import (
     generate_lane_b_result,
     should_use_lane_b,
 )
+from app.chat.lane_b_fast_paths import post_image_redisplay_message, post_workspace_switch_message
+from app.chat.lane_b_generated_image_actions import (
+    bind_agent_generated_images,
+    lane_b_open_file_ui_action,
+    maybe_generated_image_redisplay_reply,
+)
 from app.cli_runtime.approval_gate import normalize_execution_access
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
 from app.chat.orchestration import (
@@ -31,7 +37,6 @@ from app.chat.workspace_switch import (
     workspace_switch_ui_action,
 )
 from app.persistence import attachment_store, chat_store
-from app.workspace_handoffs import create_workspace_handoff
 from app.runs.service import (
     RunLifecycleError,
     RunNotFoundError,
@@ -542,6 +547,21 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             content=system_content,
             updated_at=updated_at,
         )
+        agent_attachments = bind_agent_generated_images(
+            workspace_id=job.workspace_id,
+            message_id=job.agent_message_id,
+            thread_id=job.thread_id,
+            lane_b_result=lane_b_result,
+            agent_content=agent_content,
+            created_at=updated_at,
+        )
+        ui_action = lane_b_open_file_ui_action(
+            operator_content=job.content,
+            workspace_id=job.workspace_id,
+            thread_id=job.thread_id,
+            lane_b_result=lane_b_result,
+            agent_content=agent_content,
+        )
         publish_chat_stream_event(
             job.thread_id,
             {
@@ -554,6 +574,8 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
                 "dispatched": dispatched,
                 "run_id": job.dispatch_run_id,
                 "run": run_record,
+                **({"attachments": agent_attachments} if agent_attachments else {}),
+                **({"ui_action": ui_action} if ui_action else {}),
             },
         )
     except Exception as exc:
@@ -590,90 +612,6 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
         clear_chat_stream_buffer(job.thread_id)
 
 
-def _post_workspace_switch_message(
-    *,
-    source_workspace_id: str,
-    content: str,
-    thread_id: str | None,
-    created_at: str,
-    intent: object,
-) -> dict[str, object]:
-    from app.chat.workspace_switch import WorkspaceSwitchIntent
-
-    if not isinstance(intent, WorkspaceSwitchIntent):
-        raise ChatValidationError("invalid workspace switch intent")
-
-    target_workspace_id = intent.target_workspace_id
-    if source_workspace_id != target_workspace_id:
-        try:
-            create_workspace_handoff(
-                source_workspace_id=source_workspace_id,
-                target_workspace_id=target_workspace_id,
-                task=content.strip(),
-                reason="Lane B workspace switch",
-            )
-        except Exception:
-            pass
-
-    thread, thread_id = _resolve_chat_thread(
-        workspace_id=source_workspace_id,
-        thread_id=thread_id,
-        thread_kind="ide",
-        run_id=None,
-        created_at=created_at,
-    )
-    agent_content = build_workspace_switch_reply(intent)
-    ui_action = workspace_switch_ui_action(intent)
-    system_content = (
-        f"Lane B — switched active workspace to {target_workspace_id} "
-        f"({intent.display_name})."
-    )
-
-    operator_message = chat_store.save_message(
-        {
-            "message_id": _new_message_id("message_operator"),
-            "thread_id": thread_id,
-            "workspace_id": source_workspace_id,
-            "run_id": thread.get("run_id"),
-            "role": "operator",
-            "content": content,
-            "created_at": created_at,
-        }
-    )
-    system_message = chat_store.save_message(
-        {
-            "message_id": _new_message_id("message_system"),
-            "thread_id": thread_id,
-            "workspace_id": source_workspace_id,
-            "run_id": thread.get("run_id"),
-            "role": "system",
-            "content": system_content,
-            "created_at": created_at,
-        }
-    )
-    agent_message = chat_store.save_message(
-        {
-            "message_id": _new_message_id("message_agent"),
-            "thread_id": thread_id,
-            "workspace_id": source_workspace_id,
-            "run_id": thread.get("run_id"),
-            "role": "agent",
-            "content": agent_content,
-            "created_at": created_at,
-        }
-    )
-
-    return {
-        "thread_id": thread_id,
-        "messages": [operator_message, system_message, agent_message],
-        "run_id": thread.get("run_id") or "",
-        "dispatched": False,
-        "run": None,
-        "streaming": False,
-        "ui_action": ui_action,
-    }
-
-
 def _post_lane_b_message(
     *,
     workspace_id: str,
@@ -695,12 +633,44 @@ def _post_lane_b_message(
     except WorkspaceSwitchError as exc:
         raise ChatValidationError(str(exc)) from exc
     if switch_intent is not None:
-        return _post_workspace_switch_message(
+        return post_workspace_switch_message(
             source_workspace_id=workspace_id,
+            target_workspace_id=switch_intent.target_workspace_id,
+            display_name=switch_intent.display_name,
             content=content,
             thread_id=thread_id,
             created_at=created_at,
-            intent=switch_intent,
+            run_id=None,
+            agent_content=build_workspace_switch_reply(switch_intent),
+            ui_action=workspace_switch_ui_action(switch_intent),
+            resolve_thread=_resolve_chat_thread,
+            new_message_id=_new_message_id,
+        )
+
+    # Resolve the thread early so "show me the images" can re-embed known
+    # :::image blocks without launching another Lane B agent run.
+    early_thread, thread_id = _resolve_chat_thread(
+        workspace_id=workspace_id,
+        thread_id=thread_id,
+        thread_kind="ide",
+        run_id=run_id,
+        created_at=created_at,
+    )
+    redisplay_reply = maybe_generated_image_redisplay_reply(
+        content,
+        workspace_id=workspace_id,
+        thread_id=thread_id,
+    )
+    if redisplay_reply:
+        return post_image_redisplay_message(
+            workspace_id=workspace_id,
+            content=content,
+            thread_id=thread_id,
+            run_id=early_thread.get("run_id") or run_id or "",
+            created_at=created_at,
+            redisplay_reply=redisplay_reply,
+            resolve_thread=_resolve_chat_thread,
+            new_message_id=_new_message_id,
         )
 
     context = LaneBContext(
@@ -921,6 +891,24 @@ def _post_lane_b_message(
             "created_at": created_at,
         }
     )
+    agent_attachments = bind_agent_generated_images(
+        workspace_id=workspace_id,
+        message_id=str(agent_message["message_id"]),
+        thread_id=thread_id,
+        lane_b_result=lane_b_result,
+        agent_content=agent_content,
+        created_at=created_at,
+    )
+    if agent_attachments:
+        agent_message = {**agent_message, "attachments": agent_attachments}
+
+    ui_action = lane_b_open_file_ui_action(
+        operator_content=content,
+        workspace_id=workspace_id,
+        thread_id=thread_id,
+        lane_b_result=lane_b_result,
+        agent_content=agent_content,
+    )
 
     return {
         "thread_id": thread_id,
@@ -934,6 +922,7 @@ def _post_lane_b_message(
             if agent_terminal_session is not None
             else {}
         ),
+        **({"ui_action": ui_action} if ui_action else {}),
     }
 
 

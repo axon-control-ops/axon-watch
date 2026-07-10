@@ -16,21 +16,26 @@ from app.routes.schemas import (
     CreateTerminalSessionRequest,
     CreateWorkspaceChatThreadRequest,
     CreateWorkspaceHandoffRequest,
+    RenameTerminalSessionRequest,
     RenameWorkspaceFileRequest,
     WriteWorkspaceFileRequest,
 )
 from app.terminal.session_handler import handle_terminal_session
 from app.terminal.session_registry import (
     create_session,
+    delete_session,
     ensure_operator_session,
     list_sessions,
+    rename_session,
     serialize_session,
 )
+from app.terminal.session_runtime import terminate_runtime
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record, list_workspace_records
 from app.workspace_files import (
     WorkspaceFileError,
     list_workspace_files,
     read_workspace_file,
+    read_workspace_file_bytes,
     rename_workspace_file,
     write_workspace_file,
 )
@@ -177,6 +182,39 @@ def workspace_terminal_sessions_create(
     return serialize_session(record)
 
 
+@router.post("/api/workspaces/{workspace_id}/terminal/sessions/{session_id}/rename")
+def workspace_terminal_sessions_rename(
+    workspace_id: str,
+    session_id: str,
+    body: RenameTerminalSessionRequest,
+) -> dict[str, object]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    updated = rename_session(workspace_id, session_id, body.title)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="terminal session not found")
+    return serialize_session(updated)
+
+
+@router.delete("/api/workspaces/{workspace_id}/terminal/sessions/{session_id}")
+def workspace_terminal_sessions_delete(workspace_id: str, session_id: str) -> dict[str, object]:
+    try:
+        get_workspace_record(workspace_id)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    deleted = delete_session(workspace_id, session_id)
+    terminate_runtime(workspace_id, session_id)
+    if not deleted and session_id != "terminal-operator":
+        raise HTTPException(status_code=404, detail="terminal session not found")
+    ensure_operator_session(workspace_id)
+    items = [serialize_session(record) for record in list_sessions(workspace_id)]
+    return {"workspace_id": workspace_id, "deleted": deleted, "items": items, "count": len(items)}
+
+
 @router.get("/api/workspaces/{workspace_id}/files")
 def workspace_files_index(workspace_id: str) -> dict[str, object]:
     try:
@@ -186,6 +224,24 @@ def workspace_files_index(workspace_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except WorkspaceFileError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/api/workspaces/{workspace_id}/files/{file_path:path}/raw")
+def workspace_files_raw(workspace_id: str, file_path: str):
+    try:
+        payload, media_type, _ = read_workspace_file_bytes(workspace_id, file_path)
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkspaceFileError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    from starlette.responses import Response
+
+    return Response(
+        content=payload,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=120"},
+    )
 
 
 @router.get("/api/workspaces/{workspace_id}/files/{file_path:path}")

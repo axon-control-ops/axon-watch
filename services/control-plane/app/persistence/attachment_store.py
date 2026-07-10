@@ -96,6 +96,28 @@ def _safe_filename(filename: str, mime_type: str) -> str:
     return base[:180]
 
 
+def save_from_path(
+    *,
+    workspace_id: str,
+    source_path: str | Path,
+    mime_type: str,
+    created_at: str,
+    filename: str | None = None,
+) -> dict[str, Any]:
+    path = Path(source_path).expanduser()
+    if not path.is_file():
+        raise AttachmentValidationError("attachment source file not found")
+    data = path.read_bytes()
+    chosen_name = filename or path.name
+    return save_upload(
+        workspace_id=workspace_id,
+        filename=chosen_name,
+        mime_type=mime_type,
+        data=data,
+        created_at=created_at,
+    )
+
+
 def save_upload(
     *,
     workspace_id: str,

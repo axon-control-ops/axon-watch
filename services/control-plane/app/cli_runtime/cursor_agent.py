@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.cli_runtime.cursor_stream_events import CursorStreamAssembler
@@ -14,6 +15,12 @@ from app.cli_runtime.subprocess_runner import (
     raise_if_operator_stopped,
     stream_registered_process,
 )
+
+
+@dataclass(frozen=True)
+class CursorAgentReply:
+    content: str
+    generated_image_paths: tuple[str, ...] = ()
 
 
 def _cursor_mode_flag(composer_mode: str, execution_tier: str) -> str:
@@ -39,7 +46,7 @@ def run_cursor_local(
     subprocess_env: dict[str, str] | None = None,
     run_id: str = "",
     on_chunk: Callable[[str, str], None] | None = None,
-) -> str:
+) -> CursorAgentReply:
     # stream-json is the only print format that reliably carries assistant text;
     # `--output-format text` returns an empty body for plan/tool-heavy replies.
     command = [
@@ -111,4 +118,7 @@ def run_cursor_local(
         raise RuntimeError(assembler.error_text)
     if not reply:
         raise RuntimeError("Cursor CLI returned no output.")
-    return reply
+    return CursorAgentReply(
+        content=reply,
+        generated_image_paths=assembler.generated_image_paths,
+    )

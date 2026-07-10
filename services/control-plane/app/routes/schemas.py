@@ -57,6 +57,10 @@ class CreateTerminalSessionRequest(BaseModel):
     session_id: str | None = None
 
 
+class RenameTerminalSessionRequest(BaseModel):
+    title: str
+
+
 class CreateWorkspaceHandoffRequest(BaseModel):
     target_workspace_id: str
     task: str

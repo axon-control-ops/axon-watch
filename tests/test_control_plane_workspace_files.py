@@ -148,6 +148,30 @@ class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
         )
         self.assertEqual(409, rename_response.status_code)
 
+    def test_raw_workspace_image_endpoint_serves_binary(self) -> None:
+        image_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "assets" / "mockup.png"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_bytes = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+            b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+            b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        image_path.write_bytes(image_bytes)
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/assets/mockup.png/raw")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("image/png", response.headers.get("content-type"))
+        self.assertEqual(image_bytes, response.content)
+
+    def test_text_workspace_file_endpoint_rejects_images(self) -> None:
+        image_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "assets" / "mockup.png"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/assets/mockup.png")
+        self.assertEqual(404, response.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()
