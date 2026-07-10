@@ -45,8 +45,7 @@ export function summarizeIdeAgentActivity(content: string): IdeAgentActivitySumm
       chips.push({
         id: `terminal:${terminalCount}:${segment.command}`,
         kind: 'terminal',
-        label:
-          terminalCount === 1 ? '1 background terminal' : `${terminalCount} background terminals`,
+        label: terminalCount === 1 ? '1 terminal' : `${terminalCount} terminals`,
       });
       continue;
     }

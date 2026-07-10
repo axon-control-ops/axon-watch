@@ -1,8 +1,8 @@
 import {
   AGENT_LIVE_LINE_DISPLAY_MAX,
   firstSpeakableAgentLiveBlock,
-  flattenLiveLineText,
   isAgentLiveLineTruncated,
+  sanitizeAgentThinkingForOperator,
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
 import { personaThreadPrefix } from './operator-persona-name';
@@ -53,13 +53,23 @@ export function streamingActivityLabel(content: string, fullAccess = false): str
 export function resolveStreamingActivity(content: string, fullAccess = false): StreamingActivityView {
   const thinking = liveThinkingText(content);
   if (thinking) {
-    const flattened = flattenLiveLineText(thinking);
-    const displayBody = truncateAgentLiveLineForDisplay(flattened, AGENT_LIVE_LINE_DISPLAY_MAX);
+    const sanitized = sanitizeAgentThinkingForOperator(thinking);
+    if (sanitized) {
+      const displayBody = truncateAgentLiveLineForDisplay(sanitized, AGENT_LIVE_LINE_DISPLAY_MAX);
+      return {
+        label: personaThreadPrefix(displayBody),
+        liveBodyFull: sanitized,
+        liveBodySpoken: firstSpeakableAgentLiveBlock(sanitized),
+        liveBodyTruncated: isAgentLiveLineTruncated(sanitized, displayBody),
+      };
+    }
+    // Meta-only thinking ("The user is asking…") — do not surface as VAXON copy.
+    const fallback = fullAccess ? 'Full Access agent running…' : 'Agent running…';
     return {
-      label: personaThreadPrefix(displayBody),
-      liveBodyFull: flattened,
-      liveBodySpoken: firstSpeakableAgentLiveBlock(flattened),
-      liveBodyTruncated: isAgentLiveLineTruncated(flattened, displayBody),
+      label: personaThreadPrefix(fallback),
+      liveBodyFull: null,
+      liveBodySpoken: null,
+      liveBodyTruncated: false,
     };
   }
 

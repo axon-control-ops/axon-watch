@@ -242,6 +242,10 @@ describe('thinkingPreview', () => {
     expect(thinkingPreview(long).length).toBeLessThanOrEqual(90);
     expect(thinkingPreview(long).endsWith('…')).toBe(true);
   });
+
+  it('replaces pure user-meta thinking with Thinking…', () => {
+    expect(thinkingPreview('The user is asking whether')).toBe('Thinking…');
+  });
 });
 
 describe('editedFilePathsFromTranscript', () => {

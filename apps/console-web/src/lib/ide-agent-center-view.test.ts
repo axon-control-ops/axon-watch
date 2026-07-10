@@ -179,5 +179,15 @@ describe('ide agent center view', () => {
       reviewLabel: 'Review 2 files',
       applyLabel: 'Apply all',
     });
+
+    expect(
+      buildIdeAgentReviewBar({
+        canStop: false,
+        stopping: false,
+        editedFileCount: 0,
+        reviewReadyCount: 0,
+        completing: false,
+      }).showStop,
+    ).toBe(false);
   });
 });

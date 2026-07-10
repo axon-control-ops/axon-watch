@@ -1,5 +1,7 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
+import { sanitizeAgentThinkingForOperator } from './agent-live-line-view';
+
 export type ResearchTranscriptItem = {
   title: string;
   url: string;
@@ -420,7 +422,8 @@ export function diffLineTone(line: string): DiffLineTone {
 }
 
 export function thinkingPreview(text: string, maxLength = 90): string {
-  const flattened = text.replace(/\s+/g, ' ').trim();
+  const sanitized = sanitizeAgentThinkingForOperator(text);
+  const flattened = (sanitized || 'Thinking…').replace(/\s+/g, ' ').trim();
   if (flattened.length <= maxLength) {
     return flattened;
   }

@@ -45,7 +45,6 @@ const {
   extraPinnedRows,
   fullAccessConsentChecked,
   handleApproveRun,
-  handleBackgroundRun,
   handleComposerDragLeave,
   handleComposerDragOver,
   handleComposerDrop,
@@ -72,6 +71,7 @@ const {
   openVaultSurface,
   removeChip,
   removeComposerImage,
+  editQueuedMessage,
   removeQueuedMessage,
   requestFullAccess,
   revealComposerTerminalPanel,
@@ -184,6 +184,7 @@ const {
           @remove-chip="removeChip"
           @open-image="openComposerImage"
           @remove-image="removeComposerImage"
+          @edit-queued="editQueuedMessage"
           @remove-queued="removeQueuedMessage"
           @steer-queued="handleSteerQueuedMessage"
           @sync-height="syncComposerHeight"
@@ -194,7 +195,6 @@ const {
           @steer="handleSteer"
           @toggle-voice="toggleVoiceCapture"
           @stop="handleStopRun"
-          @background="handleBackgroundRun"
         >
           <template #toolbar>
             <AgentDockComposerToolbar

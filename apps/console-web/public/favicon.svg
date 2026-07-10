@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Axon-X">
+  <defs>
+    <linearGradient id="tile-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a1828" />
+      <stop offset="100%" stop-color="#040f1c" />
+    </linearGradient>
+    <linearGradient id="mark-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d8f8ff" />
+      <stop offset="52%" stop-color="#48c4ff" />
+      <stop offset="100%" stop-color="#9ef0ff" />
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <linearGradient id="sheen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2" />
+      <stop offset="40%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="14" fill="url(#tile-bg)" />
+  <rect
+    x="1.5"
+    y="1.5"
+    width="61"
+    height="61"
+    rx="12.5"
+    fill="none"
+    stroke="#48c4ff"
+    stroke-opacity="0.42"
+    stroke-width="1.2"
+  />
+  <rect width="64" height="64" rx="14" fill="url(#sheen)" />
+
+  <g filter="url(#glow)" fill="none" stroke="url(#mark-grad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18.5 45.5 L32 18.5 L45.5 45.5" />
+    <path d="M45.5 18.5 L18.5 45.5" />
+  </g>
+  <rect
+    x="26.8"
+    y="30.4"
+    width="10.4"
+    height="3.2"
+    rx="0.7"
+    transform="rotate(-14 32 32)"
+    fill="url(#mark-grad)"
+    filter="url(#glow)"
+  />
+</svg>

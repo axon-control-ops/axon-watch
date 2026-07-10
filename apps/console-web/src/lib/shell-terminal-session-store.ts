@@ -7,6 +7,7 @@ import {
   renameWorkspaceTerminalSession,
   type TerminalSessionRecord,
 } from '../api/control-plane';
+import { armAgentShellMirror } from './agent-shell-mirror-state';
 import {
   DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
   upsertTerminalSession,
@@ -136,6 +137,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
   }
 
   function backgroundIdeAgentRun(): void {
+    armAgentShellMirror();
     input.revealIdeTerminalPanel();
     const agentSession = input.terminalSessions.value.find((session) => session.role === 'agent');
     if (agentSession) {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldShowAgentTerminalBackgroundControl } from './agent-terminal-background-view';
+import {
+  agentTranscriptHasOpenTerminalBlock,
+  shouldShowAgentTerminalBackgroundControl,
+} from './agent-terminal-background-view';
 
 describe('agent terminal background visibility', () => {
   it('hides when the agent run is not stoppable', () => {
@@ -8,12 +11,11 @@ describe('agent terminal background visibility', () => {
       shouldShowAgentTerminalBackgroundControl({
         canStopIdeAgentRun: false,
         terminalBlockRunning: true,
-        agentTerminalFocused: true,
       }),
     ).toBe(false);
   });
 
-  it('shows on a running terminal transcript block', () => {
+  it('shows only while an in-thread shell block is still open', () => {
     expect(
       shouldShowAgentTerminalBackgroundControl({
         canStopIdeAgentRun: true,
@@ -22,20 +24,20 @@ describe('agent terminal background visibility', () => {
     ).toBe(true);
   });
 
-  it('shows when the agent terminal dock is focused during a stoppable run', () => {
+  it('hides for a busy agent with no open shell block', () => {
     expect(
       shouldShowAgentTerminalBackgroundControl({
         canStopIdeAgentRun: true,
-        agentTerminalFocused: true,
-      }),
-    ).toBe(true);
-  });
-
-  it('hides when neither a running block nor agent terminal focus applies', () => {
-    expect(
-      shouldShowAgentTerminalBackgroundControl({
-        canStopIdeAgentRun: true,
+        terminalBlockRunning: false,
       }),
     ).toBe(false);
+  });
+
+  it('detects open vs closed terminal blocks in transcript content', () => {
+    expect(agentTranscriptHasOpenTerminalBlock(':::terminal npm test\nrunning…')).toBe(true);
+    expect(
+      agentTranscriptHasOpenTerminalBlock([':::terminal npm test', 'ok', ':::'].join('\n')),
+    ).toBe(false);
+    expect(agentTranscriptHasOpenTerminalBlock(':::thinking\nstill going')).toBe(false);
   });
 });

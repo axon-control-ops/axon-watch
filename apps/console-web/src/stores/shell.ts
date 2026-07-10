@@ -172,9 +172,8 @@ import {
   shouldSyncWorkspaceStreamGlobals,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
-import {
-  resolveOperatorSignalCount,
-} from '../lib/operator-signal-count';
+import { resolveOperatorSignalCount } from '../lib/operator-signal-count';
+import { resolveKairoPresenceClickTarget } from '../lib/kairo-presence-action';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
   resolveAttentionFocusScrollTarget,
@@ -1722,33 +1721,34 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function handleKairoPresenceAction(): void {
-    if (kairoVoicePaused.value) {
+    const target = resolveKairoPresenceClickTarget({
+      paused: kairoVoicePaused.value,
+      voiceBusy:
+        kairoSpeechQueueActive.value ||
+        kairoVoiceEngineActive.value ||
+        isKairoSpeechQueueBusy() ||
+        kairoConversationPhase.value === 'speaking' ||
+        kairoConversationPhase.value === 'thinking',
+      layoutMode: layoutMode.value,
+      state: kairoPresenceState.value,
+    });
+    if (target === 'resume') {
       resumeKairoSpeech();
       return;
     }
-
-    const voiceBusy =
-      kairoSpeechQueueActive.value ||
-      kairoVoiceEngineActive.value ||
-      isKairoSpeechQueueBusy() ||
-      kairoConversationPhase.value === 'speaking' ||
-      kairoConversationPhase.value === 'thinking';
-
-    if (layoutMode.value === 'ide') {
-      if (voiceBusy) {
-        pauseKairoSpeech();
-        return;
-      }
-      focusKairoBriefing();
+    if (target === 'pause') {
+      pauseKairoSpeech();
       return;
     }
-
-    if (voiceBusy) {
+    if (target === 'interrupt') {
       interruptKairoVoice();
       setKairoConversationPhase('idle');
       return;
     }
-
+    if (target === 'attention') {
+      focusAttentionSidebar();
+      return;
+    }
     focusKairoBriefing();
   }
 

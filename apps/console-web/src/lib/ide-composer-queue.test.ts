@@ -4,6 +4,7 @@ import type { RunRecord } from '../contracts/canonical';
 
 import {
   appendIdeComposerQueueEntry,
+  findIdeComposerQueueEntry,
   removeIdeComposerQueueEntry,
   resolveIdeStopRun,
   shouldQueueIdeComposerSubmit,
@@ -88,5 +89,17 @@ describe('ide composer queue', () => {
 
     expect(shiftIdeComposerQueue(queue).next?.content).toBe('first');
     expect(removeIdeComposerQueueEntry(queue, 'q1')).toEqual([]);
+  });
+
+  it('finds a queued entry by id for edit', () => {
+    const queue = appendIdeComposerQueueEntry([], {
+      id: 'q1',
+      content: 'revise me',
+      composerMode: 'plan',
+      createdAt: '2026-07-08T00:00:00Z',
+    });
+
+    expect(findIdeComposerQueueEntry(queue, 'q1')?.content).toBe('revise me');
+    expect(findIdeComposerQueueEntry(queue, 'missing')).toBeNull();
   });
 });

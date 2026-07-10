@@ -26,9 +26,14 @@ function persistTerminalScrollback(): void {
   terminalController?.persistScrollback();
 }
 
+function writeMirrorSnapshot(text: string): void {
+  terminalController?.writeMirrorSnapshot(text);
+}
+
 defineExpose({
   clearTerminal,
   persistTerminalScrollback,
+  writeMirrorSnapshot,
 });
 
 function handleBeforeUnload(): void {

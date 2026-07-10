@@ -90,6 +90,24 @@
   gap: 0.2rem;
 }
 
+.agent-dock-composer__queue-edit {
+  border: 0;
+  background: transparent;
+  color: rgba(168, 186, 208, 0.92);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 0.2rem 0.28rem;
+  border-radius: 0.28rem;
+  cursor: pointer;
+}
+
+.agent-dock-composer__queue-edit:hover {
+  color: rgba(230, 240, 255, 0.98);
+  background: rgba(148, 163, 184, 0.14);
+}
+
 .agent-dock-composer__queue-steer {
   display: inline-grid;
   place-items: center;

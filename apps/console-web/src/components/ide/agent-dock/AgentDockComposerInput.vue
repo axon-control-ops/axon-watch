@@ -51,6 +51,7 @@ const emit = defineEmits<{
   'remove-chip': [key: string];
   'open-image': [image: ComposerClipboardImage];
   'remove-image': [imageId: string];
+  'edit-queued': [messageId: string];
   'remove-queued': [messageId: string];
   'steer-queued': [messageId: string];
   'sync-height': [];
@@ -61,7 +62,6 @@ const emit = defineEmits<{
   steer: [];
   'toggle-voice': [];
   stop: [];
-  background: [];
 }>();
 </script>
 
@@ -131,6 +131,15 @@ const emit = defineEmits<{
       >
         <span class="agent-dock-composer__queue-text">{{ item.content }}</span>
         <div class="agent-dock-composer__queue-actions">
+          <button
+            type="button"
+            class="agent-dock-composer__queue-edit"
+            aria-label="Edit queued message"
+            title="Edit"
+            @click="emit('edit-queued', item.id)"
+          >
+            Edit
+          </button>
           <button
             type="button"
             class="agent-dock-composer__queue-steer"
@@ -215,16 +224,6 @@ const emit = defineEmits<{
         @click="emit('toggle-voice')"
       >
         {{ speechCapturing ? 'Listening…' : 'Mic' }}
-      </button>
-      <button
-        v-if="showComposerStop"
-        type="button"
-        class="agent-dock-composer__background"
-        title="Continue in background (vaxon terminal)"
-        aria-label="Continue run in background"
-        @click="emit('background')"
-      >
-        Background
       </button>
       <button
         v-if="showComposerSteer"

@@ -38,6 +38,7 @@ import {
   parseAgentTranscriptBlocks,
   thinkingPreview,
 } from '../lib/agent-transcript-blocks';
+import { sanitizeAgentThinkingForOperator } from '../lib/agent-live-line-view';
 import { shouldShowAgentTerminalBackgroundControl } from '../lib/agent-terminal-background-view';
 import { resolveChatAttachmentUrl } from '../api/control-plane';
 import { threadAttachmentUrlForImagePath } from '../lib/thread-image-url';
@@ -156,10 +157,15 @@ function backgroundAgentTerminalRun(): void {
 }
 
 function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean): boolean {
+  // Cursor shows "Run in Background" only on an in-flight shell card.
   return shouldShowAgentTerminalBackgroundControl({
     canStopIdeAgentRun: shell.canStopIdeAgentRun,
     terminalBlockRunning: segmentOpen && isStreamingMessage(messageId),
   });
+}
+
+function thinkingBodyText(text: string): string {
+  return sanitizeAgentThinkingForOperator(text) || 'Thinking…';
 }
 
 async function copyTerminalOutput(output: string): Promise<void> {
@@ -497,7 +503,7 @@ watch(
                 v-if="isThinkingExpanded(segmentKey(item.message.message_id, segmentIndex), segment.open)"
                 class="agent-block__thinking-body"
               >
-                {{ segment.text }}
+                {{ thinkingBodyText(segment.text) }}
               </p>
             </div>
 
@@ -534,8 +540,8 @@ watch(
                   v-if="showTerminalBackgroundControl(item.message.message_id, segment.open)"
                   type="button"
                   class="agent-block__terminal-background"
-                  title="Continue in background (vaxon terminal)"
-                  aria-label="Continue run in background"
+                  title="Move shell to terminal panel (vaxon)"
+                  aria-label="Move shell command to background terminal"
                   @click="backgroundAgentTerminalRun"
                 >
                   Background

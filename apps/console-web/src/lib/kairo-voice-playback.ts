@@ -37,9 +37,47 @@ const chunkListeners = new Set<() => void>();
 let speaking = false;
 
 const AUDIO_PREROLL_MS = 40;
+/** Data/blob URLs sometimes never fire canplaythrough — never block forever. */
+const AUDIO_READY_TIMEOUT_MS = 2500;
 
 function speechPort(): SpeechPort | null {
   return typeof speechSynthesis === 'undefined' ? null : speechSynthesis;
+}
+
+type AzureAudioHandle = {
+  audio: HTMLAudioElement;
+  revoke: () => void;
+};
+
+/** Prefer blob URLs — large data: audio URLs often stall before canplaythrough. */
+function createAzureAudioHandle(
+  audioBase64: string,
+  contentType?: string,
+): AzureAudioHandle {
+  const mime = (contentType ?? 'audio/mpeg').split(';')[0]?.trim() || 'audio/mpeg';
+  let objectUrl: string | null = null;
+  try {
+    const binary = atob(audioBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    objectUrl = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    const audio = new Audio(objectUrl);
+    const url = objectUrl;
+    return {
+      audio,
+      revoke: () => {
+        URL.revokeObjectURL(url);
+      },
+    };
+  } catch {
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+    }
+    const audio = new Audio(`data:${mime};base64,${audioBase64}`);
+    return { audio, revoke: () => undefined };
+  }
 }
 
 function notifySpeaking(active: boolean): void {
@@ -117,39 +155,78 @@ function delay(ms: number): Promise<void> {
 }
 
 async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
-  if (audio.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+  // HAVE_CURRENT_DATA is enough to start playback; waiting for canplaythrough
+  // on blob/data URLs can hang indefinitely in Chromium.
+  if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
     return;
   }
   await new Promise<void>((resolve, reject) => {
-    const onReady = (): void => {
+    let settled = false;
+    const finish = (ok: boolean, error?: Error): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       cleanup();
-      resolve();
+      if (ok) {
+        resolve();
+        return;
+      }
+      reject(error ?? new Error('audio preload failed'));
+    };
+    const onReady = (): void => {
+      finish(true);
     };
     const onError = (): void => {
-      cleanup();
-      reject(new Error('audio preload failed'));
+      finish(false, new Error('audio preload failed'));
     };
+    const timer = globalThis.setTimeout(() => {
+      if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        finish(true);
+        return;
+      }
+      // Last resort: let play() decide — do not leave SPEAKING stuck forever.
+      finish(true);
+    }, AUDIO_READY_TIMEOUT_MS);
     const cleanup = (): void => {
+      globalThis.clearTimeout(timer);
+      audio.removeEventListener('canplay', onReady);
       audio.removeEventListener('canplaythrough', onReady);
+      audio.removeEventListener('loadeddata', onReady);
       audio.removeEventListener('error', onError);
     };
-    audio.addEventListener('canplaythrough', onReady, { once: true });
-    audio.addEventListener('error', onError, { once: true });
-    audio.load();
+    audio.addEventListener('canplay', onReady);
+    audio.addEventListener('canplaythrough', onReady);
+    audio.addEventListener('loadeddata', onReady);
+    audio.addEventListener('error', onError);
+    // Avoid audio.load() here — restarting a blob/data URL often stalls decode.
   });
 }
 
 async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void> {
   audio.preload = 'auto';
-  audio.currentTime = 0;
+  try {
+    audio.currentTime = 0;
+  } catch {
+    // Some engines throw if metadata is not ready yet; play() still works.
+  }
   await waitForAudioReady(audio);
   await delay(AUDIO_PREROLL_MS);
   await new Promise<void>((resolve, reject) => {
+    let settled = false;
     const finish = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       cleanup();
       resolve();
     };
     const fail = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       cleanup();
       reject(new Error('audio playback failed'));
     };
@@ -159,7 +236,7 @@ async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void
     };
     audio.onended = finish;
     audio.onerror = fail;
-    void audio.play().catch(fail);
+    void audio.play().then(undefined, fail);
   });
 }
 
@@ -179,17 +256,16 @@ async function speakAzureChunks(chunks: string[]): Promise<KairoVoicePlaybackRes
     if (!response.available || !response.audio_base64) {
       return speakWithBrowser(remaining, resolveAzureFallbackReason(response));
     }
-    const audio = new Audio(
-      `data:${response.content_type ?? 'audio/mpeg'};base64,${response.audio_base64}`,
-    );
-    registerKairoAudioElement(audio);
+    const handle = createAzureAudioHandle(response.audio_base64, response.content_type);
+    registerKairoAudioElement(handle.audio);
     try {
-      await playAzureAudioToCompletion(audio);
+      await playAzureAudioToCompletion(handle.audio);
     } catch {
       registerKairoAudioElement(null);
       return speakWithBrowser(remaining, 'audio_playback_failed');
     } finally {
       registerKairoAudioElement(null);
+      handle.revoke();
     }
   }
   notifySpeaking(false);
@@ -264,18 +340,19 @@ export async function playKairoUtteranceNow(
       notifyChunk();
       const response = await postKairoTts(chunks[0]);
       if (response.available && response.audio_base64) {
-        const audio = new Audio(
-          `data:${response.content_type ?? 'audio/mpeg'};base64,${response.audio_base64}`,
-        );
-        registerKairoAudioElement(audio);
+        const handle = createAzureAudioHandle(response.audio_base64, response.content_type);
+        registerKairoAudioElement(handle.audio);
         try {
-          await playAzureAudio(audio);
+          await playAzureAudio(handle.audio);
           notifySpeaking(false);
           notifyIdle();
           return finishPlayback({ engine: 'azure', reason: null }, trimmed);
         } catch {
           registerKairoAudioElement(null);
           return speakWithBrowser(trimmed, 'audio_playback_failed');
+        } finally {
+          registerKairoAudioElement(null);
+          handle.revoke();
         }
       }
       return speakWithBrowser(trimmed, resolveAzureFallbackReason(response));

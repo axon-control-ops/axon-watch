@@ -167,7 +167,6 @@ export function useAgentDockComposer() {
 
   const {
     handleApproveRun,
-    handleBackgroundRun,
     handleComposerKeydown,
     handleRejectRun,
     handleResumeRun,
@@ -175,6 +174,7 @@ export function useAgentDockComposer() {
     handleSteerQueuedMessage,
     handleStopRun,
     handleSubmit,
+    editQueuedMessage,
     removeQueuedMessage,
     revealComposerTerminalPanel,
     toggleVoiceCapture,
@@ -228,6 +228,9 @@ export function useAgentDockComposer() {
   );
   const composerQueueHint = computed(() => {
     if (!composerAgentBusy.value || composerMode.value !== 'agent') {
+      return '';
+    }
+    if (!shell.ideComposerDraft.trim()) {
       return '';
     }
     const steerKey = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
@@ -375,7 +378,6 @@ export function useAgentDockComposer() {
     extraPinnedRows,
     fullAccessConsentChecked,
     handleApproveRun,
-    handleBackgroundRun,
     handleComposerDragLeave,
     handleComposerDragOver,
     handleComposerDrop,
@@ -402,6 +404,7 @@ export function useAgentDockComposer() {
     openVaultSurface,
     removeChip,
     removeComposerImage,
+    editQueuedMessage,
     removeQueuedMessage,
     requestFullAccess,
     revealComposerTerminalPanel,

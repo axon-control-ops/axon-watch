@@ -232,6 +232,13 @@
   color: rgba(255, 190, 190, 0.92);
 }
 
+.ide-agent-review-strip__btn--background {
+  border-color: rgba(0, 245, 212, 0.35);
+  background: rgba(0, 40, 36, 0.72);
+  color: rgba(160, 255, 235, 0.95);
+  font-weight: 600;
+}
+
 .ide-agent-review-strip__btn--review {
   border-color: rgba(138, 154, 173, 0.28);
   background: rgba(28, 32, 40, 0.92);

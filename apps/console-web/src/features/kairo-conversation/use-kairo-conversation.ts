@@ -52,6 +52,7 @@ export function useKairoConversation() {
   const pending = ref(false);
   const thinkingLine = ref('');
   let runtimeCueTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  let lastOperatorPrompt = '';
 
   const canSubmit = computed(
     () =>
@@ -81,8 +82,10 @@ export function useKairoConversation() {
     return id;
   }
 
-  function speakReply(line: string): Promise<void> {
-    return shell.speakKairoConversationLine(line, { skipSpeakApi: true });
+  function speakReply(line: string, operatorPrompt?: string): Promise<void> {
+    return shell.speakKairoConversationLine(line, {
+      operatorPrompt: operatorPrompt ?? lastOperatorPrompt,
+    });
   }
 
   function clearRuntimeAssistantCue(): void {
@@ -104,7 +107,7 @@ export function useKairoConversation() {
         return;
       }
       kairoConversationReply.value = RUNTIME_ASSISTANT_CUE_COPY;
-      void shell.speakKairoConversationLine(RUNTIME_ASSISTANT_CUE_LINE, { skipSpeakApi: true });
+      void shell.speakKairoConversationLine(RUNTIME_ASSISTANT_CUE_LINE, { operatorPrompt: content });
     }, RUNTIME_ASSISTANT_CUE_DELAY_MS);
   }
 
@@ -238,6 +241,7 @@ export function useKairoConversation() {
     if (!content || pending.value) {
       return;
     }
+    lastOperatorPrompt = content;
     const answerTier = determineAnswerTier(content);
 
     pending.value = true;

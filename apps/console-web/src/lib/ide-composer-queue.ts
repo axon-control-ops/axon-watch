@@ -89,6 +89,13 @@ export function removeIdeComposerQueueEntry(
   return queue.filter((entry) => entry.id !== messageId);
 }
 
+export function findIdeComposerQueueEntry(
+  queue: readonly IdeComposerQueuedMessage[],
+  messageId: string,
+): IdeComposerQueuedMessage | null {
+  return queue.find((entry) => entry.id === messageId) ?? null;
+}
+
 export function ideComposerQueueLabel(count: number): string {
   if (count <= 0) {
     return '';

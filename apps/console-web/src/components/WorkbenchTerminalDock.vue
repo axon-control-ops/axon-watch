@@ -4,8 +4,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import TerminalHost from './TerminalHost.vue';
 import WorkbenchIcon from './WorkbenchIcon.vue';
 import TerminalSessionRail from './shell/TerminalSessionRail.vue';
+import { useAgentTerminalMirror } from '../composables/useAgentTerminalMirror';
+import {
+  agentShellMirrorActive,
+  clearAgentShellMirror,
+} from '../lib/agent-shell-mirror-state';
+import { findAgentTerminalMirrorSegment } from '../lib/agent-terminal-mirror';
 import { terminalSessionTabLabel } from '../lib/terminal-session-view';
-import { shouldShowAgentTerminalBackgroundControl } from '../lib/agent-terminal-background-view';
 import { useShellStore } from '../stores/shell';
 
 const props = defineProps<{
@@ -58,12 +63,39 @@ const visibleTerminalSessions = computed(() => {
   return sessions.slice(0, 2);
 });
 
-const showAgentTerminalBackground = computed(() =>
-  shouldShowAgentTerminalBackgroundControl({
-    canStopIdeAgentRun: shell.canStopIdeAgentRun,
-    agentTerminalFocused: activeTerminalSession.value.role === 'agent',
-  }),
+const agentSessionId = computed(
+  () => shell.terminalSessions.find((session) => session.role === 'agent')?.id ?? null,
 );
+
+const agentStreamActive = computed(() => shell.agentStreamActive);
+
+const mirrorTranscriptContent = computed(() => {
+  const streamId = shell.agentStreamMessageId;
+  if (streamId) {
+    return (
+      shell.threadMessages.find((message) => message.message_id === streamId)?.content ?? ''
+    );
+  }
+  for (let index = shell.threadMessages.length - 1; index >= 0; index -= 1) {
+    const message = shell.threadMessages[index];
+    if (message?.role !== 'agent') {
+      continue;
+    }
+    if (findAgentTerminalMirrorSegment(message.content)) {
+      return message.content;
+    }
+  }
+  return '';
+});
+
+const { syncNow: syncAgentTerminalMirror } = useAgentTerminalMirror({
+  mirrorActive: agentShellMirrorActive,
+  agentSessionId,
+  transcriptContent: mirrorTranscriptContent,
+  streamActive: agentStreamActive,
+  clearMirror: clearAgentShellMirror,
+  getHost: (sessionId) => terminalHostRefs.value[sessionId] ?? null,
+});
 
 function paneLabel(session: (typeof shell.terminalSessions)[number]): string {
   const base = terminalSessionTabLabel({
@@ -74,11 +106,10 @@ function paneLabel(session: (typeof shell.terminalSessions)[number]): string {
     run_id: session.runId,
     created_at: '',
   });
+  if (session.role === 'agent' && agentShellMirrorActive.value) {
+    return `${base} · agent shell`;
+  }
   return session.role === 'agent' ? `${base} · read-only` : base;
-}
-
-function backgroundAgentTerminalRun(): void {
-  shell.backgroundIdeAgentRun();
 }
 
 function setTerminalHostRef(sessionId: string, host: TerminalHostInstance | null): void {
@@ -86,6 +117,9 @@ function setTerminalHostRef(sessionId: string, host: TerminalHostInstance | null
     ...terminalHostRefs.value,
     [sessionId]: host,
   };
+  if (host && agentShellMirrorActive.value && sessionId === agentSessionId.value) {
+    syncAgentTerminalMirror();
+  }
 }
 
 function closeNewTerminalMenu(): void {
@@ -223,16 +257,6 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <div class="terminal-tabbar__actions">
-          <button
-            v-if="showAgentTerminalBackground"
-            type="button"
-            class="terminal-tabbar__background"
-            title="Continue in background (vaxon terminal)"
-            aria-label="Continue run in background"
-            @click="backgroundAgentTerminalRun"
-          >
-            Background
-          </button>
           <div class="terminal-tabbar__new-wrap">
             <button
               type="button"

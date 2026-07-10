@@ -77,7 +77,11 @@ function openSettings(): void {
         <KairoPresenceBar
           v-if="showTopbarKairoPresence"
           compact
-          :state="shell.kairoPresenceState"
+          :state="
+            shell.layoutMode === 'ide'
+              ? shell.ideDisplayKairoPresenceState
+              : shell.kairoPresenceState
+          "
           :speech-active="shell.kairoSpeechActive && !shell.kairoVoicePaused"
           :paused="shell.kairoVoicePaused"
           @action="shell.handleKairoPresenceAction()"

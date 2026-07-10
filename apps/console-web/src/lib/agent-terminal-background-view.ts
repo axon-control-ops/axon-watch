@@ -1,21 +1,28 @@
 /**
- * Visibility for Cursor-parity "Background" on agent terminal runs.
- * Background reveals/focuses the vaxon terminal while the agent keeps running.
+ * Visibility for Cursor-parity "Background" on in-thread agent shell cards.
+ *
+ * Cursor shows this only while a Shell tool is in-flight (open `:::terminal`
+ * block). Pressing it reveals the bottom terminal and mirrors that shell card
+ * into the vaxon tab. True process detach into a real PTY remains a follow-up.
  */
+
+import { parseAgentTranscriptBlocks } from './agent-transcript-blocks';
 
 export type AgentTerminalBackgroundVisibilityInput = {
   canStopIdeAgentRun: boolean;
-  /** Open `:::terminal` transcript block while the agent message is still streaming. */
-  terminalBlockRunning?: boolean;
-  /** Active bottom-dock session is the agent (vaxon) PTY. */
-  agentTerminalFocused?: boolean;
+  /** Open (unclosed) `:::terminal` block = shell tool still running in-thread. */
+  terminalBlockRunning: boolean;
 };
 
 export function shouldShowAgentTerminalBackgroundControl(
   input: AgentTerminalBackgroundVisibilityInput,
 ): boolean {
-  if (!input.canStopIdeAgentRun) {
-    return false;
-  }
-  return Boolean(input.terminalBlockRunning || input.agentTerminalFocused);
+  return input.canStopIdeAgentRun && input.terminalBlockRunning;
+}
+
+/** True when the agent transcript still has an unclosed `:::terminal` block. */
+export function agentTranscriptHasOpenTerminalBlock(content: string): boolean {
+  return parseAgentTranscriptBlocks(content).some(
+    (segment) => segment.kind === 'terminal' && segment.open,
+  );
 }

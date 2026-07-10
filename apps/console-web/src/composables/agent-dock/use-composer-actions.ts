@@ -14,6 +14,7 @@ import {
 } from '../../features/kairo-conversation/conversation-briefing-surface';
 import { kairoConversationReply } from '../../features/kairo-conversation/kairo-conversation-state';
 import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
+import { findIdeComposerQueueEntry } from '../../lib/ide-composer-queue';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 
@@ -62,10 +63,6 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   function handleStopRun(): void {
     void shell.stopIdeAgentRun();
-  }
-
-  function handleBackgroundRun(): void {
-    shell.backgroundIdeAgentRun();
   }
 
   function handleResumeRun(): void {
@@ -125,6 +122,25 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   function removeQueuedMessage(messageId: string): void {
     shell.removeIdeComposerQueuedMessage(messageId);
+  }
+
+  function editQueuedMessage(messageId: string): void {
+    const entry = findIdeComposerQueueEntry(shell.ideComposerQueue, messageId);
+    if (!entry) {
+      return;
+    }
+    shell.removeIdeComposerQueuedMessage(messageId);
+    composerMode.value = entry.composerMode;
+    shell.ideComposerDraft = entry.content;
+    requestAnimationFrame(() => {
+      const input = inputRef.value;
+      if (!input) {
+        return;
+      }
+      input.focus();
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+    });
   }
 
   function revealComposerTerminalPanel(): void {
@@ -187,7 +203,6 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   return {
     handleApproveRun,
-    handleBackgroundRun,
     handleComposerKeydown,
     handleRejectRun,
     handleResumeRun,
@@ -195,6 +210,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     handleSteerQueuedMessage,
     handleStopRun,
     handleSubmit,
+    editQueuedMessage,
     removeQueuedMessage,
     revealComposerTerminalPanel,
     toggleVoiceCapture,

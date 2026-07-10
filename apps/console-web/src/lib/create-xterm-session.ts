@@ -34,6 +34,8 @@ export interface XtermSessionController {
   dispose: () => void;
   persistScrollback: () => void;
   setContext: (context: TerminalContext) => void;
+  /** Replace the viewport with a Cursor-style agent shell mirror (no PTY). */
+  writeMirrorSnapshot: (text: string) => void;
 }
 
 interface TerminalServerMessage {
@@ -95,6 +97,7 @@ export async function createXtermSession(
   let inputDisposable: { dispose: () => void } | null = null;
   let pasteDisposable: (() => void) | null = null;
   let pendingInputLine = '';
+  let mirrorMode = false;
 
   const clearScreen = (): void => {
     terminal.clear();
@@ -133,6 +136,13 @@ export async function createXtermSession(
     if (activeSocket.readyState === WebSocket.OPEN) {
       activeSocket.close();
     }
+  };
+
+  const writeMirrorSnapshot = (text: string): void => {
+    mirrorMode = true;
+    disposeSocket();
+    terminal.reset();
+    terminal.write(text.replace(/\n/g, '\r\n'));
   };
 
   const attachWorkspace = (
@@ -280,13 +290,21 @@ export async function createXtermSession(
     },
     persistScrollback: persistAttachedScrollback,
     setContext(context: TerminalContext) {
+      if (mirrorMode && context.sessionRole === 'agent') {
+        attachedWorkspaceId = context.workspaceId;
+        attachedSessionId = context.sessionId;
+        attachedSessionRole = context.sessionRole;
+        return;
+      }
       if (
         context.workspaceId !== attachedWorkspaceId ||
         context.sessionId !== attachedSessionId ||
         context.sessionRole !== attachedSessionRole
       ) {
+        mirrorMode = false;
         attachWorkspace(context.workspaceId, context.sessionId, context.sessionRole);
       }
     },
+    writeMirrorSnapshot,
   };
 }

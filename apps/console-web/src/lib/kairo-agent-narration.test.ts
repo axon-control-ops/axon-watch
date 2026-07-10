@@ -39,6 +39,13 @@ describe('resolveStreamingActivity', () => {
     );
     expect(view.liveBodyTruncated).toBe(true);
   });
+
+  it('hides pure user-meta thinking from the VAXON live line', () => {
+    const view = resolveStreamingActivity(':::thinking\nThe user is asking whether\n');
+    expect(view.label).toBe('VAXON — Agent running…');
+    expect(view.liveBodyFull).toBeNull();
+    expect(view.liveBodySpoken).toBeNull();
+  });
 });
 
 describe('narrationMilestonesForDelta', () => {

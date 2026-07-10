@@ -1,4 +1,5 @@
 import { pickBestSpeechTranscript } from '../../lib/operator-persona-stt-aliases';
+import { applySpeechRecognitionBias } from './speech-recognition-bias';
 
 export type SpeechCaptureCallbacks = {
   onInterim?: (transcript: string) => void;
@@ -76,6 +77,7 @@ export class SpeechCaptureSession {
     recognition.interimResults = true;
     recognition.maxAlternatives = 5;
     recognition.continuous = true;
+    applySpeechRecognitionBias(recognition);
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
