@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from app.operator_persona_name import OPERATOR_PERSONA_NAME
+from app.kairo_spoken_symbol_words import strip_literal_symbol_words
 
 _STREAM_BLOCK_START_RE = re.compile(
     r"^:::(?:thinking|tool|edit|terminal|research)\b",
@@ -161,6 +162,7 @@ def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> st
         flags=re.IGNORECASE,
     )
     text = _soften_symbols_for_speech(text)
+    text = strip_literal_symbol_words(text)
     text = re.sub(r"\s+", " ", text).strip()
     if text and not text.endswith((".", "!", "?")):
         text = f"{text}."

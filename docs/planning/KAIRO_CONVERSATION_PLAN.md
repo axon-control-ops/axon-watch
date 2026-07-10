@@ -155,13 +155,15 @@ aloud; privacy mode blocks the mic entirely.
 **Done when:** "show me DashPro" focuses the galaxy node + switches workspace;
 "run the health check" → confirm → run dispatched with receipt.
 
-### OP-C5 — Turn memory + follow-ups
+### OP-C5 — Turn memory + follow-ups — **Done**
 
 - Server session memory: last N turns (question + answer + referenced entity
   ids) so "why?" / "and the other one?" resolve against prior context.
 - Context pack refresh policy: re-pull DTOs when stale (> 10 s) so answers never
   describe a dead world.
 - Memory is per-session, capped, non-authoritative, never persisted as truth.
+- Client handoff phrases call `/api/kairo/converse` first; inbox top-signal is
+  fallback only when the server returns no `handoff_signal`.
 
 **Done when:** "what's wrong with DashPro?" → answer → "hand it off" works
 without re-stating the workspace.

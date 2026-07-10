@@ -105,7 +105,7 @@ Detail: `docs/planning/KAIRO_CONVERSATION_PLAN.md`
 | C2 | **OP-C2 gate** | Galaxy conversation bar: typed Q + command dispatch + spoken reply | Manual: "any approvals?" → spoken + written answer; "git status" → run dispatched |
 | C3 | **OP-C3 gate** | Push-to-talk (hold orb / Space); privacy mode blocks mic | Manual: hold → speak → release → answer; privacy ON hides mic |
 | C4 | **OP-C4** | Navigation intents ("show DashPro", "open attention"); execute-tier confirm flow | vitest `conversation-intents.test.ts` PASS; manual nav + confirm dispatch | **Done** |
-| C5 | **OP-C5** | Session turn memory for follow-ups ("hand it off" after prior entity) | Contract tests for memory cap; manual follow-up without re-stating workspace |
+| C5 | **OP-C5** | Session turn memory for follow-ups ("hand it off" after prior entity) | Contract tests for memory cap; manual follow-up without re-stating workspace | **Done** |
 | C6 | **V5+V9** | Narration plumbing cleanup + honest settings copy | vitest narration tests PASS; no speak API calls for filtered milestones |
 | C7 | **V1+V4+V6** | Honest mode labels, persona parity for thinking, error/fallback narration | Manual: minimal thinking uses Vaxon tone; agent error spoken |
 | C8 | **M1+M2** | Unified session id + SQLite-backed turn/entity memory | pytest: follow-up survives CP restart |
@@ -254,7 +254,14 @@ gate is clear. If debt returns, pause C/D and return to Phase B.
 - Client: `shouldAutoDispatchConverseCommand` respects confirmation flag; yes-follow-up dispatches.
 - UX: markdown workspace links, image attachment lightbox, galaxy workspace focus on nav intents.
 - Gates green: kairo conversation pytest, vitest policy/intents/markdown, production-operator build.
-- **Next:** C5 turn memory; debt gate stays clear (B1 dry-run: 0 stale runs).
+- **Next:** C6 narration plumbing; debt gate stays clear (B1 dry-run: 0 stale runs).
+
+### 2026-07-10 — OP-C5 turn memory + model picker
+
+- Extracted `app/kairo/turn_memory.py` + `context_pack_cache.py`; lowered `kairo_conversation.py` ratchet to 697.
+- Pack workspace falls back to `entity.target_workspace_id`; top-signal remember uses resolved pack workspace.
+- Client: converse-first for handoff phrases; AgentDock model picker honors available non-composer catalog picks.
+- Gates: `tests.test_kairo_conversation`, cursor-catalog-view + handoff-order vitest.
 
 ### 2026-07-09 — Locked execution plan published
 

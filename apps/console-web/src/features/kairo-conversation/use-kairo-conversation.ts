@@ -42,7 +42,8 @@ import { brainGalaxyConversationFocus, setBrainGalaxyConversationFocus } from '.
 import { useKairoSpeechCapture } from './use-kairo-speech-capture';
 import { useKairoVoiceInterrupt } from './use-kairo-voice-interrupt';
 
-const HANDOFF_CLIENT_RE = /\b(hand\s*off|handoff|continue in ide|investigate in ide)\b/i;
+const HANDOFF_CLIENT_RE =
+  /\b(hand\s*it\s*off|hand\s*off|handoff|continue in ide|investigate in ide|open in ide)\b/i;
 const RUNTIME_ASSISTANT_CUE_DELAY_MS = 1200;
 
 export function useKairoConversation() {
@@ -216,9 +217,7 @@ export function useKairoConversation() {
     }
     const topSignal = resolveHandoffSignal();
     if (!topSignal) {
-      kairoConversationReply.value = 'No signal in context to hand off yet.';
-      speakReply(kairoConversationReply.value);
-      return true;
+      return false;
     }
     await shell.handoffSignalToIde({
       signal_id: topSignal.signal_id,
@@ -297,14 +296,6 @@ export function useKairoConversation() {
       return;
     }
 
-    if (await tryClientHandoff(content)) {
-      clearRuntimeAssistantCue();
-      draft.value = '';
-      pending.value = false;
-      thinkingLine.value = '';
-      return;
-    }
-
     try {
       const response = await postKairoConverse({
         content,
@@ -319,6 +310,15 @@ export function useKairoConversation() {
       clearRuntimeAssistantCue();
       if (response.artifacts.length) {
         recordOperatorArtifacts(response.artifacts, parseChatUiAction);
+      }
+      // Prefer server entity-memory handoff; client inbox top-signal is fallback only.
+      if (!response.action && HANDOFF_CLIENT_RE.test(content)) {
+        if (await tryClientHandoff(content)) {
+          draft.value = '';
+          pending.value = false;
+          thinkingLine.value = '';
+          return;
+        }
       }
       kairoConversationReply.value = normalizeKairoCopy(
         formatConversationDisplayReply(response.reply) || sanitizeSpokenReply(response.reply),

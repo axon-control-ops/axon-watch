@@ -49,7 +49,15 @@ _MOCK_FLEET = {
 _MOCK_GRAPH = {"nodes": [{"node_id": "n1"}], "edges": []}
 
 
+from app.kairo.context_pack_cache import clear_pack_cache_for_tests  # noqa: E402
+from app.kairo.turn_memory import clear_memory_for_tests  # noqa: E402
+
+
 class KairoConversationUnitTests(unittest.TestCase):
+    def setUp(self) -> None:
+        clear_pack_cache_for_tests()
+        clear_memory_for_tests()
+
     def test_classify_command_turn(self) -> None:
         self.assertEqual("command", classify_conversation_turn("git status"))
         self.assertEqual("command", classify_conversation_turn("what is the git status?"))
@@ -236,6 +244,7 @@ class KairoConversationUnitTests(unittest.TestCase):
         action = payload["action"]
         assert isinstance(action, dict)
         self.assertEqual("handoff_signal", action.get("type"))
+        self.assertEqual("workspace_dashpro", action.get("target_workspace_id"))
 
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
@@ -286,7 +295,10 @@ class KairoConversationUnitTests(unittest.TestCase):
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
     @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
     @patch("app.kairo_conversation.dispatch_ide_composer")
-    @patch("app.kairo_conversation.build_lane_b_context_block", return_value="Workspace context")
+    @patch(
+        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
+        return_value="Workspace context",
+    )
     def test_converse_open_question_sanitizes_runtime_agent_dump(
         self,
         _mock_context: object,
@@ -318,7 +330,10 @@ class KairoConversationUnitTests(unittest.TestCase):
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
     @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
     @patch("app.kairo_conversation.dispatch_ide_composer")
-    @patch("app.kairo_conversation.build_lane_b_context_block", return_value="Workspace context")
+    @patch(
+        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
+        return_value="Workspace context",
+    )
     def test_converse_open_question_uses_runtime_assistant(
         self,
         _mock_context: object,
@@ -365,7 +380,10 @@ class KairoConversationUnitTests(unittest.TestCase):
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
     @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
     @patch("app.kairo_conversation.dispatch_ide_composer")
-    @patch("app.kairo_conversation.build_lane_b_context_block", return_value="Workspace context")
+    @patch(
+        "app.kairo_conversation_runtime_context.build_lane_b_context_block",
+        return_value="Workspace context",
+    )
     def test_converse_open_question_trims_run_on_runtime_tail(
         self,
         _mock_context: object,
@@ -451,6 +469,8 @@ class KairoConversationUnitTests(unittest.TestCase):
 
 class KairoConversationEndpointTests(unittest.TestCase):
     def setUp(self) -> None:
+        clear_pack_cache_for_tests()
+        clear_memory_for_tests()
         isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
@@ -465,9 +485,10 @@ class KairoConversationEndpointTests(unittest.TestCase):
         )
         self.assertEqual(200, response.status_code)
         payload = response.json()
-        self.assertEqual(
-            {"turn_kind", "reply", "source", "command_content", "requires_confirmation", "action", "artifacts"},
-            set(payload),
-        )
+        expected = {
+            "turn_kind", "reply", "source", "command_content",
+            "requires_confirmation", "action", "artifacts", "active_participant",
+        }
+        self.assertEqual(expected, set(payload))
         self.assertEqual("status_question", payload["turn_kind"])
         self.assertTrue(payload["reply"])

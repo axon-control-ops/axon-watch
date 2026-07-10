@@ -5,7 +5,11 @@ from __future__ import annotations
 from app.chat.generated_image_redisplay import maybe_generated_image_redisplay_reply
 from app.chat.lane_b_image_attachments import ingest_agent_generated_images
 from app.chat.open_file_intent import open_file_ui_action, resolve_open_file_intent
-from app.cli_runtime.generated_image_paths import dedupe_image_paths, image_paths_from_markdown
+from app.cli_runtime.generated_image_paths import (
+    dedupe_image_paths,
+    image_paths_from_markdown,
+    image_paths_from_transcript_blocks,
+)
 
 
 def generated_image_paths_from_lane_b_result(
@@ -16,6 +20,7 @@ def generated_image_paths_from_lane_b_result(
     raw_paths = lane_b_result.get("generated_image_paths")
     if isinstance(raw_paths, list):
         paths.extend(str(item).strip() for item in raw_paths if str(item).strip())
+    paths.extend(image_paths_from_transcript_blocks(agent_content))
     paths.extend(image_paths_from_markdown(agent_content))
     return dedupe_image_paths(paths)
 

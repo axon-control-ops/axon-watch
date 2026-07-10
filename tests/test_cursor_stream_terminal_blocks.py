@@ -11,6 +11,7 @@ from app.cli_runtime.cursor_stream_events import (  # noqa: E402
     CursorStreamAssembler,
     _tool_block_from_event,
     assistant_text_delta,
+    terminal_started_block_from_event,
 )
 
 
@@ -22,6 +23,18 @@ def _shell_event(command: str, stdout: str = "") -> dict:
             "shellToolCall": {
                 "args": {"command": command},
                 "result": {"success": {"stdout": stdout}},
+            }
+        },
+    }
+
+
+def _shell_started_event(command: str) -> dict:
+    return {
+        "type": "tool_call",
+        "subtype": "started",
+        "tool_call": {
+            "shellToolCall": {
+                "args": {"command": command},
             }
         },
     }
@@ -51,6 +64,26 @@ class CursorStreamTerminalBlockTests(unittest.TestCase):
         }
         block = _tool_block_from_event(event, "")
         self.assertIn(":::tool Read README.md", block)
+
+    def test_shell_started_opens_live_terminal_block(self) -> None:
+        block = terminal_started_block_from_event(_shell_started_event("npm test"))
+        self.assertEqual("\n:::terminal npm test\n", block)
+        self.assertFalse(block.rstrip().endswith(":::"))
+
+    def test_assembler_opens_then_closes_terminal_without_duplicate(self) -> None:
+        assembler = CursorStreamAssembler()
+        import json
+
+        assembler.feed_line(json.dumps(_shell_started_event("sleep 5")))
+        self.assertIn(":::terminal sleep 5", assembler.content)
+        self.assertFalse(assembler.content.rstrip().endswith(":::"))
+        assembler.feed_line(
+            json.dumps(_shell_event("sleep 5", "done"))
+        )
+        finalized = assembler.finalize()
+        self.assertEqual(finalized.count(":::terminal sleep 5"), 1)
+        self.assertIn("done", finalized)
+        self.assertTrue(finalized.rstrip().endswith(":::") or ":::terminal" in finalized)
 
 
 class CursorStreamPartialDedupeTests(unittest.TestCase):

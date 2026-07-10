@@ -61,7 +61,7 @@
       "target": "apps/console-web/src/styles/tokens/* + feature CSS"
     },
     "services/control-plane/app/kairo_conversation.py": {
-      "max_lines": 798,
+      "max_lines": 697,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/*"

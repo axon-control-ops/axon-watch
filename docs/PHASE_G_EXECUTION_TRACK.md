@@ -120,7 +120,7 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 - Markdown links in agent transcript and editor preview open workspace files safely.
 - Image attachments preview inline (lightbox) instead of opening a new tab.
 - Gates: `tests.test_kairo_conversation`, vitest conversation/markdown tests, `vue-tsc` PASS.
-- **Next:** Phase C5 session turn memory; C6–C12 narration/memory slices per voice plan.
+- **Next:** C6–C12 narration/memory slices per voice plan (OP-C5 turn memory Done).
 
 ### 2026-07-09 — KAIRO voice + context/memory plan
 

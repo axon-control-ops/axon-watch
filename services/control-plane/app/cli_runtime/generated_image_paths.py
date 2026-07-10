@@ -8,6 +8,7 @@ from typing import Any
 
 _IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"})
 _MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
+_IMAGE_HEADER_RE = re.compile(r"^:::image\s+(.+)$")
 _GENERATE_IMAGE_TOOL_HINT = re.compile(r"generate.*image|image.*generat", re.I)
 
 
@@ -98,6 +99,18 @@ def image_paths_from_tool_call_event(event: dict[str, Any]) -> list[str]:
 def image_paths_from_markdown(content: str) -> list[str]:
     found: list[str] = []
     for match in _MARKDOWN_IMAGE_RE.finditer(str(content or "")):
+        candidate = str(match.group(1) or "").strip().strip("\"'")
+        if _is_image_path(candidate):
+            found.append(candidate)
+    return dedupe_image_paths(found)
+
+
+def image_paths_from_transcript_blocks(content: str) -> list[str]:
+    found: list[str] = []
+    for line in str(content or "").splitlines():
+        match = _IMAGE_HEADER_RE.match(line.strip())
+        if not match:
+            continue
         candidate = str(match.group(1) or "").strip().strip("\"'")
         if _is_image_path(candidate):
             found.append(candidate)

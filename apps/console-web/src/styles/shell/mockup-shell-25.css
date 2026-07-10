@@ -203,6 +203,10 @@
   text-decoration: underline;
 }
 
+.conversation-seam__inline-image-caption-name {
+  color: rgba(138, 154, 173, 0.72);
+}
+
 .conversation-seam__inline-image-live {
   color: rgba(0, 242, 255, 0.72);
   font-family: var(--font-mono);

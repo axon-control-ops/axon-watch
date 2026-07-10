@@ -49,6 +49,18 @@ class KairoVoicePromptTests(unittest.TestCase):
         self.assertNotIn("Do NOT use", KAIRO_VOICE_SYSTEM)
         self.assertIn('Address the primary operator as "sir"', KAIRO_CONVERSATION_VOICE_SYSTEM)
 
+    def test_guest_name_appears_in_speak_prompt(self) -> None:
+        prompt = build_speak_user_prompt(
+            event_type="conversation_reply",
+            context={
+                "reply": "Systems are nominal.",
+                "guest_name": "Sarah",
+            },
+            recent_lines=[],
+        )
+        self.assertIn("guest_name: Sarah", prompt)
+        self.assertIn("Addressing: speak to Sarah by name", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

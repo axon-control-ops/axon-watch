@@ -134,6 +134,25 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertIn("Two approvals", payload["line"])
         self.assertEqual(payload["source"], "fallback")
 
+    def test_guest_introduction_replaces_sir_in_fallback(self) -> None:
+        from app.kairo_participant_memory import reset_participant_memory_for_tests
+
+        reset_participant_memory_for_tests()
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="conversation_reply",
+                context={
+                    "fallback": "All set, sir — ready for review.",
+                    "operator_prompt": "this is Sarah",
+                },
+                session_id="guest-intro-session",
+                narration="minimal",
+                use_runtime=False,
+            )
+        self.assertIn("Sarah", payload["line"])
+        self.assertNotIn("sir", payload["line"].lower())
+        reset_participant_memory_for_tests()
+
     def test_normalize_spoken_line_strips_agent_stream_blocks(self) -> None:
         raw = (
             ":::thinking\nInvestigating the spike.\n:::\n"

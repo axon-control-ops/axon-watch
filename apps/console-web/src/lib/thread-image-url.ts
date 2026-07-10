@@ -1,6 +1,11 @@
 import { resolveChatAttachmentUrl } from '../api/chat-api';
 import { resolveWorkspaceFileRawUrl } from '../api/workspace-api';
 
+export interface ThreadImageDisplayOptions {
+  workspaceId?: string | null;
+  attachmentUrl?: string | null;
+}
+
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
 
 /** Bare generated-image filenames are stored under assets/ in this workspace. */
@@ -23,8 +28,13 @@ function isImagePath(value: string): boolean {
 
 export function resolveThreadImageUrl(
   source: string,
-  options: { workspaceId?: string | null } = {},
+  options: ThreadImageDisplayOptions = {},
 ): string {
+  const attachmentUrl = String(options.attachmentUrl ?? '').trim();
+  if (attachmentUrl) {
+    return resolveChatAttachmentUrl(attachmentUrl);
+  }
+
   const normalized = String(source ?? '').trim();
   if (!normalized) {
     return '';
@@ -41,6 +51,23 @@ export function resolveThreadImageUrl(
     return resolveWorkspaceFileRawUrl(workspaceId, path);
   }
   return normalized;
+}
+
+export function threadAttachmentUrlForImagePath(
+  path: string,
+  attachments: ReadonlyArray<{ filename: string; url: string }> = [],
+): string | null {
+  const normalized = normalizeGeneratedImagePath(String(path ?? '').trim());
+  const fileName = normalized.split('/').pop() ?? normalized;
+  if (!fileName) {
+    return null;
+  }
+  const match = attachments.find((attachment) => {
+    const attachmentName = String(attachment.filename ?? '').trim();
+    return attachmentName === fileName || attachmentName === normalized;
+  });
+  const url = String(match?.url ?? '').trim();
+  return url || null;
 }
 
 export function rewriteMarkdownImageSources(

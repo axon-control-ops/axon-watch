@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { rewriteMarkdownImageSources, resolveThreadImageUrl } from './thread-image-url';
+import { rewriteMarkdownImageSources, resolveThreadImageUrl, threadAttachmentUrlForImagePath } from './thread-image-url';
 
 describe('thread image urls', () => {
   it('rewrites workspace image paths to raw file urls', () => {
@@ -17,6 +17,26 @@ describe('thread image urls', () => {
     ).toBe(
       '/api/workspaces/workspace_axon_watch/files/assets/axon-x-mobile-glass-3d-mockup.png/raw',
     );
+  });
+
+  it('prefers persisted attachment urls when provided', () => {
+    expect(
+      resolveThreadImageUrl('axon-x-mobile-glass-3d-mockup.png', {
+        workspaceId: 'workspace_axon_watch',
+        attachmentUrl: '/api/chat/attachments/attachment_123',
+      }),
+    ).toBe('/api/chat/attachments/attachment_123');
+  });
+
+  it('matches attachment urls by image filename', () => {
+    expect(
+      threadAttachmentUrlForImagePath('axon-x-mobile-glass-3d-mockup.png', [
+        {
+          filename: 'axon-x-mobile-glass-3d-mockup.png',
+          url: '/api/chat/attachments/attachment_123',
+        },
+      ]),
+    ).toBe('/api/chat/attachments/attachment_123');
   });
 
   it('rewrites markdown image tags to resolved urls', () => {

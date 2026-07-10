@@ -1,4 +1,5 @@
 import { OPERATOR_PERSONA_NAME } from './operator-persona-name';
+import { stripLiteralSymbolWords } from './spoken-symbol-words';
 
 const STREAM_BLOCK_START_RE = /^:::(?:thinking|tool|edit|terminal|research)\b/i;
 const STREAM_BLOCK_CLOSE_RE = /^:::\s*$/;
@@ -156,6 +157,7 @@ export function formatConversationDisplayReply(raw: string, maxChars = MAX_DISPL
 export function sanitizeSpokenReply(raw: string, maxChars = MAX_SPOKEN_CHARS): string {
   const display = formatConversationDisplayReply(raw, maxChars);
   let spoken = softenSymbolsForSpeech(display.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim());
+  spoken = stripLiteralSymbolWords(spoken);
   if (spoken && !/[.!?]$/.test(spoken)) {
     spoken = `${spoken}.`;
   }

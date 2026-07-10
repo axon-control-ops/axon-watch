@@ -72,11 +72,28 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
   color: rgba(196, 206, 218, 0.9);
-  font-family: var(--font-mono);
-  font-size: 0.52rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.02em;
   cursor: pointer;
+}
+
+.agent-block__terminal-background {
+  flex-shrink: 0;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid rgba(90, 180, 220, 0.35);
+  border-radius: 999px;
+  background: rgba(70, 150, 200, 0.12);
+  color: rgba(170, 230, 255, 0.96);
+  font: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.agent-block__terminal-background:hover {
+  border-color: rgba(110, 210, 255, 0.55);
+  background: rgba(70, 150, 200, 0.2);
 }
 
 .agent-block__terminal-copy:hover {

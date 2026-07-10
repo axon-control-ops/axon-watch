@@ -120,14 +120,11 @@ export function resolveCursorComposerModel(modelId: string, rows: CursorCatalogR
   if (!normalized || normalized === 'auto') {
     return normalized || 'auto';
   }
-  if (isCursorComposerModel(normalized)) {
-    const available = rows.some((row) => row.id === normalized && row.available !== false);
-    if (available) {
-      return normalized;
-    }
-    return cursorComposerPickerRows(rows)[0]?.id ?? CURSOR_PICKER_DEFAULT_MODEL;
+  const match = rows.find((row) => row.id === normalized);
+  if (match && match.available !== false) {
+    return normalized;
   }
-  // Non-composer pins route through API quota; prefer Composer subscription routing.
+  // Stale / unavailable ids fall back to Composer subscription default.
   return cursorComposerPickerRows(rows)[0]?.id ?? CURSOR_PICKER_DEFAULT_MODEL;
 }
 

@@ -38,7 +38,9 @@ import {
   parseAgentTranscriptBlocks,
   thinkingPreview,
 } from '../lib/agent-transcript-blocks';
+import { shouldShowAgentTerminalBackgroundControl } from '../lib/agent-terminal-background-view';
 import { resolveChatAttachmentUrl } from '../api/control-plane';
+import { threadAttachmentUrlForImagePath } from '../lib/thread-image-url';
 import { useShellStore } from '../stores/shell';
 
 const shell = useShellStore();
@@ -149,6 +151,17 @@ function revealTerminalPanel(): void {
   shell.revealIdeTerminalPanel();
 }
 
+function backgroundAgentTerminalRun(): void {
+  shell.backgroundIdeAgentRun();
+}
+
+function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean): boolean {
+  return shouldShowAgentTerminalBackgroundControl({
+    canStopIdeAgentRun: shell.canStopIdeAgentRun,
+    terminalBlockRunning: segmentOpen && isStreamingMessage(messageId),
+  });
+}
+
 async function copyTerminalOutput(output: string): Promise<void> {
   if (typeof navigator === 'undefined' || !navigator.clipboard || !output.trim()) {
     return;
@@ -172,6 +185,13 @@ function displayItemKey(item: ConversationDisplayItem): string {
     return item.messageId;
   }
   return item.message.message_id;
+}
+
+function attachmentUrlForImagePath(
+  message: OperatorThreadEntry,
+  path: string,
+): string | null {
+  return threadAttachmentUrlForImagePath(path, message.attachments ?? []);
 }
 
 function applyArtifactAction(action: { uiAction: ChatUiAction | null }): void {
@@ -511,6 +531,16 @@ watch(
                   >running…</span>
                 </button>
                 <button
+                  v-if="showTerminalBackgroundControl(item.message.message_id, segment.open)"
+                  type="button"
+                  class="agent-block__terminal-background"
+                  title="Continue in background (vaxon terminal)"
+                  aria-label="Continue run in background"
+                  @click="backgroundAgentTerminalRun"
+                >
+                  Background
+                </button>
+                <button
                   v-if="segment.output"
                   type="button"
                   class="agent-block__terminal-copy"
@@ -538,6 +568,7 @@ watch(
             <AgentImageBlock
               v-else-if="segment.kind === 'image'"
               :path="segment.path"
+              :attachment-url="attachmentUrlForImagePath(item.message, segment.path)"
               :open="segment.open && isStreamingMessage(item.message.message_id)"
             />
 

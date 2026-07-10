@@ -156,6 +156,25 @@
   margin-left: auto;
 }
 
+.terminal-tabbar--mockup .terminal-tabbar__background {
+  border: 1px solid rgba(90, 180, 220, 0.35);
+  border-radius: 0.3rem;
+  background: rgba(70, 150, 200, 0.12);
+  color: rgba(170, 230, 255, 0.96);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  padding: 0.28rem 0.5rem;
+  white-space: nowrap;
+}
+
+.terminal-tabbar--mockup .terminal-tabbar__background:hover {
+  border-color: rgba(110, 210, 255, 0.55);
+  background: rgba(70, 150, 200, 0.2);
+}
+
 .terminal-tabbar__new-wrap {
   position: relative;
 }

@@ -30,17 +30,18 @@ Answer the operator_prompt directly; do not recite UI chrome or invent new syste
 No markdown, quotes, labels, or preamble — spoken words only."""
 
 # Keys allowed per event — stale editor state (active_file) is never forwarded.
+_GUEST_NAME_KEY = "guest_name"
 _CONTEXT_KEYS_BY_EVENT: dict[str, frozenset[str]] = {
-    "agent_start": frozenset({"operator_prompt", "full_access", "task_summary"}),
-    "done": frozenset({"operator_prompt", "file_name", "edit_count"}),
-    "tool": frozenset({"operator_prompt", "tool_label"}),
-    "edit": frozenset({"operator_prompt", "file_name"}),
-    "thinking": frozenset({"operator_prompt"}),
-    "greeting": frozenset({"workspace_count", "pending_approvals"}),
-    "alert": frozenset({"pending_approvals", "top_signal_title", "degraded_active", "load_state"}),
-    "approval_literal": frozenset({"literal_line"}),
-    "chat_summary": frozenset({"operator_prompt", "summary"}),
-    "briefing": frozenset({"notice", "advise", "workspace_id", "pending_approvals", "top_signal_title"}),
+    "agent_start": frozenset({"operator_prompt", "full_access", "task_summary", _GUEST_NAME_KEY}),
+    "done": frozenset({"operator_prompt", "file_name", "edit_count", _GUEST_NAME_KEY}),
+    "tool": frozenset({"operator_prompt", "tool_label", _GUEST_NAME_KEY}),
+    "edit": frozenset({"operator_prompt", "file_name", _GUEST_NAME_KEY}),
+    "thinking": frozenset({"operator_prompt", _GUEST_NAME_KEY}),
+    "greeting": frozenset({"workspace_count", "pending_approvals", _GUEST_NAME_KEY}),
+    "alert": frozenset({"pending_approvals", "top_signal_title", "degraded_active", "load_state", _GUEST_NAME_KEY}),
+    "approval_literal": frozenset({"literal_line", _GUEST_NAME_KEY}),
+    "chat_summary": frozenset({"operator_prompt", "summary", _GUEST_NAME_KEY}),
+    "briefing": frozenset({"notice", "advise", "workspace_id", "pending_approvals", "top_signal_title", _GUEST_NAME_KEY}),
     "conversation_reply": frozenset({
         "operator_prompt",
         "reply",
@@ -49,6 +50,7 @@ _CONTEXT_KEYS_BY_EVENT: dict[str, frozenset[str]] = {
         "top_signal_title",
         "active_run_count",
         "degraded_active",
+        _GUEST_NAME_KEY,
     }),
 }
 
@@ -84,6 +86,11 @@ def build_speak_user_prompt(
             lines.append(f"- {key}: {value}")
     else:
         lines.append("- (none)")
+    guest_name = str(filtered.get(_GUEST_NAME_KEY) or "").strip()
+    if guest_name:
+        lines.append(
+            f'Addressing: speak to {guest_name} by name (not "sir", "user", or "operator").'
+        )
     if recent_lines:
         lines.append("Recent spoken lines (do not repeat phrasing):")
         for item in recent_lines[-6:]:

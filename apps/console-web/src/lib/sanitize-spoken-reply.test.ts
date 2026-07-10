@@ -67,6 +67,16 @@ describe('sanitizeSpokenReply', () => {
     expect(spoken).toContain('12:30');
   });
 
+  it('strips literal spoken symbol words', () => {
+    const spoken = sanitizeSpokenReply(
+      'Open apps slash console web colon forty two with a smiley face',
+    );
+    expect(spoken.toLowerCase()).not.toContain('slash');
+    expect(spoken.toLowerCase()).not.toContain('colon');
+    expect(spoken.toLowerCase()).not.toContain('smiley');
+    expect(spoken.toLowerCase()).toContain('apps');
+  });
+
   it('leaves concise template replies unchanged', () => {
     const line = '2 approvals on the board — Attention has the detail.';
     expect(sanitizeSpokenReply(line)).toBe(line);

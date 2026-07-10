@@ -11,6 +11,11 @@ from typing import Any, Literal
 from app.cli_runtime.catalog import find_cursor_cli
 from app.cli_runtime.cursor_agent import run_cursor_local
 from app.kairo_persona import build_persona_voice_line
+from app.kairo_participant_memory import (
+    apply_participant_address,
+    get_active_participant,
+    update_participant_from_utterance,
+)
 from app.kairo_voice_prompt import (
     KAIRO_CONVERSATION_VOICE_SYSTEM,
     KAIRO_VOICE_SYSTEM,
@@ -164,10 +169,18 @@ _QUESTION_START_RE = re.compile(
 )
 
 
-def _pick_pool_line(pool_key: str, recent: list[str], *, persona_enabled: bool) -> str:
+def _pick_pool_line(
+    pool_key: str,
+    recent: list[str],
+    *,
+    persona_enabled: bool,
+    guest_name: str | None = None,
+) -> str:
     pool = list(_FALLBACK_POOLS.get(pool_key, _FALLBACK_POOLS["done"]))
     if not persona_enabled:
         pool = [line.replace("sir", "operator").replace("—", "-") for line in pool]
+    elif guest_name:
+        pool = [apply_participant_address(line, guest_name) for line in pool]
     recent_lower = {item.lower() for item in recent}
     for candidate in pool:
         if candidate.lower() not in recent_lower:
@@ -182,11 +195,12 @@ def _fallback_for_event(
     *,
     persona_enabled: bool,
 ) -> str:
+    guest_name = str(context.get("guest_name") or "").strip() or None
     if event_type == "approval_literal":
         return str(context.get("literal_line") or "Approval required before I can continue.")
 
     if event_type == "alert":
-        return build_persona_voice_line(
+        line = build_persona_voice_line(
             pending_approvals=int(context.get("pending_approvals") or 0),
             top_signal_title=str(context.get("top_signal_title") or ""),
             top_signal_workspace_id=str(context.get("top_signal_workspace_id") or ""),
@@ -195,6 +209,7 @@ def _fallback_for_event(
             load_state=str(context.get("load_state") or "loaded"),
             persona_enabled=persona_enabled,
         )
+        return apply_participant_address(line, guest_name)
 
     if event_type == "greeting":
         workspace_count = int(context.get("workspace_count") or 0)
@@ -207,7 +222,12 @@ def _fallback_for_event(
             tail = f"{workspace_count} workspace{suffix} bound and ready"
         else:
             tail = "workspace ready"
-        line = _pick_pool_line("greeting", recent, persona_enabled=persona_enabled)
+        line = _pick_pool_line(
+            "greeting",
+            recent,
+            persona_enabled=persona_enabled,
+            guest_name=guest_name,
+        )
         return f"{line} {tail.capitalize()}."
 
     if event_type == "briefing":
@@ -224,11 +244,11 @@ def _fallback_for_event(
     if event_type == "conversation_reply":
         literal = str(context.get("fallback") or context.get("reply") or "").strip()
         if literal:
-            recent_lower = {item.lower() for item in recent}
-            if literal.lower() not in recent_lower:
-                return literal
-            return literal
-        return "Standing by for your next command."
+            return apply_participant_address(literal, guest_name)
+        return apply_participant_address(
+            "Standing by for your next command.",
+            guest_name,
+        )
 
     if event_type == "tool":
         tool_label = str(context.get("tool_label") or "").strip().lower()
@@ -240,30 +260,55 @@ def _fallback_for_event(
             pool_key = "tool_shell"
         else:
             pool_key = "thinking"
-        return _pick_pool_line(pool_key, recent, persona_enabled=persona_enabled)
+        return _pick_pool_line(
+            pool_key,
+            recent,
+            persona_enabled=persona_enabled,
+            guest_name=guest_name,
+        )
 
     if event_type == "edit":
         file_name = str(context.get("file_name") or "the file").strip() or "the file"
-        line = _pick_pool_line("tool_edit", recent, persona_enabled=persona_enabled)
+        line = _pick_pool_line(
+            "tool_edit",
+            recent,
+            persona_enabled=persona_enabled,
+            guest_name=guest_name,
+        )
         return line.replace("that file", file_name).replace("the file", file_name)
 
     if event_type == "agent_start":
         contextual = _contextual_agent_start_fallback(context)
         if contextual:
-            return contextual
-        return _pick_pool_line("agent_start", recent, persona_enabled=persona_enabled)
+            return apply_participant_address(contextual, guest_name)
+        return _pick_pool_line(
+            "agent_start",
+            recent,
+            persona_enabled=persona_enabled,
+            guest_name=guest_name,
+        )
 
     if event_type == "failed":
-        return _contextual_failed_fallback(context)
+        return apply_participant_address(_contextual_failed_fallback(context), guest_name)
 
     if event_type == "done":
         contextual = _contextual_done_fallback(context)
         if contextual:
-            return contextual
-        return _pick_pool_line("done", recent, persona_enabled=persona_enabled)
+            return apply_participant_address(contextual, guest_name)
+        return _pick_pool_line(
+            "done",
+            recent,
+            persona_enabled=persona_enabled,
+            guest_name=guest_name,
+        )
 
     pool_key = event_type if event_type in _FALLBACK_POOLS else "done"
-    return _pick_pool_line(pool_key, recent, persona_enabled=persona_enabled)
+    return _pick_pool_line(
+        pool_key,
+        recent,
+        persona_enabled=persona_enabled,
+        guest_name=guest_name,
+    )
 
 
 def _try_runtime_line(
@@ -347,8 +392,16 @@ def generate_spoken_line(
     payload = dict(context or {})
     recent = _recent_lines(session_id)
 
+    operator_prompt = str(payload.get("operator_prompt") or "").strip()
+    if operator_prompt:
+        update_participant_from_utterance(session_id, operator_prompt)
+    guest_name = get_active_participant(session_id)
+    if guest_name and not str(payload.get("guest_name") or "").strip():
+        payload["guest_name"] = guest_name
+
     if event_type == "approval_literal":
         line = _normalize_spoken_line(str(payload.get("literal_line") or ""))
+        line = apply_participant_address(line, guest_name)
         if line:
             _remember_line(session_id, line)
         return {"line": line, "source": "literal"}
@@ -371,6 +424,7 @@ def generate_spoken_line(
         source = "fallback"
 
     line = _normalize_spoken_line(line)
+    line = apply_participant_address(line, guest_name)
     if line:
         _remember_line(session_id, line)
     return {"line": line, "source": source}

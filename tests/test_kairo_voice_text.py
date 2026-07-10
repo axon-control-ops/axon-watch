@@ -23,6 +23,15 @@ class KairoVoiceTextTests(unittest.TestCase):
         spoken = normalize_spoken_line("Briefing ready at 12:30.")
         self.assertIn("12:30", spoken)
 
+    def test_strips_literal_symbol_words(self) -> None:
+        spoken = normalize_spoken_line(
+            "Open apps slash console web colon forty two with a smiley face"
+        )
+        self.assertNotIn("slash", spoken.lower())
+        self.assertNotIn("colon", spoken.lower())
+        self.assertNotIn("smiley", spoken.lower())
+        self.assertIn("apps", spoken.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

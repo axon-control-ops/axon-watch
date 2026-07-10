@@ -128,12 +128,77 @@ def _shell_output_from_result(result: Any) -> str:
     return ""
 
 
+_SHELL_TOOL_KEYS = ("shellToolCall", "runTerminalCommandToolCall", "terminalToolCall")
+
+
+def _shell_command_from_tool_call(tool_call: dict[str, Any]) -> str:
+    for shell_key in _SHELL_TOOL_KEYS:
+        shell_call = tool_call.get(shell_key)
+        if not isinstance(shell_call, dict):
+            continue
+        args = shell_call.get("args") if isinstance(shell_call.get("args"), dict) else {}
+        command = str(args.get("command") or args.get("commandLine") or "").strip()
+        if command:
+            return command
+    return ""
+
+
+def _shell_call_from_tool_call(tool_call: dict[str, Any]) -> dict[str, Any] | None:
+    for shell_key in _SHELL_TOOL_KEYS:
+        shell_call = tool_call.get(shell_key)
+        if isinstance(shell_call, dict):
+            return shell_call
+    return None
+
+
 def _terminal_block(command: str, output: str) -> str:
     trimmed = output.strip()
     if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
         trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
     body = f"\n{trimmed}\n" if trimmed else "\n"
     return f"\n:::terminal {command}{body}:::\n"
+
+
+def _terminal_started_block(command: str) -> str:
+    trimmed = command.strip()
+    if not trimmed:
+        return ""
+    return f"\n:::terminal {trimmed}\n"
+
+
+def _terminal_close_body(output: str) -> str:
+    trimmed = output.strip()
+    if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
+        trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
+    if trimmed:
+        return f"{trimmed}\n:::\n"
+    return ":::\n"
+
+
+def terminal_started_block_from_event(event: dict[str, Any]) -> str:
+    """Open a live `:::terminal` block when a shell tool call starts (Cursor parity)."""
+    if event.get("type") != "tool_call" or event.get("subtype") != "started":
+        return ""
+    tool_call = event.get("tool_call")
+    if not isinstance(tool_call, dict):
+        return ""
+    return _terminal_started_block(_shell_command_from_tool_call(tool_call))
+
+
+def _shell_completion_from_event(event: dict[str, Any]) -> tuple[str, str] | None:
+    if event.get("type") != "tool_call" or event.get("subtype") != "completed":
+        return None
+    tool_call = event.get("tool_call")
+    if not isinstance(tool_call, dict):
+        return None
+    shell_call = _shell_call_from_tool_call(tool_call)
+    if shell_call is None:
+        return None
+    command = _shell_command_from_tool_call(tool_call)
+    if not command:
+        return None
+    output = _shell_output_from_result(shell_call.get("result"))
+    return command, output
 
 
 def _image_block_from_event(
@@ -190,15 +255,9 @@ def _tool_block_from_event(
         path = _relative_path(str(args.get("path") or ""), workspace_root)
         return f"\n:::tool Read {path}\n"
 
-    for shell_key in ("shellToolCall", "runTerminalCommandToolCall", "terminalToolCall"):
-        shell_call = tool_call.get(shell_key)
-        if not isinstance(shell_call, dict):
-            continue
-        args = shell_call.get("args") if isinstance(shell_call.get("args"), dict) else {}
-        command = str(args.get("command") or args.get("commandLine") or "").strip()
-        if not command:
-            break
-        output = _shell_output_from_result(shell_call.get("result"))
+    shell_completion = _shell_completion_from_event(event)
+    if shell_completion is not None:
+        command, output = shell_completion
         return _terminal_block(command, output)
 
     for key, value in tool_call.items():
@@ -262,6 +321,8 @@ class CursorStreamAssembler:
         self._assistant_accumulated = ""
         self._research_open_query: str | None = None
         self._research_open_active = False
+        self._terminal_open_command: str | None = None
+        self._terminal_open_active = False
         self._generated_image_paths: list[str] = []
         self.result_text = ""
         self.error_text = ""
@@ -291,6 +352,13 @@ class CursorStreamAssembler:
             self._append("\n:::\n")
             self._research_open_query = None
             self._research_open_active = False
+
+    def _close_open_terminal(self, *, output: str = "") -> None:
+        if not self._terminal_open_active:
+            return
+        self._append(_terminal_close_body(output))
+        self._terminal_open_command = None
+        self._terminal_open_active = False
 
     def feed_line(self, line: str) -> None:
         event = parse_stream_event(line)
@@ -327,6 +395,7 @@ class CursorStreamAssembler:
             if subtype == "started":
                 started = research_started_block_from_event(event)
                 if started:
+                    self._close_open_terminal()
                     self._close_open_research()
                     self._append(started)
                     tool_call = event.get("tool_call")
@@ -334,10 +403,28 @@ class CursorStreamAssembler:
                         self._research_open_query = research_query_from_tool_call(tool_call) or "Research"
                         self._research_open_active = True
                     return
+                terminal_started = terminal_started_block_from_event(event)
+                if terminal_started:
+                    self._close_open_research()
+                    self._close_open_terminal()
+                    self._append(terminal_started)
+                    tool_call = event.get("tool_call")
+                    if isinstance(tool_call, dict):
+                        self._terminal_open_command = _shell_command_from_tool_call(tool_call) or None
+                        self._terminal_open_active = True
+                    return
             if subtype == "completed":
                 for image_path in image_paths_from_tool_call_event(event):
                     if image_path not in self._generated_image_paths:
                         self._generated_image_paths.append(image_path)
+                shell_completion = _shell_completion_from_event(event)
+                if shell_completion is not None:
+                    command, output = shell_completion
+                    if self._terminal_open_active:
+                        self._close_open_terminal(output=output)
+                    else:
+                        self._append(_terminal_block(command, output))
+                    return
                 open_query = self._research_open_query if self._research_open_active else None
                 block = _tool_block_from_event(
                     event,
@@ -361,6 +448,7 @@ class CursorStreamAssembler:
     def finalize(self) -> str:
         self._close_thinking()
         self._close_open_research()
+        self._close_open_terminal()
         content = normalize_transcript_content(self.content.strip())
         if not self._saw_assistant_text and self.result_text and not content:
             return normalize_transcript_content(self.result_text.strip())

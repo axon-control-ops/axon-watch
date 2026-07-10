@@ -55,7 +55,22 @@ export function buildOpenedFileDocuments(
   return openedPaths.flatMap((path) => {
     const entry = entryByPath.get(path);
     if (!entry) {
-      return [];
+      if (!isImageFilePath(path)) {
+        return [];
+      }
+      return [
+        {
+          id: workspaceFileDocumentId(path),
+          title: path,
+          language: languageForFilePath(path) as EditorDocumentLanguage,
+          value: '',
+          description: 'Image preview.',
+          source: 'file',
+          filePath: path,
+          readOnly: true,
+          dirty: false,
+        },
+      ];
     }
 
     const content = contents[path] ?? '';

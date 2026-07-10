@@ -16,6 +16,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.cli_runtime.generated_image_paths import (  # noqa: E402
     image_paths_from_markdown,
     image_paths_from_tool_call_event,
+    image_paths_from_transcript_blocks,
 )
 from app.chat.lane_b_image_attachments import (  # noqa: E402
     ingest_agent_generated_images,
@@ -74,6 +75,12 @@ class LaneBImageAttachmentTests(unittest.TestCase):
             "Here is the mockup:\n\n![mockup](assets/axon-x-mobile.png)"
         )
         self.assertEqual(["assets/axon-x-mobile.png"], paths)
+
+    def test_image_paths_from_transcript_blocks(self) -> None:
+        paths = image_paths_from_transcript_blocks(
+            "Mockup ready.\n\n:::image axon-x-mobile-glass-3d-mockup.png\n:::\n"
+        )
+        self.assertEqual(["axon-x-mobile-glass-3d-mockup.png"], paths)
 
     def test_resolve_generated_image_path_prefers_workspace_assets(self) -> None:
         workspace_root = self._root / "workspace"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildOpenedFileDocuments,
   isSafeWorkspaceFilePath,
   normalizeWorkspaceFilePath,
   remapWorkspaceFilePaths,
@@ -34,5 +35,23 @@ describe('workspace file session helpers', () => {
     expect(
       remapWorkspaceFilePaths(['README.md', 'src/old.txt'], 'src/old.txt', 'src/new.txt'),
     ).toEqual(['README.md', 'src/new.txt']);
+  });
+
+  it('builds image tabs before the workspace file index catches up', () => {
+    const documents = buildOpenedFileDocuments(
+      [{ path: 'README.md', size_bytes: 12 }],
+      ['assets/mockup.png'],
+      {},
+      {},
+      { 'assets/mockup.png': 'loaded' },
+    );
+
+    expect(documents).toEqual([
+      expect.objectContaining({
+        filePath: 'assets/mockup.png',
+        language: 'image',
+        readOnly: true,
+      }),
+    ]);
   });
 });
