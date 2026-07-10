@@ -11,11 +11,11 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 4618,
+      "max_lines": 4609,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
-      "rule": "FS-003 deferred: prior slice split was incomplete; monolith restored. Budget tracks current working-tree size after bootstrap/briefing wiring."
+      "rule": "FS-003 in progress: shell types and dock layout slice extracted; keep shrinking via factory slices."
     },
     "apps/console-web/src/styles/ide-layout.css": {
       "max_lines": 11,

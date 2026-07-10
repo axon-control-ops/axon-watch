@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-09",
-  "file_count": 37,
+  "generated_on": "2026-07-10",
+  "file_count": 38,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -104,6 +104,10 @@
     "SLICE-FS-001-control-plane-api-split.md": {
       "sha256": "8c707b2b05c76793d9e55b7b6a017c3c64a5da4ad627f9bc419d1d1a4e9d4eb3",
       "bytes": 6124
+    },
+    "SLICE-FS-003-shell-store-split.md": {
+      "sha256": "155bf575f8db14a3b6588f23d70b0b3c48663bc61b2e2c220783321be49ecc08",
+      "bytes": 3738
     },
     "TEST_STRATEGY.md": {
       "sha256": "3f6d93a3076313249a031c1c4e8ddce1db5c6f7594f9974c64ec3369b9f1ef1f",

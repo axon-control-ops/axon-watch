@@ -111,7 +111,6 @@ import {
 } from '../lib/ide-thread-tabs-view';
 import {
   clearActiveIdeThreadIdForWorkspace,
-  readActiveIdeThreadIdsByWorkspace,
   readOpenIdeThreadIdsByWorkspace,
   writeActiveIdeThreadIdForWorkspace,
   writeOpenIdeThreadIdsForWorkspace,
@@ -301,18 +300,14 @@ import {
   type DockSeamId,
 } from '../lib/dock-seam-layout';
 import {
-  persistDockHeroMode,
   readStoredDockHeroMode,
 } from '../lib/dock-hero-prefs';
 import {
-  resolveDefaultDockHeroMode,
   type DockHeroMode,
 } from '../lib/dock-hero-mode';
 import {
   leftSidebarAttentionBadgeCount as computeLeftSidebarAttentionBadgeCount,
-  persistLeftSidebarMode,
   readStoredLeftSidebarMode,
-  resolveDefaultLeftSidebarMode,
   type LeftSidebarMode,
 } from '../lib/left-sidebar-mode';
 import {
@@ -351,59 +346,24 @@ import {
   readStoredLayoutMode,
 } from '../lib/ide-layout-prefs';
 import { persistWorkbenchTerminalPanelVisible } from '../lib/workbench-terminal-split';
-
-export type LayoutMode = 'operator' | 'ide';
-export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
-export type RuntimeStatusLoadState = 'idle' | 'loading' | 'loaded' | 'error';
-export type InboxLoadState = 'idle' | 'loading' | 'loaded' | 'error';
-export type RunsLoadState = 'idle' | 'loading' | 'loaded' | 'error';
-export type WorkspacesLoadState = 'idle' | 'loading' | 'loaded' | 'error';
-export type BriefingLoadState = 'idle' | 'loading' | 'loaded' | 'error';
-export type WorkspaceFilesLoadState = 'idle' | 'loading' | 'loaded' | 'error';
-export type RunMutationState =
-  | 'idle'
-  | 'stopping'
-  | 'resuming'
-  | 'approving'
-  | 'rejecting'
-  | 'reviewing'
-  | 'completing';
-type WorkbenchSurface = 'editor' | 'preview';
-
-interface EditorTabDescriptor {
-  id: string;
-  title: string;
-  surface: WorkbenchSurface;
-  state: 'placeholder';
-}
-
-interface DockContextDescriptor {
-  id: string;
-  title: string;
-  state: 'placeholder';
-}
-
-const DEFAULT_EDITOR_TABS: EditorTabDescriptor[] = [
-  { id: 'editor-shell', title: 'Editor', surface: 'editor', state: 'placeholder' },
-  { id: 'preview-shell', title: 'Preview', surface: 'preview', state: 'placeholder' },
-];
-
-const DEFAULT_DOCK_CONTEXT: DockContextDescriptor = {
-  id: 'dock-thread',
-  title: 'Dock Thread Shell',
-  state: 'placeholder',
-};
-
-function hydrateWorkspaceSurfaceThreadIds(): Record<
-  string,
-  Partial<Record<ThreadSurface, string>>
-> {
-  const output: Record<string, Partial<Record<ThreadSurface, string>>> = {};
-  for (const [workspaceId, threadId] of Object.entries(readActiveIdeThreadIdsByWorkspace())) {
-    output[workspaceId] = { ide: threadId };
-  }
-  return output;
-}
+import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
+import {
+  DEFAULT_DOCK_CONTEXT,
+  DEFAULT_EDITOR_TABS,
+  hydrateWorkspaceSurfaceThreadIds,
+  type BriefingLoadState,
+  type DockContextDescriptor,
+  type EditorTabDescriptor,
+  type InboxLoadState,
+  type LayoutMode,
+  type RunMutationState,
+  type RuntimeStatusLoadState,
+  type RuntimeSummaryLoadState,
+  type RunsLoadState,
+  type WorkspaceFilesLoadState,
+  type WorkspacesLoadState,
+} from './shell/types';
+export type { LayoutMode, RuntimeSummaryLoadState, RuntimeStatusLoadState, InboxLoadState, RunsLoadState, WorkspacesLoadState, BriefingLoadState, WorkspaceFilesLoadState, RunMutationState } from './shell/types';
 
 export const useShellStore = defineStore('shell', () => {
   const layoutMode = ref<LayoutMode>(readStoredLayoutMode() ?? 'operator');
@@ -1002,20 +962,26 @@ export const useShellStore = defineStore('shell', () => {
       expandedSeams: expandedDockSeams.value,
     }),
   );
-
-  function dockSeamState(id: DockSeamId) {
-    return dockSeamLayout.value.find((seam) => seam.id === id) ?? null;
-  }
-
-  function toggleDockSeam(id: DockSeamId): void {
-    const next = new Set(expandedDockSeams.value);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    expandedDockSeams.value = next;
-  }
+  const {
+    applyOperatorDockDefaults,
+    dockSeamState,
+    setDockHeroMode,
+    setLeftSidebarMode,
+    toggleDockHeroMode,
+    toggleDockSeam,
+  } = createDockLayoutSlice({
+    layoutMode,
+    dockSeamLayout,
+    expandedDockSeams,
+    pendingApprovalsCount,
+    operatorBriefing,
+    runtimeSummary,
+    leftSidebarMode,
+    leftSidebarModeTouched,
+    dockHeroMode,
+    dockHeroModeTouched,
+    briefingSeamEmphasized,
+  });
 
   function getWorkspaceStreamUi(workspaceId: string): WorkspaceStreamUiState {
     return workspaceStreamUiById.value[workspaceId] ?? defaultWorkspaceStreamUi();
@@ -2562,50 +2528,6 @@ export const useShellStore = defineStore('shell', () => {
     setDockHeroMode('command');
     commandFocusToken.value += 1;
     await submitOperatorCommand();
-  }
-
-  function applyOperatorDockDefaults(): void {
-    if (layoutMode.value !== 'operator') {
-      return;
-    }
-
-    const next = new Set(expandedDockSeams.value);
-    next.add('thread');
-    expandedDockSeams.value = next;
-
-    if (!leftSidebarModeTouched.value) {
-      leftSidebarMode.value = resolveDefaultLeftSidebarMode({
-        pendingApprovals: pendingApprovalsCount.value,
-        briefing: operatorBriefing.value,
-      });
-    }
-
-    if (!dockHeroModeTouched.value) {
-      dockHeroMode.value = resolveDefaultDockHeroMode({
-        pendingApprovals: pendingApprovalsCount.value,
-        criticalSignals: runtimeSummary.value?.signals.critical_count ?? 0,
-        highSignals: runtimeSummary.value?.signals.high_count ?? 0,
-      });
-    }
-  }
-
-  function setLeftSidebarMode(mode: LeftSidebarMode): void {
-    leftSidebarModeTouched.value = true;
-    leftSidebarMode.value = mode;
-    persistLeftSidebarMode(mode);
-  }
-
-  function setDockHeroMode(mode: DockHeroMode): void {
-    dockHeroModeTouched.value = true;
-    dockHeroMode.value = mode;
-    persistDockHeroMode(mode);
-    if (mode === 'briefing') {
-      briefingSeamEmphasized.value = false;
-    }
-  }
-
-  function toggleDockHeroMode(): void {
-    setDockHeroMode(dockHeroMode.value === 'command' ? 'briefing' : 'command');
   }
 
   function focusAttentionSidebar(signalId?: string | null): void {
