@@ -7,14 +7,10 @@ import {
   completeRun,
   fetchCursorRuntimeStatus,
   fetchInbox,
-  fetchOperatorBrainGraph,
   fetchOperatorBriefing,
-  fetchOperatorFleetHealth,
   fetchOperatorPresenceSettings,
   fetchRunHistory,
   fetchRuns,
-  fetchRuntimeStatus,
-  fetchRuntimeMcpTools,
   fetchRuntimeSummary,
   fetchThreadHistory,
   fetchWorkspaceChatThread,
@@ -284,7 +280,6 @@ import {
   selectWorkspacePrimaryRun,
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
-import { normalizeBrainGraphSnapshot } from '../lib/kairo-entity-labels';
 import {
   filterTopbarChipsForIde,
   ideDisplayKairoState,
@@ -344,6 +339,8 @@ import {
 import { persistWorkbenchTerminalPanelVisible } from '../lib/workbench-terminal-split';
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
+import { createOperatorProbesSlice } from './shell/slices/create-operator-probes-slice';
+import { createRuntimeProbesSlice } from './shell/slices/create-runtime-probes-slice';
 import {
   DEFAULT_DOCK_CONTEXT,
   DEFAULT_EDITOR_TABS,
@@ -3404,32 +3401,16 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadRuntimeStatus(forceRefresh = false): Promise<void> {
-    runtimeStatusLoadState.value = 'loading';
-    runtimeStatusError.value = null;
-
-    try {
-      const status = await fetchRuntimeStatus({ forceRefresh });
-      runtimeStatus.value = status;
-      runtimeStatusLoadState.value = 'loaded';
-    } catch (error) {
-      runtimeStatusLoadState.value = 'error';
-      runtimeStatusError.value =
-        error instanceof Error ? error.message : 'runtime status request failed';
-    }
-  }
-
-  async function loadRuntimeMcpTools(): Promise<void> {
-    runtimeMcpToolsLoadState.value = 'loading';
-
-    try {
-      runtimeMcpTools.value = await fetchRuntimeMcpTools();
-      runtimeMcpToolsLoadState.value = 'loaded';
-    } catch {
-      runtimeMcpTools.value = null;
-      runtimeMcpToolsLoadState.value = 'error';
-    }
-  }
+  const {
+    loadRuntimeMcpTools,
+    loadRuntimeStatus,
+  } = createRuntimeProbesSlice({
+    runtimeStatus,
+    runtimeStatusLoadState,
+    runtimeStatusError,
+    runtimeMcpTools,
+    runtimeMcpToolsLoadState,
+  });
 
   const composerRuntimePrefs = computed(() => {
     composerRuntimePrefsRevision.value;
@@ -3736,45 +3717,17 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadOperatorFleetHealth(options?: { background?: boolean }): Promise<void> {
-    const backgroundRefresh =
-      options?.background === true && operatorFleetHealthLoadState.value === 'loaded';
-    if (!backgroundRefresh) {
-      operatorFleetHealthLoadState.value = 'loading';
-      operatorFleetHealthError.value = null;
-    }
-
-    try {
-      operatorFleetHealth.value = await fetchOperatorFleetHealth();
-      operatorFleetHealthLoadState.value = 'loaded';
-    } catch (error) {
-      if (!backgroundRefresh) {
-        operatorFleetHealthLoadState.value = 'error';
-        operatorFleetHealthError.value =
-          error instanceof Error ? error.message : 'operator fleet health request failed';
-      }
-    }
-  }
-
-  async function loadOperatorBrainGraph(options?: { background?: boolean }): Promise<void> {
-    const backgroundRefresh =
-      options?.background === true && operatorBrainGraphLoadState.value === 'loaded';
-    if (!backgroundRefresh) {
-      operatorBrainGraphLoadState.value = 'loading';
-      operatorBrainGraphError.value = null;
-    }
-
-    try {
-      operatorBrainGraph.value = normalizeBrainGraphSnapshot(await fetchOperatorBrainGraph());
-      operatorBrainGraphLoadState.value = 'loaded';
-    } catch (error) {
-      if (!backgroundRefresh) {
-        operatorBrainGraphLoadState.value = 'error';
-        operatorBrainGraphError.value =
-          error instanceof Error ? error.message : 'operator brain graph request failed';
-      }
-    }
-  }
+  const {
+    loadOperatorBrainGraph,
+    loadOperatorFleetHealth,
+  } = createOperatorProbesSlice({
+    operatorFleetHealth,
+    operatorFleetHealthLoadState,
+    operatorFleetHealthError,
+    operatorBrainGraph,
+    operatorBrainGraphLoadState,
+    operatorBrainGraphError,
+  });
 
   function syncViewportCompactFromResize(): void {
     if (typeof window === 'undefined') {
