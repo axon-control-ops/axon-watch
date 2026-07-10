@@ -3,7 +3,11 @@
  *
  * Cursor shows this only while a Shell tool is in-flight (open `:::terminal`
  * block). Pressing it reveals the bottom terminal and mirrors that shell card
- * into the vaxon tab. True process detach into a real PTY remains a follow-up.
+ * into the vaxon tab.
+ *
+ * True process detach (shell continues in a real PTY; agent continues other
+ * work) requires Cursor CLI protocol support — see
+ * docs/planning/AGENT_SHELL_BACKGROUND_DETACH.md.
  */
 
 import { parseAgentTranscriptBlocks } from './agent-transcript-blocks';

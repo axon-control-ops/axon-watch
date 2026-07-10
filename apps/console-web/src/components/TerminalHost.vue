@@ -30,10 +30,15 @@ function writeMirrorSnapshot(text: string): void {
   terminalController?.writeMirrorSnapshot(text);
 }
 
+function exitMirrorMode(): void {
+  terminalController?.exitMirrorMode();
+}
+
 defineExpose({
   clearTerminal,
   persistTerminalScrollback,
   writeMirrorSnapshot,
+  exitMirrorMode,
 });
 
 function handleBeforeUnload(): void {

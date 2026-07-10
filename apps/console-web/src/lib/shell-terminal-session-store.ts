@@ -136,7 +136,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     input.revealIdeTerminalPanel();
   }
 
-  function backgroundIdeAgentRun(): void {
+  async function backgroundIdeAgentRun(): Promise<void> {
     armAgentShellMirror();
     input.revealIdeTerminalPanel();
     const agentSession = input.terminalSessions.value.find((session) => session.role === 'agent');
@@ -144,7 +144,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
       input.activeTerminalSessionId.value = agentSession.id;
       return;
     }
-    void createVaxonTerminalSession(input.ideAgentRunId.value);
+    await createVaxonTerminalSession(input.ideAgentRunId.value);
   }
 
   async function splitTerminalSession(sessionId: string): Promise<string | null> {

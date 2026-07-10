@@ -36,6 +36,8 @@ export interface XtermSessionController {
   setContext: (context: TerminalContext) => void;
   /** Replace the viewport with a Cursor-style agent shell mirror (no PTY). */
   writeMirrorSnapshot: (text: string) => void;
+  /** Leave mirror mode and reconnect the agent PTY websocket. */
+  exitMirrorMode: () => void;
 }
 
 interface TerminalServerMessage {
@@ -306,5 +308,19 @@ export async function createXtermSession(
       }
     },
     writeMirrorSnapshot,
+    exitMirrorMode() {
+      if (!mirrorMode) {
+        return;
+      }
+      mirrorMode = false;
+      const workspaceId = attachedWorkspaceId;
+      const sessionId = attachedSessionId;
+      const sessionRole = attachedSessionRole;
+      // Force attachWorkspace to reconnect even if ids are unchanged.
+      attachedWorkspaceId = null;
+      if (workspaceId) {
+        attachWorkspace(workspaceId, sessionId, sessionRole);
+      }
+    },
   };
 }

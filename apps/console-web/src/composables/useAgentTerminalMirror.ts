@@ -7,6 +7,7 @@ import {
 
 export type AgentTerminalMirrorHost = {
   writeMirrorSnapshot: (text: string) => void;
+  exitMirrorMode?: () => void;
 };
 
 type MaybeStringRef = Ref<string | null> | Ref<string> | { readonly value: string | null };
@@ -20,6 +21,13 @@ export function useAgentTerminalMirror(input: {
   streamActive: Ref<boolean>;
 }): { syncNow: () => void } {
   let lastSnapshot = '';
+
+  function exitHostMirror(sessionId: string | null): void {
+    if (!sessionId) {
+      return;
+    }
+    input.getHost(sessionId)?.exitMirrorMode?.();
+  }
 
   function syncNow(): void {
     if (!input.mirrorActive.value) {
@@ -51,8 +59,11 @@ export function useAgentTerminalMirror(input: {
       sessionId: input.agentSessionId.value,
       content: input.transcriptContent.value,
     }),
-    () => {
-      if (!input.mirrorActive.value) {
+    (next, prev) => {
+      if (!next.active) {
+        if (prev?.active) {
+          exitHostMirror(next.sessionId ?? prev.sessionId ?? null);
+        }
         lastSnapshot = '';
         return;
       }
@@ -70,7 +81,9 @@ export function useAgentTerminalMirror(input: {
       if (input.mirrorActive.value) {
         syncNow();
       }
+      const sessionId = input.agentSessionId.value;
       input.clearMirror();
+      exitHostMirror(sessionId);
       lastSnapshot = '';
     },
   );
