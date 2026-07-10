@@ -3,7 +3,7 @@
 **Status:** In progress (2026-07-10)  
 **Effective:** 2026-07-10  
 **Owner:** `console-web`  
-**Ratchet:** `apps/console-web/src/stores/shell.ts` — 4,419 lines max (target: `stores/shell/slices/*`)
+**Ratchet:** `apps/console-web/src/stores/shell.ts` — 3,775 lines max (target: `stores/shell/slices/*`)
 
 ## Problem
 
@@ -61,6 +61,15 @@ apps/console-web/src/stores/
       create-operator-probes-slice.ts
       create-operator-briefing-slice.ts
       create-cursor-catalog-slice.ts
+      create-operator-presence-settings-slice.ts
+      create-inbox-signals-slice.ts
+      create-catalog-loaders-slice.ts
+      create-viewport-compact-slice.ts
+      create-thread-surface-slice.ts
+      create-ide-workbench-chrome-slice.ts
+      create-composer-runtime-prefs-slice.ts
+      create-operator-focus-slice.ts
+      create-shell-display-slice.ts
 ```
 
 ## First-cut scope
@@ -104,6 +113,46 @@ Move low-coupling probe loaders into factory slices:
 - `create-cursor-catalog-slice.ts` — `loadCursorCatalog` + model migration helper
 
 **Gate:** `npm run typecheck -w @axon-watch/console-web` + console-web vitest
+
+### Step 6 — Extract operator presence + inbox signal slices ✅
+
+- `create-operator-presence-settings-slice.ts` — operator presence load/save/reset + settings surface toggles
+- `create-inbox-signals-slice.ts` — `loadInbox`, CLEAR, verify-dismiss, and linked handoff dismissal
+
+**Gate:** `python3 scripts/guardrails/check_file_sizes.py` + `npx vitest run src/lib/signal-handoff-dismiss.test.ts`
+
+**Result:** `shell.ts` ratcheted from `4419` to `4278`.
+
+### Step 7 — Extract catalog loaders ✅
+
+- `create-catalog-loaders-slice.ts` — `loadWorkspaces`, `loadRuns`, `loadRunHistory`, `syncCurrentWorkspace`, and auto-sync helper
+
+Keep `setCurrentWorkspace` in `shell.ts` (editor/thread/terminal side effects).
+
+**Gate:** `python3 scripts/guardrails/check_file_sizes.py` + workspace catalog vitest
+
+**Result:** `shell.ts` ratcheted from `4278` to `4206`.
+
+### Step 8 — Extract six low-risk factory slices ✅
+
+- `create-viewport-compact-slice.ts` — `mobileCompactLayout`, resize bind/unbind, owns
+  `lastViewportCompactRequested` and exports get/set for briefing wiring
+- `create-thread-surface-slice.ts` — surface helpers + workspace surface thread id map
+- `create-ide-workbench-chrome-slice.ts` — terminal reveal/toggle, activity view,
+  explorer/agent dock toggles (still feeds `createTerminalSessionStore`)
+- `create-composer-runtime-prefs-slice.ts` — runtime target/model prefs + picker
+  visibility (keeps `createCursorCatalogSlice` separate)
+- `create-operator-focus-slice.ts` — attention/briefing/mission/command focus chrome
+- `create-shell-display-slice.ts` — read-only display/capability computeds (excludes
+  editor docs, Kairo voice, composer submit/queue)
+
+**Gate:** `python3 scripts/guardrails/check_file_sizes.py` + signal-handoff + workspace catalog vitest
+
+**Result:** `shell.ts` ratcheted from `4206` to `3775`.
+
+### Next candidate
+
+- Editor document/session helpers, or IDE thread tab orchestration (higher coupling)
 
 ## Verification checklist
 

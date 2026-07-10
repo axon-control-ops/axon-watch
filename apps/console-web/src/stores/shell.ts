@@ -1,19 +1,13 @@
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, type ComputedRef } from 'vue';
 import { defineStore } from 'pinia';
 
 import {
   approveRun,
-  acknowledgeInboxSignals,
   completeRun,
-  fetchInbox,
-  fetchOperatorPresenceSettings,
-  fetchRunHistory,
-  fetchRuns,
   fetchThreadHistory,
   fetchWorkspaceChatThread,
   hasWorkspaceChatThread,
   fetchWorkspaceFile,
-  fetchWorkspaces,
   fetchWorkspaceFiles,
   markRunReviewReady,
   createWorkspaceChatThread,
@@ -24,7 +18,6 @@ import {
   rejectRun,
   resumeRun,
   saveWorkspaceFile,
-  saveOperatorPresenceSettings,
   stopRun,
 } from '../api/control-plane';
 import type {
@@ -36,14 +29,12 @@ import type {
   WorkspaceChatThreadListItem,
 } from '../api/control-plane';
 import {
-  persistOperatorCenterView,
   readStoredOperatorCenterView,
   type BrainGraphSnapshot,
   type OperatorCenterView,
 } from '../lib/operator-brain-graph-view';
 import { resolveSignalHandoff, type SignalHandoffInput } from '../lib/signal-handoff-view';
 import {
-  canVerifyDismissHandoffSignal,
   readPendingHandoffDismissSignalId,
   writePendingHandoffDismissSignalId,
 } from '../lib/signal-handoff-dismiss';
@@ -59,7 +50,6 @@ import type {
   SpokenAlertEligibility,
   WorkspaceRecord,
 } from '../contracts/canonical';
-import { navigateToAppSurface, readAppSurface } from '../lib/app-surface-route';
 import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
 import {
   editedFilePathsFromTranscript,
@@ -99,9 +89,7 @@ import {
   resolveOpenIdeThreadTabItems,
 } from '../lib/ide-thread-tabs-view';
 import {
-  clearActiveIdeThreadIdForWorkspace,
   readOpenIdeThreadIdsByWorkspace,
-  writeActiveIdeThreadIdForWorkspace,
   writeOpenIdeThreadIdsForWorkspace,
 } from '../lib/ide-thread-tabs-prefs';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
@@ -147,14 +135,12 @@ import {
 } from '../lib/ide-agent-run-link';
 import {
   shouldClearIdeAgentRunLink,
-  shouldShowIdeAgentStop,
 } from '../lib/ide-agent-run-active';
 import { resolveComposerContextPayload } from '../lib/ide-composer-context-tokens';
 import {
   appendIdeComposerQueueEntry,
   ideComposerQueueLabel as buildIdeComposerQueueLabel,
   removeIdeComposerQueueEntry,
-  resolveIdeStopRun,
   shiftIdeComposerQueue,
   shouldQueueIdeComposerSubmit,
   type IdeComposerMode,
@@ -169,59 +155,32 @@ import {
   shouldSyncWorkspaceStreamGlobals,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
-import { resolveOperatorSignalCount } from '../lib/operator-signal-count';
 import { resolveKairoPresenceClickTarget } from '../lib/kairo-presence-action';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
-  resolveAttentionFocusScrollTarget,
-  resolveDefaultHighlightedSignalId,
-} from '../lib/ide-attention-focus';
-import {
   readViewportWidth,
-  shouldRequestViewportCompactBriefing,
-  shouldUseMobileCompactLayout,
 } from '../lib/viewport-compact';
 import {
   defaultOperatorPresenceSettings,
-  normalizeOperatorPresenceSettings,
-  persistOperatorPresenceSettings,
   readPersistedOperatorPresenceSettings,
 } from '../lib/operator-presence-settings';
 import {
   buildRunHistoryRows,
   type RunHistorySnapshot,
 } from '../lib/run-history-view';
-import { formatRunIdentityLabel } from '../lib/run-display';
 import { isOperatorCompletablePhase } from '../lib/run-lifecycle-ui';
 import {
   appendOperatorCommand,
   canSubmitOperatorCommand as canSubmitOperatorCommandDraft,
   commandSeamHint as buildCommandSeamHint,
-  conversationEmptyStateLabel,
   mapChatMessageRecord,
   mergeThreadMessages,
   type OperatorThreadEntry,
 } from '../lib/operator-thread';
 import {
   filterThreadMessagesForSurface,
-  isActiveWorkspaceSurface,
-  threadSurfaceForLayout,
   type ThreadSurface,
 } from '../lib/thread-surface-view';
-import {
-  buildCursorCatalogRows,
-  cursorComposerRuntimeLabel,
-  resolveCursorComposerModel,
-  type CursorCatalogRow,
-} from '../lib/cursor-catalog-view';
-import {
-  readComposerRuntimePrefs,
-  writeComposerRuntimePrefs,
-} from '../lib/composer-runtime-prefs';
-import {
-  readCursorPickerVisibleModelIds,
-  toggleCursorPickerVisibleModel as toggleCursorPickerVisibleModelPref,
-} from '../lib/cursor-picker-prefs';
 import {
   applyChatUiAction,
   parseChatUiAction,
@@ -271,13 +230,10 @@ import {
 } from '../lib/ide-agent-edit-review';
 import { normalizeEditedFilePath } from '../lib/agent-transcript-blocks';
 import {
-  selectPrimaryApprovalRun,
-  selectPrimaryRun,
   selectWorkspacePrimaryRun,
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
 import {
-  filterTopbarChipsForIde,
   ideDisplayKairoState,
   resolveIdePresenceProfile,
   type IdePresenceProfile,
@@ -293,7 +249,6 @@ import {
   type DockHeroMode,
 } from '../lib/dock-hero-mode';
 import {
-  leftSidebarAttentionBadgeCount as computeLeftSidebarAttentionBadgeCount,
   readStoredLeftSidebarMode,
   type LeftSidebarMode,
 } from '../lib/left-sidebar-mode';
@@ -304,7 +259,6 @@ import {
 } from '../lib/kairo-briefing-attention';
 import {
   buildStatusBarSegments,
-  buildTopbarChips,
 } from '../lib/runtime-strip';
 import {
   persistOperatorWorkspaceId,
@@ -312,34 +266,31 @@ import {
 } from '../lib/operator-workspace-selection';
 import {
   defaultOperatorWorkspaceId,
-  mergeOperatorWorkspaceCatalog,
-  workspaceCatalogMode,
 } from '../lib/operator-workspace-catalog';
-import {
-  buildBriefingSummaryLine,
-  buildStatusBarZones,
-  buildTopbarBreadcrumb,
-  buildTopbarMetaPills,
-  buildWorkspaceStatusCardRows,
-  resolveOperatorWorkspaceId,
-} from '../lib/mockup-shell-view';
 import {
   type IdeActivityView,
   persistAgentDockCollapsed,
-  persistIdeExplorerCollapsed,
   persistLayoutMode,
   readStoredAgentDockCollapsed,
   readStoredIdeExplorerCollapsed,
   readStoredLayoutMode,
 } from '../lib/ide-layout-prefs';
-import { persistWorkbenchTerminalPanelVisible } from '../lib/workbench-terminal-split';
+import { createCatalogLoadersSlice } from './shell/slices/create-catalog-loaders-slice';
+import { createComposerRuntimePrefsSlice } from './shell/slices/create-composer-runtime-prefs-slice';
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
 import { createCursorCatalogSlice } from './shell/slices/create-cursor-catalog-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
+import { createIdeWorkbenchChromeSlice } from './shell/slices/create-ide-workbench-chrome-slice';
 import { createOperatorBriefingSlice } from './shell/slices/create-operator-briefing-slice';
+import { createOperatorFocusSlice } from './shell/slices/create-operator-focus-slice';
+import { createOperatorPresenceSettingsSlice } from './shell/slices/create-operator-presence-settings-slice';
 import { createOperatorProbesSlice } from './shell/slices/create-operator-probes-slice';
+import { createInboxSignalsSlice } from './shell/slices/create-inbox-signals-slice';
 import { createRuntimeProbesSlice } from './shell/slices/create-runtime-probes-slice';
 import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary-slice';
+import { createShellDisplaySlice } from './shell/slices/create-shell-display-slice';
+import { createThreadSurfaceSlice } from './shell/slices/create-thread-surface-slice';
+import { createViewportCompactSlice } from './shell/slices/create-viewport-compact-slice';
 import {
   DEFAULT_DOCK_CONTEXT,
   DEFAULT_EDITOR_TABS,
@@ -442,10 +393,7 @@ export const useShellStore = defineStore('shell', () => {
   const operatorPresenceSettingsSaving = ref(false);
   const operatorPresenceSettingsError = ref<string | null>(null);
   const operatorPresenceSettingsSavedAt = ref<number | null>(null);
-  let operatorPresenceSettingsSaveQueue: Promise<void> = Promise.resolve();
   const viewportWidth = ref(readViewportWidth());
-  let lastViewportCompactRequested: boolean | null = null;
-  let viewportCompactListenerBound = false;
   const briefingLoadState = ref<BriefingLoadState>('idle');
   const briefingError = ref<string | null>(null);
   const signalViews = ref<SignalView[]>([]);
@@ -521,109 +469,70 @@ export const useShellStore = defineStore('shell', () => {
     layoutMode.value === 'operator' ? 'Operator mode' : 'IDE mode',
   );
 
-  const workspaceTrailLabel = computed(() => {
-    const workspace = currentWorkspace.value?.workspace_id ?? 'No workspace selected';
-    const identity = runtimeSummary.value?.runtime_identity;
-    if (!identity) {
-      return workspace;
-    }
-    return `${workspace} / ${identity.provider_name}`;
-  });
-
-  const workspaceStateLabel = computed(() => {
-    if (!currentWorkspace.value) {
-      return 'No workspace selected';
-    }
-    return currentWorkspace.value.display_name?.trim() || currentWorkspace.value.workspace_id;
-  });
-
-  const usesProductionWorkspaceCatalog = computed(
-    () => workspaceCatalogMode(workspaces.value) === 'production',
-  );
-
-  const topbarChips = computed(() => {
-    const chips = buildTopbarChips({
-      runtimeSummary: runtimeSummary.value,
-      runtimeSummaryLoadState: runtimeSummaryLoadState.value,
-      primaryActiveRun: activeRun.value,
-    });
-    return filterTopbarChipsForIde(chips, layoutMode.value, idePresenceProfile.value);
-  });
-
-  const topbarMetaPills = computed(() => buildTopbarMetaPills(runtimeSummary.value));
-  const topbarBreadcrumb = computed(() =>
-    buildTopbarBreadcrumb(runtimeSummary.value, currentWorkspace.value),
-  );
-  const activeOperatorSignalCount = computed(() =>
-    resolveOperatorSignalCount({
-      inboxItems: inboxItems.value,
-      inboxLoadState: inboxLoadState.value,
-      runtimeSummaryOpenCount: runtimeSummary.value?.signals.open_count,
-    }),
-  );
-
-  const workspaceAttentionSignalCount = computed(() =>
-    resolveOperatorSignalCount({
-      inboxItems: inboxItems.value,
-      inboxLoadState: inboxLoadState.value,
-      runtimeSummaryOpenCount: runtimeSummary.value?.signals.open_count,
-      workspaceId: currentWorkspace.value?.workspace_id ?? null,
-    }),
-  );
-
-  const statusBarZones = computed(() =>
-    buildStatusBarZones({
-      runtimeSummary: runtimeSummary.value,
-      runtimeSummaryLoadState: runtimeSummaryLoadState.value,
-      primaryActiveRun: primaryActiveRun.value,
-      workspaceId: currentWorkspace.value?.workspace_id ?? null,
-      layoutMode: layoutMode.value,
-      idePresenceProfile: idePresenceProfile.value,
-      activeSignalCount: activeOperatorSignalCount.value,
-    }),
-  );
-
-  const workspaceStatusCardRows = computed(() =>
-    buildWorkspaceStatusCardRows({
-      runtimeSummary: runtimeSummary.value,
-      runtimeSummaryLoadState: runtimeSummaryLoadState.value,
-    }),
-  );
-
-  const briefingSummaryLine = computed(() =>
-    buildBriefingSummaryLine(
-      operatorBriefing.value,
-      runtimeSummary.value,
-      currentWorkspace.value?.workspace_id ?? null,
-    ),
-  );
-
-  const runtimeStateLabel = computed(() => topbarChips.value.map((chip) => chip.label).join(' · '));
-
   const workspaceRuns = computed(() =>
     currentWorkspace.value
       ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
       : runs.value,
   );
   const primaryActiveRun = computed(() => selectWorkspacePrimaryRun(workspaceRuns.value));
-  const runStateLabel = computed(() => {
-    if (runsLoadState.value === 'loading') {
-      return 'Loading active run…';
-    }
 
-    if (runsLoadState.value === 'error') {
-      return 'Active run unavailable';
-    }
+  let idePresenceProfile: ComputedRef<IdePresenceProfile>;
 
-    if (!primaryActiveRun.value) {
-      return 'No active run';
-    }
-
-    const run = primaryActiveRun.value;
-    return formatRunIdentityLabel(run);
+  const {
+    workspaceTrailLabel,
+    workspaceStateLabel,
+    usesProductionWorkspaceCatalog,
+    topbarChips,
+    topbarMetaPills,
+    topbarBreadcrumb,
+    activeOperatorSignalCount,
+    workspaceAttentionSignalCount,
+    statusBarZones,
+    workspaceStatusCardRows,
+    briefingSummaryLine,
+    runtimeStateLabel,
+    runStateLabel,
+    runMutationPending,
+    activeIdeStopRun,
+    canStopIdeAgentRun,
+    canStopPrimaryRun,
+    canResumePrimaryRun,
+    canMarkPrimaryRunReviewReady,
+    canCompletePrimaryRun,
+    primaryApprovalRun,
+    primaryInboxItem,
+    inboxStateLabel,
+    approvalsSummaryLabel,
+    canApprovePrimaryRun,
+    canApproveIdeAgentRun,
+    canResumeIdeAgentRun,
+    canRejectPrimaryRun,
+    threadStateLabel,
+    pendingApprovalsCount,
+    leftSidebarAttentionBadgeCount,
+  } = createShellDisplaySlice({
+    currentWorkspace,
+    workspaces,
+    runtimeSummary,
+    runtimeSummaryLoadState,
+    activeRun,
+    primaryActiveRun,
+    layoutMode,
+    getIdePresenceProfile: () => idePresenceProfile.value,
+    inboxItems,
+    inboxLoadState,
+    operatorBriefing,
+    runs,
+    runsLoadState,
+    runMutationState,
+    ideAgentLinkedRun,
+    ideAgentRunId,
+    agentStreamActive,
+    operatorThreadMessages,
+    threadMessages,
   });
+
   const runHistoryRows = computed(() => buildRunHistoryRows(runHistorySnapshot.value));
-  const primaryApprovalRun = computed(() => selectPrimaryApprovalRun(runs.value));
   const workspacePrimarySignal = computed(() =>
     currentWorkspace.value
       ? inboxItems.value.find((item) => item.workspace_id === currentWorkspace.value?.workspace_id) ??
@@ -685,93 +594,6 @@ export const useShellStore = defineStore('shell', () => {
 
     return editorDocuments.value[0] ?? null;
   });
-  const runMutationPending = computed(() => runMutationState.value !== 'idle');
-  const activeIdeStopRun = computed(() =>
-    resolveIdeStopRun({
-      linkedRun: ideAgentLinkedRun.value,
-      linkedRunId: ideAgentRunId.value,
-      runs: runs.value,
-      primaryRun: primaryActiveRun.value,
-      workspaceId: currentWorkspace.value?.workspace_id ?? null,
-    }),
-  );
-  const canStopIdeAgentRun = computed(() => {
-    if (runMutationPending.value) {
-      return false;
-    }
-    if (agentStreamActive.value) {
-      return true;
-    }
-    return (
-      shouldShowIdeAgentStop({
-        agentStreamActive: false,
-        run: ideAgentLinkedRun.value,
-      }) || Boolean(activeIdeStopRun.value)
-    );
-  });
-  const canStopPrimaryRun = computed(
-    () => Boolean(primaryActiveRun.value?.can_stop) && !runMutationPending.value,
-  );
-  const canResumePrimaryRun = computed(
-    () => Boolean(primaryActiveRun.value?.can_resume) && !runMutationPending.value,
-  );
-  const canMarkPrimaryRunReviewReady = computed(
-    () => primaryActiveRun.value?.phase === 'executing' && !runMutationPending.value,
-  );
-  const canCompletePrimaryRun = computed(
-    () =>
-      isOperatorCompletablePhase(primaryActiveRun.value?.phase) && !runMutationPending.value,
-  );
-
-  const inboxStateLabel = computed(() => {
-    if (inboxLoadState.value === 'loading') {
-      return 'Loading signals…';
-    }
-
-    if (inboxLoadState.value === 'error') {
-      return 'Signals unavailable';
-    }
-
-    const primary = inboxItems.value[0];
-    if (!primary) {
-      return 'No open signals';
-    }
-
-    return `${primary.title} · ${primary.severity}`;
-  });
-
-  const approvalsSummaryLabel = computed(() => {
-    const pending =
-      runtimeSummary.value?.approvals.pending_count ??
-      operatorBriefing.value?.pending_approvals.count ??
-      0;
-    if (pending === 0) {
-      return 'No pending approvals';
-    }
-    return `${pending} pending approval${pending === 1 ? '' : 's'}`;
-  });
-
-  const primaryInboxItem = computed(() => inboxItems.value[0] ?? null);
-
-  const canApprovePrimaryRun = computed(
-    () => Boolean(primaryApprovalRun.value?.can_approve) && !runMutationPending.value,
-  );
-  const canApproveIdeAgentRun = computed(
-    () => Boolean(ideAgentLinkedRun.value?.can_approve) && !runMutationPending.value,
-  );
-  const canResumeIdeAgentRun = computed(
-    () => Boolean(ideAgentLinkedRun.value?.can_resume) && !runMutationPending.value,
-  );
-  const canRejectPrimaryRun = computed(
-    () => primaryApprovalRun.value?.phase === 'awaiting_approval' && !runMutationPending.value,
-  );
-
-  const threadStateLabel = computed(() =>
-    conversationEmptyStateLabel(
-      (layoutMode.value === 'operator' ? operatorThreadMessages.value : threadMessages.value)
-        .length,
-    ),
-  );
 
   const canSubmitOperatorCommand = computed(
     () =>
@@ -870,21 +692,7 @@ export const useShellStore = defineStore('shell', () => {
 
   const showDevSeams = computed(() => import.meta.env.VITE_DEV_SEAMS === '1');
 
-  const mobileCompactLayout = computed(() =>
-    shouldUseMobileCompactLayout(
-      viewportWidth.value,
-      operatorBriefing.value?.operator_presence ?? null,
-      operatorPresenceSettings.value,
-    ),
-  );
-
-  const pendingApprovalsCount = computed(() => {
-    const fromSummary = runtimeSummary.value?.approvals.pending_count ?? 0;
-    const fromBriefing = operatorBriefing.value?.pending_approvals.count ?? 0;
-    return Math.max(fromSummary, fromBriefing);
-  });
-
-  const idePresenceProfile = computed<IdePresenceProfile>(() => {
+  idePresenceProfile = computed<IdePresenceProfile>(() => {
     const summary = runtimeSummary.value;
     return resolveIdePresenceProfile({
       pendingApprovals: pendingApprovalsCount.value,
@@ -920,15 +728,6 @@ export const useShellStore = defineStore('shell', () => {
       settingsNarration: operatorPresenceSettings.value.kairo_narration ?? 'minimal',
       layoutMode: layoutMode.value,
       idePresenceProfile: idePresenceProfile.value,
-    }),
-  );
-
-  const leftSidebarAttentionBadgeCount = computed(() =>
-    computeLeftSidebarAttentionBadgeCount({
-      pendingApprovals: pendingApprovalsCount.value,
-      briefing: operatorBriefing.value,
-      inboxItems: inboxItems.value,
-      inboxLoadState: inboxLoadState.value,
     }),
   );
 
@@ -1077,57 +876,17 @@ export const useShellStore = defineStore('shell', () => {
     threadMessages.value = history.items.map((item) => mapChatMessageRecord(item));
   }
 
-  function currentThreadSurface(): ThreadSurface {
-    return threadSurfaceForLayout(layoutMode.value);
-  }
-
-  function isViewingWorkspaceSurface(workspaceId: string, surface: ThreadSurface): boolean {
-    return isActiveWorkspaceSurface({
-      currentWorkspaceId: currentWorkspace.value?.workspace_id ?? null,
-      targetWorkspaceId: workspaceId,
-      currentSurface: currentThreadSurface(),
-      targetSurface: surface,
-    });
-  }
-
-  function getWorkspaceSurfaceThreadId(
-    workspaceId: string,
-    surface: ThreadSurface,
-  ): string | null {
-    return workspaceSurfaceThreadIds.value[workspaceId]?.[surface] ?? null;
-  }
-
-  function setWorkspaceSurfaceThreadId(
-    workspaceId: string,
-    surface: ThreadSurface,
-    threadId: string,
-  ): void {
-    workspaceSurfaceThreadIds.value = {
-      ...workspaceSurfaceThreadIds.value,
-      [workspaceId]: {
-        ...(workspaceSurfaceThreadIds.value[workspaceId] ?? {}),
-        [surface]: threadId,
-      },
-    };
-    if (surface === 'ide') {
-      writeActiveIdeThreadIdForWorkspace(workspaceId, threadId);
-    }
-  }
-
-  function clearWorkspaceSurfaceThreadId(workspaceId: string, surface: ThreadSurface): void {
-    const next = { ...workspaceSurfaceThreadIds.value };
-    const record = { ...(next[workspaceId] ?? {}) };
-    delete record[surface];
-    if (Object.keys(record).length) {
-      next[workspaceId] = record;
-    } else {
-      delete next[workspaceId];
-    }
-    workspaceSurfaceThreadIds.value = next;
-    if (surface === 'ide') {
-      clearActiveIdeThreadIdForWorkspace(workspaceId);
-    }
-  }
+  const {
+    currentThreadSurface,
+    isViewingWorkspaceSurface,
+    getWorkspaceSurfaceThreadId,
+    setWorkspaceSurfaceThreadId,
+    clearWorkspaceSurfaceThreadId,
+  } = createThreadSurfaceSlice({
+    layoutMode,
+    currentWorkspace,
+    workspaceSurfaceThreadIds,
+  });
 
   const activeIdeThreadId = computed(() => {
     const workspaceId = currentWorkspace.value?.workspace_id;
@@ -2523,144 +2282,52 @@ export const useShellStore = defineStore('shell', () => {
     await submitOperatorCommand();
   }
 
-  function focusAttentionSidebar(signalId?: string | null): void {
-    const topSignals = operatorBriefing.value?.top_signals ?? [];
-    highlightedSignalId.value = resolveDefaultHighlightedSignalId(topSignals, signalId);
+  const {
+    focusAttentionSidebar,
+    closeIdeAttentionPanel,
+    closeIdeBriefingPanel,
+    openIdeBriefingPanel,
+    toggleSignalDetails,
+    focusMissionControl,
+    setOperatorCenterView,
+    afterRunLifecycleMutation,
+    focusKairoBriefing,
+    focusCommandSeam,
+  } = createOperatorFocusSlice({
+    layoutMode,
+    operatorBriefing,
+    highlightedSignalId,
+    ideAttentionPanelOpen,
+    ideBriefingPanelOpen,
+    ideExplorerCollapsed,
+    signalsSeamEmphasized,
+    missionControlEmphasized,
+    briefingSeamEmphasized,
+    operatorCenterView,
+    dockHeroMode,
+    setLeftSidebarMode,
+    setDockHeroMode,
+    restoreComposerDraft,
+  });
 
-    if (layoutMode.value === 'ide') {
-      ideAttentionPanelOpen.value = true;
-      ideBriefingPanelOpen.value = false;
-      ideExplorerCollapsed.value = false;
-      persistIdeExplorerCollapsed(false);
-    } else {
-      setLeftSidebarMode('attention');
-    }
-
-    signalsSeamEmphasized.value = true;
-    if (typeof window !== 'undefined') {
-      const scrollTargetId = resolveAttentionFocusScrollTarget(layoutMode.value);
-      window.requestAnimationFrame(() => {
-        document.getElementById(scrollTargetId)?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-        });
-        window.setTimeout(() => {
-          signalsSeamEmphasized.value = false;
-        }, 1200);
-      });
-    }
-  }
-
-  function closeIdeAttentionPanel(): void {
-    ideAttentionPanelOpen.value = false;
-    highlightedSignalId.value = null;
-  }
-
-  function closeIdeBriefingPanel(): void {
-    ideBriefingPanelOpen.value = false;
-  }
-
-  function openIdeBriefingPanel(): void {
-    ideBriefingPanelOpen.value = true;
-    ideAttentionPanelOpen.value = false;
-    ideExplorerCollapsed.value = false;
-    persistIdeExplorerCollapsed(false);
-  }
-
-  function toggleSignalDetails(signalId: string): void {
-    highlightedSignalId.value = highlightedSignalId.value === signalId ? null : signalId;
-  }
-
-  function focusMissionControl(): void {
-    missionControlEmphasized.value = true;
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        document.getElementById('operator-mission-control')?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-        });
-        window.setTimeout(() => {
-          missionControlEmphasized.value = false;
-        }, 1200);
-      });
-    }
-  }
-
-  function setOperatorCenterView(view: OperatorCenterView): void {
-    operatorCenterView.value = view;
-    persistOperatorCenterView(view);
-  }
-
-  function afterRunLifecycleMutation(): void {
-    focusMissionControl();
-    if (dockHeroMode.value === 'briefing' && typeof window !== 'undefined') {
-      briefingSeamEmphasized.value = true;
-      window.setTimeout(() => {
-        briefingSeamEmphasized.value = false;
-      }, 1200);
-    }
-  }
-
-  function focusKairoBriefing(): void {
-    if (layoutMode.value === 'ide') {
-      openIdeBriefingPanel();
-    } else {
-      setDockHeroMode('briefing');
-    }
-    briefingSeamEmphasized.value = true;
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        const targetId =
-          layoutMode.value === 'ide' ? 'ide-briefing-panel' : 'dock-seam-briefing';
-        document.getElementById(targetId)?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-        });
-        window.setTimeout(() => {
-          briefingSeamEmphasized.value = false;
-        }, 1200);
-      });
-    }
-  }
-
-  function focusCommandSeam(example: string): void {
-    restoreComposerDraft(example);
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        document.getElementById('operator-command-input')?.focus();
-        document.getElementById('dock-seam-briefing')?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-        });
-      });
-    }
-  }
-
-  function syncCurrentWorkspace(preferredWorkspaceId?: string | null): void {
-    if (workspaces.value.length === 0) {
-      currentWorkspace.value = null;
-      return;
-    }
-
-    const targetWorkspaceId = resolveOperatorWorkspaceId({
-      explicitPreferredId:
-        preferredWorkspaceId !== undefined && preferredWorkspaceId !== null
-          ? preferredWorkspaceId
-          : null,
-      pinnedWorkspaceId: operatorPinnedWorkspaceId.value,
-      workspaces: workspaces.value,
-      activeRun: activeRun.value,
-    });
-
-    currentWorkspace.value =
-      workspaces.value.find((workspace) => workspace.workspace_id === targetWorkspaceId) ??
-      workspaces.value[0] ??
-      null;
-  }
-
-  function shouldAutoSyncWorkspaceFromRuns(): boolean {
-    return !operatorPinnedWorkspaceId.value;
-  }
+  const {
+    syncCurrentWorkspace,
+    loadWorkspaces,
+    loadRuns,
+    loadRunHistory,
+  } = createCatalogLoadersSlice({
+    workspaces,
+    currentWorkspace,
+    operatorPinnedWorkspaceId,
+    workspacesLoadState,
+    workspacesError,
+    runs,
+    activeRun,
+    runsLoadState,
+    runsError,
+    runHistorySnapshot,
+    runHistoryLoadState,
+  });
 
   function setLayoutMode(mode: LayoutMode): void {
     layoutMode.value = mode;
@@ -2688,10 +2355,21 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  function revealIdeTerminalPanel(): void {
-    persistWorkbenchTerminalPanelVisible('ide', true);
-    ideTerminalRevealToken.value += 1;
-  }
+  const {
+    revealIdeTerminalPanel,
+    toggleIdeTerminalPanel,
+    setIdeActivityView,
+    toggleIdeExplorer,
+    toggleAgentDock,
+  } = createIdeWorkbenchChromeSlice({
+    ideTerminalRevealToken,
+    ideTerminalToggleToken,
+    ideActivityView,
+    ideExplorerCollapsed,
+    agentDockCollapsed,
+    ideAttentionPanelOpen,
+    ideBriefingPanelOpen,
+  });
 
   const terminalSessionStore = createTerminalSessionStore({
     currentWorkspace,
@@ -2712,45 +2390,6 @@ export const useShellStore = defineStore('shell', () => {
     setActiveTerminalSession,
     splitTerminalSession,
   } = terminalSessionStore;
-
-  function toggleIdeTerminalPanel(): void {
-    ideTerminalToggleToken.value += 1;
-  }
-
-  function setIdeActivityView(view: IdeActivityView): void {
-    ideAttentionPanelOpen.value = false;
-    ideBriefingPanelOpen.value = false;
-    ideActivityView.value = view;
-    if (view === 'explorer') {
-      ideExplorerCollapsed.value = false;
-      persistIdeExplorerCollapsed(false);
-      return;
-    }
-    if (view === 'terminal') {
-      revealIdeTerminalPanel();
-      return;
-    }
-    if (view === 'agent') {
-      agentDockCollapsed.value = false;
-      persistAgentDockCollapsed(false);
-      return;
-    }
-    ideExplorerCollapsed.value = false;
-    persistIdeExplorerCollapsed(false);
-  }
-
-  function toggleIdeExplorer(): void {
-    ideExplorerCollapsed.value = !ideExplorerCollapsed.value;
-    persistIdeExplorerCollapsed(ideExplorerCollapsed.value);
-    if (!ideExplorerCollapsed.value) {
-      ideActivityView.value = 'explorer';
-    }
-  }
-
-  function toggleAgentDock(): void {
-    agentDockCollapsed.value = !agentDockCollapsed.value;
-    persistAgentDockCollapsed(agentDockCollapsed.value);
-  }
 
   const activeWorkspaceFilePath = computed(() => {
     const path = filePathFromDocumentId(activeEditorDocumentId.value);
@@ -3354,31 +2993,6 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadWorkspaces(options: { sync?: boolean } = {}): Promise<void> {
-    workspacesLoadState.value = 'loading';
-    workspacesError.value = null;
-
-    try {
-      const snapshot = await fetchWorkspaces({ scope: 'operator' });
-      workspaces.value = mergeOperatorWorkspaceCatalog(snapshot.items);
-      const visibleIds = new Set(workspaces.value.map((workspace) => workspace.workspace_id));
-      if (
-        operatorPinnedWorkspaceId.value &&
-        !visibleIds.has(operatorPinnedWorkspaceId.value)
-      ) {
-        operatorPinnedWorkspaceId.value = null;
-        persistOperatorWorkspaceId(null);
-      }
-      if (options.sync !== false && shouldAutoSyncWorkspaceFromRuns()) {
-        syncCurrentWorkspace();
-      }
-      workspacesLoadState.value = 'loaded';
-    } catch (error) {
-      workspacesLoadState.value = 'error';
-      workspacesError.value = error instanceof Error ? error.message : 'workspaces request failed';
-    }
-  }
-
   const {
     loadRuntimeSummary,
   } = createRuntimeSummarySlice({
@@ -3398,64 +3012,22 @@ export const useShellStore = defineStore('shell', () => {
     runtimeMcpToolsLoadState,
   });
 
-  const composerRuntimePrefs = computed(() => {
-    composerRuntimePrefsRevision.value;
-    return readComposerRuntimePrefs(currentWorkspace.value?.workspace_id ?? null);
-  });
-
-  const selectedRuntimeTargetId = computed(() => {
-    const preferred = composerRuntimePrefs.value.runtime_target?.trim();
-    if (preferred) {
-      return preferred;
-    }
-    return runtimeStatus.value?.default_runtime ?? '';
-  });
-
-  const selectedComposerModel = computed(() => {
-    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    if (!workspaceId) {
-      return 'composer-2.5-fast';
-    }
-    const prefs = composerRuntimePrefs.value;
-    const target = selectedRuntimeTargetId.value;
-    const targetRecord = [...(runtimeStatus.value?.local ?? []), ...(runtimeStatus.value?.cloud ?? [])]
-      .find((record) => record.id === target);
-    const family = targetRecord?.family ?? 'cursor';
-    if (family === 'codex') {
-      return prefs.codex_cli_model?.trim() || 'auto';
-    }
-    const stored = prefs.cursor_cli_model?.trim();
-    if (!stored || stored === 'auto') {
-      return stored || 'auto';
-    }
-    return resolveCursorComposerModel(stored, cursorCatalogRows.value);
-  });
-
-  const cursorCatalogRows = computed((): CursorCatalogRow[] =>
-    buildCursorCatalogRows(cursorRuntimeStatus.value),
-  );
-
-  const cursorPickerVisibleModelIds = computed(() => {
-    cursorPickerVisibleRevision.value;
-    return readCursorPickerVisibleModelIds();
-  });
-
-  const composerRuntimeLabel = computed(() => {
-    const target = [...(runtimeStatus.value?.local ?? []), ...(runtimeStatus.value?.cloud ?? [])]
-      .find((record) => record.id === selectedRuntimeTargetId.value);
-    const scope = target?.target_type === 'cloud' ? 'cloud' : 'local';
-    const family = target?.family ?? 'runtime';
-    if (family === 'cursor') {
-      return cursorComposerRuntimeLabel({
-        family,
-        scope,
-        modelId: selectedComposerModel.value,
-        rows: cursorCatalogRows.value,
-      });
-    }
-    const model = selectedComposerModel.value;
-    const modelLabel = model === 'auto' ? 'Auto' : model;
-    return `${family} ${scope} · ${modelLabel}`;
+  const {
+    composerRuntimePrefs,
+    selectedRuntimeTargetId,
+    selectedComposerModel,
+    cursorCatalogRows,
+    cursorPickerVisibleModelIds,
+    composerRuntimeLabel,
+    setSelectedRuntimeTarget,
+    setSelectedComposerModel,
+    toggleCursorPickerVisibleModel,
+  } = createComposerRuntimePrefsSlice({
+    currentWorkspace,
+    runtimeStatus,
+    cursorRuntimeStatus,
+    composerRuntimePrefsRevision,
+    cursorPickerVisibleRevision,
   });
 
   const {
@@ -3470,53 +3042,6 @@ export const useShellStore = defineStore('shell', () => {
     currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
   });
 
-  function setSelectedRuntimeTarget(runtimeTarget: string): void {
-    const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
-      return;
-    }
-    writeComposerRuntimePrefs(workspaceId, { runtime_target: runtimeTarget });
-    composerRuntimePrefsRevision.value += 1;
-  }
-
-  function setSelectedComposerModel(modelId: string): void {
-    const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
-      return;
-    }
-    const target = selectedRuntimeTargetId.value;
-    const targetRecord = [...(runtimeStatus.value?.local ?? []), ...(runtimeStatus.value?.cloud ?? [])]
-      .find((record) => record.id === target);
-    const family = targetRecord?.family ?? 'cursor';
-    const normalized = modelId.trim() || 'auto';
-    if (family === 'codex') {
-      writeComposerRuntimePrefs(workspaceId, { codex_cli_model: normalized });
-    } else {
-      writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: normalized });
-    }
-    composerRuntimePrefsRevision.value += 1;
-  }
-
-  function toggleCursorPickerVisibleModel(modelId: string): void {
-    toggleCursorPickerVisibleModelPref(modelId, readCursorPickerVisibleModelIds());
-    cursorPickerVisibleRevision.value += 1;
-  }
-
-  async function loadInbox(): Promise<void> {
-    inboxLoadState.value = 'loading';
-    inboxError.value = null;
-
-    try {
-      const inbox = await fetchInbox();
-      inboxItems.value = inbox.items;
-      signalViews.value = inbox.items;
-      inboxLoadState.value = 'loaded';
-    } catch (error) {
-      inboxLoadState.value = 'error';
-      inboxError.value = error instanceof Error ? error.message : 'inbox request failed';
-    }
-  }
-
   const {
     loadConnectors,
     refreshWatchSummary,
@@ -3530,74 +3055,10 @@ export const useShellStore = defineStore('shell', () => {
     connectorsError,
     connectorMutationPending,
     loadRuntimeSummary: () => loadRuntimeSummary(),
-    loadInbox,
+    loadInbox: () => loadInbox(),
     loadOperatorBriefing: () => loadOperatorBriefing(),
     loadOperatorFleetHealth: () => loadOperatorFleetHealth(),
   });
-
-  async function loadOperatorPresenceSettings(options?: {
-    reportError?: boolean;
-  }): Promise<void> {
-    const cached = readPersistedOperatorPresenceSettings();
-    if (cached) {
-      operatorPresenceSettings.value = cached;
-    }
-
-    try {
-      const snapshot = await fetchOperatorPresenceSettings();
-      operatorPresenceSettings.value = normalizeOperatorPresenceSettings(snapshot.settings);
-      persistOperatorPresenceSettings(operatorPresenceSettings.value);
-      operatorPresenceSettingsError.value = null;
-    } catch (error) {
-      if (options?.reportError) {
-        operatorPresenceSettingsError.value =
-          error instanceof Error ? error.message : 'operator presence settings load failed';
-      }
-    }
-  }
-
-  async function saveOperatorPresenceSettingsPatchImpl(
-    patch: Partial<OperatorPresenceSettings>,
-  ): Promise<void> {
-    operatorPresenceSettingsSaving.value = true;
-    operatorPresenceSettingsError.value = null;
-    const previousSettings = operatorPresenceSettings.value;
-    const nextSettings = normalizeOperatorPresenceSettings({
-      ...operatorPresenceSettings.value,
-      ...patch,
-    });
-    operatorPresenceSettings.value = nextSettings;
-    persistOperatorPresenceSettings(nextSettings);
-
-    try {
-      const snapshot = await saveOperatorPresenceSettings(patch);
-      operatorPresenceSettings.value = normalizeOperatorPresenceSettings(snapshot.settings);
-      persistOperatorPresenceSettings(operatorPresenceSettings.value);
-      operatorPresenceSettingsSavedAt.value = Date.now();
-      operatorPresenceSettingsError.value = null;
-      await loadOperatorBriefing();
-    } catch (error) {
-      operatorPresenceSettings.value = previousSettings;
-      persistOperatorPresenceSettings(previousSettings);
-      operatorPresenceSettingsError.value =
-        error instanceof Error ? error.message : 'operator presence settings save failed';
-    } finally {
-      operatorPresenceSettingsSaving.value = false;
-    }
-  }
-
-  function saveOperatorPresenceSettingsPatch(
-    patch: Partial<OperatorPresenceSettings>,
-  ): Promise<void> {
-    const run = (): Promise<void> => saveOperatorPresenceSettingsPatchImpl(patch);
-    operatorPresenceSettingsSaveQueue = operatorPresenceSettingsSaveQueue.then(run, run);
-    return operatorPresenceSettingsSaveQueue;
-  }
-
-  async function resetOperatorPresenceSettings(): Promise<void> {
-    const defaults = defaultOperatorPresenceSettings();
-    await saveOperatorPresenceSettingsPatch(defaults);
-  }
 
   async function testKairoVoiceFromSettings(): Promise<'azure' | 'browser' | 'skipped'> {
     if (
@@ -3618,19 +3079,25 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  function openOperatorPresenceSettingsPanel(): void {
-    navigateToAppSurface('settings');
-  }
+  const briefingLoader = {
+    load: async (_options?: {
+      viewportCompact?: boolean;
+      background?: boolean;
+    }): Promise<void> => {},
+  };
 
-  function toggleOperatorPresenceSettingsPanel(forceOpen?: boolean): void {
-    if (forceOpen === false) {
-      if (readAppSurface() === 'settings') {
-        navigateToAppSurface('console');
-      }
-      return;
-    }
-    openOperatorPresenceSettingsPanel();
-  }
+  const {
+    mobileCompactLayout,
+    getLastViewportCompactRequested,
+    setLastViewportCompactRequested,
+    bindViewportCompactListener,
+    unbindViewportCompactListener,
+  } = createViewportCompactSlice({
+    viewportWidth,
+    operatorBriefing,
+    operatorPresenceSettings,
+    loadOperatorBriefing: (options) => briefingLoader.load(options),
+  });
 
   const {
     loadOperatorBriefing,
@@ -3643,10 +3110,44 @@ export const useShellStore = defineStore('shell', () => {
     operatorPresenceSettings,
     currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
     applyOperatorDockDefaults,
-    getLastViewportCompactRequested: () => lastViewportCompactRequested,
-    setLastViewportCompactRequested: (value) => {
-      lastViewportCompactRequested = value;
-    },
+    getLastViewportCompactRequested,
+    setLastViewportCompactRequested,
+  });
+  briefingLoader.load = loadOperatorBriefing;
+
+  const {
+    loadOperatorPresenceSettings,
+    saveOperatorPresenceSettingsPatch,
+    resetOperatorPresenceSettings,
+    openOperatorPresenceSettingsPanel,
+    toggleOperatorPresenceSettingsPanel,
+  } = createOperatorPresenceSettingsSlice({
+    operatorPresenceSettings,
+    operatorPresenceSettingsOpen,
+    operatorPresenceSettingsSaving,
+    operatorPresenceSettingsError,
+    operatorPresenceSettingsSavedAt,
+    loadOperatorBriefing: () => loadOperatorBriefing(),
+  });
+
+  const {
+    loadInbox,
+    dismissInboxSignalIds,
+    verifyAndDismissHandoffSignal,
+    dismissLinkedHandoffSignalAfterRunComplete,
+    clearActiveSignals,
+  } = createInboxSignalsSlice({
+    inboxItems,
+    signalViews,
+    inboxLoadState,
+    inboxError,
+    signalClearState,
+    signalClearError,
+    highlightedSignalId,
+    pendingHandoffDismissSignalId,
+    operatorBriefing,
+    loadOperatorBriefing: () => loadOperatorBriefing(),
+    loadRuntimeSummary: () => loadRuntimeSummary(),
   });
 
   const {
@@ -3660,75 +3161,6 @@ export const useShellStore = defineStore('shell', () => {
     operatorBrainGraphLoadState,
     operatorBrainGraphError,
   });
-
-  function syncViewportCompactFromResize(): void {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    viewportWidth.value = readViewportWidth(window);
-    const shouldRequest = shouldRequestViewportCompactBriefing(
-      viewportWidth.value,
-      operatorBriefing.value?.operator_presence ?? null,
-      operatorPresenceSettings.value,
-    );
-    if (shouldRequest === lastViewportCompactRequested) {
-      return;
-    }
-    void loadOperatorBriefing({ viewportCompact: shouldRequest });
-  }
-
-  function bindViewportCompactListener(): void {
-    if (typeof window === 'undefined' || viewportCompactListenerBound) {
-      return;
-    }
-    viewportWidth.value = readViewportWidth(window);
-    window.addEventListener('resize', syncViewportCompactFromResize);
-    viewportCompactListenerBound = true;
-  }
-
-  function unbindViewportCompactListener(): void {
-    if (typeof window === 'undefined' || !viewportCompactListenerBound) {
-      return;
-    }
-    window.removeEventListener('resize', syncViewportCompactFromResize);
-    viewportCompactListenerBound = false;
-  }
-
-  async function loadRuns(options: { sync?: boolean } = {}): Promise<void> {
-    runsLoadState.value = 'loading';
-    runsError.value = null;
-
-    try {
-      const snapshot = await fetchRuns();
-      runs.value = snapshot.items;
-      activeRun.value = selectPrimaryRun(snapshot.items);
-      if (options.sync !== false && shouldAutoSyncWorkspaceFromRuns()) {
-        syncCurrentWorkspace(activeRun.value?.workspace_id ?? null);
-      }
-      runsLoadState.value = 'loaded';
-    } catch (error) {
-      runsLoadState.value = 'error';
-      runsError.value = error instanceof Error ? error.message : 'runs request failed';
-    }
-  }
-
-  async function loadRunHistory(runId: string | null): Promise<void> {
-    if (!runId) {
-      runHistorySnapshot.value = null;
-      runHistoryLoadState.value = 'idle';
-      return;
-    }
-
-    runHistoryLoadState.value = 'loading';
-    try {
-      runHistorySnapshot.value = await fetchRunHistory(runId);
-      runHistoryLoadState.value = 'loaded';
-    } catch {
-      runHistorySnapshot.value = null;
-      runHistoryLoadState.value = 'error';
-    }
-  }
 
   async function refreshOperatorPresence(): Promise<void> {
     await loadOperatorBriefing({ background: true });
@@ -4020,82 +3452,6 @@ export const useShellStore = defineStore('shell', () => {
       runMutationError.value = error instanceof Error ? error.message : 'reject run request failed';
     } finally {
       runMutationState.value = 'idle';
-    }
-  }
-
-  async function dismissInboxSignalIds(signalIds: string[]): Promise<void> {
-    const normalized = [...new Set(signalIds.map((id) => id.trim()).filter(Boolean))];
-    if (!normalized.length) {
-      return;
-    }
-
-    await acknowledgeInboxSignals(normalized);
-    await Promise.all([loadInbox(), loadOperatorBriefing(), loadRuntimeSummary()]);
-  }
-
-  async function verifyAndDismissHandoffSignal(signalId: string): Promise<void> {
-    signalClearError.value = null;
-    await loadInbox();
-    const gate = canVerifyDismissHandoffSignal(
-      signalId,
-      inboxItems.value.map((item) => ({ signal_id: item.signal_id })),
-    );
-    if (!gate.allowed) {
-      signalClearError.value = gate.reason ?? 'Signal cannot be dismissed yet.';
-      return;
-    }
-
-    signalClearState.value = 'clearing';
-    try {
-      await dismissInboxSignalIds([signalId]);
-      if (pendingHandoffDismissSignalId.value === signalId) {
-        pendingHandoffDismissSignalId.value = null;
-        writePendingHandoffDismissSignalId(null);
-      }
-      highlightedSignalId.value = null;
-    } catch (error) {
-      signalClearError.value =
-        error instanceof Error ? error.message : 'verify and dismiss request failed';
-    } finally {
-      signalClearState.value = 'idle';
-    }
-  }
-
-  async function dismissLinkedHandoffSignalAfterRunComplete(): Promise<void> {
-    const signalId = pendingHandoffDismissSignalId.value?.trim();
-    if (!signalId) {
-      return;
-    }
-
-    try {
-      await dismissInboxSignalIds([signalId]);
-    } catch {
-      // Run completion should still succeed even if watch ack is temporarily unavailable.
-    } finally {
-      pendingHandoffDismissSignalId.value = null;
-      writePendingHandoffDismissSignalId(null);
-    }
-  }
-
-  async function clearActiveSignals(): Promise<void> {
-    const signalIds =
-      operatorBriefing.value?.top_signals.map((signal) => signal.signal_id) ??
-      signalViews.value.map((signal) => signal.signal_id);
-    if (!signalIds.length || signalClearState.value === 'clearing') {
-      return;
-    }
-
-    signalClearState.value = 'clearing';
-    signalClearError.value = null;
-    highlightedSignalId.value = null;
-
-    try {
-      await dismissInboxSignalIds(signalIds);
-    } catch (error) {
-      signalClearError.value =
-        error instanceof Error ? error.message : 'clear signals request failed';
-    } finally {
-      signalClearState.value = 'idle';
     }
   }
 

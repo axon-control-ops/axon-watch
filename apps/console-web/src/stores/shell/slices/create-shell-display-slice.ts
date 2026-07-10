@@ -1,0 +1,311 @@
+import { computed, type ComputedRef, type Ref } from 'vue';
+
+import type {
+  InboxItem,
+  OperatorBriefing,
+  RunRecord,
+  RuntimeSummary,
+  WorkspaceRecord,
+} from '../../../contracts/canonical';
+import { shouldShowIdeAgentStop } from '../../../lib/ide-agent-run-active';
+import { resolveIdeStopRun } from '../../../lib/ide-composer-queue';
+import {
+  filterTopbarChipsForIde,
+  type IdePresenceProfile,
+} from '../../../lib/ide-presence-profile';
+import { leftSidebarAttentionBadgeCount as computeLeftSidebarAttentionBadgeCount } from '../../../lib/left-sidebar-mode';
+import {
+  buildBriefingSummaryLine,
+  buildStatusBarZones,
+  buildTopbarBreadcrumb,
+  buildTopbarMetaPills,
+  buildWorkspaceStatusCardRows,
+} from '../../../lib/mockup-shell-view';
+import { conversationEmptyStateLabel, type OperatorThreadEntry } from '../../../lib/operator-thread';
+import { resolveOperatorSignalCount } from '../../../lib/operator-signal-count';
+import { workspaceCatalogMode } from '../../../lib/operator-workspace-catalog';
+import { formatRunIdentityLabel } from '../../../lib/run-display';
+import { isOperatorCompletablePhase } from '../../../lib/run-lifecycle-ui';
+import { buildTopbarChips } from '../../../lib/runtime-strip';
+import { selectPrimaryApprovalRun } from '../../shell-run-selection';
+import type {
+  InboxLoadState,
+  LayoutMode,
+  RunMutationState,
+  RunsLoadState,
+  RuntimeSummaryLoadState,
+} from '../types';
+
+interface CreateShellDisplaySliceInput {
+  currentWorkspace: Ref<WorkspaceRecord | null>;
+  workspaces: Ref<WorkspaceRecord[]>;
+  runtimeSummary: Ref<RuntimeSummary | null>;
+  runtimeSummaryLoadState: Ref<RuntimeSummaryLoadState>;
+  activeRun: Ref<RunRecord | null>;
+  primaryActiveRun: ComputedRef<RunRecord | null>;
+  layoutMode: Ref<LayoutMode>;
+  getIdePresenceProfile: () => IdePresenceProfile;
+  inboxItems: Ref<InboxItem[]>;
+  inboxLoadState: Ref<InboxLoadState>;
+  operatorBriefing: Ref<OperatorBriefing | null>;
+  runs: Ref<RunRecord[]>;
+  runsLoadState: Ref<RunsLoadState>;
+  runMutationState: Ref<RunMutationState>;
+  ideAgentLinkedRun: ComputedRef<RunRecord | null>;
+  ideAgentRunId: Ref<string | null>;
+  agentStreamActive: Ref<boolean>;
+  operatorThreadMessages: Ref<OperatorThreadEntry[]>;
+  threadMessages: Ref<OperatorThreadEntry[]>;
+}
+
+export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
+  const workspaceTrailLabel = computed(() => {
+    const workspace = input.currentWorkspace.value?.workspace_id ?? 'No workspace selected';
+    const identity = input.runtimeSummary.value?.runtime_identity;
+    if (!identity) {
+      return workspace;
+    }
+    return `${workspace} / ${identity.provider_name}`;
+  });
+
+  const workspaceStateLabel = computed(() => {
+    if (!input.currentWorkspace.value) {
+      return 'No workspace selected';
+    }
+    return (
+      input.currentWorkspace.value.display_name?.trim() ||
+      input.currentWorkspace.value.workspace_id
+    );
+  });
+
+  const usesProductionWorkspaceCatalog = computed(
+    () => workspaceCatalogMode(input.workspaces.value) === 'production',
+  );
+
+  const topbarChips = computed(() => {
+    const chips = buildTopbarChips({
+      runtimeSummary: input.runtimeSummary.value,
+      runtimeSummaryLoadState: input.runtimeSummaryLoadState.value,
+      primaryActiveRun: input.activeRun.value,
+    });
+    return filterTopbarChipsForIde(
+      chips,
+      input.layoutMode.value,
+      input.getIdePresenceProfile(),
+    );
+  });
+
+  const topbarMetaPills = computed(() => buildTopbarMetaPills(input.runtimeSummary.value));
+  const topbarBreadcrumb = computed(() =>
+    buildTopbarBreadcrumb(input.runtimeSummary.value, input.currentWorkspace.value),
+  );
+
+  const activeOperatorSignalCount = computed(() =>
+    resolveOperatorSignalCount({
+      inboxItems: input.inboxItems.value,
+      inboxLoadState: input.inboxLoadState.value,
+      runtimeSummaryOpenCount: input.runtimeSummary.value?.signals.open_count,
+    }),
+  );
+
+  const workspaceAttentionSignalCount = computed(() =>
+    resolveOperatorSignalCount({
+      inboxItems: input.inboxItems.value,
+      inboxLoadState: input.inboxLoadState.value,
+      runtimeSummaryOpenCount: input.runtimeSummary.value?.signals.open_count,
+      workspaceId: input.currentWorkspace.value?.workspace_id ?? null,
+    }),
+  );
+
+  const statusBarZones = computed(() =>
+    buildStatusBarZones({
+      runtimeSummary: input.runtimeSummary.value,
+      runtimeSummaryLoadState: input.runtimeSummaryLoadState.value,
+      primaryActiveRun: input.primaryActiveRun.value,
+      workspaceId: input.currentWorkspace.value?.workspace_id ?? null,
+      layoutMode: input.layoutMode.value,
+      idePresenceProfile: input.getIdePresenceProfile(),
+      activeSignalCount: activeOperatorSignalCount.value,
+    }),
+  );
+
+  const workspaceStatusCardRows = computed(() =>
+    buildWorkspaceStatusCardRows({
+      runtimeSummary: input.runtimeSummary.value,
+      runtimeSummaryLoadState: input.runtimeSummaryLoadState.value,
+    }),
+  );
+
+  const briefingSummaryLine = computed(() =>
+    buildBriefingSummaryLine(
+      input.operatorBriefing.value,
+      input.runtimeSummary.value,
+      input.currentWorkspace.value?.workspace_id ?? null,
+    ),
+  );
+
+  const runtimeStateLabel = computed(() =>
+    topbarChips.value.map((chip) => chip.label).join(' · '),
+  );
+
+  const runStateLabel = computed(() => {
+    if (input.runsLoadState.value === 'loading') {
+      return 'Loading active run…';
+    }
+
+    if (input.runsLoadState.value === 'error') {
+      return 'Active run unavailable';
+    }
+
+    if (!input.primaryActiveRun.value) {
+      return 'No active run';
+    }
+
+    return formatRunIdentityLabel(input.primaryActiveRun.value);
+  });
+
+  const runMutationPending = computed(() => input.runMutationState.value !== 'idle');
+
+  const activeIdeStopRun = computed(() =>
+    resolveIdeStopRun({
+      linkedRun: input.ideAgentLinkedRun.value,
+      linkedRunId: input.ideAgentRunId.value,
+      runs: input.runs.value,
+      primaryRun: input.primaryActiveRun.value,
+      workspaceId: input.currentWorkspace.value?.workspace_id ?? null,
+    }),
+  );
+
+  const canStopIdeAgentRun = computed(() => {
+    if (runMutationPending.value) {
+      return false;
+    }
+    if (input.agentStreamActive.value) {
+      return true;
+    }
+    return (
+      shouldShowIdeAgentStop({
+        agentStreamActive: false,
+        run: input.ideAgentLinkedRun.value,
+      }) || Boolean(activeIdeStopRun.value)
+    );
+  });
+
+  const canStopPrimaryRun = computed(
+    () => Boolean(input.primaryActiveRun.value?.can_stop) && !runMutationPending.value,
+  );
+  const canResumePrimaryRun = computed(
+    () => Boolean(input.primaryActiveRun.value?.can_resume) && !runMutationPending.value,
+  );
+  const canMarkPrimaryRunReviewReady = computed(
+    () => input.primaryActiveRun.value?.phase === 'executing' && !runMutationPending.value,
+  );
+  const canCompletePrimaryRun = computed(
+    () =>
+      isOperatorCompletablePhase(input.primaryActiveRun.value?.phase) &&
+      !runMutationPending.value,
+  );
+
+  const primaryApprovalRun = computed(() => selectPrimaryApprovalRun(input.runs.value));
+  const primaryInboxItem = computed(() => input.inboxItems.value[0] ?? null);
+
+  const inboxStateLabel = computed(() => {
+    if (input.inboxLoadState.value === 'loading') {
+      return 'Loading signals…';
+    }
+
+    if (input.inboxLoadState.value === 'error') {
+      return 'Signals unavailable';
+    }
+
+    const primary = input.inboxItems.value[0];
+    if (!primary) {
+      return 'No open signals';
+    }
+
+    return `${primary.title} · ${primary.severity}`;
+  });
+
+  const approvalsSummaryLabel = computed(() => {
+    const pending =
+      input.runtimeSummary.value?.approvals.pending_count ??
+      input.operatorBriefing.value?.pending_approvals.count ??
+      0;
+    if (pending === 0) {
+      return 'No pending approvals';
+    }
+    return `${pending} pending approval${pending === 1 ? '' : 's'}`;
+  });
+
+  const canApprovePrimaryRun = computed(
+    () => Boolean(primaryApprovalRun.value?.can_approve) && !runMutationPending.value,
+  );
+  const canApproveIdeAgentRun = computed(
+    () => Boolean(input.ideAgentLinkedRun.value?.can_approve) && !runMutationPending.value,
+  );
+  const canResumeIdeAgentRun = computed(
+    () => Boolean(input.ideAgentLinkedRun.value?.can_resume) && !runMutationPending.value,
+  );
+  const canRejectPrimaryRun = computed(
+    () =>
+      primaryApprovalRun.value?.phase === 'awaiting_approval' && !runMutationPending.value,
+  );
+
+  const threadStateLabel = computed(() =>
+    conversationEmptyStateLabel(
+      (input.layoutMode.value === 'operator'
+        ? input.operatorThreadMessages.value
+        : input.threadMessages.value
+      ).length,
+    ),
+  );
+
+  const pendingApprovalsCount = computed(() => {
+    const fromSummary = input.runtimeSummary.value?.approvals.pending_count ?? 0;
+    const fromBriefing = input.operatorBriefing.value?.pending_approvals.count ?? 0;
+    return Math.max(fromSummary, fromBriefing);
+  });
+
+  const leftSidebarAttentionBadgeCount = computed(() =>
+    computeLeftSidebarAttentionBadgeCount({
+      pendingApprovals: pendingApprovalsCount.value,
+      briefing: input.operatorBriefing.value,
+      inboxItems: input.inboxItems.value,
+      inboxLoadState: input.inboxLoadState.value,
+    }),
+  );
+
+  return {
+    workspaceTrailLabel,
+    workspaceStateLabel,
+    usesProductionWorkspaceCatalog,
+    topbarChips,
+    topbarMetaPills,
+    topbarBreadcrumb,
+    activeOperatorSignalCount,
+    workspaceAttentionSignalCount,
+    statusBarZones,
+    workspaceStatusCardRows,
+    briefingSummaryLine,
+    runtimeStateLabel,
+    runStateLabel,
+    runMutationPending,
+    activeIdeStopRun,
+    canStopIdeAgentRun,
+    canStopPrimaryRun,
+    canResumePrimaryRun,
+    canMarkPrimaryRunReviewReady,
+    canCompletePrimaryRun,
+    primaryApprovalRun,
+    primaryInboxItem,
+    inboxStateLabel,
+    approvalsSummaryLabel,
+    canApprovePrimaryRun,
+    canApproveIdeAgentRun,
+    canResumeIdeAgentRun,
+    canRejectPrimaryRun,
+    threadStateLabel,
+    pendingApprovalsCount,
+    leftSidebarAttentionBadgeCount,
+  };
+}
