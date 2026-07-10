@@ -11,11 +11,11 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 4609,
+      "max_lines": 4534,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
-      "rule": "FS-003 in progress: shell types and dock layout slice extracted; keep shrinking via factory slices."
+      "rule": "FS-003 in progress: dock layout + connectors slices extracted; keep shrinking via factory slices."
     },
     "apps/console-web/src/styles/ide-layout.css": {
       "max_lines": 11,

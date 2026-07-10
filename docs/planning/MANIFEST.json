@@ -42,8 +42,8 @@
       "bytes": 3278
     },
     "EXECUTION_PLAN.md": {
-      "sha256": "5e3a557bf95fadbb4581832d779ed3a59a734960d94d9e98a75eae3dfa0deaed",
-      "bytes": 13557
+      "sha256": "3af2922d34ff541ed46134ff070a593d4c948073b355822f9a0796647c032355",
+      "bytes": 14054
     },
     "FITNESS_FUNCTIONS.md": {
       "sha256": "f688b05666210bf2d4fb5870adbd6f0e91e39ecfd8c2a7b4552d25e275af5e2f",
@@ -62,8 +62,8 @@
       "bytes": 8503
     },
     "KAIRO_CONVERSATION_PLAN.md": {
-      "sha256": "12470d2e0dd5368c7f8757ee6762d7d180a2c9081820054fb56e006aa79c2638",
-      "bytes": 11123
+      "sha256": "a3e564a080885da54ff2385bec03da33e4848b6471e7791b277029357a54375f",
+      "bytes": 11276
     },
     "KAIRO_MODE.md": {
       "sha256": "bb4b5d187d5b91a9a9a4b8c419122a8f1080f96a73cc54df055ff53547c7e8a4",
@@ -74,8 +74,8 @@
       "bytes": 12077
     },
     "OPERATOR_BRAIN_PIVOT.md": {
-      "sha256": "111634fe98aebef4f4ac58e022c99d532adc93f9b5150093c186702c4cf4a18b",
-      "bytes": 17562
+      "sha256": "e2203ee05310977c36ba62eaa421228da7c93c4a9f83bed0f9373cf918fa031e",
+      "bytes": 17559
     },
     "OPERATOR_REFRESH_POLICY.md": {
       "sha256": "005fcb07f2ba778d3519ef7088abbfae4c5127b8305f57fed989bd77785ba7ae",
@@ -106,7 +106,7 @@
       "bytes": 6124
     },
     "SLICE-FS-003-shell-store-split.md": {
-      "sha256": "155bf575f8db14a3b6588f23d70b0b3c48663bc61b2e2c220783321be49ecc08",
+      "sha256": "35b377b60b4f719a9414910d50ef5e036a82b67b9db840ecebb030abef1c8207",
       "bytes": 3738
     },
     "TEST_STRATEGY.md": {

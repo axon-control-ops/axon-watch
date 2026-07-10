@@ -3,7 +3,7 @@
 **Status:** In progress (2026-07-10)  
 **Effective:** 2026-07-10  
 **Owner:** `console-web`  
-**Ratchet:** `apps/console-web/src/stores/shell.ts` — 4,618 lines max (target: `stores/shell/slices/*`)
+**Ratchet:** `apps/console-web/src/stores/shell.ts` — 4,534 lines max (target: `stores/shell/slices/*`)
 
 ## Problem
 
@@ -79,11 +79,10 @@ public methods.
 
 **Gate:** `npm run test -w @axon-watch/console-web`
 
-### Step 3 — Extract connectors slice if needed for ratchet headroom
+### Step 3 — Extract connectors slice ✅
 
-If `shell.ts` is still above 4,618 after Step 2, move connector/tunnel/watch
-actions into `create-connectors-slice.ts`, injecting runtime/briefing reload
-callbacks instead of importing the store.
+Move connector/tunnel/watch actions into `create-connectors-slice.ts`, injecting
+runtime/briefing reload callbacks instead of importing the store.
 
 **Gate:** `npm run verify:connector-parity`
 

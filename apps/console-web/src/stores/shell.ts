@@ -5,7 +5,6 @@ import {
   approveRun,
   acknowledgeInboxSignals,
   completeRun,
-  fetchConnectors,
   fetchCursorRuntimeStatus,
   fetchInbox,
   fetchOperatorBrainGraph,
@@ -29,14 +28,11 @@ import {
   fetchWorkspaceChatThreads,
   uploadChatAttachment,
   postChatMessage,
-  postWatchCommand,
   rejectRun,
   resumeRun,
   saveWorkspaceFile,
   saveOperatorPresenceSettings,
-  startTunnel,
   stopRun,
-  stopTunnel,
 } from '../api/control-plane';
 import type {
   ConnectorProbeRecord,
@@ -346,6 +342,7 @@ import {
   readStoredLayoutMode,
 } from '../lib/ide-layout-prefs';
 import { persistWorkbenchTerminalPanelVisible } from '../lib/workbench-terminal-split';
+import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
 import {
   DEFAULT_DOCK_CONTEXT,
@@ -3575,95 +3572,23 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadConnectors(): Promise<void> {
-    connectorsLoadState.value = 'loading';
-    connectorsError.value = null;
-
-    try {
-      const snapshot = await fetchConnectors();
-      connectorsItems.value = snapshot.items;
-      connectorsSummary.value = snapshot.summary;
-      connectorsLoadState.value = 'loaded';
-    } catch (error) {
-      connectorsLoadState.value = 'error';
-      connectorsError.value =
-        error instanceof Error ? error.message : 'connectors request failed';
-    }
-  }
-
-  async function reprobeConnector(connectorId: string): Promise<void> {
-    connectorMutationPending.value = true;
-    connectorsError.value = null;
-
-    try {
-      await postWatchCommand({
-        command_type: 'reprobe_connector',
-        target_type: 'connector',
-        target_id: connectorId,
-        requested_by: 'operator',
-      });
-      await Promise.all([loadConnectors(), loadRuntimeSummary(), loadInbox()]);
-    } catch (error) {
-      connectorsError.value =
-        error instanceof Error ? error.message : 'connector reprobe failed';
-    } finally {
-      connectorMutationPending.value = false;
-    }
-  }
-
-  async function refreshWatchSummary(): Promise<void> {
-    connectorMutationPending.value = true;
-    connectorsError.value = null;
-
-    try {
-      await postWatchCommand({
-        command_type: 'refresh_summary',
-        requested_by: 'operator',
-      });
-      await Promise.all([
-        loadConnectors(),
-        loadRuntimeSummary(),
-        loadInbox(),
-        loadOperatorBriefing(),
-        loadOperatorFleetHealth(),
-      ]);
-    } catch (error) {
-      connectorsError.value =
-        error instanceof Error ? error.message : 'watch summary refresh failed';
-    } finally {
-      connectorMutationPending.value = false;
-    }
-  }
-
-  async function startCloudflareTunnel(): Promise<void> {
-    connectorMutationPending.value = true;
-    connectorsError.value = null;
-
-    try {
-      await startTunnel();
-      await Promise.all([loadConnectors(), loadRuntimeSummary(), loadInbox()]);
-    } catch (error) {
-      connectorsError.value =
-        error instanceof Error ? error.message : 'tunnel start failed';
-    } finally {
-      connectorMutationPending.value = false;
-    }
-  }
-
-  async function stopCloudflareTunnel(): Promise<void> {
-    connectorMutationPending.value = true;
-    connectorsError.value = null;
-
-    try {
-      await stopTunnel();
-      await Promise.all([loadConnectors(), loadRuntimeSummary(), loadInbox()]);
-    } catch (error) {
-      connectorsError.value =
-        error instanceof Error ? error.message : 'tunnel stop failed';
-    } finally {
-      connectorMutationPending.value = false;
-    }
-  }
+  const {
+    loadConnectors,
+    refreshWatchSummary,
+    reprobeConnector,
+    startCloudflareTunnel,
+    stopCloudflareTunnel,
+  } = createConnectorsSlice({
+    connectorsItems,
+    connectorsSummary,
+    connectorsLoadState,
+    connectorsError,
+    connectorMutationPending,
+    loadRuntimeSummary: () => loadRuntimeSummary(),
+    loadInbox,
+    loadOperatorBriefing: () => loadOperatorBriefing(),
+    loadOperatorFleetHealth: () => loadOperatorFleetHealth(),
+  });
 
   async function loadOperatorPresenceSettings(options?: {
     reportError?: boolean;
