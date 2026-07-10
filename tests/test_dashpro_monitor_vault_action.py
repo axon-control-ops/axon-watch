@@ -7,13 +7,20 @@ from pathlib import Path
 from unittest.mock import patch
 
 WATCH_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
+for module_name in list(sys.modules):
+    if module_name == "app" or module_name.startswith("app."):
+        sys.modules.pop(module_name, None)
 sys.path.insert(0, str(WATCH_ROOT))
 
 from app.monitors.dashpro_monitor import probe_dashpro_monitor_records  # noqa: E402
+from app.monitors.dashpro_monitor import reset_monitor_probe_cache  # noqa: E402
 
 
 class DashproMonitorVaultActionTests(unittest.TestCase):
-    @patch("app.monitors.monitor_probe.check_sentry_recent_issues", return_value=("skipped", "missing token"))
+    def setUp(self) -> None:
+        reset_monitor_probe_cache()
+
+    @patch("app.monitors.monitor_probe.check_sentry_recent_issues", return_value=("skipped", "missing token", []))
     def test_skipped_monitor_records_include_vault_action(self, _check) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = Path(tmp)

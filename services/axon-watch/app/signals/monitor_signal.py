@@ -20,6 +20,17 @@ def monitor_inbox_item(record: dict[str, object]) -> dict[str, object] | None:
     workspace_label = str(record.get("workspace_label") or workspace_id).strip()
     severity = "high" if status == "warning" else "critical"
     now = utc_now_iso()
+    sentry_issues = record.get("issues") if isinstance(record.get("issues"), list) else []
+    meta: dict[str, object] = {
+        "signal_family": "child_project_monitor",
+        "workspace_label": workspace_label,
+        "check_id": check_id,
+        "check_type": record.get("check_type"),
+        "monitor_status": status,
+    }
+    if sentry_issues:
+        meta["sentry_issues"] = sentry_issues
+        meta["sentry_issue_count"] = len(sentry_issues)
 
     return {
         "signal_id": f"signal_monitor_{check_id}_{status}",
@@ -33,13 +44,7 @@ def monitor_inbox_item(record: dict[str, object]) -> dict[str, object] | None:
         "updated_at": now,
         "action_type": "investigate",
         "delivery_state": "pending",
-        "meta": {
-            "signal_family": "child_project_monitor",
-            "workspace_label": workspace_label,
-            "check_id": check_id,
-            "check_type": record.get("check_type"),
-            "monitor_status": status,
-        },
+        "meta": meta,
     }
 
 

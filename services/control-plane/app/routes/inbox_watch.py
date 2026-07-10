@@ -12,11 +12,17 @@ from app.adapters.watch_client import (
     fetch_watch_tunnel,
     get_watch_command,
     post_watch_command,
+    post_watch_sentry_issue_resolve,
+    post_watch_sentry_probe_write,
     post_watch_tunnel_action,
 )
 from app.inbox_projection import build_inbox_response
 from app.inbox_signals import acknowledge_inbox_signals
-from app.routes.schemas import AcknowledgeInboxSignalsRequest, WatchCommandRequest
+from app.routes.schemas import (
+    AcknowledgeInboxSignalsRequest,
+    SentryResolveRequest,
+    WatchCommandRequest,
+)
 
 router = APIRouter()
 
@@ -42,6 +48,29 @@ def monitors_index() -> dict[str, object]:
     payload = fetch_watch_monitors()
     if payload is None:
         raise HTTPException(status_code=503, detail="watch monitors unavailable")
+    return payload
+
+
+@router.post("/api/sentry/issues/{issue_id}/resolve")
+def sentry_issue_resolve(issue_id: str, body: SentryResolveRequest | None = None) -> dict[str, object]:
+    request = body or SentryResolveRequest()
+    payload = post_watch_sentry_issue_resolve(
+        issue_id,
+        status=request.status,
+        requested_by=request.requested_by,
+    )
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch sentry resolve unavailable")
+    if not payload.get("ok"):
+        raise HTTPException(status_code=400, detail=payload)
+    return payload
+
+
+@router.post("/api/sentry/probe-write")
+def sentry_probe_write() -> dict[str, object]:
+    payload = post_watch_sentry_probe_write()
+    if payload is None:
+        raise HTTPException(status_code=503, detail="watch sentry write probe unavailable")
     return payload
 
 

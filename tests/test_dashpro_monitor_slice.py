@@ -53,6 +53,34 @@ class DashProMonitorSignalTests(unittest.TestCase):
         self.assertEqual("high", item["severity"])
         self.assertEqual("child_project_monitor", item["meta"]["signal_family"])
 
+    def test_monitor_inbox_item_attaches_sentry_issues(self) -> None:
+        issues = [
+            {
+                "id": "12345",
+                "short_id": "RN-1",
+                "title": "TypeError: boom",
+                "level": "error",
+                "count": 4,
+                "permalink": "https://sentry.io/issues/12345/",
+                "culprit": "app.js",
+            }
+        ]
+        item = monitor_inbox_item(
+            {
+                "check_id": "dashpro_sentry_recent_issues",
+                "check_type": "sentry_recent_issues",
+                "service": "Sentry",
+                "workspace_id": "workspace_dashpro",
+                "status": "critical",
+                "detail": "unresolved issues",
+                "issues": issues,
+            }
+        )
+        self.assertIsNotNone(item)
+        assert item is not None
+        self.assertEqual(issues, item["meta"]["sentry_issues"])
+        self.assertEqual(1, item["meta"]["sentry_issue_count"])
+
     def test_monitor_inbox_items_filters_ok(self) -> None:
         items = monitor_inbox_items(
             [

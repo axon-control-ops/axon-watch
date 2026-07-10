@@ -50,7 +50,7 @@ class MonitorSliceRegistryTests(unittest.TestCase):
             )
             with patch(
                 "app.monitors.monitor_probe.check_sentry_recent_issues",
-                return_value=("ok", "fine"),
+                return_value=("ok", "fine", []),
             ):
                 records = probe_all_monitor_slices(config_dir)
         self.assertEqual(1, len(records))

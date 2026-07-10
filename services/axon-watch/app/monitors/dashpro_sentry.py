@@ -8,6 +8,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from app.monitors.sentry_issue_sample import extract_sentry_issue_sample
+
 
 def _sentry_org_slug(env: dict[str, str]) -> str:
     return str(env.get("SENTRY_ORG_SLUG") or "edudashpro").strip()
@@ -31,12 +33,13 @@ def check_sentry_recent_issues(
     warning_threshold: int = 10,
     critical_threshold: int = 20,
     timeout_seconds: float = 10,
-) -> tuple[str, str]:
+) -> tuple[str, str, list[dict[str, object]]]:
     token = str(env.get("SENTRY_AUTH_TOKEN") or env.get("SENTRY_API_TOKEN") or "").strip()
     org = _sentry_org_slug(env)
     project = _sentry_project_slug(env)
+    empty: list[dict[str, object]] = []
     if not token:
-        return "skipped", "Sentry check skipped until SENTRY_AUTH_TOKEN is available"
+        return "skipped", "Sentry check skipped until SENTRY_AUTH_TOKEN is available", empty
     url = (
         f"https://sentry.io/api/0/projects/{org}/{project}/issues/"
         f"?query=is:unresolved&limit={max(1, limit)}"
@@ -57,32 +60,33 @@ def check_sentry_recent_issues(
         status = int(exc.code)
         body = exc.read().decode("utf-8", errors="replace")
     except (TimeoutError, URLError, OSError) as exc:
-        return "critical", f"Sentry API query failed: {exc}"
+        return "critical", f"Sentry API query failed: {exc}", empty
 
     if status == 401:
-        return "critical", "Sentry API rejected the auth token"
+        return "critical", "Sentry API rejected the auth token", empty
     if status == 403:
-        return "warning", "Sentry token lacks issue read scope"
+        return "warning", "Sentry token lacks issue read scope", empty
     if status != 200:
-        return "critical", f"Sentry API HTTP {status}: {body[:200]}"
+        return "critical", f"Sentry API HTTP {status}: {body[:200]}", empty
 
     try:
         issues = json.loads(body)
     except json.JSONDecodeError:
-        return "critical", "Sentry API returned non-JSON payload"
+        return "critical", "Sentry API returned non-JSON payload", empty
     if not isinstance(issues, list):
-        return "critical", "Sentry API response was not an issue list"
+        return "critical", "Sentry API response was not an issue list", empty
     if not issues:
-        return "ok", f"Sentry project {project} has zero unresolved issues"
+        return "ok", f"Sentry project {project} has zero unresolved issues", empty
 
-    titles = [str(item.get("title") or "unknown")[:80] for item in issues[:3] if isinstance(item, dict)]
-    total_events = sum(int(item.get("count") or 0) for item in issues if isinstance(item, dict))
+    sample = extract_sentry_issue_sample(issues, limit=max(1, limit))
+    titles = [str(item.get("title") or "unknown")[:80] for item in sample[:3]]
+    total_events = sum(int(item.get("count") or 0) for item in sample)
     detail = (
         f"Sentry returned {len(issues)} unresolved issue(s), {total_events} event(s); "
         f"latest={titles[0] if titles else 'unknown'}"
     )
     if len(issues) >= critical_threshold or total_events >= critical_threshold * 5:
-        return "critical", detail
+        return "critical", detail, sample
     if len(issues) >= warning_threshold:
-        return "warning", detail
-    return "ok", detail
+        return "warning", detail, sample
+    return "ok", detail, sample

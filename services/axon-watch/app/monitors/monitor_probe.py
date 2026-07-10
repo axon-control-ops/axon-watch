@@ -40,11 +40,13 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
             continue
 
         if check_type == "sentry_recent_issues":
-            status, detail = check_sentry_recent_issues(env=env)
+            status, detail, issues = check_sentry_recent_issues(env=env)
         elif check_type == "posthog_recent_events":
             status, detail = check_posthog_recent_events(env=env)
+            issues = []
         elif check_type == "supabase_storage_quota":
             status, detail = check_supabase_storage_quota(env=env)
+            issues = []
         else:
             continue
 
@@ -57,6 +59,8 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
             "status": status,
             "detail": detail,
         }
+        if check_type == "sentry_recent_issues" and issues:
+            record["issues"] = issues
         if status == "skipped":
             record["vault_action"] = {
                 "surface": "/vault",

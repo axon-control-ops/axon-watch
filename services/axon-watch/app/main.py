@@ -47,6 +47,10 @@ from app.vault.api import (
 from app.vault.operations import attempt_auto_unlock
 from app.watch_summary import build_connectors_response, build_watch_summary
 from app.monitors.monitor_snapshot import build_monitors_response
+from app.monitors.sentry_resolve_service import (
+    probe_watch_sentry_write_scope,
+    resolve_watch_sentry_issue,
+)
 
 
 def _state_dir() -> str:
@@ -72,6 +76,11 @@ class WatchCommandBody(BaseModel):
     requested_by: str = "control-plane"
     payload: dict[str, object] | None = None
     requested_at: str | None = None
+
+
+class SentryResolveBody(BaseModel):
+    status: str = "resolved"
+    requested_by: str = "operator"
 
 
 app = FastAPI(
@@ -158,6 +167,24 @@ def tunnel_stop_route() -> dict[str, object]:
 @app.get("/internal/watch/monitors")
 def monitors() -> dict[str, object]:
     return build_monitors_response()
+
+
+@app.post("/internal/watch/sentry/issues/{issue_id}/resolve")
+def sentry_resolve_issue(issue_id: str, body: SentryResolveBody | None = None) -> dict[str, object]:
+    payload = body or SentryResolveBody()
+    result = resolve_watch_sentry_issue(
+        issue_id,
+        status=payload.status,
+        requested_by=payload.requested_by,
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result)
+    return result
+
+
+@app.post("/internal/watch/sentry/probe-write")
+def sentry_probe_write() -> dict[str, object]:
+    return probe_watch_sentry_write_scope()
 
 
 @app.get("/internal/watch/inbox")

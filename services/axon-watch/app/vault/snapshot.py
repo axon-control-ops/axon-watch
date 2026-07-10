@@ -25,6 +25,10 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         "label": "DashPro Sentry monitor",
         "required_keys": ("SENTRY_AUTH_TOKEN",),
         "optional_keys": ("SENTRY_API_TOKEN", "SENTRY_ORG_SLUG", "SENTRY_PROJECT_SLUG", "EXPO_PUBLIC_SENTRY_DSN"),
+        "auth_note": (
+            "Read monitors need project:read (or event:read). "
+            "Resolving issues from Axon requires event:write or project:write on the same token."
+        ),
     },
     {
         "id": "dashpro_posthog",

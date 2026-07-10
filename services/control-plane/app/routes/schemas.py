@@ -81,6 +81,11 @@ class AcknowledgeInboxSignalsRequest(BaseModel):
     signal_ids: list[str]
 
 
+class SentryResolveRequest(BaseModel):
+    status: str = "resolved"
+    requested_by: str = "operator"
+
+
 class VaultImportRequest(BaseModel):
     secrets: dict[str, str] = {}
     export_text: str = ""
