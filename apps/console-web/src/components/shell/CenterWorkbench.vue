@@ -2,10 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import WorkbenchIcon from '../WorkbenchIcon.vue';
+import WorkbenchTerminalDock from '../WorkbenchTerminalDock.vue';
 import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
 import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
-import TerminalHost from '../TerminalHost.vue';
 import {
   clampWorkbenchTerminalHeight,
   persistWorkbenchTerminalPanelVisible,
@@ -23,6 +23,8 @@ import {
 import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
+import { isImageFilePath } from '../../lib/workspace-file-language';
+import { resolveThreadImageUrl } from '../../lib/thread-image-url';
 import {
   persistEditorMarkdownPreviewEnabled,
   resolveEditorMarkdownPreviewEnabled,
@@ -41,7 +43,6 @@ import {
   persistEditorMinimapEnabled,
   readEditorMinimapEnabled,
 } from '../../lib/editor-surface-prefs';
-import { terminalSessionTabLabel } from '../../lib/terminal-session-view';
 import { isAgentEditReviewDocumentId } from '../../lib/ide-agent-edit-review';
 
 const shell = useShellStore();
@@ -52,10 +53,7 @@ const workbenchLayoutMode = computed((): 'operator' | 'ide' =>
 );
 const terminalPanelVisible = ref(true);
 const showTerminalDock = computed(() => terminalPanelVisible.value);
-type BottomTabId = 'terminal' | 'problems' | 'output' | 'logs';
-const bottomTab = ref<BottomTabId>('terminal');
 const workbenchRef = ref<HTMLElement | null>(null);
-const terminalHostRef = ref<InstanceType<typeof TerminalHost> | null>(null);
 const terminalHeight = ref(240);
 const resizing = ref(false);
 const terminalHeightCustomized = ref(false);
@@ -76,23 +74,6 @@ const problemItems = computed(() => {
   if (shell.inboxError) items.push(`Inbox: ${shell.inboxError}`);
   return items;
 });
-
-function createTerminalSession(): void {
-  void shell.createTerminalSession();
-}
-
-function selectTerminalSession(sessionId: string): void {
-  shell.setActiveTerminalSession(sessionId);
-}
-
-const activeTerminalSession = computed(() => shell.activeTerminalSession);
-
-const bottomTabs = computed(() => [
-  { id: 'terminal' as const, label: 'TERMINAL' },
-  { id: 'problems' as const, label: `PROBLEMS ${problemItems.value.length}` },
-  { id: 'output' as const, label: 'OUTPUT' },
-  { id: 'logs' as const, label: 'LOGS' },
-]);
 
 const editorBreadcrumbSegments = computed((): EditorBreadcrumbSegment[] => {
   const workspace = shell.currentWorkspace?.workspace_id ?? 'workspace_smoke';
@@ -125,16 +106,6 @@ const editorBreadcrumbSegments = computed((): EditorBreadcrumbSegment[] => {
   });
 });
 
-const workspaceTerminalLabel = computed(() => {
-  const workspaceId = shell.currentWorkspace?.workspace_id;
-  if (!workspaceId) {
-    return 'No workspace selected';
-  }
-  return shell.runtimeSummary?.watch.connected
-    ? `Connected · ${workspaceId}`
-    : `Workspace · ${workspaceId}`;
-});
-
 const activeEditorValue = computed(() => shell.activeEditorDocument?.value ?? '');
 const editorLineCount = computed(() => {
   const value = activeEditorValue.value;
@@ -142,8 +113,11 @@ const editorLineCount = computed(() => {
 });
 const editorEol = computed(() => (activeEditorValue.value.includes('\r\n') ? 'CRLF' : 'LF'));
 const editorLanguageLabel = computed(() => {
-  if (isAgentEditReviewDocument.value) {
+  if (isAgentEditReviewDocument.value && !isMarkdownEditorDocument.value) {
     return 'Diff review';
+  }
+  if (isAgentEditReviewDocument.value && isMarkdownEditorDocument.value) {
+    return 'Markdown review';
   }
   const language = shell.activeEditorDocument?.language ?? 'plaintext';
   const labels: Record<string, string> = {
@@ -154,6 +128,7 @@ const editorLanguageLabel = computed(() => {
     javascript: 'JavaScript',
     python: 'Python',
     shell: 'Shell',
+    image: 'Image',
   };
   return labels[language] ?? language;
 });
@@ -169,8 +144,22 @@ const editorAccessLabel = computed(() => {
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
 );
+const isImageEditorDocument = computed(() => {
+  const document = shell.activeEditorDocument;
+  if (!document) {
+    return false;
+  }
+  if (document.language === 'image') {
+    return true;
+  }
+  return document.source === 'file' && isImageFilePath(document.filePath ?? document.title);
+});
 const isAgentEditReviewDocument = computed(() =>
   isAgentEditReviewDocumentId(shell.activeEditorDocument?.id),
+);
+/** Green unified-diff viewer — only for non-markdown agent reviews. */
+const showAgentDiffReviewViewer = computed(
+  () => isAgentEditReviewDocument.value && !isMarkdownEditorDocument.value,
 );
 const editorPreviewEnabled = ref(false);
 
@@ -194,7 +183,19 @@ const editorPreviewHtml = computed(() => {
   if (!isMarkdownEditorDocument.value) {
     return '';
   }
-  return renderAgentMessageMarkdown(activeEditorValue.value);
+  return renderAgentMessageMarkdown(activeEditorValue.value, {
+    workspaceId: shell.currentWorkspace?.workspace_id ?? null,
+  });
+});
+
+const editorImagePreviewUrl = computed(() => {
+  const document = shell.activeEditorDocument;
+  const workspaceId = shell.currentWorkspace?.workspace_id;
+  if (!document || !workspaceId || !isImageEditorDocument.value || document.source !== 'file') {
+    return '';
+  }
+  const filePath = document.filePath ?? document.title;
+  return resolveThreadImageUrl(filePath, { workspaceId });
 });
 
 function handleEditorPreviewClick(event: MouseEvent): void {
@@ -348,7 +349,6 @@ function showTerminalPanel(): void {
   }
 
   terminalPanelVisible.value = true;
-  bottomTab.value = 'terminal';
   persistTerminalPanelVisible(true);
   syncTerminalHeightToContainer();
   requestAnimationFrame(() => runLayoutSync('resize'));
@@ -360,10 +360,6 @@ function toggleTerminalPanel(): void {
     return;
   }
   showTerminalPanel();
-}
-
-function clearTerminalPanel(): void {
-  terminalHostRef.value?.clearTerminal();
 }
 
 function startTerminalResize(event: MouseEvent): void {
@@ -514,16 +510,9 @@ watch(
   <main
     ref="workbenchRef"
     class="region region-center-workbench center-workbench center-workbench--mockup"
-    :class="{
-      'center-workbench--resizing': resizing,
-      'center-workbench--operator': hideOperatorEditor,
-      'center-workbench--terminal-collapsed': !terminalPanelVisible,
-    }"
+    :class="{ 'center-workbench--resizing': resizing, 'center-workbench--operator': hideOperatorEditor, 'center-workbench--terminal-collapsed': !terminalPanelVisible }"
   >
-    <section
-      v-if="!hideOperatorEditor"
-      class="center-workbench__editor-stack center-workbench__editor-stack--surface"
-    >
+    <section v-if="!hideOperatorEditor" class="center-workbench__editor-stack center-workbench__editor-stack--surface">
       <header class="editor-chrome editor-chrome--mockup">
         <div class="editor-tabbar editor-tabbar--mockup">
           <div
@@ -608,14 +597,8 @@ watch(
         </nav>
       </header>
 
-      <section
-        class="center-workbench__editor"
-        :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }"
-      >
-        <div
-          v-if="isMarkdownEditorDocument && shell.activeEditorDocument"
-          class="editor-markdown-toolbar"
-        >
+      <section class="center-workbench__editor" :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }">
+        <div v-if="isMarkdownEditorDocument && shell.activeEditorDocument" class="editor-markdown-toolbar">
           <div
             class="conversation-seam__markdown-mode-toggle editor-markdown-toolbar__toggle"
             role="group"
@@ -642,11 +625,11 @@ watch(
           </div>
         </div>
         <AgentEditReviewViewer
-          v-if="shell.activeEditorDocument && isAgentEditReviewDocument"
+          v-if="shell.activeEditorDocument && showAgentDiffReviewViewer"
           :content="shell.activeEditorDocument.value"
         />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled)"
+          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
           :title="shell.activeEditorDocument.title"
@@ -662,6 +645,9 @@ watch(
           @value-change="shell.updateActiveFileContent"
           @save="shell.saveActiveFileDocument"
         />
+        <div v-else-if="shell.activeEditorDocument && isImageEditorDocument" class="editor-image-preview">
+          <img class="editor-image-preview__img" :src="editorImagePreviewUrl" :alt="shell.activeEditorDocument.title">
+        </div>
         <div
           v-else-if="shell.activeEditorDocument && isMarkdownEditorDocument && editorPreviewEnabled"
           class="editor-markdown-preview conversation-seam__content conversation-seam__content--markdown"
@@ -681,7 +667,7 @@ watch(
           </button>
           <div class="editor-statusbar__meta">
             <button
-              v-if="!isAgentEditReviewDocument"
+              v-if="!showAgentDiffReviewViewer"
               type="button"
               class="editor-statusbar__toggle"
               :class="{ 'editor-statusbar__toggle--active': editorMinimapEnabled }"
@@ -703,147 +689,7 @@ watch(
       </section>
     </section>
 
-    <OperatorStatusRadarPanel
-      v-if="hideOperatorEditor"
-      :terminal-visible="terminalPanelVisible"
-      @toggle-terminal="toggleTerminalPanel"
-    />
-
-    <div
-      v-if="showTerminalDock"
-      class="center-workbench__bottom-dock center-workbench__bottom-dock--surface"
-      :style="{ height: `${terminalHeight}px` }"
-    >
-      <section class="center-workbench__terminal-panel center-workbench__terminal-panel--mockup">
-        <div
-          class="center-workbench__resize-handle"
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label="Resize terminal panel"
-          tabindex="0"
-          @mousedown="startTerminalResize"
-        >
-          <span class="center-workbench__resize-grip" aria-hidden="true" />
-        </div>
-
-        <div class="terminal-tabbar terminal-tabbar--mockup">
-          <div class="terminal-tabbar__tabs">
-            <button
-              v-for="tab in bottomTabs"
-              :key="tab.id"
-              type="button"
-              class="terminal-tabbar__tab hud-active-chip hud-active-chip--tab"
-              :class="{ 'terminal-tabbar__tab--active hud-active-chip--active': bottomTab === tab.id }"
-              @click="bottomTab = tab.id"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
-          <p class="terminal-tabbar__workspace">
-            <span
-              class="terminal-tabbar__workspace-dot"
-              :class="{
-                'terminal-tabbar__workspace-dot--connected': Boolean(
-                  shell.runtimeSummary?.watch.connected && shell.currentWorkspace,
-                ),
-              }"
-              aria-hidden="true"
-            />
-            {{ workspaceTerminalLabel }}
-          </p>
-          <div class="terminal-tabbar__actions">
-            <button type="button" class="terminal-tabbar__action-button" title="New terminal" aria-label="New terminal" @click="createTerminalSession">
-              <WorkbenchIcon name="plus" class="terminal-tabbar__action" />
-            </button>
-            <button type="button" class="terminal-tabbar__action-button" title="Split terminal" aria-label="Split terminal">
-              <WorkbenchIcon name="split" class="terminal-tabbar__action" />
-            </button>
-            <button
-              type="button"
-              class="terminal-tabbar__action-button"
-              title="Clear terminal"
-              aria-label="Clear terminal"
-              @click="clearTerminalPanel"
-            >
-              <WorkbenchIcon name="trash" class="terminal-tabbar__action" />
-            </button>
-            <button
-              type="button"
-              class="terminal-tabbar__action-button"
-              :title="hideOperatorEditor ? 'Hide terminal panel' : 'Close terminal panel (Ctrl/Cmd+J)'"
-              :aria-label="hideOperatorEditor ? 'Hide terminal panel' : 'Close terminal panel'"
-              @click="hideTerminalPanel"
-            >
-              <WorkbenchIcon name="close" class="terminal-tabbar__action" />
-            </button>
-          </div>
-        </div>
-
-        <div v-if="bottomTab === 'terminal'" class="center-workbench__terminal-body">
-          <div class="terminal-session-tabs" role="tablist" aria-label="Terminal sessions">
-            <button
-              v-for="session in shell.terminalSessions"
-              :key="session.id"
-              type="button"
-              role="tab"
-              class="terminal-session-tabs__tab"
-              :class="{
-                'terminal-session-tabs__tab--active': shell.activeTerminalSessionId === session.id,
-                'terminal-session-tabs__tab--agent': session.role === 'agent',
-              }"
-              :aria-selected="shell.activeTerminalSessionId === session.id"
-              @click="selectTerminalSession(session.id)"
-            >
-              {{ terminalSessionTabLabel({
-                session_id: session.id,
-                workspace_id: shell.currentWorkspace?.workspace_id ?? '',
-                role: session.role,
-                title: session.title,
-                run_id: session.runId,
-                created_at: '',
-              }) }}
-            </button>
-          </div>
-          <TerminalHost
-            ref="terminalHostRef"
-            variant="mockup"
-            :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
-            :session-id="activeTerminalSession.id"
-            :session-role="activeTerminalSession.role"
-            :run-summary="
-              shell.primaryActiveRun
-                ? `${shell.primaryActiveRun.run_id} · ${shell.primaryActiveRun.phase} · ${shell.primaryActiveRun.status}`
-                : null
-            "
-            :primary-signal-id="shell.workspacePrimarySignal?.signal_id ?? null"
-            :runtime-connected="Boolean(shell.runtimeSummary?.watch.connected)"
-          />
-        </div>
-        <div v-else-if="bottomTab === 'problems'" class="center-workbench__panel-surface">
-          <p v-if="problemItems.length === 0" class="center-workbench__panel-empty region-copy">
-            No active problems. Runtime, save, briefing, and run surfaces are clear.
-          </p>
-          <ul v-else class="center-workbench__panel-list">
-            <li v-for="item in problemItems" :key="item" class="center-workbench__panel-item center-workbench__panel-item--problem">
-              {{ item }}
-            </li>
-          </ul>
-        </div>
-        <div v-else-if="bottomTab === 'output'" class="center-workbench__panel-surface">
-          <ul class="center-workbench__panel-list">
-            <li v-for="item in outputLines" :key="item" class="center-workbench__panel-item">
-              {{ item }}
-            </li>
-          </ul>
-        </div>
-        <div v-else class="center-workbench__panel-surface">
-          <ul class="center-workbench__panel-list">
-            <li v-for="item in logLines" :key="item" class="center-workbench__panel-item center-workbench__panel-item--log">
-              {{ item }}
-            </li>
-          </ul>
-        </div>
-      </section>
-    </div>
+    <OperatorStatusRadarPanel v-if="hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
+    <WorkbenchTerminalDock v-if="showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
   </main>
 </template>

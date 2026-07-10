@@ -30,4 +30,14 @@ describe('workspaceExplorerStatusMessage', () => {
       }),
     ).toBe('Preparing explorer…');
   });
+
+  it('keeps the tree surface available for empty loaded workspaces', () => {
+    expect(
+      workspaceExplorerStatusMessage({
+        loadState: 'loaded',
+        hasWorkspace: true,
+        entryCount: 0,
+      }),
+    ).toBeNull();
+  });
 });

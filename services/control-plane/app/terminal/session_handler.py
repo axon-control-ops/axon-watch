@@ -9,12 +9,12 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app.terminal.pty_process import PtyProcess
 from app.terminal.session_registry import (
     create_session,
     ensure_operator_session,
     get_session,
 )
+from app.terminal.session_runtime import ensure_runtime
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 
@@ -55,7 +55,12 @@ async def handle_terminal_session(
                 session_id=clean_session_id,
             )
 
-    pty = PtyProcess(str(workspace_root), session_id=session.session_id)
+    runtime = ensure_runtime(
+        workspace_id=workspace_id,
+        workspace_root=str(workspace_root),
+        session=session,
+    )
+    pty = runtime.pty
     loop = asyncio.get_running_loop()
     output_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
 
@@ -92,7 +97,7 @@ async def handle_terminal_session(
             msg_type = message.get("type")
             if msg_type == "input":
                 data = message.get("data", "")
-                if isinstance(data, str):
+                if session.role != "agent" and isinstance(data, str):
                     pty.write(data.encode("utf-8"))
             elif msg_type == "resize":
                 pty.resize(int(message.get("cols", 80)), int(message.get("rows", 24)))
@@ -107,7 +112,6 @@ async def handle_terminal_session(
         with contextlib.suppress(asyncio.CancelledError):
             await writer_task
         pty.detach_reader(loop)
-        pty.close()
 
 
 async def _pump_output(websocket: WebSocket, output_queue: asyncio.Queue[bytes | None]) -> None:

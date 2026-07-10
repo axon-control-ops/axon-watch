@@ -140,6 +140,105 @@
   flex-shrink: 0;
 }
 
+.conversation-seam__attachments--thread {
+  margin-top: 0.35rem;
+}
+
+.conversation-seam__attachment-card--thread {
+  width: min(100%, 18rem);
+  height: auto;
+  max-height: 14rem;
+  border-radius: 12px;
+}
+
+.conversation-seam__attachment-card--thread .conversation-seam__attachment-preview {
+  width: 100%;
+  height: auto;
+  max-height: 14rem;
+  object-fit: contain;
+}
+
+.conversation-seam__inline-image {
+  margin: 0.45rem 0;
+}
+
+.conversation-seam__inline-image-button {
+  display: block;
+  width: min(100%, 20rem);
+  padding: 0;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+  border-radius: 12px;
+  background: rgba(8, 12, 18, 0.92);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.conversation-seam__inline-image-button:hover {
+  border-color: rgba(0, 242, 255, 0.28);
+}
+
+.conversation-seam__inline-image-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 16rem;
+  object-fit: contain;
+}
+
+.conversation-seam__inline-image-caption {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.3rem;
+  color: rgba(138, 154, 173, 0.82);
+  font-size: 0.62rem;
+}
+
+.conversation-seam__inline-image-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-brand);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.conversation-seam__inline-image-live {
+  color: rgba(0, 242, 255, 0.72);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.conversation-seam__content--markdown img {
+  display: block;
+  width: min(100%, 20rem);
+  height: auto;
+  max-height: 16rem;
+  margin: 0.45rem 0;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.editor-image-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+  padding: 1rem;
+  background: rgba(4, 10, 16, 0.88);
+}
+
+.editor-image-preview__img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 14rem);
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+}
+
 .conversation-seam__attachments {
   display: flex;
   flex-wrap: wrap;

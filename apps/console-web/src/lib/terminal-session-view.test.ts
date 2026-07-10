@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+  DEFAULT_VAXON_TERMINAL_TITLE,
   sortTerminalSessionsOperatorFirst,
   terminalSessionTabLabel,
   upsertTerminalSession,
@@ -9,7 +10,7 @@ import {
 } from './terminal-session-view';
 
 describe('terminal session view', () => {
-  it('labels agent sessions distinctly', () => {
+  it('labels legacy agent shells as vaxon', () => {
     const session: TerminalSessionRecord = {
       session_id: 'terminal-agent-abc',
       workspace_id: 'workspace_axon_watch',
@@ -19,11 +20,24 @@ describe('terminal session view', () => {
       created_at: '2026-07-07T12:00:00Z',
     };
 
-    expect(terminalSessionTabLabel(session)).toBe('Agent shell');
+    expect(terminalSessionTabLabel(session)).toBe(DEFAULT_VAXON_TERMINAL_TITLE);
   });
 
-  it('keeps the operator session first', () => {
-    const operator: TerminalSessionRecord = {
+  it('keeps explicit vaxon titles', () => {
+    const session: TerminalSessionRecord = {
+      session_id: 'terminal-agent-abc',
+      workspace_id: 'workspace_axon_watch',
+      role: 'agent',
+      title: 'vaxon',
+      run_id: 'run_abc',
+      created_at: '2026-07-07T12:00:00Z',
+    };
+
+    expect(terminalSessionTabLabel(session)).toBe('vaxon');
+  });
+
+  it('labels generic operator Terminal tabs as bash', () => {
+    const session: TerminalSessionRecord = {
       session_id: DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
       workspace_id: 'workspace_axon_watch',
       role: 'operator',
@@ -31,11 +45,24 @@ describe('terminal session view', () => {
       run_id: null,
       created_at: '2026-07-07T10:00:00Z',
     };
+
+    expect(terminalSessionTabLabel(session)).toBe('bash');
+  });
+
+  it('keeps the operator session first', () => {
+    const operator: TerminalSessionRecord = {
+      session_id: DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
+      workspace_id: 'workspace_axon_watch',
+      role: 'operator',
+      title: 'bash',
+      run_id: null,
+      created_at: '2026-07-07T10:00:00Z',
+    };
     const agent: TerminalSessionRecord = {
       session_id: 'terminal-agent-abc',
       workspace_id: 'workspace_axon_watch',
       role: 'agent',
-      title: 'Agent shell',
+      title: 'vaxon',
       run_id: 'run_abc',
       created_at: '2026-07-07T12:00:00Z',
     };
@@ -56,9 +83,9 @@ describe('terminal session view', () => {
     };
     const updated: TerminalSessionRecord = {
       ...existing,
-      title: 'Agent shell',
+      title: 'vaxon',
     };
 
-    expect(upsertTerminalSession([existing], updated)[0]?.title).toBe('Agent shell');
+    expect(upsertTerminalSession([existing], updated)[0]?.title).toBe('vaxon');
   });
 });

@@ -84,6 +84,31 @@
   color: rgba(214, 226, 240, 0.92);
 }
 
+.agent-dock-composer__queue-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.agent-dock-composer__queue-steer {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(0, 245, 212, 0.92), rgba(0, 196, 167, 0.88));
+  color: rgba(2, 6, 23, 0.96);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-dock-composer__queue-steer:hover {
+  background: linear-gradient(180deg, rgba(0, 245, 212, 1), rgba(0, 196, 167, 0.98));
+}
+
 .agent-dock-composer__queue-remove {
   border: 0;
   background: transparent;

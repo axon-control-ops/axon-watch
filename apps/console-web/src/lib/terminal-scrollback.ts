@@ -48,7 +48,6 @@ export function migrateTerminalScrollback(workspaceId: string, sessionId = 'term
   sessionStorage.removeItem(`axon-xterm-scrollback-v1:${workspaceId}`);
   sessionStorage.removeItem(`axon-xterm-scrollback-v2:${workspaceId}`);
   sessionStorage.removeItem(`axon-xterm-scrollback-v3:${workspaceId}`);
-  sessionStorage.removeItem(scrollbackStorageKey(workspaceId, sessionId));
 }
 
 export function serializeTerminalBuffer(terminal: Terminal): string {

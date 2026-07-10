@@ -1,6 +1,7 @@
 import type { SpokenAlertEligibility } from '../contracts/canonical';
 
 import { speakKairoLine } from './kairo-voice-playback';
+import type { KairoVoicePriority } from './kairo-voice-queue';
 import { shouldSpeakAlert, spokenAlertDedupeKey } from './operator-presence';
 
 export type SpokenAlertDeliveryChannel = 'voice_deck' | 'azure' | 'browser' | 'skipped';
@@ -8,6 +9,11 @@ export type SpokenAlertDeliveryChannel = 'voice_deck' | 'azure' | 'browser' | 's
 export type VoiceDeckSpokenAlertHandler = (
   alert: SpokenAlertEligibility,
 ) => boolean | Promise<boolean>;
+
+export type DeliverSpokenAlertOptions = {
+  /** Default `alert`. Use `narration` for run milestones / live thinking. */
+  priority?: KairoVoicePriority;
+};
 
 let voiceDeckSpokenAlertHandler: VoiceDeckSpokenAlertHandler | null = null;
 
@@ -24,6 +30,7 @@ export function getVoiceDeckSpokenAlertHandler(): VoiceDeckSpokenAlertHandler | 
 export async function deliverSpokenOperatorAlert(
   alert: SpokenAlertEligibility,
   storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
+  options: DeliverSpokenAlertOptions = {},
 ): Promise<SpokenAlertDeliveryChannel> {
   if (!shouldSpeakAlert(alert, storage)) {
     return 'skipped';
@@ -36,7 +43,9 @@ export async function deliverSpokenOperatorAlert(
     }
   }
 
-  const result = await speakKairoLine(alert.message);
+  const result = await speakKairoLine(alert.message, {
+    priority: options.priority ?? 'alert',
+  });
   if (result.engine === 'azure') {
     return 'azure';
   }

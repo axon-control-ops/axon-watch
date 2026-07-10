@@ -114,9 +114,22 @@ class OperatorBriefingSignalsTests(unittest.TestCase):
         line = build_persona_voice_line(
             pending_approvals=0,
             top_signal_title="Console web connector unavailable",
+            top_signal_workspace_id="workspace_dashpro",
+            top_signal_summary="Probe failed for console-web",
             degraded_active=False,
         )
-        self.assertIn("Top signals need review", line)
+        self.assertIn("Console web connector unavailable", line)
+        self.assertIn("dashpro", line)
+        self.assertNotIn("Tell me which workspace to focus", line)
+
+    def test_persona_signal_without_workspace_still_names_title(self) -> None:
+        line = build_persona_voice_line(
+            pending_approvals=0,
+            top_signal_title="DashPro Sentry critical",
+            degraded_active=False,
+        )
+        self.assertIn("DashPro Sentry critical", line)
+        self.assertNotIn("Tell me which workspace to focus", line)
 
 
 if __name__ == "__main__":

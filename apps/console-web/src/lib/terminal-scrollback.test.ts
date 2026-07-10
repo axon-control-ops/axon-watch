@@ -1,9 +1,43 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   isShellPromptLine,
+  migrateTerminalScrollback,
   sanitizeScrollbackText,
+  scrollbackStorageKey,
 } from './terminal-scrollback';
+
+const sessionStorageMock = (() => {
+  let store = new Map<string, string>();
+  return {
+    clear() {
+      store = new Map<string, string>();
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    key(index: number) {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    get length() {
+      return store.size;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+  } satisfies Storage;
+})();
+
+beforeEach(() => {
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    configurable: true,
+    value: sessionStorageMock,
+  });
+  sessionStorageMock.clear();
+});
 
 describe('terminal-scrollback', () => {
   it('removes scaffold status lines from persisted scrollback', () => {
@@ -42,5 +76,15 @@ describe('terminal-scrollback', () => {
 
     expect(isShellPromptLine(noisy)).toBe(true);
     expect(sanitizeScrollbackText(['git status', noisy].join('\n'))).toBe('git status');
+  });
+
+  it('preserves current scrollback key during migration cleanup', () => {
+    sessionStorage.setItem(scrollbackStorageKey('workspace_alpha', 'terminal-1'), 'persist me');
+
+    migrateTerminalScrollback('workspace_alpha', 'terminal-1');
+
+    expect(sessionStorage.getItem(scrollbackStorageKey('workspace_alpha', 'terminal-1'))).toBe(
+      'persist me',
+    );
   });
 });

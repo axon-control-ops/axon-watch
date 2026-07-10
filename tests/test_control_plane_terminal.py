@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -17,12 +17,18 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
 from app.persistence import run_store  # noqa: E402
+from app.terminal.session_registry import reset_registry  # noqa: E402
+from app.terminal.session_runtime import reset_runtimes  # noqa: E402
 from app.terminal.workspace_roots import resolve_workspace_root, workspace_roots_base  # noqa: E402
 
 
 class ControlPlaneTerminalTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_control_plane_db(self, run_store)
+        reset_registry()
+        reset_runtimes()
+        self.addCleanup(reset_registry)
+        self.addCleanup(reset_runtimes)
         self.workspace_tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.workspace_tempdir.cleanup)
         self.env_patch = patch.dict(
@@ -97,6 +103,50 @@ class ControlPlaneTerminalTests(unittest.TestCase):
                     break
 
         self.assertIn("axon-pty-smoke", "".join(collected))
+
+    def test_terminal_session_persists_shell_state_across_reconnects(self) -> None:
+        session_id = "terminal-reconnect-smoke"
+
+        with self.client.websocket_connect(
+            f"/api/workspaces/workspace_alpha/terminal?session_id={session_id}"
+        ) as ws:
+            ws.receive_text()
+            ws.send_text(json.dumps({"type": "input", "data": "export AXON_TERM_PERSIST=sticky\n"}))
+
+        collected: list[str] = []
+        with self.client.websocket_connect(
+            f"/api/workspaces/workspace_alpha/terminal?session_id={session_id}"
+        ) as ws:
+            ws.receive_text()
+            ws.send_text(json.dumps({"type": "input", "data": "echo $AXON_TERM_PERSIST\n"}))
+            for _ in range(50):
+                payload = json.loads(ws.receive_text())
+                if payload.get("type") == "output":
+                    collected.append(str(payload.get("data", "")))
+                if "sticky" in "".join(collected):
+                    break
+
+        self.assertIn("sticky", "".join(collected))
+
+    def test_agent_terminal_ignores_operator_input(self) -> None:
+        fake_pty = Mock()
+        fake_pty.attach_reader.side_effect = lambda loop, on_output, on_closed: None
+        fake_pty.detach_reader.side_effect = lambda loop: None
+        fake_runtime = Mock()
+        fake_runtime.pty = fake_pty
+
+        with patch("app.terminal.session_handler.ensure_runtime", return_value=fake_runtime):
+            with self.client.websocket_connect(
+                "/api/workspaces/workspace_alpha/terminal?session_id=terminal-agent-test&role=agent"
+            ) as ws:
+                ready = json.loads(ws.receive_text())
+                self.assertEqual("agent", ready["role"])
+                ws.send_text(json.dumps({"type": "input", "data": "echo should-not-run\n"}))
+                ws.send_text(json.dumps({"type": "resize", "cols": 120, "rows": 30}))
+                ws.send_text(json.dumps({"type": "close"}))
+
+        fake_pty.write.assert_not_called()
+        fake_pty.resize.assert_called_once_with(120, 30)
 
 
 if __name__ == "__main__":

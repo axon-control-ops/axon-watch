@@ -80,6 +80,8 @@ def build_operator_presence(
     voice_line = build_persona_voice_line(
         pending_approvals=pending_approvals,
         top_signal_title=str(top_signal.get("title", "")) if top_signal else "",
+        top_signal_workspace_id=str(top_signal.get("workspace_id", "")) if top_signal else "",
+        top_signal_summary=str(top_signal.get("summary", "")) if top_signal else "",
         degraded_active=degraded_active,
         persona_enabled=bool(resolved_settings.get("operator_persona_enabled", True)),
     )

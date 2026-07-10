@@ -26,14 +26,11 @@ import {
   markRunReviewReady,
   createWorkspaceChatThread,
   createWorkspaceHandoff,
-  createWorkspaceTerminalSession,
   fetchWorkspaceChatThreads,
-  fetchWorkspaceTerminalSessions,
   uploadChatAttachment,
   postChatMessage,
   postWatchCommand,
   rejectRun,
-  renameWorkspaceFile,
   resumeRun,
   saveWorkspaceFile,
   saveOperatorPresenceSettings,
@@ -97,8 +94,13 @@ import type { EditorRevealRequest } from '../components/EditorHost.vue';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
 import {
   DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
-  upsertTerminalSession,
 } from '../lib/terminal-session-view';
+import {
+  createTerminalSessionStore,
+  DEFAULT_TERMINAL_SESSIONS,
+  type TerminalSessionDescriptor,
+} from '../lib/shell-terminal-session-store';
+import { createWorkspaceFileOps } from '../lib/shell-workspace-file-ops';
 import { sortIdeThreadsNewestFirst } from '../lib/ide-thread-picker-view';
 import {
   ensureOpenIdeThreadTabs,
@@ -124,6 +126,11 @@ import {
   subscribeKairoVoiceSpeaking,
   isKairoVoiceSpeaking,
 } from '../lib/kairo-voice-playback';
+import {
+  flushKairoSpeechQueue,
+  interruptKairoSpeechQueue,
+  isKairoSpeechQueueBusy,
+} from '../lib/kairo-voice-queue';
 import {
   onSpeechQueueIdle,
   subscribeSpeechQueueSpeaking,
@@ -239,6 +246,7 @@ import {
 import {
   filePathFromDocumentId,
   languageForFilePath,
+  isImageFilePath,
   workspaceFileDocumentId,
 } from '../lib/workspace-file-language';
 import {
@@ -256,12 +264,22 @@ import {
   type WorkspaceDocumentDescriptor,
 } from '../lib/workspace-documents';
 import { persistEditorMarkdownPreviewEnabled } from '../lib/editor-markdown-preview-prefs';
+import {
+  readActiveEditorDocumentIdsByWorkspace,
+  readOpenEditorFilePathsByWorkspace,
+  resolveRestoredActiveEditorDocumentId,
+  restoreOpenEditorFilePaths,
+  writeActiveEditorDocumentIdForWorkspace,
+  writeOpenEditorFilePathsForWorkspace,
+} from '../lib/editor-open-tabs-prefs';
 import { formatAgentDraftTitle } from '../lib/editor-tab-labels';
 import type { IdeAgentEditSummary } from '../lib/ide-agent-center-view';
 import {
   agentEditReviewDocumentId,
   agentEditReviewDocumentTitle,
   formatAgentEditReviewContent,
+  isAgentEditReviewDocumentId,
+  isMarkdownAgentEditPath,
   shouldOpenWorkspaceFileForEditReview,
 } from '../lib/ide-agent-edit-review';
 import { normalizeEditedFilePath } from '../lib/agent-transcript-blocks';
@@ -359,14 +377,6 @@ interface EditorTabDescriptor {
   state: 'placeholder';
 }
 
-interface TerminalSessionDescriptor {
-  id: string;
-  title: string;
-  role: 'operator' | 'agent' | string;
-  runId: string | null;
-  state: 'ready';
-}
-
 interface DockContextDescriptor {
   id: string;
   title: string;
@@ -376,16 +386,6 @@ interface DockContextDescriptor {
 const DEFAULT_EDITOR_TABS: EditorTabDescriptor[] = [
   { id: 'editor-shell', title: 'Editor', surface: 'editor', state: 'placeholder' },
   { id: 'preview-shell', title: 'Preview', surface: 'preview', state: 'placeholder' },
-];
-
-const DEFAULT_TERMINAL_SESSIONS: TerminalSessionDescriptor[] = [
-  {
-    id: DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
-    title: 'Terminal',
-    role: 'operator',
-    runId: null,
-    state: 'ready',
-  },
 ];
 
 const DEFAULT_DOCK_CONTEXT: DockContextDescriptor = {
@@ -1259,12 +1259,6 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  const activeTerminalSession = computed(
-    () =>
-      terminalSessions.value.find((session) => session.id === activeTerminalSessionId.value) ??
-      DEFAULT_TERMINAL_SESSIONS[0],
-  );
-
   const workspaceThreadLoadPromises = new Map<string, Promise<void>>();
   const ideThreadsLoadPromises = new Map<string, Promise<void>>();
 
@@ -1380,66 +1374,6 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     await loadWorkspaceThread(workspaceId, 'ide');
-  }
-
-  function mapTerminalSessionRecord(record: TerminalSessionRecord): TerminalSessionDescriptor {
-    return {
-      id: record.session_id,
-      title: record.title,
-      role: record.role,
-      runId: record.run_id,
-      state: 'ready',
-    };
-  }
-
-  async function loadTerminalSessions(workspaceId: string): Promise<void> {
-    try {
-      const snapshot = await fetchWorkspaceTerminalSessions(workspaceId);
-      const mapped = snapshot.items.map((item) => mapTerminalSessionRecord(item));
-      terminalSessions.value = mapped.length ? mapped : [...DEFAULT_TERMINAL_SESSIONS];
-      if (!terminalSessions.value.some((session) => session.id === activeTerminalSessionId.value)) {
-        activeTerminalSessionId.value = DEFAULT_OPERATOR_TERMINAL_SESSION_ID;
-      }
-    } catch {
-      terminalSessions.value = [...DEFAULT_TERMINAL_SESSIONS];
-      activeTerminalSessionId.value = DEFAULT_OPERATOR_TERMINAL_SESSION_ID;
-    }
-  }
-
-  function setActiveTerminalSession(sessionId: string): void {
-    if (!terminalSessions.value.some((session) => session.id === sessionId)) {
-      return;
-    }
-    activeTerminalSessionId.value = sessionId;
-    revealIdeTerminalPanel();
-  }
-
-  async function createTerminalSession(): Promise<void> {
-    const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
-      return;
-    }
-
-    const created = await createWorkspaceTerminalSession(workspaceId, {
-      role: 'operator',
-      title: 'Terminal',
-    });
-    applyAgentTerminalSession(created);
-    revealIdeTerminalPanel();
-  }
-
-  function applyAgentTerminalSession(record: TerminalSessionRecord): void {
-    const existingRecords: TerminalSessionRecord[] = terminalSessions.value.map((session) => ({
-      session_id: session.id,
-      workspace_id: currentWorkspace.value?.workspace_id ?? record.workspace_id,
-      role: session.role,
-      title: session.title,
-      run_id: session.runId,
-      created_at: '',
-    }));
-    const next = upsertTerminalSession(existingRecords, record);
-    terminalSessions.value = next.map((session) => mapTerminalSessionRecord(session));
-    activeTerminalSessionId.value = record.session_id;
   }
 
   async function refreshOperatorThreadMessages(workspaceId: string): Promise<void> {
@@ -1693,11 +1627,19 @@ export const useShellStore = defineStore('shell', () => {
     workspaceId: string,
     messageId: string,
     content: string,
+    attachments?: OperatorThreadEntry['attachments'],
   ): void {
     const updateMessages = (messages: OperatorThreadEntry[]) =>
-      messages.map((message) =>
-        message.message_id === messageId ? { ...message, content } : message,
-      );
+      messages.map((message) => {
+        if (message.message_id !== messageId) {
+          return message;
+        }
+        const next: OperatorThreadEntry = { ...message, content };
+        if (attachments?.length) {
+          next.attachments = attachments;
+        }
+        return next;
+      });
 
     if (currentWorkspace.value?.workspace_id === workspaceId) {
       threadMessages.value = updateMessages(threadMessages.value);
@@ -1733,6 +1675,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function stopKairoSpeech(): void {
+    flushKairoSpeechQueue('stopped');
     stopKairoPlayback();
     kairoVoicePaused.value = false;
     if (kairoConversationPhase.value === 'speaking') {
@@ -1758,7 +1701,11 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function interruptKairoVoice(): void {
-    stopKairoSpeech();
+    void interruptKairoSpeechQueue('barge_in');
+    kairoVoicePaused.value = false;
+    if (kairoConversationPhase.value === 'speaking') {
+      setKairoConversationPhase('idle');
+    }
   }
 
   async function speakKairoConversationLine(
@@ -1811,7 +1758,7 @@ export const useShellStore = defineStore('shell', () => {
       }
     }
 
-    await speakKairoLine(message);
+    await speakKairoLine(message, { priority: 'conversation' });
   }
 
   function handleKairoPresenceAction(): void {
@@ -1823,6 +1770,7 @@ export const useShellStore = defineStore('shell', () => {
     const voiceBusy =
       kairoSpeechQueueActive.value ||
       kairoVoiceEngineActive.value ||
+      isKairoSpeechQueueBusy() ||
       kairoConversationPhase.value === 'speaking' ||
       kairoConversationPhase.value === 'thinking';
 
@@ -1885,12 +1833,16 @@ export const useShellStore = defineStore('shell', () => {
       if (response.source === 'skipped' || !response.line?.trim()) {
         return;
       }
-      void deliverSpokenOperatorAlert({
-        eligible: true,
-        reason: `kairo-agent-narration:${eventKey}`,
-        signal_id: `${messageId}:${eventKey}`,
-        message: response.line.trim(),
-      });
+      void deliverSpokenOperatorAlert(
+        {
+          eligible: true,
+          reason: `kairo-agent-narration:${eventKey}`,
+          signal_id: `${messageId}:${eventKey}`,
+          message: response.line.trim(),
+        },
+        sessionStorage,
+        { priority: 'narration' },
+      );
     } catch {
       // No frontend template fallback — spoken lines must come from /api/kairo/speak.
     }
@@ -1911,10 +1863,13 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     let eventType = 'alert';
+    const topSignal = operatorBriefing.value?.top_signals[0];
     const context: Record<string, unknown> = {
       fallback: alert.message,
       pending_approvals: pendingApprovalsCount.value,
-      top_signal_title: operatorBriefing.value?.top_signals[0]?.title ?? '',
+      top_signal_title: topSignal?.title ?? '',
+      top_signal_workspace_id: topSignal?.workspace_id ?? '',
+      top_signal_summary: topSignal?.summary ?? '',
       degraded_active: Boolean(runtimeSummary.value?.degraded.active),
     };
 
@@ -2106,12 +2061,16 @@ export const useShellStore = defineStore('shell', () => {
               if (narration === 'conversational') {
                 void speakKairoConversationLine(spokenBlock, { operatorPrompt });
               } else {
-                void deliverSpokenOperatorAlert({
-                  eligible: true,
-                  reason: 'kairo-agent-live-thinking',
-                  signal_id: `${messageId}:thinking-spoken`,
-                  message: spokenBlock,
-                });
+                void deliverSpokenOperatorAlert(
+                  {
+                    eligible: true,
+                    reason: 'kairo-agent-live-thinking',
+                    signal_id: `${messageId}:thinking-spoken`,
+                    message: spokenBlock,
+                  },
+                  sessionStorage,
+                  { priority: 'narration' },
+                );
               }
             }
           }
@@ -2144,12 +2103,29 @@ export const useShellStore = defineStore('shell', () => {
               payload.system_content,
             );
           }
+          const streamAttachments = (payload.attachments ?? [])
+            .map((item) => ({
+              attachment_id: String(item.attachment_id ?? '').trim(),
+              filename: String(item.filename ?? '').trim(),
+              mime_type: String(item.mime_type ?? '').trim(),
+              url: String(item.url ?? '').trim(),
+            }))
+            .filter((item) => item.attachment_id && item.url);
+          if (streamAttachments.length) {
+            patchThreadMessageContent(
+              workspaceId,
+              messageId,
+              payload.content ?? narratedContent,
+              streamAttachments,
+            );
+          }
           const uiAction = parseChatUiAction(payload.ui_action);
           if (uiAction) {
             applyChatUiAction(
               {
                 setCurrentWorkspace,
                 openWorkspaceFile,
+                setLayoutMode,
               },
               uiAction,
             );
@@ -2530,6 +2506,32 @@ export const useShellStore = defineStore('shell', () => {
     await dispatchIdeComposerMessage(composerMode, options);
   }
 
+  async function steerQueuedIdeComposerMessage(messageId: string): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return;
+    }
+
+    const queue = ideComposerQueueByWorkspaceId.value[workspaceId] ?? [];
+    const entry = queue.find((item) => item.id === messageId);
+    if (!entry) {
+      return;
+    }
+
+    ideComposerQueueByWorkspaceId.value = {
+      ...ideComposerQueueByWorkspaceId.value,
+      [workspaceId]: removeIdeComposerQueueEntry(queue, messageId),
+    };
+
+    if (composerAgentBusy.value) {
+      await stopIdeAgentRun();
+    }
+
+    await dispatchIdeComposerMessage(entry.composerMode, {
+      contentOverride: entry.content,
+    });
+  }
+
   async function submitIdeComposer(
     composerMode: 'ask' | 'plan' | 'agent',
     options: { attachmentFiles?: File[] } = {},
@@ -2776,6 +2778,26 @@ export const useShellStore = defineStore('shell', () => {
     ideTerminalRevealToken.value += 1;
   }
 
+  const terminalSessionStore = createTerminalSessionStore({
+    currentWorkspace,
+    terminalSessions,
+    activeTerminalSessionId,
+    ideAgentRunId,
+    revealIdeTerminalPanel,
+  });
+  const {
+    activeTerminalSession,
+    applyAgentTerminalSession,
+    backgroundIdeAgentRun,
+    closeTerminalSession,
+    createTerminalSession,
+    createVaxonTerminalSession,
+    loadTerminalSessions,
+    renameTerminalSession,
+    setActiveTerminalSession,
+    splitTerminalSession,
+  } = terminalSessionStore;
+
   function toggleIdeTerminalPanel(): void {
     ideTerminalToggleToken.value += 1;
   }
@@ -2829,7 +2851,32 @@ export const useShellStore = defineStore('shell', () => {
     activeEditorTabId.value = id;
   }
 
+  function migrateMarkdownAgentReviewDraft(id: string): boolean {
+    if (!isAgentEditReviewDocumentId(id)) {
+      return false;
+    }
+    const draft = draftDocuments.value.find((document) => document.id === id);
+    const reviewPath =
+      draft?.filePath ||
+      (() => {
+        const match = /^#\s*Agent review ·\s+(.+?)\s*$/m.exec(draft?.value || '');
+        return match?.[1]?.trim() || null;
+      })();
+    if (!reviewPath || !isMarkdownAgentEditPath(reviewPath)) {
+      return false;
+    }
+    draftDocuments.value = draftDocuments.value.filter((document) => document.id !== id);
+    persistEditorMarkdownPreviewEnabled(workspaceFileDocumentId(reviewPath), true);
+    void openWorkspaceFile(reviewPath);
+    return true;
+  }
+
   function setActiveEditorDocument(id: string): void {
+    // Stale markdown agent-review drafts (green + lines / no Preview) → open the real file.
+    if (migrateMarkdownAgentReviewDraft(id)) {
+      return;
+    }
+
     activeEditorDocumentId.value = id;
     editorSelection.value = null;
     const path = filePathFromDocumentId(id);
@@ -2837,6 +2884,15 @@ export const useShellStore = defineStore('shell', () => {
       void openWorkspaceFile(path);
     }
   }
+
+  // Also migrate if a green markdown review tab is already active (e.g. after reload).
+  watch(
+    activeEditorDocumentId,
+    (id) => {
+      migrateMarkdownAgentReviewDraft(id);
+    },
+    { flush: 'post' },
+  );
 
   function closeEditorDocument(id: string): void {
     const path = filePathFromDocumentId(id);
@@ -2882,33 +2938,17 @@ export const useShellStore = defineStore('shell', () => {
     };
   }
 
-  function promptWorkspaceFilePath(message: string, defaultValue = ''): string | null {
-    if (typeof window === 'undefined') {
-      return null;
-    }
-
-    const response = window.prompt(message, defaultValue);
-    if (response === null) {
-      return null;
-    }
-
-    const normalized = normalizeWorkspaceFilePath(response);
-    if (!isSafeWorkspaceFilePath(normalized)) {
-      workspaceFilesError.value = 'Enter a safe relative path inside the workspace.';
-      return null;
-    }
-
-    if (!normalized) {
-      workspaceFilesError.value = 'File path is required.';
-      return null;
-    }
-
-    return normalized;
-  }
-
   async function reloadWorkspaceFile(path: string): Promise<void> {
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (!workspaceId) {
+      return;
+    }
+
+    if (isImageFilePath(path)) {
+      fileContentLoadStates.value = {
+        ...fileContentLoadStates.value,
+        [path]: 'loaded',
+      };
       return;
     }
 
@@ -2948,6 +2988,14 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     if (fileContentLoadStates.value[path] === 'loading') {
+      return;
+    }
+
+    if (isImageFilePath(path)) {
+      fileContentLoadStates.value = {
+        ...fileContentLoadStates.value,
+        [path]: 'loaded',
+      };
       return;
     }
 
@@ -3108,6 +3156,10 @@ export const useShellStore = defineStore('shell', () => {
       if (layoutMode.value !== 'ide') {
         setLayoutMode('ide');
       }
+      // Markdown edits are already on disk — open the real file with Preview enabled.
+      if (languageForFilePath(path) === 'markdown') {
+        persistEditorMarkdownPreviewEnabled(workspaceFileDocumentId(path), true);
+      }
       void openWorkspaceFile(path);
       return;
     }
@@ -3124,6 +3176,9 @@ export const useShellStore = defineStore('shell', () => {
     const id = agentEditReviewDocumentId(path);
     const title = agentEditReviewDocumentTitle(path);
     const content = formatAgentEditReviewContent(edit);
+    const language = (
+      languageForFilePath(path) === 'markdown' ? 'markdown' : 'plaintext'
+    ) as EditorDocumentLanguage;
     const existing = draftDocuments.value.find((document) => document.id === id);
 
     if (existing) {
@@ -3132,6 +3187,7 @@ export const useShellStore = defineStore('shell', () => {
           ? {
               ...document,
               title,
+              language,
               value: content,
               dirty: document.value !== content,
             }
@@ -3143,16 +3199,23 @@ export const useShellStore = defineStore('shell', () => {
         {
           id,
           title,
-          language: 'plaintext' as EditorDocumentLanguage,
+          language,
           value: content,
-          description: 'Agent proposed changes from the transcript diff (read-only review).',
+          description:
+            language === 'markdown'
+              ? 'Agent markdown review (Preview/Raw). Diff markers are stripped for readable rendering.'
+              : 'Agent proposed changes from the transcript diff (read-only review).',
           source: 'draft',
           readOnly: true,
           dirty: false,
+          filePath: path,
         },
       ];
     }
 
+    if (language === 'markdown') {
+      persistEditorMarkdownPreviewEnabled(id, true);
+    }
     activeEditorDocumentId.value = id;
   }
 
@@ -3177,140 +3240,19 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function createWorkspaceFile(): Promise<void> {
-    const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
-      workspaceFilesError.value = 'Select a workspace before creating a file.';
-      return;
-    }
-
-    workspaceFilesError.value = null;
-    const path = promptWorkspaceFilePath('New workspace file path', 'src/new-file.txt');
-    if (!path) {
-      return;
-    }
-
-    if (workspaceFileEntries.value.some((entry) => entry.path === path)) {
-      await openWorkspaceFile(path);
-      return;
-    }
-
-    fileSaveState.value = 'saving';
-    fileSaveError.value = null;
-
-    try {
-      const payload = await saveWorkspaceFile(workspaceId, path, '');
-      workspaceFileEntries.value = [...workspaceFileEntries.value, payload].sort((left, right) =>
-        left.path.localeCompare(right.path),
-      );
-      fileContents.value = {
-        ...fileContents.value,
-        [path]: '',
-      };
-      fileSavedContents.value = {
-        ...fileSavedContents.value,
-        [path]: '',
-      };
-      fileContentLoadStates.value = {
-        ...fileContentLoadStates.value,
-        [path]: 'loaded',
-      };
-      await openWorkspaceFile(path);
-    } catch (error) {
-      fileSaveError.value = error instanceof Error ? error.message : 'workspace file create failed';
-    } finally {
-      fileSaveState.value = 'idle';
-    }
-  }
-
-  async function createWorkspaceFolder(): Promise<void> {
-    const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
-      workspaceFilesError.value = 'Select a workspace before creating a folder.';
-      return;
-    }
-
-    workspaceFilesError.value = null;
-    const folderPath = promptWorkspaceFilePath('New folder path', 'src/new-folder');
-    if (!folderPath) {
-      return;
-    }
-
-    const markerPath = `${folderPath.replace(/\/+$/, '')}/.gitkeep`;
-    if (workspaceFileEntries.value.some((entry) => entry.path === markerPath)) {
-      return;
-    }
-
-    fileSaveState.value = 'saving';
-    fileSaveError.value = null;
-
-    try {
-      const payload = await saveWorkspaceFile(workspaceId, markerPath, '');
-      workspaceFileEntries.value = [...workspaceFileEntries.value, payload].sort((left, right) =>
-        left.path.localeCompare(right.path),
-      );
-      await loadWorkspaceFiles();
-    } catch (error) {
-      fileSaveError.value = error instanceof Error ? error.message : 'workspace folder create failed';
-    } finally {
-      fileSaveState.value = 'idle';
-    }
-  }
-
-  async function renameActiveWorkspaceFile(): Promise<void> {
-    const workspaceId = currentWorkspace.value?.workspace_id;
-    const oldPath = activeWorkspaceFilePath.value;
-    if (!workspaceId || !oldPath) {
-      workspaceFilesError.value = 'Open a workspace file before renaming it.';
-      return;
-    }
-
-    workspaceFilesError.value = null;
-    const newPath = promptWorkspaceFilePath('Rename workspace file to', oldPath);
-    if (!newPath || newPath === oldPath) {
-      return;
-    }
-
-    fileSaveState.value = 'saving';
-    fileSaveError.value = null;
-
-    try {
-      const payload = await renameWorkspaceFile(workspaceId, oldPath, newPath);
-      workspaceFileEntries.value = workspaceFileEntries.value
-        .map((entry) =>
-          entry.path === oldPath ? { path: payload.path, size_bytes: payload.size_bytes } : entry,
-        )
-        .sort((left, right) => left.path.localeCompare(right.path));
-      fileContents.value = remapWorkspaceFileRecord(fileContents.value, oldPath, newPath);
-      fileSavedContents.value = remapWorkspaceFileRecord(
-        fileSavedContents.value,
-        oldPath,
-        newPath,
-      );
-      fileContentLoadStates.value = remapWorkspaceFileRecord(
-        fileContentLoadStates.value,
-        oldPath,
-        newPath,
-      );
-      openedFilePaths.value = remapWorkspaceFilePaths(openedFilePaths.value, oldPath, newPath);
-      activeEditorDocumentId.value = workspaceFileDocumentId(newPath);
-      await ensureWorkspaceFileLoaded(newPath);
-    } catch (error) {
-      fileSaveError.value = error instanceof Error ? error.message : 'workspace file rename failed';
-    } finally {
-      fileSaveState.value = 'idle';
-    }
-  }
-
   function setCurrentWorkspace(workspaceId: string): void {
     const previousWorkspaceId = currentWorkspace.value?.workspace_id ?? null;
+    if (previousWorkspaceId && previousWorkspaceId !== workspaceId) {
+      // Persist outgoing workspace tabs before we wipe/replace the open set.
+      persistOpenEditorTabs(previousWorkspaceId);
+      stashWorkspaceIdeView(previousWorkspaceId);
+      openedFilePaths.value = [];
+      activeEditorDocumentId.value = 'file:README.md';
+    }
     operatorPinnedWorkspaceId.value = workspaceId;
     persistOperatorWorkspaceId(workspaceId);
     syncCurrentWorkspace(workspaceId);
     if (previousWorkspaceId !== workspaceId) {
-      if (previousWorkspaceId) {
-        stashWorkspaceIdeView(previousWorkspaceId);
-      }
       syncIdeComposerDraftForWorkspace(workspaceId);
       void refreshOperatorThreadMessages(workspaceId);
       void restoreWorkspaceIdeView(workspaceId);
@@ -3321,6 +3263,30 @@ export const useShellStore = defineStore('shell', () => {
       void loadTerminalSessions(workspaceId);
     }
     void loadWorkspaceFiles();
+  }
+
+  let suppressOpenTabsPersist = false;
+
+  function persistOpenEditorTabs(workspaceId: string | null | undefined = currentWorkspace.value?.workspace_id): void {
+    if (suppressOpenTabsPersist) {
+      return;
+    }
+    const id = String(workspaceId || '').trim();
+    if (!id) {
+      return;
+    }
+    // Never persist an empty set over a known saved session (e.g. mid-switch wipe).
+    if (openedFilePaths.value.length === 0) {
+      const existing = readOpenEditorFilePathsByWorkspace()[id] ?? [];
+      if (existing.length > 0) {
+        return;
+      }
+    }
+    writeOpenEditorFilePathsForWorkspace(id, openedFilePaths.value);
+    const activeId = activeEditorDocumentId.value.trim();
+    if (activeId.startsWith('file:')) {
+      writeActiveEditorDocumentIdForWorkspace(id, activeId);
+    }
   }
 
   async function loadWorkspaceFiles(): Promise<void> {
@@ -3340,24 +3306,92 @@ export const useShellStore = defineStore('shell', () => {
 
     try {
       const snapshot = await fetchWorkspaceFiles(workspaceId);
+      // Workspace may have changed while the request was in flight.
+      if (currentWorkspace.value?.workspace_id !== workspaceId) {
+        return;
+      }
+
       workspaceFileEntries.value = snapshot.items;
       fileContents.value = {};
       fileSavedContents.value = {};
       fileContentLoadStates.value = {};
       workspaceFilesLoadState.value = 'loaded';
 
+      const availablePaths = snapshot.items.map((entry) => entry.path);
       const preferredPath = pickPreferredWorkspaceFilePath(snapshot.items);
-      openedFilePaths.value = preferredPath ? [preferredPath] : [];
-      if (preferredPath) {
-        activeEditorDocumentId.value = workspaceFileDocumentId(preferredPath);
-        await ensureWorkspaceFileLoaded(preferredPath);
+      // Keep in-session tabs across file-tree reloads; on hard refresh use localStorage.
+      const storedPaths = readOpenEditorFilePathsByWorkspace()[workspaceId] ?? [];
+      const candidatePaths =
+        openedFilePaths.value.length > 0 ? openedFilePaths.value : storedPaths;
+
+      suppressOpenTabsPersist = true;
+      let restoredPaths: string[] = [];
+      try {
+        restoredPaths = restoreOpenEditorFilePaths(
+          candidatePaths,
+          availablePaths,
+          preferredPath,
+        );
+        openedFilePaths.value = restoredPaths;
+
+        const storedActiveId = readActiveEditorDocumentIdsByWorkspace()[workspaceId] ?? null;
+        const currentPath = filePathFromDocumentId(activeEditorDocumentId.value);
+        const restoredActiveId = resolveRestoredActiveEditorDocumentId({
+          storedDocumentId:
+            activeEditorDocumentId.value.startsWith('file:') &&
+            currentPath &&
+            restoredPaths.includes(currentPath)
+              ? activeEditorDocumentId.value
+              : storedActiveId,
+          openedPaths: restoredPaths,
+        });
+        if (restoredActiveId) {
+          activeEditorDocumentId.value = restoredActiveId;
+        }
+      } finally {
+        suppressOpenTabsPersist = false;
       }
+
+      persistOpenEditorTabs(workspaceId);
+
+      await Promise.all(
+        restoredPaths.map((path) => ensureWorkspaceFileLoaded(path)),
+      );
     } catch (error) {
+      if (currentWorkspace.value?.workspace_id !== workspaceId) {
+        return;
+      }
       workspaceFilesLoadState.value = 'error';
       workspaceFilesError.value =
         error instanceof Error ? error.message : 'workspace files request failed';
     }
   }
+
+  const { createWorkspaceFile, createWorkspaceFolder, renameActiveWorkspaceFile } =
+    createWorkspaceFileOps({
+      currentWorkspace,
+      workspaceFilesError,
+      workspaceFileEntries,
+      fileSaveState,
+      fileSaveError,
+      fileContents,
+      fileSavedContents,
+      fileContentLoadStates,
+      activeWorkspaceFilePath,
+      activeEditorDocumentId,
+      openedFilePaths,
+      openWorkspaceFile,
+      loadWorkspaceFiles,
+      ensureWorkspaceFileLoaded,
+    });
+
+  watch(
+    [openedFilePaths, activeEditorDocumentId, () => currentWorkspace.value?.workspace_id],
+    () => {
+      persistOpenEditorTabs();
+    },
+    { deep: true },
+  );
 
   function updateActiveFileContent(value: string): void {
     const document = activeEditorDocument.value;
@@ -4495,6 +4529,11 @@ export const useShellStore = defineStore('shell', () => {
     loadTerminalSessions,
     setActiveTerminalSession,
     createTerminalSession,
+    createVaxonTerminalSession,
+    backgroundIdeAgentRun,
+    splitTerminalSession,
+    renameTerminalSession,
+    closeTerminalSession,
     loadWorkspaces,
     markPrimaryRunReviewReady,
     operatorBrainGraph,
@@ -4589,6 +4628,7 @@ export const useShellStore = defineStore('shell', () => {
     lastDiscussedSignal,
     submitIdeComposer,
     steerIdeComposer,
+    steerQueuedIdeComposerMessage,
     removeIdeComposerQueuedMessage,
     terminalSessions,
     threadMessages,

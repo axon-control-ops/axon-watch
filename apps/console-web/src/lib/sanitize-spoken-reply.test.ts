@@ -52,6 +52,21 @@ describe('sanitizeSpokenReply', () => {
     expect(spoken).toContain('Command');
   });
 
+  it('softens paths and symbols so TTS does not say slash or colon', () => {
+    const spoken = sanitizeSpokenReply('Open apps/console-web/src/lib/foo.ts:42 🙂');
+    expect(spoken).not.toContain('/');
+    expect(spoken).not.toContain(':');
+    expect(spoken).not.toContain('🙂');
+    expect(spoken.toLowerCase()).toContain('apps');
+    expect(spoken.toLowerCase()).toContain('console-web');
+    expect(spoken).toContain('42');
+  });
+
+  it('keeps clock times with a colon', () => {
+    const spoken = sanitizeSpokenReply('Briefing ready at 12:30.');
+    expect(spoken).toContain('12:30');
+  });
+
   it('leaves concise template replies unchanged', () => {
     const line = '2 approvals on the board — Attention has the detail.';
     expect(sanitizeSpokenReply(line)).toBe(line);

@@ -7,7 +7,8 @@ export type EditorDocumentLanguage =
   | 'typescript'
   | 'javascript'
   | 'python'
-  | 'shell';
+  | 'shell'
+  | 'image';
 
 export interface WorkspaceDocumentDescriptor {
   id: string;

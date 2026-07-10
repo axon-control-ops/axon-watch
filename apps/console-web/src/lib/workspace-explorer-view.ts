@@ -18,8 +18,5 @@ export function workspaceExplorerStatusMessage(input: {
   if (input.loadState === 'idle') {
     return 'Preparing explorer…';
   }
-  if (input.entryCount === 0) {
-    return 'No files found in this workspace root.';
-  }
   return null;
 }

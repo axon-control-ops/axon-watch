@@ -5,6 +5,7 @@ import { createXtermSession } from '../lib/create-xterm-session';
 
 const props = defineProps<{
   primarySignalId: string | null;
+  readOnly?: boolean;
   runtimeConnected: boolean;
   runSummary: string | null;
   workspaceId: string | null;
@@ -44,6 +45,7 @@ onMounted(async () => {
 
   try {
     terminalController = await createXtermSession(containerRef.value, {
+      readOnly: props.readOnly ?? props.sessionRole === 'agent',
       variant: props.variant,
     });
     terminalController.setContext({

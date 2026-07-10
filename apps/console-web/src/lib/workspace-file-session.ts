@@ -1,5 +1,5 @@
 import type { EditorDocumentLanguage, WorkspaceDocumentDescriptor } from './workspace-documents';
-import { languageForFilePath, workspaceFileDocumentId } from './workspace-file-language';
+import { isImageFilePath, languageForFilePath, workspaceFileDocumentId } from './workspace-file-language';
 
 export type FileContentLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 
@@ -61,7 +61,8 @@ export function buildOpenedFileDocuments(
     const content = contents[path] ?? '';
     const saved = savedContents[path];
     const loadState = loadStates[path] ?? 'idle';
-    const pending = loadState === 'idle' || loadState === 'loading';
+    const pending = !isImageFilePath(path) && (loadState === 'idle' || loadState === 'loading');
+    const imageFile = isImageFilePath(path);
 
     return [
       {
@@ -69,13 +70,15 @@ export function buildOpenedFileDocuments(
         title: path,
         language: languageForFilePath(path) as EditorDocumentLanguage,
         value: pending ? '' : content,
-        description: pending
-          ? 'Loading workspace file…'
-          : `Workspace file on disk (${entry.size_bytes} bytes). Editable — use Save.`,
+        description: imageFile
+          ? `Image preview (${entry.size_bytes} bytes).`
+          : pending
+            ? 'Loading workspace file…'
+            : `Workspace file on disk (${entry.size_bytes} bytes). Editable — use Save.`,
         source: 'file',
         filePath: path,
-        readOnly: pending,
-        dirty: saved !== undefined && saved !== content,
+        readOnly: pending || imageFile,
+        dirty: !imageFile && saved !== undefined && saved !== content,
       },
     ];
   });

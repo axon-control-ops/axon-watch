@@ -59,6 +59,10 @@ describe('spoken alert delivery', () => {
 
     expect(channel).toBe('azure');
     expect(speakKairoLine).toHaveBeenCalledOnce();
+    expect(speakKairoLine).toHaveBeenCalledWith(
+      'VAXON attention: Watch summary degraded.',
+      { priority: 'alert' },
+    );
   });
 
   it('reports browser fallback channel', async () => {

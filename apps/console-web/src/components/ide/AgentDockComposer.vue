@@ -45,6 +45,7 @@ const {
   extraPinnedRows,
   fullAccessConsentChecked,
   handleApproveRun,
+  handleBackgroundRun,
   handleComposerDragLeave,
   handleComposerDragOver,
   handleComposerDrop,
@@ -52,10 +53,11 @@ const {
   handleComposerPaste,
   handleRejectRun,
   handleResumeRun,
+  handleSteer,
+  handleSteerQueuedMessage,
   handleStopRun,
   handleSubmit,
   hasTerminalSnippet,
-  inputRef,
   setInputRef,
   isFullAccessAgent,
   kairoConversationError,
@@ -90,6 +92,7 @@ const {
   showAddModelsPanel,
   showApprovalBanner,
   showComposerResume,
+  showComposerSteer,
   showComposerStop,
   showContextMenu,
   showCursorCatalog,
@@ -111,19 +114,8 @@ const {
 </script>
 
 <template>
-  <AgentDockFullAccessConsent
-    :show="showFullAccessConsent"
-    :checked="fullAccessConsentChecked"
-    @update:checked="fullAccessConsentChecked = $event"
-    @cancel="cancelFullAccessConsent"
-    @confirm="confirmFullAccessConsent"
-  />
-
-  <AgentDockComposerImageLightbox
-    :image="enlargedComposerImage"
-    @close="closeComposerImageLightbox"
-  />
-
+  <AgentDockFullAccessConsent :show="showFullAccessConsent" :checked="fullAccessConsentChecked" @update:checked="fullAccessConsentChecked = $event" @cancel="cancelFullAccessConsent" @confirm="confirmFullAccessConsent" />
+  <AgentDockComposerImageLightbox :image="enlargedComposerImage" @close="closeComposerImageLightbox" />
   <form
     class="agent-dock-composer"
     @submit="handleSubmit"
@@ -178,6 +170,7 @@ const {
           :activity-chips="composerActivityChips"
           :composer-queue-hint="composerQueueHint"
           :show-composer-resume="showComposerResume"
+          :show-composer-steer="showComposerSteer"
           :show-composer-stop="showComposerStop"
           :can-submit-composer="canSubmitComposer"
           :composer-submit-label="composerSubmitLabel"
@@ -192,13 +185,16 @@ const {
           @open-image="openComposerImage"
           @remove-image="removeComposerImage"
           @remove-queued="removeQueuedMessage"
+          @steer-queued="handleSteerQueuedMessage"
           @sync-height="syncComposerHeight"
           @keydown="handleComposerKeydown"
           @paste="handleComposerPaste"
           @reveal-terminal="revealComposerTerminalPanel"
           @resume="handleResumeRun"
+          @steer="handleSteer"
           @toggle-voice="toggleVoiceCapture"
           @stop="handleStopRun"
+          @background="handleBackgroundRun"
         >
           <template #toolbar>
             <AgentDockComposerToolbar
@@ -265,7 +261,6 @@ const {
         </AgentDockComposerInput>
       </div>
     </div>
-
     <div v-if="composerMode === 'kairo' && kairoConversationReply" class="agent-dock-composer__kairo-reply">
       <span class="agent-dock-composer__kairo-reply-label">
         <OperatorPersonaMark size="xs" />
@@ -276,13 +271,8 @@ const {
     <p v-if="composerMode === 'kairo' && kairoConversationError" class="agent-dock-composer__error" role="alert">
       {{ kairoConversationError }}
     </p>
-    <p v-else-if="composerMode === 'kairo'" class="agent-dock-composer__kairo-hint">
-      Tap header {{ OPERATOR_PERSONA_NAME }} to pause or continue · Esc stops speech · Mic barge-in
-    </p>
-
-    <p v-if="!shell.currentWorkspace" class="agent-dock-composer__empty">
-      Select a workspace to send commands.
-    </p>
+    <p v-else-if="composerMode === 'kairo'" class="agent-dock-composer__kairo-hint">Tap header {{ OPERATOR_PERSONA_NAME }} to pause or continue · Esc stops speech · Mic barge-in</p>
+    <p v-if="!shell.currentWorkspace" class="agent-dock-composer__empty">Select a workspace to send commands.</p>
     <p v-if="shell.commandMutationError" class="agent-dock-composer__error">
       {{ shell.commandMutationError }}
     </p>

@@ -74,6 +74,30 @@ def _strip_markdown_for_speech(text: str) -> str:
     return text
 
 
+def _soften_symbols_for_speech(text: str) -> str:
+    """Keep TTS from reading punctuation/symbol names aloud."""
+    # Emoji / pictographs (incl. many "smiley" ranges).
+    text = re.sub(
+        r"[\U0001F300-\U0001FAFF\U00002700-\U000027BF\U00002600-\U000026FF]",
+        " ",
+        text,
+    )
+    # Paths / URLs: turn separators into spaces instead of spoken "slash".
+    text = text.replace("\\", " ").replace("/", " ")
+    text = text.replace("_", " ").replace("|", " ")
+    text = text.replace("#", " ").replace("@", " ").replace("*", " ")
+    text = text.replace("→", " ").replace("←", " ").replace("=>", " ")
+    # Preserve clock times (12:30); turn every other colon into a pause.
+    _clock_mark = "\ue000"
+    text = re.sub(r"\b(\d{1,2}):(\d{2})\b", rf"\1{_clock_mark}\2", text)
+    text = text.replace(":", ", ")
+    text = text.replace(_clock_mark, ":")
+    text = re.sub(r"[<>{}[\]()`~^]", " ", text)
+    text = re.sub(r"\s+,", ",", text)
+    text = re.sub(r",\s*,+", ",", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _truncate_at_sentence(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
@@ -136,6 +160,7 @@ def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> st
         text,
         flags=re.IGNORECASE,
     )
+    text = _soften_symbols_for_speech(text)
     text = re.sub(r"\s+", " ", text).strip()
     if text and not text.endswith((".", "!", "?")):
         text = f"{text}."

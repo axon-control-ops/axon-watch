@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   enqueueSpeech,
+  isSpeechQueueBusy,
   isSpeechQueueSpeaking,
   stopSpeech,
   subscribeSpeechQueueSpeaking,
+  waitForSpeechQueueIdle,
   type SpeechPort,
 } from './speech-queue';
 
@@ -43,6 +45,25 @@ describe('speech queue', () => {
     stopSpeech(speech);
     expect(isSpeechQueueSpeaking()).toBe(false);
     expect(speech.cancel).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('waitForSpeechQueueIdle resolves after utterance ends', async () => {
+    vi.useFakeTimers();
+    const speech = createSpeechPort();
+    stopSpeech(speech);
+
+    enqueueSpeech('hello operator', speech);
+    const idle = waitForSpeechQueueIdle();
+    expect(isSpeechQueueBusy()).toBe(true);
+
+    vi.advanceTimersByTime(60);
+    const utterance = speech.utterances[0];
+    utterance.onend?.();
+    await vi.advanceTimersByTimeAsync(300);
+    await idle;
+
+    expect(isSpeechQueueBusy()).toBe(false);
     vi.useRealTimers();
   });
 

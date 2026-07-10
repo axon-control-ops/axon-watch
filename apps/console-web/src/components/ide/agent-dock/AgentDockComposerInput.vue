@@ -34,6 +34,7 @@ const props = defineProps<{
   activityChips: ActivityChip[];
   composerQueueHint: string;
   showComposerResume: boolean;
+  showComposerSteer: boolean;
   showComposerStop: boolean;
   canSubmitComposer: boolean;
   composerSubmitLabel: string;
@@ -51,13 +52,16 @@ const emit = defineEmits<{
   'open-image': [image: ComposerClipboardImage];
   'remove-image': [imageId: string];
   'remove-queued': [messageId: string];
+  'steer-queued': [messageId: string];
   'sync-height': [];
   keydown: [event: KeyboardEvent];
   paste: [event: ClipboardEvent];
   'reveal-terminal': [];
   resume: [];
+  steer: [];
   'toggle-voice': [];
   stop: [];
+  background: [];
 }>();
 </script>
 
@@ -126,14 +130,25 @@ const emit = defineEmits<{
         class="agent-dock-composer__queue-item"
       >
         <span class="agent-dock-composer__queue-text">{{ item.content }}</span>
-        <button
-          type="button"
-          class="agent-dock-composer__queue-remove"
-          aria-label="Remove queued message"
-          @click="emit('remove-queued', item.id)"
-        >
-          ×
-        </button>
+        <div class="agent-dock-composer__queue-actions">
+          <button
+            type="button"
+            class="agent-dock-composer__queue-steer"
+            aria-label="Send queued message now"
+            title="Send now"
+            @click="emit('steer-queued', item.id)"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            class="agent-dock-composer__queue-remove"
+            aria-label="Remove queued message"
+            @click="emit('remove-queued', item.id)"
+          >
+            ×
+          </button>
+        </div>
       </li>
     </ul>
   </div>
@@ -200,6 +215,27 @@ const emit = defineEmits<{
         @click="emit('toggle-voice')"
       >
         {{ speechCapturing ? 'Listening…' : 'Mic' }}
+      </button>
+      <button
+        v-if="showComposerStop"
+        type="button"
+        class="agent-dock-composer__background"
+        title="Continue in background (vaxon terminal)"
+        aria-label="Continue run in background"
+        @click="emit('background')"
+      >
+        Background
+      </button>
+      <button
+        v-if="showComposerSteer"
+        type="button"
+        class="agent-dock-composer__send agent-dock-composer__send--steer"
+        :disabled="runMutationState === 'stopping' || commandMutationState === 'submitting'"
+        aria-label="Steer now"
+        title="Steer now (interrupt and send)"
+        @click="emit('steer')"
+      >
+        <span class="agent-dock-composer__send-icon" aria-hidden="true">↑</span>
       </button>
       <button
         v-if="showComposerStop"

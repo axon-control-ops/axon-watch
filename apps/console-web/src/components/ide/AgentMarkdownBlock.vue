@@ -10,11 +10,14 @@ import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
   content: string;
+  workspaceId?: string | null;
 }>();
 
 const shell = useShellStore();
 const parts = computed(() => splitAgentMessageForPreview(props.content));
-const previewHtml = computed(() => renderAgentMessageMarkdown(props.content));
+const previewHtml = computed(() =>
+  renderAgentMessageMarkdown(props.content, { workspaceId: props.workspaceId }),
+);
 
 function handleMarkdownClick(event: MouseEvent): void {
   handleMarkdownContainerClick(event, {

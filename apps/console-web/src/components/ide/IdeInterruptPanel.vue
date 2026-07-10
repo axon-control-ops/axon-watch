@@ -156,21 +156,22 @@ function stopActiveRun(): void {
 .ide-interrupt-topbar {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.28rem;
   min-width: 0;
-  max-width: 100%;
-  height: calc(var(--topbar-height) - 0.42rem);
-  padding: 0 0.55rem;
-  border: 1px solid rgba(255, 120, 72, 0.38);
-  border-radius: 0.35rem;
-  background: rgba(24, 12, 8, 0.88);
-  box-shadow: inset 0 0 0 1px rgba(255, 120, 72, 0.08);
+  max-width: min(36vw, 24rem);
+  height: 1.2rem;
+  max-height: 1.2rem;
+  padding: 0 0.32rem;
+  border: 1px solid rgba(255, 120, 72, 0.32);
+  border-radius: 0.22rem;
+  background: rgba(24, 12, 8, 0.82);
+  box-shadow: none;
 }
 
 .ide-interrupt-topbar__badge {
   flex-shrink: 0;
-  font-size: 0.56rem;
-  letter-spacing: 0.08em;
+  font-size: 0.46rem;
+  letter-spacing: 0.06em;
   font-weight: 700;
   color: rgba(255, 160, 120, 0.95);
 }
@@ -179,8 +180,8 @@ function stopActiveRun(): void {
   margin: 0;
   min-width: 0;
   flex: 1 1 auto;
-  font-size: 0.68rem;
-  line-height: 1.2;
+  font-size: 0.52rem;
+  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -189,21 +190,21 @@ function stopActiveRun(): void {
 .ide-interrupt-topbar__actions {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.14rem;
   flex-shrink: 0;
 }
 
 .ide-interrupt-topbar__button {
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 0.3rem;
+  border-radius: 0.18rem;
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 0.58rem;
-  letter-spacing: 0.04em;
+  font-size: 0.48rem;
+  letter-spacing: 0.03em;
   line-height: 1;
-  padding: 0.22rem 0.42rem;
+  padding: 0.1rem 0.28rem;
   white-space: nowrap;
 }
 

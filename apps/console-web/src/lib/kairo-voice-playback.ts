@@ -9,7 +9,13 @@ import {
   resumeKairoPlayback,
   stopKairoPlayback as stopSharedPlayback,
 } from './kairo-playback-control';
-import { enqueueSpeech, stopSpeech, subscribeSpeechQueueSpeaking, type SpeechPort } from './speech-queue';
+import {
+  enqueueSpeech,
+  stopSpeech,
+  subscribeSpeechQueueSpeaking,
+  waitForSpeechQueueIdle,
+  type SpeechPort,
+} from './speech-queue';
 
 export type KairoVoiceEngine = 'azure' | 'browser' | 'skipped' | 'idle';
 
@@ -18,13 +24,19 @@ export type KairoVoicePlaybackResult = {
   reason: string | null;
 };
 
+export type SpeakKairoLineOptions = {
+  /** When set, routes through the global voice queue. Default: conversation. */
+  priority?: 'interrupt' | 'alert' | 'conversation' | 'narration';
+  /** Skip the queue and play immediately (queue worker only). */
+  immediate?: boolean;
+};
+
 const speakingListeners = new Set<(active: boolean) => void>();
 const idleListeners = new Set<() => void>();
 const chunkListeners = new Set<() => void>();
 let speaking = false;
 
 const AUDIO_PREROLL_MS = 40;
-const PLAYBACK_HANDOFF_MS = 50;
 
 function speechPort(): SpeechPort | null {
   return typeof speechSynthesis === 'undefined' ? null : speechSynthesis;
@@ -91,6 +103,7 @@ export function subscribeKairoVoiceChunk(listener: () => void): () => void {
 
 export function stopKairoPlayback(): void {
   stopSharedPlayback();
+  stopSpeech(speechPort());
   notifySpeaking(false);
   notifyIdle();
 }
@@ -155,11 +168,16 @@ async function playAzureAudio(audio: HTMLAudioElement): Promise<void> {
 }
 
 async function speakAzureChunks(chunks: string[]): Promise<KairoVoicePlaybackResult> {
-  for (const chunk of chunks) {
+  // If a later Azure chunk fails after earlier ones already played, fall back with
+  // ONLY the remaining text. Falling back with chunks.join(' ') re-speaks the
+  // Azure audio in browser TTS (neural + robotic double voice).
+  for (let index = 0; index < chunks.length; index += 1) {
+    const chunk = chunks[index];
+    const remaining = chunks.slice(index).join(' ');
     notifyChunk();
     const response = await postKairoTts(chunk);
     if (!response.available || !response.audio_base64) {
-      return speakWithBrowser(chunks.join(' '), resolveAzureFallbackReason(response));
+      return speakWithBrowser(remaining, resolveAzureFallbackReason(response));
     }
     const audio = new Audio(
       `data:${response.content_type ?? 'audio/mpeg'};base64,${response.audio_base64}`,
@@ -169,7 +187,7 @@ async function speakAzureChunks(chunks: string[]): Promise<KairoVoicePlaybackRes
       await playAzureAudioToCompletion(audio);
     } catch {
       registerKairoAudioElement(null);
-      return speakWithBrowser(chunks.join(' '), 'audio_playback_failed');
+      return speakWithBrowser(remaining, 'audio_playback_failed');
     } finally {
       registerKairoAudioElement(null);
     }
@@ -192,35 +210,50 @@ async function speakWithBrowser(
   text: string,
   reason: string | null = 'azure_unavailable',
 ): Promise<KairoVoicePlaybackResult> {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    notifySpeaking(false);
+    notifyIdle();
+    return finishPlayback({ engine: 'skipped', reason: reason ?? 'empty_remainder' }, text);
+  }
+
   const port = speechPort();
   if (!port) {
     notifySpeaking(false);
     notifyIdle();
-    return finishPlayback({ engine: 'skipped', reason: 'browser_unavailable' }, text);
+    return finishPlayback({ engine: 'skipped', reason: 'browser_unavailable' }, trimmed);
   }
 
+  // Ensure Azure HTMLAudioElement is fully released before browser TTS starts.
+  stopSharedPlayback();
   notifySpeaking(true);
   await delay(AUDIO_PREROLL_MS);
-  for (const chunk of splitSpokenReplyChunks(text)) {
+  for (const chunk of splitSpokenReplyChunks(trimmed)) {
     notifyChunk();
     enqueueSpeech(chunk, port);
   }
-  return finishPlayback({ engine: 'browser', reason }, text);
+  // Must wait for browser TTS to finish — returning early made callers start
+  // the next line while the front of this one was still speaking (or clipped).
+  await waitForSpeechQueueIdle();
+  notifySpeaking(false);
+  notifyIdle();
+  return finishPlayback({ engine: 'browser', reason }, trimmed);
 }
 
 function resolveAzureFallbackReason(response: KairoTtsResponse): string {
   return response.reason?.trim() || 'azure_unavailable';
 }
 
-export async function speakKairoLine(text: string): Promise<KairoVoicePlaybackResult> {
+/**
+ * Play one sanitized line now. Does not interrupt other jobs — the global
+ * voice queue (`enqueueKairoSpeech` / `speakKairoLine`) owns serialization.
+ */
+export async function playKairoUtteranceNow(
+  text: string,
+): Promise<KairoVoicePlaybackResult> {
   const trimmed = sanitizeSpokenReply(text);
   if (!trimmed) {
     return finishPlayback({ engine: 'skipped', reason: 'empty_text' }, text);
-  }
-
-  if (isKairoPlaybackActive()) {
-    stopKairoPlayback();
-    await delay(PLAYBACK_HANDOFF_MS);
   }
 
   notifySpeaking(true);
@@ -254,6 +287,23 @@ export async function speakKairoLine(text: string): Promise<KairoVoicePlaybackRe
     });
     return speakWithBrowser(trimmed, 'fetch_error');
   }
+}
+
+/**
+ * Queue (default) or immediately play a Kairo line. Concurrent callers no
+ * longer interrupt each other mid-word — only barge-in flushes the queue.
+ */
+export async function speakKairoLine(
+  text: string,
+  options: SpeakKairoLineOptions = {},
+): Promise<KairoVoicePlaybackResult> {
+  if (options.immediate) {
+    return playKairoUtteranceNow(text);
+  }
+  const { enqueueKairoSpeech } = await import('./kairo-voice-queue');
+  return enqueueKairoSpeech(text, {
+    priority: options.priority ?? 'conversation',
+  });
 }
 
 /** @deprecated Use speakKairoLine() and read `.engine` */

@@ -4,6 +4,8 @@ import { computed, ref, watch } from 'vue';
 import AgentResearchBlock from './ide/AgentResearchBlock.vue';
 import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from './ide/AgentFileReadBlock.vue';
+import AgentEditBlock from './ide/AgentEditBlock.vue';
+import AgentImageBlock from './ide/AgentImageBlock.vue';
 import IdeActivityIcon from './ide/IdeActivityIcon.vue';
 import IdeAgentThreadStatusStrip from './ide/IdeAgentThreadStatusStrip.vue';
 import { useConversationSeamScroll } from '../composables/useConversationSeamScroll';
@@ -33,8 +35,6 @@ import {
 } from '../lib/operator-thread';
 import {
   agentContentHasTranscriptBlocks,
-  diffLineTone,
-  normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
   thinkingPreview,
 } from '../lib/agent-transcript-blocks';
@@ -132,7 +132,6 @@ function isStreamingMessage(messageId: string): boolean {
 }
 
 const expandedThinkingKeys = ref<Record<string, boolean>>({});
-const collapsedEditKeys = ref<Record<string, boolean>>({});
 
 function hasTranscriptBlocks(content: string): boolean {
   return agentContentHasTranscriptBlocks(content);
@@ -166,39 +165,6 @@ function toggleThinking(key: string, open: boolean): void {
     ...expandedThinkingKeys.value,
     [key]: !isThinkingExpanded(key, open),
   };
-}
-
-function isEditExpanded(key: string): boolean {
-  return !(collapsedEditKeys.value[key] ?? false);
-}
-
-function toggleEdit(key: string): void {
-  collapsedEditKeys.value = {
-    ...collapsedEditKeys.value,
-    [key]: isEditExpanded(key),
-  };
-}
-
-function openEditedFile(segment: {
-  path: string;
-  added: number;
-  removed: number;
-  diff: string;
-  open: boolean;
-}): void {
-  shell.openAgentEditReview({
-    path: normalizeEditedFilePath(segment.path),
-    added: segment.added,
-    removed: segment.removed,
-    diff: segment.diff,
-    open: segment.open,
-  });
-}
-
-function diffLines(diff: string): Array<{ text: string; tone: string }> {
-  return diff
-    .split('\n')
-    .map((line) => ({ text: line, tone: diffLineTone(line) }));
 }
 
 function displayItemKey(item: ConversationDisplayItem): string {
@@ -417,14 +383,14 @@ watch(
 
         <div
           v-if="messageImageAttachments(item.message).length"
-          class="conversation-seam__attachments"
+          class="conversation-seam__attachments conversation-seam__attachments--thread"
           aria-label="Message attachments"
         >
           <button
             v-for="attachment in messageImageAttachments(item.message)"
             :key="attachment.attachment_id"
             type="button"
-            class="conversation-seam__attachment-card"
+            class="conversation-seam__attachment-card conversation-seam__attachment-card--thread"
             :title="`Preview ${attachment.filename}`"
             @click="openAttachmentPreview(attachment)"
           >
@@ -560,39 +526,20 @@ watch(
               >{{ segment.output }}</pre>
             </div>
 
-            <div v-else-if="segment.kind === 'edit'" class="agent-block agent-block--edit">
-              <div class="agent-block__edit-header">
-                <button
-                  type="button"
-                  class="agent-block__edit-toggle"
-                  @click="toggleEdit(segmentKey(item.message.message_id, segmentIndex))"
-                >
-                  <span class="agent-block__edit-icon" aria-hidden="true">
-                    {{ isEditExpanded(segmentKey(item.message.message_id, segmentIndex)) ? '▾' : '▸' }}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class="agent-block__edit-path agent-block__edit-path--link"
-                  :title="`Open ${segment.path} in editor`"
-                  @click="openEditedFile(segment)"
-                >
-                  {{ normalizeEditedFilePath(segment.path) }}
-                </button>
-                <span class="agent-block__edit-stat agent-block__edit-stat--add">+{{ segment.added }}</span>
-                <span class="agent-block__edit-stat agent-block__edit-stat--remove">-{{ segment.removed }}</span>
-              </div>
-              <pre
-                v-if="isEditExpanded(segmentKey(item.message.message_id, segmentIndex)) && segment.diff"
-                class="agent-block__edit-diff"
-              ><span
-                v-for="(diffLine, diffIndex) in diffLines(segment.diff)"
-                :key="diffIndex"
-                class="agent-block__diff-line"
-                :class="`agent-block__diff-line--${diffLine.tone}`"
-              >{{ diffLine.text }}
-</span></pre>
-            </div>
+            <AgentEditBlock
+              v-else-if="segment.kind === 'edit'"
+              :path="segment.path"
+              :added="segment.added"
+              :removed="segment.removed"
+              :diff="segment.diff"
+              :open="segment.open"
+            />
+
+            <AgentImageBlock
+              v-else-if="segment.kind === 'image'"
+              :path="segment.path"
+              :open="segment.open && isStreamingMessage(item.message.message_id)"
+            />
 
             <div
               v-else-if="shouldShowEditorStub(item.message.message_id, segment.text)"
@@ -616,6 +563,7 @@ watch(
             <AgentMarkdownBlock
               v-else-if="isMarkdownBlock(segment.text, !isStreamingMessage(item.message.message_id))"
               :content="segment.text"
+              :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
             />
 
             <p
@@ -671,6 +619,7 @@ watch(
         <AgentMarkdownBlock
           v-else-if="isMarkdownBlock(item.message.content, !isStreamingMessage(item.message.message_id))"
           :content="item.message.content"
+          :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
         />
 
         <pre

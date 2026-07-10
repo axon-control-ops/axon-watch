@@ -1,6 +1,7 @@
 import { marked } from 'marked';
 
 import { agentContentHasTranscriptBlocks } from './agent-transcript-blocks';
+import { rewriteMarkdownImageSources } from './thread-image-url';
 
 marked.setOptions({
   breaks: true,
@@ -109,9 +110,13 @@ export function splitAgentMessageForPreview(content: string): AgentMessagePrevie
   };
 }
 
-export function renderAgentMessageMarkdown(content: string): string {
+export function renderAgentMessageMarkdown(
+  content: string,
+  options: { workspaceId?: string | null } = {},
+): string {
   const parts = splitAgentMessageForPreview(content);
-  return marked.parse(parts.markdownSource, { async: false }) as string;
+  const html = marked.parse(parts.markdownSource, { async: false }) as string;
+  return rewriteMarkdownImageSources(html, options);
 }
 
 export function shouldOfferMarkdownPreview(content: string): boolean {

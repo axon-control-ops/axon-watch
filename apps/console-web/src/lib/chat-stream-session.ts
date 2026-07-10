@@ -19,6 +19,12 @@ export interface ChatStreamEventPayload {
   system_message_id?: string;
   system_content?: string;
   ui_action?: ChatUiAction | null;
+  attachments?: Array<{
+    attachment_id: string;
+    filename: string;
+    mime_type: string;
+    url: string;
+  }>;
 }
 
 function controlPlaneBaseUrl(): string {

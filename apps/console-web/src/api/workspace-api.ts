@@ -1,6 +1,6 @@
 import type { WorkspaceRecord } from '../contracts/canonical';
 
-import { fetchJson } from './client';
+import { fetchJson, apiUrl } from './client';
 
 export interface WorkspaceListSnapshot {
   items: WorkspaceRecord[];
@@ -59,6 +59,12 @@ function encodeWorkspaceFilePath(filePath: string): string {
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/');
+}
+
+export function resolveWorkspaceFileRawUrl(workspaceId: string, filePath: string): string {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const encodedPath = encodeWorkspaceFilePath(filePath.replace(/^\/+/, ''));
+  return apiUrl(`/api/workspaces/${encodedWorkspaceId}/files/${encodedPath}/raw`);
 }
 
 export async function createWorkspaceHandoff(
@@ -189,5 +195,41 @@ export async function createWorkspaceTerminalSession(
       }),
     },
     'workspace terminal session create failed',
+  );
+}
+
+export async function renameWorkspaceTerminalSession(
+  workspaceId: string,
+  sessionId: string,
+  title: string,
+): Promise<TerminalSessionRecord> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const encodedSessionId = encodeURIComponent(sessionId);
+  return fetchJson<TerminalSessionRecord>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/sessions/${encodedSessionId}/rename`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    },
+    'workspace terminal session rename failed',
+  );
+}
+
+export async function deleteWorkspaceTerminalSession(
+  workspaceId: string,
+  sessionId: string,
+): Promise<{ workspace_id: string; deleted: boolean; items: TerminalSessionRecord[]; count: number }> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  const encodedSessionId = encodeURIComponent(sessionId);
+  return fetchJson<{
+    workspace_id: string;
+    deleted: boolean;
+    items: TerminalSessionRecord[];
+    count: number;
+  }>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/sessions/${encodedSessionId}`,
+    { method: 'DELETE' },
+    'workspace terminal session delete failed',
   );
 }

@@ -18,7 +18,8 @@ export type AgentTranscriptSegment =
     }
   | { kind: 'tool'; label: string }
   | { kind: 'research'; query: string; items: ResearchTranscriptItem[]; open: boolean; provider?: string; kindLabel?: ResearchBlockKind }
-  | { kind: 'terminal'; command: string; output: string; open: boolean };
+  | { kind: 'terminal'; command: string; output: string; open: boolean }
+  | { kind: 'image'; path: string; open: boolean };
 
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from './research-snippet';
 import { inferResearchBlockKind, type ResearchBlockKind } from './research-provider';
@@ -30,9 +31,10 @@ const RESEARCH_ITEM_RE = /^-\s+(.+?)\s+\|\s+(\S+)\s*$/;
 const RESEARCH_PROVIDER_RE = /^@provider\s+(.+)$/;
 const RESEARCH_KIND_RE = /^@kind\s+(search|fetch)\s*$/i;
 const TERMINAL_HEADER_RE = /^:::terminal\s+(.+)$/;
+const IMAGE_HEADER_RE = /^:::image\s+(.+)$/;
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
-  return /^:::(thinking|edit|tool|terminal|research)\b/m.test(content);
+  return /^:::(thinking|edit|tool|terminal|research|image)\b/m.test(content);
 }
 
 export function parseAgentTranscriptBlocks(content: string): AgentTranscriptSegment[] {
@@ -202,6 +204,23 @@ export function parseAgentTranscriptBlocks(content: string): AgentTranscriptSegm
         kind: 'terminal',
         command: terminalMatch[1].trim(),
         output: body.join('\n').replace(/^\n+|\n+$/g, ''),
+        open: !closed,
+      });
+      continue;
+    }
+
+    const imageMatch = line.match(IMAGE_HEADER_RE);
+    if (imageMatch) {
+      flushText();
+      let closed = false;
+      index += 1;
+      if (index < lines.length && lines[index].trimEnd() === ':::') {
+        closed = true;
+        index += 1;
+      }
+      segments.push({
+        kind: 'image',
+        path: imageMatch[1].trim(),
         open: !closed,
       });
       continue;

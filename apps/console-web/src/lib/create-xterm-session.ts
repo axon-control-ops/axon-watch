@@ -25,6 +25,7 @@ export interface TerminalContext {
 }
 
 export interface XtermSessionOptions {
+  readOnly?: boolean;
   variant?: 'default' | 'mockup';
 }
 
@@ -62,6 +63,7 @@ export async function createXtermSession(
   options: XtermSessionOptions = {},
 ): Promise<XtermSessionController> {
   const useMockupTheme = options.variant === 'mockup';
+  const readOnly = Boolean(options.readOnly);
   const terminal = new Terminal({
     theme: useMockupTheme
       ? mockupXtermTheme
@@ -77,8 +79,9 @@ export async function createXtermSession(
     fontFamily: useMockupTheme
       ? mockupTerminalFontOptions.fontFamily
       : 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    cursorBlink: true,
+    cursorBlink: !readOnly,
     convertEol: true,
+    disableStdin: readOnly,
   });
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
@@ -182,6 +185,10 @@ export async function createXtermSession(
 
       fitAddon.fit();
       sendResize(nextSocket, terminal);
+
+      if (sessionRole === 'agent') {
+        return;
+      }
 
       const sendInput = (data: string): void => {
         if (socket !== nextSocket || nextSocket.readyState !== WebSocket.OPEN) {

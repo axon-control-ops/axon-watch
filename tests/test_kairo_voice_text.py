@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
+sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+
+from app.kairo_voice_text import normalize_spoken_line  # noqa: E402
+
+
+class KairoVoiceTextTests(unittest.TestCase):
+    def test_softens_paths_and_emoji_for_speech(self) -> None:
+        spoken = normalize_spoken_line("Open apps/console-web/src/lib/foo.ts:42 🙂")
+        self.assertNotIn("/", spoken)
+        self.assertNotIn(":", spoken)
+        self.assertNotIn("🙂", spoken)
+        self.assertIn("apps", spoken.lower())
+        self.assertIn("42", spoken)
+
+    def test_keeps_clock_times(self) -> None:
+        spoken = normalize_spoken_line("Briefing ready at 12:30.")
+        self.assertIn("12:30", spoken)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -53,7 +53,7 @@ def ensure_operator_session(workspace_id: str) -> TerminalSessionRecord:
             session_id=_OPERATOR_SESSION_ID,
             workspace_id=clean_workspace_id,
             role="operator",
-            title="Terminal",
+            title="bash",
             run_id=None,
             created_at=_utc_now(),
         )
@@ -91,7 +91,7 @@ def create_session(
 
         resolved_title = str(title or "").strip()
         if not resolved_title:
-            resolved_title = "Agent shell" if normalized_role == "agent" else "Terminal"
+            resolved_title = "vaxon" if normalized_role == "agent" else "bash"
 
         record = TerminalSessionRecord(
             session_id=clean_session_id,
@@ -112,7 +112,7 @@ def ensure_agent_session(*, workspace_id: str, run_id: str) -> TerminalSessionRe
     return create_session(
         workspace_id=workspace_id,
         role="agent",
-        title="Agent shell",
+        title="vaxon",
         run_id=clean_run_id,
     )
 
@@ -136,6 +136,37 @@ def list_sessions(workspace_id: str) -> list[TerminalSessionRecord]:
     if not any(item.session_id == _OPERATOR_SESSION_ID for item in records):
         records.insert(0, ensure_operator_session(clean_workspace_id))
     return records
+
+
+def rename_session(workspace_id: str, session_id: str, title: str) -> TerminalSessionRecord | None:
+    clean_title = str(title or "").strip()
+    if not clean_title:
+        return None
+    key = _session_key(workspace_id, session_id)
+    with _lock:
+        record = _sessions.get(key)
+        if record is None:
+            return None
+        updated = TerminalSessionRecord(
+            session_id=record.session_id,
+            workspace_id=record.workspace_id,
+            role=record.role,
+            title=clean_title,
+            run_id=record.run_id,
+            created_at=record.created_at,
+        )
+        _sessions[key] = updated
+        return deepcopy(updated)
+
+
+def delete_session(workspace_id: str, session_id: str) -> bool:
+    clean_session_id = str(session_id or "").strip()
+    if clean_session_id == _OPERATOR_SESSION_ID:
+        return False
+    key = _session_key(workspace_id, clean_session_id)
+    with _lock:
+        removed = _sessions.pop(key, None)
+    return removed is not None
 
 
 def serialize_session(record: TerminalSessionRecord) -> dict[str, str | None]:

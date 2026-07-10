@@ -1,8 +1,5 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
-import {
-  FULL_ACCESS_CONSENT_LINES,
-} from '../lib/agent-dock-activity-view';
 import { agentExecutionAccessHint } from '../lib/agent-execution-access-prefs';
 import { resizeCommandComposer } from '../lib/command-composer-autosize';
 import {
@@ -11,7 +8,6 @@ import {
 import { summarizeIdeAgentActivity } from '../lib/ide-agent-activity-view';
 import {
   filterMcpToolsForComposerMode,
-  mcpToolDetail,
 } from '../lib/composer-mcp-tools-view';
 import {
   kairoConversationError,
@@ -33,7 +29,6 @@ import { useComposerModelRuntime } from './agent-dock/use-composer-model-runtime
 
 export type { ComposerMode };
 export { MODE_OPTIONS };
-
 export function useAgentDockComposer() {
   const shell = useShellStore();
   const {
@@ -117,7 +112,6 @@ export function useAgentDockComposer() {
     if (!inputRef.value) return;
     resizeCommandComposer(inputRef.value, { compact: true });
   }
-
   const {
     composerHistory,
     composerHistoryIndex,
@@ -145,7 +139,6 @@ export function useAgentDockComposer() {
     cursorCatalogTotal,
     cursorManageRows,
     cursorStaleWarning,
-    currentRuntimeTarget,
     extraPinnedRows,
     onAutoToggleClick,
     openAddModelsPanel,
@@ -153,7 +146,6 @@ export function useAgentDockComposer() {
     runtimeDetail,
     runtimeHint,
     runtimeLabel,
-    runtimeStatusLine,
     runtimeTargets,
     selectComposerModel,
     selectManageModelRow,
@@ -175,9 +167,12 @@ export function useAgentDockComposer() {
 
   const {
     handleApproveRun,
+    handleBackgroundRun,
     handleComposerKeydown,
     handleRejectRun,
     handleResumeRun,
+    handleSteer,
+    handleSteerQueuedMessage,
     handleStopRun,
     handleSubmit,
     removeQueuedMessage,
@@ -225,6 +220,12 @@ export function useAgentDockComposer() {
   const showComposerStop = computed(
     () => shell.canStopIdeAgentRun && composerMode.value !== 'kairo',
   );
+  const showComposerSteer = computed(
+    () =>
+      composerAgentBusy.value
+      && composerMode.value === 'agent'
+      && Boolean(shell.ideComposerDraft.trim()),
+  );
   const composerQueueHint = computed(() => {
     if (!composerAgentBusy.value || composerMode.value !== 'agent') {
       return '';
@@ -232,7 +233,7 @@ export function useAgentDockComposer() {
     const steerKey = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
       ? '⌘'
       : 'Ctrl';
-    return `Enter queues · ${steerKey}+Enter steers`;
+    return `Enter queues · ↑ steers now · ${steerKey}+Enter steers`;
   });
   const composerActivitySummary = computed(() => {
     if (!shell.agentStreamActive && !shell.composerAgentBusy) {
@@ -337,7 +338,6 @@ export function useAgentDockComposer() {
   });
 
   return {
-    FULL_ACCESS_CONSENT_LINES,
     MODE_OPTIONS,
     OPERATOR_PERSONA_NAME,
     activeMode,
@@ -349,7 +349,6 @@ export function useAgentDockComposer() {
     closeAddModelsPanel,
     closeComposerImageLightbox,
     composerActivityChips,
-    composerAgentBusy,
     composerDraftModel,
     composerImages,
     composerMode,
@@ -371,32 +370,29 @@ export function useAgentDockComposer() {
     cursorCatalogTotal,
     cursorManageRows,
     cursorStaleWarning,
-    currentRuntimeTarget,
     enlargedComposerImage,
     executionAccessHint,
     extraPinnedRows,
     fullAccessConsentChecked,
     handleApproveRun,
+    handleBackgroundRun,
     handleComposerDragLeave,
     handleComposerDragOver,
     handleComposerDrop,
-    handleComposerImageLightboxKeydown,
     handleComposerKeydown,
     handleComposerPaste,
     handleRejectRun,
     handleResumeRun,
+    handleSteer,
+    handleSteerQueuedMessage,
     handleStopRun,
     handleSubmit,
     hasTerminalSnippet,
-    inputRef,
     setInputRef,
     isFullAccessAgent,
-    kairoCanSubmit,
     kairoConversationError,
     kairoConversationReply,
-    kairoDraft,
     kairoPending,
-    mcpToolDetail,
     mcpToolsForMode,
     modeButtonLabel,
     modelSearchQuery,
@@ -412,7 +408,6 @@ export function useAgentDockComposer() {
     runtimeDetail,
     runtimeHint,
     runtimeLabel,
-    runtimeStatusLine,
     runtimeTargets,
     selectComposerModel,
     selectManageModelRow,
@@ -427,6 +422,7 @@ export function useAgentDockComposer() {
     showAddModelsPanel,
     showApprovalBanner,
     showComposerResume,
+    showComposerSteer,
     showComposerStop,
     showContextMenu,
     showCursorCatalog,

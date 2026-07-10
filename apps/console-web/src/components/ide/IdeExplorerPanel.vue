@@ -52,11 +52,21 @@ function expandAllFolders(): void {
 }
 
 function createNewFile(): void {
-  void shell.createWorkspaceFile();
+  closeExplorerMenu();
+  fileTreeRef.value?.beginInlineCreate?.('file');
 }
 
 function createNewFolder(): void {
-  void shell.createWorkspaceFolder();
+  closeExplorerMenu();
+  fileTreeRef.value?.beginInlineCreate?.('folder');
+}
+
+function handleCreateFile(path: string): void {
+  void shell.createWorkspaceFile(path);
+}
+
+function handleCreateFolder(path: string): void {
+  void shell.createWorkspaceFolder(path);
 }
 </script>
 
@@ -84,7 +94,7 @@ function createNewFolder(): void {
           aria-label="New Folder"
           @click="createNewFolder"
         >
-          <WorkbenchIcon name="folder" :size="16" />
+          <WorkbenchIcon name="new-folder" :size="16" />
         </button>
         <button
           type="button"
@@ -122,6 +132,22 @@ function createNewFolder(): void {
             class="ide-explorer-panel__menu"
             role="menu"
           >
+            <button
+              type="button"
+              class="ide-explorer-panel__menu-item"
+              role="menuitem"
+              @click="createNewFile"
+            >
+              New File
+            </button>
+            <button
+              type="button"
+              class="ide-explorer-panel__menu-item"
+              role="menuitem"
+              @click="createNewFolder"
+            >
+              New Folder
+            </button>
             <button
               type="button"
               class="ide-explorer-panel__menu-item"
@@ -168,6 +194,8 @@ function createNewFolder(): void {
         :error="shell.workspaceFilesError"
         :has-workspace="Boolean(shell.currentWorkspace?.workspace_id)"
         @open="shell.openWorkspaceFile"
+        @create-file="handleCreateFile"
+        @create-folder="handleCreateFolder"
       />
     </div>
   </section>

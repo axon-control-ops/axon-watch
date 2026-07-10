@@ -7,7 +7,12 @@ from pathlib import Path
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.kairo_voice_prompt import build_speak_user_prompt, filter_speak_context  # noqa: E402
+from app.kairo_voice_prompt import (  # noqa: E402
+    KAIRO_CONVERSATION_VOICE_SYSTEM,
+    KAIRO_VOICE_SYSTEM,
+    build_speak_user_prompt,
+    filter_speak_context,
+)
 
 
 class KairoVoicePromptTests(unittest.TestCase):
@@ -35,6 +40,14 @@ class KairoVoicePromptTests(unittest.TestCase):
         )
         self.assertIn("operator_prompt: fix the terminal", prompt)
         self.assertNotIn("README", prompt)
+
+    def test_voice_system_requires_sir_and_blocks_symbol_speech(self) -> None:
+        self.assertIn('Address the primary operator as "sir"', KAIRO_VOICE_SYSTEM)
+        self.assertIn("introduced someone else by name", KAIRO_VOICE_SYSTEM)
+        self.assertIn("colon", KAIRO_VOICE_SYSTEM.lower())
+        self.assertIn("smiley face", KAIRO_VOICE_SYSTEM.lower())
+        self.assertNotIn("Do NOT use", KAIRO_VOICE_SYSTEM)
+        self.assertIn('Address the primary operator as "sir"', KAIRO_CONVERSATION_VOICE_SYSTEM)
 
 
 if __name__ == "__main__":

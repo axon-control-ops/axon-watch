@@ -13,6 +13,8 @@ import {
   briefingRhythmField,
   type BriefingPanelLoadState,
 } from '../lib/briefing-panel-view';
+import { OPERATOR_PERSONA_NAME } from '../lib/operator-persona-name';
+import { buildPersonaVoiceLineFallback } from '../lib/persona-voice-line';
 
 const props = defineProps<{
   briefing: OperatorBriefing | null;
@@ -49,40 +51,22 @@ const connectivityLabels = computed(() =>
 const personaEnabled = computed(
   () => props.briefing?.operator_presence?.settings?.operator_persona_enabled !== false,
 );
-const personaTitle = computed(() => (personaEnabled.value ? 'KAIRO' : 'Operator'));
+const personaTitle = computed(() => (personaEnabled.value ? OPERATOR_PERSONA_NAME : 'Operator'));
 
 const voiceLine = computed(() => {
   if (props.briefing?.operator_presence?.persona_voice_line) {
     return props.briefing.operator_presence.persona_voice_line;
   }
-  if (props.loadState === 'loading') {
-    return personaEnabled.value
-      ? 'KAIRO: Standing by while briefing loads.'
-      : 'Standing by while briefing loads.';
-  }
-  if (props.loadState === 'error') {
-    return personaEnabled.value
-      ? 'KAIRO: Briefing unavailable. Check control-plane connectivity.'
-      : 'Briefing unavailable. Check control-plane connectivity.';
-  }
-  if (props.briefing?.pending_approvals.count) {
-    return personaEnabled.value
-      ? 'KAIRO: Approvals need your review before I can continue.'
-      : 'Approvals need your review before execution can continue.';
-  }
-  if (props.briefing?.top_signals.length) {
-    return personaEnabled.value
-      ? 'KAIRO: Top signals need review. Tell me which workspace to focus.'
-      : 'Top signals need review. Choose a workspace to focus.';
-  }
-  if (props.briefing?.degraded.active) {
-    return personaEnabled.value
-      ? 'KAIRO: Runtime is degraded. Review the status strip before continuing.'
-      : 'Runtime is degraded. Review the status strip before continuing.';
-  }
-  return personaEnabled.value
-    ? "KAIRO: I'm listening. Tell me what to focus on."
-    : 'Ready. Tell me what to focus on.';
+  const topSignal = props.briefing?.top_signals?.[0];
+  return buildPersonaVoiceLineFallback({
+    pendingApprovals: props.briefing?.pending_approvals.count ?? 0,
+    topSignalTitle: topSignal?.title,
+    topSignalWorkspaceId: topSignal?.workspace_id,
+    topSignalSummary: topSignal?.summary,
+    degradedActive: Boolean(props.briefing?.degraded.active),
+    loadState: props.loadState,
+    personaEnabled: personaEnabled.value,
+  });
 });
 </script>
 

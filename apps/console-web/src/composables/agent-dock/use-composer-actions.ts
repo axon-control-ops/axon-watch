@@ -64,6 +64,10 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     void shell.stopIdeAgentRun();
   }
 
+  function handleBackgroundRun(): void {
+    shell.backgroundIdeAgentRun();
+  }
+
   function handleResumeRun(): void {
     void shell.resumeIdeAgentRun();
   }
@@ -110,6 +114,13 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     const attachmentFiles = composerImages.value.map((image) => image.file);
     await shell.steerIdeComposer(composerMode.value, { attachmentFiles });
     recordComposerHistoryIfSent(draft);
+  }
+
+  async function handleSteerQueuedMessage(messageId: string): Promise<void> {
+    if (composerMode.value === 'kairo') {
+      return;
+    }
+    await shell.steerQueuedIdeComposerMessage(messageId);
   }
 
   function removeQueuedMessage(messageId: string): void {
@@ -176,10 +187,12 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   return {
     handleApproveRun,
+    handleBackgroundRun,
     handleComposerKeydown,
     handleRejectRun,
     handleResumeRun,
     handleSteer,
+    handleSteerQueuedMessage,
     handleStopRun,
     handleSubmit,
     removeQueuedMessage,

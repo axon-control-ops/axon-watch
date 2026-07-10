@@ -156,7 +156,16 @@ export function buildBriefingHeroSubtitle(
   }
 
   if (briefing?.top_signals.length) {
-    return 'Top signals need review. Tell me what to focus on.';
+    const signal = briefing.top_signals[0];
+    const title = String(signal?.title || '').trim() || 'Top signal';
+    const workspace = String(signal?.workspace_id || '')
+      .replace(/^workspace_/, '')
+      .replace(/_/g, ' ')
+      .trim();
+    if (workspace) {
+      return `Top signal on ${workspace}: ${title}.`;
+    }
+    return `Top signal needs review: ${title}.`;
   }
 
   if (briefing?.degraded.active) {

@@ -49,6 +49,30 @@ function stripMarkdownForSpeech(text: string): string {
     .replace(/'/g, "'");
 }
 
+/** Keep TTS from reading punctuation / symbol names aloud. */
+function softenSymbolsForSpeech(text: string): string {
+  let out = text
+    // Emoji / pictographs (incl. many "smiley" ranges).
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2700}-\u{27BF}\u{2600}-\u{26FF}]/gu, ' ')
+    .replace(/\\/g, ' ')
+    .replace(/\//g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\|/g, ' ')
+    .replace(/#/g, ' ')
+    .replace(/@/g, ' ')
+    .replace(/\*/g, ' ')
+    .replace(/→/g, ' ')
+    .replace(/←/g, ' ')
+    .replace(/=>/g, ' ');
+  // Preserve clock times (12:30); turn every other colon into a pause.
+  out = out.replace(/\b(\d{1,2}):(\d{2})\b/g, '$1\uE000$2');
+  out = out.replace(/:/g, ', ');
+  out = out.replace(/\uE000/g, ':');
+  out = out.replace(/[<>{}[\]()`~^]/g, ' ');
+  out = out.replace(/\s+,/g, ',').replace(/,\s*,+/g, ',');
+  return out.replace(/\s+/g, ' ').trim();
+}
+
 function stripPersonaPrefix(text: string): string {
   return text
     .replace(/^["'`]+|["'`]+$/g, '')
@@ -131,9 +155,9 @@ export function formatConversationDisplayReply(raw: string, maxChars = MAX_DISPL
 /** Convert agent/model text into operator-facing speech (may still be long). */
 export function sanitizeSpokenReply(raw: string, maxChars = MAX_SPOKEN_CHARS): string {
   const display = formatConversationDisplayReply(raw, maxChars);
-  const spoken = display.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  let spoken = softenSymbolsForSpeech(display.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim());
   if (spoken && !/[.!?]$/.test(spoken)) {
-    return `${spoken}.`;
+    spoken = `${spoken}.`;
   }
   return spoken;
 }

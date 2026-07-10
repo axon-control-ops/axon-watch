@@ -149,6 +149,30 @@ export function isSpeechQueueSpeaking(): boolean {
   return speaking;
 }
 
+export function isSpeechQueueBusy(): boolean {
+  return speaking || queue.length > 0;
+}
+
+/**
+ * Resolve when the browser speech queue has fully drained (all chunks finished).
+ * Callers that enqueue then return early used to think speech was done while
+ * TTS was still mid-utterance — that caused clipped / late-start overlaps.
+ */
+export function waitForSpeechQueueIdle(): Promise<void> {
+  if (!isSpeechQueueBusy()) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const unsubscribe = onSpeechQueueIdle(() => {
+      if (isSpeechQueueBusy()) {
+        return;
+      }
+      unsubscribe();
+      resolve();
+    });
+  });
+}
+
 export function subscribeSpeechQueueSpeaking(
   listener: (active: boolean) => void,
 ): () => void {

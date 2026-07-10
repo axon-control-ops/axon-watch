@@ -33,12 +33,10 @@ from app.persistence.voice_transcript_store import append_voice_transcript
 from app.workspace_project_bindings import get_workspace_project_binding, load_workspace_project_bindings
 
 ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
-ConversationSource = Literal["template", "model", "fallback"]
-ConversationAnswerTier = Literal["fast", "deep"]
+ConversationSource = Literal["template", "model", "fallback"]; ConversationAnswerTier = Literal["fast", "deep"]
 
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
 _MAX_TURN_MEMORY = 8
-
 _OPEN_DETAIL_RE = re.compile(
     r"\b(walk me through|explain|tell me about|in detail|step by step|compare|tradeoffs?|everything)\b",
     re.IGNORECASE,
@@ -244,7 +242,9 @@ def _build_runtime_context_block(
         "Operator voice assistant contract (JARVIS-style):",
         f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — dry, impeccably polite, confident.",
         "- Razor wit when it fits; never sycophantic or chatbot-cheerful.",
-        '- No "sir", "madam", or honorifics unless the operator used one.',
+        '- Address the primary operator as "sir" by default.',
+        "- If the operator introduced someone else by name, address them by that name — never user/operator/human.",
+        "- Never speak punctuation or symbol names aloud (colon, slash, backslash, smiley face, emoji names, etc.).",
         "- First person, natural spoken language; ground answers in operator state and workspace context.",
         "- No markdown, bullets, code fences, or raw path dumps unless the operator asked for implementation detail.",
         (

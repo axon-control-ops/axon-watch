@@ -13,7 +13,10 @@ withDefaults(
       | 'trash'
       | 'folder'
       | 'folder-open'
-      | 'history';
+      | 'new-folder'
+      | 'history'
+      | 'terminal'
+      | 'terminal-agent';
     size?: number;
   }>(),
   { size: 14 },
@@ -77,10 +80,23 @@ withDefaults(
     <template v-else-if="name === 'folder-open'">
       <path d="M2.5 4.5h4.2l1.4 1.5H13.5a1 1 0 0 1 1 1v1.5H3.2a1 1 0 0 0-.98 1.2l.8 3.8a1 1 0 0 0 .98.8h9.5a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1H8.1z" />
     </template>
+    <template v-else-if="name === 'new-folder'">
+      <path d="M2.5 4.5h4.2l1.4 1.5H13.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1z" />
+      <path d="M8 6.3v3M6.5 7.8h3" />
+    </template>
     <template v-else-if="name === 'history'">
       <circle cx="8" cy="8" r="4.5" />
       <path d="M8 5.2V8l2 1.4" />
       <path d="M5.2 3.2 4 2" />
+    </template>
+    <template v-else-if="name === 'terminal'">
+      <rect x="2.5" y="3.5" width="11" height="9" rx="0.8" />
+      <path d="M4.8 6.2l2 1.8-2 1.8M8.2 9.8h3" />
+    </template>
+    <template v-else-if="name === 'terminal-agent'">
+      <rect x="2.5" y="3.5" width="11" height="9" rx="0.8" />
+      <path d="M4.8 6.2l2 1.8-2 1.8M8.2 9.8h2.2" />
+      <circle cx="12.25" cy="9.8" r="1" fill="currentColor" stroke="none" />
     </template>
   </svg>
 </template>
