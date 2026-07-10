@@ -3,7 +3,7 @@
 **Status:** In progress (2026-07-10)  
 **Effective:** 2026-07-10  
 **Owner:** `console-web`  
-**Ratchet:** `apps/console-web/src/stores/shell.ts` — 4,487 lines max (target: `stores/shell/slices/*`)
+**Ratchet:** `apps/console-web/src/stores/shell.ts` — 4,419 lines max (target: `stores/shell/slices/*`)
 
 ## Problem
 
@@ -57,9 +57,10 @@ apps/console-web/src/stores/
       create-dock-layout-slice.ts
       create-connectors-slice.ts
       create-runtime-probes-slice.ts
+      create-runtime-summary-slice.ts
       create-operator-probes-slice.ts
-      # follow-ons:
-      # create-briefing-slice.ts / runtime-summary / cursor-catalog
+      create-operator-briefing-slice.ts
+      create-cursor-catalog-slice.ts
 ```
 
 ## First-cut scope
@@ -94,8 +95,13 @@ Move low-coupling probe loaders into factory slices:
 - `create-runtime-probes-slice.ts` — `loadRuntimeStatus`, `loadRuntimeMcpTools`
 - `create-operator-probes-slice.ts` — `loadOperatorFleetHealth`, `loadOperatorBrainGraph`
 
-Leave in `shell.ts` for a later cut: `loadRuntimeSummary`, `loadOperatorBriefing`,
-and cursor-catalog loaders (dock defaults / viewport / model migration coupling).
+**Gate:** `npm run typecheck -w @axon-watch/console-web` + console-web vitest
+
+### Step 5 — Extract briefing / summary / cursor catalog ✅
+
+- `create-runtime-summary-slice.ts` — `loadRuntimeSummary`
+- `create-operator-briefing-slice.ts` — `loadOperatorBriefing` (dock defaults + viewport via injected callbacks)
+- `create-cursor-catalog-slice.ts` — `loadCursorCatalog` + model migration helper
 
 **Gate:** `npm run typecheck -w @axon-watch/console-web` + console-web vitest
 

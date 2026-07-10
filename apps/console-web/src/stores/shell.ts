@@ -5,13 +5,10 @@ import {
   approveRun,
   acknowledgeInboxSignals,
   completeRun,
-  fetchCursorRuntimeStatus,
   fetchInbox,
-  fetchOperatorBriefing,
   fetchOperatorPresenceSettings,
   fetchRunHistory,
   fetchRuns,
-  fetchRuntimeSummary,
   fetchThreadHistory,
   fetchWorkspaceChatThread,
   hasWorkspaceChatThread,
@@ -337,9 +334,12 @@ import {
 } from '../lib/ide-layout-prefs';
 import { persistWorkbenchTerminalPanelVisible } from '../lib/workbench-terminal-split';
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
+import { createCursorCatalogSlice } from './shell/slices/create-cursor-catalog-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
+import { createOperatorBriefingSlice } from './shell/slices/create-operator-briefing-slice';
 import { createOperatorProbesSlice } from './shell/slices/create-operator-probes-slice';
 import { createRuntimeProbesSlice } from './shell/slices/create-runtime-probes-slice';
+import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary-slice';
 import {
   DEFAULT_DOCK_CONTEXT,
   DEFAULT_EDITOR_TABS,
@@ -445,7 +445,6 @@ export const useShellStore = defineStore('shell', () => {
   let operatorPresenceSettingsSaveQueue: Promise<void> = Promise.resolve();
   const viewportWidth = ref(readViewportWidth());
   let lastViewportCompactRequested: boolean | null = null;
-  let operatorBriefingFetchInFlight: Promise<void> | null = null;
   let viewportCompactListenerBound = false;
   const briefingLoadState = ref<BriefingLoadState>('idle');
   const briefingError = ref<string | null>(null);
@@ -3380,26 +3379,13 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadRuntimeSummary(options?: { background?: boolean }): Promise<void> {
-    const background =
-      options?.background === true && runtimeSummaryLoadState.value === 'loaded';
-    if (!background) {
-      runtimeSummaryLoadState.value = 'loading';
-      runtimeSummaryError.value = null;
-    }
-
-    try {
-      const summary = await fetchRuntimeSummary();
-      runtimeSummary.value = summary;
-      runtimeSummaryLoadState.value = 'loaded';
-    } catch (error) {
-      if (!background) {
-        runtimeSummaryLoadState.value = 'error';
-        runtimeSummaryError.value =
-          error instanceof Error ? error.message : 'runtime summary request failed';
-      }
-    }
-  }
+  const {
+    loadRuntimeSummary,
+  } = createRuntimeSummarySlice({
+    runtimeSummary,
+    runtimeSummaryLoadState,
+    runtimeSummaryError,
+  });
 
   const {
     loadRuntimeMcpTools,
@@ -3472,39 +3458,17 @@ export const useShellStore = defineStore('shell', () => {
     return `${family} ${scope} · ${modelLabel}`;
   });
 
-  async function loadCursorCatalog(forceRefresh = false): Promise<void> {
-    cursorCatalogLoadState.value = 'loading';
-    cursorCatalogError.value = null;
-
-    try {
-      const snapshot = await fetchCursorRuntimeStatus({ forceRefresh });
-      cursorRuntimeStatus.value = snapshot;
-      cursorCatalogLoadState.value = 'loaded';
-      migrateCursorComposerModelIfNeeded();
-    } catch (error) {
-      cursorCatalogLoadState.value = 'error';
-      cursorCatalogError.value =
-        error instanceof Error ? error.message : 'cursor catalog request failed';
-    }
-  }
-
-  function migrateCursorComposerModelIfNeeded(): void {
-    const workspaceId = currentWorkspace.value?.workspace_id;
-    if (!workspaceId) {
-      return;
-    }
-    const prefs = readComposerRuntimePrefs(workspaceId);
-    const stored = prefs.cursor_cli_model?.trim();
-    if (!stored || stored === 'auto') {
-      return;
-    }
-    const resolved = resolveCursorComposerModel(stored, cursorCatalogRows.value);
-    if (resolved === stored) {
-      return;
-    }
-    writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: resolved });
-    composerRuntimePrefsRevision.value += 1;
-  }
+  const {
+    loadCursorCatalog,
+    migrateCursorComposerModelIfNeeded,
+  } = createCursorCatalogSlice({
+    cursorRuntimeStatus,
+    cursorCatalogLoadState,
+    cursorCatalogError,
+    cursorCatalogRows,
+    composerRuntimePrefsRevision,
+    currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
+  });
 
   function setSelectedRuntimeTarget(runtimeTarget: string): void {
     const workspaceId = currentWorkspace.value?.workspace_id;
@@ -3668,54 +3632,22 @@ export const useShellStore = defineStore('shell', () => {
     openOperatorPresenceSettingsPanel();
   }
 
-  async function loadOperatorBriefing(options?: {
-    viewportCompact?: boolean;
-    background?: boolean;
-  }): Promise<void> {
-    if (operatorBriefingFetchInFlight) {
-      return operatorBriefingFetchInFlight;
-    }
-
-    operatorBriefingFetchInFlight = (async () => {
-      const backgroundRefresh =
-        options?.background === true && briefingLoadState.value === 'loaded';
-      if (!backgroundRefresh) {
-        briefingLoadState.value = 'loading';
-        briefingError.value = null;
-      }
-
-      const viewportCompact =
-        options?.viewportCompact ??
-        shouldRequestViewportCompactBriefing(
-          viewportWidth.value,
-          operatorBriefing.value?.operator_presence ?? null,
-          operatorPresenceSettings.value,
-        );
-
-      try {
-        operatorBriefing.value = await fetchOperatorBriefing({
-          viewportCompact,
-          workspaceId: currentWorkspace.value?.workspace_id ?? null,
-        });
-        lastViewportCompactRequested = viewportCompact;
-        approvals.value = operatorBriefing.value.pending_approvals.items;
-        briefingLoadState.value = 'loaded';
-        applyOperatorDockDefaults();
-      } catch (error) {
-        if (!backgroundRefresh) {
-          briefingLoadState.value = 'error';
-          briefingError.value =
-            error instanceof Error ? error.message : 'operator briefing request failed';
-        }
-      }
-    })();
-
-    try {
-      await operatorBriefingFetchInFlight;
-    } finally {
-      operatorBriefingFetchInFlight = null;
-    }
-  }
+  const {
+    loadOperatorBriefing,
+  } = createOperatorBriefingSlice({
+    operatorBriefing,
+    briefingLoadState,
+    briefingError,
+    approvals,
+    viewportWidth,
+    operatorPresenceSettings,
+    currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
+    applyOperatorDockDefaults,
+    getLastViewportCompactRequested: () => lastViewportCompactRequested,
+    setLastViewportCompactRequested: (value) => {
+      lastViewportCompactRequested = value;
+    },
+  });
 
   const {
     loadOperatorBrainGraph,
