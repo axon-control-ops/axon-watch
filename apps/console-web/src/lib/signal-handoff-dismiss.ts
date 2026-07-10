@@ -51,7 +51,7 @@ export function canVerifyDismissHandoffSignal(
     return {
       allowed: false,
       reason:
-        'Monitor still reports this issue. Deploy the fix, wait for Sentry to clear, or use CLEAR to acknowledge anyway.',
+        'Monitor still reports this issue. Resolve the Sentry issue(s) below, deploy the fix, wait for the monitor to clear, or use CLEAR to acknowledge locally.',
     };
   }
 

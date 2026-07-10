@@ -140,8 +140,16 @@
   margin-top: 0.35rem;
 }
 
-.conversation-seam__resend-button {
+.conversation-seam__resend-button,
+.conversation-seam__edit-button {
   flex-shrink: 0;
+}
+
+.conversation-seam__edit-button {
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-inline: 0.42rem;
 }
 
 .conversation-seam__meta-button {

@@ -27,6 +27,7 @@ import {
   prepareOperatorConversationDock,
   type ConversationDisplayItem,
 } from '../lib/operator-conversation-view';
+import { focusAgentDockComposerInput } from '../lib/agent-dock-composer-focus';
 import { applyChatUiAction, type ChatUiAction } from '../lib/chat-ui-action';
 import { operatorArtifactRecords } from '../lib/operator-artifact-view';
 import {
@@ -247,6 +248,7 @@ function compactCommandSummary(output: string): string {
 
 function restoreCommandToComposer(command: string): void {
   shell.restoreComposerDraft(command);
+  focusAgentDockComposerInput();
 }
 
 function isEmptyStreamingAgent(message: { role: string; message_id: string; content: string }): boolean {
@@ -343,12 +345,12 @@ watch(
           <div class="conversation-seam__message-actions">
             <button
               type="button"
-              class="conversation-seam__meta-icon-button conversation-seam__resend-button"
-              title="Load this command back into the composer"
-              aria-label="Resend"
+              class="conversation-seam__meta-icon-button conversation-seam__edit-button"
+              title="Edit — load this command into the composer"
+              aria-label="Edit"
               @click="restoreCommandToComposer(item.command)"
             >
-              <span aria-hidden="true">↻</span>
+              Edit
             </button>
           </div>
         </template>
@@ -540,8 +542,8 @@ watch(
                   v-if="showTerminalBackgroundControl(item.message.message_id, segment.open)"
                   type="button"
                   class="agent-block__terminal-background"
-                  title="Move shell to terminal panel (vaxon)"
-                  aria-label="Move shell command to background terminal"
+                  title="Mirror this shell into the vaxon terminal (Cursor CLI still owns the process)"
+                  aria-label="Background shell into vaxon terminal"
                   @click="backgroundAgentTerminalRun"
                 >
                   Background
@@ -679,12 +681,12 @@ watch(
         >
           <button
             type="button"
-            class="conversation-seam__meta-icon-button conversation-seam__resend-button"
-            title="Load this request back into the composer"
-            aria-label="Resend"
+            class="conversation-seam__meta-icon-button conversation-seam__edit-button"
+            title="Edit — load this request into the composer"
+            aria-label="Edit"
             @click="restoreCommandToComposer(item.message.content)"
           >
-            <span aria-hidden="true">↻</span>
+            Edit
           </button>
         </div>
           </template>

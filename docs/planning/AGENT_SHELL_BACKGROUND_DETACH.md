@@ -40,5 +40,11 @@ Until Cursor exposes that control, Axon cannot honestly claim Cursor-parity deta
 ## Operator-facing honesty
 
 - Tab label while mirroring: `vaxon · agent shell`
-- After the agent stream ends, mirror mode exits and the agent PTY websocket reconnects.
-- CLEAR/ack and Sentry resolve are unrelated; do not conflate with shell Background.
+- Background button tooltip: mirrors into vaxon; Cursor CLI still owns the process
+- After the agent stream ends, mirror mode exits and the agent PTY websocket reconnects
+- CLEAR/ack and Sentry resolve are unrelated; do not conflate with shell Background
+
+## Sprint status (2026-07-10)
+
+Shipped ceiling for this sprint: mirror + honest tooltip + PTY reconnect.
+True detach remains deferred until Cursor exposes a background/detach control.

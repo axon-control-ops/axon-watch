@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import HudSeamCard from '../HudSeamCard.vue';
 import HandoffToIdeButton from './HandoffToIdeButton.vue';
+import SentryIssuesList from './SentryIssuesList.vue';
 import VerifyDismissSignalButton from './VerifyDismissSignalButton.vue';
 import {
   formatRunDisplayName,
@@ -365,6 +366,10 @@ function signalHint(signal: {
             <p v-if="signal.latest_receipt_id" class="region-copy dock-signal-row__receipt">
               Receipt {{ signal.latest_receipt_id }}
             </p>
+            <SentryIssuesList
+              :meta="signal.meta"
+              compact
+            />
             <HandoffToIdeButton
               :signal-id="signal.signal_id"
               :workspace-id="signal.workspace_id"

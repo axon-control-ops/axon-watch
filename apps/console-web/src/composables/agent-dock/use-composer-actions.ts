@@ -15,6 +15,7 @@ import {
 import { kairoConversationReply } from '../../features/kairo-conversation/kairo-conversation-state';
 import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
 import { findIdeComposerQueueEntry } from '../../lib/ide-composer-queue';
+import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 
@@ -132,15 +133,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     shell.removeIdeComposerQueuedMessage(messageId);
     composerMode.value = entry.composerMode;
     shell.ideComposerDraft = entry.content;
-    requestAnimationFrame(() => {
-      const input = inputRef.value;
-      if (!input) {
-        return;
-      }
-      input.focus();
-      const end = input.value.length;
-      input.setSelectionRange(end, end);
-    });
+    focusAgentDockComposerInput();
   }
 
   function revealComposerTerminalPanel(): void {
