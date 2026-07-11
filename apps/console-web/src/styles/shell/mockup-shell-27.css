@@ -11,6 +11,11 @@
   align-items: center;
 }
 
+.briefing-panel__presence--text-only {
+  display: block;
+  grid-template-columns: none;
+}
+
 .briefing-panel__avatar {
   position: relative;
   width: 4.5rem;

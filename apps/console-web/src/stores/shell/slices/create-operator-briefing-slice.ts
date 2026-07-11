@@ -24,15 +24,28 @@ interface CreateOperatorBriefingSliceInput {
 
 export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceInput) {
   let operatorBriefingFetchInFlight: Promise<void> | null = null;
+  let operatorBriefingFetchWorkspaceKey: string | null = null;
 
   async function loadOperatorBriefing(options?: {
     viewportCompact?: boolean;
     background?: boolean;
   }): Promise<void> {
+    const requestedWorkspaceKey = input.currentWorkspaceId()?.trim() || '';
+
     if (operatorBriefingFetchInFlight) {
-      return operatorBriefingFetchInFlight;
+      if (operatorBriefingFetchWorkspaceKey === requestedWorkspaceKey) {
+        return operatorBriefingFetchInFlight;
+      }
+      await operatorBriefingFetchInFlight;
+      if (
+        operatorBriefingFetchInFlight &&
+        operatorBriefingFetchWorkspaceKey === requestedWorkspaceKey
+      ) {
+        return operatorBriefingFetchInFlight;
+      }
     }
 
+    operatorBriefingFetchWorkspaceKey = requestedWorkspaceKey;
     operatorBriefingFetchInFlight = (async () => {
       const backgroundRefresh =
         options?.background === true && input.briefingLoadState.value === 'loaded';
@@ -50,15 +63,23 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
         );
 
       try {
-        input.operatorBriefing.value = await fetchOperatorBriefing({
+        const briefing = await fetchOperatorBriefing({
           viewportCompact,
           workspaceId: input.currentWorkspaceId(),
         });
+        // Drop stale responses if the operator switched workspaces mid-flight.
+        if ((input.currentWorkspaceId()?.trim() || '') !== requestedWorkspaceKey) {
+          return;
+        }
+        input.operatorBriefing.value = briefing;
         input.setLastViewportCompactRequested(viewportCompact);
-        input.approvals.value = input.operatorBriefing.value.pending_approvals.items;
+        input.approvals.value = briefing.pending_approvals.items;
         input.briefingLoadState.value = 'loaded';
         input.applyOperatorDockDefaults();
       } catch (error) {
+        if ((input.currentWorkspaceId()?.trim() || '') !== requestedWorkspaceKey) {
+          return;
+        }
         if (!backgroundRefresh) {
           input.briefingLoadState.value = 'error';
           input.briefingError.value =
@@ -70,7 +91,10 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
     try {
       await operatorBriefingFetchInFlight;
     } finally {
-      operatorBriefingFetchInFlight = null;
+      if (operatorBriefingFetchWorkspaceKey === requestedWorkspaceKey) {
+        operatorBriefingFetchInFlight = null;
+        operatorBriefingFetchWorkspaceKey = null;
+      }
     }
   }
 

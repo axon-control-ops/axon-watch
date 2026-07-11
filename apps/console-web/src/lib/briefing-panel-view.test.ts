@@ -30,10 +30,10 @@ function rhythmFrom(
 const emptyBriefing: OperatorBriefing = {
   generated_at: '2026-07-04T08:00:00Z',
   notice: 'No active runs. Systems nominal.',
-  advise: 'Describe the next operator action in Command.',
+  advise: 'Describe the next action in Command.',
   executive_rhythm: rhythmFrom(
     'No active runs. Systems nominal.',
-    'Describe the next operator action in Command.',
+    'Describe the next action in Command.',
   ),
   top_signals: [],
   pending_approvals: { count: 0, items: [] },
@@ -131,7 +131,7 @@ describe('briefing panel view helpers', () => {
     );
     expect(briefingNotice(emptyBriefing, 'loaded')).toBe('No active runs. Systems nominal.');
     expect(briefingAdvise(emptyBriefing, 'loaded')).toBe(
-      'Describe the next operator action in Command.',
+      'Describe the next action in Command.',
     );
     expect(briefingRhythmField(approvalBriefing, 'decide', 'loaded')).toContain('approve or reject');
   });

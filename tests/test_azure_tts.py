@@ -23,7 +23,20 @@ class AzureTtsTests(unittest.TestCase):
             extract_azure_speech_key("abc1234567890123456789012345678"),
             "abc1234567890123456789012345678",
         )
-        self.assertIn("Hello operator", build_azure_ssml("Hello operator"))
+        ssml = build_azure_ssml("Hello operator")
+        self.assertIn("Hello operator", ssml)
+        self.assertIn("en-GB-RyanNeural", ssml)
+        # Conversational chat style for Ryan; no dulling rate/pitch prosody.
+        self.assertIn("mstts:express-as", ssml)
+        self.assertIn("style='chat'", ssml)
+        self.assertNotIn("prosody", ssml)
+        self.assertNotIn("rate=", ssml)
+        self.assertNotIn("pitch=", ssml)
+
+        # Non-Ryan voices must not get an unsupported style wrapper.
+        other = build_azure_ssml("Hello", voice="en-GB-ThomasNeural")
+        self.assertNotIn("express-as", other)
+        self.assertIn("en-GB-ThomasNeural", other)
 
     def test_returns_none_when_azure_is_not_configured(self) -> None:
         with patch.dict(os.environ, {}, clear=False):

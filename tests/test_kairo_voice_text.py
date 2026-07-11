@@ -32,6 +32,15 @@ class KairoVoiceTextTests(unittest.TestCase):
         self.assertNotIn("smiley", spoken.lower())
         self.assertIn("apps", spoken.lower())
 
+    def test_never_addresses_listener_as_operator(self) -> None:
+        spoken = normalize_spoken_line("Hello operator, systems are nominal.")
+        self.assertNotIn("operator", spoken.lower())
+        self.assertIn("systems are nominal", spoken.lower())
+
+        rewritten = normalize_spoken_line("Smoke run is ready for operator review.")
+        self.assertIn("for your review", rewritten.lower())
+        self.assertNotIn("operator", rewritten.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

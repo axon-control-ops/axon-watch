@@ -6,6 +6,7 @@ import {
   galaxyNodeCounts,
   galaxyOmnibarHint,
   galaxyTopHubs,
+  resolveGalaxyWorkspaceNavigation,
 } from './brain-galaxy-hud-view';
 import type { BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
 
@@ -68,6 +69,15 @@ describe('brain-galaxy-hud-view', () => {
   it('describes inspector state for null and selected nodes', () => {
     expect(galaxyInspectorCopy(null).title).toBe('Inspector');
     expect(galaxyInspectorCopy(snapshot.nodes[3]).hint).toContain('Attention');
+    expect(galaxyInspectorCopy(snapshot.nodes[1]).hint).toContain('IDE');
+  });
+
+  it('resolves workspace navigation targets from hub clicks', () => {
+    expect(resolveGalaxyWorkspaceNavigation('workspace_dashpro')).toEqual({
+      workspaceId: 'workspace_dashpro',
+    });
+    expect(resolveGalaxyWorkspaceNavigation('  ')).toBeNull();
+    expect(resolveGalaxyWorkspaceNavigation(null)).toBeNull();
   });
 
   it('builds omnibar hints from run and approval state', () => {

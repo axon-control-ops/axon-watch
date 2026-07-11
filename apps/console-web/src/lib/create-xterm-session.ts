@@ -100,6 +100,7 @@ export async function createXtermSession(
   let pasteDisposable: (() => void) | null = null;
   let pendingInputLine = '';
   let mirrorMode = false;
+  let lastMirrorText = '';
 
   const clearScreen = (): void => {
     terminal.clear();
@@ -143,8 +144,18 @@ export async function createXtermSession(
   const writeMirrorSnapshot = (text: string): void => {
     mirrorMode = true;
     disposeSocket();
+    const normalized = text.replace(/\n/g, '\r\n');
+    if (lastMirrorText && normalized.startsWith(lastMirrorText)) {
+      const delta = normalized.slice(lastMirrorText.length);
+      if (delta) {
+        terminal.write(delta);
+      }
+      lastMirrorText = normalized;
+      return;
+    }
     terminal.reset();
-    terminal.write(text.replace(/\n/g, '\r\n'));
+    terminal.write(normalized);
+    lastMirrorText = normalized;
   };
 
   const attachWorkspace = (
@@ -313,6 +324,7 @@ export async function createXtermSession(
         return;
       }
       mirrorMode = false;
+      lastMirrorText = '';
       const workspaceId = attachedWorkspaceId;
       const sessionId = attachedSessionId;
       const sessionRole = attachedSessionRole;

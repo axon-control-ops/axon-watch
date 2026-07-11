@@ -10,6 +10,11 @@ from xml.sax.saxutils import escape
 
 DEFAULT_AZURE_VOICE = "en-GB-RyanNeural"
 DEFAULT_AZURE_REGION = "southafricanorth"
+# RyanNeural is natively 48 kHz — requesting 24 kHz downsampled and dulled the voice.
+DEFAULT_AZURE_OUTPUT_FORMAT = "audio-48khz-192kbitrate-mono-mp3"
+# Conversational delivery for assistant lines (Ryan supports cheerful + chat).
+DEFAULT_AZURE_STYLE = "chat"
+_CHAT_STYLE_VOICES = frozenset({"en-GB-RyanNeural"})
 _PLACEHOLDER_KEYS = frozenset({"changeme", "change-me", "placeholder", "your-key-here", "test"})
 _AZURE_KEY_NAMES = ("AZURE_SPEECH_KEY", "azure_speech_key")
 _AZURE_REGION_NAMES = ("AZURE_SPEECH_REGION", "azure_speech_region")
@@ -76,13 +81,29 @@ def azure_speech_configured() -> bool:
     return bool(key)
 
 
-def build_azure_ssml(text: str, *, voice: str = DEFAULT_AZURE_VOICE) -> str:
+def build_azure_ssml(
+    text: str,
+    *,
+    voice: str = DEFAULT_AZURE_VOICE,
+    style: str | None = DEFAULT_AZURE_STYLE,
+) -> str:
+    """Build SSML for neural TTS.
+
+    No rate/pitch prosody overrides — those dulled the voice. For Ryan, wrap in
+    the supported ``chat`` style so lines sound conversational rather than flat.
+    """
     safe_voice = escape(voice, {"'": "&apos;", '"': "&quot;"})
     safe_text = escape(_clean_for_speech(text), {"'": "&apos;", '"': "&quot;"})
+    resolved_style = style if voice in _CHAT_STYLE_VOICES else None
+    if resolved_style:
+        safe_style = escape(resolved_style, {"'": "&apos;", '"': "&quot;"})
+        inner = f"<mstts:express-as style='{safe_style}'>{safe_text}</mstts:express-as>"
+    else:
+        inner = safe_text
     return (
-        "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-GB'>"
-        f"<voice name='{safe_voice}'><prosody rate='-4%' pitch='-2%'>"
-        f"{safe_text}</prosody></voice>"
+        "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' "
+        "xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-GB'>"
+        f"<voice name='{safe_voice}'>{inner}</voice>"
         "</speak>"
     )
 
@@ -111,7 +132,7 @@ def synthesize_azure_speech(
         headers={
             "Ocp-Apim-Subscription-Key": speech_key,
             "Content-Type": "application/ssml+xml",
-            "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
+            "X-Microsoft-OutputFormat": DEFAULT_AZURE_OUTPUT_FORMAT,
             "User-Agent": "axon-watch-control-plane",
         },
         method="POST",

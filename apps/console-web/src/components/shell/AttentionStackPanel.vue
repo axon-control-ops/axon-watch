@@ -77,6 +77,8 @@ function signalCount(): number {
   return shell.workspaceAttentionSignalCount;
 }
 
+const attentionSignals = computed(() => shell.attentionSignals);
+
 function phaseTagClass(phase: string | undefined): string {
   if (phase === 'review_ready') {
     return 'dock-tag--review';
@@ -306,9 +308,9 @@ function signalHint(signal: {
       <p class="dock-signals__hint">
         Tap title for details · OBSERVE / DELIVERED = status labels
       </p>
-      <ul v-if="shell.operatorBriefing?.top_signals.length" class="dock-list dock-list--signals">
+      <ul v-if="attentionSignals.length" class="dock-list dock-list--signals">
         <li
-          v-for="signal in shell.operatorBriefing.top_signals.slice(0, 3)"
+          v-for="signal in attentionSignals"
           :key="signal.signal_id"
           class="dock-list__item dock-signal-row"
           :class="{ 'dock-signal-row--expanded': isSignalExpanded(signal.signal_id) }"

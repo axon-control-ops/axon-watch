@@ -64,7 +64,7 @@ describe('runtime strip helpers', () => {
   it('keeps status bar segments short and count-focused', () => {
     expect(
       buildStatusBarSegments({
-        layoutModeLabel: 'Operator mode',
+        layoutModeLabel: 'Mission Control',
         workspaceId: 'workspace_smoke',
         runtimeSummary: {
           ...runtimeSummary,
@@ -73,7 +73,7 @@ describe('runtime strip helpers', () => {
         pendingApprovals: 1,
       }),
     ).toEqual([
-      { id: 'mode', label: 'Operator mode', tone: 'default' },
+      { id: 'mode', label: 'Mission Control', tone: 'default' },
       { id: 'workspace', label: 'workspace_smoke', tone: 'default' },
       { id: 'watch', label: 'watch connected', tone: 'success' },
       { id: 'signals', label: 'signals: 1 · high', tone: 'warning' },

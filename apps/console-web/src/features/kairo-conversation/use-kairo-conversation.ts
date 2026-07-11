@@ -126,9 +126,9 @@ export function useKairoConversation() {
       return 'Checking the selected signal against the current fleet state…';
     }
     if (/\b(approval|attention|signal|status|briefing|health)\b/i.test(content)) {
-      return 'Scanning live operator state and briefing signals…';
+      return 'Scanning live system state and briefing signals…';
     }
-    return 'Checking the current operator state…';
+    return 'Checking the current system state…';
   }
 
   function shouldScheduleHandsFreeFollowup(voiceCaptureMode?: KairoVoiceCaptureMode): boolean {

@@ -42,8 +42,8 @@ def build_briefing_notice(
             title = _short_run_title(
                 str(review_ready[0].get("title") or review_ready[0].get("run_id") or "Run")
             )
-            return f"{title} is ready for operator review."
-        return f"{len(review_ready)} runs are ready for operator review."
+            return f"{title} is ready for your review."
+        return f"{len(review_ready)} runs are ready for your review."
 
     if top_signals:
         signal = top_signals[0]
@@ -89,7 +89,7 @@ def build_briefing_advise(
     if _review_ready_runs(active_runs):
         return "Review execution evidence in Command or Active Run when ready."
 
-    return "Describe the next operator action in Command."
+    return "Describe the next action in Command."
 
 
 def build_briefing_decide(
@@ -131,7 +131,7 @@ def build_briefing_decide(
 
 def build_briefing_execute(*, next_safe_actions: list[dict[str, object]]) -> str:
     if not next_safe_actions:
-        return "Execute the next operator command from Command when you are ready."
+        return "Execute the next command from Command when you are ready."
 
     action = next_safe_actions[0]
     kind = str(action.get("kind", "")).strip()
@@ -198,7 +198,7 @@ def build_briefing_report(
         parts.append("runtime degraded")
 
     if not parts:
-        return "Report: systems nominal; no active operator decisions."
+        return "Report: systems nominal; no active decisions."
 
     return f"Report: {', '.join(parts)}."
 

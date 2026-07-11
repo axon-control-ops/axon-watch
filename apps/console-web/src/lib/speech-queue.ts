@@ -98,8 +98,9 @@ function drainQueue(speech: SpeechPort): void {
   notifySpeaking(true);
   const text = queue.shift() ?? '';
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.88;
-  utterance.pitch = 0.92;
+  // Keep browser fallback at natural defaults — slowed/lowered pitch sounded robotic.
+  utterance.rate = 1;
+  utterance.pitch = 1;
   utterance.volume = 1;
   const voice = pickJarvisVoice(speech);
   if (voice) {

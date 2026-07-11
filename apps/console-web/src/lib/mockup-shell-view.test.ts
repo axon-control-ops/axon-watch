@@ -72,6 +72,18 @@ describe('mockup shell view helpers', () => {
     ).toContain('approval');
   });
 
+  it('uses fleet active signal count when workspace-scoped briefing is empty', () => {
+    const emptySignalsBriefing = {
+      ...briefing,
+      top_signals: [],
+      pending_approvals: { ...briefing.pending_approvals, count: 0, items: [] },
+    } as OperatorBriefing;
+
+    expect(
+      buildBriefingSummaryLine(emptySignalsBriefing, runtimeSummary, 'workspace_axon_watch', 1),
+    ).toContain('1 signal require review');
+  });
+
   it('builds briefing hero subtitle without KAIRO prefix', () => {
     expect(buildBriefingHeroSubtitle(briefing, 'loaded')).toBe(briefing.notice);
     expect(buildBriefingHeroSubtitle(briefing, 'loading')).toBe(briefing.notice);

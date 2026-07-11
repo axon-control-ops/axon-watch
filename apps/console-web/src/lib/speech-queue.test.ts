@@ -11,8 +11,14 @@ import {
 } from './speech-queue';
 
 class MockUtterance {
+  rate = 0;
+  pitch = 0;
+  volume = 0;
+  voice: SpeechSynthesisVoice | null = null;
   onend?: () => void;
   onerror?: () => void;
+
+  constructor(public text = '') {}
 }
 
 function createSpeechPort(): SpeechPort & { utterances: MockUtterance[] } {
@@ -81,5 +87,20 @@ describe('speech queue', () => {
 
     expect(states).toContain(true);
     expect(states.at(-1)).toBe(false);
+  });
+
+  it('uses natural rate and pitch for browser fallback', () => {
+    vi.useFakeTimers();
+    const speech = createSpeechPort();
+    stopSpeech(speech);
+
+    enqueueSpeech('natural voice', speech);
+    vi.advanceTimersByTime(60);
+
+    const utterance = speech.utterances[0] as MockUtterance;
+    expect(utterance.rate).toBe(1);
+    expect(utterance.pitch).toBe(1);
+    expect(utterance.volume).toBe(1);
+    vi.useRealTimers();
   });
 });

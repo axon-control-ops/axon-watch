@@ -33,8 +33,9 @@ from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_r
 
 
 _REPLY_STYLE = (
-    "Reply in first person. Use plain language the operator understands — "
-    "avoid internal repo jargon such as lane IDs, slice names, or implementation acronyms."
+    "Reply in first person. Use plain language anyone can follow — "
+    "avoid internal repo jargon such as lane IDs, slice names, or implementation acronyms. "
+    "Never address the listener as \"operator\", \"user\", or \"human\"."
 )
 
 

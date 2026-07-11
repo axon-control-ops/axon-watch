@@ -104,7 +104,7 @@ export function briefingAdvise(
     return briefing.advise;
   }
 
-  return 'Describe the next operator action in Command.';
+  return 'Describe the next action in Command.';
 }
 
 export function briefingRhythmField(

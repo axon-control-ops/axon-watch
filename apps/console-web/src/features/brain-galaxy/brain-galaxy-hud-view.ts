@@ -84,14 +84,14 @@ export function galaxyInspectorCopy(node: BrainGraphNode | null): {
   if (!node) {
     return {
       title: 'Inspector',
-      body: 'Click a node to focus it. Workspaces switch context; signals open Attention.',
+      body: 'Click a node to inspect it. Workspaces open in the IDE; signals open Attention.',
       hint: 'Drag to orbit the galaxy',
     };
   }
 
   const hints: Record<string, string> = {
     core: 'KAIRO control plane — the center of your operator brain.',
-    workspace: 'Click to focus this workspace across the console.',
+    workspace: 'Opens this workspace in the IDE and sets console context.',
     run: 'Active execution lane tied to a workspace.',
     signal: 'Click to open this signal in Attention.',
     connector: 'Live connector health bound to a workspace.',
@@ -121,5 +121,16 @@ export function galaxyOmnibarHint(options: {
   if (options.hasActiveRun && options.runSummary) {
     return `Active: ${options.runSummary.slice(0, 72)}${options.runSummary.length > 72 ? '…' : ''}`;
   }
-  return "Tell KAIRO what to focus on — or click a workspace in the galaxy.";
+  return "Tell KAIRO what to focus on — or click a workspace to open it.";
+}
+
+/** Workspace hub/node click: switch console context and enter the IDE. */
+export function resolveGalaxyWorkspaceNavigation(workspaceId: string | null | undefined): {
+  workspaceId: string;
+} | null {
+  const id = workspaceId?.trim() ?? '';
+  if (!id) {
+    return null;
+  }
+  return { workspaceId: id };
 }

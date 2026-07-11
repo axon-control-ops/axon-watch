@@ -169,6 +169,19 @@ _QUESTION_START_RE = re.compile(
 )
 
 
+def _strip_sir_address(line: str) -> str:
+    """Neutral persona: drop JARVIS address forms — never substitute \"operator\"."""
+    text = str(line or "")
+    text = re.sub(r",\s*sir\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bsir\s*[—-]\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bsir,\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bsir\b", "", text, flags=re.IGNORECASE)
+    text = text.replace("—", "-")
+    text = re.sub(r"\s{2,}", " ", text)
+    text = re.sub(r"\s+([,.!?])", r"\1", text)
+    return text.strip()
+
+
 def _pick_pool_line(
     pool_key: str,
     recent: list[str],
@@ -178,7 +191,7 @@ def _pick_pool_line(
 ) -> str:
     pool = list(_FALLBACK_POOLS.get(pool_key, _FALLBACK_POOLS["done"]))
     if not persona_enabled:
-        pool = [line.replace("sir", "operator").replace("—", "-") for line in pool]
+        pool = [_strip_sir_address(line) for line in pool]
     elif guest_name:
         pool = [apply_participant_address(line, guest_name) for line in pool]
     recent_lower = {item.lower() for item in recent}

@@ -142,6 +142,43 @@ def _extract_voice_answer(text: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> s
     return _extract_readable_reply(text, max_chars=max_chars)
 
 
+def _strip_forbidden_listener_address(text: str) -> str:
+    """Never address the listener as operator/user/human (JARVIS-style)."""
+    cleaned = str(text or "")
+    # Vocative / greeting forms: "Hello operator", "Right, operator — …"
+    cleaned = re.sub(
+        r"\b(?:hello|hi|hey)\s+(?:operator|user|human)\b[,!]?\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r",\s*\b(?:operator|user|human)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"\b(?:operator|user|human)\s*[—-]\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    # Clinical product phrases that should never be spoken aloud.
+    cleaned = re.sub(r"\bfor operator review\b", "for your review", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"\bnext operator (command|action)\b",
+        r"next \1",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\boperator decisions\b", "decisions", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"\b(?:live|current) operator state\b",
+        "current system state",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+([,.!?])", r"\1", cleaned)
+    return cleaned.strip()
+
+
 def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> str:
     """Convert agent/model text into concise operator-facing speech."""
     original = str(raw or "").strip()
@@ -161,6 +198,7 @@ def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> st
         text,
         flags=re.IGNORECASE,
     )
+    text = _strip_forbidden_listener_address(text)
     text = _soften_symbols_for_speech(text)
     text = strip_literal_symbol_words(text)
     text = re.sub(r"\s+", " ", text).strip()

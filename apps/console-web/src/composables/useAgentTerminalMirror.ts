@@ -15,7 +15,8 @@ type MaybeStringRef = Ref<string | null> | Ref<string> | { readonly value: strin
 export function useAgentTerminalMirror(input: {
   mirrorActive: Ref<boolean>;
   agentSessionId: MaybeStringRef;
-  transcriptContent: Ref<string> | { readonly value: string };
+  /** Prefer a cheap getter — only read while mirror is armed. */
+  getTranscriptContent: () => string;
   getHost: (sessionId: string) => AgentTerminalMirrorHost | null | undefined;
   clearMirror: () => void;
   streamActive: Ref<boolean>;
@@ -37,7 +38,7 @@ export function useAgentTerminalMirror(input: {
     if (!sessionId) {
       return;
     }
-    const segment = findAgentTerminalMirrorSegment(input.transcriptContent.value);
+    const segment = findAgentTerminalMirrorSegment(input.getTranscriptContent());
     if (!segment) {
       return;
     }
@@ -54,14 +55,28 @@ export function useAgentTerminalMirror(input: {
   }
 
   watch(
-    () => ({
-      active: input.mirrorActive.value,
-      sessionId: input.agentSessionId.value,
-      content: input.transcriptContent.value,
-    }),
+    () => {
+      // Do not subscribe to transcript content unless Background is armed.
+      if (!input.mirrorActive.value) {
+        return {
+          active: false as const,
+          sessionId: input.agentSessionId.value,
+          contentLen: -1,
+        };
+      }
+      const content = input.getTranscriptContent();
+      return {
+        active: true as const,
+        sessionId: input.agentSessionId.value,
+        // Length + tail notices stream growth without cloning the full transcript
+        // into the dependency object on every tick.
+        contentLen: content.length,
+        contentTail: content.slice(-240),
+      };
+    },
     (next, prev) => {
       if (!next.active) {
-        if (prev?.active) {
+        if (prev && 'active' in prev && prev.active) {
           exitHostMirror(next.sessionId ?? prev.sessionId ?? null);
         }
         lastSnapshot = '';

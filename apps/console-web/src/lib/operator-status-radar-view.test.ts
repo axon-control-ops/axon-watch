@@ -67,13 +67,13 @@ describe('operator status radar view', () => {
       operatorStatusHeadline({
         briefing: {
           ...briefing,
-          notice: '52 runs are ready for operator review.',
+          notice: '52 runs are ready for your review.',
         },
         loadState: 'loaded',
         primaryActiveRun: activeRun,
         workspaceReviewReadyCount: 17,
       }),
-    ).toBe('17 runs are ready for operator review in this workspace.');
+    ).toBe('17 runs are ready for your review in this workspace.');
   });
 
   it('builds DTO-backed metrics for the operator panel', () => {

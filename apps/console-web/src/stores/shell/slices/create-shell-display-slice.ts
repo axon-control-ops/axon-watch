@@ -22,7 +22,7 @@ import {
   buildWorkspaceStatusCardRows,
 } from '../../../lib/mockup-shell-view';
 import { conversationEmptyStateLabel, type OperatorThreadEntry } from '../../../lib/operator-thread';
-import { resolveOperatorSignalCount } from '../../../lib/operator-signal-count';
+import { resolveOperatorSignalCount, resolveAttentionSignalCount, filterAttentionSignals } from '../../../lib/operator-signal-count';
 import { workspaceCatalogMode } from '../../../lib/operator-workspace-catalog';
 import { formatRunIdentityLabel } from '../../../lib/run-display';
 import { isOperatorCompletablePhase } from '../../../lib/run-lifecycle-ui';
@@ -108,12 +108,30 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     }),
   );
 
+  const attentionSignals = computed(() => {
+    if (
+      input.inboxLoadState.value === 'loaded' ||
+      (input.inboxLoadState.value === 'loading' && input.inboxItems.value.length > 0)
+    ) {
+      return filterAttentionSignals(
+        input.inboxItems.value,
+        input.currentWorkspace.value?.workspace_id ?? null,
+      ).slice(0, 3);
+    }
+
+    return filterAttentionSignals(
+      input.operatorBriefing.value?.top_signals ?? [],
+      input.currentWorkspace.value?.workspace_id ?? null,
+    ).slice(0, 3);
+  });
+
   const workspaceAttentionSignalCount = computed(() =>
-    resolveOperatorSignalCount({
+    resolveAttentionSignalCount({
       inboxItems: input.inboxItems.value,
       inboxLoadState: input.inboxLoadState.value,
       runtimeSummaryOpenCount: input.runtimeSummary.value?.signals.open_count,
       workspaceId: input.currentWorkspace.value?.workspace_id ?? null,
+      briefingTopSignals: input.operatorBriefing.value?.top_signals ?? null,
     }),
   );
 
@@ -141,6 +159,7 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
       input.operatorBriefing.value,
       input.runtimeSummary.value,
       input.currentWorkspace.value?.workspace_id ?? null,
+      activeOperatorSignalCount.value,
     ),
   );
 
@@ -283,6 +302,7 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     topbarMetaPills,
     topbarBreadcrumb,
     activeOperatorSignalCount,
+    attentionSignals,
     workspaceAttentionSignalCount,
     statusBarZones,
     workspaceStatusCardRows,

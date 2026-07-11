@@ -69,7 +69,7 @@ const agentSessionId = computed(
 
 const agentStreamActive = computed(() => shell.agentStreamActive);
 
-const mirrorTranscriptContent = computed(() => {
+function resolveMirrorTranscriptContent(): string {
   const streamId = shell.agentStreamMessageId;
   if (streamId) {
     return (
@@ -86,12 +86,12 @@ const mirrorTranscriptContent = computed(() => {
     }
   }
   return '';
-});
+}
 
 const { syncNow: syncAgentTerminalMirror } = useAgentTerminalMirror({
   mirrorActive: agentShellMirrorActive,
   agentSessionId,
-  transcriptContent: mirrorTranscriptContent,
+  getTranscriptContent: resolveMirrorTranscriptContent,
   streamActive: agentStreamActive,
   clearMirror: clearAgentShellMirror,
   getHost: (sessionId) => terminalHostRefs.value[sessionId] ?? null,

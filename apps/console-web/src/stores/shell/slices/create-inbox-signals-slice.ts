@@ -2,6 +2,7 @@ import type { Ref } from 'vue';
 
 import { acknowledgeInboxSignals, fetchInbox } from '../../../api/inbox-api';
 import type { InboxItem, OperatorBriefing, SignalView } from '../../../contracts/canonical';
+import { filterActionableOpenSignals } from '../../../lib/operator-signal-count';
 import {
   canVerifyDismissHandoffSignal,
   writePendingHandoffDismissSignalId,
@@ -23,9 +24,13 @@ interface CreateInboxSignalsSliceInput {
 }
 
 export function createInboxSignalsSlice(input: CreateInboxSignalsSliceInput) {
-  async function loadInbox(): Promise<void> {
-    input.inboxLoadState.value = 'loading';
-    input.inboxError.value = null;
+  async function loadInbox(options?: { background?: boolean }): Promise<void> {
+    const backgroundRefresh =
+      options?.background === true && input.inboxLoadState.value === 'loaded';
+    if (!backgroundRefresh) {
+      input.inboxLoadState.value = 'loading';
+      input.inboxError.value = null;
+    }
 
     try {
       const inbox = await fetchInbox();
@@ -33,8 +38,10 @@ export function createInboxSignalsSlice(input: CreateInboxSignalsSliceInput) {
       input.signalViews.value = inbox.items;
       input.inboxLoadState.value = 'loaded';
     } catch (error) {
-      input.inboxLoadState.value = 'error';
-      input.inboxError.value = error instanceof Error ? error.message : 'inbox request failed';
+      if (!backgroundRefresh) {
+        input.inboxLoadState.value = 'error';
+        input.inboxError.value = error instanceof Error ? error.message : 'inbox request failed';
+      }
     }
   }
 
@@ -93,9 +100,13 @@ export function createInboxSignalsSlice(input: CreateInboxSignalsSliceInput) {
   }
 
   async function clearActiveSignals(): Promise<void> {
-    const signalIds =
-      input.operatorBriefing.value?.top_signals.map((signal) => signal.signal_id) ??
-      input.signalViews.value.map((signal) => signal.signal_id);
+    const fromInbox = filterActionableOpenSignals(input.inboxItems.value).map(
+      (signal) => signal.signal_id,
+    );
+    const signalIds = fromInbox.length
+      ? fromInbox
+      : (input.operatorBriefing.value?.top_signals.map((signal) => signal.signal_id) ??
+        input.signalViews.value.map((signal) => signal.signal_id));
     if (!signalIds.length || input.signalClearState.value === 'clearing') {
       return;
     }

@@ -153,6 +153,19 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertNotIn("sir", payload["line"].lower())
         reset_participant_memory_for_tests()
 
+    def test_neutral_persona_fallback_never_says_operator(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="agent_start",
+                context={"operator_prompt": "check fleet health"},
+                session_id="neutral-persona-no-operator",
+                persona_enabled=False,
+                use_runtime=False,
+            )
+        self.assertNotIn("operator", payload["line"].lower())
+        self.assertNotIn("sir", payload["line"].lower())
+        self.assertTrue(payload["line"].strip())
+
     def test_normalize_spoken_line_strips_agent_stream_blocks(self) -> None:
         raw = (
             ":::thinking\nInvestigating the spike.\n:::\n"

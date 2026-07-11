@@ -115,13 +115,19 @@ export function buildBriefingSummaryLine(
   briefing: OperatorBriefing | null,
   runtimeSummary: RuntimeSummary | null,
   workspaceId: string | null,
+  activeSignalCount?: number | null,
 ): string {
   const activeRunSource = briefing?.active_runs ?? runtimeSummary?.active_runs ?? [];
   const activeRuns = workspaceId
     ? activeRunSource.filter((run) => run.workspace_id === workspaceId).length
     : activeRunSource.length;
   const signalCount =
-    briefing?.top_signals.length ?? runtimeSummary?.signals.open_count ?? 0;
+    activeSignalCount ??
+    (briefing && briefing.top_signals.length > 0
+      ? briefing.top_signals.length
+      : null) ??
+    runtimeSummary?.signals.open_count ??
+    0;
   const approvals = briefing?.pending_approvals.count ?? runtimeSummary?.approvals.pending_count ?? 0;
 
   if (approvals > 0) {

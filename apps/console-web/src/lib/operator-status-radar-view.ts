@@ -185,10 +185,10 @@ export function operatorStatusHeadline(input: {
       return `${workspaceReviewReadyCount}× ${label} runs queued — use Complete all to clear.`;
     }
     if (workspaceReviewReadyCount === 1 && input.primaryActiveRun?.phase === 'review_ready') {
-      return `${formatRunDisplayName(input.primaryActiveRun)} is ready for operator review.`;
+      return `${formatRunDisplayName(input.primaryActiveRun)} is ready for your review.`;
     }
     const noun = workspaceReviewReadyCount === 1 ? 'run is' : 'runs are';
-    return `${workspaceReviewReadyCount} ${noun} ready for operator review in this workspace.`;
+    return `${workspaceReviewReadyCount} ${noun} ready for your review in this workspace.`;
   }
 
   if (input.briefing?.notice) {
@@ -196,7 +196,7 @@ export function operatorStatusHeadline(input: {
   }
 
   if (input.primaryActiveRun?.phase === 'review_ready') {
-    return `${formatRunDisplayName(input.primaryActiveRun)} is ready for operator review.`;
+    return `${formatRunDisplayName(input.primaryActiveRun)} is ready for your review.`;
   }
 
   if (input.primaryActiveRun) {
@@ -218,7 +218,7 @@ export function operatorStatusAdvise(input: {
     return 'Review connectivity before dispatching more work.';
   }
 
-  return input.briefing?.advise ?? 'Describe the next operator action in Command.';
+  return input.briefing?.advise ?? 'Describe the next action in Command.';
 }
 
 export function operatorStatusMetrics(input: {
@@ -301,7 +301,7 @@ export function operatorMissionSummary(input: {
       workspace: input.workspaceId ?? 'none selected',
       status: 'standing by',
       elapsed: '—',
-      currentStep: 'Waiting for the next operator command.',
+      currentStep: 'Waiting for the next command.',
       watchConnected,
     };
   }
@@ -425,7 +425,7 @@ export function operatorExecutionStage(input: {
     identityLabel: mission.identityLabel,
     phase: mission.phase,
     phaseProgress: runPhaseProgress(run?.phase ?? null),
-    summary: run ? humanizeRunSummary(run.summary) : 'Standing by for the next operator command.',
+    summary: run ? humanizeRunSummary(run.summary) : 'Standing by for the next command.',
     commandDetail: run ? formatRunCommandDetail(run) : null,
     currentStep: mission.currentStep,
     notice: operatorStatusHeadline({

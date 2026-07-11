@@ -110,13 +110,7 @@ const voiceLine = computed(() => {
     </template>
 
     <template v-else>
-      <div class="briefing-panel__presence">
-        <div class="briefing-panel__avatar" aria-hidden="true">
-          <span class="briefing-panel__avatar-core" />
-          <span class="briefing-panel__avatar-ring" />
-          <span class="briefing-panel__avatar-ring briefing-panel__avatar-ring--outer" />
-          <span class="briefing-panel__avatar-ring briefing-panel__avatar-ring--pulse" />
-        </div>
+      <div class="briefing-panel__presence briefing-panel__presence--text-only">
         <div class="briefing-panel__voice-copy">
           <p class="briefing-panel__voice-line">{{ voiceLine }}</p>
           <strong class="briefing-panel__headline">{{ headline }}</strong>

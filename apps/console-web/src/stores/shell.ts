@@ -466,7 +466,7 @@ export const useShellStore = defineStore('shell', () => {
 
 
   const layoutModeLabel = computed(() =>
-    layoutMode.value === 'operator' ? 'Operator mode' : 'IDE mode',
+    layoutMode.value === 'operator' ? 'Mission Control' : 'IDE mode',
   );
 
   const workspaceRuns = computed(() =>
@@ -486,6 +486,7 @@ export const useShellStore = defineStore('shell', () => {
     topbarMetaPills,
     topbarBreadcrumb,
     activeOperatorSignalCount,
+    attentionSignals,
     workspaceAttentionSignalCount,
     statusBarZones,
     workspaceStatusCardRows,
@@ -3169,11 +3170,12 @@ export const useShellStore = defineStore('shell', () => {
   async function refreshRunSurfaces(): Promise<void> {
     const briefingBackground = briefingLoadState.value === 'loaded';
     const runtimeBackground = runtimeSummaryLoadState.value === 'loaded';
+    const inboxBackground = inboxLoadState.value === 'loaded';
     await Promise.all([
       loadRuns(),
       loadRuntimeStatus(),
       loadRuntimeSummary({ background: runtimeBackground }),
-      loadInbox(),
+      loadInbox({ background: inboxBackground }),
       loadConnectors(),
       loadOperatorBriefing({ background: briefingBackground }),
       loadOperatorFleetHealth({ background: operatorFleetHealthLoadState.value === 'loaded' }),
@@ -3559,6 +3561,7 @@ export const useShellStore = defineStore('shell', () => {
     inboxItems,
     inboxLoadState,
     activeOperatorSignalCount,
+    attentionSignals,
     workspaceAttentionSignalCount,
     inboxStateLabel,
     kairoBriefingAttention,

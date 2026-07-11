@@ -12,6 +12,7 @@ import {
   galaxyLegendItems,
   galaxyNodeCounts,
   galaxyTopHubs,
+  resolveGalaxyWorkspaceNavigation,
 } from '../../features/brain-galaxy/brain-galaxy-hud-view';
 import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
 import {
@@ -47,16 +48,38 @@ const headline = computed(() => brainGraphHeadline(snapshot.value));
 const legend = computed(() => galaxyLegendItems());
 const topHubs = computed(() => galaxyTopHubs(snapshot.value));
 const nodeCounts = computed(() => galaxyNodeCounts(snapshot.value));
+const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 
-function handleNodeClick(node: { kind: string; workspace_id: string | null; node_id: string }): void {
+function enterWorkspace(workspaceId: string, nodeId: string, label: string): void {
+  setBrainGalaxyConversationFocus({
+    nodeId,
+    workspaceId,
+    signalId: null,
+    label,
+  });
+  shell.setCurrentWorkspace(workspaceId);
+  shell.setLeftSidebarMode('workspaces');
+  // Dive into the workspace IDE — camera-only focus felt like a dead end.
+  shell.setLayoutMode('ide');
+}
+
+function handleNodeClick(node: {
+  kind: string;
+  workspace_id: string | null;
+  node_id: string;
+  label?: string;
+}): void {
   setBrainGalaxyConversationFocus({
     nodeId: node.node_id,
     workspaceId: node.workspace_id,
     signalId: node.kind === 'signal' ? node.node_id.replace(/^sig_/, '') : null,
-    label: node.node_id,
+    label: node.label ?? node.node_id,
   });
-  if (node.kind === 'workspace' && node.workspace_id) {
-    shell.setCurrentWorkspace(node.workspace_id);
+  if (node.kind === 'workspace') {
+    const nav = resolveGalaxyWorkspaceNavigation(node.workspace_id);
+    if (nav) {
+      enterWorkspace(nav.workspaceId, node.node_id, node.label ?? node.node_id);
+    }
     return;
   }
   if (node.kind === 'signal') {
@@ -75,17 +98,19 @@ const showLoading = computed(() => !webglReady.value && !webglFailed.value);
 const showSvgFallback = computed(() => webglFailed.value);
 const vaxonBusy = computed(() => isKairoConversationBusy());
 
-function handleHubClick(hub: { node_id: string; workspace_id: string | null }): void {
-  focusNode(hub.node_id);
-  setBrainGalaxyConversationFocus({
-    nodeId: hub.node_id,
-    workspaceId: hub.workspace_id,
-    signalId: null,
-    label: hub.node_id,
-  });
-  if (hub.workspace_id) {
-    shell.setCurrentWorkspace(hub.workspace_id);
+function handleHubClick(hub: {
+  node_id: string;
+  workspace_id: string | null;
+  label: string;
+}): void {
+  const nav = resolveGalaxyWorkspaceNavigation(hub.workspace_id);
+  if (!nav) {
+    focusNode(hub.node_id);
+    return;
   }
+  // Brief camera cue, then leave galaxy for the workspace IDE.
+  focusNode(hub.node_id);
+  enterWorkspace(nav.workspaceId, hub.node_id, hub.label);
 }
 </script>
 
@@ -177,8 +202,13 @@ function handleHubClick(hub: { node_id: string; workspace_id: string | null }): 
             class="brain-galaxy-stage__hub"
             :class="[
               `brain-galaxy-stage__hub--${hub.tone}`,
-              { 'brain-galaxy-stage__hub--active': selectedNode?.node_id === hub.node_id },
+              {
+                'brain-galaxy-stage__hub--active':
+                  currentWorkspaceId === hub.workspace_id ||
+                  selectedNode?.node_id === hub.node_id,
+              },
             ]"
+            :title="`Open ${hub.label} in IDE`"
             @click="handleHubClick(hub)"
           >
             <span class="brain-galaxy-stage__hub-dot" aria-hidden="true" />

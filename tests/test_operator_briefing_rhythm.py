@@ -39,7 +39,7 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
             watch_connected=True,
         )
 
-        self.assertEqual("Smoke run is ready for operator review.", notice)
+        self.assertEqual("Smoke run is ready for your review.", notice)
 
     def test_advise_uses_first_next_safe_action(self) -> None:
         advise = build_briefing_advise(

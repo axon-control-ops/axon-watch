@@ -244,7 +244,7 @@ def _build_runtime_artifact(
     if facts["advise"]:
         sources.append({"label": "Briefing advise", "detail": facts["advise"]})
     if not sources:
-        sources.append({"label": "Operator briefing", "detail": "Grounded in current fleet and run state."})
+        sources.append({"label": "Briefing", "detail": "Grounded in current fleet and run state."})
     actions: list[dict[str, object]] = []
     handoff = _artifact_handoff_action(
         pack=pack,
