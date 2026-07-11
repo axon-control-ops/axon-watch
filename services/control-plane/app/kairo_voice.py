@@ -263,6 +263,8 @@ def _fallback_for_event(
             guest_name,
         )
 
+    # Tool/edit pools stay available for opt-in tool narration; the shell
+    # currently filters those milestones client-side before calling speak.
     if event_type == "tool":
         tool_label = str(context.get("tool_label") or "").strip().lower()
         if tool_label.startswith("read"):

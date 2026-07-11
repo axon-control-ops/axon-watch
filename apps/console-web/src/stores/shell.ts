@@ -1538,6 +1538,8 @@ export const useShellStore = defineStore('shell', () => {
       return;
     }
     const narration = effectiveKairoNarrationLevel.value;
+    // Gate before any speak network call so filtered tool/edit/thinking
+    // milestones never hit /api/kairo/speak.
     if (!shouldNarrateAgentEvent({ eventKey, narration })) {
       return;
     }

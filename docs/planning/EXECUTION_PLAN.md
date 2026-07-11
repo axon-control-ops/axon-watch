@@ -106,7 +106,7 @@ Detail: `docs/planning/KAIRO_CONVERSATION_PLAN.md`
 | C3 | **OP-C3 gate** | Push-to-talk (hold orb / Space); privacy mode blocks mic | Manual: hold → speak → release → answer; privacy ON hides mic |
 | C4 | **OP-C4** | Navigation intents ("show DashPro", "open attention"); execute-tier confirm flow | vitest `conversation-intents.test.ts` PASS; manual nav + confirm dispatch | **Done** |
 | C5 | **OP-C5** | Session turn memory for follow-ups ("hand it off" after prior entity) | Contract tests for memory cap; manual follow-up without re-stating workspace | **Done** |
-| C6 | **V5+V9** | Narration plumbing cleanup + honest settings copy | vitest narration tests PASS; no speak API calls for filtered milestones |
+| C6 | **V5+V9** | Narration plumbing cleanup + honest settings copy | vitest narration tests PASS; no speak API calls for filtered milestones | **Done** |
 | C7 | **V1+V4+V6** | Honest mode labels, persona parity for thinking, error/fallback narration | Manual: minimal thinking uses Vaxon tone; agent error spoken |
 | C8 | **M1+M2** | Unified session id + SQLite-backed turn/entity memory | pytest: follow-up survives CP restart |
 | C9 | **M3+M5+M6** | Chat tail in context pack, 10 s DTO refresh, unified voice-log dedup | pytest context pack + TTL; manual: no repeated phrasing across channels |
@@ -247,6 +247,18 @@ gate is clear. If debt returns, pause C/D and return to Phase B.
 ---
 
 ## Append log
+
+### 2026-07-11 — C6 (V5+V9) narration plumbing + settings copy
+
+- Collapsed duplicate `shouldNarrateAgentEvent` branches; bookends only for
+  minimal and conversational (tool/edit/thinking milestones stay silent here).
+- Confirmed shell gates with `shouldNarrateAgentEvent` before `/api/kairo/speak`.
+- Kept backend tool/edit fallback pools for later opt-in tool narration.
+- Settings hints now match real behavior (start/done/alerts + one thinking line;
+  conversational = polished phrasing, not per-tool chatter).
+- Gate: `kairo-narration-policy.test.ts` PASS.
+- **Next:** C7 (V1+V4+V6) honest mode labels, persona parity for thinking,
+  error/fallback narration.
 
 ### 2026-07-09 — OP-C4 execute-tier confirm landed
 

@@ -304,6 +304,16 @@ Manual smoke (5 min):
 
 ## Append log
 
+### 2026-07-11 — C6 / V5+V9 landed
+
+- Client policy: single bookend gate for minimal + conversational; live thinking
+  remains on `shouldSpeakLiveThinkingBlock`.
+- Shell already short-circuits filtered milestones before speak network calls.
+- Backend tool/edit pools retained (commented) for future opt-in tool narration.
+- Operator presence settings copy aligned with actual Minimal / Conversational
+  behavior (no oversold “dialogue paraphrase” claim).
+- **Next:** V1+V4+V6 (C7).
+
 ### 2026-07-09 — Plan published
 
 - Consolidated 11-point Vaxon narration audit into slices V1–V9 (+ deferred V11).

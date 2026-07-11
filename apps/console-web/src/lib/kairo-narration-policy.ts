@@ -23,16 +23,15 @@ export function shouldNarrateAgentEvent(input: {
   if (input.narration === 'off') {
     return false;
   }
-  // Bookends only — avoid narrating every tool/edit/thinking milestone.
-  const isBookend =
+  // Bookends only for both minimal and conversational. Tool/edit milestones stay
+  // silent until opt-in tool narration ships. Live thinking uses
+  // shouldSpeakLiveThinkingBlock instead of this gate.
+  return (
     input.eventKey === 'start' ||
     input.eventKey === 'done' ||
     input.eventKey === 'failed' ||
-    input.eventKey.startsWith('alert');
-  if (input.narration === 'conversational') {
-    return isBookend;
-  }
-  return isBookend;
+    input.eventKey.startsWith('alert')
+  );
 }
 
 export function shouldSpeakLiveThinkingBlock(input: {

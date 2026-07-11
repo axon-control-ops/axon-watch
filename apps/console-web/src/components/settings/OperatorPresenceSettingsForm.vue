@@ -64,12 +64,12 @@ const narrationOptions = [
   {
     value: 'minimal',
     label: 'Minimal',
-    hint: 'Start, done, and high-value interrupts only.',
+    hint: 'Start, done, alerts, and one thinking sentence while the agent works (browser voice).',
   },
   {
     value: 'conversational',
     label: 'Conversational',
-    hint: 'JARVIS-style paraphrase for dialogue and voice replies.',
+    hint: 'Same as Minimal, with polished phrasing on those lines — not every tool step.',
   },
 ] as const;
 
@@ -159,7 +159,7 @@ function requestReset(): void {
         <label class="operator-settings-form__row operator-settings-form__row--select">
           <span class="operator-settings-form__copy">
             <strong>KAIRO narration</strong>
-            <small>Choose how much KAIRO speaks during operator work.</small>
+            <small>Agent runs speak bookends and one thinking line — not every tool.</small>
           </span>
           <select
             class="operator-settings-form__select"
