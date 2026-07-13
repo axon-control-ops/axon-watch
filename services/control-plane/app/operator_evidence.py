@@ -135,22 +135,70 @@ def _signal_evidence(signal_id: str) -> dict[str, Any]:
     if signal is None:
         raise ValueError(f"signal not found: {signal_id}")
     workspace_id = str(signal.get("workspace_id") or "")
+    meta = signal.get("meta") if isinstance(signal.get("meta"), dict) else {}
+    facts = [
+        {"label": "Signal", "value": signal_id},
+        {"label": "Severity", "value": str(signal.get("severity") or "info")},
+        {"label": "Status", "value": str(signal.get("status") or "open")},
+        {"label": "Source", "value": str(signal.get("source") or "unknown")},
+        {"label": "Action", "value": str(signal.get("action_type") or "none")},
+        {"label": "Delivery", "value": str(signal.get("delivery_state") or "pending")},
+    ]
+    if str(meta.get("check_id") or "").strip():
+        facts.append({"label": "Monitor check", "value": str(meta.get("check_id"))})
+    if str(meta.get("monitor_status") or "").strip():
+        facts.append({"label": "Monitor status", "value": str(meta.get("monitor_status"))})
+    if str(meta.get("signal_family") or "").strip():
+        facts.append({"label": "Family", "value": str(meta.get("signal_family"))})
+
+    sections: list[dict[str, Any]] = []
+    sentry_issues = meta.get("sentry_issues")
+    if isinstance(sentry_issues, list) and sentry_issues:
+        sections.append(
+            {
+                "title": "Sentry issues",
+                "items": [
+                    {
+                        "title": str(issue.get("title") or issue.get("id") or "Issue"),
+                        "detail": (
+                            f"count={issue.get('count', '?')}"
+                            + (
+                                f" · {issue.get('permalink')}"
+                                if str(issue.get("permalink") or "").strip()
+                                else ""
+                            )
+                        ),
+                        "source_ref": _source_ref(
+                            "sentry_issue",
+                            str(issue.get("id") or issue.get("shortId") or ""),
+                            label=str(issue.get("permalink") or "Sentry issue"),
+                            workspace_id=workspace_id,
+                        ),
+                    }
+                    for issue in sentry_issues
+                    if isinstance(issue, dict)
+                ][:8],
+            }
+        )
+
     return {
         "node_id": f"sig_{signal_id}",
         "kind": "signal",
         "title": str(signal.get("title") or signal_id),
         "summary": str(signal.get("summary") or signal.get("severity") or ""),
-        "facts": [
-            {"label": "Signal", "value": signal_id},
-            {"label": "Severity", "value": str(signal.get("severity") or "info")},
-            {"label": "Status", "value": str(signal.get("status") or "open")},
-        ],
+        "facts": facts,
         "sources": [_source_ref("signal", signal_id, label="Inbox signal", workspace_id=workspace_id)],
         "actions": [
             {"label": "Open in Attention", "target": "signal", "signal_id": signal_id},
+            {
+                "label": "Continue in IDE",
+                "target": "handoff",
+                "signal_id": signal_id,
+                "workspace_id": workspace_id,
+            },
             {"label": "Open workspace in IDE", "target": "workspace", "workspace_id": workspace_id},
         ],
-        "sections": [],
+        "sections": sections,
     }
 
 

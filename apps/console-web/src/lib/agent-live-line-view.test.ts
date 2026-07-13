@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  collapseBackToBackThinkingEcho,
   firstSpeakableAgentLiveBlock,
   isAgentLiveLineTruncated,
   sanitizeAgentThinkingForOperator,
@@ -9,6 +10,9 @@ import {
 
 const LONG_THINKING =
   "I'm starting to analyze the rendering issues the user wants fixed. They want table rendering to work in markdown previews without breaking layout.";
+
+const DASHBOARD_THOUGHT =
+  'I found the one concrete breakage left behind: the new teacher dashboard tests aren’t mocking useWindowDimensions, so they fail immediately, while the parent realtime tests already pass. I’m patching the test environment now so the new dashboard work can actually run.';
 
 describe('sanitizeAgentThinkingForOperator', () => {
   it('strips third-person user-asking meta commentary', () => {
@@ -23,6 +27,22 @@ describe('sanitizeAgentThinkingForOperator', () => {
 
   it('keeps technical thinking that only mentions the user incidentally', () => {
     expect(sanitizeAgentThinkingForOperator(LONG_THINKING)).toBe(LONG_THINKING);
+  });
+
+  it('collapses exact and glued back-to-back thinking echoes', () => {
+    expect(sanitizeAgentThinkingForOperator(DASHBOARD_THOUGHT + DASHBOARD_THOUGHT)).toBe(
+      DASHBOARD_THOUGHT,
+    );
+    const glued =
+      'found the one concrete breakage left behind: the new teacher dashboard tests aren’t mocking useWindowDimensions, so they fail immediately, while the parent realtime tests already pass. I’m patching the test environment now so the new dashboard work can actually run.' +
+      DASHBOARD_THOUGHT;
+    expect(sanitizeAgentThinkingForOperator(glued)).toBe(DASHBOARD_THOUGHT);
+  });
+});
+
+describe('collapseBackToBackThinkingEcho', () => {
+  it('keeps non-echoed thinking intact', () => {
+    expect(collapseBackToBackThinkingEcho(DASHBOARD_THOUGHT)).toBe(DASHBOARD_THOUGHT);
   });
 });
 

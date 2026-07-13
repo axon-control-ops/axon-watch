@@ -160,12 +160,16 @@ export function useKairoConversation() {
     action: NonNullable<Awaited<ReturnType<typeof postKairoConverse>>['action']>,
   ): Promise<void> {
     if (action.type === 'handoff_signal') {
-      await shell.handoffSignalToIde({
-        signal_id: action.signal_id,
-        workspace_id: action.target_workspace_id,
-        title: action.task.replace(/^Investigate signal "/, '').split('"')[0] ?? action.task,
-        summary: action.task,
-      });
+      await shell.handoffSignalToIde(
+        {
+          signal_id: action.signal_id,
+          workspace_id: action.target_workspace_id,
+          title: action.task.replace(/^Investigate signal "/, '').split('"')[0] ?? action.task,
+          summary: action.task,
+          task: action.task,
+        },
+        { autoSubmit: true },
+      );
       return;
     }
     if (action.type === 'focus_briefing') {
@@ -223,12 +227,15 @@ export function useKairoConversation() {
     if (!topSignal) {
       return false;
     }
-    await shell.handoffSignalToIde({
-      signal_id: topSignal.signal_id,
-      workspace_id: topSignal.workspace_id ?? shell.currentWorkspace?.workspace_id ?? '',
-      title: topSignal.title,
-      summary: topSignal.summary ?? topSignal.title,
-    });
+    await shell.handoffSignalToIde(
+      {
+        signal_id: topSignal.signal_id,
+        workspace_id: topSignal.workspace_id ?? shell.currentWorkspace?.workspace_id ?? '',
+        title: topSignal.title,
+        summary: topSignal.summary ?? topSignal.title,
+      },
+      { autoSubmit: true },
+    );
     kairoConversationReply.value = 'Handing the top signal off to the IDE.';
     speakReply(kairoConversationReply.value);
     return true;

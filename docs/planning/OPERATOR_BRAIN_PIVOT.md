@@ -167,7 +167,7 @@ All graph layout (3D positions, clustering) is **client-derived** from `BrainGra
 | **OP-B6b** | 2D graph fallback (deterministic radial SVG) | console-web | OP-B6a | **Done** (`operator-brain-graph-view.ts`, `OperatorBrainGraphPanel.vue`) |
 | **OP-B6c** | 3D galaxy view (WebGL, bounded feature module) | console-web `brain-galaxy/` | OP-B6a | **In progress** (WebGL stage + orb + galaxy HUD landed; prove-source wiring still thin) |
 | **OP-B6d** | View switcher: GRID \| BRAIN; persist preference | shell store | OP-B6b,c | **Done** (2D; galaxy joins switcher in OP-B6c) |
-| **OP-B6e** | Node click → prove-source panel (reuse OP-B5) | console-web | OP-B5 | Partial (workspace click focuses, signal click opens Attention, converse context + artifact handoff skeleton landed) |
+| **OP-B6e** | Node click → prove-source panel (reuse OP-B5) | console-web | OP-B5 | **Done** (node click loads evidence DTO; SVG + WebGL selection; Sentry sample + Continue in IDE action) |
 
 **Performance budget:** initial galaxy load <2s on dev machine; <100 animated nodes default; LOD beyond that.
 

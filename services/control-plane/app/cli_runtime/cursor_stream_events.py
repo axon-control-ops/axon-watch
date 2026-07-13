@@ -317,6 +317,7 @@ class CursorStreamAssembler:
         self._on_delta = on_delta
         self._parts: list[str] = []
         self._thinking_open = False
+        self._thinking_accumulated = ""
         self._saw_assistant_text = False
         self._assistant_accumulated = ""
         self._research_open_query: str | None = None
@@ -346,6 +347,7 @@ class CursorStreamAssembler:
         if self._thinking_open:
             self._append("\n:::\n")
             self._thinking_open = False
+        self._thinking_accumulated = ""
 
     def _close_open_research(self) -> None:
         if self._research_open_active:
@@ -370,12 +372,17 @@ class CursorStreamAssembler:
             if event.get("subtype") == "completed":
                 self._close_thinking()
                 return
-            delta = str(event.get("text") or "")
-            if delta:
-                if not self._thinking_open:
-                    self._append("\n:::thinking\n")
-                    self._thinking_open = True
-                self._append(delta)
+            # Cursor can emit incremental thinking chunks and then a cumulative
+            # echo of the full block — same failure mode as assistant text.
+            incoming = _collapse_echo_text(str(event.get("text") or ""))
+            if incoming:
+                delta = assistant_text_delta(self._thinking_accumulated, incoming)
+                if delta:
+                    if not self._thinking_open:
+                        self._append("\n:::thinking\n")
+                        self._thinking_open = True
+                    self._thinking_accumulated += delta
+                    self._append(delta)
             return
 
         if event_type == "assistant":

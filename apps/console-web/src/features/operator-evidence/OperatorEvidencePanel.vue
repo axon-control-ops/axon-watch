@@ -20,6 +20,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   openWorkspace: [workspaceId: string];
   openSignal: [signalId: string];
+  handoffSignal: [
+    signal: {
+      signal_id: string;
+      workspace_id?: string | null;
+      title: string;
+      summary?: string | null;
+    },
+  ];
 }>();
 
 const loading = ref(false);
@@ -104,6 +112,14 @@ function triggerAction(action: OperatorEvidenceRecord['actions'][number]): void 
   }
   if (action.target === 'signal' && action.signal_id) {
     emit('openSignal', action.signal_id);
+  }
+  if (action.target === 'handoff' && action.signal_id && evidence.value) {
+    emit('handoffSignal', {
+      signal_id: action.signal_id,
+      workspace_id: action.workspace_id ?? workspaceId.value,
+      title: evidence.value.title,
+      summary: evidence.value.summary,
+    });
   }
 }
 

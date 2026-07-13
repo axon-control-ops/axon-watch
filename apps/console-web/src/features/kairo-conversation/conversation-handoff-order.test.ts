@@ -86,7 +86,9 @@ describe('conversation handoff order', () => {
       expect.objectContaining({
         signal_id: 'signal_monitor_dashpro_sentry_recent_issues_warning',
         workspace_id: 'workspace_dashpro',
+        task: 'Investigate signal "Sentry spike in DashPro": 3 unresolved issues',
       }),
+      { autoSubmit: true },
     );
   });
 });

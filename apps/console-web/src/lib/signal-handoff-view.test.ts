@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { canHandoffSignalToIde, resolveSignalHandoff } from './signal-handoff-view';
+import {
+  buildSignalHandoffTask,
+  canHandoffSignalToIde,
+  resolveSignalHandoff,
+} from './signal-handoff-view';
 
 describe('signal-handoff-view', () => {
   it('blocks bootstrap signals from handoff', () => {
@@ -10,6 +14,17 @@ describe('signal-handoff-view', () => {
         title: 'Watch bootstrap ready',
       }),
     ).toBe(false);
+  });
+
+  it('uses an explicit task when provided', () => {
+    expect(
+      buildSignalHandoffTask({
+        signal_id: 'signal_monitor_dashpro_sentry_recent_issues_warning',
+        title: 'DashPro Sentry warning',
+        summary: '3 unresolved issues',
+        task: 'Investigate signal "DashPro Sentry warning": 3 unresolved issues',
+      }),
+    ).toBe('Investigate signal "DashPro Sentry warning": 3 unresolved issues');
   });
 
   it('resolves cross-workspace handoff', () => {
@@ -30,5 +45,8 @@ describe('signal-handoff-view', () => {
     expect(resolved?.mode).toBe('handoff');
     expect(resolved?.sourceWorkspaceId).toBe('workspace_axon_watch');
     expect(resolved?.targetWorkspaceId).toBe('workspace_dashpro');
+    expect(resolved?.task).toBe(
+      'Investigate signal "DashPro Sentry warning": 3 unresolved issues',
+    );
   });
 });

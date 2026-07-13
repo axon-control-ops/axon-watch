@@ -77,8 +77,40 @@ class LaneBGitDispatchTests(unittest.TestCase):
             with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
                 message = derive_commit_message("workspace_alpha")
 
-            self.assertIn("KAIRO", message)
-            self.assertIn("IDE terminal", message)
+            self.assertTrue(message.startswith("Add ") or message.startswith("Update "))
+            self.assertIn("kairo_voice.py", message)
+            self.assertNotIn("Polish", message)
+
+    def test_derive_commit_message_prefers_turn_subject(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            (root / "notes.txt").write_text("hello\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                message = derive_commit_message(
+                    "workspace_alpha",
+                    turn_subject="Fix incremental stream-state race in shell onDelta",
+                )
+
+            self.assertEqual(message, "Fix incremental stream-state race in shell onDelta")
+
+    def test_derive_commit_message_ignores_bare_commit_intent(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            (root / "notes.txt").write_text("hello\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                message = derive_commit_message(
+                    "workspace_alpha",
+                    turn_subject="commit these changes",
+                )
+
+            self.assertNotEqual(message, "commit these changes")
+            self.assertTrue(message.startswith("Add ") or message.startswith("Update "))
 
     def test_skips_questions_about_commits(self) -> None:
         for prompt in (

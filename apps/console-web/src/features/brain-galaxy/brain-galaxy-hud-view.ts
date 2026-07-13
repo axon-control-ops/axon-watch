@@ -84,16 +84,16 @@ export function galaxyInspectorCopy(node: BrainGraphNode | null): {
   if (!node) {
     return {
       title: 'Inspector',
-      body: 'Click a node to inspect it. Workspaces open in the IDE; signals open Attention.',
+      body: 'Click a node to open its evidence panel. Workspaces focus context; signals show prove-source.',
       hint: 'Drag to orbit the galaxy',
     };
   }
 
   const hints: Record<string, string> = {
     core: 'KAIRO control plane — the center of your operator brain.',
-    workspace: 'Opens this workspace in the IDE and sets console context.',
+    workspace: 'Evidence lists signals and runs; open the workspace in the IDE from the panel.',
     run: 'Active execution lane tied to a workspace.',
-    signal: 'Click to open this signal in Attention.',
+    signal: 'Evidence panel loads prove-source facts; open Attention or Continue in IDE from actions.',
     connector: 'Live connector health bound to a workspace.',
   };
 

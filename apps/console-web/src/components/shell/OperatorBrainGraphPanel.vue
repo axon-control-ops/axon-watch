@@ -16,9 +16,11 @@ import {
   resolveGalaxyWorkspaceNavigation,
 } from '../../features/brain-galaxy/brain-galaxy-hud-view';
 import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
+import { resolveBrainGalaxyNodeSelection } from '../../features/brain-galaxy/brain-galaxy-node-selection';
 import {
   brainGraphHeadline,
   layoutBrainGraph,
+  type BrainGraphNode,
 } from '../../lib/operator-brain-graph-view';
 import { useShellStore } from '../../stores/shell';
 
@@ -64,21 +66,12 @@ function enterWorkspace(workspaceId: string, nodeId: string, label: string): voi
   shell.setLayoutMode('ide');
 }
 
-function handleNodeClick(node: {
-  kind: string;
-  workspace_id: string | null;
-  node_id: string;
-  label?: string;
-}): void {
-  setBrainGalaxyConversationFocus({
-    nodeId: node.node_id,
-    workspaceId: node.workspace_id,
-    signalId: node.kind === 'signal' ? node.node_id.replace(/^sig_/, '') : null,
-    label: node.label ?? node.node_id,
-  });
+function handleNodeClick(node: BrainGraphNode): void {
+  const selection = resolveBrainGalaxyNodeSelection(node);
+  setBrainGalaxyConversationFocus(selection.focus);
 }
 
-const { webglReady, webglFailed, selectedNode, resetView, focusNode } = useBrainGalaxy({
+const { webglReady, webglFailed, selectedNode, resetView, focusNode, selectNode } = useBrainGalaxy({
   container: galaxyHost,
   snapshot,
   onNodeClick: handleNodeClick,
@@ -97,6 +90,11 @@ function handleHubClick(hub: {
   focusNode(hub.node_id);
 }
 
+function handleSvgNodeClick(node: BrainGraphNode): void {
+  // SVG fallback has no WebGL selection path — drive evidence + focus here.
+  selectNode(node);
+}
+
 function handleEvidenceWorkspace(workspaceId: string): void {
   const nav = resolveGalaxyWorkspaceNavigation(workspaceId);
   if (!nav) {
@@ -111,6 +109,15 @@ function handleEvidenceWorkspace(workspaceId: string): void {
 
 function handleEvidenceSignal(signalId: string): void {
   shell.focusAttentionSidebar(signalId);
+}
+
+function handleEvidenceHandoff(signal: {
+  signal_id: string;
+  workspace_id?: string | null;
+  title: string;
+  summary?: string | null;
+}): void {
+  void shell.handoffSignalToIde(signal, { autoSubmit: true });
 }
 </script>
 
@@ -158,7 +165,7 @@ function handleEvidenceSignal(signalId: string): void {
             `operator-brain-graph__node--${node.tone}`,
           ]"
           :transform="`translate(${node.x}, ${node.y})`"
-          @click="handleNodeClick(node)"
+          @click="handleSvgNodeClick(node)"
         >
           <circle :r="node.radius" />
         </g>
@@ -208,7 +215,7 @@ function handleEvidenceSignal(signalId: string): void {
                   selectedNode?.node_id === hub.node_id,
               },
             ]"
-            :title="`Open ${hub.label} in IDE`"
+            :title="`Inspect ${hub.label}`"
             @click="handleHubClick(hub)"
           >
             <span class="brain-galaxy-stage__hub-dot" aria-hidden="true" />
@@ -228,6 +235,7 @@ function handleEvidenceSignal(signalId: string): void {
       :fallback-hint="inspector.hint"
       @open-workspace="handleEvidenceWorkspace"
       @open-signal="handleEvidenceSignal"
+      @handoff-signal="handleEvidenceHandoff"
     />
 
     <aside class="brain-galaxy-stage__hud brain-galaxy-stage__hud--right">

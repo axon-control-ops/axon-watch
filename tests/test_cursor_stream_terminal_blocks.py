@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -98,6 +99,34 @@ class CursorStreamPartialDedupeTests(unittest.TestCase):
             "The built-in web lookup path was not available, so I am checking the audited path."
         )
         self.assertEqual("", assistant_text_delta(sentence, sentence + sentence))
+
+    def test_stream_assembler_does_not_duplicate_thinking_echo(self) -> None:
+        assembler = CursorStreamAssembler()
+        thought = (
+            "I found the one concrete breakage left behind: the new teacher dashboard "
+            "tests aren't mocking useWindowDimensions."
+        )
+        events = [
+            json.dumps({"type": "thinking", "subtype": "delta", "text": thought[:24]}),
+            json.dumps({"type": "thinking", "subtype": "delta", "text": thought}),
+            json.dumps({"type": "thinking", "subtype": "delta", "text": thought + thought}),
+            json.dumps({"type": "thinking", "subtype": "completed"}),
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "message": {
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": "DONE"}],
+                    },
+                }
+            ),
+        ]
+        for line in events:
+            assembler.feed_line(line)
+        content = assembler.finalize()
+        self.assertEqual(content.count(thought), 1)
+        self.assertIn(f":::thinking\n{thought}\n:::", content)
+        self.assertTrue(content.endswith("DONE"))
 
     def test_stream_assembler_does_not_duplicate_partial_and_final_text(self) -> None:
         assembler = CursorStreamAssembler()

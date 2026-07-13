@@ -248,6 +248,13 @@ gate is clear. If debt returns, pause C/D and return to Phase B.
 
 ## Append log
 
+### 2026-07-13 — D1 (OP-B6e) galaxy node → evidence panel
+
+- Node selection drives `/api/operator/evidence` for WebGL and SVG fallback.
+- Signal evidence includes monitor/Sentry sample facts + Continue in IDE action.
+- Gates: `tests.test_operator_evidence`, vitest brain-galaxy node-selection + HUD.
+- **Next:** D2 (OP-V1f / OP-B5) handoff from incident feed + conversation → IDE run.
+
 ### 2026-07-13 — C8 / M1+M2 session persistence landed
 
 - SQLite `kairo_session_memory` + stable `kairo:workspace:thread` session ids.

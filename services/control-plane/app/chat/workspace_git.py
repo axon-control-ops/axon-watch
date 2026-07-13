@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from dataclasses import dataclass
 
@@ -115,8 +116,37 @@ def git_push(workspace_id: str) -> GitCommandResult:
     return run_git(workspace_id, ["git", "push"])
 
 
-def derive_commit_message(workspace_id: str) -> str:
-    """Build a descriptive commit subject from pending changes when none was given."""
+_COMMIT_INTENT_ONLY_RE = re.compile(
+    r"^\s*(?:please\s+)?(?:commit(?:\s+(?:these|my|the|all))?(?:\s+changes?)?"
+    r"(?:\s+and\s+push)?|create\s+(?:a\s+)?commit|git\s+commit(?:\s+and\s+push)?)"
+    r"(?:\s+please)?[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_turn_subject(turn_subject: str | None) -> str | None:
+    """Use the operator/agent turn as commit subject when it describes real work."""
+    text = " ".join(str(turn_subject or "").split()).strip()
+    if not text:
+        return None
+    if _COMMIT_INTENT_ONLY_RE.match(text):
+        return None
+    # Drop trailing commit instructions glued onto a real subject.
+    text = re.sub(
+        r"(?:,?\s+)?(?:and\s+)?(?:please\s+)?(?:commit(?:\s+and\s+push)?|git\s+commit).*$",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    ).strip(" ,.-")
+    if not text or _COMMIT_INTENT_ONLY_RE.match(text):
+        return None
+    if len(text) > 72:
+        cut = text[:71].rsplit(" ", 1)[0].rstrip(" ,.-")
+        text = f"{cut}…" if cut else f"{text[:71]}…"
+    return text
+
+
+def _collect_changed_paths(workspace_id: str) -> list[str]:
     files: list[str] = []
     for args in (
         ["git", "diff", "--name-only", "HEAD"],
@@ -130,28 +160,96 @@ def derive_commit_message(workspace_id: str) -> str:
             cleaned = line.strip()
             if cleaned:
                 files.append(cleaned)
+    return list(dict.fromkeys(files))
 
-    files = list(dict.fromkeys(files))
+
+def _summarize_diff_stat(workspace_id: str, files: list[str]) -> str | None:
+    """Build a subject from ``git diff --stat`` (+ untracked basenames)."""
     if not files:
-        return "Update via Axon-X"
+        return None
 
-    blob = " ".join(files).lower()
-    themes: list[str] = []
-    if any(token in blob for token in ("kairo", "voice", "narration", "spoken")):
-        themes.append("KAIRO voice")
-    if any(token in blob for token in ("terminal", "xterm", "websocket")):
-        themes.append("IDE terminal")
-    if any(token in blob for token in ("explorer", "file-tree", "file_tree", "workspace-file")):
-        themes.append("explorer")
-    if any(token in blob for token in ("git_dispatch", "workspace_git", "lane_b_git")):
-        themes.append("git dispatch")
-    if any(token in blob for token in ("transcript", "conversation-seam")):
-        themes.append("agent transcript")
+    stat = run_git(workspace_id, ["git", "diff", "--stat", "HEAD"])
+    cached = run_git(workspace_id, ["git", "diff", "--cached", "--stat"])
+    stat_blob = "\n".join(
+        part
+        for part in (stat.output if stat.success else "", cached.output if cached.success else "")
+        if part and part != "(no output)"
+    )
 
-    if themes:
-        return f"Polish {', '.join(dict.fromkeys(themes))}"
+    insert_total = 0
+    delete_total = 0
+    for match in re.finditer(r"(\d+)\s+insertions?\(\+\)", stat_blob):
+        insert_total += int(match.group(1))
+    for match in re.finditer(r"(\d+)\s+deletions?\(-\)", stat_blob):
+        delete_total += int(match.group(1))
 
-    areas = sorted({path.split("/")[0] for path in files if "/" in path})
-    if areas:
-        return f"Update {'/'.join(areas[:2])} ({len(files)} files)"
-    return f"Update {len(files)} workspace files"
+    basenames: list[str] = []
+    for path in files:
+        name = path.rsplit("/", 1)[-1]
+        if name and name not in basenames:
+            basenames.append(name)
+        if len(basenames) >= 3:
+            break
+
+    if not basenames:
+        return None
+
+    if insert_total and not delete_total and all(
+        path.startswith("apps/") or path.startswith("services/") or "/" in path for path in files
+    ):
+        # Prefer "Add" when the tree is mostly new files.
+        untracked = run_git(workspace_id, ["git", "ls-files", "--others", "--exclude-standard"])
+        untracked_set = {
+            line.strip()
+            for line in (untracked.output.splitlines() if untracked.success else [])
+            if line.strip()
+        }
+        if files and all(path in untracked_set for path in files):
+            verb = "Add"
+        else:
+            verb = "Update"
+    elif delete_total and not insert_total:
+        verb = "Remove"
+    else:
+        verb = "Update"
+
+    focus = ", ".join(basenames[:2])
+    if len(basenames) > 2 or len(files) > 2:
+        focus = f"{focus} (+{len(files) - min(2, len(basenames))} more)" if len(files) > 2 else focus
+
+    counts = ""
+    if insert_total or delete_total:
+        counts = f" (+{insert_total}/−{delete_total})"
+
+    subject = f"{verb} {focus}{counts}".strip()
+    if len(subject) > 72:
+        subject = f"{subject[:71].rstrip()}…"
+    return subject
+
+
+def derive_commit_message(workspace_id: str, turn_subject: str | None = None) -> str:
+    """Build a commit subject from the turn text and/or ``git diff --stat``.
+
+    Preference order:
+    1. Descriptive operator/agent turn subject (not bare "commit these changes")
+    2. Diff-stat summary of pending paths
+    3. Generic fallback
+    """
+    from_turn = _normalize_turn_subject(turn_subject)
+    files = _collect_changed_paths(workspace_id)
+    from_diff = _summarize_diff_stat(workspace_id, files)
+
+    if from_turn and from_diff and from_turn.lower() not in from_diff.lower():
+        # Keep the human intent when it already names the work.
+        if any(token in from_turn.lower() for token in ("fix", "add", "update", "extract", "harden", "land")):
+            return from_turn
+    if from_diff:
+        return from_diff
+    if from_turn:
+        return from_turn
+    if files:
+        areas = sorted({path.split("/")[0] for path in files if "/" in path})
+        if areas:
+            return f"Update {'/'.join(areas[:2])} ({len(files)} files)"
+        return f"Update {len(files)} workspace files"
+    return "Update via Axon-X"

@@ -2,16 +2,12 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import { agentExecutionAccessHint } from '../lib/agent-execution-access-prefs';
 import { resizeCommandComposer } from '../lib/command-composer-autosize';
-import {
-  resolveActiveIdeAgentMessage,
-} from '../lib/ide-agent-center-view';
+import { resolveActiveIdeAgentMessage } from '../lib/ide-agent-center-view';
 import {
   summarizeIdeAgentActivity,
   summarizeIdeAgentActivityFromCounts,
 } from '../lib/ide-agent-activity-view';
-import {
-  filterMcpToolsForComposerMode,
-} from '../lib/composer-mcp-tools-view';
+import { filterMcpToolsForComposerMode } from '../lib/composer-mcp-tools-view';
 import {
   kairoConversationError,
   kairoConversationReply,
@@ -29,6 +25,7 @@ import {
   type ComposerMode,
 } from './agent-dock/use-composer-menus';
 import { useComposerModelRuntime } from './agent-dock/use-composer-model-runtime';
+import { useComposerRestoreModeFocus } from './agent-dock/use-composer-restore-mode-focus';
 
 export type { ComposerMode };
 export { MODE_OPTIONS };
@@ -324,15 +321,12 @@ export function useAgentDockComposer() {
     { immediate: true },
   );
 
-  watch(
-    () => shell.commandFocusToken,
-    () => {
-      void nextTick(() => {
-        syncComposerHeight();
-        inputRef.value?.focus();
-      });
-    },
-  );
+  useComposerRestoreModeFocus({
+    commandFocusToken: () => shell.commandFocusToken,
+    composerMode,
+    inputRef,
+    syncComposerHeight,
+  });
 
   onMounted(() => {
     syncComposerHeight();

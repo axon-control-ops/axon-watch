@@ -5,6 +5,8 @@ export type SignalHandoffInput = {
   workspace_id?: string | null;
   title: string;
   summary?: string | null;
+  /** When set, used as the IDE agent prompt instead of rebuilding from title/summary. */
+  task?: string | null;
 };
 
 export type WorkspaceHandoffTarget = {
@@ -21,6 +23,10 @@ export type ResolvedSignalHandoff = {
 };
 
 export function buildSignalHandoffTask(signal: SignalHandoffInput): string {
+  const providedTask = signal.task?.trim();
+  if (providedTask) {
+    return providedTask;
+  }
   const summary = signal.summary?.trim();
   if (summary) {
     return `Investigate signal "${signal.title}": ${summary}`;

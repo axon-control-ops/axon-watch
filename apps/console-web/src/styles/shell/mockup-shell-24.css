@@ -134,22 +134,29 @@
   color: rgba(0, 210, 255, 0.92);
 }
 
-.conversation-seam__message-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0.35rem;
-}
-
 .conversation-seam__resend-button,
 .conversation-seam__edit-button {
   flex-shrink: 0;
-}
-
-.conversation-seam__edit-button {
+  width: auto;
+  min-width: 2.6rem;
+  height: auto;
+  min-height: 1.35rem;
+  padding: 0.12rem 0.42rem;
   font-size: 0.58rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding-inline: 0.42rem;
+}
+
+.conversation-seam__resend-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.conversation-seam__message-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
 }
 
 .conversation-seam__meta-button {
@@ -169,6 +176,18 @@
 .conversation-seam__meta-button:hover {
   border-color: rgba(0, 210, 255, 0.55);
   color: var(--accent-brand);
+}
+
+.conversation-seam__meta-button--handoff {
+  border-color: rgba(0, 242, 255, 0.42);
+  background: rgba(0, 242, 255, 0.1);
+  color: rgba(0, 242, 255, 0.95);
+}
+
+.conversation-seam__handoff-error {
+  margin: 0.35rem 0 0;
+  color: rgba(255, 140, 140, 0.92);
+  font-size: 0.68rem;
 }
 
 .conversation-seam__markdown-block {

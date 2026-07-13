@@ -16,6 +16,7 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   selectedNode: Ref<BrainGraphNode | null>;
   resetView: () => void;
   focusNode: (nodeId: string) => void;
+  selectNode: (node: BrainGraphNode) => void;
 } {
   const webglReady = ref(false);
   const webglFailed = ref(false);
@@ -28,10 +29,20 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     sceneRef.value?.resetView();
   }
 
+  function selectNode(node: BrainGraphNode): void {
+    selectedNode.value = node;
+    sceneRef.value?.setSelectedNode(node.node_id);
+    options.onNodeClick(node);
+  }
+
   function focusNode(nodeId: string): void {
     sceneRef.value?.focusNode(nodeId);
     const node = options.snapshot.value?.nodes.find((entry) => entry.node_id === nodeId) ?? null;
-    selectedNode.value = node;
+    if (node) {
+      selectNode(node);
+      return;
+    }
+    selectedNode.value = null;
   }
 
   function mountScene(): void {
@@ -99,5 +110,5 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     sceneRef.value = null;
   });
 
-  return { webglReady, webglFailed, selectedNode, resetView, focusNode };
+  return { webglReady, webglFailed, selectedNode, resetView, focusNode, selectNode };
 }

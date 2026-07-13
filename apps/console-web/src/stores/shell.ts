@@ -1919,6 +1919,7 @@ export const useShellStore = defineStore('shell', () => {
     agentDockCollapsed.value = false;
     persistAgentDockCollapsed(false);
     ideActivityView.value = 'agent';
+    commandFocusToken.value += 1;
   }
 
   function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {

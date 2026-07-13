@@ -39,7 +39,7 @@ export interface OperatorEvidenceRecord {
   sources: Array<{ ref_type: string; ref_id: string; label: string; workspace_id?: string }>;
   actions: Array<{
     label: string;
-    target: 'workspace' | 'signal' | string;
+    target: 'workspace' | 'signal' | 'handoff' | string;
     workspace_id?: string;
     signal_id?: string;
   }>;

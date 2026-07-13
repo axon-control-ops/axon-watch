@@ -65,12 +65,18 @@ export function useKairoAppVoice(): void {
           } else if (response.action.type === 'dispatch_command') {
             await shell.submitOperatorCommandContent(response.action.content);
           } else if (response.action.type === 'handoff_signal') {
-            await shell.handoffSignalToIde({
-              signal_id: response.action.signal_id,
-              workspace_id: response.action.target_workspace_id,
-              title: response.action.task.replace(/^Investigate signal "/, '').split('"')[0] ?? response.action.task,
-              summary: response.action.task,
-            });
+            await shell.handoffSignalToIde(
+              {
+                signal_id: response.action.signal_id,
+                workspace_id: response.action.target_workspace_id,
+                title:
+                  response.action.task.replace(/^Investigate signal "/, '').split('"')[0] ??
+                  response.action.task,
+                summary: response.action.task,
+                task: response.action.task,
+              },
+              { autoSubmit: true },
+            );
           }
         } else if (shouldAutoDispatchConverseCommand(response)) {
           await shell.submitOperatorCommandContent(response.command_content!);

@@ -99,7 +99,10 @@ def try_lane_b_git_commit_dispatch(
             "reason": "clean working tree",
         }
 
-    message = explicit_message or derive_commit_message(workspace_id)
+    message = explicit_message or derive_commit_message(
+        workspace_id,
+        turn_subject=user_prompt,
+    )
     if not message.strip() or message.strip() == "Update via Axon-X":
         lines.extend(
             [

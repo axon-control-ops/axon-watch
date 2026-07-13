@@ -30,12 +30,15 @@ async function handleHandoff(): Promise<void> {
   }
   pending.value = true;
   try {
-    await shell.handoffSignalToIde({
-      signal_id: props.signalId,
-      workspace_id: props.workspaceId,
-      title: props.title,
-      summary: props.summary,
-    });
+    await shell.handoffSignalToIde(
+      {
+        signal_id: props.signalId,
+        workspace_id: props.workspaceId,
+        title: props.title,
+        summary: props.summary,
+      },
+      { autoSubmit: true },
+    );
   } finally {
     pending.value = false;
   }

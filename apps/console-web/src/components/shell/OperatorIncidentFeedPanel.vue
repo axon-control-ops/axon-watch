@@ -48,17 +48,26 @@ function focusSignal(signalId: string): void {
               {{ item.source === 'fleet' ? 'Fleet rollup' : 'Signal inbox' }}
             </span>
           </button>
-          <HandoffToIdeButton
-            v-if="item.source === 'signal'"
-            :signal-id="item.id"
-            :workspace-id="item.workspaceId"
-            :title="item.title"
-            :summary="item.summary"
-            compact
-          />
+          <div v-if="item.source === 'signal'" class="operator-incident-feed__handoff-card">
+            <p class="operator-incident-feed__handoff-label">Investigate in IDE</p>
+            <HandoffToIdeButton
+              :signal-id="item.id"
+              :workspace-id="item.workspaceId"
+              :title="item.title"
+              :summary="item.summary"
+              compact
+            />
+          </div>
         </div>
       </li>
     </ul>
     <p v-else class="operator-incident-feed__empty">{{ feedView.emptyCopy }}</p>
+    <p
+      v-if="shell.handoffMutationError"
+      class="operator-incident-feed__handoff-error"
+      role="alert"
+    >
+      {{ shell.handoffMutationError }}
+    </p>
   </section>
 </template>

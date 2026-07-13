@@ -94,13 +94,16 @@ export interface WorkspaceSwitchShell {
   setCurrentWorkspace: (workspaceId: string) => void;
   openWorkspaceFile: (path: string) => Promise<void>;
   setLayoutMode?: (mode: 'operator' | 'ide') => void;
-  handoffSignalToIde?: (signal: {
-    signal_id: string;
-    workspace_id: string;
-    task: string;
-    title: string;
-    summary: string;
-  }, options?: { autoSubmit?: boolean }) => Promise<void>;
+  handoffSignalToIde?: (
+    signal: {
+      signal_id: string;
+      workspace_id: string;
+      task?: string;
+      title: string;
+      summary: string;
+    },
+    options?: { autoSubmit?: boolean },
+  ) => Promise<void>;
   surfaceOperatorArtifact?: (artifactId: string) => void;
 }
 
@@ -124,13 +127,16 @@ export function applyChatUiAction(
   }
 
   if (action.type === 'handoff_ide') {
-    void shell.handoffSignalToIde?.({
-      signal_id: action.signal_id,
-      workspace_id: action.target_workspace_id,
-      task: action.task,
-      title: action.task,
-      summary: action.task,
-    }, { autoSubmit: true });
+    void shell.handoffSignalToIde?.(
+      {
+        signal_id: action.signal_id,
+        workspace_id: action.target_workspace_id,
+        task: action.task,
+        title: action.task,
+        summary: action.task,
+      },
+      { autoSubmit: true },
+    );
     return;
   }
 

@@ -11,8 +11,66 @@ const USER_META_PREFIX_RE =
   /^(?:\*+)?\s*(?:the\s+)?user\s+(?:is\s+asking(?:\s+(?:whether|if|about))?|asked|requested|said|says)\s*/i;
 const LEADING_WHETHER_RE = /^(?:whether|if)\s+/i;
 
+const THINKING_ECHO_MIN = 40;
+
 export function flattenLiveLineText(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
+}
+
+function normalizeThinkingEchoCompare(text: string): string {
+  return text
+    .replace(/^I\s+/i, '')
+    .replace(/^./, (char) => char.toLowerCase())
+    .trim();
+}
+
+/**
+ * Collapse thinking text that was echoed back-to-back (exact or glued after
+ * a sentence end), e.g. "...run.I found ... run." → one copy.
+ */
+export function collapseBackToBackThinkingEcho(text: string, minLength = THINKING_ECHO_MIN): string {
+  const flattened = flattenLiveLineText(text);
+  if (flattened.length < minLength * 2) {
+    return flattened || text;
+  }
+
+  if (flattened.length % 2 === 0) {
+    const half = flattened.length / 2;
+    if (flattened.slice(0, half) === flattened.slice(half)) {
+      return flattened.slice(0, half);
+    }
+  }
+
+  for (let index = minLength; index <= flattened.length - minLength; index += 1) {
+    const prev = flattened[index - 1];
+    const next = flattened[index];
+    if (!prev || !next || !/[.!?]/.test(prev) || !/[A-Z]/.test(next)) {
+      continue;
+    }
+    const left = flattened.slice(0, index).trim();
+    const right = flattened.slice(index).trim();
+    if (left.length < minLength || right.length < minLength) {
+      continue;
+    }
+    if (left === right) {
+      return left;
+    }
+    if (normalizeThinkingEchoCompare(left) === normalizeThinkingEchoCompare(right)) {
+      return right.length >= left.length ? right : left;
+    }
+    const shorter = left.length <= right.length ? left : right;
+    const longer = left.length <= right.length ? right : left;
+    const lengthDelta = Math.abs(left.length - right.length);
+    const maxDelta = Math.max(12, Math.floor(shorter.length * 0.15));
+    if (
+      lengthDelta <= maxDelta &&
+      longer.includes(shorter.slice(0, Math.floor(shorter.length * 0.85)))
+    ) {
+      return longer;
+    }
+  }
+
+  return flattened;
 }
 
 /**
@@ -20,7 +78,7 @@ export function flattenLiveLineText(text: string): string {
  * Returns operator-facing copy, or empty when nothing usable remains.
  */
 export function sanitizeAgentThinkingForOperator(text: string): string {
-  let out = flattenLiveLineText(text);
+  let out = collapseBackToBackThinkingEcho(text);
   if (!out) {
     return '';
   }
@@ -35,6 +93,7 @@ export function sanitizeAgentThinkingForOperator(text: string): string {
   }
   return out;
 }
+
 
 /** Compact UI copy — never cut mid-word; prefer a sentence boundary. */
 export function truncateAgentLiveLineForDisplay(

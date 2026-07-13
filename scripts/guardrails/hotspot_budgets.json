@@ -67,7 +67,7 @@
       "target": "services/control-plane/app/kairo/*"
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
-      "max_lines": 775,
+      "max_lines": 768,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*"

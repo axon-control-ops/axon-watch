@@ -27,7 +27,7 @@ import {
   prepareOperatorConversationDock,
   type ConversationDisplayItem,
 } from '../lib/operator-conversation-view';
-import { focusAgentDockComposerInput } from '../lib/agent-dock-composer-focus';
+import OperatorMessageActions from './conversation/OperatorMessageActions.vue';
 import { applyChatUiAction, type ChatUiAction } from '../lib/chat-ui-action';
 import { operatorArtifactRecords } from '../lib/operator-artifact-view';
 import {
@@ -36,9 +36,9 @@ import {
 } from '../lib/operator-thread';
 import {
   agentContentHasTranscriptBlocks,
-  prepareAgentTranscriptSegmentsForDisplay,
   thinkingPreview,
 } from '../lib/agent-transcript-blocks';
+import { createTranscriptSegmentCache } from '../lib/conversation-transcript-segment-cache';
 import { sanitizeAgentThinkingForOperator } from '../lib/agent-live-line-view';
 import { shouldShowAgentTerminalBackgroundControl } from '../lib/agent-terminal-background-view';
 import { buildAgentTerminalMirrorText } from '../lib/agent-terminal-mirror';
@@ -138,57 +138,10 @@ function isStreamingMessage(messageId: string): boolean {
 }
 
 const expandedThinkingKeys = ref<Record<string, boolean>>({});
-
-type TranscriptSegmentCacheEntry = {
-  contentLength: number;
-  contentTail: string;
-  segments: ReturnType<typeof prepareAgentTranscriptSegmentsForDisplay>;
-  atMs: number;
-};
-
-const transcriptSegmentCache = new Map<string, TranscriptSegmentCacheEntry>();
-const STREAM_SEGMENT_MIN_INTERVAL_MS = 120;
-const STREAM_SEGMENT_MIN_GROWTH = 1500;
+const { transcriptSegments } = createTranscriptSegmentCache();
 
 function hasTranscriptBlocks(content: string): boolean {
   return agentContentHasTranscriptBlocks(content);
-}
-
-function transcriptSegments(messageId: string, content: string, streaming: boolean) {
-  // Large agent turns (100+ file edits) must not mount a diff card per file on
-  // every stream tick — that is what freezes the console ("Page Unresponsive").
-  if (streaming) {
-    const cached = transcriptSegmentCache.get(messageId);
-    const now = Date.now();
-    if (
-      cached &&
-      now - cached.atMs < STREAM_SEGMENT_MIN_INTERVAL_MS &&
-      content.length - cached.contentLength < STREAM_SEGMENT_MIN_GROWTH &&
-      content.endsWith(cached.contentTail)
-    ) {
-      return cached.segments;
-    }
-  }
-
-  const segments = prepareAgentTranscriptSegmentsForDisplay(content, {
-    collapseClosedEditsAt: 8,
-  });
-  transcriptSegmentCache.set(messageId, {
-    contentLength: content.length,
-    contentTail: content.slice(-64),
-    segments,
-    atMs: Date.now(),
-  });
-  if (!streaming) {
-    // Keep completed turns cheap to re-render without unbounded growth.
-    if (transcriptSegmentCache.size > 12) {
-      const oldest = transcriptSegmentCache.keys().next().value;
-      if (oldest !== undefined) {
-        transcriptSegmentCache.delete(oldest);
-      }
-    }
-  }
-  return segments;
 }
 
 function segmentKey(messageId: string, index: number): string {
@@ -314,11 +267,6 @@ function compactCommandSummary(output: string): string {
   return line.length <= 96 ? line : `${line.slice(0, 93)}…`;
 }
 
-function restoreCommandToComposer(command: string): void {
-  shell.restoreComposerDraft(command);
-  focusAgentDockComposerInput();
-}
-
 function isEmptyStreamingAgent(message: { role: string; message_id: string; content: string }): boolean {
   return message.role === 'agent' && !message.content.trim() && isStreamingMessage(message.message_id);
 }
@@ -410,17 +358,11 @@ watch(
           >
             {{ item.execution.footer }}
           </p>
-          <div class="conversation-seam__message-actions">
-            <button
-              type="button"
-              class="conversation-seam__meta-icon-button conversation-seam__edit-button"
-              title="Edit — load this command into the composer"
-              aria-label="Edit"
-              @click="restoreCommandToComposer(item.command)"
-            >
-              Edit
-            </button>
-          </div>
+          <OperatorMessageActions
+            :text="item.command"
+            edit-title="Edit — load this command into the composer"
+            edit-aria-label="Edit command"
+          />
         </template>
 
         <template v-else-if="item.kind === 'artifact'">
@@ -451,11 +393,22 @@ watch(
               :key="`${item.artifact.artifactId}:${action.label}`"
               type="button"
               class="conversation-seam__meta-button"
+              :class="{
+                'conversation-seam__meta-button--handoff':
+                  action.uiAction?.type === 'handoff_ide',
+              }"
               @click="applyArtifactAction(action)"
             >
               {{ action.label }}
             </button>
           </div>
+          <p
+            v-if="shell.handoffMutationError"
+            class="conversation-seam__handoff-error"
+            role="alert"
+          >
+            {{ shell.handoffMutationError }}
+          </p>
         </template>
 
         <template v-else>
@@ -747,20 +700,11 @@ watch(
           class="conversation-seam__stream-cursor"
           aria-hidden="true"
         >▍</span></pre>
-        <div
+        <OperatorMessageActions
           v-if="item.message.role === 'operator'"
-          class="conversation-seam__message-actions"
-        >
-          <button
-            type="button"
-            class="conversation-seam__meta-icon-button conversation-seam__edit-button"
-            title="Edit — load this request into the composer"
-            aria-label="Edit"
-            @click="restoreCommandToComposer(item.message.content)"
-          >
-            Edit
-          </button>
-        </div>
+          :text="item.message.content"
+          show-resend
+        />
           </template>
         </template>
       </li>
