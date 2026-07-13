@@ -563,6 +563,67 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertIn("KAIRO memory", context.memory_appendix or "")
         self.assertIn("DashPro payments degraded", context.memory_appendix or "")
 
+    @patch(
+        "app.chat.service.generate_lane_b_result",
+        return_value={
+            "content": "Continuing the teacher dashboard work.",
+            "dispatched": True,
+            "runtime_id": "cursor_local",
+            "runtime_label": "Cursor CLI (local)",
+            "reason": "",
+            "execution_tier": "executing",
+        },
+    )
+    def test_post_chat_message_agent_always_packs_ide_thread_history(
+        self,
+        mock_runtime,
+    ) -> None:
+        thread = chat_store.create_thread(
+            workspace_id="workspace_alpha",
+            run_id=None,
+            thread_kind="ide",
+            created_at="2026-07-13T10:00:00Z",
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_operator_prior",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_alpha",
+                "run_id": "",
+                "role": "operator",
+                "content": "Polish the teacher dashboard tests",
+                "created_at": "2026-07-13T10:00:00Z",
+            }
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_agent_prior",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_alpha",
+                "run_id": "",
+                "role": "agent",
+                "content": "Updating TeacherDashboardSecondaryMenu mocks",
+                "created_at": "2026-07-13T10:00:01Z",
+            }
+        )
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "thread_id": thread["thread_id"],
+                "content": "Yes please continue there",
+                "composer_mode": "agent",
+                "execution_access": "full",
+                "kairo_session_id": "kairo:workspace_alpha:thread_main",
+            },
+        )
+        self.assertEqual(200, response.status_code)
+        context = mock_runtime.call_args.kwargs["context"]
+        appendix = context.memory_appendix or ""
+        self.assertIn("Recent IDE thread", appendix)
+        self.assertIn("teacher dashboard", appendix)
+        self.assertIn("TeacherDashboardSecondaryMenu", appendix)
+
     def test_thread_history_normalizes_agent_research_blocks_on_read(self) -> None:
         thread = chat_store.create_thread(
             workspace_id="workspace_alpha",

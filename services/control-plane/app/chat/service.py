@@ -34,6 +34,7 @@ from app.chat.orchestration import (
     orchestrate_resume_from_review,
 )
 from app.chat.reply_verification import verify_lane_b_reply
+from app.chat.lane_b_thread_context import build_lane_b_thread_context_appendix
 from app.chat.progress_milestones import (
     publish_completion_milestone,
     persist_stream_delta,
@@ -46,7 +47,7 @@ from app.chat.workspace_switch import (
     resolve_workspace_switch_intent,
     workspace_switch_ui_action,
 )
-from app.kairo.turn_memory import build_lane_b_memory_appendix
+from app.kairo.turn_memory import build_lane_b_memory_appendix, remember_turn
 from app.persistence import attachment_store, chat_store
 from app.runs.service import (
     RunLifecycleError,
@@ -102,6 +103,43 @@ class LaneBStreamJob:
     dispatch_run_id: str
     created_at: str
     memory_appendix: str | None = None
+    kairo_session_id: str | None = None
+
+
+def _compose_lane_b_memory_appendix(
+    *,
+    thread_id: str,
+    content: str,
+    kairo_session_id: str | None,
+    composer_mode: str,
+) -> str | None:
+    thread_appendix = build_lane_b_thread_context_appendix(
+        chat_store.list_thread_messages(thread_id)
+    )
+    kairo_appendix = (
+        _lane_b_memory_appendix(content=content, kairo_session_id=kairo_session_id)
+        if composer_mode == "agent"
+        else None
+    )
+    parts = [part.strip() for part in (thread_appendix, kairo_appendix) if part and str(part).strip()]
+    if not parts:
+        return None
+    return "\n\n".join(parts)
+
+
+def _remember_lane_b_turn(
+    *,
+    kairo_session_id: str | None,
+    operator_content: str,
+    agent_content: str,
+) -> None:
+    session = str(kairo_session_id or "").strip()
+    if not session:
+        return
+    if str(operator_content or "").strip():
+        remember_turn(session, "user", operator_content)
+    if str(agent_content or "").strip():
+        remember_turn(session, "assistant", agent_content)
 
 
 def _coerce_attachment_ids(raw: list[str] | None) -> list[str]:
@@ -538,6 +576,11 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             content=agent_content,
             updated_at=updated_at,
         )
+        _remember_lane_b_turn(
+            kairo_session_id=job.kairo_session_id,
+            operator_content=job.content,
+            agent_content=agent_content,
+        )
 
         if job.composer_mode == "agent" and job.dispatch_run_id:
             dispatched, run_record = _finalize_lane_b_agent_run(
@@ -709,10 +752,11 @@ def _post_lane_b_message(
             new_message_id=_new_message_id,
         )
 
-    memory_appendix = (
-        _lane_b_memory_appendix(content=content, kairo_session_id=kairo_session_id)
-        if composer_mode == "agent"
-        else None
+    memory_appendix = _compose_lane_b_memory_appendix(
+        thread_id=thread_id,
+        content=content,
+        kairo_session_id=kairo_session_id,
+        composer_mode=composer_mode,
     )
     recent_turns = [
         {
@@ -856,6 +900,7 @@ def _post_lane_b_message(
             dispatch_run_id=dispatch_run_id,
             created_at=created_at,
             memory_appendix=memory_appendix,
+            kairo_session_id=kairo_session_id,
         )
         payload: dict[str, object] = {
             "thread_id": thread_id,
@@ -979,6 +1024,12 @@ def _post_lane_b_message(
     )
     if agent_attachments:
         agent_message = {**agent_message, "attachments": agent_attachments}
+
+    _remember_lane_b_turn(
+        kairo_session_id=kairo_session_id,
+        operator_content=content,
+        agent_content=agent_content,
+    )
 
     ui_action = lane_b_open_file_ui_action(
         operator_content=content,
