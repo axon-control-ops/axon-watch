@@ -31,6 +31,7 @@ const LEGEND: GalaxyLegendItem[] = [
   { kind: 'run', label: 'Active runs', color: '#6b8fa8' },
   { kind: 'signal', label: 'Signals', color: '#ffa040' },
   { kind: 'connector', label: 'Connectors', color: '#5a8cff' },
+  { kind: 'mailbox', label: 'Mailboxes', color: '#7ee0a8' },
 ];
 
 export function galaxyLegendItems(): GalaxyLegendItem[] {
@@ -83,18 +84,19 @@ export function galaxyInspectorCopy(node: BrainGraphNode | null): {
 } {
   if (!node) {
     return {
-      title: 'Inspector',
-      body: 'Click a node to open its evidence panel. Workspaces focus context; signals show prove-source.',
-      hint: 'Drag to orbit the galaxy',
+      title: 'Node inspector',
+      body: 'Select a workspace, mailbox, connector, or signal to load evidence here. Attention items and active runs light this graph up — quiet fleet = quieter galaxy.',
+      hint: 'Drag to orbit · mailboxes appear from Settings → Email',
     };
   }
 
   const hints: Record<string, string> = {
     core: 'KAIRO control plane — the center of your operator brain.',
-    workspace: 'Evidence lists signals and runs; open the workspace in the IDE from the panel.',
+    workspace: 'Click opens evidence and enters the workspace IDE.',
     run: 'Active execution lane tied to a workspace.',
     signal: 'Evidence panel loads prove-source facts; open Attention or Continue in IDE from actions.',
     connector: 'Live connector health bound to a workspace.',
+    mailbox: 'Configured inbox. Amber = needs password. Open Settings → Email to finish setup, then Test.',
   };
 
   return {

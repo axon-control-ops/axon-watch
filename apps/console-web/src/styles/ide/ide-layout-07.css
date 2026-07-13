@@ -238,6 +238,12 @@
   background: rgba(245, 158, 11, 0.1);
 }
 
+.agent-dock-composer__tool--mode[data-mode='debug'].is-active {
+  border-color: rgba(167, 139, 250, 0.48);
+  color: rgba(221, 214, 254, 0.98);
+  background: rgba(124, 58, 237, 0.16);
+}
+
 .agent-dock-composer__menu {
   position: absolute;
   bottom: calc(100% + 0.45rem);

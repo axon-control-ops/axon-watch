@@ -1,7 +1,8 @@
 import { OPERATOR_PERSONA_NAME } from './operator-persona-name';
 import { stripLiteralSymbolWords } from './spoken-symbol-words';
 
-const STREAM_BLOCK_START_RE = /^:::(?:thinking|tool|edit|terminal|research)\b/i;
+const STREAM_BLOCK_START_RE =
+  /^:::(?:thinking|tool|edit|terminal|research|debug-reproduce)\b/i;
 const STREAM_BLOCK_CLOSE_RE = /^:::\s*$/;
 const PATH_ONLY_RE = /^[\w./_-]+$/;
 const MAX_DISPLAY_CHARS = 1600;
@@ -18,7 +19,7 @@ function stripStreamBlocks(text: string): string {
       continue;
     }
     if (skipping) {
-      if (STREAM_BLOCK_CLOSE_RE.test(stripped) || !stripped) {
+      if (STREAM_BLOCK_CLOSE_RE.test(stripped)) {
         skipping = false;
       }
       continue;
@@ -136,7 +137,27 @@ export function cleanAgentReplyText(raw: string): string {
   text = stripMarkdownForSpeech(text);
   text = dedupeDoubledText(text);
   text = stripPersonaPrefix(text);
-  return text.replace(/\n{3,}/g, '\n\n').trim();
+  const cleaned = text.replace(/\n{3,}/g, '\n\n').trim();
+  // #region agent log
+  if (/:::debug-reproduce\b/m.test(original) || /^\s*\d+\.\s+/m.test(cleaned)) {
+    void import('./axon-debug-session-log').then(({ axonDebugSessionLog }) => {
+      axonDebugSessionLog({
+        hypothesisId: 'H1',
+        location: 'sanitize-spoken-reply.ts:cleanAgentReplyText',
+        message: 'cleaned reply after stripStreamBlocks',
+        data: {
+          hadDebugReproduceHeader: /:::debug-reproduce\b/m.test(original),
+          cleanedPreview: cleaned.slice(0, 240),
+          cleanedStillHasNumberedSteps: /^\s*\d+\.\s+/m.test(cleaned),
+          streamBlockStartCoversReproduce: /debug-reproduce/.test(
+            String(STREAM_BLOCK_START_RE),
+          ),
+        },
+      });
+    });
+  }
+  // #endregion
+  return cleaned;
 }
 
 /** Format a reply for on-screen display in the conversation bar. */

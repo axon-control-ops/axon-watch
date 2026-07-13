@@ -13,10 +13,10 @@ import {
 } from './kairo-galaxy-orb-view';
 import { resolveOrbPointerUpIntent } from './kairo-galaxy-orb-interaction';
 import { rectsOverlap, resolveAutoAvoidOrbCandidates } from './kairo-galaxy-orb-position';
-import { kairoPresenceModuleParts } from '../../lib/mockup-shell-view';
 import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
 import { subscribeKairoVoiceChunk, subscribeKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
+import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
 import { kairoConversationPhase, isKairoConversationBusy, kairoConversationReply, setKairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
 import { useKairoSpeechCapture } from '../kairo-conversation/use-kairo-speech-capture';
 import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_ORB_LABEL } from '../../lib/operator-persona-name';
@@ -85,13 +85,26 @@ const presenceState = computed(() => {
   });
 });
 
-const parts = computed(() => kairoPresenceModuleParts(presenceState.value));
+const speechCapture = useKairoSpeechCapture({
+  privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
+  captureMode: 'manual',
+  stopOnUnmount: 'manual_only',
+});
+
+const gateFeedback = computed(() =>
+  formatVoiceGateFeedback(
+    speechCapture.lastGateReason.value,
+    speechCapture.lastHeardTranscript.value,
+    speechCapture.lastAccepted.value,
+  ),
+);
 
 const orbStateClass = computed(() =>
   galaxyOrbStateClass(
     presenceState.value,
     kairoSpeaking.value || shell.kairoSpeechActive,
     kairoConversationPhase.value,
+    speechCapture.capturing.value,
   ),
 );
 
@@ -105,6 +118,7 @@ const hint = computed(() =>
     kairoSpeaking.value || shell.kairoSpeechActive,
     kairoConversationPhase.value,
     handsFreeEnabled.value,
+    gateFeedback.value,
   ),
 );
 
@@ -116,6 +130,7 @@ const orbStatusLabel = computed(() =>
   galaxyOrbStatusLabel(
     kairoConversationPhase.value,
     kairoSpeaking.value || shell.kairoSpeechActive,
+    speechCapture.capturing.value,
   ),
 );
 
@@ -142,12 +157,6 @@ function handleInterrupt(): void {
 }
 
 const voiceBlocked = computed(() => shell.operatorPresenceSettings.privacy_mode);
-
-const speechCapture = useKairoSpeechCapture({
-  privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
-  captureMode: 'manual',
-  stopOnUnmount: 'manual_only',
-});
 
 function stageElement(): HTMLElement | null {
   return orbAnchor.value?.closest('.brain-galaxy-stage') as HTMLElement | null;
@@ -212,9 +221,10 @@ function defaultOrbPosition(): { x: number; y: number } | null {
   if (!stage || !anchor) {
     return null;
   }
+  // Top-right default keeps the orb off workspace nodes and the reply band.
   return clampOrbPosition({
     x: stage.clientWidth - anchor.offsetWidth - ORB_MARGIN_RIGHT_PX,
-    y: stage.clientHeight - anchor.offsetHeight - ORB_MARGIN_BOTTOM_PX,
+    y: ORB_MARGIN_TOP_PX + ORB_TOP_DOCK_OFFSET_PX,
   });
 }
 
@@ -382,7 +392,7 @@ function handleOrbPttStart(): void {
     return;
   }
   shell.interruptKairoVoice();
-  speechCapture.startCapture('manual');
+  speechCapture.startCapture('manual', { takeover: true });
 }
 
 function handleOrbDragStart(event: PointerEvent): void {

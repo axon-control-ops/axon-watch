@@ -11,6 +11,13 @@ describe('agent-dock-activity-view', () => {
     expect(buildIdeComposerActivityLabel('agent', 'consultative')).not.toContain('Full Access');
   });
 
+  it('labels debug mode distinctly from agent', () => {
+    expect(buildIdeComposerActivityLabel('debug', 'full')).toContain('Debug');
+    expect(buildIdeComposerActivityLabel('debug', 'full')).toContain('Full Access');
+    expect(buildIdeComposerActivityLabel('debug', 'consultative')).toMatch(/^Debug/);
+    expect(buildIdeComposerActivityLabel('debug', 'consultative')).not.toContain('Full Access');
+  });
+
   it('labels streaming for full access', () => {
     expect(buildIdeStreamActivityLabel('full')).toContain('Full Access');
   });

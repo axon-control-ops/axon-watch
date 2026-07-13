@@ -112,7 +112,7 @@ def _local_runtime_record(
         "binary": binary,
         "auth": auth,
         "ready": bool(binary) and bool(auth.get("logged_in")),
-        "mode_support": ["ask", "plan", "agent"],
+        "mode_support": ["ask", "plan", "agent", "debug"],
     }
 
 
@@ -156,7 +156,7 @@ def _cloud_runtime_record(
         "binary": "",
         "auth": auth,
         "ready": ready,
-        "mode_support": ["ask", "plan", "agent"],
+        "mode_support": ["ask", "plan", "agent", "debug"],
     }
 
 

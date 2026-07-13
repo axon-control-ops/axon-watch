@@ -135,4 +135,28 @@ describe('briefing panel view helpers', () => {
     );
     expect(briefingRhythmField(approvalBriefing, 'decide', 'loaded')).toContain('approve or reject');
   });
+
+  it('overrides idle no-runs notice when a primary active run exists', () => {
+    expect(
+      briefingNotice(emptyBriefing, 'loaded', {
+        primaryActiveRun: {
+          run_id: 'run_review_me',
+          summary: 'Review me',
+          detail: '',
+          phase: 'review_ready',
+        },
+      }),
+    ).toBe('Review me is ready for your review.');
+
+    expect(
+      briefingNotice(emptyBriefing, 'loaded', {
+        primaryActiveRun: {
+          run_id: 'run_abcdef123',
+          summary: 'Build fix',
+          detail: '',
+          phase: 'executing',
+        },
+      }),
+    ).toContain('EXECUTE');
+  });
 });

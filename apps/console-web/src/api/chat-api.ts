@@ -39,7 +39,7 @@ export interface PostChatMessageRequest {
   content: string;
   thread_id?: string | null;
   run_id?: string | null;
-  composer_mode?: 'ask' | 'plan' | 'agent' | 'command' | string | null;
+  composer_mode?: 'ask' | 'plan' | 'agent' | 'debug' | 'command' | string | null;
   active_file_path?: string | null;
   editor_selection?: EditorSelectionContext | null;
   terminal_snippet?: string | null;

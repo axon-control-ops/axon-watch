@@ -8,12 +8,14 @@ CONTROL_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane
 sys.path.insert(0, str(CONTROL_ROOT))
 
 from app.azure_tts import (  # noqa: E402
+    LEADING_AUDIO_GUARD_MS,
     azure_speech_configured,
     build_azure_ssml,
     extract_azure_speech_key,
     resolve_azure_speech_credentials,
     synthesize_azure_speech,
 )
+from app.voice_tuning import azure_voice_pitch_attr, azure_voice_rate_attr  # noqa: E402
 
 
 class AzureTtsTests(unittest.TestCase):
@@ -26,17 +28,21 @@ class AzureTtsTests(unittest.TestCase):
         ssml = build_azure_ssml("Hello operator")
         self.assertIn("Hello operator", ssml)
         self.assertIn("en-GB-RyanNeural", ssml)
-        # Conversational chat style for Ryan; no dulling rate/pitch prosody.
-        self.assertIn("mstts:express-as", ssml)
-        self.assertIn("style='chat'", ssml)
-        self.assertNotIn("prosody", ssml)
-        self.assertNotIn("rate=", ssml)
-        self.assertNotIn("pitch=", ssml)
+        # axon-local parity: relative prosody, no chat express-as.
+        self.assertIn("prosody", ssml)
+        self.assertIn("rate='+0%'", ssml)
+        self.assertIn("pitch=", ssml)
+        self.assertNotIn("express-as", ssml)
+        self.assertNotIn("style='chat'", ssml)
 
-        # Non-Ryan voices must not get an unsupported style wrapper.
-        other = build_azure_ssml("Hello", voice="en-GB-ThomasNeural")
-        self.assertNotIn("express-as", other)
-        self.assertIn("en-GB-ThomasNeural", other)
+    def test_relative_rate_and_pitch_attrs(self) -> None:
+        self.assertEqual(azure_voice_rate_attr(0.85), "-15%")
+        self.assertEqual(azure_voice_rate_attr(1.05), "+5%")
+        self.assertEqual(azure_voice_pitch_attr(1.04), "+4%")
+        calm = build_azure_ssml("Hello operator", rate=0.85, pitch=1.04)
+        self.assertIn("rate='-15%'", calm)
+        self.assertIn("pitch='+4%'", calm)
+        self.assertIn(f"<break time='{LEADING_AUDIO_GUARD_MS}ms'/>", calm)
 
     def test_returns_none_when_azure_is_not_configured(self) -> None:
         with patch.dict(os.environ, {}, clear=False):

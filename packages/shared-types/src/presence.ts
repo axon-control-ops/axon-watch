@@ -1,5 +1,9 @@
 export type KairoNarrationLevel = 'off' | 'minimal' | 'conversational';
 
+/**
+ * Continuous speech tuning — axon-local parity (`voice_speech_rate` / `voice_speech_pitch`).
+ * Rate: 0.50–1.30 · Pitch: 0.50–1.50
+ */
 export interface OperatorPresenceSettings {
   operator_persona_enabled: boolean;
   spoken_alerts_enabled: boolean;
@@ -8,6 +12,10 @@ export interface OperatorPresenceSettings {
   kairo_narration: KairoNarrationLevel;
   ide_voice_strip_enabled: boolean;
   hands_free_enabled: boolean;
+  /** Azure + browser speech rate (1.0 = engine default). */
+  speech_rate: number;
+  /** Azure + browser speech pitch (1.04 = axon-local Azure default). */
+  speech_pitch: number;
 }
 
 export interface SpokenAlertEligibility {

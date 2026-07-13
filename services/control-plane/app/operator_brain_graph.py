@@ -13,6 +13,7 @@ from typing import Any, Callable
 from app.adapters.watch_client import fetch_watch_connectors
 from app.domain.run_state import is_terminal_phase
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
+from app.persistence import email_settings_store
 from app.runs.service import list_runs
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
 from app.operator_persona_name import OPERATOR_PERSONA_NAME
@@ -52,6 +53,72 @@ def _signal_tone(severity: str) -> str:
     if severity in {"critical", "high"}:
         return "critical"
     return "attention"
+
+
+def _mailbox_tone(account: dict[str, Any]) -> str:
+    imap = account.get("imap") if isinstance(account.get("imap"), dict) else {}
+    smtp = account.get("smtp") if isinstance(account.get("smtp"), dict) else {}
+    has_password = bool(str(imap.get("password_ref") or "").strip()) or bool(
+        str(smtp.get("password_ref") or "").strip()
+    )
+    monitor = account.get("monitor") if isinstance(account.get("monitor"), dict) else {}
+    if not has_password:
+        return "attention"
+    if not bool(monitor.get("enabled", True)):
+        return "attention"
+    return "nominal"
+
+
+def _append_mailbox_nodes(
+    *,
+    nodes: list[dict[str, object]],
+    edges: list[dict[str, object]],
+    workspace_node_ids: set[str],
+) -> None:
+    try:
+        settings = email_settings_store.load_settings()
+    except Exception:  # noqa: BLE001 — graph must stay available if settings store fails
+        return
+    accounts = settings.get("accounts") if isinstance(settings, dict) else []
+    if not isinstance(accounts, list):
+        return
+    for account in accounts:
+        if not isinstance(account, dict):
+            continue
+        account_id = str(account.get("account_id") or "").strip()
+        email_address = str(account.get("email_address") or "").strip()
+        workspace_id = str(account.get("workspace_id") or "").strip()
+        if not account_id or not email_address:
+            continue
+        imap = account.get("imap") if isinstance(account.get("imap"), dict) else {}
+        has_password = bool(str(imap.get("password_ref") or "").strip())
+        node_id = f"mail_{account_id}"
+        nodes.append(
+            {
+                "node_id": node_id,
+                "kind": "mailbox",
+                "label": email_address,
+                "tone": _mailbox_tone(account),
+                "workspace_id": workspace_id or None,
+                "detail": (
+                    f"{imap.get('host') or 'no-host'} · "
+                    f"{'ready' if has_password else 'needs password'}"
+                ),
+            }
+        )
+        source = (
+            f"ws_{workspace_id}"
+            if workspace_id and f"ws_{workspace_id}" in workspace_node_ids
+            else _CORE_NODE_ID
+        )
+        edges.append(
+            {
+                "edge_id": f"monitors_mail_{account_id}",
+                "source": source,
+                "target": node_id,
+                "kind": "monitors",
+            }
+        )
 
 
 def build_operator_brain_graph(
@@ -285,6 +352,12 @@ def build_operator_brain_graph(
                 "kind": "monitors",
             }
         )
+
+    _append_mailbox_nodes(
+        nodes=nodes,
+        edges=edges,
+        workspace_node_ids=workspace_node_ids,
+    )
 
     return {
         "generated_at": generated_at,

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import AppGeneralSettingsPanel from './AppGeneralSettingsPanel.vue';
 import EmailSettingsPanel from './EmailSettingsPanel.vue';
 import OperatorPresenceSettingsForm from './OperatorPresenceSettingsForm.vue';
 import RuntimeAuthSettingsPanel from './RuntimeAuthSettingsPanel.vue';
+import type { OperatorPresenceSettings } from '../../contracts/canonical';
 import { navigateToAppSurface } from '../../lib/app-surface-route';
 import { useShellStore } from '../../stores/shell';
 
@@ -12,6 +13,11 @@ type SettingsSection = 'voice' | 'runtime' | 'email' | 'app';
 
 const shell = useShellStore();
 const activeSection = ref<SettingsSection>('voice');
+const presenceFormRef = ref<{
+  flushIfDirty: () => Promise<boolean>;
+  dirty: { value: boolean };
+} | null>(null);
+const presenceDirty = ref(false);
 
 const sections = [
   { id: 'voice' as const, label: 'Voice & presence', hint: 'VAXON persona, narration, privacy', mark: '01' },
@@ -52,6 +58,12 @@ const syncStatus = computed(() => {
   if (shell.operatorPresenceSettingsError) {
     return { tone: 'error' as const, label: shell.operatorPresenceSettingsError };
   }
+  if (presenceDirty.value) {
+    return {
+      tone: 'pending' as const,
+      label: 'Unsaved changes — Save, or leave Settings to auto-save',
+    };
+  }
   if (shell.operatorPresenceSettingsSavedAt) {
     const savedAt = new Date(shell.operatorPresenceSettingsSavedAt);
     const time = savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -64,7 +76,23 @@ onMounted(() => {
   void shell.loadOperatorPresenceSettings({ reportError: true });
 });
 
-function returnToConsole(): void {
+onBeforeUnmount(() => {
+  void presenceFormRef.value?.flushIfDirty();
+});
+
+async function persistPresenceSettings(settings: OperatorPresenceSettings): Promise<void> {
+  await shell.saveOperatorPresenceSettingsPatch(settings);
+}
+
+async function leaveVoiceSectionIfNeeded(next: SettingsSection): Promise<void> {
+  if (activeSection.value === 'voice' && next !== 'voice') {
+    await presenceFormRef.value?.flushIfDirty();
+  }
+  activeSection.value = next;
+}
+
+async function returnToConsole(): Promise<void> {
+  await presenceFormRef.value?.flushIfDirty();
   navigateToAppSurface('console');
 }
 </script>
@@ -90,7 +118,7 @@ function returnToConsole(): void {
             type="button"
             class="settings-surface__nav-button"
             :class="{ 'settings-surface__nav-button--active': activeSection === section.id }"
-            @click="activeSection = section.id"
+            @click="leaveVoiceSectionIfNeeded(section.id)"
           >
             <span class="settings-surface__nav-mark">{{ section.mark }}</span>
             <span class="settings-surface__nav-copy">
@@ -125,10 +153,11 @@ function returnToConsole(): void {
 
             <OperatorPresenceSettingsForm
               v-if="activeSection === 'voice'"
+              ref="presenceFormRef"
               :settings="shell.operatorPresenceSettings"
               :saving="shell.operatorPresenceSettingsSaving"
-              @save="shell.saveOperatorPresenceSettingsPatch($event)"
-              @reset="shell.resetOperatorPresenceSettings()"
+              :persist="persistPresenceSettings"
+              @dirty="presenceDirty = $event"
             />
 
             <RuntimeAuthSettingsPanel v-else-if="activeSection === 'runtime'" />

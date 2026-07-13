@@ -1,58 +1,93 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import type { OperatorPresenceSettings } from '../../contracts/canonical';
+import { kairoVoiceLastReason } from '../../lib/kairo-voice-diagnostics';
+import {
+  defaultOperatorPresenceSettings,
+  formatVoiceTuningValue,
+  normalizeOperatorPresenceSettings,
+} from '../../lib/operator-presence-settings';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
   settings: OperatorPresenceSettings;
   saving?: boolean;
+  persist: (settings: OperatorPresenceSettings) => Promise<void>;
 }>();
 
 const emit = defineEmits<{
-  save: [patch: Partial<OperatorPresenceSettings>];
-  reset: [];
+  dirty: [dirty: boolean];
 }>();
 
 const shell = useShellStore();
 
+const draft = ref<OperatorPresenceSettings>(normalizeOperatorPresenceSettings(props.settings));
+const dirty = ref(false);
 const voiceTesting = ref(false);
 const voiceTestResult = ref<string | null>(null);
 
-const configuredNarration = computed(() => props.settings.kairo_narration ?? 'minimal');
+watch(
+  () => props.settings,
+  (next) => {
+    if (dirty.value) {
+      return;
+    }
+    draft.value = normalizeOperatorPresenceSettings(next);
+  },
+  { deep: true },
+);
+
+watch(dirty, (value) => {
+  emit('dirty', value);
+});
+
+function markDirty(): void {
+  dirty.value = true;
+}
+
+function patchDraft(patch: Partial<OperatorPresenceSettings>): void {
+  draft.value = normalizeOperatorPresenceSettings({
+    ...draft.value,
+    ...patch,
+  });
+  markDirty();
+}
+
+const configuredNarration = computed(() => draft.value.kairo_narration ?? 'minimal');
 const effectiveNarration = computed(() => shell.effectiveKairoNarrationLevel);
 const narrationOverridden = computed(
   () => configuredNarration.value !== effectiveNarration.value,
 );
 
 const personaEnabled = computed({
-  get: () => props.settings.operator_persona_enabled,
-  set: (value: boolean) => emit('save', { operator_persona_enabled: value }),
+  get: () => draft.value.operator_persona_enabled,
+  set: (value: boolean) => patchDraft({ operator_persona_enabled: value }),
 });
 
 const spokenAlertsEnabled = computed({
-  get: () => props.settings.spoken_alerts_enabled,
-  set: (value: boolean) => emit('save', { spoken_alerts_enabled: value }),
+  get: () => draft.value.spoken_alerts_enabled,
+  set: (value: boolean) => patchDraft({ spoken_alerts_enabled: value }),
 });
 
 const ideVoiceStripEnabled = computed({
-  get: () => props.settings.ide_voice_strip_enabled,
-  set: (value: boolean) => emit('save', { ide_voice_strip_enabled: value }),
+  get: () => draft.value.ide_voice_strip_enabled,
+  set: (value: boolean) => patchDraft({ ide_voice_strip_enabled: value }),
 });
 
 const privacyMode = computed({
-  get: () => props.settings.privacy_mode,
-  set: (value: boolean) => emit('save', { privacy_mode: value }),
+  get: () => draft.value.privacy_mode,
+  set: (value: boolean) => patchDraft({ privacy_mode: value }),
 });
 
 const mobileCompactPreferred = computed({
-  get: () => props.settings.mobile_compact_preferred,
-  set: (value: boolean) => emit('save', { mobile_compact_preferred: value }),
+  get: () => draft.value.mobile_compact_preferred,
+  set: (value: boolean) => patchDraft({ mobile_compact_preferred: value }),
 });
 
 const handsFreeEnabled = computed({
-  get: () => props.settings.hands_free_enabled,
-  set: (value: boolean) => emit('save', { hands_free_enabled: value }),
+  get: () => draft.value.hands_free_enabled,
+  set: (value: boolean) => patchDraft({ hands_free_enabled: value }),
 });
 
 const narrationOptions = [
@@ -73,26 +108,137 @@ const narrationOptions = [
   },
 ] as const;
 
+const speechRateDisplay = computed(() => formatVoiceTuningValue(draft.value.speech_rate ?? 1));
+const speechPitchDisplay = computed(() =>
+  formatVoiceTuningValue(draft.value.speech_pitch ?? 1.04),
+);
+
 function onNarrationChange(event: Event): void {
   const value = (event.target as HTMLSelectElement).value;
   if (value === 'off' || value === 'minimal' || value === 'conversational') {
-    emit('save', { kairo_narration: value });
+    patchDraft({ kairo_narration: value });
   }
 }
 
+function onSpeechRateInput(event: Event): void {
+  const value = Number((event.target as HTMLInputElement).value);
+  if (!Number.isFinite(value)) {
+    return;
+  }
+  patchDraft({ speech_rate: Math.round(value * 100) / 100 });
+}
+
+function onSpeechPitchInput(event: Event): void {
+  const value = Number((event.target as HTMLInputElement).value);
+  if (!Number.isFinite(value)) {
+    return;
+  }
+  patchDraft({ speech_pitch: Math.round(value * 100) / 100 });
+}
+
+function resetVoiceTuning(): void {
+  patchDraft({ speech_rate: 1.0, speech_pitch: 1.04 });
+}
+
+async function commitSave(): Promise<void> {
+  if (props.saving || !dirty.value) {
+    return;
+  }
+  // #region agent log
+  fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
+    body: JSON.stringify({
+      sessionId: 'df24bc',
+      runId: 'post-fix',
+      hypothesisId: 'SAVE',
+      location: 'OperatorPresenceSettingsForm.vue:commitSave',
+      message: 'explicit save clicked',
+      data: {
+        speech_rate: draft.value.speech_rate,
+        speech_pitch: draft.value.speech_pitch,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+  try {
+    await props.persist(normalizeOperatorPresenceSettings(draft.value));
+    dirty.value = false;
+  } catch {
+    // Keep dirty so the operator can retry; store surface shows the error.
+  }
+}
+
+async function flushIfDirty(): Promise<boolean> {
+  if (!dirty.value || props.saving) {
+    return false;
+  }
+  // #region agent log
+  fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
+    body: JSON.stringify({
+      sessionId: 'df24bc',
+      runId: 'post-fix',
+      hypothesisId: 'SAVE',
+      location: 'OperatorPresenceSettingsForm.vue:flushIfDirty',
+      message: 'auto-save on exit',
+      data: {
+        speech_rate: draft.value.speech_rate,
+        speech_pitch: draft.value.speech_pitch,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+  try {
+    await props.persist(normalizeOperatorPresenceSettings(draft.value));
+    dirty.value = false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function discardDraft(): void {
+  draft.value = normalizeOperatorPresenceSettings(props.settings);
+  dirty.value = false;
+}
+
+function requestReset(): void {
+  if (props.saving) {
+    return;
+  }
+  draft.value = defaultOperatorPresenceSettings();
+  markDirty();
+}
+
 async function testVoiceSample(): Promise<void> {
-  if (props.settings.privacy_mode || props.settings.kairo_narration === 'off') {
+  if (draft.value.privacy_mode || draft.value.kairo_narration === 'off') {
     voiceTestResult.value = 'Enable narration and disable privacy mode to test voice.';
     return;
   }
   voiceTesting.value = true;
   voiceTestResult.value = null;
   try {
-    const engine = await shell.testKairoVoiceFromSettings();
+    const engine = await shell.testKairoVoiceFromSettings({
+      speechRate: draft.value.speech_rate,
+      speechPitch: draft.value.speech_pitch,
+    });
     if (engine === 'azure') {
-      voiceTestResult.value = 'Azure voice played successfully.';
+      voiceTestResult.value = 'Azure neural voice played successfully.';
     } else if (engine === 'browser') {
-      voiceTestResult.value = 'Browser fallback voice played (Azure unavailable).';
+      const reason = kairoVoiceLastReason.value;
+      if (reason === 'vault_locked') {
+        voiceTestResult.value =
+          'Browser fallback — unlock Vault (AZURE_SPEECH_KEY) for neural TTS.';
+      } else if (reason === 'missing_key') {
+        voiceTestResult.value =
+          'Browser fallback — add AZURE_SPEECH_KEY to Vault for neural TTS.';
+      } else {
+        voiceTestResult.value = `Browser fallback voice played (${reason || 'Azure unavailable'}).`;
+      }
     } else {
       voiceTestResult.value = 'Voice skipped — check privacy mode and narration level.';
     }
@@ -104,12 +250,11 @@ async function testVoiceSample(): Promise<void> {
   }
 }
 
-function requestReset(): void {
-  if (props.saving) {
-    return;
-  }
-  emit('reset');
-}
+defineExpose({
+  dirty,
+  flushIfDirty,
+  discardDraft,
+});
 </script>
 
 <template>
@@ -131,14 +276,29 @@ function requestReset(): void {
         </div>
         <div>
           <dt>Privacy</dt>
-          <dd>{{ settings.privacy_mode ? 'Muted' : 'Voice allowed' }}</dd>
+          <dd>{{ draft.privacy_mode ? 'Muted' : 'Voice allowed' }}</dd>
         </div>
         <div>
           <dt>Spoken alerts</dt>
-          <dd>{{ settings.spoken_alerts_enabled ? 'On' : 'Off' }}</dd>
+          <dd>{{ draft.spoken_alerts_enabled ? 'On' : 'Off' }}</dd>
+        </div>
+        <div>
+          <dt>Speech rate</dt>
+          <dd>
+            <span class="operator-settings-form__pill">{{ speechRateDisplay }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Speech pitch</dt>
+          <dd>
+            <span class="operator-settings-form__pill">{{ speechPitchDisplay }}</span>
+          </dd>
         </div>
       </dl>
-      <p v-if="narrationOverridden" class="operator-settings-form__status-note">
+      <p v-if="dirty" class="operator-settings-form__status-note">
+        Unsaved changes — Save, or leave Settings to auto-save.
+      </p>
+      <p v-else-if="narrationOverridden" class="operator-settings-form__status-note">
         Effective narration differs in IDE quiet mode unless conversational is selected.
       </p>
     </aside>
@@ -163,7 +323,7 @@ function requestReset(): void {
           </span>
           <select
             class="operator-settings-form__select"
-            :value="settings.kairo_narration"
+            :value="draft.kairo_narration"
             :disabled="saving"
             @change="onNarrationChange"
           >
@@ -173,16 +333,73 @@ function requestReset(): void {
           </select>
           <p class="operator-settings-form__option-hint">
             {{
-              narrationOptions.find((option) => option.value === settings.kairo_narration)?.hint ??
+              narrationOptions.find((option) => option.value === draft.kairo_narration)?.hint ??
               ''
             }}
           </p>
         </label>
+        <div class="operator-settings-form__voice-tuning">
+          <header class="operator-settings-form__copy">
+            <strong>Voice tuning</strong>
+            <small>
+              Same controls as Axon Signal — continuous rate/pitch for Azure neural and browser
+              fallback. Drag freely, then Save (or leave Settings to auto-save).
+            </small>
+          </header>
+          <div class="operator-settings-form__slider-grid">
+            <label class="operator-settings-form__slider">
+              <span class="operator-settings-form__slider-head">
+                <span>Speech rate</span>
+                <span class="operator-settings-form__slider-value">{{ speechRateDisplay }}</span>
+              </span>
+              <input
+                type="range"
+                min="0.5"
+                max="1.3"
+                step="0.02"
+                :value="draft.speech_rate"
+                :disabled="saving || privacyMode || draft.kairo_narration === 'off'"
+                @input="onSpeechRateInput"
+              />
+              <span class="operator-settings-form__slider-ends">
+                <span>0.50 slow</span><span>1.00 default</span><span>1.30 fast</span>
+              </span>
+            </label>
+            <label class="operator-settings-form__slider">
+              <span class="operator-settings-form__slider-head">
+                <span>Speech pitch</span>
+                <span class="operator-settings-form__slider-value">{{ speechPitchDisplay }}</span>
+              </span>
+              <input
+                type="range"
+                min="0.5"
+                max="1.5"
+                step="0.02"
+                :value="draft.speech_pitch"
+                :disabled="saving || privacyMode || draft.kairo_narration === 'off'"
+                @input="onSpeechPitchInput"
+              />
+              <span class="operator-settings-form__slider-ends">
+                <span>0.50 deep</span><span>1.04 default</span><span>1.50 high</span>
+              </span>
+            </label>
+          </div>
+          <div class="operator-settings-form__actions operator-settings-form__actions--inline">
+            <button
+              type="button"
+              class="operator-settings-form__button operator-settings-form__button--ghost"
+              :disabled="saving || privacyMode || draft.kairo_narration === 'off'"
+              @click="resetVoiceTuning"
+            >
+              Reset voice defaults
+            </button>
+          </div>
+        </div>
         <div class="operator-settings-form__actions">
           <button
             type="button"
             class="operator-settings-form__button"
-            :disabled="saving || voiceTesting || settings.privacy_mode || settings.kairo_narration === 'off'"
+            :disabled="saving || voiceTesting || draft.privacy_mode || draft.kairo_narration === 'off'"
             @click="testVoiceSample"
           >
             {{ voiceTesting ? 'Testing voice…' : 'Test voice sample' }}
@@ -203,18 +420,18 @@ function requestReset(): void {
           <h2>Voice &amp; alerts</h2>
           <p>When KAIRO may speak aloud during operator work.</p>
         </header>
-      <label class="operator-settings-form__row">
-        <input v-model="handsFreeEnabled" type="checkbox" :disabled="saving || privacyMode" />
-        <span class="operator-settings-form__copy">
-          <strong>Hands-free voice (galaxy orb)</strong>
-          <small>
-            Listens continuously but only responds when you say "VAXON" or a direct command
-            (e.g. git status). Ignores side conversation. Say "stop" to interrupt speech.
-          </small>
-        </span>
-      </label>
-      <label class="operator-settings-form__row">
-        <input v-model="spokenAlertsEnabled" type="checkbox" :disabled="saving || privacyMode" />
+        <label class="operator-settings-form__row">
+          <input v-model="handsFreeEnabled" type="checkbox" :disabled="saving || privacyMode" />
+          <span class="operator-settings-form__copy">
+            <strong>Hands-free voice (galaxy orb)</strong>
+            <small>
+              Listens continuously but only responds when you say "VAXON" or a direct command
+              (e.g. git status). Ignores side conversation. Say "stop" to interrupt speech.
+            </small>
+          </span>
+        </label>
+        <label class="operator-settings-form__row">
+          <input v-model="spokenAlertsEnabled" type="checkbox" :disabled="saving || privacyMode" />
           <span class="operator-settings-form__copy">
             <strong>Spoken high-value alerts</strong>
             <small>Interrupt with approvals, degraded runtime, or critical signals.</small>
@@ -251,6 +468,22 @@ function requestReset(): void {
       </section>
 
       <div class="operator-settings-form__actions operator-settings-form__actions--footer">
+        <button
+          type="button"
+          class="operator-settings-form__button"
+          :disabled="saving || !dirty"
+          @click="commitSave"
+        >
+          {{ saving ? 'Saving…' : 'Save' }}
+        </button>
+        <button
+          type="button"
+          class="operator-settings-form__button operator-settings-form__button--ghost"
+          :disabled="saving || !dirty"
+          @click="discardDraft"
+        >
+          Discard
+        </button>
         <button
           type="button"
           class="operator-settings-form__button operator-settings-form__button--ghost"

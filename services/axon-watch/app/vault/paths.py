@@ -7,7 +7,10 @@ from pathlib import Path
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    # paths.py lives at services/axon-watch/app/vault/paths.py → parents[4] is the repo root.
+    # parents[3] incorrectly resolves to services/ and created a split-brain vault under
+    # services/.local/state whenever AXON_WATCH_STATE_DIR was relative/unset.
+    return Path(__file__).resolve().parents[4]
 
 
 def state_dir() -> Path:

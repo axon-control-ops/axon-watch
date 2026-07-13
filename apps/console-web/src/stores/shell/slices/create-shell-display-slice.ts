@@ -25,7 +25,10 @@ import { conversationEmptyStateLabel, type OperatorThreadEntry } from '../../../
 import { resolveOperatorSignalCount, resolveAttentionSignalCount, filterAttentionSignals } from '../../../lib/operator-signal-count';
 import { workspaceCatalogMode } from '../../../lib/operator-workspace-catalog';
 import { formatRunIdentityLabel } from '../../../lib/run-display';
-import { isOperatorCompletablePhase } from '../../../lib/run-lifecycle-ui';
+import {
+  isOperatorCompletablePhase,
+  shouldOfferRunContinue,
+} from '../../../lib/run-lifecycle-ui';
 import { buildTopbarChips } from '../../../lib/runtime-strip';
 import { selectPrimaryApprovalRun } from '../../shell-run-selection';
 import type {
@@ -199,23 +202,28 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     if (runMutationPending.value) {
       return false;
     }
-    if (input.agentStreamActive.value) {
-      return true;
-    }
-    return (
-      shouldShowIdeAgentStop({
-        agentStreamActive: false,
-        run: input.ideAgentLinkedRun.value,
-      }) || Boolean(activeIdeStopRun.value)
-    );
+    // Stream-live only. Idle executing runs surface Resume/Continue, not Stop.
+    return shouldShowIdeAgentStop({
+      agentStreamActive: input.agentStreamActive.value,
+      run: input.ideAgentLinkedRun.value ?? activeIdeStopRun.value,
+    });
   });
 
   const canStopPrimaryRun = computed(
     () => Boolean(input.primaryActiveRun.value?.can_stop) && !runMutationPending.value,
   );
-  const canResumePrimaryRun = computed(
-    () => Boolean(input.primaryActiveRun.value?.can_resume) && !runMutationPending.value,
-  );
+  const canResumePrimaryRun = computed(() => {
+    const run = input.primaryActiveRun.value;
+    if (!run || runMutationPending.value) {
+      return false;
+    }
+    return shouldOfferRunContinue({
+      phase: run.phase,
+      canResume: Boolean(run.can_resume),
+      agentStreamActive: input.agentStreamActive.value,
+      mode: run.mode,
+    });
+  });
   const canMarkPrimaryRunReviewReady = computed(
     () => input.primaryActiveRun.value?.phase === 'executing' && !runMutationPending.value,
   );
@@ -262,9 +270,18 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
   const canApproveIdeAgentRun = computed(
     () => Boolean(input.ideAgentLinkedRun.value?.can_approve) && !runMutationPending.value,
   );
-  const canResumeIdeAgentRun = computed(
-    () => Boolean(input.ideAgentLinkedRun.value?.can_resume) && !runMutationPending.value,
-  );
+  const canResumeIdeAgentRun = computed(() => {
+    const run = input.ideAgentLinkedRun.value;
+    if (!run || runMutationPending.value) {
+      return false;
+    }
+    return shouldOfferRunContinue({
+      phase: run.phase,
+      canResume: Boolean(run.can_resume),
+      agentStreamActive: input.agentStreamActive.value,
+      mode: run.mode,
+    });
+  });
   const canRejectPrimaryRun = computed(
     () =>
       primaryApprovalRun.value?.phase === 'awaiting_approval' && !runMutationPending.value,

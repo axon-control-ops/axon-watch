@@ -1,8 +1,9 @@
 import type { RunRecord } from '../contracts/canonical';
+import { isToolCapableComposerMode } from './composer-tool-modes';
 
 const LIVE_STOP_PHASES = new Set(['queued', 'starting', 'planning', 'executing']);
 
-export type IdeComposerMode = 'ask' | 'plan' | 'agent';
+export type IdeComposerMode = 'ask' | 'plan' | 'agent' | 'debug';
 
 export interface IdeComposerQueuedMessage {
   id: string;
@@ -58,7 +59,7 @@ export function shouldQueueIdeComposerSubmit(input: {
   agentBusy: boolean;
   composerMode: IdeComposerMode;
 }): boolean {
-  return input.agentBusy && input.composerMode === 'agent';
+  return input.agentBusy && isToolCapableComposerMode(input.composerMode);
 }
 
 export function appendIdeComposerQueueEntry(

@@ -200,7 +200,7 @@ def generate_lane_b_reply(*, context: LaneBContext, user_prompt: str) -> str:
 
 def is_lane_b_composer_mode(composer_mode: str | None) -> bool:
     normalized = str(composer_mode or "command").strip().lower()
-    return normalized in {"ask", "agent", "plan"}
+    return normalized in {"ask", "agent", "plan", "debug"}
 
 
 def should_use_lane_b(*, composer_mode: str | None, command_intent: str) -> bool:

@@ -29,6 +29,19 @@ describe('resolveIdeAgentLinkedRunId', () => {
     expect(resolveIdeAgentLinkedRunId('run_done', runs)).toBeNull();
   });
 
+  it('does not link an agent run when debug mode is expected', () => {
+    const runs = [run({ run_id: 'run_agent', phase: 'review_ready', mode: 'agent' })];
+    expect(resolveIdeAgentLinkedRunId('run_agent', runs, { expectedMode: 'debug' })).toBeNull();
+    expect(resolveIdeAgentLinkedRunId('run_agent', runs, { expectedMode: 'agent' })).toBe('run_agent');
+  });
+
+  it('links a debug run when debug mode is expected', () => {
+    const runs = [run({ run_id: 'run_debug', phase: 'review_ready', mode: 'debug' })];
+    expect(resolveIdeAgentLinkedRunId('run_debug', runs, { expectedMode: 'debug' })).toBe(
+      'run_debug',
+    );
+  });
+
   it('restores the latest reusable run from thread history', () => {
     const runs = [
       run({ run_id: 'run_done', phase: 'completed' }),

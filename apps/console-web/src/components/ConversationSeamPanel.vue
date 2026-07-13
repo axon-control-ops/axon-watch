@@ -65,7 +65,7 @@ const conversationDisplayItems = computed((): ConversationDisplayItem[] => {
 
 const conversationDockHint = computed(() =>
   shell.layoutMode === 'operator'
-    ? 'Recent command results and VAXON artifacts. Run queue lives in Mission Control — not here.'
+    ? 'Actions, KAIRO turns, and receipts — not the run queue. Open loops live in the KAIRO briefing below.'
     : null,
 );
 const showAgentWorking = computed(
@@ -88,6 +88,7 @@ const rootRef = ref<HTMLElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
 const expandedErrorByMessageId = ref<Record<string, boolean>>({});
 const expandedSystemByMessageId = ref<Record<string, boolean>>({});
+const loggedSuppressedDebugReproduceIds = new Set<string>();
 
 const { handleWheel, handleContentChange } = useConversationSeamScroll({
   rootRef,
@@ -100,6 +101,16 @@ function toggleErrorExpanded(messageId: string): void {
     ...expandedErrorByMessageId.value,
     [messageId]: !expandedErrorByMessageId.value[messageId],
   };
+}
+
+function suppressInlineDebugReproduce(messageId: string): true {
+  if (!loggedSuppressedDebugReproduceIds.has(messageId)) {
+    loggedSuppressedDebugReproduceIds.add(messageId);
+    // #region agent log
+    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:messageId,hypothesisId:'R8',location:'ConversationSeamPanel.vue:suppressInlineDebugReproduce',message:'inline debug reproduce block suppressed',data:{messageId,actionableBannerOwnsPresentation:true},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }
+  return true;
 }
 
 function isMarkdownBlock(content: string, isComplete = true): boolean {
@@ -597,6 +608,14 @@ watch(
               :diff="segment.diff"
               :open="segment.open"
             />
+
+            <!-- The composer renders this segment once as its actionable Proceed/Dismiss banner. -->
+            <template
+              v-else-if="
+                segment.kind === 'debug-reproduce' &&
+                suppressInlineDebugReproduce(item.message.message_id)
+              "
+            ></template>
 
             <AgentImageBlock
               v-else-if="segment.kind === 'image'"

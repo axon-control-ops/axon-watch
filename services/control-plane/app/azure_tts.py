@@ -1,4 +1,4 @@
-"""Minimal Azure Speech synthesis for KAIRO playback."""
+"""Minimal Azure Speech synthesis for KAIRO playback (axon-local SSML parity)."""
 
 from __future__ import annotations
 
@@ -8,13 +8,21 @@ import urllib.error
 import urllib.request
 from xml.sax.saxutils import escape
 
+from app.voice_tuning import (
+    DEFAULT_VOICE_PITCH,
+    DEFAULT_VOICE_RATE,
+    azure_voice_pitch_attr,
+    azure_voice_rate_attr,
+)
+
 DEFAULT_AZURE_VOICE = "en-GB-RyanNeural"
 DEFAULT_AZURE_REGION = "southafricanorth"
 # RyanNeural is natively 48 kHz — requesting 24 kHz downsampled and dulled the voice.
 DEFAULT_AZURE_OUTPUT_FORMAT = "audio-48khz-192kbitrate-mono-mp3"
-# Conversational delivery for assistant lines (Ryan supports cheerful + chat).
-DEFAULT_AZURE_STYLE = "chat"
-_CHAT_STYLE_VOICES = frozenset({"en-GB-RyanNeural"})
+# Runtime evidence: Chromium reported fully buffered audio at currentTime=0,
+# yet the sink dropped roughly the first 400–500 ms ("Continuing" → "uing").
+# Encoded silence survives decoder/device wake-up; a JS delay before play does not.
+LEADING_AUDIO_GUARD_MS = 650
 _PLACEHOLDER_KEYS = frozenset({"changeme", "change-me", "placeholder", "your-key-here", "test"})
 _AZURE_KEY_NAMES = ("AZURE_SPEECH_KEY", "azure_speech_key")
 _AZURE_REGION_NAMES = ("AZURE_SPEECH_REGION", "azure_speech_region")
@@ -23,6 +31,37 @@ _AZURE_REGION_NAMES = ("AZURE_SPEECH_REGION", "azure_speech_region")
 def _clean_for_speech(text: str) -> str:
     cleaned = re.sub(r"\s+", " ", str(text or "").strip())
     return cleaned[:3000]
+
+
+def _inject_ssml_breaks(text: str) -> str:
+    """Insert short pauses so delivery is conversational (axon-local parity)."""
+    value = str(text or "")
+    if not value:
+        return value
+    value = re.sub(r"([.!?])\s+", r"\1<break time='120ms'/> ", value)
+    value = re.sub(r":\s+", r":<break time='90ms'/> ", value)
+    value = re.sub(r";\s+", r";<break time='80ms'/> ", value)
+    value = re.sub(r"\s*[—–]\s*", r"<break time='80ms'/> ", value)
+    value = re.sub(
+        r",\s+(?=(?:and|but|or|so|yet|because|since|while|although)\b)",
+        r",<break time='70ms'/> ",
+        value,
+    )
+    return value
+
+
+def _escape_ssml_text_preserving_breaks(text: str) -> str:
+    break_tag = re.compile(r"(<break time='(?:70|80|90|120)ms'/>)")
+    parts = break_tag.split(str(text or ""))
+    escaped_parts: list[str] = []
+    for part in parts:
+        if not part:
+            continue
+        if break_tag.fullmatch(part):
+            escaped_parts.append(part)
+        else:
+            escaped_parts.append(escape(part, {"'": "&apos;", '"': "&quot;"}))
+    return "".join(escaped_parts)
 
 
 def extract_azure_speech_key(value: object) -> str:
@@ -85,25 +124,26 @@ def build_azure_ssml(
     text: str,
     *,
     voice: str = DEFAULT_AZURE_VOICE,
-    style: str | None = DEFAULT_AZURE_STYLE,
+    rate: float | int | str | None = None,
+    pitch: float | int | str | None = None,
 ) -> str:
-    """Build SSML for neural TTS.
+    """Build SSML matching axon-local Azure talkback.
 
-    No rate/pitch prosody overrides — those dulled the voice. For Ryan, wrap in
-    the supported ``chat`` style so lines sound conversational rather than flat.
+    - Relative prosody rate/pitch (e.g. ``-15%``, ``+4%``) — not absolute ``85%``
+    - Sentence/colon breaks for natural pacing
+    - No ``mstts:express-as style=chat`` (that style races past operator pacing)
     """
     safe_voice = escape(voice, {"'": "&apos;", '"': "&quot;"})
-    safe_text = escape(_clean_for_speech(text), {"'": "&apos;", '"': "&quot;"})
-    resolved_style = style if voice in _CHAT_STYLE_VOICES else None
-    if resolved_style:
-        safe_style = escape(resolved_style, {"'": "&apos;", '"': "&quot;"})
-        inner = f"<mstts:express-as style='{safe_style}'>{safe_text}</mstts:express-as>"
-    else:
-        inner = safe_text
+    cleaned = _clean_for_speech(text)
+    safe_text = _escape_ssml_text_preserving_breaks(_inject_ssml_breaks(cleaned))
+    rate_attr = azure_voice_rate_attr(rate if rate is not None else DEFAULT_VOICE_RATE)
+    pitch_attr = azure_voice_pitch_attr(pitch if pitch is not None else DEFAULT_VOICE_PITCH)
     return (
         "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' "
-        "xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-GB'>"
-        f"<voice name='{safe_voice}'>{inner}</voice>"
+        "xml:lang='en-GB'>"
+        f"<voice name='{safe_voice}'><prosody rate='{rate_attr}' pitch='{pitch_attr}'>"
+        f"<break time='{LEADING_AUDIO_GUARD_MS}ms'/>"
+        f"{safe_text}</prosody></voice>"
         "</speak>"
     )
 
@@ -114,6 +154,8 @@ def synthesize_azure_speech(
     voice: str = DEFAULT_AZURE_VOICE,
     region: str | None = None,
     key: str | None = None,
+    rate: float | None = None,
+    pitch: float | None = None,
 ) -> tuple[bytes, str] | None:
     resolved_key, resolved_region = resolve_azure_speech_credentials()
     speech_key = extract_azure_speech_key(key) or resolved_key
@@ -128,7 +170,7 @@ def synthesize_azure_speech(
     url = f"https://{speech_region}.tts.speech.microsoft.com/cognitiveservices/v1"
     request = urllib.request.Request(
         url,
-        data=build_azure_ssml(trimmed, voice=voice).encode("utf-8"),
+        data=build_azure_ssml(trimmed, voice=voice, rate=rate, pitch=pitch).encode("utf-8"),
         headers={
             "Ocp-Apim-Subscription-Key": speech_key,
             "Content-Type": "application/ssml+xml",

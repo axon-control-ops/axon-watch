@@ -18,12 +18,29 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.main import app  # noqa: E402
 from app.persistence import run_store  # noqa: E402
 from app.workspace_agents import (  # noqa: E402
+    _derive_agent_status,
     build_workspace_agent_record,
     load_workspace_agent_configs,
 )
 
 
 class WorkspaceAgentsModuleTests(unittest.TestCase):
+    def test_review_ready_run_marks_agent_verifying(self) -> None:
+        with patch(
+            "app.workspace_agents.list_runs",
+            return_value=[
+                {
+                    "run_id": "run_review",
+                    "workspace_id": "workspace_demo",
+                    "status": "review",
+                    "phase": "review_ready",
+                    "ended_at": None,
+                    "updated_at": "2026-07-13T14:18:34Z",
+                }
+            ],
+        ):
+            self.assertEqual("verifying", _derive_agent_status("workspace_demo"))
+
     def test_loads_agent_overrides_from_config(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             agents_file = Path(tempdir) / "agents.json"

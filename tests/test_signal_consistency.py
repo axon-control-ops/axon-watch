@@ -12,6 +12,7 @@ from tests.support.bootstrap_signal_fixture import (
     BOOTSTRAP_WATCH_INBOX,
     consistency_tuple,
 )
+from tests.support.email_signal_fixture import EMAIL_INBOX_ITEM, EMAIL_WATCH_INBOX
 from tests.support.summary_degraded_signal_fixture import SUMMARY_DEGRADED_INBOX_ITEM
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
@@ -84,6 +85,28 @@ class SignalConsistencyTests(unittest.TestCase):
         )
         self.assertEqual(0, summary["open_count"])
         self.assertEqual([], summary["top_items"])
+
+    def test_control_plane_preserves_email_signal_across_inbox_and_summary(self) -> None:
+        with patch(
+            "app.inbox_projection.fetch_watch_inbox",
+            return_value=EMAIL_WATCH_INBOX,
+        ), patch(
+            "app.runtime_summary_assembler.fetch_watch_inbox",
+            return_value=EMAIL_WATCH_INBOX,
+        ), patch(
+            "app.runtime_summary_assembler.default_watch_probe",
+            return_value=(True, "ok", None, "2026-07-13T12:00:00Z"),
+        ):
+            inbox_item = self.client.get("/api/inbox").json()["items"][0]
+            summary = self.client.get("/api/runtime/summary").json()["signals"]
+
+        self.assertEqual(consistency_tuple(EMAIL_INBOX_ITEM), consistency_tuple(inbox_item))
+        self.assertEqual(1, summary["open_count"])
+        self.assertEqual(
+            consistency_tuple(EMAIL_INBOX_ITEM),
+            consistency_tuple(summary["top_items"][0]),
+        )
+        self.assertEqual("email", inbox_item["source"])
 
 
 if __name__ == "__main__":

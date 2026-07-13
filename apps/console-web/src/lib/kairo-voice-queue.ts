@@ -19,6 +19,8 @@ export type KairoVoicePriority =
 export type EnqueueKairoSpeechOptions = {
   priority?: KairoVoicePriority;
   preferBrowser?: boolean;
+  speechRate?: number;
+  speechPitch?: number;
 };
 
 type VoiceJob = {
@@ -26,6 +28,8 @@ type VoiceJob = {
   text: string;
   priority: KairoVoicePriority;
   preferBrowser: boolean;
+  speechRate?: number;
+  speechPitch?: number;
   resolve: (result: KairoVoicePlaybackResult) => void;
   reject: (error: unknown) => void;
 };
@@ -85,6 +89,8 @@ async function pump(): Promise<void> {
       try {
         const result = await playKairoUtteranceNow(job.text, {
           preferBrowser: job.preferBrowser,
+          speechRate: job.speechRate,
+          speechPitch: job.speechPitch,
         });
         await settleAfterUtterance();
         job.resolve(result);
@@ -146,9 +152,14 @@ export function enqueueKairoSpeech(
       text: trimmed,
       priority,
       preferBrowser: options.preferBrowser === true,
+      speechRate: options.speechRate,
+      speechPitch: options.speechPitch,
       resolve,
       reject,
     };
+    // #region agent log
+    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:`voice-job-${job.id}`,hypothesisId:'R6',location:'kairo-voice-queue.ts:enqueueKairoSpeech',message:'voice job enqueued',data:{jobId:job.id,line:trimmed.slice(0,280),priority,pendingJobIds:pending.map((item)=>item.id),activeJobId:activeJob?.id??null,pumping},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     if (priority === 'interrupt') {
       flushKairoSpeechQueue('preempted_by_interrupt');

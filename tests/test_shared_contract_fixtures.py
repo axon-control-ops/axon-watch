@@ -9,7 +9,7 @@ from scripts.verify.common import compact_json_size_bytes, load_config
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES_DIR = REPO_ROOT / "packages" / "shared-types" / "fixtures"
 
-RUN_MODES = {"ask", "agent", "plan", "auto", "watch"}
+RUN_MODES = {"ask", "agent", "plan", "debug", "auto", "watch"}
 RUN_PHASES = {
     "queued",
     "starting",

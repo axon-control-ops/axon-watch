@@ -1,7 +1,21 @@
-import type { OperatorBriefing } from '../contracts/canonical';
+import type { OperatorBriefing, RunRecord } from '../contracts/canonical';
+
+import { formatRunDisplayName, formatRunIdentityLabel } from './run-display';
+import { runPhaseTag } from './mockup-shell-view';
 
 export type BriefingPanelLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 export type BriefingConnectivity = OperatorBriefing['connectivity'];
+
+export type BriefingNoticeOptions = {
+  primaryActiveRun?: Pick<RunRecord, 'run_id' | 'summary' | 'detail' | 'phase'> | null;
+};
+
+function isIdleNoRunsNotice(notice: string | undefined): boolean {
+  if (!notice?.trim()) {
+    return true;
+  }
+  return /no active runs/i.test(notice);
+}
 
 export function briefingPanelHeadline(
   briefing: OperatorBriefing | null,
@@ -72,6 +86,7 @@ export function briefingIsEmpty(briefing: OperatorBriefing | null): boolean {
 export function briefingNotice(
   briefing: OperatorBriefing | null,
   loadState: BriefingPanelLoadState,
+  options?: BriefingNoticeOptions,
 ): string {
   if (loadState === 'loading') {
     return 'Standing by while briefing loads.';
@@ -79,6 +94,14 @@ export function briefingNotice(
 
   if (loadState === 'error') {
     return 'Briefing unavailable. Check control-plane connectivity.';
+  }
+
+  const primaryActiveRun = options?.primaryActiveRun ?? null;
+  if (primaryActiveRun && isIdleNoRunsNotice(briefing?.notice)) {
+    if (primaryActiveRun.phase === 'review_ready') {
+      return `${formatRunDisplayName(primaryActiveRun)} is ready for your review.`;
+    }
+    return `${formatRunIdentityLabel(primaryActiveRun)} · ${runPhaseTag(primaryActiveRun.phase)}`;
   }
 
   if (briefing?.notice) {

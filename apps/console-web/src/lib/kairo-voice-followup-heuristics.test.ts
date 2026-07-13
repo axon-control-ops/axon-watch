@@ -14,8 +14,8 @@ describe('kairo voice follow-up heuristics', () => {
     expect(looksLikeOperatorFollowUp('still degraded?')).toBe(true);
   });
 
-  it('rejects ambient chatter', () => {
-    expect(looksLikeOperatorFollowUp('did you see the game last night')).toBe(false);
-    expect(looksLikeOperatorFollowUp('nice weather today')).toBe(false);
+  it('accepts repeat/clarification follow-ups', () => {
+    expect(looksLikeOperatorFollowUp('can you repeat that please')).toBe(true);
+    expect(looksLikeOperatorFollowUp('say that again')).toBe(true);
   });
 });

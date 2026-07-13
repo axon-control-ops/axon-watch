@@ -26,6 +26,7 @@ const NODE_RADIUS: Record<string, number> = {
   workspace: 0.28,
   connector: 0.14,
   signal: 0.16,
+  mailbox: 0.17,
   run: 0.12,
 };
 
@@ -100,13 +101,15 @@ export function layoutBrainGraph3D(snapshot: BrainGraphSnapshot | null): BrainGr
   }
 
   const satellites = snapshot.nodes.filter(
-    (node) => node.kind === 'signal' || node.kind === 'connector',
+    (node) => node.kind === 'signal' || node.kind === 'connector' || node.kind === 'mailbox',
   );
   satellites.forEach((node, index) => {
     const boundAngle = node.workspace_id ? workspaceAngle.get(node.workspace_id) : undefined;
+    const kindOffset =
+      node.kind === 'signal' ? 0.55 : node.kind === 'mailbox' ? 0.9 : -0.45;
     const angle =
       boundAngle !== undefined
-        ? boundAngle + (node.kind === 'signal' ? 0.55 : -0.45)
+        ? boundAngle + kindOffset
         : (index / Math.max(satellites.length, 1)) * Math.PI * 2 + Math.PI / 4;
     const depth = Math.sin(angle * 1.5) * 0.45;
     place(

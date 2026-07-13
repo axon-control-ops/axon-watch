@@ -75,6 +75,7 @@ main_tests=(
   tests.test_lane_b_agent
   tests.test_runtime_vault_integration
   tests.test_email_settings_store
+  tests.test_operator_evidence
 )
 
 watch_vault_tests=(

@@ -29,8 +29,11 @@ export function useKairoSpeechCapture(options: {
     return canStartKairoSpeechCapture();
   }
 
-  function startCapture(mode?: KairoVoiceCaptureMode): boolean {
-    return startKairoSpeechCapture(mode ?? options.captureMode ?? 'manual');
+  function startCapture(
+    mode?: KairoVoiceCaptureMode,
+    startOptions?: { takeover?: boolean },
+  ): boolean {
+    return startKairoSpeechCapture(mode ?? options.captureMode ?? 'manual', startOptions);
   }
 
   function stopCapture(): void {
@@ -57,6 +60,7 @@ export function useKairoSpeechCapture(options: {
     lastAccepted: kairoCaptureLastAccepted,
     lastGateReason: kairoCaptureLastGateReason,
     lastSubmitState: kairoCaptureLastSubmitState,
+    captureMode: kairoCaptureMode,
     canCapture,
     startCapture,
     stopCapture,

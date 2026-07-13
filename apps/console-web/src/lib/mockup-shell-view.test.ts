@@ -140,7 +140,7 @@ describe('mockup shell view helpers', () => {
   });
 
   it('uppercases KAIRO presence module labels', () => {
-    expect(kairoPresenceModuleLabel('observing')).toBe('VAXON LISTENING');
+    expect(kairoPresenceModuleLabel('observing')).toBe('VAXON WATCHING');
     expect(kairoPresenceModuleLabel('thinking')).toBe('VAXON CHECKING');
     expect(kairoPresenceModuleLabel('alerting')).toBe('VAXON ATTENTION');
   });

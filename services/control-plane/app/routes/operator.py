@@ -18,6 +18,7 @@ from app.persistence import operator_presence_settings_store
 from app.persistence.operator_memory_store import create_memory, list_memories, search_memories
 from app.research.service import fetch_url, search_web
 from app.routes.schemas import (
+    DebugSessionLogRequest,
     KairoConverseRequest,
     KairoSpeakRequest,
     KairoTtsRequest,
@@ -209,7 +210,9 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         }
 
     voice = str(body.voice or DEFAULT_AZURE_VOICE).strip() or DEFAULT_AZURE_VOICE
-    synthesized = synthesize_azure_speech(trimmed, voice=voice)
+    synthesized = synthesize_azure_speech(
+        trimmed, voice=voice, rate=body.rate, pitch=body.pitch
+    )
     if not synthesized:
         return {
             "available": False,
@@ -271,6 +274,38 @@ def kairo_converse(
 def dev_trigger_spoken_briefing() -> dict[str, object]:
     delivered = broadcast_live_event({"type": "spoken_briefing"})
     return {"ok": True, "subscribers": delivered}
+
+
+@router.post("/api/dev/debug-session-log")
+def dev_debug_session_log(body: DebugSessionLogRequest) -> dict[str, object]:
+    """Append one NDJSON evidence line for Debug-mode instrumentation."""
+    import json
+    from pathlib import Path
+
+    from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+
+    workspace_root: Path | None = None
+    workspace_id = (body.workspace_id or "").strip() or "workspace_axon_watch"
+    try:
+        workspace_root = resolve_workspace_root(workspace_id)
+    except WorkspaceRootError:
+        workspace_root = None
+    if workspace_root is None:
+        workspace_root = Path(__file__).resolve().parents[4]
+
+    axon_dir = workspace_root / ".axon"
+    axon_dir.mkdir(parents=True, exist_ok=True)
+    log_path = axon_dir / "debug-session.ndjson"
+    payload = {
+        "hypothesisId": body.hypothesisId,
+        "location": body.location,
+        "message": body.message,
+        "data": body.data or {},
+        "timestamp": body.timestamp if body.timestamp is not None else __import__("time").time() * 1000,
+    }
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    return {"ok": True, "path": str(log_path)}
 
 
 @router.get("/api/live/events")

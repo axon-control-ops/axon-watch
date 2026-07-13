@@ -1,26 +1,15 @@
 import type { RunRecord } from '../contracts/canonical';
 
-const LIVE_STOP_PHASES = new Set(['queued', 'starting', 'planning', 'executing']);
-
-/** Show IDE stop only while the agent is actively running, not after the lane goes idle. */
+/**
+ * Show IDE stop only while the agent stream is live.
+ * Idle/stuck executing runs offer Resume/Continue instead of Stop.
+ */
 export function shouldShowIdeAgentStop(input: {
   agentStreamActive: boolean;
   run: RunRecord | null | undefined;
 }): boolean {
-  if (input.agentStreamActive) {
-    return true;
-  }
-
-  const run = input.run;
-  if (!run?.can_stop) {
-    return false;
-  }
-
-  if (!LIVE_STOP_PHASES.has(run.phase)) {
-    return false;
-  }
-
-  return run.status === 'running';
+  void input.run;
+  return input.agentStreamActive;
 }
 
 export function shouldClearIdeAgentRunLink(run: RunRecord | null | undefined): boolean {

@@ -38,4 +38,17 @@ describe('kairo-galaxy-orb-position', () => {
 
     expect(candidates.every((candidate) => candidate.y <= 104)).toBe(true);
   });
+
+  it('includes a stable top-right dock candidate', () => {
+    const candidates = resolveAutoAvoidOrbCandidates({
+      stage: { width: 640, height: 400 },
+      orb: { width: 200, height: 192 },
+      obstacle: { left: 12, top: 260, right: 628, bottom: 388 },
+      margins: { left: 12, top: 56, right: 12, bottom: 94 },
+      dockTopOffset: 48,
+      clearance: 12,
+    });
+
+    expect(candidates[2]).toEqual({ x: 428, y: 104 });
+  });
 });

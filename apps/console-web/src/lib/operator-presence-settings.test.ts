@@ -55,6 +55,8 @@ describe('operator-presence-settings', () => {
       kairo_narration: 'conversational',
       ide_voice_strip_enabled: false,
       hands_free_enabled: false,
+      speech_rate: 1.0,
+      speech_pitch: 1.04,
     });
     expect(storage.getItem(OPERATOR_PRESENCE_SETTINGS_KEY)).toContain('"operator_persona_enabled":false');
   });
@@ -68,7 +70,16 @@ describe('operator-presence-settings', () => {
       kairo_narration: 'conversational',
       ide_voice_strip_enabled: false,
       hands_free_enabled: false,
+      speech_rate: 1.0,
+      speech_pitch: 1.04,
     });
+  });
+
+  it('normalizes continuous speech rate and pitch like axon-local', () => {
+    expect(normalizeOperatorPresenceSettings({ speech_rate: 0.85 }).speech_rate).toBe(0.85);
+    expect(normalizeOperatorPresenceSettings({ speech_pitch: 1.12 }).speech_pitch).toBe(1.12);
+    expect(normalizeOperatorPresenceSettings({ speech_rate: 9.99 }).speech_rate).toBe(1.3);
+    expect(normalizeOperatorPresenceSettings({ speech_pitch: -1 }).speech_pitch).toBe(0.5);
   });
 
   it('normalizes ide voice strip opt-in', () => {

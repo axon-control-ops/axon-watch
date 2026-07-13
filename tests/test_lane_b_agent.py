@@ -23,6 +23,7 @@ class LaneBAgentTests(unittest.TestCase):
         self.assertTrue(should_use_lane_b(composer_mode="ask", command_intent="unsupported"))
         self.assertTrue(should_use_lane_b(composer_mode="plan", command_intent="unsupported"))
         self.assertTrue(should_use_lane_b(composer_mode="agent", command_intent="unsupported"))
+        self.assertTrue(should_use_lane_b(composer_mode="debug", command_intent="unsupported"))
         self.assertFalse(should_use_lane_b(composer_mode="command", command_intent="unsupported"))
 
     def test_executing_tier_prompt_authorizes_edits(self) -> None:
@@ -65,6 +66,17 @@ class LaneBAgentTests(unittest.TestCase):
         self.assertIn("Online research", plan)
         self.assertIn("discovery, implementation, verification", plan)
         self.assertIn("Reply in first person", plan)
+
+        debug = _build_prompt(
+            composer_mode="debug",
+            user_prompt="this button does nothing",
+            context_block="ctx",
+            execution_tier="executing",
+        )
+        self.assertIn("Debug mode with Full Access", debug)
+        self.assertIn(".axon/debug-session.ndjson", debug)
+        self.assertIn("hypotheses", debug.lower())
+        self.assertIn("Reply in first person", debug)
 
     def test_ide_modes_keep_lane_b_even_when_prompt_matches_command_keywords(self) -> None:
         # "Add a comment to README.md" must not become an operator read_file run.

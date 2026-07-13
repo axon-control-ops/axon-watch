@@ -55,6 +55,17 @@ describe('dock-hero-mode', () => {
     ).toBe('briefing');
   });
 
+  it('defaults to briefing when active runs exist', () => {
+    expect(
+      resolveDefaultDockHeroMode({
+        pendingApprovals: 0,
+        criticalSignals: 0,
+        highSignals: 0,
+        activeRunCount: 2,
+      }),
+    ).toBe('briefing');
+  });
+
   it('derives operator-facing labels', () => {
     expect(dockHeroModeLabel('command')).toBe('Command');
     expect(dockHeroModeTitle('command')).toBe('Command');

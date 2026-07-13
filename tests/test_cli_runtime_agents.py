@@ -26,8 +26,10 @@ class CliRuntimeAgentTests(unittest.TestCase):
         self.assertEqual("ask", _cursor_mode_flag("ask", "consultative"))
         self.assertEqual("plan", _cursor_mode_flag("plan", "executing"))
         self.assertEqual("plan", _cursor_mode_flag("agent", "consultative"))
+        self.assertEqual("plan", _cursor_mode_flag("debug", "consultative"))
         # Cursor CLI rejects --mode agent; full access omits the flag entirely.
         self.assertEqual("", _cursor_mode_flag("agent", "executing"))
+        self.assertEqual("", _cursor_mode_flag("debug", "executing"))
 
     @patch("app.cli_runtime.cursor_agent.communicate_registered_process")
     def test_cursor_parses_stream_json_reply(self, mock_communicate) -> None:

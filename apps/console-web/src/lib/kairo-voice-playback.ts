@@ -31,14 +31,52 @@ export type SpeakKairoLineOptions = {
   immediate?: boolean;
   /** Prefer local browser TTS to avoid Azure request latency. */
   preferBrowser?: boolean;
+  /** Playback rate for Azure SSML + browser utterance (axon-local 0.50–1.30). */
+  speechRate?: number;
+  /** Playback pitch for Azure SSML + browser utterance (axon-local 0.50–1.50). */
+  speechPitch?: number;
 };
 
 const speakingListeners = new Set<(active: boolean) => void>();
 const idleListeners = new Set<() => void>();
 const chunkListeners = new Set<() => void>();
 let speaking = false;
+let nextAzurePlaybackId = 0;
 
-const AUDIO_PREROLL_MS = 120;
+type VoiceTuning = { rate: number; pitch: number };
+
+let speechTuningProvider: () => VoiceTuning = () => ({ rate: 1.0, pitch: 1.04 });
+
+/** Wire operator presence speech_rate / speech_pitch (axon-local parity). */
+export function setKairoSpeechTuningProvider(provider: () => VoiceTuning): void {
+  speechTuningProvider = provider;
+}
+
+/** @deprecated Use setKairoSpeechTuningProvider */
+export function setKairoSpeechRateProvider(provider: () => number): void {
+  speechTuningProvider = () => ({ rate: provider(), pitch: 1.04 });
+}
+
+function resolveSpeechTuning(options: {
+  speechRate?: number;
+  speechPitch?: number;
+} = {}): VoiceTuning {
+  const fromSettings = speechTuningProvider();
+  const rateRaw =
+    typeof options.speechRate === 'number' && Number.isFinite(options.speechRate)
+      ? options.speechRate
+      : fromSettings.rate;
+  const pitchRaw =
+    typeof options.speechPitch === 'number' && Number.isFinite(options.speechPitch)
+      ? options.speechPitch
+      : fromSettings.pitch;
+  return {
+    rate: Math.max(0.5, Math.min(1.3, rateRaw)),
+    pitch: Math.max(0.5, Math.min(1.5, pitchRaw)),
+  };
+}
+
+const AUDIO_PREROLL_MS = 280;
 /** Data/blob URLs sometimes never fire canplaythrough — never block forever. */
 const AUDIO_READY_TIMEOUT_MS = 2500;
 
@@ -157,9 +195,9 @@ function delay(ms: number): Promise<void> {
 }
 
 async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
-  // HAVE_CURRENT_DATA is enough to start playback; waiting for canplaythrough
-  // on blob/data URLs can hang indefinitely in Chromium.
-  if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+  // Prefer HAVE_FUTURE_DATA so the first phonemes are buffered before play().
+  const readyEnough = (): boolean => audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+  if (readyEnough()) {
     return;
   }
   await new Promise<void>((resolve, reject) => {
@@ -177,7 +215,9 @@ async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
       reject(error ?? new Error('audio preload failed'));
     };
     const onReady = (): void => {
-      finish(true);
+      if (readyEnough() || audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        finish(true);
+      }
     };
     const onError = (): void => {
       finish(false, new Error('audio preload failed'));
@@ -201,18 +241,14 @@ async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
     audio.addEventListener('canplaythrough', onReady);
     audio.addEventListener('loadeddata', onReady);
     audio.addEventListener('error', onError);
-    // Avoid audio.load() here — restarting a blob/data URL often stalls decode.
   });
 }
 
 async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void> {
+  const playbackId = ++nextAzurePlaybackId;
   audio.preload = 'auto';
   await waitForAudioReady(audio);
-  try {
-    audio.currentTime = 0;
-  } catch {
-    // Some engines throw if metadata is not ready yet; play() still works.
-  }
+  // Do not seek to 0 after buffering — that can discard the primed start and clip.
   await delay(AUDIO_PREROLL_MS);
   await new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -220,6 +256,9 @@ async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void
       if (settled) {
         return;
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:`azure-playback-${playbackId}`,hypothesisId:'R5',location:'kairo-voice-playback.ts:onended',message:'azure audio ended',data:{playbackId,currentTime:audio.currentTime,duration:audio.duration,ended:audio.ended,paused:audio.paused},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       settled = true;
       cleanup();
       resolve();
@@ -238,6 +277,9 @@ async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void
     };
     audio.onended = finish;
     audio.onerror = fail;
+    // #region agent log
+    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:`azure-playback-${playbackId}`,hypothesisId:'R5',location:'kairo-voice-playback.ts:play',message:'azure audio play invoked',data:{playbackId,currentTime:audio.currentTime,duration:audio.duration,ended:audio.ended,paused:audio.paused},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     void audio.play().then(undefined, fail);
   });
 }
@@ -246,7 +288,10 @@ async function playAzureAudio(audio: HTMLAudioElement): Promise<void> {
   await playAzureAudioToCompletion(audio);
 }
 
-async function speakAzureChunks(chunks: string[]): Promise<KairoVoicePlaybackResult> {
+async function speakAzureChunks(
+  chunks: string[],
+  tuning: VoiceTuning,
+): Promise<KairoVoicePlaybackResult> {
   // If a later Azure chunk fails after earlier ones already played, fall back with
   // ONLY the remaining text. Falling back with chunks.join(' ') re-speaks the
   // Azure audio in browser TTS (neural + robotic double voice).
@@ -254,9 +299,9 @@ async function speakAzureChunks(chunks: string[]): Promise<KairoVoicePlaybackRes
     const chunk = chunks[index];
     const remaining = chunks.slice(index).join(' ');
     notifyChunk();
-    const response = await postKairoTts(chunk);
+    const response = await postKairoTts(chunk, { rate: tuning.rate, pitch: tuning.pitch });
     if (!response.available || !response.audio_base64) {
-      return speakWithBrowser(remaining, resolveAzureFallbackReason(response));
+      return speakWithBrowser(remaining, resolveAzureFallbackReason(response), tuning);
     }
     const handle = createAzureAudioHandle(response.audio_base64, response.content_type);
     registerKairoAudioElement(handle.audio);
@@ -264,7 +309,7 @@ async function speakAzureChunks(chunks: string[]): Promise<KairoVoicePlaybackRes
       await playAzureAudioToCompletion(handle.audio);
     } catch {
       registerKairoAudioElement(null);
-      return speakWithBrowser(remaining, 'audio_playback_failed');
+      return speakWithBrowser(remaining, 'audio_playback_failed', tuning);
     } finally {
       registerKairoAudioElement(null);
       handle.revoke();
@@ -287,6 +332,7 @@ function finishPlayback(
 async function speakWithBrowser(
   text: string,
   reason: string | null = 'azure_unavailable',
+  tuning: VoiceTuning = { rate: 1.0, pitch: 1.04 },
 ): Promise<KairoVoicePlaybackResult> {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -302,13 +348,15 @@ async function speakWithBrowser(
     return finishPlayback({ engine: 'skipped', reason: 'browser_unavailable' }, trimmed);
   }
 
+  const browserChunks = splitSpokenReplyChunks(trimmed);
+
   // Ensure Azure HTMLAudioElement is fully released before browser TTS starts.
   stopSharedPlayback();
   notifySpeaking(true);
   await delay(AUDIO_PREROLL_MS);
-  for (const chunk of splitSpokenReplyChunks(trimmed)) {
+  for (const chunk of browserChunks) {
     notifyChunk();
-    enqueueSpeech(chunk, port);
+    enqueueSpeech(chunk, port, { rate: tuning.rate, pitch: tuning.pitch });
   }
   // Must wait for browser TTS to finish — returning early made callers start
   // the next line while the front of this one was still speaking (or clipped).
@@ -328,15 +376,16 @@ function resolveAzureFallbackReason(response: KairoTtsResponse): string {
  */
 export async function playKairoUtteranceNow(
   text: string,
-  options: { preferBrowser?: boolean } = {},
+  options: { preferBrowser?: boolean; speechRate?: number; speechPitch?: number } = {},
 ): Promise<KairoVoicePlaybackResult> {
   const trimmed = sanitizeSpokenReply(text);
+  const tuning = resolveSpeechTuning(options);
   if (!trimmed) {
     return finishPlayback({ engine: 'skipped', reason: 'empty_text' }, text);
   }
 
   if (options.preferBrowser) {
-    return speakWithBrowser(trimmed, 'preferred_browser');
+    return speakWithBrowser(trimmed, 'preferred_browser', tuning);
   }
 
   notifySpeaking(true);
@@ -345,7 +394,10 @@ export async function playKairoUtteranceNow(
   try {
     if (chunks.length === 1) {
       notifyChunk();
-      const response = await postKairoTts(chunks[0]);
+      const response = await postKairoTts(chunks[0], {
+        rate: tuning.rate,
+        pitch: tuning.pitch,
+      });
       if (response.available && response.audio_base64) {
         const handle = createAzureAudioHandle(response.audio_base64, response.content_type);
         registerKairoAudioElement(handle.audio);
@@ -356,20 +408,20 @@ export async function playKairoUtteranceNow(
           return finishPlayback({ engine: 'azure', reason: null }, trimmed);
         } catch {
           registerKairoAudioElement(null);
-          return speakWithBrowser(trimmed, 'audio_playback_failed');
+          return speakWithBrowser(trimmed, 'audio_playback_failed', tuning);
         } finally {
           registerKairoAudioElement(null);
           handle.revoke();
         }
       }
-      return speakWithBrowser(trimmed, resolveAzureFallbackReason(response));
+      return speakWithBrowser(trimmed, resolveAzureFallbackReason(response), tuning);
     }
-    return await speakAzureChunks(chunks);
+    return await speakAzureChunks(chunks, tuning);
   } catch (error) {
     logKairoVoice('tts_error', {
       message: error instanceof Error ? error.message : String(error),
     });
-    return speakWithBrowser(trimmed, 'fetch_error');
+    return speakWithBrowser(trimmed, 'fetch_error', tuning);
   }
 }
 
@@ -382,12 +434,18 @@ export async function speakKairoLine(
   options: SpeakKairoLineOptions = {},
 ): Promise<KairoVoicePlaybackResult> {
   if (options.immediate) {
-    return playKairoUtteranceNow(text, { preferBrowser: options.preferBrowser });
+    return playKairoUtteranceNow(text, {
+      preferBrowser: options.preferBrowser,
+      speechRate: options.speechRate,
+      speechPitch: options.speechPitch,
+    });
   }
   const { enqueueKairoSpeech } = await import('./kairo-voice-queue');
   return enqueueKairoSpeech(text, {
     priority: options.priority ?? 'conversation',
     preferBrowser: options.preferBrowser,
+    speechRate: options.speechRate,
+    speechPitch: options.speechPitch,
   });
 }
 

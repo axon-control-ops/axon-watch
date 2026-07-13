@@ -21,7 +21,8 @@ export type AgentTranscriptSegment =
   | { kind: 'tool'; label: string }
   | { kind: 'research'; query: string; items: ResearchTranscriptItem[]; open: boolean; provider?: string; kindLabel?: ResearchBlockKind }
   | { kind: 'terminal'; command: string; output: string; open: boolean }
-  | { kind: 'image'; path: string; open: boolean };
+  | { kind: 'image'; path: string; open: boolean }
+  | { kind: 'debug-reproduce'; steps: string[]; open: boolean };
 
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from './research-snippet';
 import { inferResearchBlockKind, type ResearchBlockKind } from './research-provider';
@@ -34,9 +35,10 @@ const RESEARCH_PROVIDER_RE = /^@provider\s+(.+)$/;
 const RESEARCH_KIND_RE = /^@kind\s+(search|fetch)\s*$/i;
 const TERMINAL_HEADER_RE = /^:::terminal\s+(.+)$/;
 const IMAGE_HEADER_RE = /^:::image\s+(.+)$/;
+const DEBUG_REPRODUCE_HEADER_RE = /^:::debug-reproduce\s*$/;
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
-  return /^:::(thinking|edit|tool|terminal|research|image)\b/m.test(content);
+  return /^:::(thinking|edit|tool|terminal|research|image|debug-reproduce)\b/m.test(content);
 }
 
 /** Cheap header counts — safe to run on every stream delta. */
@@ -339,6 +341,31 @@ function parseAgentTranscriptBlocksUncached(
       segments.push({
         kind: 'image',
         path: imageMatch[1].trim(),
+        open: !closed,
+      });
+      continue;
+    }
+
+    if (DEBUG_REPRODUCE_HEADER_RE.test(line.trimEnd())) {
+      flushText();
+      const body: string[] = [];
+      let closed = false;
+      index += 1;
+      while (index < lines.length) {
+        if (lines[index].trimEnd() === ':::') {
+          closed = true;
+          index += 1;
+          break;
+        }
+        body.push(lines[index]);
+        index += 1;
+      }
+      const steps = body
+        .map((entry) => entry.replace(/^\s*(?:\d+[.)]|[-*])\s*/, '').trim())
+        .filter(Boolean);
+      segments.push({
+        kind: 'debug-reproduce',
+        steps: steps.length > 0 ? steps : ['Follow the reproduction steps above, then proceed.'],
         open: !closed,
       });
       continue;

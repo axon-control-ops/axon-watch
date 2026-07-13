@@ -24,7 +24,11 @@ class CursorAgentReply:
 
 
 def _cursor_mode_flag(composer_mode: str, execution_tier: str) -> str:
-    """Cursor CLI only accepts --mode plan|ask; full agent mode is the default (no flag)."""
+    """Cursor CLI only accepts --mode plan|ask; full agent mode is the default (no flag).
+
+    Debug uses the same flags as Agent: consultative → plan (read-only), executing → no flag.
+    The Debug evidence loop is enforced via the system prompt, not a CLI mode flag.
+    """
     if composer_mode == "ask":
         return "ask"
     if composer_mode == "plan":

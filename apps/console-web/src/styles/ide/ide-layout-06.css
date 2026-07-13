@@ -302,6 +302,13 @@
     0 12px 30px rgba(0, 0, 0, 0.24);
 }
 
+.agent-dock-composer__shell--debug:focus-within .agent-dock-composer__card {
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.16),
+    0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
 .agent-dock-composer__chips {
   display: flex;
   flex-wrap: wrap;

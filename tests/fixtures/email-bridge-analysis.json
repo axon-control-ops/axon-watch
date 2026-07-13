@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "analyses": [
+    {
+      "message": {
+        "message_id": "<bridge-urgent@example.com>",
+        "uid": "42",
+        "from": "CTO <cto@example.com>",
+        "subject": "Urgent: DashPro deploy failed"
+      },
+      "analysis": {
+        "message_id": "<bridge-urgent@example.com>",
+        "sender": "CTO <cto@example.com>",
+        "subject": "Urgent: DashPro deploy failed",
+        "snippet": "Please investigate the failing deploy today. We cannot ship until this is fixed.",
+        "recommended_detail": "Respond to the blocker or investigate the issue.",
+        "workspace_hints": ["DashPro"],
+        "priority": 90,
+        "risk_level": "high"
+      }
+    }
+  ]
+}

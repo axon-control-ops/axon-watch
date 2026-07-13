@@ -31,7 +31,7 @@ describe('ide-agent-run-active', () => {
     expect(shouldShowIdeAgentStop({ agentStreamActive: true, run: null })).toBe(true);
   });
 
-  it('hides stop for paused or waiting runs after the stream ends', () => {
+  it('hides stop after the stream ends — including stuck executing runs', () => {
     expect(
       shouldShowIdeAgentStop({
         agentStreamActive: false,
@@ -41,18 +41,9 @@ describe('ide-agent-run-active', () => {
     expect(
       shouldShowIdeAgentStop({
         agentStreamActive: false,
-        run: run({ phase: 'executing', status: 'waiting', can_stop: true }),
-      }),
-    ).toBe(false);
-  });
-
-  it('shows stop for actively running executing runs without a stream', () => {
-    expect(
-      shouldShowIdeAgentStop({
-        agentStreamActive: false,
         run: run({ phase: 'executing', status: 'running', can_stop: true }),
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('clears ide agent link when run is terminal', () => {

@@ -3,7 +3,7 @@ import type { AgentStreamCounts } from './agent-stream-incremental';
 
 export type IdeComposerActivity = {
   label: string;
-  mode: 'ask' | 'plan' | 'agent';
+  mode: 'ask' | 'plan' | 'agent' | 'debug';
   executionAccess: AgentExecutionAccess;
   /** Operator message that started the current composer turn (for KAIRO narration). */
   operatorPrompt?: string;
@@ -17,9 +17,15 @@ export type IdeComposerActivity = {
 };
 
 export function buildIdeComposerActivityLabel(
-  mode: 'ask' | 'plan' | 'agent',
+  mode: 'ask' | 'plan' | 'agent' | 'debug',
   executionAccess: AgentExecutionAccess,
 ): string {
+  if (mode === 'debug' && executionAccess === 'full') {
+    return 'Debug · Full Access — contacting runtime…';
+  }
+  if (mode === 'debug') {
+    return 'Debug — contacting runtime…';
+  }
   if (mode === 'agent' && executionAccess === 'full') {
     return 'Full Access — contacting Cursor/Codex runtime…';
   }
@@ -40,7 +46,7 @@ export function buildIdeStreamActivityLabel(executionAccess: AgentExecutionAcces
 }
 
 export const FULL_ACCESS_CONSENT_LINES = [
-  'Full Access lets the Agent edit files, run shell commands, and change your workspace.',
-  'This consent is the approval: Agent turns execute immediately, with no per-run Approve step.',
+  'Full Access lets Agent and Debug edit files, run shell commands, and change your workspace.',
+  'This consent is the approval: tool-capable turns execute immediately, with no per-run Approve step.',
   'It lasts for this session only. Switch back to Consultative at any time to stop tool execution.',
 ] as const;

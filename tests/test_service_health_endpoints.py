@@ -26,6 +26,7 @@ class ControlPlaneHealthEndpointTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual("control-plane", payload["service"])
         self.assertEqual("ok", payload["status"])
+        self.assertTrue(payload["boot_id"])
 
     def test_readiness_endpoint_reports_ready(self) -> None:
         response = self.client.get("/api/readiness")

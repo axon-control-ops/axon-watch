@@ -25,6 +25,7 @@ from app.cli_runtime.runtime_auth import (
 )
 from app.cli_runtime.vault_keys import runtime_subprocess_env
 from app.cli_runtime.research_mcp import ensure_workspace_research_mcp
+from app.debug_prompt import build_debug_system_prompt
 from app.kairo_ask_prompt import build_ask_system_prompt
 from app.research.availability import format_capability_line, research_capability_snapshot
 from app.persistence.operator_presence_settings_store import load_settings
@@ -73,6 +74,11 @@ def _system_prompt(
             "discovery, implementation, verification, and any material risks or open questions. "
             "Never invent source names, publications, or dates. Do not claim execution happened. "
             f"{research_line} {_REPLY_STYLE}"
+        )
+    if composer_mode == "debug":
+        return build_debug_system_prompt(
+            execution_tier=execution_tier,
+            research_line=research_line,
         )
     if execution_tier == "executing":
         research_clause = ""

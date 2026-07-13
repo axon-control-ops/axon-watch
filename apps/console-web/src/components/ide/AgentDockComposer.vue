@@ -5,6 +5,7 @@ import { useAgentDockComposer } from '../../composables/useAgentDockComposer';
 import AgentDockComposerImageLightbox from './agent-dock/AgentDockComposerImageLightbox.vue';
 import AgentDockComposerInput from './agent-dock/AgentDockComposerInput.vue';
 import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue';
+import AgentDockDebugReproduceBanner from './agent-dock/AgentDockDebugReproduceBanner.vue';
 import AgentDockFullAccessConsent from './agent-dock/AgentDockFullAccessConsent.vue';
 
 const {
@@ -22,13 +23,14 @@ const {
   composerDraftModel,
   composerImages,
   composerMode,
+  debugReproduceRequest,
   composerPlaceholder,
   composerPickerRows,
   composerQueueHint,
   composerShellClasses,
   composerSubmitLabel,
   confirmFullAccessConsent,
-  contextActiveFile,
+  attachFilesMedia,
   contextIde,
   contextPinned,
   contextSelection,
@@ -50,6 +52,8 @@ const {
   handleComposerDrop,
   handleComposerKeydown,
   handleComposerPaste,
+  handleDebugReproduceDismiss,
+  handleDebugReproduceProceed,
   handleRejectRun,
   handleResumeRun,
   handleSteer,
@@ -92,9 +96,11 @@ const {
   showAddModelsPanel,
   showApprovalBanner,
   showComposerResume,
+  composerResumeLabel,
   showComposerSteer,
   showComposerStop,
   showContextMenu,
+  showDebugReproduceBanner,
   showCursorCatalog,
   showExtraPinnedRows,
   showFullAccessConsent,
@@ -124,6 +130,13 @@ const {
     @drop="handleComposerDrop"
   >
     <BriefingSurfaceFollowupPrompt />
+    <AgentDockDebugReproduceBanner
+      v-if="showDebugReproduceBanner && debugReproduceRequest"
+      :request="debugReproduceRequest"
+      :pending="shell.commandMutationState === 'submitting' || shell.agentStreamActive"
+      @proceed="handleDebugReproduceProceed(debugReproduceRequest.messageId)"
+      @dismiss="handleDebugReproduceDismiss"
+    />
     <div
       v-if="showApprovalBanner"
       class="agent-dock-composer__approval-banner"
@@ -170,6 +183,7 @@ const {
           :activity-chips="composerActivityChips"
           :composer-queue-hint="composerQueueHint"
           :show-composer-resume="showComposerResume"
+          :composer-resume-label="composerResumeLabel"
           :show-composer-steer="showComposerSteer"
           :show-composer-stop="showComposerStop"
           :can-submit-composer="canSubmitComposer"
@@ -209,6 +223,7 @@ const {
               :show-cursor-catalog="showCursorCatalog"
               :show-vault-action="showVaultAction"
               :attachment-chips="attachmentChips"
+              :composer-image-count="composerImages.length"
               :mcp-tools-for-mode="mcpToolsForMode"
               :composer-mode="composerMode"
               :mode-options="MODE_OPTIONS"
@@ -217,7 +232,6 @@ const {
               :is-full-access-agent="isFullAccessAgent"
               :execution-access-hint="executionAccessHint"
               :context-workspace="contextWorkspace"
-              :context-active-file="contextActiveFile"
               :context-selection="contextSelection"
               :context-terminal="contextTerminal"
               :context-ide="contextIde"
@@ -244,6 +258,7 @@ const {
               :runtime-hint="runtimeHint"
               @toggle-section="toggleSection"
               @toggle-context="toggleContext"
+              @attach-files-media="attachFilesMedia"
               @toggle-runtime-targets="toggleRuntimeTargetsPanel"
               @select-runtime-target="selectRuntimeTarget"
               @select-composer-model="selectComposerModel"

@@ -19,6 +19,7 @@ const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?
 const {
   currentWorkspaceAgent,
   agentForWorkspace,
+  loadWorkspaceAgents,
 } = useWorkspaceAgents(currentWorkspaceId);
 
 const currentWorkspace = computed(() => shell.currentWorkspace ?? null);
@@ -49,7 +50,11 @@ function workspaceRowMeta(workspaceId: string): string {
 
 function toggleMenu(event: MouseEvent): void {
   event.stopPropagation();
-  menuOpen.value = !menuOpen.value;
+  const nextOpen = !menuOpen.value;
+  menuOpen.value = nextOpen;
+  if (nextOpen) {
+    void loadWorkspaceAgents({ reason: 'menu-open' });
+  }
 }
 
 function selectWorkspace(workspaceId: string): void {

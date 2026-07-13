@@ -10,6 +10,7 @@ import {
   formatRunShortId,
 } from '../../lib/run-display';
 import { runPhaseProgress, runPhaseTag } from '../../lib/mockup-shell-view';
+import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import {
   deliveryStateLabel,
   deliveryStateTooltip,
@@ -69,8 +70,17 @@ const showStopAction = computed(
 
 const showReviewActions = computed(
   () =>
-    Boolean(activeRun.value?.can_resume) ||
+    shell.canResumePrimaryRun ||
     shell.canCompletePrimaryRun,
+);
+
+const continueActionLabel = computed(() =>
+  runContinueActionLabel({
+    phase: activeRun.value?.phase,
+    agentStreamActive: shell.agentStreamActive,
+    mode: activeRun.value?.mode,
+    pending: shell.runMutationState === 'resuming',
+  }),
 );
 
 function signalCount(): number {
@@ -196,13 +206,13 @@ function signalHint(signal: {
 
         <div v-if="showReviewActions || showStopAction" class="run-actions run-actions--sidebar">
           <button
-            v-if="activeRun.can_resume && activeRun.phase !== 'review_ready'"
+            v-if="shell.canResumePrimaryRun"
             type="button"
             class="run-actions__button run-actions__button--warning"
-            :disabled="!shell.canResumePrimaryRun"
+            :disabled="!shell.canResumePrimaryRun || shell.runMutationPending"
             @click="shell.resumePrimaryRun()"
           >
-            {{ shell.runMutationState === 'resuming' ? 'RESUMING…' : 'RESUME' }}
+            {{ continueActionLabel }}
           </button>
           <button
             v-if="shell.canCompletePrimaryRun"

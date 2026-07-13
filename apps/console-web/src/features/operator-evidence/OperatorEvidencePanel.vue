@@ -151,6 +151,42 @@ watch(
   },
   { immediate: true },
 );
+
+// #region agent log
+watch(
+  [shownTitle, shownBody, () => props.nodeId],
+  () => {
+    globalThis.requestAnimationFrame?.(() => {
+      const el = document.querySelector('.brain-galaxy-stage__hud--inspector') as HTMLElement | null;
+      if (!el) {
+        return;
+      }
+      const styles = getComputedStyle(el);
+      fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
+        body: JSON.stringify({
+          sessionId: 'df24bc',
+          hypothesisId: 'D',
+          location: 'OperatorEvidencePanel.vue:layout',
+          message: 'inspector panel layout metrics',
+          data: {
+            nodeId: props.nodeId,
+            title: shownTitle.value.slice(0, 40),
+            clientHeight: el.clientHeight,
+            scrollHeight: el.scrollHeight,
+            clipped: el.scrollHeight > el.clientHeight + 2,
+            maxHeight: styles.maxHeight,
+            overflowY: styles.overflowY,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    });
+  },
+  { immediate: true },
+);
+// #endregion
 </script>
 
 <template>

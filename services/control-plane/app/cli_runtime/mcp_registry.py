@@ -11,31 +11,31 @@ def runtime_mcp_tools_registry() -> dict[str, object]:
             "id": "workspace_files.list",
             "label": "List workspace files",
             "bounded_context": "workspace_files",
-            "mode_support": ["ask", "plan", "agent"],
+            "mode_support": ["ask", "plan", "agent", "debug"],
         },
         {
             "id": "workspace_files.read",
             "label": "Read workspace file",
             "bounded_context": "workspace_files",
-            "mode_support": ["ask", "plan", "agent"],
+            "mode_support": ["ask", "plan", "agent", "debug"],
         },
         {
             "id": "runs.history",
             "label": "Read persisted run history",
             "bounded_context": "runs",
-            "mode_support": ["plan", "agent"],
+            "mode_support": ["plan", "agent", "debug"],
         },
         {
             "id": "runtime.status",
             "label": "Inspect runtime status",
             "bounded_context": "cli_runtime",
-            "mode_support": ["ask", "plan", "agent"],
+            "mode_support": ["ask", "plan", "agent", "debug"],
         },
         {
             "id": "vault.status",
             "label": "Inspect vault posture",
             "bounded_context": "vault",
-            "mode_support": ["ask", "plan", "agent"],
+            "mode_support": ["ask", "plan", "agent", "debug"],
         },
     ]
     if research_capability_snapshot().get("available"):
@@ -45,13 +45,13 @@ def runtime_mcp_tools_registry() -> dict[str, object]:
                     "id": "axon_research.search",
                     "label": "Search the public web (audited)",
                     "bounded_context": "research",
-                    "mode_support": ["ask", "plan", "agent"],
+                    "mode_support": ["ask", "plan", "agent", "debug"],
                 },
                 {
                     "id": "axon_research.fetch",
                     "label": "Fetch readable page text (audited)",
                     "bounded_context": "research",
-                    "mode_support": ["ask", "plan", "agent"],
+                    "mode_support": ["ask", "plan", "agent", "debug"],
                 },
             ]
         )

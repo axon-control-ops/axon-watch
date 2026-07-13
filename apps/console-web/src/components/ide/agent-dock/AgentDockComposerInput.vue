@@ -34,6 +34,7 @@ const props = defineProps<{
   activityChips: ActivityChip[];
   composerQueueHint: string;
   showComposerResume: boolean;
+  composerResumeLabel: string;
   showComposerSteer: boolean;
   showComposerStop: boolean;
   canSubmitComposer: boolean;
@@ -213,7 +214,7 @@ const emit = defineEmits<{
         :disabled="runMutationState === 'resuming'"
         @click="emit('resume')"
       >
-        {{ runMutationState === 'resuming' ? 'Resuming…' : 'Resume' }}
+        {{ composerResumeLabel }}
       </button>
       <button
         v-if="composerMode === 'kairo' && speechCaptureSupported"

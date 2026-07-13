@@ -41,11 +41,11 @@ def _utc_now_iso() -> str:
     )
 
 
-def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str]:
+def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str | float]:
     defaults = default_operator_presence_settings()
     if not raw:
         return defaults
-    normalized = dict(defaults)
+    normalized: dict[str, bool | str | float] = dict(defaults)
     for key in defaults:
         if key not in raw:
             continue
@@ -53,6 +53,22 @@ def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str]:
             value = str(raw[key] or defaults[key]).strip().lower()
             if value in {"off", "minimal", "conversational"}:
                 normalized[key] = value
+            continue
+        if key == "speech_rate":
+            try:
+                rate = float(raw[key])  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            if 0.5 <= rate <= 1.3:
+                normalized[key] = round(rate, 2)
+            continue
+        if key == "speech_pitch":
+            try:
+                pitch = float(raw[key])  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+            if 0.5 <= pitch <= 1.5:
+                normalized[key] = round(pitch, 2)
             continue
         normalized[key] = bool(raw[key])
     return normalized
@@ -64,7 +80,7 @@ def reset_store() -> None:
         connection.commit()
 
 
-def load_settings() -> dict[str, bool]:
+def load_settings() -> dict[str, bool | str | float]:
     with _managed_connection() as connection:
         row = connection.execute(
             "SELECT settings_json FROM operator_presence_settings WHERE settings_key = ?",

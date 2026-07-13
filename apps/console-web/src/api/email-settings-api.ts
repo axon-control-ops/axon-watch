@@ -48,6 +48,7 @@ export type EmailSettingsSnapshot = {
   };
   projection_path: string;
   account?: EmailMailboxAccount;
+  warning?: string;
 };
 
 export type EmailAccountUpsertBody = {

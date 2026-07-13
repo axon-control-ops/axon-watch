@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .venv/
+.axon/
 .axon_terminal_history
 **/.axon_terminal_history
 **/.axon_terminal_history_*
@@ -13,3 +14,4 @@ node_modules/
 dist/
 .local/
 *.egg-info/
+config/email-operator-settings.json

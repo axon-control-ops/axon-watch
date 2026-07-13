@@ -12,6 +12,9 @@ from typing import Literal
 ExecutionTier = Literal["consultative", "executing"]
 ExecutionAccess = Literal["consultative", "full"]
 
+# Modes that create linked runs and may use tool-capable CLI execution.
+_TOOL_CAPABLE_COMPOSER_MODES = frozenset({"agent", "debug"})
+
 _BLOCKED_PHASES = frozenset(
     {
         "awaiting_approval",
@@ -37,6 +40,11 @@ def _truthy_env(name: str, default: bool = False) -> bool:
 def normalize_execution_access(value: str | None) -> ExecutionAccess:
     normalized = str(value or "consultative").strip().lower()
     return "full" if normalized == "full" else "consultative"
+
+
+def is_tool_capable_composer_mode(composer_mode: str | None) -> bool:
+    """True for Agent and Debug — modes that may edit files / run tools after consent."""
+    return str(composer_mode or "").strip().lower() in _TOOL_CAPABLE_COMPOSER_MODES
 
 
 def full_access_requested(execution_access: str | None) -> bool:
@@ -68,8 +76,7 @@ def resolve_runtime_execution_tier(
     run_phase: str | None,
     execution_access: str | None = None,
 ) -> ExecutionTier:
-    normalized_mode = str(composer_mode or "ask").strip().lower()
-    if normalized_mode != "agent":
+    if not is_tool_capable_composer_mode(composer_mode):
         return "consultative"
     if not agent_tool_execution_enabled(execution_access):
         return "consultative"
@@ -88,15 +95,17 @@ def runtime_dispatch_blocked_reason(
     """Human-readable block reason when tool execution was requested but denied."""
     if not agent_tool_execution_enabled(execution_access):
         return None
-    if str(composer_mode or "").strip().lower() != "agent":
+    if not is_tool_capable_composer_mode(composer_mode):
         return None
+    mode_label = str(composer_mode or "agent").strip().lower() or "agent"
     phase = str(run_phase or "").strip().lower()
     if phase == "executing":
         return None
     if phase == "awaiting_approval":
         return (
             "Run is awaiting operator approval. Approve the run in the Agent Dock or "
-            "Mission Control, then send another Agent turn to start Full Access execution."
+            "Mission Control, then send another "
+            f"{mode_label.capitalize()} turn to start Full Access execution."
         )
     if phase and phase in _BLOCKED_PHASES:
         return f"Run phase `{phase}` blocks tool execution until the run is executing."
@@ -111,8 +120,8 @@ def consultative_only_notice(
     run_phase: str | None,
     execution_access: str | None = None,
 ) -> str | None:
-    """Notice appended when Agent mode falls back to consultative tier."""
-    if str(composer_mode or "").strip().lower() != "agent":
+    """Notice appended when Agent/Debug mode falls back to consultative tier."""
+    if not is_tool_capable_composer_mode(composer_mode):
         return None
     if (
         resolve_runtime_execution_tier(
@@ -131,8 +140,9 @@ def consultative_only_notice(
     if blocked:
         return blocked
     if not agent_tool_execution_enabled(execution_access):
+        mode_label = str(composer_mode or "agent").strip().lower() or "agent"
         return (
-            "Agent mode is consultative-only. Enable Full Access in the Agent Dock "
-            "composer to let the agent edit files and run commands."
+            f"{mode_label.capitalize()} mode is consultative-only. Enable Full Access in the "
+            "Agent Dock composer to let the agent edit files and run commands."
         )
     return None

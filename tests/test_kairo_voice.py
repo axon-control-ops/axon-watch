@@ -14,11 +14,13 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.kairo_voice import (  # noqa: E402
     _HISTORY,
+    _try_runtime_line,
     generate_spoken_line,
     narration_allows_event,
     normalize_spoken_line,
     should_use_runtime_for_event,
 )
+from app.cli_runtime.cursor_agent import CursorAgentReply  # noqa: E402
 from app.main import app  # noqa: E402
 from app.persistence import operator_presence_settings_store, run_store  # noqa: E402
 from app.persistence.voice_transcript_store import list_recent_voice_transcripts  # noqa: E402
@@ -150,6 +152,25 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertFalse(should_use_runtime_for_event("done", "off"))
         self.assertFalse(should_use_runtime_for_event("conversation_reply", "minimal"))
         self.assertTrue(should_use_runtime_for_event("conversation_reply", "conversational"))
+
+    def test_runtime_line_reads_cursor_reply_content_not_dataclass_repr(self) -> None:
+        reply = CursorAgentReply(
+            content="The DashPro check is still running.",
+            generated_image_paths=(),
+        )
+        with (
+            patch("app.kairo_voice.find_cursor_cli", return_value="/tmp/cursor"),
+            patch("app.kairo_voice.run_cursor_local", return_value=reply),
+        ):
+            line = _try_runtime_line(
+                event_type="alert",
+                context={"top_signal_title": "DashPro"},
+                recent=[],
+                workspace_id="",
+            )
+        self.assertEqual("The DashPro check is still running.", line)
+        self.assertNotIn("CursorAgentReply", line or "")
+        self.assertNotIn("content=", line or "")
 
     def test_conversation_reply_fallback_uses_literal(self) -> None:
         with patch("app.kairo_voice._try_runtime_line", return_value=None):

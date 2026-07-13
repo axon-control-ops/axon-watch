@@ -19,6 +19,7 @@ export type AgentStreamIncrementalState = {
   consumeFullContent(content: string): NarrationMilestone[];
   toStreamingActivityView(fullAccess?: boolean): StreamingActivityView;
   toCounts(): AgentStreamCounts;
+  takeCompletedThinkingSpeech(): string | null;
   reset(): void;
 };
 
@@ -27,6 +28,7 @@ const TOOL_HEADER_RE = /^:::tool\s+(.+)$/;
 const EDIT_HEADER_RE = /^:::edit\s+(.+?)\s+\+(\d+)\s+-(\d+)\s*$/;
 const TERMINAL_HEADER_RE = /^:::terminal\s+/;
 const RESEARCH_HEADER_RE = /^:::research\s+/;
+const DEBUG_REPRODUCE_HEADER_RE = /^:::debug-reproduce\s*$/;
 const BLOCK_CLOSE_RE = /^:::\s*$/;
 
 export function createAgentStreamIncrementalState(): AgentStreamIncrementalState {
@@ -36,6 +38,7 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
   let inFirstThinking = false;
   let firstThinkingSeen = false;
   let firstThinkingBody = '';
+  let completedThinkingSpeech: string | null = null;
   let thinkingMilestoneEmitted = false;
   let toolCount = 0;
   let editCount = 0;
@@ -50,6 +53,7 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
     inFirstThinking = false;
     firstThinkingSeen = false;
     firstThinkingBody = '';
+    completedThinkingSpeech = null;
     thinkingMilestoneEmitted = false;
     toolCount = 0;
     editCount = 0;
@@ -64,7 +68,8 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
       TOOL_HEADER_RE.test(line) ||
       EDIT_HEADER_RE.test(line) ||
       TERMINAL_HEADER_RE.test(line) ||
-      RESEARCH_HEADER_RE.test(line)
+      RESEARCH_HEADER_RE.test(line) ||
+      DEBUG_REPRODUCE_HEADER_RE.test(line.trimEnd())
     );
   }
 
@@ -73,6 +78,8 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
 
     if (inBlock === 'thinking' && inFirstThinking) {
       if (BLOCK_CLOSE_RE.test(line.trimEnd())) {
+        const complete = sanitizeAgentThinkingForOperator(firstThinkingBody);
+        completedThinkingSpeech = complete || null;
         inBlock = null;
         inFirstThinking = false;
         return milestones;
@@ -145,6 +152,11 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
 
     if (RESEARCH_HEADER_RE.test(line)) {
       researchCount += 1;
+      inBlock = 'other';
+      return milestones;
+    }
+
+    if (DEBUG_REPRODUCE_HEADER_RE.test(line.trimEnd())) {
       inBlock = 'other';
       return milestones;
     }
@@ -239,8 +251,15 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
     };
   }
 
+  function takeCompletedThinkingSpeech(): string | null {
+    const completed = completedThinkingSpeech;
+    completedThinkingSpeech = null;
+    return completed;
+  }
+
   return {
     consumeFullContent,
+    takeCompletedThinkingSpeech,
     toStreamingActivityView,
     toCounts,
     reset,

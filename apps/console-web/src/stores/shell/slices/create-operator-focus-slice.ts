@@ -131,8 +131,10 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     }
   }
 
-  function focusCommandSeam(example: string): void {
-    input.restoreComposerDraft(example);
+  function focusCommandSeam(example = ''): void {
+    if (example.trim()) {
+      input.restoreComposerDraft(example);
+    }
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
         document.getElementById('operator-command-input')?.focus();

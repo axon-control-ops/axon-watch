@@ -220,4 +220,95 @@ describe('briefing-open-loops-view', () => {
 
     expect(buildBriefingOpenLoopRows(briefing).length).toBeLessThanOrEqual(4);
   });
+
+  it('surfaces the primary active run when there are no signals', () => {
+    const rows = buildBriefingOpenLoopRows(baseBriefing, {
+      primaryActiveRun: {
+        run_id: 'run_review_me',
+        summary: 'Review me',
+        detail: 'Lane B agent-mode runtime request',
+        phase: 'review_ready',
+        workspace_id: 'workspace_dashpro',
+      },
+      workspaceId: 'workspace_dashpro',
+    });
+    expect(rows[0]).toMatchObject({
+      id: 'run:run_review_me',
+      label: 'Review me',
+      meta: 'REVIEW READY',
+      focusKind: 'mission',
+    });
+    expect(briefingHasOpenLoops(baseBriefing, {
+      primaryActiveRun: {
+        run_id: 'run_review_me',
+        summary: 'Review me',
+        detail: '',
+        phase: 'executing',
+        workspace_id: 'workspace_dashpro',
+      },
+    })).toBe(true);
+  });
+
+  it('surfaces fleet runs when this workspace is idle', () => {
+    const rows = buildBriefingOpenLoopRows(baseBriefing, {
+      primaryActiveRun: null,
+      workspaceId: 'workspace_dashpro',
+      fleetActiveRuns: [
+        {
+          run_id: 'run_elsewhere',
+          workspace_id: 'workspace_axon_local',
+          phase: 'executing',
+          title: 'Elsewhere',
+          mode: 'agent',
+          status: 'running',
+          detail: '',
+          lane_id: 'control-plane',
+          updated_at: '2026-07-13T10:00:00Z',
+        },
+      ],
+    });
+    expect(rows[0]).toMatchObject({
+      label: '1 run in flight (other workspaces)',
+      meta: 'Open Brain view',
+      focusKind: 'mission',
+    });
+  });
+
+  it('keeps compact galaxy hero at two rows including a live run', () => {
+    const briefing: OperatorBriefing = {
+      ...baseBriefing,
+      next_safe_actions: [
+        {
+          action_id: 'a1',
+          kind: 'approve_run',
+          title: 'Action 1',
+          detail: 'd1',
+          workspace_id: null,
+          run_id: 'r1',
+          signal_id: null,
+        },
+        {
+          action_id: 'a2',
+          kind: 'resume_run',
+          title: 'Action 2',
+          detail: 'd2',
+          workspace_id: null,
+          run_id: 'r2',
+          signal_id: null,
+        },
+      ],
+    };
+    expect(
+      buildBriefingOpenLoopRows(briefing, {
+        compact: true,
+        primaryActiveRun: {
+          run_id: 'run_live',
+          summary: 'Live task',
+          detail: '',
+          phase: 'executing',
+          workspace_id: 'workspace_dashpro',
+        },
+      }),
+    ).toHaveLength(2);
+  });
 });

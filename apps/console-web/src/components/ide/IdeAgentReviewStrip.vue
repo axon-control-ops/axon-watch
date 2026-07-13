@@ -10,6 +10,7 @@ import {
   resolveIdeAgentEditDiffFromThread,
   shouldShowIdeAgentReviewStrip,
 } from '../../lib/ide-agent-center-view';
+import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -37,13 +38,22 @@ const showReviewStrip = computed(() =>
     reviewReadyCount: reviewReadyCount.value,
     editedFileCount: editSummaries.value.length,
     latestAgentTurnFailed: latestIdeAgentTurnFailed(shell.threadMessages),
-  }),
+  }) || shell.canResumeIdeAgentRun,
 );
 
 const reviewBar = computed(() =>
   buildIdeAgentReviewBar({
     canStop: shell.canStopIdeAgentRun,
     stopping: shell.runMutationState === 'stopping',
+    canResume: shell.canResumeIdeAgentRun,
+    resuming: shell.runMutationState === 'resuming',
+    resumeLabel: runContinueActionLabel({
+      phase: shell.ideAgentLinkedRun?.phase,
+      agentStreamActive: shell.agentStreamActive,
+      mode: shell.ideAgentLinkedRun?.mode,
+      continueLabel: 'Continue',
+      resumeLabel: 'Resume',
+    }),
     editedFileCount: editSummaries.value.length,
     reviewReadyCount: reviewReadyCount.value,
     completing: shell.runMutationState === 'completing',
@@ -71,6 +81,10 @@ function toggleExpanded(): void {
 
 function stopAgentRun(): void {
   void shell.stopIdeAgentRun();
+}
+
+function resumeAgentRun(): void {
+  void shell.resumeIdeAgentRun();
 }
 
 function applyAllReviewReady(): void {
@@ -122,6 +136,15 @@ function focusReviewFiles(): void {
           @click="stopAgentRun"
         >
           {{ reviewBar.stopLabel }}
+        </button>
+        <button
+          v-if="reviewBar.showResume"
+          type="button"
+          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--resume"
+          :disabled="shell.runMutationState === 'resuming'"
+          @click="resumeAgentRun"
+        >
+          {{ reviewBar.resumeLabel }}
         </button>
         <button
           v-if="reviewBar.showReview"

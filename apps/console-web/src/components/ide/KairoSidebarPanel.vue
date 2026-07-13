@@ -15,6 +15,15 @@ import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 
 const shell = useShellStore();
+const debugModeActive = computed(() => shell.ideDebugModeSelected);
+const presenceLabel = computed(() => {
+  if (!debugModeActive.value) {
+    return kairoPresenceLabel(shell.kairoPresenceState);
+  }
+  const access = shell.agentExecutionAccess === 'full' ? ' FULL' : '';
+  const activity = shell.agentStreamActive ? ' · RUNNING' : '';
+  return `${OPERATOR_PERSONA_NAME} · DEBUG${access}${activity}`;
+});
 
 const showExpandedPanel = computed(() =>
   ideShowKairoSidebarExpanded(shell.idePresenceProfile),
@@ -60,14 +69,17 @@ function handleStopSpeech(event: Event): void {
     class="kairo-sidebar-panel kairo-sidebar-panel--compact"
     :class="[
       `kairo-sidebar-panel--${shell.ideDisplayKairoPresenceState}`,
-      { 'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized },
+      {
+        'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized,
+        'kairo-sidebar-panel--debug-mode': debugModeActive,
+      },
     ]"
-    :aria-label="`${OPERATOR_PERSONA_NAME}. ${kairoPresenceLabel(shell.ideDisplayKairoPresenceState)}`"
+    :aria-label="presenceLabel"
     @click="handleExpand"
   >
     <span class="kairo-sidebar-panel__compact-dot" aria-hidden="true" />
     <span class="kairo-sidebar-panel__compact-label">
-      {{ kairoPresenceLabel(shell.ideDisplayKairoPresenceState) }}
+      {{ presenceLabel }}
     </span>
   </button>
   <button
@@ -77,7 +89,10 @@ function handleStopSpeech(event: Event): void {
     class="kairo-sidebar-panel hud-panel-frame"
     :class="[
       `kairo-sidebar-panel--${shell.kairoPresenceState}`,
-      { 'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized },
+      {
+        'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized,
+        'kairo-sidebar-panel--debug-mode': debugModeActive,
+      },
     ]"
     :aria-label="`${OPERATOR_PERSONA_NAME}. ${shell.briefingSummaryLine}`"
     @click="handleExpand"
@@ -93,7 +108,7 @@ function handleStopSpeech(event: Event): void {
         <span class="kairo-sidebar-panel__sweep" />
       </div>
       <div class="kairo-sidebar-panel__copy">
-        <p class="kairo-sidebar-panel__state">{{ kairoPresenceLabel(shell.kairoPresenceState) }}</p>
+        <p class="kairo-sidebar-panel__state">{{ presenceLabel }}</p>
         <AgentLiveLineHeadline
           class="kairo-sidebar-panel__headline"
           :activity="shell.ideComposerActivity"
@@ -121,6 +136,14 @@ function handleStopSpeech(event: Event): void {
           Stop speaking
         </button>
       </div>
+      <section
+        v-if="shell.ideComposerActivity?.liveBodyFull"
+        class="kairo-sidebar-panel__transcript"
+        aria-label="Current run transcript"
+      >
+        <span class="kairo-sidebar-panel__transcript-label">Run transcript</span>
+        <p>{{ shell.ideComposerActivity.liveBodyFull }}</p>
+      </section>
       <BriefingSurfaceFollowupPrompt />
     </div>
   </button>

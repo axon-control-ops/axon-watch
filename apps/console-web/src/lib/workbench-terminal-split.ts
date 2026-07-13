@@ -1,5 +1,7 @@
 export const WORKBENCH_TERMINAL_HEIGHT_KEY = 'axon-x-workbench-terminal-height-v3';
-export const WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY = 'axon-x-workbench-terminal-panel-visible-v1';
+// v2 resets the old IDE-default-open preference. v1 could be written "true"
+// without an operator action, so carrying it forward would reopen the dock.
+export const WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY = 'axon-x-workbench-terminal-panel-visible-v2';
 export const DEFAULT_WORKBENCH_TERMINAL_HEIGHT = 240;
 export const DEFAULT_WORKBENCH_TERMINAL_HEIGHT_RATIO = 0.26;
 export const OPERATOR_WORKBENCH_TERMINAL_HEIGHT_RATIO = 0.2;
@@ -68,7 +70,9 @@ export function readStoredWorkbenchTerminalHeight(): number | null {
 export function readStoredWorkbenchTerminalPanelVisible(
   layoutMode: WorkbenchLayoutMode,
 ): boolean {
-  const defaultVisible = layoutMode === 'ide';
+  // Terminal stays closed until the operator reveals it or an autonomous
+  // agent actually emits a terminal tool block.
+  const defaultVisible = false;
 
   if (typeof window === 'undefined') {
     return defaultVisible;

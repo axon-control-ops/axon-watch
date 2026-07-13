@@ -1,4 +1,4 @@
-export const RUN_MODES = ['ask', 'agent', 'plan', 'auto', 'watch'] as const;
+export const RUN_MODES = ['ask', 'agent', 'plan', 'debug', 'auto', 'watch'] as const;
 export type RunMode = (typeof RUN_MODES)[number];
 
 export const RUN_PHASES = [

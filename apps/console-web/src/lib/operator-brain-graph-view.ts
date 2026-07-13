@@ -1,4 +1,4 @@
-export type BrainNodeKind = 'core' | 'workspace' | 'run' | 'signal' | 'connector';
+export type BrainNodeKind = 'core' | 'workspace' | 'run' | 'signal' | 'connector' | 'mailbox';
 export type BrainNodeTone = 'nominal' | 'attention' | 'critical';
 
 export type BrainGraphNode = {
@@ -51,6 +51,7 @@ const NODE_RADIUS: Record<string, number> = {
   workspace: 18,
   connector: 10,
   signal: 11,
+  mailbox: 12,
   run: 9,
 };
 
@@ -121,13 +122,15 @@ export function layoutBrainGraph(
   }
 
   const satellites = snapshot.nodes.filter(
-    (node) => node.kind === 'signal' || node.kind === 'connector',
+    (node) => node.kind === 'signal' || node.kind === 'connector' || node.kind === 'mailbox',
   );
   satellites.forEach((node, index) => {
     const boundAngle = node.workspace_id ? workspaceAngle.get(node.workspace_id) : undefined;
+    const kindOffset =
+      node.kind === 'signal' ? 0.5 : node.kind === 'mailbox' ? 0.85 : -0.5;
     const angle =
       boundAngle !== undefined
-        ? boundAngle + (node.kind === 'signal' ? 0.5 : -0.5)
+        ? boundAngle + kindOffset
         : (index / Math.max(satellites.length, 1)) * Math.PI * 2 + Math.PI / 4;
     place(node, cx + Math.cos(angle) * outerRadius, cy + Math.sin(angle) * outerRadius);
   });

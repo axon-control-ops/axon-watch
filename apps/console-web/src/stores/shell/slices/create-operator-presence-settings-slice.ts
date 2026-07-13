@@ -73,6 +73,9 @@ export function createOperatorPresenceSettingsSlice(
       persistOperatorPresenceSettings(previousSettings);
       input.operatorPresenceSettingsError.value =
         error instanceof Error ? error.message : 'operator presence settings save failed';
+      throw error instanceof Error
+        ? error
+        : new Error('operator presence settings save failed');
     } finally {
       input.operatorPresenceSettingsSaving.value = false;
     }

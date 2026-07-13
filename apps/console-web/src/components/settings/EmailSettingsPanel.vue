@@ -15,9 +15,8 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const snapshot = ref<EmailSettingsSnapshot | null>(null);
-const loadError = ref<string | null>(null);
 const actionMessage = ref<string | null>(null);
-const actionTone = ref<'idle' | 'ok' | 'error' | 'pending'>('idle');
+const actionTone = ref<'idle' | 'ok' | 'error' | 'pending' | 'warn'>('idle');
 const saving = ref(false);
 const testingKey = ref<string | null>(null);
 
@@ -46,10 +45,27 @@ const form = reactive({
 const workspaces = computed(() => shell.workspaces ?? []);
 const accounts = computed(() => snapshot.value?.settings.accounts ?? []);
 const auth = computed(() => snapshot.value?.auth ?? null);
+const vaultLocked = computed(() => Boolean(auth.value?.locked));
+const hasPasswordDraft = computed(
+  () => Boolean(form.password_imap.trim() || form.password_smtp.trim()),
+);
+const canSaveMailbox = computed(
+  () => Boolean(form.workspace_id.trim() && form.email_address.trim() && form.imap_host.trim()),
+);
+const saveButtonLabel = computed(() => {
+  if (saving.value) {
+    return 'Saving…';
+  }
+  if (vaultLocked.value && hasPasswordDraft.value) {
+    return 'Save mailbox (passwords skipped until Vault unlock)';
+  }
+  return form.account_id ? 'Update mailbox' : 'Save mailbox';
+});
 
 function blankForm(workspaceId?: string): void {
   form.account_id = '';
-  form.workspace_id = workspaceId || shell.currentWorkspace?.workspace_id || workspaces.value[0]?.workspace_id || '';
+  form.workspace_id =
+    workspaceId || shell.currentWorkspace?.workspace_id || workspaces.value[0]?.workspace_id || '';
   form.email_address = '';
   form.display_name = '';
   form.imap_host = '';
@@ -91,21 +107,25 @@ function prefill(account: EmailMailboxAccount): void {
   form.password_smtp = '';
 }
 
+function accountHasSecrets(account: EmailMailboxAccount): boolean {
+  return Boolean(account.imap.password_ref || account.smtp.password_ref);
+}
+
 async function reload(): Promise<void> {
   actionTone.value = 'pending';
   actionMessage.value = 'Loading email settings…';
   try {
     snapshot.value = await fetchEmailSettings();
-    loadError.value = null;
     actionTone.value = 'ok';
-    actionMessage.value = 'Email settings synced.';
+    actionMessage.value = snapshot.value.auth.locked
+      ? 'Email settings synced. Unlock Axon-X Vault to store mailbox passwords.'
+      : 'Email settings synced.';
     if (!form.workspace_id) {
       blankForm();
     }
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : 'Email settings load failed';
     actionTone.value = 'error';
-    actionMessage.value = loadError.value;
+    actionMessage.value = error instanceof Error ? error.message : 'Email settings load failed';
   }
 }
 
@@ -132,6 +152,11 @@ async function saveBridgePrefs(): Promise<void> {
 }
 
 async function saveMailbox(): Promise<void> {
+  if (!canSaveMailbox.value) {
+    actionTone.value = 'error';
+    actionMessage.value = 'Workspace, email address, and IMAP host are required.';
+    return;
+  }
   saving.value = true;
   actionTone.value = 'pending';
   actionMessage.value = 'Saving mailbox…';
@@ -157,8 +182,16 @@ async function saveMailbox(): Promise<void> {
       password_imap: form.password_imap,
       password_smtp: form.password_smtp,
     });
-    actionTone.value = 'ok';
-    actionMessage.value = `Mailbox saved for ${form.email_address}.`;
+    if (snapshot.value.account) {
+      form.account_id = snapshot.value.account.account_id;
+    }
+    if (snapshot.value.warning) {
+      actionTone.value = 'warn';
+      actionMessage.value = snapshot.value.warning;
+    } else {
+      actionTone.value = 'ok';
+      actionMessage.value = `Mailbox saved for ${form.email_address}.`;
+    }
     form.password_imap = '';
     form.password_smtp = '';
   } catch (error) {
@@ -170,6 +203,14 @@ async function saveMailbox(): Promise<void> {
 }
 
 async function runTest(accountId: string): Promise<void> {
+  const account = accounts.value.find((row) => row.account_id === accountId);
+  if (account && !accountHasSecrets(account) && !form.password_imap.trim() && !form.password_smtp.trim()) {
+    actionTone.value = 'error';
+    actionMessage.value =
+      'Test failed: no passwords saved for this mailbox yet. Edit it, enter IMAP password (Vault is unlocked), Save, then Test again.';
+    prefill(account);
+    return;
+  }
   testingKey.value = accountId;
   actionTone.value = 'pending';
   actionMessage.value = 'Testing IMAP/SMTP…';
@@ -215,6 +256,10 @@ function onSmtpPortChange(): void {
   }
 }
 
+function openAxonXVault(): void {
+  navigateToAppSurface('vault');
+}
+
 onMounted(() => {
   blankForm();
   void reload();
@@ -229,6 +274,7 @@ onMounted(() => {
         'settings-feedback-banner--error': actionTone === 'error',
         'settings-feedback-banner--ok': actionTone === 'ok',
         'settings-feedback-banner--pending': actionTone === 'pending',
+        'settings-feedback-banner--warn': actionTone === 'warn',
       }"
       role="status"
       aria-live="polite"
@@ -236,12 +282,39 @@ onMounted(() => {
       {{ actionMessage || 'Configure inbound mail for Attention, Brain Galaxy, and IDE handoff.' }}
     </p>
 
+    <section
+      class="email-settings-panel__vault-callout"
+      :class="{ 'email-settings-panel__vault-callout--locked': vaultLocked }"
+    >
+      <div>
+        <p class="email-settings-panel__vault-title">Which Vault?</p>
+        <p class="email-settings-panel__vault-copy">
+          Use the <strong>Axon-X Vault</strong> from this console (top bar
+          <strong>VAULT</strong> or the button below) — the same vault for monitor keys and mailbox
+          passwords. This is <em>not</em> Thunderbird, cPanel, or the old Axon Signal (:7734)
+          settings vault. Mailboxes you saved only in Signal do not appear here unless you turn on
+          the bridge below.
+        </p>
+      </div>
+      <div class="email-settings-panel__vault-actions">
+        <button type="button" class="settings-surface__primary" @click="openAxonXVault">
+          {{ vaultLocked ? 'Unlock Axon-X Vault →' : 'Open Axon-X Vault →' }}
+        </button>
+        <button type="button" @click="reload">Refresh status</button>
+      </div>
+      <p class="email-settings-panel__vault-status">
+        Status:
+        <strong>{{ vaultLocked ? 'Locked' : 'Unlocked' }}</strong>
+        · Mailboxes here: <strong>{{ auth?.account_count ?? 0 }}</strong>
+      </p>
+    </section>
+
     <section class="operator-settings-form__section">
       <header class="operator-settings-form__section-header">
         <h2>Ingest mode</h2>
         <p>
-          Prefer live Signal bridge when :7734 is healthy. Stub messages keep the pipe demonstrable offline.
-          Passwords stay in Vault — never in settings JSON.
+          Optional: pull live triage from Axon Signal (:7734) if that server is already monitoring
+          mail. Stub messages keep the pipe working offline for demos.
         </p>
       </header>
 
@@ -266,37 +339,29 @@ onMounted(() => {
 
       <dl v-if="auth" class="operator-settings-form__status-grid">
         <div>
-          <dt>Mailboxes</dt>
+          <dt>Mailboxes in Axon-X</dt>
           <dd>{{ auth.account_count }}</dd>
         </div>
         <div>
-          <dt>Vault</dt>
-          <dd>{{ auth.locked ? 'Locked — unlock for password ops' : 'Unlocked' }}</dd>
+          <dt>Axon-X Vault</dt>
+          <dd>{{ auth.locked ? 'Locked' : 'Unlocked' }}</dd>
         </div>
         <div>
-          <dt>Bridge</dt>
+          <dt>Signal bridge</dt>
           <dd>{{ auth.bridge_enabled ? 'Enabled' : 'Off' }}</dd>
         </div>
       </dl>
-
-      <div class="email-settings-panel__links">
-        <button type="button" class="settings-surface__link-button" @click="navigateToAppSurface('vault')">
-          Open Vault →
-        </button>
-        <button type="button" class="settings-surface__link-button" @click="reload">
-          Refresh status
-        </button>
-      </div>
     </section>
 
     <section class="operator-settings-form__section">
       <header class="operator-settings-form__section-header">
         <h2>Configured mailboxes</h2>
-        <p>Per-workspace IMAP/SMTP — enhanced from Axon Signal with folder + remove.</p>
+        <p>Saved in Axon-X for this console. One or more per workspace.</p>
       </header>
 
       <p v-if="!accounts.length" class="region-copy">
-        No mailbox linked yet. Add one below so Attention and Brain Galaxy can surface email follow-ups.
+        None saved yet in Axon-X. Fill the form below (IMAP host + email), then Save. You can save
+        hosts now and add passwords after unlocking Vault.
       </p>
 
       <ul v-else class="email-settings-panel__accounts">
@@ -305,7 +370,8 @@ onMounted(() => {
             <strong>{{ account.email_address }}</strong>
             <p>
               {{ account.workspace_id }} · {{ account.imap.host || '?' }} →
-              {{ account.imap.folder }} · poll {{ account.monitor.poll_seconds }}s
+              {{ account.imap.folder }} · poll {{ account.monitor.poll_seconds }}s ·
+              {{ accountHasSecrets(account) ? 'passwords in Vault' : 'no passwords yet' }}
             </p>
           </div>
           <div class="email-settings-panel__account-actions">
@@ -328,8 +394,19 @@ onMounted(() => {
     <section class="operator-settings-form__section">
       <header class="operator-settings-form__section-header">
         <h2>{{ form.account_id ? 'Edit mailbox' : 'Add mailbox' }}</h2>
-        <p>Same shape as Axon Signal Workspace Fabric, with IMAP folder exposed.</p>
+        <p>
+          Minimum to appear in the list: workspace, email, IMAP host. Passwords need Axon-X Vault
+          unlocked.
+        </p>
       </header>
+
+      <p
+        v-if="vaultLocked"
+        class="email-settings-panel__inline-hint email-settings-panel__inline-hint--warn"
+      >
+        Vault is locked. You can still save this mailbox’s hosts/settings. Passwords will be skipped
+        until you unlock Axon-X Vault and save again.
+      </p>
 
       <div class="email-settings-panel__form">
         <label>
@@ -356,7 +433,7 @@ onMounted(() => {
 
         <h3>IMAP</h3>
         <label>
-          <span>Host</span>
+          <span>Host (required)</span>
           <input v-model="form.imap_host" type="text" placeholder="imap.example.com" />
         </label>
         <label>
@@ -376,8 +453,13 @@ onMounted(() => {
           <span>SSL</span>
         </label>
         <label>
-          <span>IMAP password</span>
-          <input v-model="form.password_imap" type="password" autocomplete="new-password" />
+          <span>IMAP password {{ vaultLocked ? '(needs Vault unlock)' : '' }}</span>
+          <input
+            v-model="form.password_imap"
+            type="password"
+            autocomplete="new-password"
+            :placeholder="vaultLocked ? 'Unlock Axon-X Vault first' : ''"
+          />
         </label>
 
         <h3>SMTP</h3>
@@ -423,8 +505,13 @@ onMounted(() => {
         </label>
 
         <div class="email-settings-panel__form-actions">
-          <button type="button" class="settings-surface__primary" :disabled="saving" @click="saveMailbox">
-            {{ saving ? 'Saving…' : 'Save mailbox' }}
+          <button
+            type="button"
+            class="settings-surface__primary"
+            :disabled="saving || !canSaveMailbox"
+            @click="saveMailbox"
+          >
+            {{ saveButtonLabel }}
           </button>
           <button type="button" @click="blankForm(form.workspace_id)">Clear form</button>
         </div>

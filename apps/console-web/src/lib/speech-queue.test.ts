@@ -89,7 +89,7 @@ describe('speech queue', () => {
     expect(states.at(-1)).toBe(false);
   });
 
-  it('uses natural rate and pitch for browser fallback', () => {
+  it('defaults browser fallback to axon-local rate/pitch', () => {
     vi.useFakeTimers();
     const speech = createSpeechPort();
     stopSpeech(speech);
@@ -98,9 +98,23 @@ describe('speech queue', () => {
     vi.advanceTimersByTime(150);
 
     const utterance = speech.utterances[0] as MockUtterance;
-    expect(utterance.rate).toBe(1);
-    expect(utterance.pitch).toBe(1);
+    expect(utterance.rate).toBe(1.0);
+    expect(utterance.pitch).toBe(1.04);
     expect(utterance.volume).toBe(1);
+    vi.useRealTimers();
+  });
+
+  it('honors explicit speech rate and pitch for browser fallback', () => {
+    vi.useFakeTimers();
+    const speech = createSpeechPort();
+    stopSpeech(speech);
+
+    enqueueSpeech('slower voice', speech, { rate: 0.85, pitch: 1.12 });
+    vi.advanceTimersByTime(150);
+
+    const utterance = speech.utterances[0] as MockUtterance;
+    expect(utterance.rate).toBe(0.85);
+    expect(utterance.pitch).toBe(1.12);
     vi.useRealTimers();
   });
 

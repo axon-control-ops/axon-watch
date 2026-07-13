@@ -4,6 +4,7 @@ import {
   type ComposerClipboardImage,
   composerImageFromStored,
   readClipboardImages,
+  readComposerImageFiles,
   readDroppedImages,
   revokeComposerClipboardImages,
   revokeComposerClipboardImagePreview,
@@ -96,6 +97,20 @@ export function useComposerImages() {
     schedulePersistComposerImages();
   }
 
+  function openComposerAttachmentPicker(): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.addEventListener('change', () => {
+      addComposerImages(readComposerImageFiles(input.files));
+    });
+    input.click();
+  }
+
   function handleComposerPaste(event: ClipboardEvent): void {
     const images = readClipboardImages(event);
     if (!shouldInterceptComposerImagePaste(images)) {
@@ -172,6 +187,7 @@ export function useComposerImages() {
     closeComposerImageLightbox,
     handleComposerImageLightboxKeydown,
     addComposerImages,
+    openComposerAttachmentPicker,
     handleComposerPaste,
     handleComposerDragOver,
     handleComposerDragLeave,

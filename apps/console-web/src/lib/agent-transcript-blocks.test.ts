@@ -32,6 +32,25 @@ const SAMPLE = [
 ].join('\n');
 
 describe('parseAgentTranscriptBlocks', () => {
+  it('parses debug reproduce steps as a dedicated segment', () => {
+    const content = [
+      'Instrumentation is ready.',
+      ':::debug-reproduce',
+      '1. Open the settings panel',
+      '2. Click Save',
+      ':::',
+    ].join('\n');
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments.map((segment) => segment.kind)).toEqual(['text', 'debug-reproduce']);
+    const reproduce = segments[1];
+    expect(reproduce.kind).toBe('debug-reproduce');
+    if (reproduce.kind === 'debug-reproduce') {
+      expect(reproduce.steps).toEqual(['Open the settings panel', 'Click Save']);
+      expect(reproduce.open).toBe(false);
+    }
+  });
+
   it('splits text, thinking, tool, and edit segments in order', () => {
     const segments = parseAgentTranscriptBlocks(SAMPLE);
     expect(segments.map((segment) => segment.kind)).toEqual([

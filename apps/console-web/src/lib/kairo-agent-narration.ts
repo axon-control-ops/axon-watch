@@ -20,6 +20,8 @@ export type NarrationMilestone = {
   key: string;
   /** Visual / debug label — not spoken verbatim. */
   message: string;
+  /** Read already-sanitized operator-facing copy without model paraphrasing. */
+  verbatim?: boolean;
   toolLabel?: string;
   editPath?: string;
   editCount?: number;
@@ -177,6 +179,32 @@ export function narrationForCompletion(content: string): NarrationMilestone {
     return { key: 'failed', message: 'Failed' };
   }
   const summary = spokenCompletionSummary(content);
+  const hasReproduceMarker = /:::debug-reproduce\b/m.test(content);
+  // #region agent log
+  void import('./axon-debug-session-log').then(({ axonDebugSessionLog }) => {
+    axonDebugSessionLog({
+      hypothesisId: hasReproduceMarker ? 'H1' : 'H2',
+      location: 'kairo-agent-narration.ts:narrationForCompletion',
+      message: hasReproduceMarker
+        ? 'completion narration using reproduce waiting line'
+        : 'completion narration without reproduce marker',
+      data: {
+        hasReproduceMarker,
+        summaryPreview: summary.slice(0, 220),
+        summaryHasNumberedSteps: /^\s*\d+\.\s+/m.test(summary) || /\b1\.\s+/.test(summary),
+        contentLen: content.length,
+      },
+    });
+  });
+  // #endregion
+  // Reproduce pause: speak a short waiting cue, never the numbered steps.
+  if (hasReproduceMarker) {
+    return {
+      key: 'done',
+      message: 'Waiting for you to reproduce the bug.',
+      verbatim: true,
+    };
+  }
   const edits = matchAll(content, EDIT_RE);
   if (edits.length === 1) {
     return {

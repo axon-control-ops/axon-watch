@@ -74,6 +74,15 @@ export const PERSONA_STT_MISHEAR_REPLACEMENTS: ReadonlyArray<[RegExp, string]> =
   [/\bvagon\b/gi, PERSONA_CANONICAL_NAME],
   [/\bvakson\b/gi, PERSONA_CANONICAL_NAME],
   [/\bpackson\b/gi, PERSONA_CANONICAL_NAME],
+  // Operator-reported mishears from Kali/Chromium STT
+  [/\bvaccine\b/gi, PERSONA_CANONICAL_NAME],
+  [/\bvaccines\b/gi, PERSONA_CANONICAL_NAME],
+  [/\bvaccinate\b/gi, PERSONA_CANONICAL_NAME],
+  [/\bericsson\b/gi, PERSONA_CANONICAL_NAME],
+  [/\beric[\s-]+son\b/gi, PERSONA_CANONICAL_NAME],
+  [/\berickson\b/gi, PERSONA_CANONICAL_NAME],
+  [/\brex[\s-]+on\b/gi, PERSONA_CANONICAL_NAME],
+  [/\brexon\b/gi, PERSONA_CANONICAL_NAME],
 ];
 
 /** Conservative phonetic fallback for v*…on wake fragments not caught above. */

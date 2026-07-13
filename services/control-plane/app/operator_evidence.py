@@ -6,6 +6,7 @@ from typing import Any
 
 from app.adapters.watch_client import fetch_watch_connectors
 from app.inbox_projection import build_inbox_response
+from app.persistence import email_settings_store
 from app.runs.service import get_run, get_run_history, list_active_runs
 from app.workspace_catalog import get_workspace_record, list_workspace_records
 
@@ -334,6 +335,69 @@ def _core_evidence() -> dict[str, Any]:
     }
 
 
+def _mailbox_evidence(account_id: str) -> dict[str, Any]:
+    settings = email_settings_store.load_settings()
+    account = None
+    for entry in settings.get("accounts") or []:
+        if isinstance(entry, dict) and str(entry.get("account_id") or "") == account_id:
+            account = entry
+            break
+    if account is None:
+        raise ValueError(f"mailbox not found: {account_id}")
+    workspace_id = str(account.get("workspace_id") or "").strip()
+    email_address = str(account.get("email_address") or "").strip()
+    imap = account.get("imap") if isinstance(account.get("imap"), dict) else {}
+    smtp = account.get("smtp") if isinstance(account.get("smtp"), dict) else {}
+    monitor = account.get("monitor") if isinstance(account.get("monitor"), dict) else {}
+    has_password = bool(str(imap.get("password_ref") or "").strip()) or bool(
+        str(smtp.get("password_ref") or "").strip()
+    )
+    return {
+        "node_id": f"mail_{account_id}",
+        "kind": "mailbox",
+        "title": email_address or account_id,
+        "summary": (
+            f"Mailbox for {workspace_id or 'unscoped workspace'} — "
+            f"{'credentials ready' if has_password else 'needs password in Vault'}"
+        ),
+        "facts": [
+            {"label": "Email", "value": email_address},
+            {"label": "Workspace", "value": workspace_id or "—"},
+            {"label": "IMAP host", "value": str(imap.get("host") or "—")},
+            {"label": "IMAP folder", "value": str(imap.get("folder") or "INBOX")},
+            {"label": "SMTP host", "value": str(smtp.get("host") or "—")},
+            {
+                "label": "Passwords",
+                "value": "saved in Vault" if has_password else "missing — edit in Settings → Email",
+            },
+            {
+                "label": "Monitor",
+                "value": (
+                    f"enabled · {monitor.get('poll_seconds', 60)}s"
+                    if monitor.get("enabled", True)
+                    else "disabled"
+                ),
+            },
+        ],
+        "sources": [
+            _source_ref(
+                "mailbox",
+                account_id,
+                label="Email settings",
+                workspace_id=workspace_id,
+            )
+        ],
+        "actions": [
+            {
+                "label": "Open workspace in IDE",
+                "target": "workspace",
+                "workspace_id": workspace_id,
+            },
+        ],
+        "sections": [],
+    }
+
+
 def build_operator_evidence(node_id: str) -> dict[str, Any]:
     clean = str(node_id or "").strip()
     if clean == "core_kairo":
@@ -346,5 +410,7 @@ def build_operator_evidence(node_id: str) -> dict[str, Any]:
         return _signal_evidence(clean.removeprefix("sig_"))
     if clean.startswith("conn_"):
         return _connector_evidence(clean.removeprefix("conn_"))
+    if clean.startswith("mail_"):
+        return _mailbox_evidence(clean.removeprefix("mail_"))
     raise ValueError(f"unsupported node id: {clean}")
 

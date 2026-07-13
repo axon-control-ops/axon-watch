@@ -2,6 +2,7 @@ import { ref } from 'vue';
 
 import { logKairoVoice } from '../../lib/kairo-voice-debug';
 import { isKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
+import { openKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
 import { normalizeVoiceTranscript } from '../../lib/kairo-entity-labels';
 import {
   detectVoiceInterruptPhrase,
@@ -73,6 +74,12 @@ function mapCaptureError(code: string): string | null {
   }
   if (code === 'start_failed') {
     return 'Could not start speech recognition — try again.';
+  }
+  if (code === 'phrases-not-supported') {
+    return 'Speech engine rejected phrase bias — refresh and try again.';
+  }
+  if (code === 'language-not-supported') {
+    return 'Speech language not supported — falling back to en-US.';
   }
   return `Speech capture failed (${code}).`;
 }
@@ -170,15 +177,29 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
     return;
   }
 
+  // Keep the post-reply follow-up window open across TTS so "repeat that" works.
+  if (mode === 'hands_free') {
+    openKairoVoiceFollowupWindow();
+  }
+
   kairoCaptureLastSubmitState.value = await submitKairoConversationTranscript(gate.submitContent, {
     voiceCaptureMode: mode,
   });
   notifyCaptureEnd();
 }
 
-export function startKairoSpeechCapture(mode: KairoVoiceCaptureMode = 'manual'): boolean {
+export function startKairoSpeechCapture(
+  mode: KairoVoiceCaptureMode = 'manual',
+  options?: { takeover?: boolean },
+): boolean {
   if (kairoConversationPhase.value === 'thinking' || kairoConversationPhase.value === 'speaking') {
     return false;
+  }
+  if (options?.takeover && kairoCaptureCapturing.value) {
+    // Space / Mic PTT while hands-free is already open — drop ambient session first.
+    session.stopImmediate();
+    kairoCaptureCapturing.value = false;
+    kairoCaptureInterim.value = '';
   }
   if (!canStartKairoSpeechCapture()) {
     return false;
@@ -202,6 +223,16 @@ export function startKairoSpeechCapture(mode: KairoVoiceCaptureMode = 'manual'):
       kairoCaptureInterim.value = '';
       kairoCaptureError.value = mapCaptureError(code);
       setKairoConversationPhase('idle');
+      // #region agent log
+      void import('../../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
+        axonDebugSessionLog({
+          hypothesisId: 'H3',
+          location: 'kairo-shared-speech-capture.ts:onError',
+          message: 'speech capture error',
+          data: { code, mode, mapped: mapCaptureError(code) },
+        });
+      });
+      // #endregion
       notifyCaptureEnd();
     },
     onEnd: () => {

@@ -12,8 +12,10 @@ import { registerKairoConversationSubmit } from './kairo-conversation-bus';
 import OperatorPersonaMark from '../../components/OperatorPersonaMark.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
+import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
 import { operatorExecutionStage } from '../../lib/operator-status-radar-view';
 import { formatRunShortId } from '../../lib/run-display';
+import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -43,6 +45,7 @@ const showRunOrbit = computed(
   () =>
     executionStage.value.hasActiveRun ||
     shell.canCompletePrimaryRun ||
+    shell.canResumePrimaryRun ||
     Boolean(shell.primaryActiveRun?.can_stop) ||
     pendingApprovals.value > 0,
 );
@@ -51,6 +54,18 @@ const showStopAction = computed(
   () =>
     Boolean(shell.primaryActiveRun?.can_stop) ||
     shell.primaryActiveRun?.phase === 'executing',
+);
+
+const continueActionLabel = computed(() =>
+  runContinueActionLabel({
+    phase: shell.primaryActiveRun?.phase,
+    agentStreamActive: shell.agentStreamActive,
+    mode: shell.primaryActiveRun?.mode,
+    pending: shell.runMutationState === 'resuming',
+    continueLabel: 'Continue',
+    resumeLabel: 'Resume',
+    pendingLabel: 'Resuming…',
+  }),
 );
 
 const inputPlaceholder = computed(() => {
@@ -73,6 +88,14 @@ const micDisabled = computed(
 
 const speechCaptureError = computed(
   () => speechCapture.captureError.value,
+);
+
+const voiceGateFeedback = computed(() =>
+  formatVoiceGateFeedback(
+    speechCapture.lastGateReason.value,
+    speechCapture.lastHeardTranscript.value,
+    speechCapture.lastAccepted.value,
+  ),
 );
 
 const voiceDebugLine = computed(() => {
@@ -131,6 +154,15 @@ async function handleSubmit(): Promise<void> {
   await submitTurn();
 }
 
+function startManualPtt(): boolean {
+  if (micDisabled.value) {
+    return false;
+  }
+  shell.interruptKairoVoice();
+  // Takeover so Space works while hands-free ambient capture is already open.
+  return speechCapture.startCapture('manual', { takeover: true });
+}
+
 function handleMicPointerDown(event: PointerEvent): void {
   if (micDisabled.value) {
     return;
@@ -139,8 +171,7 @@ function handleMicPointerDown(event: PointerEvent): void {
   if (target instanceof HTMLElement && target.setPointerCapture) {
     target.setPointerCapture(event.pointerId);
   }
-  shell.interruptKairoVoice();
-  speechCapture.startCapture('manual');
+  startManualPtt();
 }
 
 function handleMicPointerUp(event: PointerEvent): void {
@@ -154,9 +185,16 @@ function handleMicPointerUp(event: PointerEvent): void {
       // Pointer may already be released if the browser disabled the control mid-gesture.
     }
   }
-  if (speechCapture.capturing.value) {
+  if (speechCapture.capturing.value && speechCapture.captureMode.value === 'manual') {
     speechCapture.stopCapture();
   }
+}
+
+function isConversationBarPttInput(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    target.matches('input.kairo-conversation-bar__input[data-kairo-ptt-input]')
+  );
 }
 
 function handleSpaceHotkey(event: KeyboardEvent): void {
@@ -168,7 +206,10 @@ function handleSpaceHotkey(event: KeyboardEvent): void {
     target instanceof HTMLElement &&
     (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
   ) {
-    return;
+    // Allow Space PTT when the command bar is focused and empty (common case).
+    if (!isConversationBarPttInput(target) || draft.value.trim().length > 0) {
+      return;
+    }
   }
   if (!shell.operatorBrainGalaxyActive || shell.layoutMode !== 'operator') {
     return;
@@ -176,20 +217,23 @@ function handleSpaceHotkey(event: KeyboardEvent): void {
   if (pending.value || kairoConversationPhase.value === 'thinking') {
     return;
   }
-  event.preventDefault();
-  if (speechCapture.capturing.value) {
-    speechCapture.stopCapture();
-  } else if (speechCapture.canCapture()) {
-    shell.interruptKairoVoice();
-    speechCapture.startCapture('manual');
+  if (micDisabled.value) {
+    return;
   }
+  // Already in a Space/Mic hold — ignore repeat keydown until release.
+  if (speechCapture.capturing.value && speechCapture.captureMode.value === 'manual') {
+    event.preventDefault();
+    return;
+  }
+  event.preventDefault();
+  startManualPtt();
 }
 
 function handleSpaceKeyup(event: KeyboardEvent): void {
   if (event.code !== 'Space') {
     return;
   }
-  if (speechCapture.capturing.value) {
+  if (speechCapture.capturing.value && speechCapture.captureMode.value === 'manual') {
     speechCapture.stopCapture();
   }
 }
@@ -225,6 +269,7 @@ onUnmounted(() => {
           v-model="draft"
           class="kairo-conversation-bar__input"
           type="text"
+          data-kairo-ptt-input
           autocomplete="off"
           spellcheck="false"
           :placeholder="inputPlaceholder"
@@ -278,6 +323,15 @@ onUnmounted(() => {
           Stop
         </button>
         <button
+          v-if="shell.canResumePrimaryRun"
+          type="button"
+          class="brain-galaxy-stage__run-btn brain-galaxy-stage__run-btn--warn"
+          :disabled="shell.runMutationPending"
+          @click="shell.resumePrimaryRun()"
+        >
+          {{ continueActionLabel }}
+        </button>
+        <button
           v-if="shell.canCompletePrimaryRun"
           type="button"
           class="brain-galaxy-stage__run-btn"
@@ -305,6 +359,13 @@ onUnmounted(() => {
       class="kairo-conversation-bar__interim kairo-conversation-bar__interim--thinking"
     >
       {{ thinkingLine }}
+    </p>
+    <p
+      v-else-if="voiceGateFeedback"
+      class="kairo-conversation-bar__interim kairo-conversation-bar__interim--gate"
+      role="status"
+    >
+      {{ voiceGateFeedback }}
     </p>
     <div v-if="kairoConversationReply" class="kairo-conversation-bar__reply">
       <span class="kairo-conversation-bar__reply-heading">

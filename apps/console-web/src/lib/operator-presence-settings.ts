@@ -2,6 +2,10 @@ import type { OperatorPresenceSettings } from '../contracts/canonical';
 
 export const OPERATOR_PRESENCE_SETTINGS_KEY = 'axon-x:operator-presence-settings';
 
+/** axon-local desktop voice deck defaults. */
+export const DEFAULT_SPEECH_RATE = 1.0;
+export const DEFAULT_SPEECH_PITCH = 1.04;
+
 export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
   return {
     operator_persona_enabled: true,
@@ -11,7 +15,25 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     kairo_narration: 'conversational',
     ide_voice_strip_enabled: false,
     hands_free_enabled: false,
+    speech_rate: DEFAULT_SPEECH_RATE,
+    speech_pitch: DEFAULT_SPEECH_PITCH,
   };
+}
+
+function normalizeSpeechRate(raw: unknown): number {
+  const value = typeof raw === 'number' ? raw : Number.parseFloat(String(raw ?? ''));
+  if (!Number.isFinite(value)) {
+    return DEFAULT_SPEECH_RATE;
+  }
+  return Math.round(Math.max(0.5, Math.min(1.3, value)) * 100) / 100;
+}
+
+function normalizeSpeechPitch(raw: unknown): number {
+  const value = typeof raw === 'number' ? raw : Number.parseFloat(String(raw ?? ''));
+  if (!Number.isFinite(value)) {
+    return DEFAULT_SPEECH_PITCH;
+  }
+  return Math.round(Math.max(0.5, Math.min(1.5, value)) * 100) / 100;
 }
 
 export function normalizeOperatorPresenceSettings(
@@ -34,6 +56,8 @@ export function normalizeOperatorPresenceSettings(
         : defaults.kairo_narration,
     ide_voice_strip_enabled: raw.ide_voice_strip_enabled ?? defaults.ide_voice_strip_enabled,
     hands_free_enabled: raw.hands_free_enabled ?? defaults.hands_free_enabled,
+    speech_rate: normalizeSpeechRate(raw.speech_rate ?? defaults.speech_rate),
+    speech_pitch: normalizeSpeechPitch(raw.speech_pitch ?? defaults.speech_pitch),
   };
 }
 
@@ -56,4 +80,9 @@ export function persistOperatorPresenceSettings(
   storage: Pick<Storage, 'setItem'> = localStorage,
 ): void {
   storage.setItem(OPERATOR_PRESENCE_SETTINGS_KEY, JSON.stringify(settings));
+}
+
+/** Format like axon-local mono readout (`1.00`). */
+export function formatVoiceTuningValue(value: number): string {
+  return value.toFixed(2);
 }

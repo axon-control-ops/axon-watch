@@ -1,6 +1,9 @@
 /**
  * Contextual phrase biasing for browser speech recognition (MDN Web Speech API).
- * Best-effort: APIs are experimental and may be absent in older browsers.
+ *
+ * Phrase lists remain defined for future use / tests, but MUST NOT be assigned on
+ * SpeechRecognition in production paths: Chromium on Linux reports
+ * `phrases-not-supported` and aborts the entire recognition session.
  */
 
 export type SpeechRecognitionBiasPhrase = {
@@ -8,7 +11,7 @@ export type SpeechRecognitionBiasPhrase = {
   boost: number;
 };
 
-/** Domain terms that improve wake-word and workspace recognition. */
+/** Domain terms that improve wake-word and workspace recognition (when supported). */
 export const SPEECH_RECOGNITION_BIAS_PHRASES: readonly SpeechRecognitionBiasPhrase[] = [
   { phrase: 'VAXON', boost: 5 },
   { phrase: 'Vaxon', boost: 4.5 },
@@ -30,11 +33,6 @@ export const SPEECH_RECOGNITION_BIAS_PHRASES: readonly SpeechRecognitionBiasPhra
 
 type SpeechRecognitionPhraseCtor = new (phrase: string, boost: number) => unknown;
 
-type BiasableSpeechRecognition = {
-  processLocally?: boolean;
-  phrases?: unknown;
-};
-
 export function buildSpeechRecognitionPhraseObjects(
   phraseCtor: SpeechRecognitionPhraseCtor | null | undefined,
   phrases: readonly SpeechRecognitionBiasPhrase[] = SPEECH_RECOGNITION_BIAS_PHRASES,
@@ -45,31 +43,11 @@ export function buildSpeechRecognitionPhraseObjects(
   return phrases.map((entry) => new phraseCtor(entry.phrase, entry.boost));
 }
 
-export function applySpeechRecognitionBias(recognition: object): void {
-  const biasable = recognition as BiasableSpeechRecognition;
-  if ('processLocally' in biasable) {
-    try {
-      biasable.processLocally = true;
-    } catch {
-      // Browser may reject on-device mode when unavailable.
-    }
-  }
-
-  if (typeof window === 'undefined' || !('phrases' in biasable)) {
-    return;
-  }
-
-  const win = window as Window & {
-    SpeechRecognitionPhrase?: SpeechRecognitionPhraseCtor;
-  };
-  const phraseObjects = buildSpeechRecognitionPhraseObjects(win.SpeechRecognitionPhrase);
-  if (!phraseObjects?.length) {
-    return;
-  }
-
-  try {
-    biasable.phrases = phraseObjects;
-  } catch {
-    // ObservableArray assignment may fail on unsupported builds.
-  }
+/**
+ * Intentionally a no-op for live recognition.
+ * Assigning `recognition.phrases` triggers `phrases-not-supported` on Kali/Chromium
+ * and prevents any STT results from arriving.
+ */
+export function applySpeechRecognitionBias(_recognition: object): void {
+  // no-op — see file header
 }

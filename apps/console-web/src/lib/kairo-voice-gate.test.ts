@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   detectVoiceInterruptPhrase,
   evaluateVoiceTranscript,
+  formatVoiceGateFeedback,
   stripKairoWakeWordPrefix,
 } from './kairo-voice-gate';
 import {
@@ -22,6 +23,12 @@ describe('kairo voice gate', () => {
     const result = evaluateVoiceTranscript('did you see the game last night', 'hands_free');
     expect(result.accept).toBe(false);
     expect(result.reason).toBe('no_wake_word');
+  });
+
+  it('explains wake-word rejection to the operator', () => {
+    expect(formatVoiceGateFeedback('no_wake_word', 'hello there', false)).toContain('VAXON');
+    expect(formatVoiceGateFeedback('ambient_short', '', false)).toContain('VAXON');
+    expect(formatVoiceGateFeedback('wake_word', 'hello', true)).toBeNull();
   });
 
   it('accepts hands-free when VAXON is addressed', () => {

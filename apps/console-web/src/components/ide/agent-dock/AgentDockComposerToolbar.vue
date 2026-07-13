@@ -36,6 +36,7 @@ defineProps<{
   showCursorCatalog: boolean;
   showVaultAction: boolean;
   attachmentChips: AttachmentChip[];
+  composerImageCount: number;
   mcpToolsForMode: ComposerMcpTool[];
   composerMode: ComposerMode;
   modeOptions: typeof MODE_OPTIONS;
@@ -44,7 +45,6 @@ defineProps<{
   isFullAccessAgent: boolean;
   executionAccessHint: string;
   contextWorkspace: boolean;
-  contextActiveFile: boolean;
   contextSelection: boolean;
   contextTerminal: boolean;
   contextIde: boolean;
@@ -73,7 +73,8 @@ defineProps<{
 
 const emit = defineEmits<{
   'toggle-section': [section: 'context' | 'tools' | 'model' | 'mode'];
-  'toggle-context': [kind: 'workspace' | 'file' | 'selection' | 'terminal' | 'ide' | 'pin'];
+  'toggle-context': [kind: 'workspace' | 'selection' | 'terminal' | 'ide' | 'pin'];
+  'attach-files-media': [];
   'toggle-runtime-targets': [];
   'select-runtime-target': [runtimeId: string];
   'select-composer-model': [modelId: string];
@@ -103,7 +104,7 @@ function runtimeStatusLine(record: RuntimeTarget): string {
       <button
         type="button"
         class="agent-dock-composer__tool"
-        :class="{ 'is-active': showContextMenu || attachmentChips.length > 0 }"
+        :class="{ 'is-active': showContextMenu || attachmentChips.length > 0 || composerImageCount > 0 }"
         title="Open context and quick run controls"
         aria-label="Open context menu"
         @click="emit('toggle-section', 'context')"
@@ -111,10 +112,10 @@ function runtimeStatusLine(record: RuntimeTarget): string {
         <span class="agent-dock-composer__tool-plus" aria-hidden="true">+</span>
         <span>Context</span>
         <span
-          v-if="attachmentChips.length"
+          v-if="attachmentChips.length + composerImageCount"
           class="agent-dock-composer__tool-count"
         >
-          {{ attachmentChips.length }}
+          {{ attachmentChips.length + composerImageCount }}
         </span>
       </button>
       <div
@@ -133,12 +134,17 @@ function runtimeStatusLine(record: RuntimeTarget): string {
         <button
           type="button"
           class="agent-dock-composer__menu-item"
-          :class="{ 'is-active': contextActiveFile }"
-          :disabled="!shell.activeWorkspaceFilePath"
-          @click="emit('toggle-context', 'file')"
+          :class="{ 'is-active': composerImageCount > 0 }"
+          @click="emit('attach-files-media')"
         >
-          <span>Active file</span>
-          <small>{{ shell.activeWorkspaceFilePath ?? 'Open a file first' }}</small>
+          <span>Files & media</span>
+          <small>
+            {{
+              composerImageCount
+                ? `${composerImageCount} attached — add more`
+                : 'Attach images from your device'
+            }}
+          </small>
         </button>
         <button
           type="button"
@@ -453,7 +459,7 @@ function runtimeStatusLine(record: RuntimeTarget): string {
           </span>
           <small>{{ option.hint }}</small>
         </button>
-        <template v-if="composerMode === 'agent'">
+        <template v-if="composerMode === 'agent' || composerMode === 'debug'">
           <p class="agent-dock-composer__menu-caption">Execution access</p>
           <button
             type="button"

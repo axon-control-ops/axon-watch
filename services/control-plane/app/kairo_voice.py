@@ -412,7 +412,10 @@ def _try_runtime_line(
         )
     except Exception:
         return None
-    line = _normalize_spoken_line(raw)
+    # run_cursor_local returns CursorAgentReply. Passing the dataclass itself
+    # stringifies its repr (including "content=", "thinking" and escaped \n),
+    # which TTS then pronounces as "n n" and other plumbing noise.
+    line = _normalize_spoken_line(raw.content)
     if not line or len(line) > 280:
         return None
     return line

@@ -12,6 +12,7 @@ const KIND_BASE: Record<BrainNodeKind | string, number> = {
   run: 0x6b8fa8,
   signal: 0xffa040,
   connector: 0x5a8cff,
+  mailbox: 0x7ee0a8,
 };
 
 const TONE_EMISSIVE: Record<BrainNodeTone | string, number> = {

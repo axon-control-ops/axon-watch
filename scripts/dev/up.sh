@@ -20,6 +20,15 @@ require_root_node_modules
 prune_stale_pid_files
 assert_no_live_pid_files
 
+axon_local_dir="${AXON_LOCAL_ROOT:-${repo_root}/../axon-local}"
+if [[ "${AXON_WATCH_SKIP_ENSURE_AXON_LOCAL:-0}" != "1" ]] \
+  && [[ -x "${axon_local_dir}/scripts/ops/ensure-server-running.sh" ]]; then
+  echo "Ensuring sibling axon-local server on :7734..."
+  if ! "${axon_local_dir}/scripts/ops/ensure-server-running.sh"; then
+    echo "WARN: axon-local ensure failed; optional :7734 connector may stay unavailable." >&2
+  fi
+fi
+
 assert_port_free "${AXON_WATCH_CONSOLE_WEB_PORT}" "console-web"
 assert_port_free "${AXON_WATCH_CONTROL_PLANE_PORT}" "control-plane"
 assert_port_free "${AXON_WATCH_WATCH_SERVICE_PORT}" "axon-watch"

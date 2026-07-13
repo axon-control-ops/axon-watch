@@ -11,6 +11,7 @@ import {
   shouldShowIdeInterruptAttentionAction,
   shouldShowIdeInterruptStop,
 } from '../../lib/ide-interrupt-panel-view';
+import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -76,7 +77,19 @@ const stopDisabled = computed(() =>
 );
 
 const showResumeAction = computed(
-  () => shell.canResumeIdeAgentRun || Boolean(shell.primaryActiveRun?.can_resume),
+  () => shell.canResumeIdeAgentRun || shell.canResumePrimaryRun,
+);
+
+const resumeActionLabel = computed(() =>
+  runContinueActionLabel({
+    phase: shell.ideAgentLinkedRun?.phase ?? shell.primaryActiveRun?.phase,
+    agentStreamActive: shell.agentStreamActive,
+    mode: shell.ideAgentLinkedRun?.mode ?? shell.primaryActiveRun?.mode,
+    pending: shell.runMutationState === 'resuming',
+    continueLabel: 'Continue',
+    resumeLabel: 'Resume',
+    pendingLabel: 'Resuming…',
+  }),
 );
 
 function resumeActiveRun(): void {
@@ -137,7 +150,7 @@ function stopActiveRun(): void {
         :disabled="shell.runMutationState === 'resuming' || !(shell.canResumeIdeAgentRun || shell.canResumePrimaryRun)"
         @click="resumeActiveRun()"
       >
-        {{ shell.runMutationState === 'resuming' ? '…' : 'Resume' }}
+        {{ resumeActionLabel }}
       </button>
       <button
         v-if="showStopAction"

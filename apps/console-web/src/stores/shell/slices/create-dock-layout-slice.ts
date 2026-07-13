@@ -1,6 +1,11 @@
 import type { ComputedRef, Ref } from 'vue';
 
-import type { InboxItem, RuntimeSummary, OperatorBriefing } from '../../../contracts/canonical';
+import type {
+  InboxItem,
+  RuntimeSummary,
+  OperatorBriefing,
+  RunRecord,
+} from '../../../contracts/canonical';
 import type { DockSeamId, DockSeamLayoutState } from '../../../lib/dock-seam-layout';
 import {
   persistDockHeroMode,
@@ -27,6 +32,8 @@ interface CreateDockLayoutSliceInput {
   operatorBriefing: Ref<OperatorBriefing | null>;
   runtimeSummary: Ref<RuntimeSummary | null>;
   inboxItems: Ref<InboxItem[]>;
+  primaryActiveRun: ComputedRef<RunRecord | null>;
+  currentWorkspaceId: ComputedRef<string | null>;
   leftSidebarMode: Ref<LeftSidebarMode>;
   leftSidebarModeTouched: Ref<boolean>;
   dockHeroMode: Ref<DockHeroMode>;
@@ -57,7 +64,15 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
       return;
     }
     const next = new Set(input.expandedDockSeams.value);
-    const openLoops = briefingHasOpenLoops(input.operatorBriefing.value);
+    const openLoopOptions = {
+      primaryActiveRun: input.primaryActiveRun.value,
+      fleetActiveRuns:
+        input.runtimeSummary.value?.active_runs ??
+        input.operatorBriefing.value?.active_runs ??
+        [],
+      workspaceId: input.currentWorkspaceId.value,
+    };
+    const openLoops = briefingHasOpenLoops(input.operatorBriefing.value, openLoopOptions);
     if (!input.dockThreadSeamTouched.value) {
       if (openLoops) {
         // Prefer KAIRO Open loops over command-thread stdout when loops exist.
@@ -74,12 +89,18 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
       });
     }
     if (!input.dockHeroModeTouched.value) {
+      const activeRunCount = Math.max(
+        input.primaryActiveRun.value ? 1 : 0,
+        input.runtimeSummary.value?.active_runs.length ?? 0,
+        input.operatorBriefing.value?.active_runs.length ?? 0,
+      );
       input.dockHeroMode.value = resolveDefaultDockHeroMode({
         pendingApprovals: input.pendingApprovalsCount.value,
         criticalSignals: input.runtimeSummary.value?.signals.critical_count ?? 0,
         highSignals: input.runtimeSummary.value?.signals.high_count ?? 0,
         nextSafeActions: input.operatorBriefing.value?.next_safe_actions.length ?? 0,
         actionableInboxCount: countActionableOpenSignals(input.inboxItems.value),
+        activeRunCount,
       });
     }
   }

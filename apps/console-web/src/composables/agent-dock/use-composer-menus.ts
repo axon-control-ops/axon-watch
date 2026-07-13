@@ -4,10 +4,11 @@ import {
   agentExecutionAccessHint,
   agentExecutionAccessLabel,
 } from '../../lib/agent-execution-access-prefs';
+import { isToolCapableComposerMode } from '../../lib/composer-tool-modes';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { useShellStore } from '../../stores/shell';
 
-export type ComposerMode = 'agent' | 'plan' | 'ask' | 'kairo';
+export type ComposerMode = 'agent' | 'plan' | 'ask' | 'debug' | 'kairo';
 
 export const MODE_OPTIONS: Array<{
   key: ComposerMode;
@@ -17,6 +18,12 @@ export const MODE_OPTIONS: Array<{
 }> = [
   { key: 'ask', label: 'Ask', icon: '◯', hint: 'Read-only answers, no tool execution' },
   { key: 'plan', label: 'Plan', icon: '◈', hint: 'Map steps before executing' },
+  {
+    key: 'debug',
+    label: 'Debug',
+    icon: '⌖',
+    hint: 'Hypothesize, instrument, reproduce, then fix with evidence',
+  },
   { key: 'agent', label: 'Agent', icon: '◎', hint: 'Agent loop with tools and approvals' },
   { key: 'kairo', label: OPERATOR_PERSONA_NAME, icon: '◉', hint: `Talk to ${OPERATOR_PERSONA_NAME} — spoken replies` },
 ];
@@ -41,11 +48,11 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
   const modelSearchQuery = ref('');
 
   const activeMode = computed(
-    () => MODE_OPTIONS.find((option) => option.key === composerMode.value) ?? MODE_OPTIONS[2],
+    () => MODE_OPTIONS.find((option) => option.key === composerMode.value) ?? MODE_OPTIONS[3],
   );
   const showApprovalBanner = computed(
     () =>
-      composerMode.value === 'agent' &&
+      isToolCapableComposerMode(composerMode.value) &&
       shell.agentExecutionAccess === 'full' &&
       shell.ideAgentLinkedRun?.phase === 'awaiting_approval',
   );
@@ -56,11 +63,12 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     agentExecutionAccessHint(shell.agentExecutionAccess),
   );
   const isFullAccessAgent = computed(
-    () => composerMode.value === 'agent' && shell.agentExecutionAccess === 'full',
+    () =>
+      isToolCapableComposerMode(composerMode.value) && shell.agentExecutionAccess === 'full',
   );
   const modeButtonLabel = computed(() => {
     if (isFullAccessAgent.value) {
-      return 'Agent · Full';
+      return composerMode.value === 'debug' ? 'Debug · Full' : 'Agent · Full';
     }
     return activeMode.value.label;
   });

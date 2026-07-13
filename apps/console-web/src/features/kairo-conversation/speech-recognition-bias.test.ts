@@ -34,7 +34,7 @@ describe('speech-recognition-bias', () => {
     expect(buildSpeechRecognitionPhraseObjects(null)).toBeNull();
   });
 
-  it('applies on-device and phrase biasing best-effort', () => {
+  it('does not assign phrases on live recognition (Kali/Chromium crash path)', () => {
     const recognition = {
       processLocally: false,
       phrases: undefined as unknown,
@@ -49,9 +49,8 @@ describe('speech-recognition-bias', () => {
 
     applySpeechRecognitionBias(recognition);
 
-    expect(recognition.processLocally).toBe(true);
-    expect(Array.isArray(recognition.phrases)).toBe(true);
-    expect((recognition.phrases as MockPhrase[])[0]?.phrase).toBe('VAXON');
+    expect(recognition.processLocally).toBe(false);
+    expect(recognition.phrases).toBeUndefined();
 
     vi.unstubAllGlobals();
   });

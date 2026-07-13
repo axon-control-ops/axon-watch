@@ -58,6 +58,17 @@ describe('createAgentStreamIncrementalState', () => {
     expect(state2.toStreamingActivityView(true)).toEqual(resolveStreamingActivity(STAGE_2, true));
   });
 
+  it('exposes the complete first thinking block for one verbatim narration', () => {
+    const state = createAgentStreamIncrementalState();
+    state.consumeFullContent(
+      ':::thinking\nContinuing investigation of the deploy failure. Checking CI status and git status.\n:::\n',
+    );
+    expect(state.takeCompletedThinkingSpeech()).toBe(
+      'Continuing investigation of the deploy failure. Checking CI status and git status.',
+    );
+    expect(state.takeCompletedThinkingSpeech()).toBeNull();
+  });
+
   it('tracks header counts without re-scanning prior transcript', () => {
     const state = feedIncrementalDeltas(buildLargeEditTranscript(141));
     expect(state.toCounts()).toEqual({

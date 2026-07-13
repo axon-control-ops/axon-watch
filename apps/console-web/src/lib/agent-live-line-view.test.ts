@@ -67,9 +67,9 @@ describe('truncateAgentLiveLineForDisplay', () => {
 });
 
 describe('firstSpeakableAgentLiveBlock', () => {
-  it('returns the first complete sentence block', () => {
+  it('returns the first one or two complete sentences', () => {
     expect(firstSpeakableAgentLiveBlock(LONG_THINKING)).toBe(
-      "I'm starting to analyze the rendering issues the user wants fixed.",
+      "I'm starting to analyze the rendering issues the user wants fixed. They want table rendering to work in markdown previews without breaking layout.",
     );
   });
 

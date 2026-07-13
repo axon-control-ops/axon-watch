@@ -410,6 +410,80 @@ def list_active_runs() -> list[dict[str, Any]]:
     return [record for record in run_store.list_runs() if not is_terminal_phase(record["phase"])]
 
 
+_RESTART_INTERRUPT_SUMMARY = "Run interrupted by control-plane restart"
+
+
+def interrupt_run_on_restart(run_id: str) -> dict[str, Any] | None:
+    """Mark a non-terminal run stopped after the control-plane process restarted."""
+    record = run_store.get_run(run_id)
+    if record is None:
+        return None
+
+    phase = record["phase"]
+    if is_terminal_phase(phase) or phase == "review_ready":
+        return None
+
+    if phase == "executing":
+        return fail_run(
+            run_id,
+            receipt_summary=_RESTART_INTERRUPT_SUMMARY,
+            actor="control-plane",
+        )
+
+    if phase in {"awaiting_approval", "awaiting_input", "waiting_external", "paused"}:
+        return _transition_record(
+            record,
+            to_phase="cancelled",
+            current_step="Run cancelled after control-plane restart",
+            actor="control-plane",
+            receipt_type="control_plane_restart",
+            receipt_summary=_RESTART_INTERRUPT_SUMMARY,
+        )
+
+    if phase in {"queued", "starting", "planning"}:
+        paused = _transition_record(
+            record,
+            to_phase="paused",
+            current_step="Run paused after control-plane restart",
+            actor="control-plane",
+            receipt_type="control_plane_restart",
+            receipt_summary=_RESTART_INTERRUPT_SUMMARY,
+        )
+        return _transition_record(
+            paused,
+            to_phase="cancelled",
+            current_step="Run cancelled after control-plane restart",
+            actor="control-plane",
+            receipt_type="control_plane_restart",
+            receipt_summary=_RESTART_INTERRUPT_SUMMARY,
+        )
+
+    return None
+
+
+def reconcile_orphaned_runs_on_startup(*, boot_id: str) -> list[str]:
+    """Fail or cancel in-flight runs left behind by a prior control-plane process."""
+    reconciled: list[str] = []
+    for record in run_store.list_runs():
+        if interrupt_run_on_restart(record["run_id"]) is not None:
+            reconciled.append(record["run_id"])
+
+    if reconciled:
+        try:
+            from app.debug_session_log import append_debug_session_log
+
+            append_debug_session_log(
+                hypothesis_id="H3",
+                location="runs/service.py:reconcile_orphaned_runs_on_startup",
+                message="orphaned runs reconciled after control-plane boot",
+                data={"boot_id": boot_id, "run_ids": reconciled, "count": len(reconciled)},
+            )
+        except Exception:
+            pass
+
+    return reconciled
+
+
 def list_pending_approval_runs() -> list[dict[str, Any]]:
     return [record for record in run_store.list_runs() if record["phase"] == "awaiting_approval"]
 

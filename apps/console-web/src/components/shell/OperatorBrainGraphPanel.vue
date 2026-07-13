@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
@@ -35,12 +35,37 @@ const emit = defineEmits<{
 
 const shell = useShellStore();
 const galaxyHost = ref<HTMLElement | null>(null);
+const galaxyStage = ref<HTMLElement | null>(null);
+const bottomHud = ref<HTMLElement | null>(null);
 const legendOpen = ref(false);
+let bottomHudObserver: ResizeObserver | null = null;
+
+function syncGalaxyBottomReserve(): void {
+  const stage = galaxyStage.value;
+  const hud = bottomHud.value;
+  if (!stage) {
+    return;
+  }
+  const reservePx = Math.max(hud?.offsetHeight ?? 0, 92);
+  stage.style.setProperty('--galaxy-bottom-reserve', `${reservePx}px`);
+}
 
 onMounted(() => {
   if (shell.operatorBrainGraphLoadState === 'idle') {
     void shell.loadOperatorBrainGraph();
   }
+  syncGalaxyBottomReserve();
+  if (typeof ResizeObserver !== 'undefined' && bottomHud.value) {
+    bottomHudObserver = new ResizeObserver(() => {
+      syncGalaxyBottomReserve();
+    });
+    bottomHudObserver.observe(bottomHud.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  bottomHudObserver?.disconnect();
+  bottomHudObserver = null;
 });
 
 const snapshot = computed(() => shell.operatorBrainGraph);
@@ -69,6 +94,18 @@ function enterWorkspace(workspaceId: string, nodeId: string, label: string): voi
 function handleNodeClick(node: BrainGraphNode): void {
   const selection = resolveBrainGalaxyNodeSelection(node);
   setBrainGalaxyConversationFocus(selection.focus);
+
+  if (node.kind === 'workspace' && node.workspace_id) {
+    enterWorkspace(node.workspace_id, node.node_id, node.label || node.workspace_id);
+    return;
+  }
+
+  if (node.kind === 'signal' && selection.focus?.signalId) {
+    if (node.workspace_id) {
+      shell.setCurrentWorkspace(node.workspace_id);
+    }
+    shell.focusAttentionSidebar(selection.focus.signalId);
+  }
 }
 
 const { webglReady, webglFailed, selectedNode, resetView, focusNode, selectNode } = useBrainGalaxy({
@@ -88,6 +125,9 @@ function handleHubClick(hub: {
   label: string;
 }): void {
   focusNode(hub.node_id);
+  if (hub.workspace_id) {
+    enterWorkspace(hub.workspace_id, hub.node_id, hub.label);
+  }
 }
 
 function handleSvgNodeClick(node: BrainGraphNode): void {
@@ -124,6 +164,7 @@ function handleEvidenceHandoff(signal: {
 
 <template>
   <section
+    ref="galaxyStage"
     class="brain-galaxy-stage"
     :class="{ 'brain-galaxy-stage--vaxon-busy': vaxonBusy }"
     aria-label="Brain galaxy mission control"
@@ -216,7 +257,7 @@ function handleEvidenceHandoff(signal: {
                   selectedNode?.node_id === hub.node_id,
               },
             ]"
-            :title="`Inspect ${hub.label}`"
+            :title="`Open ${hub.label} in IDE`"
             @click="handleHubClick(hub)"
           >
             <span class="brain-galaxy-stage__hub-dot" aria-hidden="true" />
@@ -257,7 +298,7 @@ function handleEvidenceHandoff(signal: {
       </ul>
     </aside>
 
-    <footer class="brain-galaxy-stage__hud brain-galaxy-stage__hud--bottom">
+    <footer ref="bottomHud" class="brain-galaxy-stage__hud brain-galaxy-stage__hud--bottom">
       <KairoConversationBar />
     </footer>
 

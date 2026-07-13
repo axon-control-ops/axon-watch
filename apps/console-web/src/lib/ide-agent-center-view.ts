@@ -288,26 +288,36 @@ export function buildIdeAgentReviewComposerLabel(input: {
 export function buildIdeAgentReviewBar(input: {
   canStop: boolean;
   stopping: boolean;
+  canResume?: boolean;
+  resuming?: boolean;
+  resumeLabel?: string;
   editedFileCount: number;
   reviewReadyCount: number;
   completing: boolean;
 }): {
   showStop: boolean;
+  showResume: boolean;
   showReview: boolean;
   showApplyAll: boolean;
   stopLabel: string;
+  resumeLabel: string;
   reviewLabel: string;
   applyLabel: string;
 } {
   const showStop = input.canStop;
+  const showResume = Boolean(input.canResume) && !showStop;
   const showReview = input.editedFileCount > 0;
   const showApplyAll = input.reviewReadyCount > 0;
 
   return {
     showStop,
+    showResume,
     showReview,
     showApplyAll,
     stopLabel: input.stopping ? 'Stopping…' : 'Stop',
+    resumeLabel: input.resuming
+      ? 'Resuming…'
+      : (input.resumeLabel ?? 'Resume'),
     reviewLabel:
       input.editedFileCount === 1
         ? 'Review 1 file'

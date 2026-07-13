@@ -108,6 +108,27 @@ class CursorStreamPartialDedupeTests(unittest.TestCase):
         self.assertEqual("", assistant_text_delta(f"'ve {body}", f"I've {body}"))
         self.assertEqual("", assistant_text_delta(f"I've {body}", f"'ve {body}"))
 
+    def test_assistant_text_delta_skips_formatted_debug_aggregate(self) -> None:
+        plain = (
+            "Ranked hypotheses for*server recovery**:\n"
+            "1.*H1* — The stream was interrupted.\n"
+            "2.*H2* — The run mode was reset.\n"
+            "3.*H3* — The server identity changed.\n"
+            "4.*H4* — The transcript was duplicated.\n"
+            "5.*H5* — The UI lost its linked run.\n\n"
+            ":::debug-reproduce\n1. Restart the server.\n2. Observe recovery.\n:::"
+        )
+        formatted = (
+            "Ranked hypotheses for **server recovery**:\n"
+            "1. **H1** — The stream was interrupted.\n"
+            "2. **H2** — The run mode was reset.\n"
+            "3. **H3** — The server identity changed.\n"
+            "4. **H4** — The transcript was duplicated.\n"
+            "5. **H5** — The UI lost its linked run.\n\n"
+            ":::debug-reproduce\n1. Restart the server.\n2. Observe recovery.\n:::"
+        )
+        self.assertEqual("", assistant_text_delta(plain, formatted))
+
     def test_stream_assembler_does_not_duplicate_thinking_echo(self) -> None:
         assembler = CursorStreamAssembler()
         thought = (

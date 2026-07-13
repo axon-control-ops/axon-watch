@@ -687,6 +687,61 @@
   opacity: 0.72;
 }
 
+.operator-settings-form__voice-tuning {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.15rem 0 0.35rem;
+}
+
+.operator-settings-form__slider-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.operator-settings-form__slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.operator-settings-form__slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.operator-settings-form__slider-value {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: rgba(0, 242, 255, 0.92);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.operator-settings-form__slider input[type='range'] {
+  width: 100%;
+  accent-color: rgba(0, 242, 255, 0.85);
+  cursor: pointer;
+}
+
+.operator-settings-form__slider-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  opacity: 0.55;
+}
+
+.operator-settings-form__actions--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
 .operator-settings-form__pill {
   display: inline-block;
   padding: 0.1rem 0.4rem;
@@ -706,6 +761,10 @@
 
 .operator-settings-form__actions--footer {
   padding-top: 0.25rem;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .operator-settings-form__button {
@@ -856,4 +915,69 @@
 .settings-surface__primary {
   border-color: rgba(0, 242, 255, 0.45) !important;
   background: rgba(0, 242, 255, 0.16) !important;
+}
+
+.email-settings-panel__vault-callout {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 0.65rem;
+  padding: 0.9rem 1rem;
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.email-settings-panel__vault-callout--locked {
+  border-color: rgba(255, 180, 70, 0.4);
+  background: rgba(255, 160, 40, 0.08);
+}
+
+.email-settings-panel__vault-title {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.9);
+}
+
+.email-settings-panel__vault-callout--locked .email-settings-panel__vault-title {
+  color: rgba(255, 196, 90, 0.95);
+}
+
+.email-settings-panel__vault-copy {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(210, 230, 240, 0.88);
+}
+
+.email-settings-panel__vault-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.email-settings-panel__vault-status {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(180, 210, 230, 0.75);
+}
+
+.email-settings-panel__inline-hint {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.email-settings-panel__inline-hint--warn {
+  border: 1px solid rgba(255, 180, 70, 0.35);
+  background: rgba(255, 160, 40, 0.08);
+  color: rgba(255, 220, 160, 0.95);
+}
+
+.settings-feedback-banner--warn {
+  border-color: rgba(255, 180, 70, 0.4);
+  background: rgba(255, 160, 40, 0.1);
+  color: rgba(255, 220, 160, 0.95);
 }

@@ -16,10 +16,17 @@ const props = defineProps<{
 
 const shell = useShellStore();
 
-const rows = computed(() =>
-  buildBriefingOpenLoopRows(props.briefing, { compact: Boolean(props.compact) }),
+const openLoopOptions = computed(() => ({
+  compact: Boolean(props.compact),
+  primaryActiveRun: shell.primaryActiveRun,
+  fleetActiveRuns: shell.runtimeSummary?.active_runs ?? props.briefing?.active_runs ?? [],
+  workspaceId: shell.currentWorkspace?.workspace_id ?? null,
+}));
+
+const rows = computed(() => buildBriefingOpenLoopRows(props.briefing, openLoopOptions.value));
+const visible = computed(
+  () => rows.value.length > 0 || briefingHasOpenLoops(props.briefing, openLoopOptions.value),
 );
-const visible = computed(() => rows.value.length > 0 || briefingHasOpenLoops(props.briefing));
 
 function onActivate(row: OpenLoopRow): void {
   if (row.focusKind === 'attention') {

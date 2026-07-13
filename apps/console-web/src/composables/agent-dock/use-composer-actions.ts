@@ -14,6 +14,7 @@ import {
 } from '../../features/kairo-conversation/conversation-briefing-surface';
 import { kairoConversationReply } from '../../features/kairo-conversation/kairo-conversation-state';
 import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
+import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import { findIdeComposerQueueEntry } from '../../lib/ide-composer-queue';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import { useShellStore } from '../../stores/shell';
@@ -35,6 +36,7 @@ type UseComposerActionsOptions = {
   speechCapture: { capturing: Ref<boolean> };
   startVoiceCapture: () => void;
   stopVoiceCapture: () => void;
+  onDebugReproduceProceed?: (messageId: string) => void;
 };
 
 export function useComposerActions(options: UseComposerActionsOptions) {
@@ -52,6 +54,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     speechCapture,
     startVoiceCapture,
     stopVoiceCapture,
+    onDebugReproduceProceed,
   } = options;
 
   function handleApproveRun(): void {
@@ -77,6 +80,15 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     }
     shell.interruptKairoVoice();
     startVoiceCapture();
+  }
+
+  async function handleDebugReproduceProceed(messageId: string): Promise<void> {
+    if (composerMode.value !== 'debug' && shell.ideAgentLinkedRun?.mode !== 'debug') {
+      composerMode.value = 'debug';
+    }
+    onDebugReproduceProceed?.(messageId);
+    shell.ideComposerDraft = DEBUG_REPRODUCE_PROCEED_MESSAGE;
+    await shell.submitIdeComposer('debug');
   }
 
   async function handleSubmit(event?: Event): Promise<void> {
@@ -197,6 +209,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
   return {
     handleApproveRun,
     handleComposerKeydown,
+    handleDebugReproduceProceed,
     handleRejectRun,
     handleResumeRun,
     handleSteer,

@@ -13,13 +13,13 @@ const SNAPSHOT: ComposerMcpToolsSnapshot = {
       id: 'workspace_files.read',
       label: 'Read workspace file',
       bounded_context: 'workspace_files',
-      mode_support: ['ask', 'plan', 'agent'],
+      mode_support: ['ask', 'plan', 'agent', 'debug'],
     },
     {
       id: 'runs.history',
       label: 'Read persisted run history',
       bounded_context: 'runs',
-      mode_support: ['plan', 'agent'],
+      mode_support: ['plan', 'agent', 'debug'],
     },
     {
       id: 'vault.status',
@@ -37,6 +37,10 @@ describe('filterMcpToolsForComposerMode', () => {
       'vault.status',
     ]);
     expect(filterMcpToolsForComposerMode(SNAPSHOT, 'plan').map((tool) => tool.id)).toEqual([
+      'workspace_files.read',
+      'runs.history',
+    ]);
+    expect(filterMcpToolsForComposerMode(SNAPSHOT, 'debug').map((tool) => tool.id)).toEqual([
       'workspace_files.read',
       'runs.history',
     ]);

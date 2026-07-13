@@ -14,6 +14,7 @@ from tests.support.bootstrap_signal_fixture import (
     BOOTSTRAP_WATCH_INBOX,
     consistency_tuple,
 )
+from tests.support.email_signal_fixture import EMAIL_INBOX_ITEM, EMAIL_WATCH_INBOX
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -96,6 +97,21 @@ class ParityA4SignalInboxConsistencyTests(unittest.TestCase):
         self.assertEqual(expected, consistency_tuple(summary_item))
         self.assertEqual(expected, consistency_tuple(briefing_item))
         self.assertEqual("high", inbox_item["severity"])
+
+    def test_email_signal_consistent_across_inbox_summary_and_briefing(self) -> None:
+        self._patch_watch_inbox(EMAIL_WATCH_INBOX)
+
+        inbox_item = self.client.get("/api/inbox").json()["items"][0]
+        summary_item = self.client.get("/api/runtime/summary").json()["signals"]["top_items"][0]
+        briefing_item = self.client.get("/api/briefing").json()["top_signals"][0]
+
+        expected = consistency_tuple(EMAIL_INBOX_ITEM)
+        self.assertEqual(expected, consistency_tuple(inbox_item))
+        self.assertEqual(expected, consistency_tuple(summary_item))
+        self.assertEqual(expected, consistency_tuple(briefing_item))
+        self.assertEqual("email", inbox_item["source"])
+        self.assertEqual("workspace_dashpro", inbox_item["workspace_id"])
+        self.assertEqual("email_triage", inbox_item.get("meta", {}).get("signal_family"))
 
 
 if __name__ == "__main__":

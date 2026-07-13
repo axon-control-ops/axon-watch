@@ -108,7 +108,8 @@
 }
 
 .brain-galaxy-stage__hud--bottom .kairo-conversation-bar__command-row {
-  padding-right: min(13rem, 34vw);
+  /* Orb defaults to top-right; keep modest trailing space for run-orbit controls. */
+  padding-right: 0.75rem;
 }
 
 .brain-galaxy-stage__omnibar {
@@ -266,6 +267,11 @@
 
 .kairo-conversation-bar__interim--thinking {
   color: rgba(255, 214, 140, 0.88);
+}
+
+.kairo-conversation-bar__interim--gate {
+  color: rgba(255, 196, 120, 0.92);
+  font-style: normal;
 }
 
 .handoff-to-ide-button {

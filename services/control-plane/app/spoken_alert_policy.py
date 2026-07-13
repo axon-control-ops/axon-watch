@@ -8,7 +8,7 @@ INTERRUPTIVE_MODES = frozenset({"approval", "execute"})
 from app.operator_persona_name import OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_PREFIX
 
 
-def default_operator_presence_settings() -> dict[str, bool | str]:
+def default_operator_presence_settings() -> dict[str, bool | str | float]:
     return {
         "operator_persona_enabled": True,
         "spoken_alerts_enabled": True,
@@ -17,6 +17,9 @@ def default_operator_presence_settings() -> dict[str, bool | str]:
         "kairo_narration": "conversational",
         "ide_voice_strip_enabled": False,
         "hands_free_enabled": False,
+        # axon-local parity defaults (desktop voice deck).
+        "speech_rate": 1.0,
+        "speech_pitch": 1.04,
     }
 
 

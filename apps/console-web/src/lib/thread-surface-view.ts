@@ -2,7 +2,7 @@ import type { OperatorThreadEntry } from './operator-thread';
 
 export type ThreadSurface = 'operator' | 'ide';
 
-const LANE_B_SYSTEM_RE = /^Lane B \((ask|plan|agent)\)/i;
+const LANE_B_SYSTEM_RE = /^Lane B \((ask|plan|agent|debug)\)/i;
 
 export function threadSurfaceForLayout(layoutMode: 'operator' | 'ide'): ThreadSurface {
   return layoutMode === 'ide' ? 'ide' : 'operator';

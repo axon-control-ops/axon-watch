@@ -67,10 +67,10 @@ describe('brain-galaxy-hud-view', () => {
   });
 
   it('describes inspector state for null and selected nodes', () => {
-    expect(galaxyInspectorCopy(null).title).toBe('Inspector');
-    expect(galaxyInspectorCopy(null).body).toContain('evidence');
+    expect(galaxyInspectorCopy(null).title).toBe('Node inspector');
+    expect(galaxyInspectorCopy(null).body).toContain('workspace');
     expect(galaxyInspectorCopy(snapshot.nodes[3]).hint).toContain('prove-source');
-    expect(galaxyInspectorCopy(snapshot.nodes[1]).hint).toContain('Evidence');
+    expect(galaxyInspectorCopy(snapshot.nodes[1]).hint).toContain('opens evidence');
   });
 
   it('resolves workspace navigation targets from hub clicks', () => {

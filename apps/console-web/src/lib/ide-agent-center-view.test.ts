@@ -174,10 +174,29 @@ describe('ide agent center view', () => {
       }),
     ).toMatchObject({
       showStop: true,
+      showResume: false,
       showReview: true,
       showApplyAll: true,
       reviewLabel: 'Review 2 files',
       applyLabel: 'Apply all',
+    });
+
+    expect(
+      buildIdeAgentReviewBar({
+        canStop: false,
+        stopping: false,
+        canResume: true,
+        resumeLabel: 'Continue',
+        editedFileCount: 3,
+        reviewReadyCount: 0,
+        completing: false,
+      }),
+    ).toMatchObject({
+      showStop: false,
+      showResume: true,
+      resumeLabel: 'Continue',
+      showReview: true,
+      reviewLabel: 'Review 3 files',
     });
 
     expect(

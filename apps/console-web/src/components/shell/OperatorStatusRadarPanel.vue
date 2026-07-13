@@ -20,6 +20,7 @@ import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import {
   formatRunIdentityLabel,
 } from '../../lib/run-display';
+import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 import ConnectorsRailPanel from './ConnectorsRailPanel.vue';
 import OperatorBrainGraphPanel from './OperatorBrainGraphPanel.vue';
@@ -36,6 +37,17 @@ const emit = defineEmits<{
 }>();
 
 const shell = useShellStore();
+
+const continueActionLabel = computed(() =>
+  runContinueActionLabel({
+    phase: shell.primaryActiveRun?.phase,
+    agentStreamActive: shell.agentStreamActive,
+    mode: shell.primaryActiveRun?.mode,
+    pending: shell.runMutationState === 'resuming',
+    continueLabel: 'CONTINUE RUN',
+    resumeLabel: 'RESUME RUN',
+  }),
+);
 
 const centerView = computed(() => shell.operatorCenterView);
 const brainHeroMode = computed(() => shell.operatorBrainGalaxyActive);
@@ -163,7 +175,7 @@ const showRunActions = computed(
   () =>
     !onlyAutoCompleteReviewBacklog.value &&
     (showStopAction.value ||
-      Boolean(shell.primaryActiveRun?.can_resume) ||
+      shell.canResumePrimaryRun ||
       shell.canCompletePrimaryRun ||
       shell.pendingApprovalsCount > 0),
 );
@@ -396,13 +408,13 @@ function toggleTerminal(): void {
             {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP RUN' }}
           </button>
           <button
-            v-if="shell.primaryActiveRun?.can_resume && shell.primaryActiveRun?.phase !== 'review_ready'"
+            v-if="shell.canResumePrimaryRun"
             type="button"
             class="run-actions__button run-actions__button--warning"
-            :disabled="!shell.canResumePrimaryRun"
+            :disabled="!shell.canResumePrimaryRun || shell.runMutationPending"
             @click="shell.resumePrimaryRun()"
           >
-            {{ shell.runMutationState === 'resuming' ? 'RESUMING…' : 'RESUME RUN' }}
+            {{ continueActionLabel }}
           </button>
           <button
             v-if="shell.canCompletePrimaryRun"

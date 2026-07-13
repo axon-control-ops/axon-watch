@@ -96,6 +96,13 @@ import {
   writeOpenIdeThreadIdsForWorkspace,
 } from '../lib/ide-thread-tabs-prefs';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
+import {
+  clearIdeRunRecovery,
+  fetchControlPlaneBootId,
+  persistIdeRunRecovery,
+  readIdeRunRecovery,
+  SERVER_RESTART_CONTINUATION_PROMPT,
+} from '../lib/ide-run-recovery';
 import { buildKairoSpeechSessionId } from '../lib/kairo-speech-session';
 import {
   appendBriefingVoiceTranscriptEntry,
@@ -156,6 +163,7 @@ import {
   type IdeComposerMode,
   type IdeComposerQueuedMessage,
 } from '../lib/ide-composer-queue';
+import { isToolCapableComposerMode } from '../lib/composer-tool-modes';
 import {
   persistIdeComposerDraft,
   readStoredIdeComposerDraft,
@@ -178,7 +186,7 @@ import {
   buildRunHistoryRows,
   type RunHistorySnapshot,
 } from '../lib/run-history-view';
-import { isOperatorCompletablePhase } from '../lib/run-lifecycle-ui';
+import { isOperatorCompletablePhase, resolveAgentContinuePrompt } from '../lib/run-lifecycle-ui';
 import {
   appendOperatorCommand,
   canSubmitOperatorCommand as canSubmitOperatorCommandDraft,
@@ -422,9 +430,11 @@ export const useShellStore = defineStore('shell', () => {
   const kairoVoicePaused = ref(false);
   const ideComposerQueueByWorkspaceId = ref<Record<string, IdeComposerQueuedMessage[]>>({});
   let flushingIdeComposerQueue = false;
+  let autoRunRecoveryInFlight = false;
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
   const ideAgentRunId = ref<string | null>(null);
   const ideComposerActivity = ref<IdeComposerActivity | null>(null);
+  const ideDebugModeSelected = ref(false);
   const ideAgentLinkedRun = computed(() => {
     const runId = ideAgentRunId.value;
     if (!runId) {
@@ -679,7 +689,7 @@ export const useShellStore = defineStore('shell', () => {
     if (kairoConversationPhase.value === 'thinking') {
       return 'thinking';
     }
-    if (agentStreamActive.value && ideComposerActivity.value?.mode === 'agent') {
+    if (agentStreamActive.value && isToolCapableComposerMode(ideComposerActivity.value?.mode)) {
       return kairoSpeechActive.value ? 'speaking' : 'thinking';
     }
     if (agentStreamActive.value) {
@@ -803,6 +813,8 @@ export const useShellStore = defineStore('shell', () => {
     operatorBriefing,
     runtimeSummary,
     inboxItems,
+    primaryActiveRun,
+    currentWorkspaceId: computed(() => currentWorkspace.value?.workspace_id ?? null),
     leftSidebarMode,
     leftSidebarModeTouched,
     dockHeroMode,
@@ -1498,6 +1510,8 @@ export const useShellStore = defineStore('shell', () => {
 
     await speakKairoLine(message, {
       priority: 'conversation',
+      speechRate: operatorPresenceSettings.value.speech_rate,
+      speechPitch: operatorPresenceSettings.value.speech_pitch,
     });
   }
 
@@ -1710,6 +1724,10 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function attachChatStream(workspaceId: string, threadId: string, messageId: string): void {
+    const attachedRunId = ideAgentRunId.value;
+    // #region agent log
+    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:messageId,hypothesisId:'R3',location:'shell.ts:attachChatStream',message:'chat stream narrator attached',data:{workspaceId,threadId,messageId,attachedRunId},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     disconnectChatStreamSession(workspaceId);
     setWorkspaceStreamUi(workspaceId, {
       active: true,
@@ -1721,11 +1739,12 @@ export const useShellStore = defineStore('shell', () => {
       ...workspaceIdeThreadMessagesById.value,
       [workspaceId]: [...threadMessages.value],
     };
-    const narrationEnabled = ideComposerActivity.value?.mode === 'agent';
+    const narrationEnabled = isToolCapableComposerMode(ideComposerActivity.value?.mode);
     const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
     const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
     let streamedContent = '';
     let spokenStartIntent = false;
+    let terminalAutoRevealSeen = false;
     const streamIncremental = createAgentStreamIncrementalState();
     const streamUiBatcher = createRafStreamUiBatcher<Partial<WorkspaceStreamUiState>>(
       (wsId, partial) => setWorkspaceStreamUi(wsId, partial),
@@ -1765,6 +1784,12 @@ export const useShellStore = defineStore('shell', () => {
               agentMilestoneNarrator?.narrate(milestone);
             }
           }
+          if (!terminalAutoRevealSeen && streamIncremental.toCounts().terminal > 0) {
+            terminalAutoRevealSeen = true;
+            // A real autonomous terminal tool is now in-flight. Merely
+            // provisioning an agent terminal session does not open the dock.
+            revealIdeTerminalPanel();
+          }
           const activity = getWorkspaceStreamUi(workspaceId).activity as IdeComposerActivity | null;
           if (activity) {
             const activityView = streamIncremental.toStreamingActivityView(fullAccessNarration);
@@ -1778,7 +1803,7 @@ export const useShellStore = defineStore('shell', () => {
             };
             streamUiBatcher.schedule(workspaceId, { activity: nextActivity });
 
-            const spokenBlock = activityView.liveBodySpoken?.trim() ?? '';
+            const spokenBlock = streamIncremental.takeCompletedThinkingSpeech()?.trim() ?? '';
             if (
               narrationEnabled &&
               !spokenStartIntent &&
@@ -1792,6 +1817,7 @@ export const useShellStore = defineStore('shell', () => {
               agentMilestoneNarrator?.narrate({
                 key: 'start',
                 message: spokenBlock,
+                verbatim: true,
               });
             }
           }
@@ -1810,6 +1836,7 @@ export const useShellStore = defineStore('shell', () => {
           });
         },
         onDone: (payload) => {
+          clearIdeRunRecovery(attachedRunId ?? undefined);
           if (payload.system_message_id && payload.system_content) {
             patchThreadMessageContent(
               workspaceId,
@@ -1846,7 +1873,24 @@ export const useShellStore = defineStore('shell', () => {
           }
           const finalContent = payload.content ?? streamedContent;
           if (narrationEnabled) {
-            agentMilestoneNarrator?.narrate(narrationForCompletion(finalContent));
+            const completion = narrationForCompletion(finalContent);
+            // #region agent log
+            void import('../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
+              axonDebugSessionLog({
+                hypothesisId: /:::debug-reproduce\b/m.test(finalContent) ? 'H1' : 'H2',
+                location: 'shell.ts:attachChatStream.onDone',
+                message: 'agent turn complete — narrating',
+                data: {
+                  hasReproduce: /:::debug-reproduce\b/m.test(finalContent),
+                  milestoneKey: completion.key,
+                  spokenPreview: completion.message.slice(0, 220),
+                  narrationLevel: effectiveKairoNarrationLevel.value,
+                  voiceDeliveryAllowed: voiceDeliveryAllowed(),
+                },
+              });
+            });
+            // #endregion
+            agentMilestoneNarrator?.narrate(completion);
           }
           if (currentWorkspace.value?.workspace_id === workspaceId) {
             for (const path of editedFilePathsFromTranscript(finalContent)) {
@@ -1909,6 +1953,10 @@ export const useShellStore = defineStore('shell', () => {
     ideAgentRunId.value = null;
   }
 
+  function setIdeDebugModeSelected(selected: boolean): void {
+    ideDebugModeSelected.value = selected;
+  }
+
   function restoreComposerDraft(content: string): void {
     const trimmed = content.trim();
     commandMutationError.value = null;
@@ -1950,30 +1998,22 @@ export const useShellStore = defineStore('shell', () => {
   });
 
   function latestIdeOperatorPromptForRun(runId: string | null | undefined): string | null {
-    const targetRunId = String(runId ?? '').trim();
-    const messages = [...threadMessages.value].reverse();
-    if (targetRunId) {
-      const linked = messages.find(
-        (message) =>
-          message.role === 'operator' &&
-          String(message.run_id ?? '').trim() === targetRunId &&
-          message.content.trim(),
-      );
-      if (linked) {
-        return linked.content.trim();
-      }
-    }
-    const fallback = messages.find(
-      (message) => message.role === 'operator' && message.content.trim(),
-    );
-    return fallback?.content.trim() ?? null;
+    const run = runs.value.find((record) => record.run_id === runId) ?? null;
+    return resolveAgentContinuePrompt({
+      runId: String(runId ?? ''),
+      runSummary: run?.summary,
+      ideMessages: threadMessages.value,
+      operatorMessages: operatorThreadMessages.value,
+    });
   }
 
   async function dispatchIdeComposerMessage(
-    composerMode: 'ask' | 'plan' | 'agent',
+    composerMode: IdeComposerMode,
     options: {
       contentOverride?: string;
       linkedRunIdOverride?: string | null;
+      threadIdOverride?: string | null;
+      recoveryCountOverride?: number;
       clearDraftOnSuccess?: boolean;
       attachmentFiles?: File[];
     } = {},
@@ -1999,10 +2039,12 @@ export const useShellStore = defineStore('shell', () => {
     };
 
     try {
-      const linkedRunId =
-        composerMode === 'agent'
-          ? options.linkedRunIdOverride ?? resolveIdeAgentLinkedRunId(ideAgentRunId.value, runs.value)
-          : null;
+      const linkedRunId = isToolCapableComposerMode(composerMode)
+        ? options.linkedRunIdOverride
+          ?? resolveIdeAgentLinkedRunId(ideAgentRunId.value, runs.value, {
+            expectedMode: composerMode,
+          })
+        : null;
       const contextPayload = resolveComposerContextPayload({
         draft: content,
         workspaceId,
@@ -2021,10 +2063,19 @@ export const useShellStore = defineStore('shell', () => {
         const uploaded = await uploadChatAttachment(workspaceId, file);
         attachmentIds.push(uploaded.attachment_id);
       }
+      let controlPlaneBootId = '';
+      if (isToolCapableComposerMode(composerMode)) {
+        try {
+          controlPlaneBootId = await fetchControlPlaneBootId();
+        } catch {
+          // Recovery remains manual when the boot identity cannot be captured.
+        }
+      }
       const response = await postChatMessage({
         workspace_id: workspaceId,
         content,
-        thread_id: getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
+        thread_id:
+          options.threadIdOverride ?? getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
         run_id: linkedRunId,
         composer_mode: composerMode,
         active_file_path: activeWorkspaceFilePath.value,
@@ -2033,7 +2084,9 @@ export const useShellStore = defineStore('shell', () => {
         attachment_ids: attachmentIds.length ? attachmentIds : undefined,
         runtime_target: selectedRuntimeTargetId.value || null,
         runtime_model: selectedComposerModel.value || null,
-        execution_access: composerMode === 'agent' ? agentExecutionAccess.value : undefined,
+        execution_access: isToolCapableComposerMode(composerMode)
+          ? agentExecutionAccess.value
+          : undefined,
         kairo_session_id: kairoSpeechSessionId(),
       });
       activeThreadId.value = response.thread_id;
@@ -2047,7 +2100,7 @@ export const useShellStore = defineStore('shell', () => {
       if (options.clearDraftOnSuccess !== false) {
         ideComposerDraft.value = '';
       }
-      if (composerMode === 'agent' && response.run_id) {
+      if (isToolCapableComposerMode(composerMode) && response.run_id) {
         ideAgentRunId.value = response.run_id;
       }
       const uiAction = parseChatUiAction(response.ui_action);
@@ -2064,7 +2117,6 @@ export const useShellStore = defineStore('shell', () => {
         commandMutationState.value = 'idle';
         if (response.agent_terminal_session) {
           applyAgentTerminalSession(response.agent_terminal_session);
-          revealIdeTerminalPanel();
         }
         ideComposerActivity.value = {
           label: buildIdeStreamActivityLabel(agentExecutionAccess.value),
@@ -2072,6 +2124,41 @@ export const useShellStore = defineStore('shell', () => {
           executionAccess: agentExecutionAccess.value,
           operatorPrompt: content,
         };
+        if (
+          response.run_id &&
+          controlPlaneBootId &&
+          (composerMode === 'agent' || composerMode === 'debug')
+        ) {
+          persistIdeRunRecovery({
+            workspaceId,
+            threadId: response.thread_id,
+            runId: response.run_id,
+            mode: composerMode,
+            controlPlaneBootId,
+            recoveryCount: options.recoveryCountOverride ?? 0,
+          });
+          // #region agent log
+          fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
+            body: JSON.stringify({
+              sessionId: 'df24bc',
+              runId: 'axon-x-debug-mode',
+              hypothesisId: 'D5',
+              location: 'shell.ts:dispatchIdeComposerMessage',
+              message: 'active run recovery marker persisted',
+              data: {
+                workspaceId,
+                threadId: response.thread_id,
+                runId: response.run_id,
+                mode: composerMode,
+                bootIdCaptured: true,
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
+        }
         attachChatStream(workspaceId, response.thread_id, response.stream_agent_message_id);
         const next = new Set(expandedDockSeams.value);
         next.add('thread');
@@ -2103,6 +2190,23 @@ export const useShellStore = defineStore('shell', () => {
       commandMutationState.value = 'error';
       commandMutationError.value =
         error instanceof Error ? error.message : 'Failed to submit IDE composer message';
+      // #region agent log
+      void import('../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
+        axonDebugSessionLog({
+          hypothesisId: 'H4',
+          location: 'shell.ts:dispatchIdeComposerMessage',
+          message: 'composer submit failed',
+          data: {
+            composerMode,
+            error: error instanceof Error ? error.message : String(error),
+            linkedRunId: ideAgentRunId.value,
+            linkedRunPhase: ideAgentLinkedRun.value?.phase ?? null,
+            linkedRunMode: ideAgentLinkedRun.value?.mode ?? null,
+            contentPreview: content.slice(0, 120),
+          },
+        });
+      });
+      // #endregion
       return false;
     } finally {
       if (!agentStreamActive.value) {
@@ -2204,7 +2308,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function steerIdeComposer(
-    composerMode: 'ask' | 'plan' | 'agent',
+    composerMode: IdeComposerMode,
     options: { attachmentFiles?: File[] } = {},
   ): Promise<void> {
     const content = ideComposerDraft.value.trim();
@@ -2246,7 +2350,7 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function submitIdeComposer(
-    composerMode: 'ask' | 'plan' | 'agent',
+    composerMode: IdeComposerMode,
     options: { attachmentFiles?: File[] } = {},
   ): Promise<void> {
     const content = ideComposerDraft.value.trim();
@@ -3055,7 +3159,10 @@ export const useShellStore = defineStore('shell', () => {
     loadOperatorFleetHealth: () => loadOperatorFleetHealth(),
   });
 
-  async function testKairoVoiceFromSettings(): Promise<'azure' | 'browser' | 'skipped'> {
+  async function testKairoVoiceFromSettings(options?: {
+    speechRate?: number;
+    speechPitch?: number;
+  }): Promise<'azure' | 'browser' | 'skipped'> {
     if (
       operatorPresenceSettings.value.privacy_mode ||
       effectiveKairoNarrationLevel.value === 'off'
@@ -3065,7 +3172,13 @@ export const useShellStore = defineStore('shell', () => {
     setKairoConversationPhase('speaking');
     kairoVoicePaused.value = false;
     try {
-      const result = await speakKairoLine('Systems are up — voice delivery looks good from here.');
+      const result = await speakKairoLine(
+        'Systems are up — voice delivery looks good from here.',
+        {
+          speechRate: options?.speechRate ?? operatorPresenceSettings.value.speech_rate,
+          speechPitch: options?.speechPitch ?? operatorPresenceSettings.value.speech_pitch,
+        },
+      );
       return result.engine === 'idle' ? 'skipped' : result.engine;
     } finally {
       if (kairoConversationPhase.value === 'speaking') {
@@ -3161,6 +3274,102 @@ export const useShellStore = defineStore('shell', () => {
     await loadOperatorBriefing({ background: true });
   }
 
+  async function autoContinueInterruptedIdeRun(): Promise<void> {
+    const recovery = readIdeRunRecovery();
+    // #region agent log
+    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
+      body: JSON.stringify({
+        sessionId: 'df24bc',
+        runId: 'axon-x-debug-mode',
+        hypothesisId: 'D6',
+        location: 'shell.ts:autoContinueInterruptedIdeRun:entry',
+        message: 'server restart recovery candidate checked',
+        data: {
+          hasRecovery: Boolean(recovery),
+          recoveryWorkspaceId: recovery?.workspaceId ?? null,
+          currentWorkspaceId: currentWorkspace.value?.workspace_id ?? null,
+          recoveryRunId: recovery?.runId ?? null,
+          recoveryCount: recovery?.recoveryCount ?? null,
+          streamActive: agentStreamActive.value,
+          mutationState: commandMutationState.value,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    if (
+      !recovery ||
+      autoRunRecoveryInFlight ||
+      agentStreamActive.value ||
+      commandMutationState.value === 'submitting' ||
+      currentWorkspace.value?.workspace_id !== recovery.workspaceId
+    ) {
+      return;
+    }
+
+    const run = runs.value.find((item) => item.run_id === recovery.runId) ?? null;
+    if (!run) {
+      clearIdeRunRecovery(recovery.runId);
+      return;
+    }
+    if (recovery.recoveryCount >= 1) {
+      clearIdeRunRecovery(recovery.runId);
+      commandMutationError.value =
+        'Automatic continuation stopped after a repeated server restart. Review the run before continuing manually.';
+      return;
+    }
+    if (run.phase !== 'executing') {
+      if (run.phase === 'completed' || run.phase === 'failed') {
+        clearIdeRunRecovery(recovery.runId);
+      }
+      return;
+    }
+
+    autoRunRecoveryInFlight = true;
+    let currentBootId = '';
+    let dispatched = false;
+    try {
+      currentBootId = await fetchControlPlaneBootId();
+      if (!currentBootId || currentBootId === recovery.controlPlaneBootId) {
+        return;
+      }
+      ideAgentRunId.value = recovery.runId;
+      dispatched = await dispatchIdeComposerMessage(recovery.mode, {
+        contentOverride: SERVER_RESTART_CONTINUATION_PROMPT,
+        linkedRunIdOverride: recovery.runId,
+        threadIdOverride: recovery.threadId,
+        recoveryCountOverride: recovery.recoveryCount + 1,
+        clearDraftOnSuccess: false,
+      });
+    } finally {
+      // #region agent log
+      fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
+        body: JSON.stringify({
+          sessionId: 'df24bc',
+          runId: 'axon-x-debug-mode',
+          hypothesisId: 'D4',
+          location: 'shell.ts:autoContinueInterruptedIdeRun',
+          message: 'server restart recovery evaluated',
+          data: {
+            runId: recovery.runId,
+            mode: recovery.mode,
+            phase: run.phase,
+            bootChanged:
+              Boolean(currentBootId) && currentBootId !== recovery.controlPlaneBootId,
+            dispatched,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      autoRunRecoveryInFlight = false;
+    }
+  }
+
   async function refreshRunSurfaces(): Promise<void> {
     const briefingBackground = briefingLoadState.value === 'loaded';
     const runtimeBackground = runtimeSummaryLoadState.value === 'loaded';
@@ -3178,6 +3387,7 @@ export const useShellStore = defineStore('shell', () => {
         : Promise.resolve(),
     ]);
     await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
+    await autoContinueInterruptedIdeRun();
     await flushIdeComposerQueueIfIdle();
   }
 
@@ -3277,7 +3487,26 @@ export const useShellStore = defineStore('shell', () => {
 
   async function resumePrimaryRun(): Promise<void> {
     const run = primaryActiveRun.value;
-    if (!run?.can_resume || runMutationPending.value) {
+    if (!run || runMutationPending.value) {
+      return;
+    }
+    const idleContinue =
+      run.phase === 'executing' &&
+      !agentStreamActive.value &&
+      isToolCapableComposerMode(run.mode);
+    if (!run.can_resume && !idleContinue) {
+      return;
+    }
+
+    // Agent/Debug runs: CONTINUE/RESUME must re-dispatch work. Bare stop→resume only
+    // flips phase and does not restart the agent (verified against live API).
+    if (isToolCapableComposerMode(run.mode)) {
+      ideAgentRunId.value = run.run_id;
+      await resumeIdeAgentRun();
+      return;
+    }
+
+    if (!run.can_resume) {
       return;
     }
 
@@ -3296,8 +3525,19 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function resumeIdeAgentRun(): Promise<void> {
-    const run = ideAgentLinkedRun.value;
-    if (!run?.can_resume || runMutationPending.value) {
+    const run = ideAgentLinkedRun.value ?? primaryActiveRun.value;
+    if (!run || runMutationPending.value) {
+      return;
+    }
+    if (isToolCapableComposerMode(run.mode)) {
+      ideAgentRunId.value = run.run_id;
+    }
+    const linked = ideAgentLinkedRun.value ?? run;
+    const idleContinue =
+      linked.phase === 'executing' &&
+      !agentStreamActive.value &&
+      isToolCapableComposerMode(linked.mode);
+    if (!linked.can_resume && !idleContinue) {
       return;
     }
 
@@ -3305,26 +3545,29 @@ export const useShellStore = defineStore('shell', () => {
     runMutationError.value = null;
 
     try {
-      const latestPrompt = latestIdeOperatorPromptForRun(run.run_id);
-      if (latestPrompt) {
-        const dispatched = await dispatchIdeComposerMessage('agent', {
-          contentOverride: latestPrompt,
-          linkedRunIdOverride: run.run_id,
-          clearDraftOnSuccess: false,
-        });
-        if (dispatched) {
-          await refreshRunSurfaces();
-          const updated = ideAgentLinkedRun.value;
-          if (updated && updated.phase !== 'paused' && updated.phase !== 'review_ready') {
-            afterRunLifecycleMutation();
-            return;
-          }
-        }
+      const latestPrompt = latestIdeOperatorPromptForRun(linked.run_id);
+      if (!latestPrompt) {
+        runMutationError.value =
+          'Continue failed: no operator prompt found for this run. Type a follow-up in the IDE composer.';
+        return;
       }
 
-      await resumeRun(run.run_id);
-      await refreshRunSurfaces();
-      afterRunLifecycleMutation();
+      const resumeMode: IdeComposerMode =
+        linked.mode === 'debug' ? 'debug' : 'agent';
+      const dispatched = await dispatchIdeComposerMessage(resumeMode, {
+        contentOverride: latestPrompt,
+        linkedRunIdOverride: linked.run_id,
+        clearDraftOnSuccess: false,
+      });
+      if (dispatched) {
+        await refreshRunSurfaces();
+        afterRunLifecycleMutation();
+        return;
+      }
+
+      runMutationError.value =
+        commandMutationError.value ||
+        'Continue failed: agent re-dispatch did not start. Check Full Access and try again.';
     } catch (error) {
       runMutationError.value = error instanceof Error ? error.message : 'resume run request failed';
     } finally {
@@ -3485,6 +3728,7 @@ export const useShellStore = defineStore('shell', () => {
         threadMessages.value = operatorThreadMessages.value;
       }
     }
+    await autoContinueInterruptedIdeRun();
     applyOperatorDockDefaults();
   }
 
@@ -3546,6 +3790,7 @@ export const useShellStore = defineStore('shell', () => {
     ideAgentLinkedRun,
     ideAgentRunId,
     ideComposerActivity,
+    ideDebugModeSelected,
     activeIdeThreadId,
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,
@@ -3595,6 +3840,7 @@ export const useShellStore = defineStore('shell', () => {
     bindViewportCompactListener,
     unbindViewportCompactListener,
     loadBootstrapData,
+    setIdeDebugModeSelected,
     loadConnectors,
     loadInbox,
     loadOperatorBrainGraph,

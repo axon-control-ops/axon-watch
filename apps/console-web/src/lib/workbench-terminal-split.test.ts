@@ -28,8 +28,8 @@ describe('workbench terminal split', () => {
     expect(resolveDefaultWorkbenchTerminalHeight(1200, 'operator')).toBeLessThanOrEqual(280);
   });
 
-  it('defaults terminal panel visibility by layout mode outside the browser', () => {
-    expect(readStoredWorkbenchTerminalPanelVisible('ide')).toBe(true);
+  it('defaults terminal panel hidden until operator or agent reveals it', () => {
+    expect(readStoredWorkbenchTerminalPanelVisible('ide')).toBe(false);
     expect(readStoredWorkbenchTerminalPanelVisible('operator')).toBe(false);
   });
 

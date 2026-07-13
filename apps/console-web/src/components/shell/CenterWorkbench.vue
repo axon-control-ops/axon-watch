@@ -51,7 +51,7 @@ const isIdeMode = computed(() => shell.layoutMode === 'ide');
 const workbenchLayoutMode = computed((): 'operator' | 'ide' =>
   hideOperatorEditor.value ? 'operator' : 'ide',
 );
-const terminalPanelVisible = ref(true);
+const terminalPanelVisible = ref(false);
 const showTerminalDock = computed(() => terminalPanelVisible.value);
 const workbenchRef = ref<HTMLElement | null>(null);
 const terminalHeight = ref(240);

@@ -41,8 +41,9 @@ export function buildOperatorQuickGuide(input: {
       title: 'Run in progress',
       steps: [
         'Watch Mission Control live feed for step-by-step progress.',
-        'COMPLETE RUN when output looks good — you do not need to wait for review_ready.',
-        'STOP RUN pauses execution; COMPLETE still available while paused or executing.',
+        'CONTINUE RUN when the agent is idle but the task is unfinished (stuck execute).',
+        'COMPLETE RUN only after review_ready — when the work unit is truly done.',
+        'STOP RUN pauses execution; RESUME continues from paused.',
         'Send more work via right dock → Command (exact commands only).',
       ],
     };
@@ -53,8 +54,8 @@ export function buildOperatorQuickGuide(input: {
       title: 'Run paused — finish or continue',
       steps: [
         'RESUME continues the run (EXECUTE phase).',
-        'COMPLETE RUN closes it — use this when you are done reviewing output.',
         'Another STOP while paused cancels the run entirely.',
+        'COMPLETE RUN is available after the run reaches review_ready.',
       ],
     };
   }

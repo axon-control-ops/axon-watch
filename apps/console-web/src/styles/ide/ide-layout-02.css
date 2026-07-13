@@ -13,6 +13,37 @@
   box-shadow: 0 0 0 1px rgba(72, 196, 255, 0.45), 0 0 18px rgba(72, 196, 255, 0.22);
 }
 
+.kairo-sidebar-panel--debug-mode {
+  border-color: rgba(167, 139, 250, 0.48) !important;
+  background:
+    linear-gradient(145deg, rgba(76, 29, 149, 0.3), rgba(12, 16, 26, 0.94)) !important;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.08),
+    0 0 18px rgba(124, 58, 237, 0.16);
+}
+
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__ring {
+  border-color: rgba(167, 139, 250, 0.42);
+}
+
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__ring--inner {
+  background: rgba(124, 58, 237, 0.14);
+}
+
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(167, 139, 250, 0.5),
+    transparent 35%
+  );
+}
+
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__state,
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__compact-label {
+  color: rgba(221, 214, 254, 0.98);
+}
+
 .briefing-surface-followup {
   display: flex;
   align-items: center;
@@ -114,6 +145,35 @@
 
 .kairo-sidebar-panel__copy {
   min-width: 0;
+}
+
+.kairo-sidebar-panel__transcript {
+  grid-column: 1 / -1;
+  max-height: 5.5rem;
+  margin-top: 0.15rem;
+  padding: 0.4rem 0.45rem;
+  overflow-y: auto;
+  border-left: 2px solid rgba(0, 242, 255, 0.38);
+  background: rgba(0, 242, 255, 0.045);
+  color: var(--text-primary);
+  font-size: 0.62rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kairo-sidebar-panel__transcript-label {
+  display: block;
+  margin-bottom: 0.18rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kairo-sidebar-panel__transcript p {
+  margin: 0;
 }
 
 .kairo-sidebar-panel__state,

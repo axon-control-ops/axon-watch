@@ -191,7 +191,7 @@ export function extractAgentReportMarkdown(content: string): string | null {
     return null;
   }
 
-  if (!/^:::(thinking|edit|terminal|tool|research)\b/m.test(trimmed)) {
+  if (!/^:::(thinking|edit|terminal|tool|research|debug-reproduce)\b/m.test(trimmed)) {
     if (shouldAutoOpenAgentReportInEditor(trimmed)) {
       return splitAgentMessageForPreview(trimmed).markdownSource;
     }
@@ -201,7 +201,7 @@ export function extractAgentReportMarkdown(content: string): string | null {
   const segments = trimmed.split(/\n(?=:::)/);
   let lastReport: string | null = null;
   for (const segment of segments) {
-    if (/^:::(thinking|edit|terminal|tool|research)\b/m.test(segment.trim())) {
+    if (/^:::(thinking|edit|terminal|tool|research|debug-reproduce)\b/m.test(segment.trim())) {
       continue;
     }
     const prose = segment.trim();

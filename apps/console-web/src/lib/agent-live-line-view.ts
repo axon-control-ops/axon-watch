@@ -141,7 +141,7 @@ export function isAgentLiveLineTruncated(fullText: string, displayText: string):
   return flattenLiveLineText(fullText).length > flattenLiveLineText(displayText).replace(/…$/, '').length;
 }
 
-/** First complete sentence block suitable for TTS — skip partial / meta fragments. */
+/** First one or two complete sentences suitable for live TTS. */
 export function firstSpeakableAgentLiveBlock(text: string): string {
   const flattened = sanitizeAgentThinkingForOperator(text);
   if (!flattened) {
@@ -153,5 +153,9 @@ export function firstSpeakableAgentLiveBlock(text: string): string {
     return '';
   }
 
-  return sentences[0]?.trim() ?? '';
+  let summary = sentences[0]?.trim() ?? '';
+  if (summary.length < 120 && sentences.length > 1) {
+    summary = `${summary} ${sentences[1].trim()}`;
+  }
+  return summary;
 }

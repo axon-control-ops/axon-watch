@@ -103,7 +103,7 @@ export function kairoPresenceModuleParts(state: KairoPresenceState): {
     case 'alerting':
       return { title: OPERATOR_PERSONA_NAME, subtitle: 'ATTENTION' };
     case 'observing':
-      return { title: OPERATOR_PERSONA_NAME, subtitle: 'LISTENING' };
+      return { title: OPERATOR_PERSONA_NAME, subtitle: 'WATCHING' };
     case 'privacy_blocked':
       return { title: OPERATOR_PERSONA_NAME, subtitle: 'MUTED' };
     default:

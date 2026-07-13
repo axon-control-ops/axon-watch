@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -117,6 +118,55 @@ class EmailSettingsApiTests(unittest.TestCase):
         accounts = response.json()["settings"]["accounts"]
         self.assertEqual(1, len(accounts))
         self.assertEqual("INBOX", accounts[0]["imap"]["folder"])
+
+    def test_vault_unlocked_reads_is_unlocked_field(self) -> None:
+        from app.routes import email_settings as email_routes
+
+        with patch.object(
+            email_routes.vault_routes,
+            "get_vault_status",
+            return_value={"vault": {"is_unlocked": True, "auto_unlock_enabled": True}},
+        ):
+            self.assertTrue(email_routes._vault_unlocked())
+
+        with patch.object(
+            email_routes.vault_routes,
+            "get_vault_status",
+            return_value={"vault": {"is_unlocked": False}},
+        ):
+            self.assertFalse(email_routes._vault_unlocked())
+
+    def test_upsert_with_passwords_while_vault_locked_still_saves_config(self) -> None:
+        from app.routes import email_settings as email_routes
+
+        with patch.object(
+            email_routes.vault_routes,
+            "get_vault_status",
+            return_value={"vault": {"is_unlocked": False}},
+        ):
+            response = self.client.post(
+                "/api/email/accounts",
+                json={
+                    "workspace_id": "workspace_dashpro",
+                    "email_address": "ops@example.com",
+                    "imap_host": "imap.example.com",
+                    "imap_port": 993,
+                    "imap_ssl": True,
+                    "imap_folder": "INBOX",
+                    "smtp_host": "smtp.example.com",
+                    "smtp_port": 465,
+                    "smtp_ssl": True,
+                    "smtp_starttls": False,
+                    "monitor_enabled": True,
+                    "poll_seconds": 60,
+                    "password_imap": "secret",
+                },
+            )
+        self.assertEqual(200, response.status_code)
+        body = response.json()
+        self.assertEqual(1, len(body["settings"]["accounts"]))
+        self.assertIn("warning", body)
+        self.assertIn("Vault", body["warning"])
 
 
 if __name__ == "__main__":

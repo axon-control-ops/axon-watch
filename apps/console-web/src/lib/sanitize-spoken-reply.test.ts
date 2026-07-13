@@ -95,4 +95,39 @@ describe('sanitizeSpokenReply', () => {
     expect(cleaned).toContain('Supabase storage');
     expect(cleaned).not.toContain(':::tool');
   });
+
+  it('strips debug-reproduce blocks so numbered steps are not spoken', () => {
+    const raw = [
+      'I instrumented the speech path.',
+      '',
+      ':::debug-reproduce',
+      '1. Keep Debug mode on.',
+      '2. Listen for numbered steps.',
+      ':::',
+    ].join('\n');
+    const cleaned = cleanAgentReplyText(raw);
+    expect(cleaned).toContain('I instrumented the speech path.');
+    expect(cleaned).not.toContain(':::debug-reproduce');
+    expect(cleaned).not.toMatch(/^\s*1\.\s+/m);
+    expect(cleaned).not.toContain('Listen for numbered steps');
+    const spoken = sanitizeSpokenReply(raw);
+    expect(spoken.toLowerCase()).not.toContain('listen for numbered steps');
+    expect(spoken).toContain('instrumented');
+  });
+
+  it('strips reproduce steps separated by blank lines inside the block', () => {
+    const raw = [
+      'Ready for reproduction.',
+      '',
+      ':::debug-reproduce',
+      '1. Keep Debug mode on.',
+      '',
+      '2. Listen for numbered steps.',
+      ':::',
+    ].join('\n');
+    const cleaned = cleanAgentReplyText(raw);
+    expect(cleaned).toContain('Ready for reproduction.');
+    expect(cleaned).not.toMatch(/^\s*2\.\s+/m);
+    expect(cleaned).not.toContain('Listen for numbered steps');
+  });
 });

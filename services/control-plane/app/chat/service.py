@@ -26,7 +26,7 @@ from app.chat.lane_b_generated_image_actions import (
     lane_b_open_file_ui_action,
     maybe_generated_image_redisplay_reply,
 )
-from app.cli_runtime.approval_gate import normalize_execution_access
+from app.cli_runtime.approval_gate import is_tool_capable_composer_mode, normalize_execution_access
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
 from app.chat.orchestration import (
     build_agent_command_reply,
@@ -118,7 +118,7 @@ def _compose_lane_b_memory_appendix(
     )
     kairo_appendix = (
         _lane_b_memory_appendix(content=content, kairo_session_id=kairo_session_id)
-        if composer_mode == "agent"
+        if is_tool_capable_composer_mode(composer_mode)
         else None
     )
     parts = [part.strip() for part in (thread_appendix, kairo_appendix) if part and str(part).strip()]
@@ -444,28 +444,28 @@ def _lane_b_system_content(
     streaming: bool = False,
 ) -> str:
     if streaming:
-        if composer_mode == "agent" and dispatch_run_id:
-            return f"Lane B (agent) — streaming runtime reply for run {dispatch_run_id}."
+        if is_tool_capable_composer_mode(composer_mode) and dispatch_run_id:
+            return f"Lane B ({composer_mode}) — streaming runtime reply for run {dispatch_run_id}."
         return f"Lane B ({composer_mode}) — generating reply…"
 
-    if composer_mode == "agent" and dispatch_run_id:
+    if is_tool_capable_composer_mode(composer_mode) and dispatch_run_id:
         if run_phase == "awaiting_approval":
             if dispatched:
                 return (
-                    f"Lane B (agent) recorded run {dispatch_run_id} at the approval boundary. "
+                    f"Lane B ({composer_mode}) recorded run {dispatch_run_id} at the approval boundary. "
                     "Consultative runtime reply only; approve the run before tool execution."
                 )
             return (
-                f"Lane B (agent) recorded run {dispatch_run_id} at the approval boundary. "
+                f"Lane B ({composer_mode}) recorded run {dispatch_run_id} at the approval boundary. "
                 "Approve the run before tool execution starts."
             )
         if dispatched:
             return (
-                f"Lane B (agent) dispatched to runtime fabric for run {dispatch_run_id} "
+                f"Lane B ({composer_mode}) dispatched to runtime fabric for run {dispatch_run_id} "
                 f"(phase {run_phase or 'executing'})."
             )
         return (
-            f"Lane B (agent) recorded run {dispatch_run_id}, but runtime dispatch fell back "
+            f"Lane B ({composer_mode}) recorded run {dispatch_run_id}, but runtime dispatch fell back "
             f"to a consultative reply (phase {run_phase or 'executing'})."
         )
     return f"Lane B ({composer_mode}) — conversational reply only; no command dispatch."
@@ -582,7 +582,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             agent_content=agent_content,
         )
 
-        if job.composer_mode == "agent" and job.dispatch_run_id:
+        if is_tool_capable_composer_mode(job.composer_mode) and job.dispatch_run_id:
             dispatched, run_record = _finalize_lane_b_agent_run(
                 dispatch_run_id=job.dispatch_run_id,
                 lane_b_result=lane_b_result,
@@ -660,7 +660,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             updated_at=updated_at,
         )
         run_record = None
-        if job.composer_mode == "agent" and job.dispatch_run_id:
+        if is_tool_capable_composer_mode(job.composer_mode) and job.dispatch_run_id:
             try:
                 run_record = fail_run(
                     job.dispatch_run_id,
@@ -804,12 +804,13 @@ def _post_lane_b_message(
     run_record = None
     agent_terminal_session = None
 
-    if composer_mode == "agent":
+    if is_tool_capable_composer_mode(composer_mode):
         run_record = resolve_lane_b_agent_run(
             workspace_id=workspace_id,
             content=content,
             linked_run_id=run_id,
             execution_access=execution_access,
+            composer_mode=composer_mode,
         )
         dispatch_run_id = str(run_record["run_id"])
         agent_terminal_session = ensure_agent_session(
@@ -933,7 +934,7 @@ def _post_lane_b_message(
     )
     lane_b_result: dict[str, object]
 
-    if composer_mode == "agent" and run_record is not None:
+    if is_tool_capable_composer_mode(composer_mode) and run_record is not None:
         lane_b_result = generate_lane_b_result(
             context=context,
             user_prompt=content,
@@ -953,7 +954,7 @@ def _post_lane_b_message(
 
     agent_content = str(lane_b_result.get("content") or "")
 
-    if composer_mode == "agent" and run_record is not None:
+    if is_tool_capable_composer_mode(composer_mode) and run_record is not None:
         dispatched, run_record = _finalize_lane_b_agent_run(
             dispatch_run_id=dispatch_run_id,
             lane_b_result=lane_b_result,

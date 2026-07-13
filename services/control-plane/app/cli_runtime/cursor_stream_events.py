@@ -26,6 +26,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Callable
 
@@ -303,6 +305,25 @@ def assistant_text_delta(accumulated: str, incoming: str) -> str:
         norm_in = _norm_stream_text(incoming)
         if norm_acc and norm_acc == norm_in:
             return ""
+        if len(accumulated) >= 200 and len(incoming) >= 200:
+            semantic_acc = re.sub(r"\W+", "", accumulated).lower()
+            semantic_in = re.sub(r"\W+", "", incoming).lower()
+            similarity = SequenceMatcher(None, semantic_acc, semantic_in).ratio()
+            hypothesis_counts_match = len(
+                re.findall(r"\bH\d+\b", accumulated)
+            ) == len(re.findall(r"\bH\d+\b", incoming))
+            reproduce_counts_match = accumulated.count(
+                ":::debug-reproduce"
+            ) == incoming.count(":::debug-reproduce")
+            if (
+                similarity >= 0.86
+                and hypothesis_counts_match
+                and reproduce_counts_match
+            ):
+                # Cursor can emit token deltas followed by a formatted aggregate
+                # of the same Debug reply. Appending that aggregate repeats the
+                # complete hypothesis/reproduce section.
+                return ""
         # Near-echo with a short prefix difference ("I " / leading apostrophe).
         if norm_in.endswith(norm_acc) and 0 < len(norm_in) - len(norm_acc) <= 4:
             return ""
@@ -409,6 +430,55 @@ class CursorStreamAssembler:
             text = _collapse_echo_text(assistant_text_from_event(event))
             if text:
                 delta = assistant_text_delta(self._assistant_accumulated, text)
+                if self._assistant_accumulated:
+                    accumulated_semantic = re.sub(
+                        r"\W+", "", self._assistant_accumulated
+                    ).lower()
+                    incoming_semantic = re.sub(r"\W+", "", text).lower()
+                    # region agent log
+                    try:
+                        debug_payload = {
+                            "sessionId": "df24bc",
+                            "runId": "axon-x-debug-mode",
+                            "hypothesisId": "D1",
+                            "location": "cursor_stream_events.py:CursorStreamAssembler.feed_line",
+                            "message": "assistant stream delta compared",
+                            "data": {
+                                "accumulatedLength": len(self._assistant_accumulated),
+                                "incomingLength": len(text),
+                                "deltaLength": len(delta),
+                                "semanticSimilarity": round(
+                                    SequenceMatcher(
+                                        None,
+                                        accumulated_semantic,
+                                        incoming_semantic,
+                                    ).ratio(),
+                                    4,
+                                ),
+                                "accumulatedHypotheses": len(
+                                    re.findall(
+                                        r"\bH\d+\b", self._assistant_accumulated
+                                    )
+                                ),
+                                "incomingHypotheses": len(
+                                    re.findall(r"\bH\d+\b", text)
+                                ),
+                                "accumulatedReproduceBlocks": self._assistant_accumulated.count(
+                                    ":::debug-reproduce"
+                                ),
+                                "incomingReproduceBlocks": text.count(
+                                    ":::debug-reproduce"
+                                ),
+                            },
+                            "timestamp": int(time.time() * 1000),
+                        }
+                        with Path(
+                            "/home/edp/axon-nvme/repos/axon-local/.cursor/debug-df24bc.log"
+                        ).open("a") as debug_log:
+                            debug_log.write(json.dumps(debug_payload) + "\n")
+                    except Exception:
+                        pass
+                    # endregion
                 if delta:
                     self._saw_assistant_text = True
                     self._assistant_accumulated += delta
@@ -475,7 +545,35 @@ class CursorStreamAssembler:
         self._close_thinking()
         self._close_open_research()
         self._close_open_terminal()
-        content = normalize_transcript_content(self.content.strip())
+        raw_content = self.content.strip()
+        content = normalize_transcript_content(raw_content)
+        # region agent log
+        try:
+            debug_payload = {
+                "sessionId": "df24bc",
+                "runId": "axon-x-debug-mode",
+                "hypothesisId": "D2",
+                "location": "cursor_stream_events.py:CursorStreamAssembler.finalize",
+                "message": "debug transcript normalized",
+                "data": {
+                    "rawLength": len(raw_content),
+                    "normalizedLength": len(content),
+                    "rawHypotheses": len(re.findall(r"\bH\d+\b", raw_content)),
+                    "normalizedHypotheses": len(re.findall(r"\bH\d+\b", content)),
+                    "rawReproduceBlocks": raw_content.count(":::debug-reproduce"),
+                    "normalizedReproduceBlocks": content.count(
+                        ":::debug-reproduce"
+                    ),
+                },
+                "timestamp": int(time.time() * 1000),
+            }
+            with Path(
+                "/home/edp/axon-nvme/repos/axon-local/.cursor/debug-df24bc.log"
+            ).open("a") as debug_log:
+                debug_log.write(json.dumps(debug_payload) + "\n")
+        except Exception:
+            pass
+        # endregion
         if not self._saw_assistant_text and self.result_text and not content:
             return normalize_transcript_content(self.result_text.strip())
         return content

@@ -110,17 +110,22 @@
 
 .brain-galaxy-stage__hud--inspector {
   left: 50%;
-  bottom: 5.75rem;
+  bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.75rem);
   transform: translateX(-50%);
-  width: min(22rem, 72%);
-  padding: 0.5rem 0.65rem;
+  width: min(28rem, 78%);
+  max-height: min(
+    42vh,
+    18rem,
+    calc(100% - var(--galaxy-top-reserve, 3.5rem) - var(--galaxy-bottom-reserve, 5.75rem) - 1.5rem)
+  );
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0.55rem 0.75rem 0.65rem;
   border-radius: 0.45rem;
   border: 1px solid rgba(0, 242, 255, 0.22);
   background: rgba(0, 8, 14, 0.78);
   backdrop-filter: blur(12px);
-  text-align: center;
-  max-height: 4.5rem;
-  overflow: hidden;
+  text-align: left;
 }
 
 .brain-galaxy-stage__hud--right {

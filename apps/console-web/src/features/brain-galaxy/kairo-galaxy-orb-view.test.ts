@@ -26,6 +26,8 @@ describe('kairo-galaxy-orb-view', () => {
     expect(galaxyOrbStateClass('alerting', false)).toContain('alerting');
     expect(galaxyOrbStateClass('observing', true)).toContain('speaking');
     expect(galaxyOrbStateClass('idle', false, 'thinking')).toContain('busy');
+    expect(galaxyOrbStateClass('observing', false, 'idle')).toContain('standby');
+    expect(galaxyOrbStateClass('observing', false, 'idle')).not.toContain('listening');
     expect(galaxyOrbModeClass(true)).toContain('hands-free');
     expect(galaxyOrbModeClass(false)).toContain('manual');
   });
@@ -37,8 +39,25 @@ describe('kairo-galaxy-orb-view', () => {
   });
 
   it('describes hands-free in orb hints', () => {
-    expect(galaxyOrbHint('observing', false, 'idle', true)).toBe('Say "VAXON" for commands');
-    expect(galaxyOrbModeLabel(true, 'idle')).toBe('');
+    expect(galaxyOrbHint('observing', false, 'idle', true)).toContain('Say "VAXON" for commands');
+    expect(galaxyOrbModeLabel(true, 'idle')).toBe('Hands-free');
+  });
+
+  it('surfaces wake-word gate feedback on the orb hint', () => {
+    expect(
+      galaxyOrbHint(
+        'observing',
+        false,
+        'idle',
+        true,
+        'Heard “hello” — say “VAXON” first',
+      ),
+    ).toBe('Heard “hello” — say “VAXON” first');
+  });
+
+  it('only labels LISTENING when a mic session is open', () => {
+    expect(galaxyOrbStatusLabel('idle', false, false)).toBe('READY');
+    expect(galaxyOrbStatusLabel('listening', false, true)).toBe('LISTENING');
   });
 
   it('shortens model labels', () => {

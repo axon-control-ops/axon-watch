@@ -123,6 +123,8 @@ class OperatorPresenceSettingsRequest(BaseModel):
     kairo_narration: str | None = None
     ide_voice_strip_enabled: bool | None = None
     hands_free_enabled: bool | None = None
+    speech_rate: float | None = None
+    speech_pitch: float | None = None
 
 
 class KairoSpeakRequest(BaseModel):
@@ -148,6 +150,17 @@ class KairoConverseRequest(BaseModel):
 class KairoTtsRequest(BaseModel):
     text: str
     voice: str | None = None
+    rate: float | None = None
+    pitch: float | None = None
+
+
+class DebugSessionLogRequest(BaseModel):
+    hypothesisId: str
+    location: str
+    message: str
+    data: dict[str, Any] = {}
+    timestamp: float | int | None = None
+    workspace_id: str = ""
 
 
 class OperatorMemoryCreateRequest(BaseModel):

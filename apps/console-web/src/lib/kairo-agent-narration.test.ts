@@ -36,7 +36,7 @@ describe('resolveStreamingActivity', () => {
     expect(view.label.endsWith('…')).toBe(true);
     expect(view.liveBodyFull).toBe(LONG_THINKING_BODY);
     expect(view.liveBodySpoken).toBe(
-      "I'm starting to analyze the rendering issues the user wants fixed.",
+      "I'm starting to analyze the rendering issues the user wants fixed. They want table rendering to work in markdown previews.",
     );
     expect(view.liveBodyTruncated).toBe(true);
   });
@@ -84,5 +84,22 @@ describe('narrationForCompletion', () => {
     const failure =
       "Lane B (agent) cannot start because no CLI runtime is ready: ActionRequiredError: You're out of usage.";
     expect(narrationForCompletion(failure)).toEqual({ key: 'failed', message: 'Failed' });
+  });
+
+  it('uses a short waiting line when the reply ends with a reproduce pause', () => {
+    const content = [
+      'Root cause looks like speech cleanup.',
+      '',
+      ':::debug-reproduce',
+      '1. Keep Debug mode on.',
+      '2. Note what voice says.',
+      ':::',
+    ].join('\n');
+    expect(narrationForCompletion(content)).toEqual({
+      key: 'done',
+      message: 'Waiting for you to reproduce the bug.',
+      verbatim: true,
+    });
+    expect(spokenCompletionSummary(content)).not.toContain('Keep Debug mode on');
   });
 });

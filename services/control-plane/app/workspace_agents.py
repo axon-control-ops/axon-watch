@@ -150,14 +150,78 @@ def _default_agent_name(display_name: str, *, name_template: str) -> str:
 
 
 def _derive_agent_status(workspace_id: str) -> str:
-    active_statuses = {"running", "paused", "review_ready"}
-    runs = [
+    active_statuses = {
+        "running",
+        "waiting",
+        "blocked",
+        "review",
+        # Legacy values retained for older persisted runs.
+        "paused",
+        "review_ready",
+    }
+    workspace_runs = [
         run
         for run in list_runs()
         if str(run.get("workspace_id", "")).strip() == workspace_id.strip()
-        and str(run.get("status", "")).strip() in active_statuses
+        and not run.get("ended_at")
     ]
+    runs = [
+        run
+        for run in workspace_runs
+        if str(run.get("status", "")).strip() in active_statuses
+    ]
+    # #region agent log
+    try:
+        from app.debug_session_log import append_debug_session_log
+
+        excluded = [
+            {
+                "run_id": run.get("run_id"),
+                "status": run.get("status"),
+                "phase": run.get("phase"),
+                "in_active_filter": str(run.get("status", "")).strip() in active_statuses,
+            }
+            for run in workspace_runs
+        ]
+        append_debug_session_log(
+            hypothesis_id="EA1",
+            location="workspace_agents.py:_derive_agent_status",
+            message="employee agent status derivation",
+            data={
+                "workspace_id": workspace_id,
+                "active_status_filter": sorted(active_statuses),
+                "open_run_count": len(workspace_runs),
+                "matched_run_count": len(runs),
+                "open_runs": excluded[:8],
+                "filter_excludes_review_status": any(
+                    str(item.get("status") or "") == "review"
+                    and not item.get("in_active_filter")
+                    for item in excluded
+                ),
+            },
+        )
+    except Exception:
+        pass
+    # #endregion
     if not runs:
+        # #region agent log
+        try:
+            from app.debug_session_log import append_debug_session_log
+
+            append_debug_session_log(
+                hypothesis_id="EA1",
+                location="workspace_agents.py:_derive_agent_status:idle",
+                message="employee agent marked idle — no runs matched active status filter",
+                data={
+                    "workspace_id": workspace_id,
+                    "open_run_count": len(workspace_runs),
+                    "open_run_statuses": [str(run.get("status") or "") for run in workspace_runs[:8]],
+                    "open_run_phases": [str(run.get("phase") or "") for run in workspace_runs[:8]],
+                },
+            )
+        except Exception:
+            pass
+        # #endregion
         return "idle"
 
     runs.sort(key=lambda run: str(run.get("updated_at") or run.get("started_at") or ""), reverse=True)
@@ -166,16 +230,39 @@ def _derive_agent_status(workspace_id: str) -> str:
     status = str(primary.get("status", "")).strip()
 
     if phase == "awaiting_approval":
-        return "waiting_approval"
-    if phase == "planning" or str(primary.get("mode", "")).strip() == "plan":
-        return "planning"
-    if status == "review_ready" or phase == "review_ready":
-        return "verifying"
-    if status == "blocked" or phase in {"paused", "awaiting_input"}:
-        return "blocked"
-    if phase == "executing" or status == "running":
-        return "executing"
-    return "watching"
+        derived = "waiting_approval"
+    elif phase == "planning" or str(primary.get("mode", "")).strip() == "plan":
+        derived = "planning"
+    elif status in {"review", "review_ready"} or phase == "review_ready":
+        derived = "verifying"
+    elif status == "blocked" or phase in {"paused", "awaiting_input"}:
+        derived = "blocked"
+    elif phase == "executing" or status == "running":
+        derived = "executing"
+    else:
+        derived = "watching"
+    # #region agent log
+    try:
+        from app.debug_session_log import append_debug_session_log
+
+        append_debug_session_log(
+            hypothesis_id="EA2",
+            location="workspace_agents.py:_derive_agent_status:mapped",
+            message="employee agent status mapped from primary run",
+            data={
+                "workspace_id": workspace_id,
+                "derived": derived,
+                "primary_run_id": primary.get("run_id"),
+                "primary_status": status,
+                "primary_phase": phase,
+                "status_equals_review_ready_literal": status == "review_ready",
+                "status_equals_review": status == "review",
+            },
+        )
+    except Exception:
+        pass
+    # #endregion
+    return derived
 
 
 def build_workspace_agent_record(

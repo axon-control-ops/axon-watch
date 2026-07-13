@@ -16,6 +16,7 @@ import {
 } from '../lib/briefing-panel-view';
 import { OPERATOR_PERSONA_NAME } from '../lib/operator-persona-name';
 import { buildPersonaVoiceLineFallback } from '../lib/persona-voice-line';
+import { useShellStore } from '../stores/shell';
 import BriefingOpenLoopsStrip from './BriefingOpenLoopsStrip.vue';
 
 const props = defineProps<{
@@ -32,8 +33,14 @@ const emit = defineEmits<{
   openChat: [];
 }>();
 
+const shell = useShellStore();
+
 const headline = computed(() => briefingPanelHeadline(props.briefing, props.loadState));
-const heroNotice = computed(() => briefingNotice(props.briefing, props.loadState));
+const heroNotice = computed(() =>
+  briefingNotice(props.briefing, props.loadState, {
+    primaryActiveRun: shell.primaryActiveRun,
+  }),
+);
 const heroAdvise = computed(() => briefingAdvise(props.briefing, props.loadState));
 const heroDecide = computed(() => briefingRhythmField(props.briefing, 'decide', props.loadState));
 const heroExecute = computed(() => briefingRhythmField(props.briefing, 'execute', props.loadState));

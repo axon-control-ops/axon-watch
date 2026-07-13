@@ -56,7 +56,8 @@ def _vault_unlocked() -> bool:
         status = vault_routes.get_vault_status()
         vault = status.get("vault") if isinstance(status, dict) else None
         if isinstance(vault, dict):
-            return bool(vault.get("unlocked"))
+            # Watch vault snapshot uses is_unlocked; keep unlocked as a fallback alias.
+            return bool(vault.get("is_unlocked") or vault.get("unlocked"))
     except Exception:  # noqa: BLE001
         return False
     return False
@@ -152,9 +153,17 @@ def email_accounts_upsert(body: EmailAccountUpsertRequest) -> dict[str, Any]:
 
     imap_ref = ""
     smtp_ref = ""
-    if body.password_imap.strip():
-        if not _vault_unlocked():
-            raise HTTPException(status_code=409, detail="Unlock the vault before saving mailbox passwords.")
+    password_warning: str | None = None
+    wants_passwords = bool(body.password_imap.strip() or body.password_smtp.strip())
+    vault_ready = _vault_unlocked()
+
+    if wants_passwords and not vault_ready:
+        # Save hosts/config anyway so the mailbox appears; passwords can be added after unlock.
+        password_warning = (
+            "Mailbox saved without passwords. Unlock Axon-X Vault (top bar → VAULT), "
+            "then edit this mailbox and save passwords."
+        )
+    elif body.password_imap.strip():
         try:
             imap_ref = _upsert_vault_password(
                 name=email_settings_store.vault_secret_name(
@@ -167,10 +176,10 @@ def email_accounts_upsert(body: EmailAccountUpsertRequest) -> dict[str, Any]:
         except RuntimeError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    smtp_password = body.password_smtp.strip() or body.password_imap.strip()
-    if smtp_password:
-        if not _vault_unlocked():
-            raise HTTPException(status_code=409, detail="Unlock the vault before saving mailbox passwords.")
+    smtp_password = body.password_smtp.strip() or (
+        body.password_imap.strip() if vault_ready else ""
+    )
+    if smtp_password and vault_ready:
         try:
             smtp_ref = _upsert_vault_password(
                 name=email_settings_store.vault_secret_name(
@@ -216,6 +225,8 @@ def email_accounts_upsert(body: EmailAccountUpsertRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     payload = _status_payload(result["settings"])
     payload["account"] = result.get("account")
+    if password_warning:
+        payload["warning"] = password_warning
     return payload
 
 

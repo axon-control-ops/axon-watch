@@ -30,6 +30,14 @@ describe('operator persona STT aliases', () => {
     expect(normalized.toLowerCase()).toContain(OPERATOR_PERSONA_NAME.toLowerCase());
   });
 
+  it.each(['vaccine', 'ericsson', 'eric son', 'erickson'])(
+    'maps operator-reported mishear %s to VAXON',
+    (phrase) => {
+      const normalized = normalizePersonaSttAliases(`${phrase} what signals need attention`);
+      expect(normalized.toLowerCase()).toContain(OPERATOR_PERSONA_NAME.toLowerCase());
+    },
+  );
+
   it('does not rewrite unrelated words', () => {
     expect(normalizePersonaSttAliases('vision check health')).toBe('vision check health');
     expect(normalizePersonaSttAliases('vector status')).toBe('vector status');

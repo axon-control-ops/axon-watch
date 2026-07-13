@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,12 +12,22 @@ from app.cli_runtime.routes import get_runtime_mcp_tools, get_runtime_status
 from app.config import _cors_origins
 from app.data.routes import get_data_export, get_data_snapshot
 from app.routes import register_routes
+from app.routes.health import _BOOT_ID
+from app.runs.service import reconcile_orphaned_runs_on_startup
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    reconcile_orphaned_runs_on_startup(boot_id=_BOOT_ID)
+    yield
+
 
 app = FastAPI(
     title="Axon-X Control Plane",
     version="0.1.0",
     docs_url=None,
     redoc_url=None,
+    lifespan=_lifespan,
 )
 
 app.add_middleware(

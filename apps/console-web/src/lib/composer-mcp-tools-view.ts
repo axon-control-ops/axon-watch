@@ -10,7 +10,7 @@ export type ComposerMcpToolsSnapshot = {
   items: ComposerMcpTool[];
 };
 
-export type IdeComposerMode = 'ask' | 'plan' | 'agent';
+export type IdeComposerMode = 'ask' | 'plan' | 'agent' | 'debug';
 
 export function filterMcpToolsForComposerMode(
   snapshot: ComposerMcpToolsSnapshot | null,

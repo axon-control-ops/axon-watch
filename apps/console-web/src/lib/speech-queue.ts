@@ -9,7 +9,13 @@ export type SpeechPort = Pick<SpeechSynthesis, 'speak' | 'getVoices'> & {
   addEventListener?: SpeechSynthesis['addEventListener'];
 };
 
-let queue: string[] = [];
+type QueuedUtterance = {
+  text: string;
+  rate: number;
+  pitch: number;
+};
+
+let queue: QueuedUtterance[] = [];
 let speaking = false;
 let voicesReady = false;
 let cachedVoice: SpeechSynthesisVoice | null = null;
@@ -108,12 +114,11 @@ function drainQueue(speech: SpeechPort): void {
   }
 
   notifySpeaking(true);
-  const text = queue.shift() ?? '';
-  const utterance = new SpeechSynthesisUtterance(text);
+  const next = queue.shift() ?? { text: '', rate: 1.0, pitch: 1.04 };
+  const utterance = new SpeechSynthesisUtterance(next.text);
   const epoch = queueEpoch;
-  // Keep browser fallback at natural defaults — slowed/lowered pitch sounded robotic.
-  utterance.rate = 1;
-  utterance.pitch = 1;
+  utterance.rate = next.rate;
+  utterance.pitch = next.pitch;
   utterance.volume = 1;
   const voice = pickJarvisVoice(speech);
   if (voice) {
@@ -147,13 +152,21 @@ function drainQueue(speech: SpeechPort): void {
   }, SPEECH_START_DELAY_MS);
 }
 
-export function enqueueSpeech(message: string, speech: SpeechPort | null): void {
+export function enqueueSpeech(
+  message: string,
+  speech: SpeechPort | null,
+  options: { rate?: number; pitch?: number } = {},
+): void {
   const trimmed = message.trim();
   if (!trimmed || !speech) {
     return;
   }
   warmSpeechIfNeeded(speech);
-  queue.push(trimmed);
+  queue.push({
+    text: trimmed,
+    rate: options.rate ?? 1.0,
+    pitch: options.pitch ?? 1.04,
+  });
   drainQueue(speech);
 }
 

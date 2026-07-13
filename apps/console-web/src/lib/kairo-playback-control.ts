@@ -46,6 +46,9 @@ export function pauseKairoPlayback(): boolean {
 
 export function resumeKairoPlayback(): boolean {
   const speech = speechPort();
+  // #region agent log
+  fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:'kairo-playback-control',hypothesisId:'R7',location:'kairo-playback-control.ts:resumeKairoPlayback',message:'playback resume requested',data:{paused,hasAudio:Boolean(currentAudio),audioPaused:currentAudio?.paused??null,audioEnded:currentAudio?.ended??null,audioCurrentTime:currentAudio?.currentTime??null,speechPaused:speech?.paused??null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (paused && speech && 'resume' in speech && typeof speech.resume === 'function' && speech.paused) {
     speech.resume();
     paused = false;

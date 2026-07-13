@@ -217,6 +217,39 @@
   background: rgba(0, 210, 255, 0.7);
 }
 
+.agent-block--debug-reproduce {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(167, 139, 250, 0.36);
+  border-radius: 0.4rem;
+  background: rgba(46, 16, 101, 0.5);
+}
+
+.agent-block__debug-reproduce-title {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: rgba(196, 181, 253, 0.98);
+}
+
+.agent-block__debug-reproduce-steps {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: rgba(237, 233, 254, 0.92);
+}
+
+.agent-block__debug-reproduce-hint {
+  margin: 0;
+  font-size: 0.56rem;
+  color: rgba(196, 181, 253, 0.82);
+}
+
 .agent-block--file-read {
   display: inline-flex;
   align-items: center;

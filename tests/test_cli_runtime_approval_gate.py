@@ -13,6 +13,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.approval_gate import (  # noqa: E402
     agent_tool_execution_enabled,
+    is_tool_capable_composer_mode,
     lane_b_agent_requires_approval,
     resolve_runtime_execution_tier,
     runtime_dispatch_blocked_reason,
@@ -82,6 +83,27 @@ class ApprovalGateTests(unittest.TestCase):
         command = mock_communicate.call_args.kwargs["command"]
         # Cursor CLI rejects --mode agent; executing tier omits the flag.
         self.assertNotIn("--mode", command)
+
+    def test_debug_mode_is_tool_capable_like_agent(self) -> None:
+        self.assertTrue(is_tool_capable_composer_mode("debug"))
+        self.assertTrue(is_tool_capable_composer_mode("agent"))
+        self.assertFalse(is_tool_capable_composer_mode("ask"))
+        self.assertEqual(
+            "executing",
+            resolve_runtime_execution_tier(
+                composer_mode="debug",
+                run_phase="executing",
+                execution_access="full",
+            ),
+        )
+        self.assertEqual(
+            "consultative",
+            resolve_runtime_execution_tier(
+                composer_mode="debug",
+                run_phase="executing",
+                execution_access="consultative",
+            ),
+        )
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ const emit = defineEmits<{
             type="checkbox"
             @change="emit('update:checked', ($event.target as HTMLInputElement).checked)"
           >
-          <span>I understand and consent to Full Access for Agent turns in this workspace.</span>
+          <span>I understand and consent to Full Access for Agent and Debug turns in this workspace.</span>
         </label>
         <div class="agent-dock-full-access-consent__actions">
           <button
