@@ -15,8 +15,8 @@ import {
 } from '../../lib/operator-workspace-catalog';
 import {
   workspaceIconKind,
-  workspaceStatusLine,
-} from '../../lib/mockup-shell-view';
+} from '../../lib/mockup-workspace-icons';
+import { workspaceStatusLine } from '../../lib/mockup-shell-view';
 import {
   clampSidebarWidth,
   readStoredSidebarWidth,

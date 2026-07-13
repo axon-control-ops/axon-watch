@@ -39,6 +39,11 @@ from app.workspace_files import (
     rename_workspace_file,
     write_workspace_file,
 )
+from app.workspace_agents import (
+    WorkspaceAgentError,
+    get_workspace_agent_record,
+    list_workspace_agent_records,
+)
 from app.workspace_handoffs import (
     WorkspaceHandoffError,
     create_workspace_handoff,
@@ -76,6 +81,22 @@ def workspaces_show(workspace_id: str) -> dict[str, str]:
         return get_workspace_record(workspace_id)
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/api/agents")
+def agents_index(scope: str = "") -> dict[str, Any]:
+    operator_surface = scope.strip().lower() == "operator"
+    items = list_workspace_agent_records(operator_surface=operator_surface)
+    return {"items": items, "count": len(items), "scope": "operator" if operator_surface else "all"}
+
+
+@router.get("/api/workspaces/{workspace_id}/agent")
+def workspace_agent_show(workspace_id: str) -> dict[str, object]:
+    try:
+        return get_workspace_agent_record(workspace_id)
+    except WorkspaceAgentError as exc:
+        status_code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 @router.post("/api/workspaces/{workspace_id}/handoffs")

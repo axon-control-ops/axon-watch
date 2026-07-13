@@ -304,6 +304,43 @@ Manual smoke (5 min):
 
 ## Append log
 
+### 2026-07-13 — C9 / C10 / M3-M6 landed
+
+- `build_conversation_context_pack()` now carries the latest operator-thread chat
+  tail and honors `refresh=true` to bypass the 10-second pack cache when needed.
+- Template follow-ups can reuse that recent thread context, so short callbacks can
+  reference the prior workspace topic without restating it.
+- IDE agent dispatch now receives a compact KAIRO memory appendix on continuation
+  and signal-handoff prompts, capped for prompt safety.
+- `/api/kairo/speak` writes every spoken line into the shared voice log, and
+  dedup now reads the last session-scoped spoken lines across converse, briefing,
+  and agent events.
+- Gates: `tests.test_kairo_conversation`, `tests.test_kairo_voice`,
+  `tests.test_control_plane_chat`, `tests.test_kairo_turn_memory`,
+  `tests.test_voice_transcript_store`, `tests.test_lane_b_context_tokens`,
+  and console-web conversation/session vitest checks.
+
+### 2026-07-13 — C8 / M1+M2 landed
+
+- `buildKairoSpeechSessionId()` binds voice/conversation to active workspace +
+  chat thread (`kairo:workspace:thread`); shell store owns `kairoSpeechSessionId()`.
+- Converse, speak, agent milestone, and progress narrators pass the same session id.
+- SQLite `kairo_session_memory` persists turn + entity memory with write-through
+  hydration; follow-up handoff survives simulated control-plane restart.
+- Gates: `test_followup_memory_survives_simulated_restart`,
+  `test_persisted_turns_reload_after_cache_clear`, M1 session-key contract tests,
+  `kairo-speech-session.test.ts`.
+- **Next:** C11 optional depth work (V2, V3, V7, V8); C12 remains deferred.
+
+### 2026-07-13 — C7 / V1+V4+V6 landed
+
+- Settings copy already documents honest Minimal vs Conversational behavior (V1).
+- Agent bookends route through `/api/kairo/speak` in both modes; minimal uses
+  template/fallback (`use_runtime: false`) for persona tone without model latency (V4).
+- `agentMilestoneFallbackLine` mirrors backend fallbacks when speak times out or
+  fails; agent `onError` now passes a capped error summary to the failed bookend (V6).
+- **Next:** C8 (M1+M2) session identity + SQLite-backed memory — **landed same day**.
+
 ### 2026-07-11 — C6 / V5+V9 landed
 
 - Client policy: single bookend gate for minimal + conversational; live thinking

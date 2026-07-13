@@ -4,6 +4,7 @@ import {
   buildAgentTerminalMirrorText,
   findAgentTerminalMirrorSegment,
 } from '../lib/agent-terminal-mirror';
+import { agentShellMirrorForcedText } from '../lib/agent-shell-mirror-state';
 
 export type AgentTerminalMirrorHost = {
   writeMirrorSnapshot: (text: string) => void;
@@ -20,14 +21,22 @@ export function useAgentTerminalMirror(input: {
   getHost: (sessionId: string) => AgentTerminalMirrorHost | null | undefined;
   clearMirror: () => void;
   streamActive: Ref<boolean>;
+  forcedText?: Ref<string | null>;
 }): { syncNow: () => void } {
   let lastSnapshot = '';
+  let syncFrame: number | null = null;
+  const forcedText = input.forcedText ?? agentShellMirrorForcedText;
 
-  function exitHostMirror(sessionId: string | null): void {
-    if (!sessionId) {
-      return;
+  function resolveSnapshot(): string | null {
+    const forced = forcedText.value?.trim();
+    if (forced) {
+      return forced.endsWith('\n') ? forced : `${forced}\n`;
     }
-    input.getHost(sessionId)?.exitMirrorMode?.();
+    const segment = findAgentTerminalMirrorSegment(input.getTranscriptContent());
+    if (!segment) {
+      return null;
+    }
+    return buildAgentTerminalMirrorText(segment);
   }
 
   function syncNow(): void {
@@ -38,11 +47,10 @@ export function useAgentTerminalMirror(input: {
     if (!sessionId) {
       return;
     }
-    const segment = findAgentTerminalMirrorSegment(input.getTranscriptContent());
-    if (!segment) {
+    const snapshot = resolveSnapshot();
+    if (!snapshot) {
       return;
     }
-    const snapshot = buildAgentTerminalMirrorText(segment);
     if (snapshot === lastSnapshot) {
       return;
     }
@@ -54,35 +62,56 @@ export function useAgentTerminalMirror(input: {
     host.writeMirrorSnapshot(snapshot);
   }
 
+  function scheduleSync(): void {
+    if (syncFrame !== null) {
+      return;
+    }
+    const schedule =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (cb: FrameRequestCallback) => globalThis.setTimeout(cb, 16) as unknown as number;
+    syncFrame = schedule(() => {
+      syncFrame = null;
+      syncNow();
+    });
+  }
+
   watch(
     () => {
-      // Do not subscribe to transcript content unless Background is armed.
+      // Forced snapshots are stable — do not re-read the growing transcript every delta.
       if (!input.mirrorActive.value) {
         return {
           active: false as const,
           sessionId: input.agentSessionId.value,
           contentLen: -1,
+          forced: forcedText.value,
+        };
+      }
+      if (forcedText.value) {
+        return {
+          active: true as const,
+          sessionId: input.agentSessionId.value,
+          contentLen: -1,
+          forced: forcedText.value,
         };
       }
       const content = input.getTranscriptContent();
       return {
         active: true as const,
         sessionId: input.agentSessionId.value,
-        // Length + tail notices stream growth without cloning the full transcript
-        // into the dependency object on every tick.
         contentLen: content.length,
         contentTail: content.slice(-240),
+        forced: null as string | null,
       };
     },
-    (next, prev) => {
+    (next) => {
       if (!next.active) {
-        if (prev && 'active' in prev && prev.active) {
-          exitHostMirror(next.sessionId ?? prev.sessionId ?? null);
-        }
+        // Keep the last mirrored shell on screen. Exiting mirror mode reconnects an
+        // empty agent PTY and is what made the bottom panel look blank.
         lastSnapshot = '';
         return;
       }
-      syncNow();
+      scheduleSync();
     },
     { flush: 'post' },
   );
@@ -93,13 +122,11 @@ export function useAgentTerminalMirror(input: {
       if (!wasStreaming || streaming) {
         return;
       }
+      // Final paint, then stop watching further deltas — but leave the snapshot visible.
       if (input.mirrorActive.value) {
         syncNow();
       }
-      const sessionId = input.agentSessionId.value;
       input.clearMirror();
-      exitHostMirror(sessionId);
-      lastSnapshot = '';
     },
   );
 

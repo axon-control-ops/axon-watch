@@ -19,7 +19,6 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const speaking = ref(false);
 const voiceLog = ref<KairoVoiceLogEntry[]>([]);
-let pollTimer: number | null = null;
 let unsubscribeSpeaking: (() => void) | null = null;
 const showDevVoiceDiagnostics = import.meta.env.DEV;
 
@@ -73,14 +72,10 @@ onMounted(() => {
   unsubscribeSpeaking = subscribeKairoVoiceSpeaking((active) => {
     speaking.value = active;
   });
-  pollTimer = window.setInterval(refreshSpeakingState, 300);
   void refreshVoiceLog();
 });
 
 onBeforeUnmount(() => {
-  if (pollTimer !== null) {
-    window.clearInterval(pollTimer);
-  }
   unsubscribeSpeaking?.();
 });
 </script>

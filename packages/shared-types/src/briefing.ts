@@ -45,6 +45,17 @@ export interface OperatorBriefingScope {
   workspace_id?: string;
 }
 
+export interface OperatorBriefingMemoryHighlight {
+  memory_id: string;
+  workspace_id: string;
+  kind: string;
+  title: string;
+  content: string;
+  source_refs: Array<Record<string, unknown>>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OperatorBriefing {
   generated_at: string;
   scope?: OperatorBriefingScope;
@@ -57,5 +68,6 @@ export interface OperatorBriefing {
   next_safe_actions: BriefingAction[];
   degraded: RuntimeSummaryDegradedState;
   connectivity: OperatorBriefingConnectivity;
+  memory_highlights?: OperatorBriefingMemoryHighlight[];
   operator_presence?: OperatorPresence;
 }

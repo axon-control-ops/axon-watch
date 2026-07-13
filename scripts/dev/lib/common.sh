@@ -33,6 +33,11 @@ load_env() {
   : "${AXON_WATCH_CONTROL_PLANE_PORT:=8787}"
   : "${AXON_WATCH_WATCH_SERVICE_PORT:=8788}"
   : "${AXON_WATCH_STATE_DIR:=./.local/state}"
+  # Always pin an absolute control-plane DB path so service cwd cannot create/wipe a second store.
+  if [[ "${AXON_WATCH_STATE_DIR}" != /* ]]; then
+    AXON_WATCH_STATE_DIR="${repo_root}/${AXON_WATCH_STATE_DIR#./}"
+  fi
+  : "${AXON_WATCH_CONTROL_PLANE_DB:=${AXON_WATCH_STATE_DIR}/control-plane.sqlite3}"
   : "${AXON_WATCH_PUBLIC_BASE_URL:=http://127.0.0.1:${AXON_WATCH_CONSOLE_WEB_PORT}}"
   : "${AXON_WATCH_CONTROL_PLANE_BASE_URL:=http://127.0.0.1:${AXON_WATCH_CONTROL_PLANE_PORT}}"
   : "${AXON_WATCH_WATCH_SERVICE_BASE_URL:=http://127.0.0.1:${AXON_WATCH_WATCH_SERVICE_PORT}}"
@@ -42,6 +47,7 @@ load_env() {
   export AXON_WATCH_CONTROL_PLANE_PORT
   export AXON_WATCH_WATCH_SERVICE_PORT
   export AXON_WATCH_STATE_DIR
+  export AXON_WATCH_CONTROL_PLANE_DB
   export AXON_WATCH_PUBLIC_BASE_URL
   export AXON_WATCH_CONTROL_PLANE_BASE_URL
   export AXON_WATCH_WATCH_SERVICE_BASE_URL

@@ -47,6 +47,7 @@ export interface PostChatMessageRequest {
   runtime_target?: string | null;
   runtime_model?: string | null;
   execution_access?: 'consultative' | 'full' | string | null;
+  kairo_session_id?: string | null;
 }
 
 export interface PostChatMessageResponse {

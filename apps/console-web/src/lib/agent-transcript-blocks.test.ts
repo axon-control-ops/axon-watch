@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentContentHasTranscriptBlocks,
+  collapseClosedEditSegmentsForDisplay,
   diffLineTone,
   editedFilePathsFromTranscript,
   normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
+  prepareAgentTranscriptSegmentsForDisplay,
   thinkingPreview,
 } from './agent-transcript-blocks';
 
@@ -268,5 +270,49 @@ describe('normalizeEditedFilePath', () => {
     expect(
       normalizeEditedFilePath('/home/edp/.cursor/projects/foo/README.md'),
     ).toBe('README.md');
+  });
+});
+
+describe('collapseClosedEditSegmentsForDisplay', () => {
+  it('collapses large closed-edit fan-out into a single summary chip', () => {
+    const segments = Array.from({ length: 20 }, (_, index) => ({
+      kind: 'edit' as const,
+      path: `file-${index}.ts`,
+      added: 1,
+      removed: 0,
+      diff: `+line ${index}`,
+      open: false,
+    }));
+    segments.push({
+      kind: 'edit',
+      path: 'still-open.ts',
+      added: 1,
+      removed: 0,
+      diff: '+live',
+      open: true,
+    });
+
+    const collapsed = collapseClosedEditSegmentsForDisplay(segments, 8);
+    expect(collapsed).toEqual([
+      { kind: 'tool', label: 'Updated 20 files' },
+      {
+        kind: 'edit',
+        path: 'still-open.ts',
+        added: 1,
+        removed: 0,
+        diff: '+live',
+        open: true,
+      },
+    ]);
+  });
+
+  it('is used by the conversation display helper', () => {
+    const content = Array.from({ length: 12 }, (_, index) =>
+      [`:::edit file-${index}.ts +1 -0`, `+x`, `:::`].join('\n'),
+    ).join('\n');
+    const segments = prepareAgentTranscriptSegmentsForDisplay(content, {
+      collapseClosedEditsAt: 8,
+    });
+    expect(segments).toEqual([{ kind: 'tool', label: 'Updated 12 files' }]);
   });
 });

@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
+import OperatorEvidencePanel from '../../features/operator-evidence/OperatorEvidencePanel.vue';
 import {
   isKairoConversationBusy,
 } from '../../features/kairo-conversation/kairo-conversation-state';
@@ -75,16 +76,6 @@ function handleNodeClick(node: {
     signalId: node.kind === 'signal' ? node.node_id.replace(/^sig_/, '') : null,
     label: node.label ?? node.node_id,
   });
-  if (node.kind === 'workspace') {
-    const nav = resolveGalaxyWorkspaceNavigation(node.workspace_id);
-    if (nav) {
-      enterWorkspace(nav.workspaceId, node.node_id, node.label ?? node.node_id);
-    }
-    return;
-  }
-  if (node.kind === 'signal') {
-    shell.focusAttentionSidebar(node.node_id.replace(/^sig_/, ''));
-  }
 }
 
 const { webglReady, webglFailed, selectedNode, resetView, focusNode } = useBrainGalaxy({
@@ -103,14 +94,23 @@ function handleHubClick(hub: {
   workspace_id: string | null;
   label: string;
 }): void {
-  const nav = resolveGalaxyWorkspaceNavigation(hub.workspace_id);
+  focusNode(hub.node_id);
+}
+
+function handleEvidenceWorkspace(workspaceId: string): void {
+  const nav = resolveGalaxyWorkspaceNavigation(workspaceId);
   if (!nav) {
-    focusNode(hub.node_id);
     return;
   }
-  // Brief camera cue, then leave galaxy for the workspace IDE.
-  focusNode(hub.node_id);
-  enterWorkspace(nav.workspaceId, hub.node_id, hub.label);
+  const label =
+    selectedNode.value?.label ??
+    topHubs.value.find((hub) => hub.workspace_id === workspaceId)?.label ??
+    workspaceId;
+  enterWorkspace(nav.workspaceId, `ws_${workspaceId}`, label);
+}
+
+function handleEvidenceSignal(signalId: string): void {
+  shell.focusAttentionSidebar(signalId);
 }
 </script>
 
@@ -221,14 +221,14 @@ function handleHubClick(hub: {
       </ul>
     </aside>
 
-    <aside
-      v-if="selectedNode"
-      class="brain-galaxy-stage__hud brain-galaxy-stage__hud--inspector"
-    >
-      <p class="brain-galaxy-stage__inspector-title">{{ inspector.title }}</p>
-      <p class="brain-galaxy-stage__inspector-body">{{ inspector.body }}</p>
-      <p class="brain-galaxy-stage__inspector-hint">{{ inspector.hint }}</p>
-    </aside>
+    <OperatorEvidencePanel
+      :node-id="selectedNode?.node_id ?? null"
+      :fallback-title="inspector.title"
+      :fallback-body="inspector.body"
+      :fallback-hint="inspector.hint"
+      @open-workspace="handleEvidenceWorkspace"
+      @open-signal="handleEvidenceSignal"
+    />
 
     <aside class="brain-galaxy-stage__hud brain-galaxy-stage__hud--right">
       <button

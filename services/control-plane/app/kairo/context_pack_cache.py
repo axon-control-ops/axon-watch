@@ -21,12 +21,13 @@ def get_cached_context_pack(
     *,
     now: Callable[[], float] | None = None,
     ttl_seconds: float = _PACK_TTL_SECONDS,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Return a cached pack when still within TTL; otherwise rebuild and store."""
     clock = now or time.monotonic
     key = _cache_key(workspace_id)
     cached = _PACK_CACHE.get(key)
-    if cached is not None:
+    if cached is not None and not force_refresh:
         pack, stored_at = cached
         if clock() - stored_at < ttl_seconds:
             return pack

@@ -5,12 +5,12 @@ import {
   voiceCockpitPresenceState,
   voiceCockpitStatusLine,
 } from '../../features/voice-deck/voice-cockpit-presence';
-import { isSpeechQueueSpeaking } from '../../lib/speech-queue';
+import { isKairoVoiceSpeaking, subscribeKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const speaking = ref(false);
-let pollTimer: number | null = null;
+let unsubscribeSpeaking: (() => void) | null = null;
 
 const visible = computed(() => shell.mobileCompactLayout && shell.briefingLoadState === 'loaded');
 
@@ -21,18 +21,18 @@ const statusLine = computed(() => voiceCockpitStatusLine(presence.value));
 const presenceState = computed(() => voiceCockpitPresenceState(presence.value));
 
 function refreshSpeakingState(): void {
-  speaking.value = isSpeechQueueSpeaking();
+  speaking.value = isKairoVoiceSpeaking();
 }
 
 onMounted(() => {
   refreshSpeakingState();
-  pollTimer = window.setInterval(refreshSpeakingState, 300);
+  unsubscribeSpeaking = subscribeKairoVoiceSpeaking((active) => {
+    speaking.value = active;
+  });
 });
 
 onBeforeUnmount(() => {
-  if (pollTimer !== null) {
-    window.clearInterval(pollTimer);
-  }
+  unsubscribeSpeaking?.();
 });
 </script>
 

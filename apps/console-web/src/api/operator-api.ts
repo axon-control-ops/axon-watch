@@ -30,6 +30,41 @@ export interface OperatorPresenceSettingsSnapshot {
   updated_at?: string;
 }
 
+export interface OperatorEvidenceRecord {
+  node_id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  facts: Array<{ label: string; value: string }>;
+  sources: Array<{ ref_type: string; ref_id: string; label: string; workspace_id?: string }>;
+  actions: Array<{
+    label: string;
+    target: 'workspace' | 'signal' | string;
+    workspace_id?: string;
+    signal_id?: string;
+  }>;
+  sections: Array<{
+    title: string;
+    items: Array<{
+      title: string;
+      detail: string;
+      source_ref?: { ref_type: string; ref_id: string; label: string; workspace_id?: string };
+    }>;
+  }>;
+}
+
+export interface OperatorMemoryRecord {
+  memory_id: string;
+  workspace_id: string;
+  scope: string;
+  kind: string;
+  title: string;
+  content: string;
+  source_refs: Array<Record<string, unknown>>;
+  created_at: string;
+  updated_at: string;
+}
+
 export async function fetchOperatorBriefing(options?: {
   viewportCompact?: boolean;
   workspaceId?: string | null;
@@ -64,6 +99,79 @@ export async function fetchOperatorBrainGraph(): Promise<BrainGraphSnapshot> {
     '/api/operator/brain-graph',
     {},
     'operator brain graph request failed',
+  );
+}
+
+export async function fetchOperatorEvidence(nodeId: string): Promise<OperatorEvidenceRecord> {
+  const params = new URLSearchParams({ node_id: nodeId });
+  return fetchJson<OperatorEvidenceRecord>(
+    `/api/operator/evidence?${params.toString()}`,
+    {},
+    'operator evidence request failed',
+  );
+}
+
+export async function fetchOperatorMemories(options?: {
+  workspaceId?: string | null;
+  query?: string;
+  kind?: string;
+  limit?: number;
+}): Promise<{ items: OperatorMemoryRecord[]; count: number }> {
+  const params = new URLSearchParams();
+  if (options?.workspaceId?.trim()) {
+    params.set('workspace_id', options.workspaceId.trim());
+  }
+  if (options?.query?.trim()) {
+    params.set('query', options.query.trim());
+  }
+  if (options?.kind?.trim()) {
+    params.set('kind', options.kind.trim());
+  }
+  if (options?.limit) {
+    params.set('limit', String(options.limit));
+  }
+  const query = params.size ? `?${params.toString()}` : '';
+  return fetchJson<{ items: OperatorMemoryRecord[]; count: number }>(
+    `/api/operator/memories${query}`,
+    {},
+    'operator memories request failed',
+  );
+}
+
+export async function createOperatorMemory(body: {
+  workspace_id?: string;
+  scope?: string;
+  kind?: string;
+  title: string;
+  content: string;
+  source_refs?: Array<Record<string, unknown>>;
+}): Promise<{ item: OperatorMemoryRecord }> {
+  return fetchJson<{ item: OperatorMemoryRecord }>(
+    '/api/operator/memories',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'operator memory save failed',
+  );
+}
+
+export async function captureOperatorResearch(body: {
+  workspace_id?: string;
+  title?: string;
+  query?: string;
+  url?: string;
+  source_refs?: Array<Record<string, unknown>>;
+}): Promise<{ result: Record<string, unknown>; memory: OperatorMemoryRecord }> {
+  return fetchJson<{ result: Record<string, unknown>; memory: OperatorMemoryRecord }>(
+    '/api/operator/research/capture',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'operator research capture failed',
   );
 }
 

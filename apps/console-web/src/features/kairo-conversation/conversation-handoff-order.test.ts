@@ -26,6 +26,7 @@ vi.mock('../../stores/shell', () => ({
       ],
     },
     operatorPresenceSettings: { privacy_mode: false, hands_free_enabled: false },
+    kairoSpeechSessionId: () => 'kairo:workspace_dashpro:default',
     handoffSignalToIde,
     speakKairoConversationLine,
     submitOperatorCommandContent,

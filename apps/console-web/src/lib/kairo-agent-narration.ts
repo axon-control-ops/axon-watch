@@ -6,6 +6,9 @@ import {
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
 import { personaThreadPrefix } from './operator-persona-name';
+import { cleanAgentReplyText } from './sanitize-spoken-reply';
+
+const COMPLETION_SUMMARY_MAX = 280;
 
 /** X milestone narration for streaming agent turns.
  *
@@ -145,23 +148,48 @@ export function isAgentTurnFailureContent(content: string): boolean {
   );
 }
 
+/** First one or two sentences from the final agent reply for end-of-run narration. */
+export function spokenCompletionSummary(content: string): string {
+  const cleaned = cleanAgentReplyText(content);
+  if (!cleaned) {
+    return '';
+  }
+  const flat = cleaned.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  const sentences = flat.match(/[^.!?]+[.!?]+/g) ?? [];
+  if (sentences.length > 0) {
+    let summary = sentences[0].trim();
+    if (summary.length < 120 && sentences.length > 1) {
+      summary = `${summary} ${sentences[1].trim()}`;
+    }
+    if (summary.length > COMPLETION_SUMMARY_MAX) {
+      return `${summary.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`;
+    }
+    return summary;
+  }
+  if (flat.length <= COMPLETION_SUMMARY_MAX) {
+    return flat;
+  }
+  return `${flat.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`;
+}
+
 export function narrationForCompletion(content: string): NarrationMilestone {
   if (isAgentTurnFailureContent(content)) {
     return { key: 'failed', message: 'Failed' };
   }
+  const summary = spokenCompletionSummary(content);
   const edits = matchAll(content, EDIT_RE);
   if (edits.length === 1) {
     return {
       key: 'done',
-      message: 'Done',
+      message: summary || 'Done',
       editPath: edits[0][1],
       editCount: 1,
     };
   }
   if (edits.length > 1) {
-    return { key: 'done', message: 'Done', editCount: edits.length };
+    return { key: 'done', message: summary || 'Done', editCount: edits.length };
   }
-  return { key: 'done', message: 'Done' };
+  return { key: 'done', message: summary || 'Done' };
 }
 
 function fileBaseName(path: string): string {

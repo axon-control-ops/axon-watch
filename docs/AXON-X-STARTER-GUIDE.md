@@ -31,8 +31,9 @@ You do **not** need to learn the whole architecture to be productive. Start with
 | Start | `./start.sh` in axon-local | `./scripts/dev/up.sh` in axon-watch |
 | Status | Daily driver | Early rebuild |
 
-They can run at the same time on different ports. Planning docs still live in
-`axon-local/Plans/Axon-Watch/`; implementation lives in `axon-watch`.
+They can run at the same time on different ports. Canonical planning lives in
+`axon-watch/docs/planning/`; `axon-local/Plans/Axon-Watch/` is a continuity
+mirror only.
 
 ---
 

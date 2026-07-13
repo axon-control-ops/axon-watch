@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.persistence import handoff_store
 from app.runs.service import list_runs
+from app.workspace_agents import get_workspace_agent_record
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
 
 
@@ -76,6 +77,8 @@ def create_workspace_handoff(
         "handoff": handoff,
         "target_workspace": target_workspace,
         "target_workspace_summary": target_workspace_summary,
+        "source_agent": get_workspace_agent_record(source_id),
+        "target_agent": get_workspace_agent_record(target_id),
     }
 
 

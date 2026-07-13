@@ -6,6 +6,7 @@ import {
   type OperatorCenterView,
 } from '../../lib/operator-brain-graph-view';
 import {
+  operatorAgentSummary,
   operatorExecutionStage,
   operatorLiveFeed,
   operatorRadarTone,
@@ -82,11 +83,17 @@ const liveFeed = computed(() =>
   operatorLiveFeed({
     historyRows: shell.runHistoryRows,
     currentStep: shell.primaryActiveRun?.current_step ?? null,
-    lastAgentMessage:
-      [...shell.operatorThreadMessages].reverse().find((message) => message.role === 'agent')
-        ?.content ?? null,
+    lastAgentMessage: shell.latestWorkspaceAgentOutput,
     advise: executionStage.value.advise,
     hasActiveRun: executionStage.value.hasActiveRun,
+  }),
+);
+
+const agentSummary = computed(() =>
+  operatorAgentSummary({
+    historyRows: shell.runHistoryRows,
+    currentStep: shell.primaryActiveRun?.current_step ?? null,
+    lastAgentMessage: shell.latestWorkspaceAgentOutput,
   }),
 );
 
@@ -344,6 +351,29 @@ function toggleTerminal(): void {
             :key="item.id"
             class="operator-status-radar-panel__feed-item"
             :class="`operator-status-radar-panel__feed-item--${item.tone}`"
+          >
+            <span class="operator-status-radar-panel__feed-marker" aria-hidden="true" />
+            <div class="operator-status-radar-panel__feed-copy">
+              <p>{{ item.label }}</p>
+              <span v-if="item.meta">{{ item.meta }}</span>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section
+        class="operator-status-radar-panel__feed"
+        aria-label="Agent summary"
+      >
+        <header class="operator-status-radar-panel__section-header">
+          <span>Agent summary</span>
+          <span>{{ shell.primaryActiveRun ? formatRunIdentityLabel(shell.primaryActiveRun) : 'Latest run state' }}</span>
+        </header>
+        <ol class="operator-status-radar-panel__feed-list">
+          <li
+            v-for="item in agentSummary"
+            :key="item.id"
+            class="operator-status-radar-panel__feed-item operator-status-radar-panel__feed-item--info"
           >
             <span class="operator-status-radar-panel__feed-marker" aria-hidden="true" />
             <div class="operator-status-radar-panel__feed-copy">

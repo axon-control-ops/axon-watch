@@ -112,6 +112,34 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             settings_json TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS operator_memories (
+            memory_id TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            source_refs_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_operator_memories_workspace
+            ON operator_memories(workspace_id, updated_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_operator_memories_kind
+            ON operator_memories(kind, updated_at DESC);
+
+        CREATE TABLE IF NOT EXISTS kairo_session_memory (
+            session_key TEXT PRIMARY KEY,
+            turns_json TEXT NOT NULL,
+            entities_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_kairo_session_memory_updated
+            ON kairo_session_memory(updated_at DESC);
         """
     )
     _ensure_chat_thread_kind_column(connection)

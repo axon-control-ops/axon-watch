@@ -7,6 +7,14 @@ export type OperatorSignalCountItem = {
   workspace_id?: string | null;
   severity?: string | null;
   summary?: string | null;
+  delivery_state?: string | null;
+  latest_receipt_id?: string | null;
+  watch_rule?: {
+    mode?: string | null;
+    reason?: string | null;
+    interrupts?: boolean | null;
+  } | null;
+  meta?: Record<string, unknown> | null;
 };
 
 export function isActionableOpenSignal(item: OperatorSignalCountItem): boolean {

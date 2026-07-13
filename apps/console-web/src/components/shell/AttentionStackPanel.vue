@@ -79,6 +79,11 @@ function signalCount(): number {
 
 const attentionSignals = computed(() => shell.attentionSignals);
 
+function signalSeverityLabel(severity: string | null | undefined): string {
+  const normalized = severity ?? 'info';
+  return normalized === 'info' ? 'INFO' : normalized.toUpperCase();
+}
+
 function phaseTagClass(phase: string | undefined): string {
   if (phase === 'review_ready') {
     return 'dock-tag--review';
@@ -335,9 +340,9 @@ function signalHint(signal: {
                   'dock-tag--warning': signal.severity === 'warning',
                   'dock-tag--info': signal.severity === 'info',
                 }"
-                :title="`${signal.severity} severity (read-only)`"
+                :title="`${signal.severity ?? 'info'} severity (read-only)`"
               >
-                {{ signal.severity === 'info' ? 'INFO' : signal.severity.toUpperCase() }}
+                {{ signalSeverityLabel(signal.severity) }}
               </span>
               <span
                 v-if="signal.watch_rule?.mode"
@@ -347,11 +352,11 @@ function signalHint(signal: {
                 {{ watchRuleLabel(signal.watch_rule.mode).toUpperCase() }}
               </span>
               <span
-                v-if="deliveryStateLabel(signal.delivery_state)"
+                v-if="deliveryStateLabel(signal.delivery_state ?? undefined)"
                 class="dock-tag dock-tag--status dock-tag--delivery"
-                :title="deliveryStateTooltip(signal.delivery_state)"
+                :title="deliveryStateTooltip(signal.delivery_state ?? undefined)"
               >
-                {{ deliveryStateLabel(signal.delivery_state)?.toUpperCase() }}
+                {{ deliveryStateLabel(signal.delivery_state ?? undefined)?.toUpperCase() }}
               </span>
             </div>
           </div>

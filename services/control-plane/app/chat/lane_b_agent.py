@@ -28,6 +28,7 @@ class LaneBContext:
     editor_selection: EditorSelectionContext | None = None
     terminal_snippet: str | None = None
     image_paths: tuple[str, ...] = ()
+    memory_appendix: str | None = None
 
 
 def _read_file_preview(workspace_id: str, path: str, *, max_chars: int = 1200) -> str:
@@ -88,6 +89,8 @@ def build_lane_b_context_block(context: LaneBContext) -> str:
 
     snapshot = research_capability_snapshot()
     lines.append(f"Capabilities: {format_capability_line(snapshot)}")
+    if context.memory_appendix and context.memory_appendix.strip():
+        lines.append(context.memory_appendix.strip())
     return "\n".join(lines)
 
 

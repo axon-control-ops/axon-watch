@@ -11,7 +11,8 @@ This working tree currently combines:
 - a shared contract baseline under `packages/shared-types/`
 - a real control-plane thin slice with persisted runs, approvals, review-ready,
   runtime summary, and operator briefing
-- a watch thin slice with two canonical inbox signals and multi-factor ranking
+- a watch service with canonical signal production (bootstrap, connector, and
+  monitor inbox items), delivery receipts, and multi-factor ranking
 - a Vue shell that consumes runs, inbox, runtime summary, briefing, and
   workspace files through dedicated `TopBar`, `LeftSidebar`,
   `CenterWorkbench`, `RightDock`, and `StatusBar` regions, plus Monaco and
@@ -23,8 +24,9 @@ This working tree currently combines:
 
 - `PRODUCT.md` defines the product thesis and non-goals.
 - `ARCHITECTURE.md` defines service ownership and deployment boundaries.
-- `UI_SPEC.md`, `UI_COMPOSITION_SPEC.md`, and `UI_VISUAL_DIRECTION.md` in the
-  frozen planning bundle define presentation rules inside the locked regions
+- `docs/planning/UI_SPEC.md`, `docs/planning/UI_COMPOSITION_SPEC.md`, and
+  `docs/planning/UI_VISUAL_DIRECTION.md` define presentation rules inside the
+  locked regions
 - **`docs/UI_LAYOUT_LOCK.md`** and **`docs/adr/ADR-004-locked-console-shell-layout.md`**
   lock the current five-region shell geometry (authoritative for implementation).
 - the frozen planning bundle in **`docs/planning/`** is the canonical
@@ -104,7 +106,8 @@ Day-to-day work happens on branch **`dev`**. **`master`** holds the last
 known-good bootstrap baseline.
 
 - Branch workflow: `docs/BRANCHING.md`
-- No `origin` remote is configured by default; add one before pushing (see branching doc)
+- Remote `origin` points at **https://github.com/axon-control-ops/axon-watch**
+  (see `docs/BRANCHING.md`)
 
 Frozen planning lives in **`docs/planning/`**. Locked layout and
 implementation ADRs live in this repo under `docs/`. See

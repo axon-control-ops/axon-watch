@@ -6,6 +6,7 @@ import hashlib
 import re
 from typing import Any, Literal
 
+from app.kairo_smalltalk import self_intro_candidates
 from app.operator_briefing_signals import is_bootstrap_signal
 
 QuestionFocus = Literal[
@@ -56,7 +57,6 @@ _ACTIVITY_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 def is_open_style_question(content: str) -> bool:
     return bool(_OPEN_QUESTION_RE.search(content.strip()))
 
@@ -90,6 +90,11 @@ def detect_question_focus(content: str, *, recent_user_turns: list[str]) -> Ques
 def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
     briefing = pack["briefing"]
     fleet = pack.get("fleet", {})
+    recent_dialogue = [
+        item
+        for item in pack.get("recent_dialogue", [])
+        if isinstance(item, dict) and str(item.get("content") or "").strip()
+    ]
     top_signals = [
         item
         for item in briefing.get("top_signals", [])
@@ -107,6 +112,16 @@ def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
     review_ready_count = sum(
         1 for item in active_runs if str(item.get("phase") or "") == "review_ready"
     )
+    dialogue_topic = ""
+    for item in reversed(recent_dialogue):
+        if str(item.get("role") or "").strip() == "operator":
+            dialogue_topic = str(item.get("content") or "").strip()
+            break
+    if not dialogue_topic and recent_dialogue:
+        dialogue_topic = str(recent_dialogue[-1].get("content") or "").strip()
+    dialogue_topic = " ".join(dialogue_topic.split())
+    if len(dialogue_topic) > 140:
+        dialogue_topic = f"{dialogue_topic[:139].rstrip()}…"
     return {
         "pending_approvals": pending,
         "top_signal_title": str(top_signal.get("title", "")).strip(),
@@ -136,6 +151,8 @@ def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
             for item in (briefing.get("cli_runtime") or {}).get("blockers", [])
             if str(item).strip()
         ],
+        "recent_dialogue": recent_dialogue[-3:],
+        "recent_dialogue_topic": dialogue_topic,
     }
 
 
@@ -429,12 +446,8 @@ def _general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
         f"{prefix}Quick read: {body}.".strip(),
         f"{prefix}From the briefing — {body}.".strip(),
     ]
-
-
 _GREETING_RE = re.compile(r"^(hi|hello|hey|good morning|good evening|good afternoon)\b", re.IGNORECASE)
 _THANKS_RE = re.compile(r"^(thanks|thank you|cheers|much appreciated)\b", re.IGNORECASE)
-
-
 def compose_smalltalk_reply(
     *,
     content: str,
@@ -468,9 +481,15 @@ def compose_smalltalk_reply(
             salt=f"thanks:{trimmed.lower()}",
             recent_assistant=recent_assistant,
         )
+    intro = self_intro_candidates(trimmed)
+    if intro:
+        return _select_line(
+            intro,
+            session_id=session_id,
+            salt=f"self:{trimmed.lower()}",
+            recent_assistant=recent_assistant,
+        )
     return None
-
-
 def compose_conversation_reply(
     *,
     content: str,
@@ -487,6 +506,14 @@ def compose_conversation_reply(
     recent_assistant = _recent_assistant_lines(recent_turns)
     focus = detect_question_focus(content, recent_user_turns=recent_user)
     followup = focus == "followup"
+    if (
+        not followup
+        and not recent_user
+        and facts.get("recent_dialogue_topic")
+        and _FOLLOWUP_RE.search(content.strip())
+    ):
+        focus = "followup"
+        followup = True
     if followup and recent_user:
         focus = detect_question_focus(recent_user[-1], recent_user_turns=recent_user[:-1])
 
@@ -505,6 +532,16 @@ def compose_conversation_reply(
     }
     builder = builders.get(focus, _general_candidates)
     candidates = [line for line in builder(facts, followup=followup) if line]
+    thread_candidates: list[str] = []
+    if followup and facts.get("recent_dialogue_topic"):
+        topic = str(facts["recent_dialogue_topic"]).strip()
+        if topic:
+            thread_candidates = [
+                f"From the recent thread, we were looking at this: {topic}.",
+                f"Recent thread context was: {topic}.",
+            ]
+    if thread_candidates:
+        candidates = thread_candidates if not recent_user else [*thread_candidates, *candidates]
     return _select_line(
         candidates,
         session_id=session_id,
@@ -531,8 +568,6 @@ def build_converse_speak_context(
         "degraded_active": facts["degraded"],
         "recent_turns": recent_turns[-4:],
     }
-
-
 __all__ = [
     "build_conversation_facts",
     "build_converse_speak_context",

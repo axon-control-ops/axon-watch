@@ -11,6 +11,7 @@ from app.runs.service import (
     to_runtime_summary_active_run,
 )
 from app.persistence import operator_presence_settings_store
+from app.persistence.operator_memory_store import search_memories
 from app.operator_briefing_rhythm import build_operator_briefing_rhythm
 from app.operator_presence import build_operator_presence
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
@@ -106,6 +107,35 @@ def _filter_records_by_workspace(
         for record in records
         if str(record.get("workspace_id", "")).strip() == workspace_id
     ]
+
+
+def _memory_highlights(
+    *,
+    workspace_id: str | None,
+    top_signals: list[dict[str, object]],
+    rhythm: dict[str, str],
+) -> list[dict[str, object]]:
+    candidate_text = " ".join(
+        [
+            rhythm.get("notice", ""),
+            rhythm.get("advise", ""),
+            *(str(item.get("title") or "") for item in top_signals[:2]),
+        ]
+    )
+    seen: set[str] = set()
+    matches: list[dict[str, object]] = []
+    for token in candidate_text.split():
+        normalized = token.strip(" ,.:;!?()[]{}").lower()
+        if len(normalized) < 4 or normalized in seen:
+            continue
+        seen.add(normalized)
+        for item in search_memories(normalized, workspace_id=workspace_id, limit=2):
+            memory_id = str(item.get("memory_id") or "")
+            if memory_id and all(memory_id != str(existing.get("memory_id")) for existing in matches):
+                matches.append(item)
+            if len(matches) >= 2:
+                return matches
+    return matches
 
 
 def build_operator_briefing(
@@ -206,6 +236,11 @@ def build_operator_briefing(
             "control_plane_ready": bool(runtime_summary["control_plane"]["ready"]),
             "watch_connected": bool(runtime_summary["watch"]["connected"]),
         },
+        "memory_highlights": _memory_highlights(
+            workspace_id=scoped_workspace_id,
+            top_signals=top_signals,
+            rhythm=rhythm,
+        ),
         "operator_presence": build_operator_presence(
             {
                 "top_signals": top_signals,

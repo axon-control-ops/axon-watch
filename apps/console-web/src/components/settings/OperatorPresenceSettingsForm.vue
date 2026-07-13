@@ -208,7 +208,7 @@ function requestReset(): void {
         <span class="operator-settings-form__copy">
           <strong>Hands-free voice (galaxy orb)</strong>
           <small>
-            Listens continuously but only responds when you say "KAIRO" or a direct command
+            Listens continuously but only responds when you say "VAXON" or a direct command
             (e.g. git status). Ignores side conversation. Say "stop" to interrupt speech.
           </small>
         </span>

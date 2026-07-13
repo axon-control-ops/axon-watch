@@ -4,6 +4,7 @@ import {
   effectiveKairoNarration,
   mapMilestoneToSpeakEvent,
   shouldNarrateAgentEvent,
+  shouldNarrateProgressMilestone,
   shouldSpeakLiveThinkingBlock,
 } from './kairo-narration-policy';
 
@@ -99,9 +100,9 @@ describe('kairo-narration-policy', () => {
     expect(mapMilestoneToSpeakEvent('failed')).toBe('failed');
   });
 
-  it('speaks live thinking once a sentence completes for minimal and conversational', () => {
+  it('speaks live thinking as the run-start intent in minimal and conversational modes', () => {
     const spokenBlock =
-      "I'm starting to analyze the rendering issues the user wants fixed.";
+      "I'll start by checking the screenshot and any recent terminal or log output.";
     expect(
       shouldSpeakLiveThinkingBlock({
         narration: 'minimal',
@@ -126,5 +127,27 @@ describe('kairo-narration-policy', () => {
         spokenBlock: 'They want table rendering to',
       }),
     ).toBe(false);
+  });
+
+  it('gates progress milestones to avoid canned status spam', () => {
+    expect(
+      shouldNarrateProgressMilestone({ eventType: 'run_started', narration: 'minimal' }),
+    ).toBe(false);
+    expect(
+      shouldNarrateProgressMilestone({ eventType: 'research_started', narration: 'minimal' }),
+    ).toBe(false);
+    expect(
+      shouldNarrateProgressMilestone({ eventType: 'approval_required', narration: 'minimal' }),
+    ).toBe(true);
+
+    expect(
+      shouldNarrateProgressMilestone({ eventType: 'run_started', narration: 'conversational' }),
+    ).toBe(false);
+    expect(
+      shouldNarrateProgressMilestone({ eventType: 'verified_complete', narration: 'conversational' }),
+    ).toBe(false);
+    expect(
+      shouldNarrateProgressMilestone({ eventType: 'stream_error', narration: 'conversational' }),
+    ).toBe(true);
   });
 });

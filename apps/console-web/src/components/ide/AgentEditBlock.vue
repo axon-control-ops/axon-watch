@@ -21,13 +21,15 @@ const props = defineProps<{
 }>();
 
 const shell = useShellStore();
-const expanded = ref(true);
+// Collapsed by default: expanded markdown/diff previews are expensive, and a
+// long agent turn can otherwise freeze the main thread while streaming.
+const expanded = ref(false);
 
 const normalizedPath = computed(() => normalizeEditedFilePath(props.path));
 const isMarkdown = computed(() => isMarkdownAgentEditPath(normalizedPath.value));
 
 const markdownPreview = computed(() => {
-  if (!isMarkdown.value || !props.diff.trim()) {
+  if (!expanded.value || !isMarkdown.value || !props.diff.trim()) {
     return { preview: '', truncated: false, html: '' };
   }
   const proposed = extractProposedFileContentFromDiff(props.diff);
@@ -39,7 +41,7 @@ const markdownPreview = computed(() => {
 });
 
 const diffPreview = computed(() => {
-  if (isMarkdown.value) {
+  if (!expanded.value || isMarkdown.value) {
     return { lines: [] as Array<{ text: string; tone: string }>, truncated: false };
   }
   const truncated = truncateDiffLinesForDock(props.diff);

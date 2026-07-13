@@ -29,6 +29,8 @@ export type SpeakKairoLineOptions = {
   priority?: 'interrupt' | 'alert' | 'conversation' | 'narration';
   /** Skip the queue and play immediately (queue worker only). */
   immediate?: boolean;
+  /** Prefer local browser TTS to avoid Azure request latency. */
+  preferBrowser?: boolean;
 };
 
 const speakingListeners = new Set<(active: boolean) => void>();
@@ -36,7 +38,7 @@ const idleListeners = new Set<() => void>();
 const chunkListeners = new Set<() => void>();
 let speaking = false;
 
-const AUDIO_PREROLL_MS = 40;
+const AUDIO_PREROLL_MS = 120;
 /** Data/blob URLs sometimes never fire canplaythrough — never block forever. */
 const AUDIO_READY_TIMEOUT_MS = 2500;
 
@@ -205,12 +207,12 @@ async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
 
 async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void> {
   audio.preload = 'auto';
+  await waitForAudioReady(audio);
   try {
     audio.currentTime = 0;
   } catch {
     // Some engines throw if metadata is not ready yet; play() still works.
   }
-  await waitForAudioReady(audio);
   await delay(AUDIO_PREROLL_MS);
   await new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -326,10 +328,15 @@ function resolveAzureFallbackReason(response: KairoTtsResponse): string {
  */
 export async function playKairoUtteranceNow(
   text: string,
+  options: { preferBrowser?: boolean } = {},
 ): Promise<KairoVoicePlaybackResult> {
   const trimmed = sanitizeSpokenReply(text);
   if (!trimmed) {
     return finishPlayback({ engine: 'skipped', reason: 'empty_text' }, text);
+  }
+
+  if (options.preferBrowser) {
+    return speakWithBrowser(trimmed, 'preferred_browser');
   }
 
   notifySpeaking(true);
@@ -375,11 +382,12 @@ export async function speakKairoLine(
   options: SpeakKairoLineOptions = {},
 ): Promise<KairoVoicePlaybackResult> {
   if (options.immediate) {
-    return playKairoUtteranceNow(text);
+    return playKairoUtteranceNow(text, { preferBrowser: options.preferBrowser });
   }
   const { enqueueKairoSpeech } = await import('./kairo-voice-queue');
   return enqueueKairoSpeech(text, {
     priority: options.priority ?? 'conversation',
+    preferBrowser: options.preferBrowser,
   });
 }
 

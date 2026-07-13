@@ -52,6 +52,19 @@ def _managed_connection():
 
 
 def reset_store() -> None:
+    """Test-only wipe. Refuses to clear the live operator DB without an explicit allow flag."""
+    db_path = run_store_sqlite.resolve_db_path(_configured_db_path())
+    allow = os.environ.get("AXON_WATCH_ALLOW_STORE_RESET", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    path_text = str(db_path).replace("\\", "/")
+    if path_text.endswith("/.local/state/control-plane.sqlite3") and not allow:
+        raise RuntimeError(
+            "refusing to wipe live chat store at "
+            f"{db_path}; set AXON_WATCH_ALLOW_STORE_RESET=1 only for intentional recovery/tests"
+        )
     with _managed_connection() as connection:
         connection.execute("DELETE FROM chat_messages")
         connection.execute("DELETE FROM chat_threads")

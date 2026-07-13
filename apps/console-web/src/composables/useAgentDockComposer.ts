@@ -5,7 +5,10 @@ import { resizeCommandComposer } from '../lib/command-composer-autosize';
 import {
   resolveActiveIdeAgentMessage,
 } from '../lib/ide-agent-center-view';
-import { summarizeIdeAgentActivity } from '../lib/ide-agent-activity-view';
+import {
+  summarizeIdeAgentActivity,
+  summarizeIdeAgentActivityFromCounts,
+} from '../lib/ide-agent-activity-view';
 import {
   filterMcpToolsForComposerMode,
 } from '../lib/composer-mcp-tools-view';
@@ -249,6 +252,10 @@ export function useAgentDockComposer() {
     );
     if (!message) {
       return null;
+    }
+    const streamCounts = shell.ideComposerActivity?.streamCounts;
+    if (streamCounts) {
+      return summarizeIdeAgentActivityFromCounts(streamCounts);
     }
     return summarizeIdeAgentActivity(message.content);
   });

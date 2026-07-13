@@ -14,12 +14,13 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.kairo_conversation import (  # noqa: E402
     answer_status_question,
+    build_conversation_context_pack,
     classify_conversation_turn,
     converse_turn,
 )
 from app.kairo_conversation_reply import compose_conversation_reply  # noqa: E402
 from app.main import app  # noqa: E402
-from app.persistence import run_store  # noqa: E402
+from app.persistence import chat_store, run_store  # noqa: E402
 
 _MOCK_BRIEFING = {
     "generated_at": "2026-07-08T00:00:00Z",
@@ -57,6 +58,9 @@ class KairoConversationUnitTests(unittest.TestCase):
     def setUp(self) -> None:
         clear_pack_cache_for_tests()
         clear_memory_for_tests()
+        # MUST isolate before reset_store — otherwise this deletes the operator's live chat DB.
+        isolate_control_plane_db(self, run_store)
+        chat_store.reset_store()
 
     def test_classify_command_turn(self) -> None:
         self.assertEqual("command", classify_conversation_turn("git status"))
@@ -133,6 +137,84 @@ class KairoConversationUnitTests(unittest.TestCase):
         self.assertIn("all clear", reply.lower())
         self.assertLess(len(reply), 120)
         self.assertNotIn("Resume Before we keep pushing OTAs", reply)
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
+    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    def test_context_pack_includes_recent_workspace_dialogue(self, *_mocks: object) -> None:
+        thread = chat_store.create_thread(
+            workspace_id="workspace_dashpro",
+            run_id=None,
+            created_at="2026-07-13T08:00:00Z",
+            thread_kind="operator",
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_operator_context_pack",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_dashpro",
+                "run_id": None,
+                "role": "operator",
+                "content": "DashPro payments are still failing after approval.",
+                "created_at": "2026-07-13T08:00:01Z",
+            }
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_agent_context_pack",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_dashpro",
+                "run_id": None,
+                "role": "agent",
+                "content": "I traced it to the retry path.",
+                "created_at": "2026-07-13T08:00:02Z",
+            }
+        )
+        pack = build_conversation_context_pack(workspace_id="workspace_dashpro")
+        self.assertEqual(2, len(pack["recent_dialogue"]))
+        self.assertEqual("operator", pack["recent_dialogue"][0]["role"])
+        self.assertIn("payments are still failing", pack["recent_dialogue"][0]["content"])
+
+    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
+    @patch("app.kairo_conversation.build_operator_fleet_health", return_value={"items": []})
+    @patch(
+        "app.kairo_conversation.build_operator_briefing",
+        return_value={
+            **_MOCK_BRIEFING,
+            "pending_approvals": {"count": 0, "items": []},
+            "active_runs": [],
+            "top_signals": [],
+            "notice": "",
+            "advise": "",
+        },
+    )
+    def test_followup_template_reply_can_reference_recent_workspace_dialogue(self, *_mocks: object) -> None:
+        thread = chat_store.create_thread(
+            workspace_id="workspace_dashpro",
+            run_id=None,
+            created_at="2026-07-13T08:05:00Z",
+            thread_kind="operator",
+        )
+        chat_store.save_message(
+            {
+                "message_id": "message_operator_followup",
+                "thread_id": thread["thread_id"],
+                "workspace_id": "workspace_dashpro",
+                "run_id": None,
+                "role": "operator",
+                "content": "DashPro payments are still failing after approval.",
+                "created_at": "2026-07-13T08:05:01Z",
+            }
+        )
+        pack = build_conversation_context_pack(workspace_id="workspace_dashpro")
+        reply = compose_conversation_reply(
+            content="what about that?",
+            pack=pack,
+            session_id="followup-dialogue-pack",
+            recent_turns=[],
+        )
+        self.assertIn("DashPro", reply)
+        self.assertIn("payments", reply.lower())
 
     @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
     @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
@@ -492,3 +574,13 @@ class KairoConversationEndpointTests(unittest.TestCase):
         self.assertEqual(expected, set(payload))
         self.assertEqual("status_question", payload["turn_kind"])
         self.assertTrue(payload["reply"])
+
+    @patch("app.routes.operator.converse_turn", return_value={"turn_kind": "chat", "reply": "ok"})
+    def test_converse_endpoint_passes_refresh_query_flag(self, mock_converse) -> None:
+        response = self.client.post(
+            "/api/kairo/converse?refresh=true",
+            json={"content": "what changed?", "session_id": "refresh-query"},
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(mock_converse.called)
+        self.assertTrue(mock_converse.call_args.kwargs["force_refresh"])

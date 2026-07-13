@@ -11,6 +11,11 @@ from typing import Any, Literal
 from app.cli_runtime.catalog import find_cursor_cli
 from app.cli_runtime.cursor_agent import run_cursor_local
 from app.kairo_persona import build_persona_voice_line
+from app.kairo_progress_voice import (
+    PROGRESS_EVENT_TYPES,
+    PROGRESS_FALLBACK_POOLS,
+    contextual_progress_fallback,
+)
 from app.kairo_participant_memory import (
     apply_participant_address,
     get_active_participant,
@@ -23,6 +28,7 @@ from app.kairo_voice_prompt import (
     filter_speak_context,
 )
 from app.kairo_voice_text import normalize_spoken_line
+from app.persistence.voice_transcript_store import list_recent_spoken_lines
 
 NarrationLevel = Literal["off", "minimal", "conversational"]
 
@@ -71,6 +77,7 @@ _FALLBACK_POOLS: dict[str, list[str]] = {
         "Systems are up, sir — what shall we focus on?",
         "At your service, sir — the workspace is ready.",
     ],
+    **PROGRESS_FALLBACK_POOLS,
 }
 
 
@@ -80,7 +87,25 @@ def _session_key(session_id: str) -> str:
 
 
 def _recent_lines(session_id: str) -> list[str]:
-    return list(_HISTORY.get(_session_key(session_id), []))
+    persisted: list[str] = []
+    try:
+        persisted = list_recent_spoken_lines(session_id=session_id, limit=_MAX_HISTORY)
+    except Exception:
+        persisted = []
+    merged: list[str] = []
+    seen: set[str] = set()
+    for item in [*persisted, *_HISTORY.get(_session_key(session_id), [])]:
+        line = str(item or "").strip()
+        if not line:
+            continue
+        normalized = " ".join(line.lower().split())
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        merged.append(line)
+    if len(merged) > _MAX_HISTORY:
+        merged = merged[-_MAX_HISTORY:]
+    return merged
 
 
 def _remember_line(session_id: str, line: str) -> None:
@@ -100,6 +125,12 @@ def _operator_prompt(context: dict[str, Any]) -> str:
 
 
 def _contextual_agent_start_fallback(context: dict[str, Any]) -> str | None:
+    task_summary = str(context.get("task_summary") or "").strip()
+    if task_summary and task_summary.lower() not in {"done", "thinking…", "thinking...", "failed"}:
+        normalized = normalize_spoken_line(task_summary, max_chars=280)
+        if normalized:
+            return normalized
+
     prompt = _operator_prompt(context)
     if not prompt:
         return None
@@ -110,7 +141,7 @@ def _contextual_agent_start_fallback(context: dict[str, Any]) -> str | None:
         return "I'll commit those changes now."
     if prompt.endswith("?") or _QUESTION_START_RE.match(lower):
         return "Good question — I'll work through that now."
-    return "Understood — working on that now."
+    return None
 
 
 def _is_failed_outcome(context: dict[str, Any]) -> bool:
@@ -141,6 +172,12 @@ def _contextual_failed_fallback(context: dict[str, Any]) -> str:
 def _contextual_done_fallback(context: dict[str, Any]) -> str | None:
     if _is_failed_outcome(context):
         return _contextual_failed_fallback(context)
+
+    task_summary = str(context.get("task_summary") or "").strip()
+    if task_summary and task_summary.lower() not in {"done", "failed"}:
+        normalized = normalize_spoken_line(task_summary, max_chars=280)
+        if normalized:
+            return normalized
 
     prompt = _operator_prompt(context)
     lower = prompt.lower()
@@ -292,12 +329,12 @@ def _fallback_for_event(
         )
         return line.replace("that file", file_name).replace("the file", file_name)
 
-    if event_type == "agent_start":
+    if event_type in {"agent_start", "run_started"}:
         contextual = _contextual_agent_start_fallback(context)
         if contextual:
             return apply_participant_address(contextual, guest_name)
         return _pick_pool_line(
-            "agent_start",
+            "run_started",
             recent,
             persona_enabled=persona_enabled,
             guest_name=guest_name,
@@ -316,6 +353,10 @@ def _fallback_for_event(
             persona_enabled=persona_enabled,
             guest_name=guest_name,
         )
+
+    progress = contextual_progress_fallback(event_type, context)
+    if progress:
+        return apply_participant_address(progress, guest_name)
 
     pool_key = event_type if event_type in _FALLBACK_POOLS else "done"
     return _pick_pool_line(
@@ -391,6 +432,7 @@ def should_use_runtime_for_event(event_type: str, narration: NarrationLevel) -> 
         "chat_summary",
         "alert",
         "briefing",
+        *PROGRESS_EVENT_TYPES,
     }
 
 
@@ -459,6 +501,7 @@ def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:
             "chat_summary",
             "briefing",
             "conversation_reply",
+            *PROGRESS_EVENT_TYPES,
         }
     return event_type in {
         "agent_start",
@@ -469,6 +512,7 @@ def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:
         "greeting",
         "briefing",
         "conversation_reply",
+        *PROGRESS_EVENT_TYPES,
     }
 
 

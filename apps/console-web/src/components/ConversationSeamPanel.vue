@@ -36,11 +36,13 @@ import {
 } from '../lib/operator-thread';
 import {
   agentContentHasTranscriptBlocks,
-  parseAgentTranscriptBlocks,
+  prepareAgentTranscriptSegmentsForDisplay,
   thinkingPreview,
 } from '../lib/agent-transcript-blocks';
 import { sanitizeAgentThinkingForOperator } from '../lib/agent-live-line-view';
 import { shouldShowAgentTerminalBackgroundControl } from '../lib/agent-terminal-background-view';
+import { buildAgentTerminalMirrorText } from '../lib/agent-terminal-mirror';
+import { queueAgentShellMirrorText } from '../lib/agent-shell-mirror-state';
 import { resolveChatAttachmentUrl } from '../api/control-plane';
 import { threadAttachmentUrlForImagePath } from '../lib/thread-image-url';
 import { useShellStore } from '../stores/shell';
@@ -137,24 +139,90 @@ function isStreamingMessage(messageId: string): boolean {
 
 const expandedThinkingKeys = ref<Record<string, boolean>>({});
 
+type TranscriptSegmentCacheEntry = {
+  contentLength: number;
+  contentTail: string;
+  segments: ReturnType<typeof prepareAgentTranscriptSegmentsForDisplay>;
+  atMs: number;
+};
+
+const transcriptSegmentCache = new Map<string, TranscriptSegmentCacheEntry>();
+const STREAM_SEGMENT_MIN_INTERVAL_MS = 120;
+const STREAM_SEGMENT_MIN_GROWTH = 1500;
+
 function hasTranscriptBlocks(content: string): boolean {
   return agentContentHasTranscriptBlocks(content);
 }
 
-function transcriptSegments(content: string) {
-  return parseAgentTranscriptBlocks(content);
+function transcriptSegments(messageId: string, content: string, streaming: boolean) {
+  // Large agent turns (100+ file edits) must not mount a diff card per file on
+  // every stream tick — that is what freezes the console ("Page Unresponsive").
+  if (streaming) {
+    const cached = transcriptSegmentCache.get(messageId);
+    const now = Date.now();
+    if (
+      cached &&
+      now - cached.atMs < STREAM_SEGMENT_MIN_INTERVAL_MS &&
+      content.length - cached.contentLength < STREAM_SEGMENT_MIN_GROWTH &&
+      content.endsWith(cached.contentTail)
+    ) {
+      return cached.segments;
+    }
+  }
+
+  const segments = prepareAgentTranscriptSegmentsForDisplay(content, {
+    collapseClosedEditsAt: 8,
+  });
+  transcriptSegmentCache.set(messageId, {
+    contentLength: content.length,
+    contentTail: content.slice(-64),
+    segments,
+    atMs: Date.now(),
+  });
+  if (!streaming) {
+    // Keep completed turns cheap to re-render without unbounded growth.
+    if (transcriptSegmentCache.size > 12) {
+      const oldest = transcriptSegmentCache.keys().next().value;
+      if (oldest !== undefined) {
+        transcriptSegmentCache.delete(oldest);
+      }
+    }
+  }
+  return segments;
 }
 
 function segmentKey(messageId: string, index: number): string {
   return `${messageId}:${index}`;
 }
 
-function revealTerminalPanel(): void {
-  shell.revealIdeTerminalPanel();
+function revealTerminalPanel(segment: { command: string; output: string; open: boolean }): void {
+  queueAgentShellMirrorText(
+    buildAgentTerminalMirrorText({
+      kind: 'terminal',
+      command: segment.command,
+      output: segment.output,
+      open: segment.open,
+    }),
+  );
+  void shell.backgroundIdeAgentRun();
 }
 
-function backgroundAgentTerminalRun(): void {
-  shell.backgroundIdeAgentRun();
+function backgroundAgentTerminalRun(segment?: {
+  command: string;
+  output: string;
+  open: boolean;
+}): void {
+  if (segment) {
+    queueAgentShellMirrorText(
+      buildAgentTerminalMirrorText({
+        kind: 'terminal',
+        command: segment.command,
+        output: segment.output,
+        open: segment.open,
+      }),
+    );
+  }
+  void shell.backgroundIdeAgentRun();
 }
 
 function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean): boolean {
@@ -478,7 +546,11 @@ watch(
           class="conversation-seam__blocks"
         >
           <template
-            v-for="(segment, segmentIndex) in transcriptSegments(item.message.content)"
+            v-for="(segment, segmentIndex) in transcriptSegments(
+              item.message.message_id,
+              item.message.content,
+              isStreamingMessage(item.message.message_id),
+            )"
             :key="segmentKey(item.message.message_id, segmentIndex)"
           >
             <div
@@ -529,7 +601,7 @@ watch(
                   type="button"
                   class="agent-block__terminal-reveal"
                   :title="`Open terminal panel for ${segment.command}`"
-                  @click="revealTerminalPanel"
+                  @click="revealTerminalPanel(segment)"
                 >
                   <span class="agent-block__terminal-prompt" aria-hidden="true">$</span>
                   <code class="agent-block__terminal-command">{{ segment.command }}</code>
@@ -544,7 +616,7 @@ watch(
                   class="agent-block__terminal-background"
                   title="Mirror this shell into the vaxon terminal (Cursor CLI still owns the process)"
                   aria-label="Background shell into vaxon terminal"
-                  @click="backgroundAgentTerminalRun"
+                  @click="backgroundAgentTerminalRun(segment)"
                 >
                   Background
                 </button>

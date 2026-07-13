@@ -43,6 +43,7 @@ class PostChatMessageRequest(BaseModel):
     runtime_target: str | None = None
     runtime_model: str | None = None
     execution_access: str | None = None
+    kairo_session_id: str | None = None
 
 
 class CreateWorkspaceChatThreadRequest(BaseModel):
@@ -147,3 +148,20 @@ class KairoConverseRequest(BaseModel):
 class KairoTtsRequest(BaseModel):
     text: str
     voice: str | None = None
+
+
+class OperatorMemoryCreateRequest(BaseModel):
+    workspace_id: str = ""
+    scope: str = "workspace"
+    kind: str = "note"
+    title: str
+    content: str
+    source_refs: list[dict[str, Any]] = []
+
+
+class OperatorResearchCaptureRequest(BaseModel):
+    workspace_id: str = ""
+    title: str = ""
+    query: str | None = None
+    url: str | None = None
+    source_refs: list[dict[str, Any]] = []

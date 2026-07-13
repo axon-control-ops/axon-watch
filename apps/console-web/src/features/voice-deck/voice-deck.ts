@@ -10,7 +10,7 @@ export async function handleVoiceDeckSpokenAlert(
     return false;
   }
 
-  await speakKairoLine(alert.message.trim(), { priority: 'alert' });
+  await speakKairoLine(alert.message.trim(), { priority: 'alert', preferBrowser: true });
   return true;
 }
 

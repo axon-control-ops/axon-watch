@@ -18,12 +18,14 @@ export type KairoVoicePriority =
 
 export type EnqueueKairoSpeechOptions = {
   priority?: KairoVoicePriority;
+  preferBrowser?: boolean;
 };
 
 type VoiceJob = {
   id: number;
   text: string;
   priority: KairoVoicePriority;
+  preferBrowser: boolean;
   resolve: (result: KairoVoicePlaybackResult) => void;
   reject: (error: unknown) => void;
 };
@@ -35,7 +37,7 @@ const PRIORITY_RANK: Record<KairoVoicePriority, number> = {
   narration: 3,
 };
 
-const POST_UTTERANCE_SETTLE_MS = 80;
+const POST_UTTERANCE_SETTLE_MS = 150;
 
 let nextJobId = 0;
 let activeJob: VoiceJob | null = null;
@@ -81,7 +83,9 @@ async function pump(): Promise<void> {
       }
       activeJob = job;
       try {
-        const result = await playKairoUtteranceNow(job.text);
+        const result = await playKairoUtteranceNow(job.text, {
+          preferBrowser: job.preferBrowser,
+        });
         await settleAfterUtterance();
         job.resolve(result);
       } catch (error) {
@@ -141,6 +145,7 @@ export function enqueueKairoSpeech(
       id: ++nextJobId,
       text: trimmed,
       priority,
+      preferBrowser: options.preferBrowser === true,
       resolve,
       reject,
     };

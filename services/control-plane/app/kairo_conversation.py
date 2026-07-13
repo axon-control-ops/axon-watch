@@ -17,6 +17,7 @@ from app.chat.command_intent import (
 )
 from app.cli_runtime.router import dispatch_ide_composer
 from app.kairo.context_pack_cache import get_cached_context_pack
+from app.kairo_memory_intents import maybe_handle_memory_intent
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
     note_briefing_surface_offer as _note_briefing_surface_offer,
@@ -42,11 +43,13 @@ from app.kairo_participant_memory import (
     get_active_participant,
     update_participant_from_utterance,
 )
+from app.kairo_workspace_intents import infer_workspace_id_from_content
 from app.kairo_voice import normalize_spoken_line
 from app.operator_briefing import build_operator_briefing
 from app.operator_brain_graph import build_operator_brain_graph
 from app.operator_fleet_health import build_operator_fleet_health
 from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
+from app.persistence import chat_store
 from app.persistence.voice_transcript_store import append_voice_transcript
 from app.workspace_project_bindings import get_workspace_project_binding, load_workspace_project_bindings
 
@@ -70,48 +73,6 @@ _WORKSPACE_ACTIVITY_RE = re.compile(
     r"\b(just did|doing|latest|recent|activity)\b",
     re.IGNORECASE,
 )
-
-
-def _normalize_alias(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", value.strip().lower()).strip()
-
-
-def _workspace_aliases(workspace_id: str, display_name: str | None) -> set[str]:
-    aliases = {_normalize_alias(workspace_id.replace("workspace_", ""))}
-    if display_name:
-        aliases.add(_normalize_alias(display_name))
-    if workspace_id == "workspace_dashpro":
-        aliases.update(
-            {
-                "dashpro",
-                "dash pro",
-                "best pro",
-                "this pro",
-                "probox space",
-                "dashpro workspace",
-            }
-        )
-    return {alias for alias in aliases if alias}
-
-
-def _infer_workspace_id_from_content(content: str) -> str | None:
-    normalized = _normalize_alias(content)
-    if not normalized:
-        return None
-    bindings = load_workspace_project_bindings()
-    matches: list[tuple[str, str]] = []
-    for binding in bindings.values():
-        for alias in _workspace_aliases(binding.workspace_id, binding.display_name):
-            if alias and alias in normalized:
-                matches.append((binding.workspace_id, alias))
-    if matches:
-        matches.sort(key=lambda item: len(item[1]), reverse=True)
-        return matches[0][0]
-    if "pro workspace" in normalized or "probox space" in normalized:
-        return "workspace_dashpro"
-    return None
-
-
 def _runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
     return runtime_workspace_id(workspace_id=workspace_id, pack=pack)
 
@@ -307,12 +268,35 @@ def _runtime_assistant_reply(
     return reply, ("model" if bool(payload.get("dispatched")) else "fallback")
 
 
+def _recent_workspace_dialogue(
+    *,
+    workspace_id: str | None,
+    limit: int = 3,
+) -> list[dict[str, str]]:
+    scoped = str(workspace_id or "").strip()
+    if not scoped:
+        return []
+    thread = chat_store.get_latest_thread_for_workspace(scoped, thread_kind="operator")
+    if thread is None:
+        return []
+    items = chat_store.list_thread_messages(str(thread["thread_id"]))
+    dialogue: list[dict[str, str]] = []
+    for item in items:
+        role = str(item.get("role") or "").strip()
+        mapped_role = "operator" if role == "operator" else "assistant" if role == "agent" else ""
+        content = str(item.get("content") or "").strip()
+        if mapped_role and content:
+            dialogue.append({"role": mapped_role, "content": content})
+    return dialogue[-max(1, limit) :]
+
+
 def _build_conversation_context_pack_uncached(*, workspace_id: str | None = None) -> dict[str, Any]:
     scoped = workspace_id.strip() if workspace_id else None
     briefing = build_operator_briefing(workspace_id=scoped)
     fleet = build_operator_fleet_health()
     graph = build_operator_brain_graph()
     binding = get_workspace_project_binding(scoped) if scoped else None
+    recent_dialogue = _recent_workspace_dialogue(workspace_id=scoped)
     nodes = [node for node in graph.get("nodes", []) if isinstance(node, dict)]
     edges = [edge for edge in graph.get("edges", []) if isinstance(edge, dict)]
     critical_workspaces = sum(
@@ -343,14 +327,20 @@ def _build_conversation_context_pack_uncached(*, workspace_id: str | None = None
             "node_count": len(nodes),
             "edge_count": len(edges),
         },
+        "recent_dialogue": recent_dialogue,
     }
 
 
-def build_conversation_context_pack(*, workspace_id: str | None = None) -> dict[str, Any]:
+def build_conversation_context_pack(
+    *,
+    workspace_id: str | None = None,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
     scoped = workspace_id.strip() if workspace_id else None
     return get_cached_context_pack(
         scoped,
         lambda: _build_conversation_context_pack_uncached(workspace_id=scoped),
+        force_refresh=force_refresh,
     )
 
 
@@ -479,6 +469,7 @@ def converse_turn(
     context_workspace_id: str | None = None,
     context_signal_id: str | None = None,
     context_node_id: str | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, object]:
     started_at = time.perf_counter()
     raw_content = content.strip()
@@ -489,13 +480,16 @@ def converse_turn(
     guest_name = update_participant_from_utterance(session_id, trimmed)
 
     tier: ConversationAnswerTier = "deep" if str(answer_tier).strip().lower() == "deep" else "fast"
-    inferred_workspace_id = _infer_workspace_id_from_content(trimmed)
+    inferred_workspace_id = infer_workspace_id_from_content(trimmed)
     entity = _entity_context(session_id)
     entity_workspace_id = entity.get("target_workspace_id") or None
     resolved_workspace_id = (
         context_workspace_id or workspace_id or inferred_workspace_id or entity_workspace_id
     )
-    pack = build_conversation_context_pack(workspace_id=resolved_workspace_id)
+    pack = build_conversation_context_pack(
+        workspace_id=resolved_workspace_id,
+        force_refresh=force_refresh,
+    )
     if context_signal_id and resolved_workspace_id:
         _remember_entities(
             session_id,
@@ -581,6 +575,33 @@ def converse_turn(
                 },
                 duration_ms=round((time.perf_counter() - started_at) * 1000),
             )
+
+    memory_intent = maybe_handle_memory_intent(
+        content=trimmed,
+        session_id=session_id,
+        workspace_id=resolved_workspace_id,
+        guest_name=guest_name,
+    )
+    if memory_intent is not None:
+        reply = str(memory_intent.get("reply") or "")
+        _remember_turn(session_id, "user", trimmed)
+        _remember_turn(session_id, "assistant", reply)
+        return _log_voice_turn(
+            session_id=session_id,
+            workspace_id=workspace_id,
+            raw_content=raw_content,
+            normalized_content=trimmed,
+            payload={
+                "turn_kind": str(memory_intent.get("turn_kind") or "action"),
+                "reply": reply,
+                "source": str(memory_intent.get("source") or "template"),
+                "command_content": memory_intent.get("command_content"),
+                "action": memory_intent.get("action"),
+                "artifacts": list(memory_intent.get("artifacts") or []),
+                "active_participant": guest_name,
+            },
+            duration_ms=round((time.perf_counter() - started_at) * 1000),
+        )
 
     turn_kind = classify_conversation_turn(trimmed)
     source: ConversationSource = "template"

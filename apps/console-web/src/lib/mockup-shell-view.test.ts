@@ -20,8 +20,8 @@ import {
   runPhaseProgress,
   runPhaseTag,
   workspaceStatusLine,
-  workspaceIconKind,
 } from './mockup-shell-view';
+import { workspaceIconKind } from './mockup-workspace-icons';
 
 const runtimeSummary = exampleRuntimeSummary as RuntimeSummary;
 const briefing = exampleBriefing as unknown as OperatorBriefing;

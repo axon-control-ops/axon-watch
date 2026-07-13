@@ -57,17 +57,20 @@ import {
 import { buildResearchEditorContent } from '../lib/prove-research-source';
 import { resolveResearchFlyToTarget } from '../lib/research-fly-to-source';
 import type { ResearchBlockKind } from '../lib/research-provider';
+import { createAgentStreamIncrementalState } from '../lib/agent-stream-incremental';
+import { narrationForCompletion } from '../lib/kairo-agent-narration';
+import { createRafStreamUiBatcher } from '../lib/stream-ui-raf-batch';
 import {
-  narrationForCompletion,
-  narrationMilestonesForDelta,
-  resolveStreamingActivity,
-} from '../lib/kairo-agent-narration';
+  resolveBootstrapIdeThreadId,
+  shouldApplyWorkspaceThreadLoad,
+} from '../lib/workspace-thread-load';
 import {
-  effectiveKairoNarration,
-  mapMilestoneToSpeakEvent,
-  shouldNarrateAgentEvent,
-  shouldSpeakLiveThinkingBlock,
-} from '../lib/kairo-narration-policy';
+  createWorkspaceThreadLoadQueue,
+  loadWorkspaceThreadOnce,
+} from '../lib/load-workspace-thread';
+import { createKairoAgentMilestoneNarrator } from '../lib/kairo-agent-milestone-narrator';
+import { effectiveKairoNarration, shouldSpeakLiveThinkingBlock } from '../lib/kairo-narration-policy';
+import { createKairoProgressNarrator } from '../lib/kairo-progress-narrator';
 import { postKairoSpeak } from '../lib/kairo-speak-client';
 import type { EditorRevealRequest } from '../components/EditorHost.vue';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
@@ -93,6 +96,12 @@ import {
   writeOpenIdeThreadIdsForWorkspace,
 } from '../lib/ide-thread-tabs-prefs';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
+import { buildKairoSpeechSessionId } from '../lib/kairo-speech-session';
+import {
+  appendBriefingVoiceTranscriptEntry,
+  readBriefingVoiceTranscript,
+  type BriefingVoiceTranscriptEntry,
+} from '../lib/briefing-voice-transcript';
 import {
   onKairoVoiceIdle,
   pauseKairoPlayback,
@@ -133,6 +142,7 @@ import {
   resolveIdeAgentLinkedRunId,
   resolveIdeAgentLinkedRunIdFromMessages,
 } from '../lib/ide-agent-run-link';
+import { resolveLatestWorkspaceAgentContent } from '../lib/ide-agent-center-view';
 import {
   shouldClearIdeAgentRunLink,
 } from '../lib/ide-agent-run-active';
@@ -396,6 +406,7 @@ export const useShellStore = defineStore('shell', () => {
   const viewportWidth = ref(readViewportWidth());
   const briefingLoadState = ref<BriefingLoadState>('idle');
   const briefingError = ref<string | null>(null);
+  const briefingVoiceTranscript = ref<BriefingVoiceTranscriptEntry[]>(readBriefingVoiceTranscript());
   const signalViews = ref<SignalView[]>([]);
   const threadMessages = ref<OperatorThreadEntry[]>([]);
   const operatorThreadMessages = ref<OperatorThreadEntry[]>([]);
@@ -534,6 +545,27 @@ export const useShellStore = defineStore('shell', () => {
   });
 
   const runHistoryRows = computed(() => buildRunHistoryRows(runHistorySnapshot.value));
+
+  const currentWorkspaceIdeThreadMessages = computed(() => {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    if (!workspaceId) {
+      return [];
+    }
+    if (layoutMode.value === 'ide') {
+      return threadMessages.value;
+    }
+    return workspaceIdeThreadMessagesById.value[workspaceId] ?? [];
+  });
+
+  const latestWorkspaceAgentOutput = computed(() =>
+    resolveLatestWorkspaceAgentContent({
+      agentStreamActive: agentStreamActive.value,
+      agentStreamMessageId: agentStreamMessageId.value,
+      ideThreadMessages: currentWorkspaceIdeThreadMessages.value,
+      operatorThreadMessages: operatorThreadMessages.value,
+    }),
+  );
+
   const workspacePrimarySignal = computed(() =>
     currentWorkspace.value
       ? inboxItems.value.find((item) => item.workspace_id === currentWorkspace.value?.workspace_id) ??
@@ -829,11 +861,10 @@ export const useShellStore = defineStore('shell', () => {
     ideAgentRunId.value = streamUi.ideAgentRunId;
 
     const cached = workspaceIdeThreadMessagesById.value[workspaceId];
-    const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
     if (cached?.length) {
       if (isViewingWorkspaceSurface(workspaceId, 'ide')) {
         threadMessages.value = cached;
-        activeThreadId.value = threadId;
+        activeThreadId.value = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
         commandMutationState.value = 'idle';
         commandMutationError.value = null;
       }
@@ -841,8 +872,13 @@ export const useShellStore = defineStore('shell', () => {
       return;
     }
 
-    await loadWorkspaceThread(workspaceId, 'ide');
     await loadIdeThreads(workspaceId);
+    bootstrapIdeActiveThreadId(workspaceId);
+    await loadWorkspaceThread(
+      workspaceId,
+      'ide',
+      getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
+    );
     applyIdeThreadMessagesToView(workspaceId);
   }
 
@@ -977,11 +1013,52 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  const workspaceThreadLoadPromises = new Map<string, Promise<void>>();
+  const workspaceThreadLoadQueue = createWorkspaceThreadLoadQueue();
   const ideThreadsLoadPromises = new Map<string, Promise<void>>();
 
-  function workspaceThreadLoadKey(workspaceId: string, surface: ThreadSurface): string {
-    return `${workspaceId}:${surface}`;
+  function bootstrapIdeActiveThreadId(workspaceId: string): string | null {
+    const resolved = resolveBootstrapIdeThreadId({
+      selectedThreadId: getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
+      openTabIds: openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [],
+      threadListIds: (ideThreadsByWorkspaceId.value[workspaceId] ?? []).map(
+        (thread) => thread.thread_id,
+      ),
+    });
+    if (resolved && resolved !== getWorkspaceSurfaceThreadId(workspaceId, 'ide')) {
+      setWorkspaceSurfaceThreadId(workspaceId, 'ide', resolved);
+    }
+    return resolved;
+  }
+
+  function applyLoadedWorkspaceThread(
+    workspaceId: string,
+    surface: ThreadSurface,
+    loadedThreadId: string,
+    mapped: OperatorThreadEntry[],
+  ): void {
+    if (!shouldApplyWorkspaceThreadLoad(getWorkspaceSurfaceThreadId(workspaceId, surface), loadedThreadId)) {
+      return;
+    }
+    if (surface === 'ide') {
+      workspaceIdeThreadMessagesById.value = {
+        ...workspaceIdeThreadMessagesById.value,
+        [workspaceId]: mapped,
+      };
+      if (currentWorkspace.value?.workspace_id === workspaceId) {
+        ideAgentRunId.value = resolveIdeAgentLinkedRunIdFromMessages(mapped, runs.value);
+        ensureIdeThreadTabOpen(loadedThreadId);
+      }
+      syncOpenIdeThreadTabs(workspaceId);
+    }
+    if (isViewingWorkspaceSurface(workspaceId, surface)) {
+      activeThreadId.value = loadedThreadId;
+      threadMessages.value = mapped;
+      commandMutationState.value = 'idle';
+      commandMutationError.value = null;
+    }
+    if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
+      operatorThreadMessages.value = mapped;
+    }
   }
 
   function applyIdeThreadMessagesToView(workspaceId: string): void {
@@ -1029,8 +1106,10 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   async function hydrateWorkspaceIdeChat(workspaceId: string): Promise<void> {
-    await loadWorkspaceThread(workspaceId, 'ide');
     await loadIdeThreads(workspaceId);
+    bootstrapIdeActiveThreadId(workspaceId);
+    const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    await loadWorkspaceThread(workspaceId, 'ide', threadId);
     applyIdeThreadMessagesToView(workspaceId);
   }
 
@@ -1091,7 +1170,7 @@ export const useShellStore = defineStore('shell', () => {
       };
     }
 
-    await loadWorkspaceThread(workspaceId, 'ide');
+    await loadWorkspaceThread(workspaceId, 'ide', threadId);
   }
 
   async function refreshOperatorThreadMessages(workspaceId: string): Promise<void> {
@@ -1121,100 +1200,42 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function loadWorkspaceThreadImpl(
-    workspaceId: string,
-    surface: ThreadSurface = currentThreadSurface(),
-  ): Promise<void> {
-    try {
-      let threadId = getWorkspaceSurfaceThreadId(workspaceId, surface);
-      if (!threadId) {
-        const workspaceThread = await fetchWorkspaceChatThread(workspaceId, { surface });
-        if (!hasWorkspaceChatThread(workspaceThread)) {
-          if (isViewingWorkspaceSurface(workspaceId, surface)) {
-            resetThreadContext();
-          }
-          if (surface === 'ide' && currentWorkspace.value?.workspace_id === workspaceId) {
-            clearIdeAgentRunLink();
-          }
-          if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
-            operatorThreadMessages.value = [];
-          }
-          return;
-        }
-
-        threadId = workspaceThread.thread_id;
-        if (threadId) {
-          setWorkspaceSurfaceThreadId(workspaceId, surface, threadId);
-        }
-      }
-
-      if (!threadId) {
-        if (isViewingWorkspaceSurface(workspaceId, surface)) {
-          resetThreadContext();
-        }
-        if (surface === 'ide' && currentWorkspace.value?.workspace_id === workspaceId) {
-          clearIdeAgentRunLink();
-        }
-        return;
-      }
-
-      const history = await fetchThreadHistory(threadId);
-      const mapped = filterThreadMessagesForSurface(
-        history.items.map((item) => mapChatMessageRecord(item)),
-        surface,
-      );
-      if (surface === 'ide') {
-        workspaceIdeThreadMessagesById.value = {
-          ...workspaceIdeThreadMessagesById.value,
-          [workspaceId]: mapped,
-        };
-        if (currentWorkspace.value?.workspace_id === workspaceId) {
-          ideAgentRunId.value = resolveIdeAgentLinkedRunIdFromMessages(mapped, runs.value);
-          ensureIdeThreadTabOpen(history.thread_id);
-        }
-        syncOpenIdeThreadTabs(workspaceId);
-      }
-      if (isViewingWorkspaceSurface(workspaceId, surface)) {
-        activeThreadId.value = history.thread_id;
-        threadMessages.value = mapped;
-        commandMutationState.value = 'idle';
-        commandMutationError.value = null;
-      }
-      if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
-        operatorThreadMessages.value = mapped;
-      }
-    } catch (error) {
-      clearWorkspaceSurfaceThreadId(workspaceId, surface);
-      if (isViewingWorkspaceSurface(workspaceId, surface)) {
-        resetThreadContext();
-        commandMutationState.value = 'error';
-        commandMutationError.value =
-          error instanceof Error ? error.message : 'Failed to load conversation history';
-      }
-      if (surface === 'ide' && currentWorkspace.value?.workspace_id === workspaceId) {
-        clearIdeAgentRunLink();
-      }
-      if (surface === 'operator' && currentWorkspace.value?.workspace_id === workspaceId) {
-        operatorThreadMessages.value = [];
-      }
-    }
-  }
-
   async function loadWorkspaceThread(
     workspaceId: string,
     surface: ThreadSurface = currentThreadSurface(),
+    requestedThreadId?: string | null,
   ): Promise<void> {
-    const key = workspaceThreadLoadKey(workspaceId, surface);
-    const inflight = workspaceThreadLoadPromises.get(key);
-    if (inflight) {
-      return inflight;
-    }
-
-    const promise = loadWorkspaceThreadImpl(workspaceId, surface).finally(() => {
-      workspaceThreadLoadPromises.delete(key);
-    });
-    workspaceThreadLoadPromises.set(key, promise);
-    return promise;
+    return workspaceThreadLoadQueue.enqueue(
+      workspaceId,
+      surface,
+      requestedThreadId,
+      getWorkspaceSurfaceThreadId(workspaceId, surface),
+      () =>
+        loadWorkspaceThreadOnce(
+          {
+            getSelectedThreadId: getWorkspaceSurfaceThreadId,
+            setSelectedThreadId: setWorkspaceSurfaceThreadId,
+            clearSelectedThreadId: clearWorkspaceSurfaceThreadId,
+            isViewingSurface: isViewingWorkspaceSurface,
+            isCurrentWorkspace: (id) => currentWorkspace.value?.workspace_id === id,
+            applyLoaded: applyLoadedWorkspaceThread,
+            resetThreadContext,
+            clearIdeAgentRunLink,
+            setOperatorThreadEmpty: () => {
+              operatorThreadMessages.value = [];
+            },
+            setLoadError: (message) => {
+              commandMutationState.value = 'error';
+              commandMutationError.value = message;
+            },
+            mapChatMessages: (items) => items.map((item) => mapChatMessageRecord(item)),
+            filterForSurface: filterThreadMessagesForSurface,
+          },
+          workspaceId,
+          surface,
+          requestedThreadId,
+        ),
+    );
   }
 
   async function submitOperatorCommand(): Promise<void> {
@@ -1373,16 +1394,11 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function kairoSpeechSessionId(): string {
-    const key = 'axon-x:kairo-speech-session';
-    if (typeof sessionStorage === 'undefined') {
-      return 'default';
-    }
-    let id = sessionStorage.getItem(key);
-    if (!id) {
-      id = `kairo-${Date.now()}`;
-      sessionStorage.setItem(key, id);
-    }
-    return id;
+    const workspaceId = currentWorkspace.value?.workspace_id ?? '';
+    const threadId = workspaceId
+      ? getWorkspaceSurfaceThreadId(workspaceId, currentThreadSurface())
+      : null;
+    return buildKairoSpeechSessionId(workspaceId, threadId);
   }
 
   function voiceDeliveryAllowed(): boolean {
@@ -1431,11 +1447,12 @@ export const useShellStore = defineStore('shell', () => {
     options?: { operatorPrompt?: string; skipSpeakApi?: boolean },
   ): Promise<void> {
     const trimmed = line.trim();
+    const configuredNarration = operatorPresenceSettings.value.kairo_narration ?? 'minimal';
     if (
       !trimmed ||
       !voiceDeliveryAllowed() ||
       operatorPresenceSettings.value.privacy_mode ||
-      effectiveKairoNarrationLevel.value === 'off'
+      configuredNarration === 'off'
     ) {
       if (kairoConversationPhase.value === 'thinking') {
         setKairoConversationPhase('idle');
@@ -1446,7 +1463,7 @@ export const useShellStore = defineStore('shell', () => {
     setKairoConversationPhase('speaking');
     kairoVoicePaused.value = false;
     let message = trimmed;
-    const narration = effectiveKairoNarrationLevel.value;
+    const narration = configuredNarration;
     const operatorPrompt = options?.operatorPrompt?.trim() ?? '';
     const skipSpeakApi = options?.skipSpeakApi === true;
 
@@ -1476,7 +1493,9 @@ export const useShellStore = defineStore('shell', () => {
       }
     }
 
-    await speakKairoLine(message, { priority: 'conversation' });
+    await speakKairoLine(message, {
+      priority: 'conversation',
+    });
   }
 
   function handleKairoPresenceAction(): void {
@@ -1526,47 +1545,6 @@ export const useShellStore = defineStore('shell', () => {
     };
     onSpeechQueueIdle(finishKairoSpeechPhase);
     onKairoVoiceIdle(finishKairoSpeechPhase);
-  }
-
-  async function narrateAgentStreamMilestone(
-    messageId: string,
-    eventKey: string,
-    eventType: string,
-    context: Record<string, unknown> = {},
-  ): Promise<void> {
-    if (!voiceDeliveryAllowed()) {
-      return;
-    }
-    const narration = effectiveKairoNarrationLevel.value;
-    // Gate before any speak network call so filtered tool/edit/thinking
-    // milestones never hit /api/kairo/speak.
-    if (!shouldNarrateAgentEvent({ eventKey, narration })) {
-      return;
-    }
-    try {
-      const response = await postKairoSpeak({
-        event_type: eventType,
-        context,
-        session_id: kairoSpeechSessionId(),
-        workspace_id: currentWorkspace.value?.workspace_id ?? '',
-        narration,
-      });
-      if (response.source === 'skipped' || !response.line?.trim()) {
-        return;
-      }
-      void deliverSpokenOperatorAlert(
-        {
-          eligible: true,
-          reason: `kairo-agent-narration:${eventKey}`,
-          signal_id: `${messageId}:${eventKey}`,
-          message: response.line.trim(),
-        },
-        sessionStorage,
-        { priority: 'narration' },
-      );
-    } catch {
-      // No frontend template fallback — spoken lines must come from /api/kairo/speak.
-    }
   }
 
   async function deliverKairoSpokenAlert(alert: SpokenAlertEligibility): Promise<void> {
@@ -1656,12 +1634,18 @@ export const useShellStore = defineStore('shell', () => {
       if (response.source === 'skipped' || !response.line?.trim()) {
         return;
       }
-      void deliverSpokenOperatorAlert({
+      const channel = await deliverSpokenOperatorAlert({
         eligible: true,
         reason: 'operator_briefing_spoken',
         signal_id: null,
         message: response.line.trim(),
-      });
+      }, sessionStorage, { dedupe: false });
+      if (channel !== 'skipped') {
+        briefingVoiceTranscript.value = appendBriefingVoiceTranscriptEntry({
+          message: response.line.trim(),
+          workspaceId: currentWorkspace.value?.workspace_id ?? null,
+        });
+      }
       scheduleBriefingSurfaceOffer();
     } catch {
       // Voice line unavailable — operator can read briefing in dock.
@@ -1737,16 +1721,33 @@ export const useShellStore = defineStore('shell', () => {
     const narrationEnabled = ideComposerActivity.value?.mode === 'agent';
     const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
     const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
-    let narratedContent = '';
-    let spokenLiveThinkingBlock = '';
+    let streamedContent = '';
+    let spokenStartIntent = false;
+    const streamIncremental = createAgentStreamIncrementalState();
+    const streamUiBatcher = createRafStreamUiBatcher<Partial<WorkspaceStreamUiState>>(
+      (wsId, partial) => setWorkspaceStreamUi(wsId, partial),
+    );
     const voiceContext = kairoVoiceContext();
-
-    if (narrationEnabled) {
-      void narrateAgentStreamMilestone(messageId, 'start', 'agent_start', {
-        operator_prompt: operatorPrompt,
-        full_access: voiceContext.fullAccess,
-      });
-    }
+    const progressNarrator = narrationEnabled
+      ? createKairoProgressNarrator({
+          messageId,
+          sessionId: kairoSpeechSessionId,
+          workspaceId: () => workspaceId,
+          narration: () => effectiveKairoNarrationLevel.value,
+          voiceDeliveryAllowed,
+        })
+      : null;
+    const agentMilestoneNarrator = narrationEnabled
+      ? createKairoAgentMilestoneNarrator({
+          messageId,
+          sessionId: kairoSpeechSessionId,
+          workspaceId: () => workspaceId,
+          narration: () => effectiveKairoNarrationLevel.value,
+          voiceDeliveryAllowed,
+          operatorPrompt: () => operatorPrompt,
+          fullAccess: () => voiceContext.fullAccess,
+        })
+      : null;
 
     chatStreamSessionsByWorkspace.set(
       workspaceId,
@@ -1754,67 +1755,56 @@ export const useShellStore = defineStore('shell', () => {
         threadId,
         messageId,
         onDelta: (content) => {
+          streamedContent = content;
           patchThreadMessageContent(workspaceId, messageId, content);
+          for (const milestone of streamIncremental.consumeFullContent(content)) {
+            if (narrationEnabled) {
+              agentMilestoneNarrator?.narrate(milestone);
+            }
+          }
           const activity = getWorkspaceStreamUi(workspaceId).activity as IdeComposerActivity | null;
           if (activity) {
-            const activityView = resolveStreamingActivity(content, fullAccessNarration);
+            const activityView = streamIncremental.toStreamingActivityView(fullAccessNarration);
             const nextActivity: IdeComposerActivity = {
               ...activity,
               label: activityView.label,
               liveBodyFull: activityView.liveBodyFull,
               liveBodySpoken: activityView.liveBodySpoken,
               liveBodyTruncated: activityView.liveBodyTruncated,
+              streamCounts: streamIncremental.toCounts(),
             };
-            setWorkspaceStreamUi(workspaceId, { activity: nextActivity });
+            streamUiBatcher.schedule(workspaceId, { activity: nextActivity });
 
             const spokenBlock = activityView.liveBodySpoken?.trim() ?? '';
             if (
               narrationEnabled &&
+              !spokenStartIntent &&
               spokenBlock &&
-              spokenBlock !== spokenLiveThinkingBlock &&
               shouldSpeakLiveThinkingBlock({
                 narration: effectiveKairoNarrationLevel.value,
                 spokenBlock,
               })
             ) {
-              spokenLiveThinkingBlock = spokenBlock;
-              const narration = effectiveKairoNarrationLevel.value;
-              if (narration === 'conversational') {
-                void speakKairoConversationLine(spokenBlock, { operatorPrompt });
-              } else {
-                void deliverSpokenOperatorAlert(
-                  {
-                    eligible: true,
-                    reason: 'kairo-agent-live-thinking',
-                    signal_id: `${messageId}:thinking-spoken`,
-                    message: spokenBlock,
-                  },
-                  sessionStorage,
-                  { priority: 'narration' },
-                );
-              }
+              spokenStartIntent = true;
+              agentMilestoneNarrator?.narrate({
+                key: 'start',
+                message: spokenBlock,
+              });
             }
           }
-          if (!narrationEnabled) {
+        },
+        onMilestone: (payload) => {
+          if (!narrationEnabled || !payload.event_key || !payload.event_type) {
             return;
           }
-          const milestones = narrationMilestonesForDelta(narratedContent, content);
-          narratedContent = content;
-          for (const milestone of milestones) {
-            const context: Record<string, unknown> = { operator_prompt: operatorPrompt };
-            if (milestone.toolLabel) {
-              context.tool_label = milestone.toolLabel;
-            }
-            if (milestone.editPath) {
-              context.file_name = milestone.editPath;
-            }
-            void narrateAgentStreamMilestone(
-              messageId,
-              milestone.key,
-              mapMilestoneToSpeakEvent(milestone.key),
-              context,
-            );
-          }
+          progressNarrator?.narrate({
+            eventKey: payload.event_key,
+            eventType: payload.event_type,
+            context: {
+              operator_prompt: operatorPrompt,
+              ...(payload.context ?? {}),
+            },
+          });
         },
         onDone: (payload) => {
           if (payload.system_message_id && payload.system_content) {
@@ -1836,7 +1826,7 @@ export const useShellStore = defineStore('shell', () => {
             patchThreadMessageContent(
               workspaceId,
               messageId,
-              payload.content ?? narratedContent,
+              payload.content ?? streamedContent,
               streamAttachments,
             );
           }
@@ -1851,26 +1841,9 @@ export const useShellStore = defineStore('shell', () => {
               uiAction,
             );
           }
-          const finalContent = payload.content ?? narratedContent;
+          const finalContent = payload.content ?? streamedContent;
           if (narrationEnabled) {
-            const done = narrationForCompletion(finalContent);
-            const doneContext: Record<string, unknown> = { operator_prompt: operatorPrompt };
-            if (done.key === 'failed') {
-              doneContext.outcome = 'failed';
-              doneContext.failure_summary = finalContent.slice(0, 280);
-            }
-            if (done.editCount) {
-              doneContext.edit_count = done.editCount;
-            }
-            if (done.editPath) {
-              doneContext.file_name = done.editPath;
-            }
-            void narrateAgentStreamMilestone(
-              messageId,
-              done.key,
-              mapMilestoneToSpeakEvent(done.key),
-              doneContext,
-            );
+            agentMilestoneNarrator?.narrate(narrationForCompletion(finalContent));
           }
           if (currentWorkspace.value?.workspace_id === workspaceId) {
             for (const path of editedFilePathsFromTranscript(finalContent)) {
@@ -1879,18 +1852,30 @@ export const useShellStore = defineStore('shell', () => {
               }
             }
           }
+          streamUiBatcher.flushNow(workspaceId);
           setWorkspaceStreamUi(workspaceId, {
             active: false,
             messageId: null,
             activity: null,
             ideAgentRunId: null,
           });
+          streamUiBatcher.cancel(workspaceId);
           disconnectChatStreamSession(workspaceId);
           void refreshRunSurfaces().finally(() => {
             void flushIdeComposerQueueIfIdle();
           });
         },
         onError: (message, payload) => {
+          if (narrationEnabled) {
+            const errorSummary = message.trim().slice(0, 120);
+            const failureContent = streamedContent || message;
+            const completion = narrationForCompletion(failureContent);
+            agentMilestoneNarrator?.narrate(
+              completion.key === 'failed'
+                ? { ...completion, message: errorSummary || completion.message }
+                : { key: 'failed', message: errorSummary || 'Failed' },
+            );
+          }
           if (payload?.system_message_id && payload.system_content) {
             patchThreadMessageContent(
               workspaceId,
@@ -1901,11 +1886,13 @@ export const useShellStore = defineStore('shell', () => {
           if (currentWorkspace.value?.workspace_id === workspaceId) {
             commandMutationError.value = message;
           }
+          streamUiBatcher.flushNow(workspaceId);
           setWorkspaceStreamUi(workspaceId, {
             active: false,
             messageId: null,
             activity: null,
           });
+          streamUiBatcher.cancel(workspaceId);
           disconnectChatStreamSession(workspaceId);
           void refreshRunSurfaces().finally(() => {
             void flushIdeComposerQueueIfIdle();
@@ -2043,6 +2030,7 @@ export const useShellStore = defineStore('shell', () => {
         runtime_target: selectedRuntimeTargetId.value || null,
         runtime_model: selectedComposerModel.value || null,
         execution_access: composerMode === 'agent' ? agentExecutionAccess.value : undefined,
+        kairo_session_id: kairoSpeechSessionId(),
       });
       activeThreadId.value = response.thread_id;
       setWorkspaceSurfaceThreadId(workspaceId, 'ide', response.thread_id);
@@ -3635,6 +3623,7 @@ export const useShellStore = defineStore('shell', () => {
     operatorBrainGalaxyActive,
     operatorCenterView,
     operatorBriefing,
+    briefingVoiceTranscript,
     operatorFleetHealth,
     operatorFleetHealthError,
     operatorFleetHealthLoadState,
@@ -3726,6 +3715,7 @@ export const useShellStore = defineStore('shell', () => {
     terminalSessions,
     threadMessages,
     operatorThreadMessages,
+    latestWorkspaceAgentOutput,
     threadStateLabel,
     toggleDockSeam,
     toggleDockHeroMode,
@@ -3752,6 +3742,7 @@ export const useShellStore = defineStore('shell', () => {
     interruptKairoVoice,
     handleKairoPresenceAction,
     kairoSpeechActive,
+    kairoSpeechSessionId,
     kairoVoicePaused,
     maybeSpeakBootGreeting,
     loadWorkspaceFiles,

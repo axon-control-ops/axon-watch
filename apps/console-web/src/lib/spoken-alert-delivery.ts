@@ -13,6 +13,8 @@ export type VoiceDeckSpokenAlertHandler = (
 export type DeliverSpokenAlertOptions = {
   /** Default `alert`. Use `narration` for run milestones / live thinking. */
   priority?: KairoVoicePriority;
+  /** Allow explicit triggers to speak even if a matching alert was already marked spoken. */
+  dedupe?: boolean;
 };
 
 let voiceDeckSpokenAlertHandler: VoiceDeckSpokenAlertHandler | null = null;
@@ -32,7 +34,7 @@ export async function deliverSpokenOperatorAlert(
   storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
   options: DeliverSpokenAlertOptions = {},
 ): Promise<SpokenAlertDeliveryChannel> {
-  if (!shouldSpeakAlert(alert, storage)) {
+  if (options.dedupe !== false && !shouldSpeakAlert(alert, storage)) {
     return 'skipped';
   }
 

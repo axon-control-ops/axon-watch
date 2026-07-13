@@ -1,4 +1,5 @@
 import type { AgentExecutionAccess } from './agent-execution-access-prefs';
+import type { AgentStreamCounts } from './agent-stream-incremental';
 
 export type IdeComposerActivity = {
   label: string;
@@ -11,6 +12,8 @@ export type IdeComposerActivity = {
   /** First complete sentence block for voice playback. */
   liveBodySpoken?: string | null;
   liveBodyTruncated?: boolean;
+  /** Incremental stream header counts — avoids full transcript scans during SSE. */
+  streamCounts?: AgentStreamCounts;
 };
 
 export function buildIdeComposerActivityLabel(

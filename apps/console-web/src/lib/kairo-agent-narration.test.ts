@@ -5,6 +5,7 @@ import {
   narrationForCompletion,
   narrationMilestonesForDelta,
   resolveStreamingActivity,
+  spokenCompletionSummary,
   streamingActivityLabel,
 } from './kairo-agent-narration';
 
@@ -62,13 +63,21 @@ describe('narrationMilestonesForDelta', () => {
 });
 
 describe('narrationForCompletion', () => {
-  it('captures edit metadata for voice script', () => {
+  it('captures edit metadata and spoken summary for voice script', () => {
     expect(narrationForCompletion(STAGE_3)).toMatchObject({
       key: 'done',
       editPath: 'README.md',
       editCount: 1,
+      message: 'DONE',
     });
-    expect(narrationForCompletion('plain reply')).toEqual({ key: 'done', message: 'Done' });
+    expect(narrationForCompletion('plain reply')).toEqual({ key: 'done', message: 'plain reply' });
+  });
+
+  it('extracts a spoken completion summary from the final reply', () => {
+    const content = `${STAGE_2}\n\nI updated the scrollback limit and added a test. The terminal should stop clipping now.`;
+    expect(spokenCompletionSummary(content)).toBe(
+      'I updated the scrollback limit and added a test. The terminal should stop clipping now.',
+    );
   });
 
   it('marks Lane B runtime failures instead of done', () => {

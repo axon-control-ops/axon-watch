@@ -27,6 +27,10 @@ describe('voice deck', () => {
 
     expect(handled).toBe(true);
     expect(speakKairoLine).toHaveBeenCalledOnce();
+    expect(speakKairoLine).toHaveBeenCalledWith(
+      'VAXON: 1 approval waiting for your review.',
+      { priority: 'alert', preferBrowser: true },
+    );
   });
 
   it('declines ineligible alerts without speaking', async () => {

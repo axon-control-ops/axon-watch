@@ -4,6 +4,22 @@ export const DEFAULT_FETCH_TIMEOUT_MS = 12_000;
 /** Runtime status / auth refresh can wait on `cursor agent status` (~7s) plus Codex probes. */
 export const RUNTIME_STATUS_FETCH_TIMEOUT_MS = 30_000;
 
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly label: string;
+
+  constructor(label: string, status: number) {
+    super(label);
+    this.name = 'ApiRequestError';
+    this.label = label;
+    this.status = status;
+  }
+}
+
+export function isApiNotFoundError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 404;
+}
+
 export function controlPlaneBaseUrl(): string {
   const configured = import.meta.env.VITE_CONTROL_PLANE_BASE_URL;
   if (configured) {
@@ -58,10 +74,16 @@ export async function fetchJson<T>(
   try {
     const response = await fetch(apiUrl(path), { ...init, signal });
     if (!response.ok) {
-      throw new Error(errorLabel ?? `request failed with status ${response.status}`);
+      throw new ApiRequestError(
+        errorLabel ?? `request failed with status ${response.status}`,
+        response.status,
+      );
     }
     return (await response.json()) as T;
   } catch (error) {
+    if (error instanceof ApiRequestError) {
+      throw error;
+    }
     if (error instanceof DOMException && error.name === 'TimeoutError') {
       throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
     }

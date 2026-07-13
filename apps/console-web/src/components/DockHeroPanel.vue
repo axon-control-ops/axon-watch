@@ -81,6 +81,7 @@ const shell = useShellStore();
         :load-state="shell.briefingLoadState"
         :error="shell.briefingError"
         :summary-line="shell.briefingSummaryLine"
+        :spoken-transcript="shell.briefingVoiceTranscript"
         :hero="true"
         :galaxy-compact="shell.operatorBrainGalaxyActive"
         @open-chat="shell.setDockHeroMode('command')"

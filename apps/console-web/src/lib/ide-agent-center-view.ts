@@ -20,6 +20,8 @@ export type IdeAgentEditSummary = {
   open: boolean;
 };
 
+const EDIT_HEADER_RE = /^:::edit\s+(.+?)\s+\+(\d+)\s+-(\d+)\s*$/;
+
 export function resolveActiveIdeAgentMessage(
   messages: readonly IdeAgentThreadMessage[],
   agentStreamActive: boolean,
@@ -42,10 +44,46 @@ export function resolveActiveIdeAgentMessage(
   return null;
 }
 
+/** Prefer IDE agent turns — Mission Control summaries should reflect dock work. */
+export function resolveLatestWorkspaceAgentContent(input: {
+  agentStreamActive: boolean;
+  agentStreamMessageId: string | null;
+  ideThreadMessages: readonly IdeAgentThreadMessage[];
+  operatorThreadMessages: readonly IdeAgentThreadMessage[];
+}): string | null {
+  const ideMessage = resolveActiveIdeAgentMessage(
+    input.ideThreadMessages,
+    input.agentStreamActive,
+    input.agentStreamMessageId,
+  );
+  if (ideMessage?.content.trim()) {
+    return ideMessage.content;
+  }
+
+  for (let index = input.operatorThreadMessages.length - 1; index >= 0; index -= 1) {
+    const message = input.operatorThreadMessages[index];
+    if (message.role === 'agent' && message.content.trim()) {
+      return message.content;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract edit cards from an agent message.
+ * Pass `includeDiff: false` for stream-time review strips (paths/counts only).
+ */
 export function extractIdeAgentEditSummaries(
   content: string,
   messageId: string,
+  options?: { includeDiff?: boolean },
 ): IdeAgentEditSummary[] {
+  const includeDiff = options?.includeDiff !== false;
+  if (!includeDiff) {
+    return extractIdeAgentEditHeadersOnly(content, messageId);
+  }
+
   const edits: IdeAgentEditSummary[] = [];
   parseAgentTranscriptBlocks(content).forEach((segment, index) => {
     if (segment.kind !== 'edit') {
@@ -63,10 +101,73 @@ export function extractIdeAgentEditSummaries(
   return edits;
 }
 
+function extractIdeAgentEditHeadersOnly(
+  content: string,
+  messageId: string,
+): IdeAgentEditSummary[] {
+  const edits: IdeAgentEditSummary[] = [];
+  const lines = content.split('\n');
+  let index = 0;
+  let editIndex = 0;
+
+  while (index < lines.length) {
+    const match = lines[index]?.match(EDIT_HEADER_RE);
+    if (!match) {
+      index += 1;
+      continue;
+    }
+    let closed = false;
+    index += 1;
+    while (index < lines.length) {
+      if (lines[index]?.trimEnd() === ':::') {
+        closed = true;
+        index += 1;
+        break;
+      }
+      index += 1;
+    }
+    edits.push({
+      id: `${messageId}:${editIndex}`,
+      path: normalizeEditedFilePath(match[1] ?? ''),
+      added: Number(match[2] ?? 0),
+      removed: Number(match[3] ?? 0),
+      diff: '',
+      open: !closed,
+    });
+    editIndex += 1;
+  }
+
+  return edits;
+}
+
+/** Resolve a single path's diff from thread messages when the strip omitted bodies. */
+export function resolveIdeAgentEditDiffFromThread(
+  messages: readonly IdeAgentThreadMessage[],
+  path: string,
+): string {
+  const normalized = normalizeEditedFilePath(path);
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    const message = messages[messageIndex];
+    if (message?.role !== 'agent') {
+      continue;
+    }
+    for (const edit of extractIdeAgentEditSummaries(message.content, message.message_id, {
+      includeDiff: true,
+    })) {
+      if (edit.path === normalized) {
+        return edit.diff;
+      }
+    }
+  }
+  return '';
+}
+
 /** Collect edit summaries across the thread; later agent messages win on duplicate paths. */
 export function collectIdeAgentEditSummariesFromThread(
   messages: readonly IdeAgentThreadMessage[],
+  options?: { includeDiff?: boolean },
 ): IdeAgentEditSummary[] {
+  const includeDiff = options?.includeDiff === true;
   const byPath = new Map<string, IdeAgentEditSummary>();
   const order: string[] = [];
 
@@ -74,7 +175,9 @@ export function collectIdeAgentEditSummariesFromThread(
     if (message.role !== 'agent') {
       continue;
     }
-    for (const edit of extractIdeAgentEditSummaries(message.content, message.message_id)) {
+    for (const edit of extractIdeAgentEditSummaries(message.content, message.message_id, {
+      includeDiff,
+    })) {
       if (!byPath.has(edit.path)) {
         order.push(edit.path);
       }

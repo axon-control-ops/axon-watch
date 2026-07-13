@@ -41,8 +41,36 @@ export function shouldSpeakLiveThinkingBlock(input: {
   if (input.narration === 'off' || !input.spokenBlock.trim()) {
     return false;
   }
-  // Speak the first complete thinking sentence for minimal + conversational.
+  // Speak the first complete thinking sentence as the run-start intent.
   return /[.!?]$/.test(input.spokenBlock.trim());
+}
+
+/** Progress milestones (run/research/verify) — not the same as agent bookends. */
+const PROGRESS_MINIMAL_EVENTS = new Set([
+  'approval_required',
+  'stream_error',
+  'unverified_complete',
+]);
+
+const PROGRESS_CONVERSATIONAL_SKIP = new Set([
+  'run_started',
+  'research_started',
+  'research_complete',
+  'verified_complete',
+]);
+
+export function shouldNarrateProgressMilestone(input: {
+  eventType: string;
+  narration: KairoNarrationLevel;
+}): boolean {
+  if (input.narration === 'off') {
+    return false;
+  }
+  if (input.narration === 'minimal') {
+    return PROGRESS_MINIMAL_EVENTS.has(input.eventType);
+  }
+  // Conversational: live thinking covers run progress; skip canned status lines.
+  return !PROGRESS_CONVERSATIONAL_SKIP.has(input.eventType);
 }
 
 export function mapMilestoneToSpeakEvent(milestoneKey: string): string {

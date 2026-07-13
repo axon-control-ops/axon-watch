@@ -24,25 +24,34 @@ git push origin dev
 When a slice set is stable, open a PR `dev` → `master` or fast-forward merge locally
 after verification.
 
-## Remote setup (first time)
+## Remote
 
-This repo ships without a configured `origin`. Suggested layout alongside
-`axon-local` (`github.com/axon-control-ops/axon`):
+`origin` is configured for **https://github.com/axon-control-ops/axon-watch**
+(private). Day-to-day pushes use `dev`; merge to `master` after verification.
+
+First-time clone on a new machine:
 
 ```bash
-cd /home/edp/axon-nvme/repos/axon-watch
-git remote add origin git@github.com:axon-control-ops/axon-watch.git  # first time only
+git clone git@github.com:axon-control-ops/axon-watch.git
+cd axon-watch
+git checkout dev
+```
+
+If you need to add `origin` on a copy that has no remote yet:
+
+```bash
+git remote add origin git@github.com:axon-control-ops/axon-watch.git
 git push -u origin master
 git push -u origin dev
 ```
 
-Remote: **https://github.com/axon-control-ops/axon-watch** (private). Both `master` and `dev` are pushed.
-
 ## Planning doc relationship
 
-Frozen planning lives in `axon-local/Plans/Axon-Watch/`. Implementation authority
-for layout and ADRs lives in this repo under `docs/`. Update both when a slice
-changes contracts or locked geometry.
+Canonical planning lives in **`docs/planning/`** in this repo. A continuity
+mirror remains in `axon-local/Plans/Axon-Watch/` (sync via
+`scripts/ops/sync_planning_mirror_to_axon_local.py`). Locked layout and
+implementation ADRs live under `docs/`. See
+`docs/CROSS_REPO_PLANNING_MIGRATION.md`.
 
 ## Verification gate (required before push)
 

@@ -2,7 +2,9 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import WorkspaceIcon from '../WorkspaceIcon.vue';
-import { workspaceIconKind } from '../../lib/mockup-shell-view';
+import { useWorkspaceAgents } from '../../features/workspace-agents/use-workspace-agents';
+import { workspaceAgentLabel } from '../../features/workspace-agents/workspace-agent-label';
+import { workspaceIconKind } from '../../lib/mockup-workspace-icons';
 import {
   workspacePickerMetaLabel,
   workspacePickerPrimaryLabel,
@@ -13,18 +15,37 @@ const shell = useShellStore();
 const menuOpen = ref(false);
 const menuRef = ref<HTMLElement | null>(null);
 
+const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
+const {
+  currentWorkspaceAgent,
+  agentForWorkspace,
+} = useWorkspaceAgents(currentWorkspaceId);
+
 const currentWorkspace = computed(() => shell.currentWorkspace ?? null);
 const currentWorkspaceLabel = computed(() =>
   currentWorkspace.value
     ? workspacePickerPrimaryLabel(currentWorkspace.value)
     : 'No workspace selected',
 );
-const currentWorkspaceMeta = computed(() =>
-  currentWorkspace.value ? workspacePickerMetaLabel(currentWorkspace.value) : '',
-);
+const currentWorkspaceMeta = computed(() => {
+  const agentLabel = workspaceAgentLabel(currentWorkspaceAgent.value);
+  if (agentLabel) {
+    return agentLabel;
+  }
+  return currentWorkspace.value ? workspacePickerMetaLabel(currentWorkspace.value) : '';
+});
 const currentWorkspaceKind = computed(() =>
   currentWorkspace.value ? workspaceIconKind(currentWorkspace.value.workspace_id) : 'hex',
 );
+
+function workspaceRowMeta(workspaceId: string): string {
+  const agentLabel = workspaceAgentLabel(agentForWorkspace(workspaceId));
+  if (agentLabel) {
+    return agentLabel;
+  }
+  const workspace = shell.workspaces.find((entry) => entry.workspace_id === workspaceId);
+  return workspace ? workspacePickerMetaLabel(workspace) : '';
+}
 
 function toggleMenu(event: MouseEvent): void {
   event.stopPropagation();
@@ -70,7 +91,15 @@ onUnmounted(() => {
           :kind="currentWorkspaceKind"
           :size="14"
         />
-        <span class="agent-dock-workspace-menu__label">{{ currentWorkspaceLabel }}</span>
+        <span class="agent-dock-workspace-menu__trigger-copy">
+          <span class="agent-dock-workspace-menu__label">{{ currentWorkspaceLabel }}</span>
+          <span
+            v-if="currentWorkspaceMeta"
+            class="agent-dock-workspace-menu__meta"
+          >
+            {{ currentWorkspaceMeta }}
+          </span>
+        </span>
       </span>
       <span
         class="agent-dock-workspace-menu__chevron"
@@ -111,10 +140,10 @@ onUnmounted(() => {
               {{ workspacePickerPrimaryLabel(workspace) }}
             </span>
             <span
-              v-if="workspacePickerMetaLabel(workspace)"
+              v-if="workspaceRowMeta(workspace.workspace_id)"
               class="agent-dock-workspace-menu__item-meta"
             >
-              {{ workspacePickerMetaLabel(workspace) }}
+              {{ workspaceRowMeta(workspace.workspace_id) }}
             </span>
           </span>
         </span>

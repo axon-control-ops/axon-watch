@@ -18,6 +18,7 @@ import { useIdeLayoutShortcuts } from './composables/useIdeLayoutShortcuts';
 import { useIdeKairoInterrupt } from './composables/useIdeKairoInterrupt';
 import { useVoiceDeckOnBoot } from './features/voice-deck/use-voice-deck';
 import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit-presence';
+import { useKairoAppVoice } from './features/kairo-conversation/use-kairo-app-voice';
 import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
 import { useShellStore } from './stores/shell';
 
@@ -26,6 +27,7 @@ useIdeLayoutShortcuts();
 useIdeKairoInterrupt();
 useVoiceDeckOnBoot();
 useVoiceCockpitPresence();
+useKairoAppVoice();
 let liveEventsSession: ReturnType<typeof startLiveEventsSession> | null = null;
 const { appSurface } = useAppSurface();
 const isVaultSurface = computed(() => appSurface.value === 'vault');

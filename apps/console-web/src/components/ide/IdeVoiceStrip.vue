@@ -3,10 +3,16 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { kairoConversationPhase } from '../../features/kairo-conversation/kairo-conversation-state';
 import {
+  kairoCaptureLastAccepted,
+  kairoCaptureLastGateReason,
+  kairoCaptureLastHeard,
+  kairoCaptureLastSubmitState,
+} from '../../features/kairo-conversation/kairo-shared-speech-capture';
+import {
   ideVoiceStripStatusLabel,
   shouldShowIdeVoiceStrip,
 } from '../../lib/ide-voice-strip';
-import { isSpeechQueueSpeaking } from '../../lib/speech-queue';
+import { isKairoVoiceSpeaking, subscribeKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
 import { useShellStore } from '../../stores/shell';
 
 const props = withDefaults(
@@ -18,7 +24,7 @@ const props = withDefaults(
 
 const shell = useShellStore();
 const speaking = ref(false);
-let pollTimer: number | null = null;
+let unsubscribeSpeaking: (() => void) | null = null;
 
 const visible = computed(() =>
   shouldShowIdeVoiceStrip({
@@ -38,10 +44,34 @@ const statusLabel = computed(() =>
   }),
 );
 
+const voiceDebugLine = computed(() => {
+  const heard = kairoCaptureLastHeard.value.trim();
+  const reason = kairoCaptureLastGateReason.value;
+  const accepted = kairoCaptureLastAccepted.value;
+  const submitState = kairoCaptureLastSubmitState.value;
+  if (!heard && !reason && accepted === null && !submitState) {
+    return '';
+  }
+  const parts = [];
+  if (heard) {
+    parts.push(`Heard: ${heard}`);
+  }
+  if (reason) {
+    parts.push(`Gate: ${reason}`);
+  }
+  if (accepted !== null) {
+    parts.push(`Accepted: ${accepted ? 'yes' : 'no'}`);
+  }
+  if (submitState) {
+    parts.push(`Submit: ${submitState}`);
+  }
+  return parts.join(' · ');
+});
+
 const showStopSpeech = computed(() => shell.kairoSpeechActive);
 
 function refreshSpeakingState(): void {
-  speaking.value = isSpeechQueueSpeaking();
+  speaking.value = isKairoVoiceSpeaking();
 }
 
 function disableStrip(): void {
@@ -54,13 +84,13 @@ function handleStopSpeech(): void {
 
 onMounted(() => {
   refreshSpeakingState();
-  pollTimer = window.setInterval(refreshSpeakingState, 250);
+  unsubscribeSpeaking = subscribeKairoVoiceSpeaking((active) => {
+    speaking.value = active;
+  });
 });
 
 onBeforeUnmount(() => {
-  if (pollTimer !== null) {
-    window.clearInterval(pollTimer);
-  }
+  unsubscribeSpeaking?.();
 });
 </script>
 
@@ -76,7 +106,10 @@ onBeforeUnmount(() => {
         :class="{ 'ide-voice-strip__pulse--active': speaking || shell.kairoSpeechActive }"
         aria-hidden="true"
       />
-      <span class="ide-voice-strip__label">{{ statusLabel }}</span>
+      <div class="ide-voice-strip__copy">
+        <span class="ide-voice-strip__label">{{ statusLabel }}</span>
+        <span v-if="voiceDebugLine" class="ide-voice-strip__debug">{{ voiceDebugLine }}</span>
+      </div>
     </div>
     <div class="ide-voice-strip__actions">
       <button
@@ -119,6 +152,12 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.ide-voice-strip__copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .ide-voice-strip__pulse {
   width: 0.5rem;
   height: 0.5rem;
@@ -139,6 +178,14 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 0.92;
+}
+
+.ide-voice-strip__debug {
+  font-size: 0.68rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.7;
 }
 
 .ide-voice-strip__actions {

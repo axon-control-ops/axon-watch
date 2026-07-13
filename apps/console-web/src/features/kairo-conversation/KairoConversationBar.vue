@@ -75,6 +75,30 @@ const speechCaptureError = computed(
   () => speechCapture.captureError.value,
 );
 
+const voiceDebugLine = computed(() => {
+  const heard = speechCapture.lastHeardTranscript.value.trim();
+  const reason = speechCapture.lastGateReason.value;
+  const accepted = speechCapture.lastAccepted.value;
+  const submitState = speechCapture.lastSubmitState.value;
+  if (!heard && !reason && accepted === null && !submitState) {
+    return '';
+  }
+  const parts = [];
+  if (heard) {
+    parts.push(`Heard: ${heard}`);
+  }
+  if (reason) {
+    parts.push(`Gate: ${reason}`);
+  }
+  if (accepted !== null) {
+    parts.push(`Accepted: ${accepted ? 'yes' : 'no'}`);
+  }
+  if (submitState) {
+    parts.push(`Submit: ${submitState}`);
+  }
+  return parts.join(' · ');
+});
+
 const showInterrupt = computed(
   () => shell.kairoSpeechActive || kairoConversationPhase.value === 'thinking',
 );
@@ -291,6 +315,9 @@ onUnmounted(() => {
     </div>
     <p v-if="speechCaptureError" class="kairo-conversation-bar__error" role="alert">
       {{ speechCaptureError }}
+    </p>
+    <p v-if="voiceDebugLine" class="kairo-conversation-bar__interim kairo-conversation-bar__interim--debug">
+      {{ voiceDebugLine }}
     </p>
     <p v-if="kairoConversationError" class="kairo-conversation-bar__error" role="alert">
       {{ kairoConversationError }}

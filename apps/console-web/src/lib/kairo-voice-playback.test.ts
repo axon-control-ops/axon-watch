@@ -50,7 +50,7 @@ describe('kairo voice playback', () => {
     });
 
     const promise = speakKairoLine('Hello operator', { immediate: true });
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(800);
     const result = await promise;
 
     expect(result.engine).toBe('browser');

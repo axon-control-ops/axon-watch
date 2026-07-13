@@ -98,19 +98,72 @@ def append_voice_transcript(
     return {"entry_id": entry_id, "created_at": created_at}
 
 
-def list_recent_voice_transcripts(*, limit: int = 20) -> list[dict[str, Any]]:
+def list_recent_voice_transcripts(
+    *,
+    limit: int = 20,
+    session_id: str | None = None,
+) -> list[dict[str, Any]]:
     capped = max(1, min(int(limit), 100))
+    clean_session_id = str(session_id or "").strip()
+    with _connect() as connection:
+        _ensure_voice_log_table(connection)
+        if clean_session_id:
+            rows = connection.execute(
+                """
+                SELECT entry_id, created_at, session_id, workspace_id,
+                       raw_content, normalized_content, reply, turn_kind, source, stt_note,
+                       duration_ms, runtime_dispatched
+                FROM kairo_voice_log
+                WHERE session_id = ?
+                ORDER BY created_at DESC, entry_id DESC
+                LIMIT ?
+                """,
+                (clean_session_id, capped),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                """
+                SELECT entry_id, created_at, session_id, workspace_id,
+                       raw_content, normalized_content, reply, turn_kind, source, stt_note,
+                       duration_ms, runtime_dispatched
+                FROM kairo_voice_log
+                ORDER BY created_at DESC, entry_id DESC
+                LIMIT ?
+                """,
+                (capped,),
+            ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_recent_spoken_lines(*, session_id: str, limit: int = 5) -> list[str]:
+    clean_session_id = str(session_id or "").strip()
+    if not clean_session_id:
+        return []
+    capped = max(1, min(int(limit), 20))
     with _connect() as connection:
         _ensure_voice_log_table(connection)
         rows = connection.execute(
             """
-            SELECT entry_id, created_at, session_id, workspace_id,
-                   raw_content, normalized_content, reply, turn_kind, source, stt_note,
-                   duration_ms, runtime_dispatched
+            SELECT rowid, reply
             FROM kairo_voice_log
-            ORDER BY created_at DESC, entry_id DESC
+            WHERE session_id = ? AND TRIM(reply) <> ''
+            ORDER BY rowid DESC
             LIMIT ?
             """,
-            (capped,),
+            (clean_session_id, capped * 4),
         ).fetchall()
-    return [dict(row) for row in rows]
+    lines: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        line = str(row["reply"] or "").strip()
+        if not line:
+            continue
+        normalized = " ".join(line.lower().split())
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        lines.append(line)
+        if len(lines) >= capped:
+            break
+    lines.reverse()
+    return lines

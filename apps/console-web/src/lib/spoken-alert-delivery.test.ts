@@ -109,4 +109,26 @@ describe('spoken alert delivery', () => {
     expect(handler).not.toHaveBeenCalled();
     expect(speakKairoLine).not.toHaveBeenCalled();
   });
+
+  it('can bypass dedupe for explicit replay requests', async () => {
+    vi.mocked(speakKairoLine).mockResolvedValue({ engine: 'browser', reason: 'preferred_browser' });
+    const storage = {
+      getItem: vi.fn().mockReturnValue('operator_briefing_spoken'),
+      setItem: vi.fn(),
+    };
+
+    const channel = await deliverSpokenOperatorAlert(
+      {
+        eligible: true,
+        reason: 'operator_briefing_spoken',
+        signal_id: null,
+        message: 'Watch bootstrap is ready for your review, sir.',
+      },
+      storage,
+      { dedupe: false },
+    );
+
+    expect(channel).toBe('browser');
+    expect(speakKairoLine).toHaveBeenCalledOnce();
+  });
 });

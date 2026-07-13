@@ -5,6 +5,7 @@ import exampleBriefing from '../../../../packages/shared-types/fixtures/operator
 import exampleRuntimeSummary from '../../../../packages/shared-types/fixtures/runtime-summary.example.json';
 
 import {
+  operatorAgentSummary,
   buildOperatorMissionSteps,
   operatorExecutionStage,
   operatorLiveFeed,
@@ -198,6 +199,21 @@ describe('operator status radar view', () => {
     expect(feed.length).toBeGreaterThan(0);
     expect(feed.some((item) => item.tone === 'active')).toBe(true);
     expect(feed.some((item) => item.tone === 'info')).toBe(true);
+  });
+
+  it('builds an agent summary from receipts and latest output', () => {
+    const summary = operatorAgentSummary({
+      historyRows: [
+        { id: '1', label: 'Run created', timestamp: '2026-07-04T07:00:00Z' },
+        { id: '2', label: 'Command execution recorded', timestamp: '2026-07-04T07:10:00Z' },
+      ],
+      currentStep: 'Review when ready',
+      lastAgentMessage: 'Executed `git_status` (ok) for run run_smoke.',
+    });
+
+    expect(summary.length).toBeGreaterThan(0);
+    expect(summary[0]?.meta).toBe('Latest agent result');
+    expect(summary.some((item) => item.meta === 'Recorded receipt')).toBe(true);
   });
 
   it('builds a compact status rail for secondary telemetry', () => {

@@ -35,6 +35,7 @@ function closePanel(): void {
       :load-state="shell.briefingLoadState"
       :error="shell.briefingError"
       :summary-line="shell.briefingSummaryLine"
+      :spoken-transcript="shell.briefingVoiceTranscript"
     />
   </section>
 </template>

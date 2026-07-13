@@ -7,6 +7,7 @@ import {
   buildIdeAgentReviewComposerLabel,
   collectIdeAgentEditSummariesFromThread,
   latestIdeAgentTurnFailed,
+  resolveIdeAgentEditDiffFromThread,
   shouldShowIdeAgentReviewStrip,
 } from '../../lib/ide-agent-center-view';
 import { useShellStore } from '../../stores/shell';
@@ -15,7 +16,8 @@ const shell = useShellStore();
 const expanded = ref(false);
 
 const editSummaries = computed(() =>
-  collectIdeAgentEditSummariesFromThread(shell.threadMessages),
+  // Stream-safe: path/count metadata only. Diff bodies are resolved on click.
+  collectIdeAgentEditSummariesFromThread(shell.threadMessages, { includeDiff: false }),
 );
 
 const reviewReadyCount = computed(
@@ -76,7 +78,11 @@ function applyAllReviewReady(): void {
 }
 
 function openEditPath(edit: IdeAgentEditSummary): void {
-  shell.openAgentEditReview(edit);
+  const diff = edit.diff || resolveIdeAgentEditDiffFromThread(shell.threadMessages, edit.path);
+  shell.openAgentEditReview({
+    ...edit,
+    diff,
+  });
 }
 
 function focusReviewFiles(): void {
@@ -85,7 +91,7 @@ function focusReviewFiles(): void {
     return;
   }
   expanded.value = true;
-  shell.openAgentEditReview(first);
+  openEditPath(first);
 }
 </script>
 

@@ -12,4 +12,5 @@ export type {
   SpokenAlertEligibility,
   ThreadMessage,
   WorkspaceRecord,
+  WorkspaceAgentRecord,
 } from '../../../../packages/shared-types/src/index';

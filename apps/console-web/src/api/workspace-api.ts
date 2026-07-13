@@ -1,4 +1,4 @@
-import type { WorkspaceRecord } from '../contracts/canonical';
+import type { WorkspaceRecord, WorkspaceAgentListSnapshot, WorkspaceAgentRecord } from '../contracts/canonical';
 
 import { fetchJson, apiUrl } from './client';
 
@@ -100,6 +100,27 @@ export async function fetchWorkspace(workspaceId: string): Promise<WorkspaceReco
     `/api/workspaces/${workspaceId}`,
     {},
     'workspace request failed',
+  );
+}
+
+export async function fetchWorkspaceAgents(options?: {
+  scope?: 'all' | 'operator';
+}): Promise<WorkspaceAgentListSnapshot> {
+  const scope = options?.scope === 'operator' ? 'operator' : '';
+  const query = scope ? '?scope=operator' : '';
+  return fetchJson<WorkspaceAgentListSnapshot>(
+    `/api/agents${query}`,
+    {},
+    'workspace agents request failed',
+  );
+}
+
+export async function fetchWorkspaceAgent(workspaceId: string): Promise<WorkspaceAgentRecord> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<WorkspaceAgentRecord>(
+    `/api/workspaces/${encoded}/agent`,
+    {},
+    'workspace agent request failed',
   );
 }
 

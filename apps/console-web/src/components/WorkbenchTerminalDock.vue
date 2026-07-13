@@ -7,8 +7,10 @@ import TerminalSessionRail from './shell/TerminalSessionRail.vue';
 import { useAgentTerminalMirror } from '../composables/useAgentTerminalMirror';
 import {
   agentShellMirrorActive,
+  agentShellMirrorForcedText,
   clearAgentShellMirror,
 } from '../lib/agent-shell-mirror-state';
+import { agentContentHasTranscriptBlocks } from '../lib/agent-transcript-blocks';
 import { findAgentTerminalMirrorSegment } from '../lib/agent-terminal-mirror';
 import { terminalSessionTabLabel } from '../lib/terminal-session-view';
 import { useShellStore } from '../stores/shell';
@@ -81,7 +83,11 @@ function resolveMirrorTranscriptContent(): string {
     if (message?.role !== 'agent') {
       continue;
     }
-    if (findAgentTerminalMirrorSegment(message.content)) {
+    // Cheap prefilter — avoid full transcript parses on every agent message.
+    if (
+      agentContentHasTranscriptBlocks(message.content) &&
+      findAgentTerminalMirrorSegment(message.content)
+    ) {
       return message.content;
     }
   }
@@ -94,8 +100,33 @@ const { syncNow: syncAgentTerminalMirror } = useAgentTerminalMirror({
   getTranscriptContent: resolveMirrorTranscriptContent,
   streamActive: agentStreamActive,
   clearMirror: clearAgentShellMirror,
+  forcedText: agentShellMirrorForcedText,
   getHost: (sessionId) => terminalHostRefs.value[sessionId] ?? null,
 });
+
+watch(
+  () => [agentShellMirrorActive.value, agentShellMirrorForcedText.value, agentSessionId.value] as const,
+  ([active, forced, sessionId]) => {
+    if (!active || !sessionId) {
+      return;
+    }
+    if (!forced && !resolveMirrorTranscriptContent()) {
+      return;
+    }
+    // Prefer the agent pane when mirroring so the operator is not left staring at empty bash.
+    const current = visibleTerminalSessionIds.value;
+    if (current[0] !== sessionId) {
+      visibleTerminalSessionIds.value = [sessionId, ...current.filter((id) => id !== sessionId)].slice(
+        0,
+        2,
+      );
+    }
+    // Host may mount one tick after the agent session becomes active.
+    requestAnimationFrame(() => {
+      syncAgentTerminalMirror();
+    });
+  },
+);
 
 function paneLabel(session: (typeof shell.terminalSessions)[number]): string {
   const base = terminalSessionTabLabel({
@@ -215,6 +246,13 @@ watch(
     visibleTerminalSessionIds.value = kept;
   },
   { immediate: true },
+);
+
+watch(
+  () => shell.ideTerminalRevealToken,
+  () => {
+    bottomTab.value = 'terminal';
+  },
 );
 
 onMounted(() => {

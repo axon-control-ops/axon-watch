@@ -45,7 +45,7 @@ describe('speech queue', () => {
 
     enqueueSpeech('first line', speech);
     expect(isSpeechQueueSpeaking()).toBe(true);
-    vi.advanceTimersByTime(60);
+    vi.advanceTimersByTime(150);
     expect(speech.utterances).toHaveLength(1);
 
     stopSpeech(speech);
@@ -63,7 +63,7 @@ describe('speech queue', () => {
     const idle = waitForSpeechQueueIdle();
     expect(isSpeechQueueBusy()).toBe(true);
 
-    vi.advanceTimersByTime(60);
+    vi.advanceTimersByTime(150);
     const utterance = speech.utterances[0];
     utterance.onend?.();
     await vi.advanceTimersByTimeAsync(300);
@@ -95,12 +95,41 @@ describe('speech queue', () => {
     stopSpeech(speech);
 
     enqueueSpeech('natural voice', speech);
-    vi.advanceTimersByTime(60);
+    vi.advanceTimersByTime(150);
 
     const utterance = speech.utterances[0] as MockUtterance;
     expect(utterance.rate).toBe(1);
     expect(utterance.pitch).toBe(1);
     expect(utterance.volume).toBe(1);
+    vi.useRealTimers();
+  });
+
+  it('cancels delayed browser speech before it can start', () => {
+    vi.useFakeTimers();
+    const speech = createSpeechPort();
+    stopSpeech(speech);
+
+    enqueueSpeech('stale line', speech);
+    stopSpeech(speech);
+    vi.advanceTimersByTime(100);
+
+    expect(speech.utterances).toHaveLength(0);
+    expect(speech.cancel).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('prevents a canceled utterance from stealing the next reply start', () => {
+    vi.useFakeTimers();
+    const speech = createSpeechPort();
+    stopSpeech(speech);
+
+    enqueueSpeech('old line', speech);
+    stopSpeech(speech);
+    enqueueSpeech('fresh line', speech);
+    vi.advanceTimersByTime(150);
+
+    expect(speech.utterances).toHaveLength(1);
+    expect(speech.utterances[0]?.text).toBe('fresh line');
     vi.useRealTimers();
   });
 });

@@ -1,9 +1,17 @@
 export type { ApprovalRecord, ThreadMessage, WorkspaceRecord } from './control-plane';
 export type {
+  WorkspaceAgentListSnapshot,
+  WorkspaceAgentRecord,
+  WorkspaceAgentRole,
+  WorkspaceAgentStatus,
+} from './workspace-agent';
+export { WORKSPACE_AGENT_ROLES, WORKSPACE_AGENT_STATUSES } from './workspace-agent';
+export type {
   BriefingAction,
   BriefingActionKind,
   OperatorBriefing,
   OperatorBriefingConnectivity,
+  OperatorBriefingMemoryHighlight,
   OperatorBriefingPendingApprovals,
   ExecutiveOperatorRhythm,
 } from './briefing';

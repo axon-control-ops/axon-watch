@@ -18,9 +18,7 @@ import { resolveKairoPresenceState } from '../../lib/kairo-presence';
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
 import { subscribeKairoVoiceChunk, subscribeKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
 import { kairoConversationPhase, isKairoConversationBusy, kairoConversationReply, setKairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
-import { useKairoHandsFreeLoop } from '../kairo-conversation/use-kairo-hands-free-loop';
 import { useKairoSpeechCapture } from '../kairo-conversation/use-kairo-speech-capture';
-import { useKairoVoiceInterrupt } from '../kairo-conversation/use-kairo-voice-interrupt';
 import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_ORB_LABEL } from '../../lib/operator-persona-name';
 import { useShellStore } from '../../stores/shell';
 
@@ -148,17 +146,8 @@ const voiceBlocked = computed(() => shell.operatorPresenceSettings.privacy_mode)
 const speechCapture = useKairoSpeechCapture({
   privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
   captureMode: 'manual',
+  stopOnUnmount: 'manual_only',
 });
-
-useKairoHandsFreeLoop({
-  enabled: () => handsFreeEnabled.value,
-  privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
-  kairoSpeaking: () => kairoSpeaking.value || shell.kairoSpeechActive,
-  conversationPending: () =>
-    kairoConversationPhase.value === 'thinking' || kairoConversationPhase.value === 'speaking',
-});
-
-useKairoVoiceInterrupt();
 
 function stageElement(): HTMLElement | null {
   return orbAnchor.value?.closest('.brain-galaxy-stage') as HTMLElement | null;

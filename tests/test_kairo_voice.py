@@ -21,6 +21,7 @@ from app.kairo_voice import (  # noqa: E402
 )
 from app.main import app  # noqa: E402
 from app.persistence import operator_presence_settings_store, run_store  # noqa: E402
+from app.persistence.voice_transcript_store import list_recent_voice_transcripts  # noqa: E402
 
 
 class KairoVoicePolicyTests(unittest.TestCase):
@@ -72,6 +73,37 @@ class KairoVoicePolicyTests(unittest.TestCase):
             )
         self.assertIn("report", start["line"].lower())
         self.assertIn("answer", done["line"].lower())
+
+    def test_agent_start_prefers_task_summary_over_canned_ack(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="agent_start",
+                context={
+                    "operator_prompt": "fix the browser failures",
+                    "task_summary": (
+                        "I'll start by checking the screenshot and any recent terminal or log output."
+                    ),
+                },
+                session_id="task-summary-start",
+                use_runtime=False,
+            )
+        self.assertIn("screenshot", payload["line"].lower())
+        self.assertNotIn("starting on that", payload["line"].lower())
+        self.assertNotIn("working on that", payload["line"].lower())
+
+    def test_done_prefers_task_summary_over_generic_all_set(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="done",
+                context={
+                    "operator_prompt": "fix the terminal scrollback bug",
+                    "task_summary": "I raised the scrollback limit and added a regression test.",
+                },
+                session_id="task-summary-done",
+                use_runtime=False,
+            )
+        self.assertIn("scrollback", payload["line"].lower())
+        self.assertNotIn("all set on my side", payload["line"].lower())
 
     def test_failed_outcome_does_not_claim_all_set(self) -> None:
         with patch("app.kairo_voice._try_runtime_line", return_value=None):
@@ -228,6 +260,24 @@ class KairoSpeakApiTests(unittest.TestCase):
         payload = response.json()
         self.assertTrue(payload["line"])
         self.assertIn(payload["source"], {"fallback", "model"})
+
+    def test_speak_logs_recent_line_and_voice_log_filters_by_session(self) -> None:
+        response = self.client.post(
+            "/api/kairo/speak",
+            json={
+                "event_type": "briefing",
+                "session_id": "voice-log-session",
+                "context": {"notice": "DashPro needs review."},
+            },
+        )
+        self.assertEqual(200, response.status_code)
+        stored = list_recent_voice_transcripts(limit=5, session_id="voice-log-session")
+        self.assertEqual(1, len(stored))
+        self.assertEqual("briefing", stored[0]["turn_kind"])
+
+        filtered = self.client.get("/api/kairo/voice-log?session_id=voice-log-session").json()
+        self.assertEqual(1, len(filtered["entries"]))
+        self.assertEqual("voice-log-session", filtered["entries"][0]["session_id"])
 
 
 if __name__ == "__main__":

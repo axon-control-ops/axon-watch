@@ -37,12 +37,15 @@ class LaneBContextTokenTests(unittest.TestCase):
                     text="const answer = 42;",
                 ),
                 terminal_snippet="Tests 10 passed",
+                memory_appendix="KAIRO memory (non-authoritative):\n- Task: Continue DashPro plan",
             )
         )
         self.assertIn("Editor selection (src/app.ts L4-L6):", block)
         self.assertIn("const answer = 42;", block)
         self.assertIn("Terminal output (recent):", block)
         self.assertIn("Tests 10 passed", block)
+        self.assertIn("KAIRO memory (non-authoritative):", block)
+        self.assertIn("Continue DashPro plan", block)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,10 @@
 import type { OperatorBriefing, RunRecord, RuntimeSummary } from '../contracts/canonical';
 import type { RunHistoryRow } from './run-history-view';
 
+import {
+  agentContentHasTranscriptBlocks,
+  parseAgentTranscriptBlocks,
+} from './agent-transcript-blocks';
 import { runPhaseProgress, runPhaseTag } from './mockup-shell-view';
 import { formatRunDisplayName, formatRunIdentityLabel, formatRunShortId, humanizeRunSummary, formatRunCommandDetail } from './run-display';
 import { isAutoCompleteRunSummary } from './operator-run-strip-view';
@@ -69,6 +73,12 @@ export interface OperatorLiveFeedItem {
   tone: 'done' | 'active' | 'info' | 'pending';
 }
 
+export interface OperatorAgentSummaryItem {
+  id: string;
+  label: string;
+  meta?: string;
+}
+
 export interface OperatorStatusRailItem {
   label: string;
   value: string;
@@ -122,10 +132,36 @@ function firstMeaningfulLine(content: string | null | undefined): string {
     return 'No agent output yet';
   }
 
-  const lines = content
+  const trimmed = content.trim();
+  if (agentContentHasTranscriptBlocks(trimmed)) {
+    const segments = parseAgentTranscriptBlocks(trimmed);
+    for (let index = segments.length - 1; index >= 0; index -= 1) {
+      const segment = segments[index];
+      if (segment.kind === 'text' && segment.text.trim()) {
+        const line = segment.text
+          .split('\n')
+          .map((entry) => entry.trim())
+          .find((entry) => entry.length > 0);
+        if (line) {
+          return truncatePanelCopy(line);
+        }
+      }
+      if (segment.kind === 'edit') {
+        return truncatePanelCopy(`Edited ${segment.path}`);
+      }
+    }
+  }
+
+  const lines = trimmed
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && line !== '```');
+    .filter(
+      (line) =>
+        line.length > 0 &&
+        line !== '```' &&
+        !line.startsWith(':::') &&
+        line !== ':::',
+    );
 
   return truncatePanelCopy(lines[0] ?? 'No agent output yet');
 }
@@ -505,6 +541,54 @@ export function operatorLiveFeed(input: {
   }
 
   return items.slice(-6);
+}
+
+export function operatorAgentSummary(input: {
+  historyRows: RunHistoryRow[];
+  currentStep: string | null;
+  lastAgentMessage: string | null;
+}): OperatorAgentSummaryItem[] {
+  const items: OperatorAgentSummaryItem[] = [];
+
+  for (const row of [...input.historyRows].reverse().slice(-3)) {
+    items.push({
+      id: row.id,
+      label: truncatePanelCopy(row.label, 120),
+      meta: 'Recorded receipt',
+    });
+  }
+
+  if (input.currentStep) {
+    const current = truncatePanelCopy(input.currentStep, 120);
+    if (!items.some((item) => item.label === current)) {
+      items.unshift({
+        id: 'current-step',
+        label: current,
+        meta: 'Current step',
+      });
+    }
+  }
+
+  if (input.lastAgentMessage) {
+    const excerpt = firstMeaningfulLine(input.lastAgentMessage);
+    if (excerpt && !items.some((item) => item.label === excerpt)) {
+      items.unshift({
+        id: 'agent-output',
+        label: excerpt,
+        meta: 'Latest agent result',
+      });
+    }
+  }
+
+  if (items.length === 0) {
+    items.push({
+      id: 'idle',
+      label: 'No agent summary yet. Start a run and receipts will accumulate here.',
+      meta: 'Idle',
+    });
+  }
+
+  return items.slice(0, 4);
 }
 
 export function operatorStatusRail(input: {

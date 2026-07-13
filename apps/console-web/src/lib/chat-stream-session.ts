@@ -3,6 +3,7 @@ import type { ChatUiAction } from './chat-ui-action';
 export type ChatStreamEventType =
   | 'connected'
   | 'chat_stream_delta'
+  | 'chat_stream_milestone'
   | 'chat_stream_done'
   | 'chat_stream_error'
   | 'chat_stream_close';
@@ -19,6 +20,9 @@ export interface ChatStreamEventPayload {
   system_message_id?: string;
   system_content?: string;
   ui_action?: ChatUiAction | null;
+  event_key?: string;
+  event_type?: string;
+  context?: Record<string, unknown>;
   attachments?: Array<{
     attachment_id: string;
     filename: string;
@@ -65,6 +69,7 @@ export interface ChatStreamSessionOptions {
   threadId: string;
   messageId: string;
   onDelta: (content: string) => void;
+  onMilestone?: (payload: ChatStreamEventPayload) => void;
   onDone?: (payload: ChatStreamEventPayload) => void;
   onError?: (message: string, payload?: ChatStreamEventPayload) => void;
   EventSourceImpl?: typeof EventSource;
@@ -110,6 +115,11 @@ export function startChatStreamSession(options: ChatStreamSessionOptions): ChatS
       options.onDelta(String(payload.content ?? ''));
       options.onDone?.(payload);
       disconnectEventSource();
+      return;
+    }
+
+    if (payload.type === 'chat_stream_milestone' && payload.message_id === options.messageId) {
+      options.onMilestone?.(payload);
       return;
     }
 

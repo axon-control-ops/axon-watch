@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import type { OperatorBriefing } from '../contracts/canonical';
+import type { BriefingVoiceTranscriptEntry } from '../lib/briefing-voice-transcript';
 import {
   briefingAdvise,
   briefingConnectivityLabels,
@@ -23,6 +24,7 @@ const props = defineProps<{
   hero?: boolean;
   galaxyCompact?: boolean;
   summaryLine?: string;
+  spokenTranscript?: BriefingVoiceTranscriptEntry[];
 }>();
 
 const emit = defineEmits<{
@@ -68,6 +70,16 @@ const voiceLine = computed(() => {
     personaEnabled: personaEnabled.value,
   });
 });
+
+const spokenTranscript = computed(() => props.spokenTranscript ?? []);
+
+function transcriptTimeLabel(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+  return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 </script>
 
 <template>
@@ -219,6 +231,37 @@ const voiceLine = computed(() => {
             <span class="briefing-panel__item-title">{{ action.title }}</span>
             <span class="region-copy">{{ action.detail }}</span>
             <span class="briefing-panel__kind">{{ action.kind }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <div v-if="briefing?.memory_highlights?.length" class="briefing-panel__section">
+        <p class="briefing-panel__section-label">Operator context</p>
+        <ul class="briefing-panel__list">
+          <li
+            v-for="memory in briefing.memory_highlights"
+            :key="memory.memory_id"
+            class="briefing-panel__item"
+          >
+            <span class="briefing-panel__item-title">{{ memory.title }}</span>
+            <span class="region-copy">{{ memory.content }}</span>
+            <span class="briefing-panel__kind">non-authoritative memory</span>
+          </li>
+        </ul>
+      </div>
+
+      <div v-if="spokenTranscript.length" class="briefing-panel__section">
+        <p class="briefing-panel__section-label">Spoken transcript</p>
+        <ul class="briefing-panel__list">
+          <li
+            v-for="entry in spokenTranscript"
+            :key="entry.id"
+            class="briefing-panel__item"
+          >
+            <span class="briefing-panel__item-title">{{ entry.message }}</span>
+            <span v-if="transcriptTimeLabel(entry.createdAt)" class="region-copy">
+              {{ transcriptTimeLabel(entry.createdAt) }}
+            </span>
           </li>
         </ul>
       </div>

@@ -17,13 +17,17 @@ export interface KairoSpeakResponse {
   source: 'model' | 'fallback' | 'literal' | 'skipped';
 }
 
-export async function postKairoSpeak(body: KairoSpeakRequest): Promise<KairoSpeakResponse> {
+export async function postKairoSpeak(
+  body: KairoSpeakRequest,
+  options?: { signal?: AbortSignal },
+): Promise<KairoSpeakResponse> {
   const baseUrl = controlPlaneBaseUrl();
   const url = baseUrl ? `${baseUrl}/api/kairo/speak` : '/api/kairo/speak';
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
   if (!response.ok) {
     throw new Error(`KAIRO speak failed (${response.status})`);

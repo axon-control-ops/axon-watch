@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -14,6 +15,10 @@ from app.chat.lane_b_agent import (
     LaneBContext,
     generate_lane_b_result,
     should_use_lane_b,
+)
+from app.chat.lane_b_persona_fast_path import (
+    build_lane_b_persona_reply,
+    post_lane_b_persona_message,
 )
 from app.chat.lane_b_fast_paths import post_image_redisplay_message, post_workspace_switch_message
 from app.chat.lane_b_generated_image_actions import (
@@ -29,6 +34,11 @@ from app.chat.orchestration import (
     orchestrate_resume_from_review,
 )
 from app.chat.reply_verification import verify_lane_b_reply
+from app.chat.progress_milestones import (
+    publish_completion_milestone,
+    persist_stream_delta,
+    publish_stream_error_milestone,
+)
 from app.chat.stream_hub import close_chat_stream, clear_chat_stream_buffer, publish_chat_stream_event
 from app.chat.workspace_switch import (
     WorkspaceSwitchError,
@@ -36,6 +46,7 @@ from app.chat.workspace_switch import (
     resolve_workspace_switch_intent,
     workspace_switch_ui_action,
 )
+from app.kairo.turn_memory import build_lane_b_memory_appendix
 from app.persistence import attachment_store, chat_store
 from app.runs.service import (
     RunLifecycleError,
@@ -55,6 +66,24 @@ class ChatValidationError(ValueError):
     pass
 
 
+_KAIRO_CONTINUATION_RE = re.compile(
+    r"\b(continue|pick up|resume|as we discussed|the plan|that in the ide)\b",
+    re.IGNORECASE,
+)
+_KAIRO_HANDOFF_TASK_RE = re.compile(r'^Investigate signal "', re.IGNORECASE)
+
+
+def _lane_b_memory_appendix(*, content: str, kairo_session_id: str | None) -> str | None:
+    clean_session_id = str(kairo_session_id or "").strip()
+    if not clean_session_id:
+        return None
+    trimmed = content.strip()
+    if not (_KAIRO_CONTINUATION_RE.search(trimmed) or _KAIRO_HANDOFF_TASK_RE.match(trimmed)):
+        return None
+    appendix = build_lane_b_memory_appendix(clean_session_id, max_chars=800)
+    return appendix or None
+
+
 @dataclass(frozen=True)
 class LaneBStreamJob:
     thread_id: str
@@ -72,6 +101,7 @@ class LaneBStreamJob:
     execution_access: str
     dispatch_run_id: str
     created_at: str
+    memory_appendix: str | None = None
 
 
 def _coerce_attachment_ids(raw: list[str] | None) -> list[str]:
@@ -242,6 +272,7 @@ def post_chat_message(
     runtime_target: str | None = None,
     runtime_model: str | None = None,
     execution_access: str | None = None,
+    kairo_session_id: str | None = None,
 ) -> dict[str, object]:
     trimmed = content.strip()
     if not trimmed:
@@ -266,6 +297,7 @@ def post_chat_message(
             runtime_target=runtime_target,
             runtime_model=runtime_model,
             execution_access=normalize_execution_access(execution_access),
+            kairo_session_id=kairo_session_id,
             created_at=created_at,
         )
     if intent == "resume_from_review":
@@ -446,30 +478,22 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
         editor_selection=job.editor_selection,
         terminal_snippet=job.terminal_snippet,
         image_paths=job.image_paths,
+        memory_appendix=job.memory_appendix,
     )
     dispatched = False
     run_record = None
     lane_b_result: dict[str, object] = {}
+    milestone_content = ""
 
     def on_chunk(accumulated: str, delta: str) -> None:
-        from app.cli_runtime.research_stream_blocks import normalize_transcript_content
-
-        normalized_accumulated = normalize_transcript_content(accumulated)
-        updated_at = _utc_now()
-        chat_store.update_message_content(
+        nonlocal milestone_content
+        milestone_content = persist_stream_delta(
+            thread_id=job.thread_id,
             message_id=job.agent_message_id,
-            content=normalized_accumulated,
-            updated_at=updated_at,
-        )
-        publish_chat_stream_event(
-            job.thread_id,
-            {
-                "type": "chat_stream_delta",
-                "thread_id": job.thread_id,
-                "message_id": job.agent_message_id,
-                "content": normalized_accumulated,
-                "delta": delta,
-            },
+            previous_content=milestone_content,
+            accumulated=accumulated,
+            delta=delta,
+            updated_at=_utc_now(),
         )
 
     try:
@@ -547,6 +571,12 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             content=system_content,
             updated_at=updated_at,
         )
+        publish_completion_milestone(
+            thread_id=job.thread_id,
+            message_id=job.agent_message_id,
+            verification_warnings=verification_warnings,
+            run_record=run_record,
+        )
         agent_attachments = bind_agent_generated_images(
             workspace_id=job.workspace_id,
             message_id=job.agent_message_id,
@@ -595,6 +625,11 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
                 )
             except RunLifecycleError:
                 run_record = None
+        publish_stream_error_milestone(
+            thread_id=job.thread_id,
+            message_id=job.agent_message_id,
+            error=fallback,
+        )
         publish_chat_stream_event(
             job.thread_id,
             {
@@ -626,6 +661,7 @@ def _post_lane_b_message(
     runtime_target: str | None,
     runtime_model: str | None,
     execution_access: str,
+    kairo_session_id: str | None,
     created_at: str,
 ) -> dict[str, object]:
     try:
@@ -673,12 +709,51 @@ def _post_lane_b_message(
             new_message_id=_new_message_id,
         )
 
+    memory_appendix = (
+        _lane_b_memory_appendix(content=content, kairo_session_id=kairo_session_id)
+        if composer_mode == "agent"
+        else None
+    )
+    recent_turns = [
+        {
+            "role": str(item.get("role") or ""),
+            "content": str(item.get("content") or ""),
+        }
+        for item in chat_store.list_thread_messages(thread_id)
+    ]
+    persona_reply = (
+        build_lane_b_persona_reply(
+            content=content,
+            recent_turns=recent_turns,
+            session_id=f"ide-thread:{thread_id}",
+        )
+        if composer_mode == "agent"
+        else None
+    )
+    if persona_reply:
+        return post_lane_b_persona_message(
+            workspace_id=workspace_id,
+            content=content,
+            thread_id=thread_id,
+            created_at=created_at,
+            save_message=chat_store.save_message,
+            new_message_id=_new_message_id,
+            bind_attachments=lambda message_id: _bind_message_attachments(
+                attachment_ids=attachment_ids,
+                workspace_id=workspace_id,
+                message_id=message_id,
+                thread_id=thread_id,
+            )[0],
+            agent_content=persona_reply,
+        )
+
     context = LaneBContext(
         workspace_id=workspace_id,
         composer_mode=composer_mode,
         active_file_path=active_file_path,
         editor_selection=editor_selection,
         terminal_snippet=terminal_snippet,
+        memory_appendix=memory_appendix,
     )
     dispatch_run_id = ""
     dispatched = False
@@ -733,6 +808,7 @@ def _post_lane_b_message(
             editor_selection=editor_selection,
             terminal_snippet=terminal_snippet,
             image_paths=image_paths,
+            memory_appendix=memory_appendix,
         )
         system_message_id = _new_message_id("message_system")
         system_message = chat_store.save_message(
@@ -779,6 +855,7 @@ def _post_lane_b_message(
             execution_access=execution_access,
             dispatch_run_id=dispatch_run_id,
             created_at=created_at,
+            memory_appendix=memory_appendix,
         )
         payload: dict[str, object] = {
             "thread_id": thread_id,
@@ -802,6 +879,7 @@ def _post_lane_b_message(
         editor_selection=editor_selection,
         terminal_snippet=terminal_snippet,
         image_paths=image_paths,
+        memory_appendix=memory_appendix,
     )
     system_content = _lane_b_system_content(
         composer_mode=composer_mode,

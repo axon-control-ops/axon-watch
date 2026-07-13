@@ -39,7 +39,118 @@ export function agentContentHasTranscriptBlocks(content: string): boolean {
   return /^:::(thinking|edit|tool|terminal|research|image)\b/m.test(content);
 }
 
-export function parseAgentTranscriptBlocks(content: string): AgentTranscriptSegment[] {
+/** Cheap header counts — safe to run on every stream delta. */
+export function countAgentTranscriptHeaders(content: string): {
+  edit: number;
+  terminal: number;
+  tool: number;
+  research: number;
+} {
+  return {
+    edit: content.match(/^:::edit\s+/gm)?.length ?? 0,
+    terminal: content.match(/^:::terminal\s+/gm)?.length ?? 0,
+    tool: content.match(/^:::tool\s+/gm)?.length ?? 0,
+    research: content.match(/^:::research\s+/gm)?.length ?? 0,
+  };
+}
+
+const PARSE_CACHE_LIMIT = 2;
+const parseCache = new Map<string, AgentTranscriptSegment[]>();
+
+function rememberParsedSegments(
+  content: string,
+  segments: AgentTranscriptSegment[],
+): AgentTranscriptSegment[] {
+  parseCache.set(content, segments);
+  if (parseCache.size > PARSE_CACHE_LIMIT) {
+    const oldest = parseCache.keys().next().value;
+    if (oldest !== undefined) {
+      parseCache.delete(oldest);
+    }
+  }
+  return segments;
+}
+
+/**
+ * Collapse large closed-edit fan-out so the conversation lane does not mount
+ * hundreds of diff previews on every stream tick (main-thread freeze).
+ */
+export function collapseClosedEditSegmentsForDisplay(
+  segments: AgentTranscriptSegment[],
+  threshold = 12,
+): AgentTranscriptSegment[] {
+  const closedEditCount = segments.reduce(
+    (count, segment) => (segment.kind === 'edit' && !segment.open ? count + 1 : count),
+    0,
+  );
+  if (closedEditCount < threshold) {
+    return segments;
+  }
+
+  const collapsed: AgentTranscriptSegment[] = [];
+  let pendingClosed = 0;
+
+  const flushClosed = (): void => {
+    if (pendingClosed <= 0) {
+      return;
+    }
+    collapsed.push({
+      kind: 'tool',
+      label: pendingClosed === 1 ? 'Updated 1 file' : `Updated ${pendingClosed} files`,
+    });
+    pendingClosed = 0;
+  };
+
+  for (const segment of segments) {
+    if (segment.kind === 'edit' && !segment.open) {
+      pendingClosed += 1;
+      continue;
+    }
+    flushClosed();
+    collapsed.push(segment);
+  }
+  flushClosed();
+  return collapsed;
+}
+
+export type ParseAgentTranscriptOptions = {
+  /** Skip retaining closed-edit diff bodies (still scans to the closing fence). */
+  omitClosedEditDiffs?: boolean;
+};
+
+export function prepareAgentTranscriptSegmentsForDisplay(
+  content: string,
+  options?: { collapseClosedEditsAt?: number },
+): AgentTranscriptSegment[] {
+  const threshold = options?.collapseClosedEditsAt ?? 12;
+  const editCount = countAgentTranscriptHeaders(content).edit;
+  // Large edit fan-out: avoid allocating every closed diff body before collapsing.
+  const segments =
+    editCount >= threshold
+      ? parseAgentTranscriptBlocksUncached(content, { omitClosedEditDiffs: true })
+      : parseAgentTranscriptBlocks(content);
+  return collapseClosedEditSegmentsForDisplay(segments, threshold);
+}
+
+export function parseAgentTranscriptBlocks(
+  content: string,
+  options?: ParseAgentTranscriptOptions,
+): AgentTranscriptSegment[] {
+  if (options?.omitClosedEditDiffs) {
+    return parseAgentTranscriptBlocksUncached(content, options);
+  }
+  const cached = parseCache.get(content);
+  if (cached) {
+    return cached;
+  }
+  return rememberParsedSegments(content, parseAgentTranscriptBlocksUncached(content));
+}
+
+function parseAgentTranscriptBlocksUncached(
+  content: string,
+  options?: ParseAgentTranscriptOptions,
+): AgentTranscriptSegment[] {
+  const omitClosedEditDiffs = options?.omitClosedEditDiffs === true;
   const segments: AgentTranscriptSegment[] = [];
   const lines = content.split('\n');
   let textBuffer: string[] = [];
@@ -81,24 +192,29 @@ export function parseAgentTranscriptBlocks(content: string): AgentTranscriptSegm
     const editMatch = line.match(EDIT_HEADER_RE);
     if (editMatch) {
       flushText();
-      const body: string[] = [];
       let closed = false;
+      const bodyStart = index + 1;
       index += 1;
       while (index < lines.length) {
         if (lines[index].trimEnd() === ':::') {
           closed = true;
-          index += 1;
           break;
         }
-        body.push(lines[index]);
         index += 1;
       }
+      const bodyEnd = index;
+      if (closed) {
+        index += 1;
+      }
+      const keepDiff = !omitClosedEditDiffs || !closed;
       segments.push({
         kind: 'edit',
         path: editMatch[1],
         added: Number(editMatch[2]),
         removed: Number(editMatch[3]),
-        diff: body.join('\n').replace(/^\n+|\n+$/g, ''),
+        diff: keepDiff
+          ? lines.slice(bodyStart, bodyEnd).join('\n').replace(/^\n+|\n+$/g, '')
+          : '',
         open: !closed,
       });
       continue;

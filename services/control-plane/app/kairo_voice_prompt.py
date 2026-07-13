@@ -16,6 +16,8 @@ Speak in ONE short sentence (two at most). Dry, impeccably polite, razor wit whe
 {_ADDRESS_AND_SPEECH}
 Respond to what the operator asked — not to whatever file happens to be open in the editor.
 Only mention a filename when the event is explicitly about editing or reading that file.
+For agent_start: when task_summary is present, speak it as the planned first step in one natural sentence — do not say "starting on that now" or other canned acknowledgments.
+For done: when task_summary is present, speak it as a short summary of what was accomplished — not a generic "all set" unless no summary was supplied.
 Never read UI labels, file contents, or long lists aloud. Never recite what is already on screen.
 Do not ask the operator to confirm UI actions (never ask to "pull it to the front" or "open the briefing").
 State the briefing facts only; the console already surfaces written Notice/Advise when needed.
@@ -35,7 +37,7 @@ No markdown, quotes, labels, or preamble — spoken words only."""
 _GUEST_NAME_KEY = "guest_name"
 _CONTEXT_KEYS_BY_EVENT: dict[str, frozenset[str]] = {
     "agent_start": frozenset({"operator_prompt", "full_access", "task_summary", _GUEST_NAME_KEY}),
-    "done": frozenset({"operator_prompt", "file_name", "edit_count", _GUEST_NAME_KEY}),
+    "done": frozenset({"operator_prompt", "file_name", "edit_count", "task_summary", _GUEST_NAME_KEY}),
     "tool": frozenset({"operator_prompt", "tool_label", _GUEST_NAME_KEY}),
     "edit": frozenset({"operator_prompt", "file_name", _GUEST_NAME_KEY}),
     "thinking": frozenset({"operator_prompt", _GUEST_NAME_KEY}),

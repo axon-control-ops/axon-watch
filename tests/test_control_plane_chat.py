@@ -14,6 +14,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
+from app.kairo.turn_memory import clear_memory_for_tests, remember_entities, remember_turn  # noqa: E402
 from app.persistence import chat_store  # noqa: E402
 from app.persistence import run_store  # noqa: E402
 
@@ -30,6 +31,7 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.addCleanup(self.streaming_env.stop)
         chat_store.reset_store()
         self.addCleanup(chat_store.reset_store)
+        clear_memory_for_tests()
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 
@@ -408,6 +410,31 @@ class ControlPlaneChatTests(unittest.TestCase):
         phases = [item["to_phase"] for item in history["items"]]
         self.assertIn("completed", phases)
 
+    @patch("app.chat.service.generate_lane_b_result")
+    def test_post_chat_message_lane_b_agent_greeting_stays_local(self, mock_runtime) -> None:
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_alpha",
+                "content": "Hey VAXON",
+                "composer_mode": "agent",
+                "execution_access": "full",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["dispatched"])
+        self.assertEqual("", payload["run_id"])
+        self.assertIsNone(payload["run"])
+        self.assertEqual("ide", self.client.get(
+            f"/api/chat/threads/{payload['thread_id']}"
+        ).json()["thread_kind"])
+        self.assertIn("local reply", payload["messages"][1]["content"].lower())
+        self.assertNotIn("lane b (agent)", payload["messages"][1]["content"].lower())
+        self.assertTrue(payload["messages"][2]["content"])
+        mock_runtime.assert_not_called()
+
     @patch(
         "app.chat.service.generate_lane_b_result",
         return_value={
@@ -490,6 +517,51 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertEqual("switch_workspace", ui_action.get("type"))
         self.assertEqual("workspace_dashpro", ui_action.get("workspace_id"))
         self.assertIn("workspace_dashpro", payload["messages"][2]["content"])
+
+    @patch(
+        "app.chat.service.generate_lane_b_result",
+        return_value={
+            "content": "Picking up the DashPro investigation.",
+            "dispatched": True,
+            "runtime_id": "cursor_local",
+            "runtime_label": "Cursor CLI (local)",
+            "reason": "",
+        },
+    )
+    def test_post_chat_message_agent_injects_kairo_memory_on_handoff_style_prompt(
+        self,
+        mock_runtime,
+    ) -> None:
+        remember_entities(
+            "kairo:workspace_dashpro:thread_main",
+            signal_title="DashPro payments degraded",
+            target_workspace_id="workspace_dashpro",
+            task='Investigate signal "DashPro payments degraded"',
+        )
+        remember_turn(
+            "kairo:workspace_dashpro:thread_main",
+            "user",
+            "What is going on with DashPro payments?",
+        )
+        remember_turn(
+            "kairo:workspace_dashpro:thread_main",
+            "assistant",
+            "DashPro payments are degraded after approval.",
+        )
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_dashpro",
+                "content": 'Investigate signal "DashPro payments degraded"',
+                "composer_mode": "agent",
+                "execution_access": "full",
+                "kairo_session_id": "kairo:workspace_dashpro:thread_main",
+            },
+        )
+        self.assertEqual(200, response.status_code)
+        context = mock_runtime.call_args.kwargs["context"]
+        self.assertIn("KAIRO memory", context.memory_appendix or "")
+        self.assertIn("DashPro payments degraded", context.memory_appendix or "")
 
     def test_thread_history_normalizes_agent_research_blocks_on_read(self) -> None:
         thread = chat_store.create_thread(

@@ -13,8 +13,12 @@ let queue: string[] = [];
 let speaking = false;
 let voicesReady = false;
 let cachedVoice: SpeechSynthesisVoice | null = null;
+let pendingSpeakTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+let queueEpoch = 0;
 const speakingListeners = new Set<(active: boolean) => void>();
 const idleListeners = new Set<() => void>();
+const SPEECH_START_DELAY_MS = 150;
+const POST_UTTERANCE_DRAIN_MS = 280;
 
 function notifySpeaking(active: boolean): void {
   speaking = active;
@@ -30,6 +34,14 @@ function notifyIdle(): void {
   for (const listener of idleListeners) {
     listener();
   }
+}
+
+function clearPendingSpeakTimer(): void {
+  if (pendingSpeakTimer === null) {
+    return;
+  }
+  globalThis.clearTimeout(pendingSpeakTimer);
+  pendingSpeakTimer = null;
 }
 
 const JARVIS_VOICE_PREFS = [
@@ -98,6 +110,7 @@ function drainQueue(speech: SpeechPort): void {
   notifySpeaking(true);
   const text = queue.shift() ?? '';
   const utterance = new SpeechSynthesisUtterance(text);
+  const epoch = queueEpoch;
   // Keep browser fallback at natural defaults — slowed/lowered pitch sounded robotic.
   utterance.rate = 1;
   utterance.pitch = 1;
@@ -108,19 +121,30 @@ function drainQueue(speech: SpeechPort): void {
   }
 
   const finish = (): void => {
+    if (epoch !== queueEpoch) {
+      return;
+    }
     notifySpeaking(false);
     globalThis.setTimeout(() => {
+      if (epoch !== queueEpoch) {
+        return;
+      }
       drainQueue(speech);
       notifyIdle();
-    }, 220);
+    }, POST_UTTERANCE_DRAIN_MS);
   };
 
   utterance.onend = finish;
   utterance.onerror = finish;
 
-  globalThis.setTimeout(() => {
+  clearPendingSpeakTimer();
+  pendingSpeakTimer = globalThis.setTimeout(() => {
+    pendingSpeakTimer = null;
+    if (epoch !== queueEpoch) {
+      return;
+    }
     speech.speak(utterance);
-  }, 60);
+  }, SPEECH_START_DELAY_MS);
 }
 
 export function enqueueSpeech(message: string, speech: SpeechPort | null): void {
@@ -138,6 +162,8 @@ export function resetSpeechQueue(): void {
 }
 
 export function stopSpeech(speech: SpeechPort | null): void {
+  queueEpoch += 1;
+  clearPendingSpeakTimer();
   queue = [];
   if (speech && typeof speech.cancel === 'function') {
     speech.cancel();

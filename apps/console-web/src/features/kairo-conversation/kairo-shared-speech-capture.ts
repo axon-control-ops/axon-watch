@@ -18,6 +18,10 @@ export const kairoCaptureCapturing = ref(false);
 export const kairoCaptureInterim = ref('');
 export const kairoCaptureError = ref<string | null>(null);
 export const kairoCaptureMode = ref<KairoVoiceCaptureMode>('manual');
+export const kairoCaptureLastHeard = ref('');
+export const kairoCaptureLastGateReason = ref<string | null>(null);
+export const kairoCaptureLastAccepted = ref<boolean | null>(null);
+export const kairoCaptureLastSubmitState = ref<'submitted' | 'queued' | 'ignored' | 'dropped' | null>(null);
 
 let privacyBlocked: () => boolean = () => false;
 let onVoiceInterrupt: () => void = () => {};
@@ -112,8 +116,12 @@ function handleInterimTranscript(transcript: string, mode: KairoVoiceCaptureMode
 async function handleFinalTranscript(transcript: string, mode: KairoVoiceCaptureMode): Promise<void> {
   kairoCaptureInterim.value = '';
   kairoCaptureCapturing.value = false;
+  kairoCaptureLastHeard.value = normalizeVoiceTranscript(transcript).trim();
 
   if (isKairoVoiceSpeaking() || kairoConversationPhase.value === 'speaking') {
+    kairoCaptureLastAccepted.value = false;
+    kairoCaptureLastGateReason.value = 'voice_output_active';
+    kairoCaptureLastSubmitState.value = 'dropped';
     logKairoVoice('final_dropped', {
       transcript,
       mode,
@@ -130,6 +138,9 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
     if (detectVoiceInterruptPhrase(normalizeVoiceTranscript(transcript))) {
       triggerVoiceInterrupt('final');
     }
+    kairoCaptureLastAccepted.value = false;
+    kairoCaptureLastGateReason.value = 'thinking';
+    kairoCaptureLastSubmitState.value = 'dropped';
     kairoCaptureCapturing.value = false;
     notifyCaptureEnd();
     return;
@@ -143,12 +154,15 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
     reason: gate.reason,
     shouldInterrupt: gate.shouldInterrupt,
   });
+  kairoCaptureLastAccepted.value = gate.accept;
+  kairoCaptureLastGateReason.value = gate.reason;
 
   if (gate.shouldInterrupt) {
     triggerVoiceInterrupt('final');
   }
 
   if (!gate.accept || !gate.submitContent) {
+    kairoCaptureLastSubmitState.value = 'ignored';
     if (kairoConversationPhase.value === 'listening') {
       setKairoConversationPhase('idle');
     }
@@ -156,7 +170,9 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
     return;
   }
 
-  await submitKairoConversationTranscript(gate.submitContent, { voiceCaptureMode: mode });
+  kairoCaptureLastSubmitState.value = await submitKairoConversationTranscript(gate.submitContent, {
+    voiceCaptureMode: mode,
+  });
   notifyCaptureEnd();
 }
 

@@ -40,7 +40,6 @@ import {
 } from './runtime-assistant-heuristics';
 import { brainGalaxyConversationFocus, setBrainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
 import { useKairoSpeechCapture } from './use-kairo-speech-capture';
-import { useKairoVoiceInterrupt } from './use-kairo-voice-interrupt';
 
 const HANDOFF_CLIENT_RE =
   /\b(hand\s*it\s*off|hand\s*off|handoff|continue in ide|investigate in ide|open in ide)\b/i;
@@ -65,26 +64,17 @@ export function useKairoConversation() {
   const speechCapture = useKairoSpeechCapture({
     privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
     captureMode: 'manual',
+    stopOnUnmount: 'manual_only',
   });
 
-  useKairoVoiceInterrupt();
-
   function kairoSpeechSessionId(): string {
-    const key = 'axon-x:kairo-speech-session';
-    if (typeof sessionStorage === 'undefined') {
-      return 'default';
-    }
-    let id = sessionStorage.getItem(key);
-    if (!id) {
-      id = `kairo-${Date.now()}`;
-      sessionStorage.setItem(key, id);
-    }
-    return id;
+    return shell.kairoSpeechSessionId();
   }
 
   function speakReply(line: string, operatorPrompt?: string): Promise<void> {
     return shell.speakKairoConversationLine(line, {
       operatorPrompt: operatorPrompt ?? lastOperatorPrompt,
+      skipSpeakApi: true,
     });
   }
 
@@ -153,6 +143,17 @@ export function useKairoConversation() {
     }
     await speakReply(spokenReply || kairoConversationReply.value);
     finalizeKairoVoiceFollowupWindow();
+  }
+
+  async function speakReplyFromExternal(
+    reply: string,
+    voiceCaptureMode?: KairoVoiceCaptureMode,
+    operatorPrompt?: string,
+  ): Promise<void> {
+    if (operatorPrompt?.trim()) {
+      lastOperatorPrompt = operatorPrompt.trim();
+    }
+    await deliverVoiceReply(reply, voiceCaptureMode);
   }
 
   async function executeConverseAction(
@@ -387,6 +388,7 @@ export function useKairoConversation() {
     pending,
     thinkingLine,
     canSubmit,
+    speakReplyFromExternal,
     submitTurn,
     handleFocus,
     handleBlur,

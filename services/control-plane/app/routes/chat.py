@@ -43,6 +43,7 @@ def chat_messages_create(
             runtime_target=body.runtime_target,
             runtime_model=body.runtime_model,
             execution_access=body.execution_access,
+            kairo_session_id=body.kairo_session_id,
         )
         stream_job = payload.pop("_stream_job", None)
         if isinstance(stream_job, LaneBStreamJob):

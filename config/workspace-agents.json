@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "defaults": {
+    "role": "workspace_agent",
+    "name_template": "{display_name} Workspace Agent"
+  },
+  "agents": {
+    "workspace_axon_watch": {
+      "agent_name": "Axon-X Workspace Agent",
+      "owns": "axon-watch product, control-plane, and console shell work"
+    },
+    "workspace_axon_local": {
+      "agent_name": "Axon Local Workspace Agent",
+      "owns": "legacy axon-local reference and donor patterns"
+    },
+    "workspace_dashpro": {
+      "agent_name": "DashPro Workspace Agent",
+      "owns": "DashPro product and platform work only"
+    }
+  }
+}
