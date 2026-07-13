@@ -39,6 +39,20 @@ describe('operator-signal-hints', () => {
     ).toContain('/vault');
   });
 
+  it('returns email triage hint copy', () => {
+    expect(
+      signalOperatorHint({
+        signalId: 'signal_email_stub_urgent',
+        title: 'Email needs follow-up: Urgent deploy',
+        meta: {
+          signal_family: 'email_triage',
+          sender: 'CTO <cto@example.com>',
+          recommended_action: 'reply_or_investigate',
+        },
+      }),
+    ).toContain('Email from CTO');
+  });
+
   it('explains observe mode is not a button', () => {
     expect(watchRuleTooltip('observe')).toContain('informational only');
   });

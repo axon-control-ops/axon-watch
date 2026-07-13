@@ -382,6 +382,7 @@ function signalHint(signal: {
               :workspace-id="signal.workspace_id"
               :title="signal.title"
               :summary="signal.summary"
+              :meta="signal.meta"
               compact
             />
             <VerifyDismissSignalButton

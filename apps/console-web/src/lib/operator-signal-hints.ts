@@ -20,6 +20,15 @@ export function signalOperatorHint(input: {
   meta?: Record<string, unknown> | null;
 }): string {
   const signalFamily = String(input.meta?.signal_family ?? '');
+  if (signalFamily === 'email_triage') {
+    const sender = String(input.meta?.sender ?? 'sender').trim() || 'sender';
+    const action = String(input.meta?.recommended_action ?? 'follow up').trim();
+    return (
+      `Email from ${sender} needs triage (${action}). ` +
+      'Open Attention for the thread, then Continue in IDE to start an agent on the follow-up.'
+    );
+  }
+
   if (signalFamily === 'child_project_monitor') {
     const workspaceLabel = String(input.meta?.workspace_label ?? 'Child project');
     const monitorStatus = String(input.meta?.monitor_status ?? 'issue');

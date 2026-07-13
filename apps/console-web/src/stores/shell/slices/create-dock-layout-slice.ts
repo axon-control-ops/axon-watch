@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue';
 
-import type { RuntimeSummary, OperatorBriefing } from '../../../contracts/canonical';
+import type { InboxItem, RuntimeSummary, OperatorBriefing } from '../../../contracts/canonical';
 import type { DockSeamId, DockSeamLayoutState } from '../../../lib/dock-seam-layout';
 import {
   persistDockHeroMode,
@@ -14,15 +14,19 @@ import {
   resolveDefaultLeftSidebarMode,
   type LeftSidebarMode,
 } from '../../../lib/left-sidebar-mode';
+import { briefingHasOpenLoops } from '../../../lib/briefing-open-loops-view';
+import { countActionableOpenSignals } from '../../../lib/operator-signal-count';
 import type { LayoutMode } from '../types';
 
 interface CreateDockLayoutSliceInput {
   layoutMode: Ref<LayoutMode>;
   dockSeamLayout: ComputedRef<DockSeamLayoutState[]>;
   expandedDockSeams: Ref<Set<DockSeamId>>;
+  dockThreadSeamTouched: Ref<boolean>;
   pendingApprovalsCount: ComputedRef<number>;
   operatorBriefing: Ref<OperatorBriefing | null>;
   runtimeSummary: Ref<RuntimeSummary | null>;
+  inboxItems: Ref<InboxItem[]>;
   leftSidebarMode: Ref<LeftSidebarMode>;
   leftSidebarModeTouched: Ref<boolean>;
   dockHeroMode: Ref<DockHeroMode>;
@@ -36,6 +40,9 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
   }
 
   function toggleDockSeam(id: DockSeamId): void {
+    if (id === 'thread') {
+      input.dockThreadSeamTouched.value = true;
+    }
     const next = new Set(input.expandedDockSeams.value);
     if (next.has(id)) {
       next.delete(id);
@@ -50,7 +57,15 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
       return;
     }
     const next = new Set(input.expandedDockSeams.value);
-    next.add('thread');
+    const openLoops = briefingHasOpenLoops(input.operatorBriefing.value);
+    if (!input.dockThreadSeamTouched.value) {
+      if (openLoops) {
+        // Prefer KAIRO Open loops over command-thread stdout when loops exist.
+        next.delete('thread');
+      } else {
+        next.add('thread');
+      }
+    }
     input.expandedDockSeams.value = next;
     if (!input.leftSidebarModeTouched.value) {
       input.leftSidebarMode.value = resolveDefaultLeftSidebarMode({
@@ -63,6 +78,8 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
         pendingApprovals: input.pendingApprovalsCount.value,
         criticalSignals: input.runtimeSummary.value?.signals.critical_count ?? 0,
         highSignals: input.runtimeSummary.value?.signals.high_count ?? 0,
+        nextSafeActions: input.operatorBriefing.value?.next_safe_actions.length ?? 0,
+        actionableInboxCount: countActionableOpenSignals(input.inboxItems.value),
       });
     }
   }

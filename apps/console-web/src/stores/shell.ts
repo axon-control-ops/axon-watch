@@ -458,6 +458,7 @@ export const useShellStore = defineStore('shell', () => {
   );
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
   const expandedDockSeams = ref<Set<DockSeamId>>(new Set(['thread']));
+  const dockThreadSeamTouched = ref(false);
   const briefingSeamEmphasized = ref(false);
   const missionControlEmphasized = ref(false);
   const signalsSeamEmphasized = ref(false);
@@ -797,9 +798,11 @@ export const useShellStore = defineStore('shell', () => {
     layoutMode,
     dockSeamLayout,
     expandedDockSeams,
+    dockThreadSeamTouched,
     pendingApprovalsCount,
     operatorBriefing,
     runtimeSummary,
+    inboxItems,
     leftSidebarMode,
     leftSidebarModeTouched,
     dockHeroMode,

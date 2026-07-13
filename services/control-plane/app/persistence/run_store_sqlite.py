@@ -113,6 +113,12 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS email_operator_settings (
+            settings_key TEXT PRIMARY KEY,
+            settings_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS operator_memories (
             memory_id TEXT PRIMARY KEY,
             workspace_id TEXT NOT NULL,

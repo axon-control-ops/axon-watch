@@ -116,6 +116,7 @@ function handleEvidenceHandoff(signal: {
   workspace_id?: string | null;
   title: string;
   summary?: string | null;
+  meta?: Record<string, unknown> | null;
 }): void {
   void shell.handoffSignalToIde(signal, { autoSubmit: true });
 }

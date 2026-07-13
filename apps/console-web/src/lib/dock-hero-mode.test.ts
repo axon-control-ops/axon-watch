@@ -35,6 +35,26 @@ describe('dock-hero-mode', () => {
     ).toBe('briefing');
   });
 
+  it('defaults to briefing when next safe actions or actionable inbox exist', () => {
+    expect(
+      resolveDefaultDockHeroMode({
+        pendingApprovals: 0,
+        criticalSignals: 0,
+        highSignals: 0,
+        nextSafeActions: 1,
+      }),
+    ).toBe('briefing');
+
+    expect(
+      resolveDefaultDockHeroMode({
+        pendingApprovals: 0,
+        criticalSignals: 0,
+        highSignals: 0,
+        actionableInboxCount: 2,
+      }),
+    ).toBe('briefing');
+  });
+
   it('derives operator-facing labels', () => {
     expect(dockHeroModeLabel('command')).toBe('Command');
     expect(dockHeroModeTitle('command')).toBe('Command');

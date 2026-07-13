@@ -27,6 +27,23 @@ describe('signal-handoff-view', () => {
     ).toBe('Investigate signal "DashPro Sentry warning": 3 unresolved issues');
   });
 
+  it('builds email-aware handoff task text', () => {
+    expect(
+      buildSignalHandoffTask({
+        signal_id: 'signal_email_stub_urgent',
+        title: 'Email needs follow-up: Urgent: DashPro deploy failed',
+        summary: 'CTO — Respond to the blocker.',
+        meta: {
+          signal_family: 'email_triage',
+          sender: 'CTO <cto@example.com>',
+          subject: 'Urgent: DashPro deploy failed',
+          recommended_action: 'reply_or_investigate',
+          recommended_detail: 'Respond to the blocker or investigate the issue.',
+        },
+      }),
+    ).toContain('Triage email from CTO <cto@example.com>');
+  });
+
   it('resolves cross-workspace handoff', () => {
     const resolved = resolveSignalHandoff(
       {

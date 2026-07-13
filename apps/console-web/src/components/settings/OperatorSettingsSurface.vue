@@ -2,12 +2,13 @@
 import { computed, onMounted, ref } from 'vue';
 
 import AppGeneralSettingsPanel from './AppGeneralSettingsPanel.vue';
+import EmailSettingsPanel from './EmailSettingsPanel.vue';
 import OperatorPresenceSettingsForm from './OperatorPresenceSettingsForm.vue';
 import RuntimeAuthSettingsPanel from './RuntimeAuthSettingsPanel.vue';
 import { navigateToAppSurface } from '../../lib/app-surface-route';
 import { useShellStore } from '../../stores/shell';
 
-type SettingsSection = 'voice' | 'runtime' | 'app';
+type SettingsSection = 'voice' | 'runtime' | 'email' | 'app';
 
 const shell = useShellStore();
 const activeSection = ref<SettingsSection>('voice');
@@ -15,7 +16,8 @@ const activeSection = ref<SettingsSection>('voice');
 const sections = [
   { id: 'voice' as const, label: 'Voice & presence', hint: 'VAXON persona, narration, privacy', mark: '01' },
   { id: 'runtime' as const, label: 'CLI runtime', hint: 'Cursor & Codex host auth', mark: '02' },
-  { id: 'app' as const, label: 'App & console', hint: 'Layout, workspace, diagnostics', mark: '03' },
+  { id: 'email' as const, label: 'Email & triage', hint: 'IMAP mailboxes, bridge, inbox', mark: '03' },
+  { id: 'app' as const, label: 'App & console', hint: 'Layout, workspace, diagnostics', mark: '04' },
 ];
 
 const sectionMeta = computed(() => {
@@ -24,6 +26,11 @@ const sectionMeta = computed(() => {
       return {
         title: 'CLI runtime auth',
         subtitle: 'Sign in or out of host CLI runtimes used by Agent dispatch.',
+      };
+    case 'email':
+      return {
+        title: 'Email & triage',
+        subtitle: 'Inbound IMAP/SMTP mailboxes, Signal bridge, and Attention routing.',
       };
     case 'app':
       return {
@@ -125,6 +132,7 @@ function returnToConsole(): void {
             />
 
             <RuntimeAuthSettingsPanel v-else-if="activeSection === 'runtime'" />
+            <EmailSettingsPanel v-else-if="activeSection === 'email'" />
             <AppGeneralSettingsPanel v-else />
           </div>
         </div>

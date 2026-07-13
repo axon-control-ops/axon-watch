@@ -9,6 +9,7 @@ const props = defineProps<{
   workspaceId?: string | null;
   title: string;
   summary?: string | null;
+  meta?: Record<string, unknown> | null;
   compact?: boolean;
 }>();
 
@@ -21,6 +22,7 @@ const visible = computed(() =>
     workspace_id: props.workspaceId,
     title: props.title,
     summary: props.summary,
+    meta: props.meta,
   }),
 );
 
@@ -36,6 +38,7 @@ async function handleHandoff(): Promise<void> {
         workspace_id: props.workspaceId,
         title: props.title,
         summary: props.summary,
+        meta: props.meta,
       },
       { autoSubmit: true },
     );

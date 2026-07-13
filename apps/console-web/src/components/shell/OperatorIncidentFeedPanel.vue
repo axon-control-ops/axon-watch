@@ -55,6 +55,7 @@ function focusSignal(signalId: string): void {
               :workspace-id="item.workspaceId"
               :title="item.title"
               :summary="item.summary"
+              :meta="item.meta"
               compact
             />
           </div>

@@ -74,6 +74,7 @@ main_tests=(
   tests.test_cli_runtime_agents
   tests.test_lane_b_agent
   tests.test_runtime_vault_integration
+  tests.test_email_settings_store
 )
 
 watch_vault_tests=(
@@ -82,8 +83,15 @@ watch_vault_tests=(
   tests.test_vault_parity
 )
 
+watch_signal_tests=(
+  tests.test_email_signal
+)
+
 echo "contract unit tests: control-plane + shared suite"
 "${python_bin}" -m unittest "${main_tests[@]}"
 
 echo "contract unit tests: axon-watch vault (isolated PYTHONPATH)"
 PYTHONPATH="${repo_root}/services/axon-watch" "${python_bin}" -m unittest "${watch_vault_tests[@]}"
+
+echo "contract unit tests: axon-watch email signals (isolated PYTHONPATH)"
+PYTHONPATH="${repo_root}/services/axon-watch" "${python_bin}" -m unittest "${watch_signal_tests[@]}"

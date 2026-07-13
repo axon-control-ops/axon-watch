@@ -50,8 +50,12 @@ class WatchInboxFilterTests(unittest.TestCase):
         self.assertTrue(should_emit_bootstrap_signal([]))
         self.assertFalse(should_emit_bootstrap_signal([MONITOR_ITEM]))
 
+    @patch("app.signals.store.is_signal_acknowledged", return_value=False)
+    @patch("app.signals.store.email_inbox_items", return_value=[])
     @patch("app.signals.store.probe_monitor_records")
-    def test_inbox_omits_bootstrap_when_monitor_signal_present(self, probe_monitors) -> None:
+    def test_inbox_omits_bootstrap_when_monitor_signal_present(
+        self, probe_monitors, _email_items, _acked
+    ) -> None:
         probe_monitors.return_value = [
             {
                 "check_id": "dashpro_sentry_recent_issues",

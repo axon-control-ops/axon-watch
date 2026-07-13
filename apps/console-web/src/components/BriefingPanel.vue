@@ -16,6 +16,7 @@ import {
 } from '../lib/briefing-panel-view';
 import { OPERATOR_PERSONA_NAME } from '../lib/operator-persona-name';
 import { buildPersonaVoiceLineFallback } from '../lib/persona-voice-line';
+import BriefingOpenLoopsStrip from './BriefingOpenLoopsStrip.vue';
 
 const props = defineProps<{
   briefing: OperatorBriefing | null;
@@ -93,6 +94,7 @@ function transcriptTimeLabel(value: string): string {
     <template v-if="hero && galaxyCompact">
       <p v-if="summaryLine" class="briefing-panel__summary-line">{{ summaryLine }}</p>
       <p class="briefing-panel__galaxy-compact-copy">{{ heroAdvise || heroNotice }}</p>
+      <BriefingOpenLoopsStrip :briefing="briefing" compact />
       <button type="button" class="briefing-panel__galaxy-compact-link" @click="emit('openChat')">
         Full briefing →
       </button>
@@ -117,6 +119,7 @@ function transcriptTimeLabel(value: string): string {
           <p class="briefing-panel__kairo-subtitle">{{ heroNotice }}</p>
           <p class="briefing-panel__section-label briefing-panel__section-label--hero">Advise</p>
           <p class="briefing-panel__kairo-advise">{{ heroAdvise }}</p>
+          <BriefingOpenLoopsStrip :briefing="briefing" />
         </div>
       </div>
     </template>

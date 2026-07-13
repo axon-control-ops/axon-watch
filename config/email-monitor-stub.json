@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "workspace_id": "workspace_axon_watch",
+  "workspace_names": ["DashPro", "Axon"],
+  "workspace_hint_map": {
+    "DashPro": "workspace_dashpro",
+    "Axon": "workspace_axon_watch",
+    "Axon Watch": "workspace_axon_watch",
+    "Axon Local": "workspace_axon_local"
+  },
+  "messages": [
+    {
+      "message_id": "<stub-urgent-dashpro@example.com>",
+      "uid": "stub-1",
+      "from": "CTO <cto@example.com>",
+      "subject": "Urgent: DashPro deploy failed",
+      "text": "Please investigate the failing deploy today. We cannot ship until this is fixed. I will send the rollback plan tomorrow.",
+      "snippet": "Please investigate the failing deploy today."
+    },
+    {
+      "message_id": "<stub-low-priority@example.com>",
+      "uid": "stub-2",
+      "from": "Newsletter <news@example.com>",
+      "subject": "Weekly digest",
+      "text": "Here is this week's reading list.",
+      "snippet": "Here is this week's reading list."
+    }
+  ]
+}

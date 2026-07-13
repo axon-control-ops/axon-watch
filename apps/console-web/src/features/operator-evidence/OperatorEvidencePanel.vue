@@ -26,6 +26,7 @@ const emit = defineEmits<{
       workspace_id?: string | null;
       title: string;
       summary?: string | null;
+      meta?: Record<string, unknown> | null;
     },
   ];
 }>();
@@ -106,6 +107,25 @@ async function captureResearch(): Promise<void> {
   statusLine.value = 'Research captured and stored as cited memory.';
 }
 
+function factValue(label: string): string {
+  const facts = evidence.value?.facts ?? [];
+  return facts.find((fact) => fact.label === label)?.value?.trim() ?? '';
+}
+
+function evidenceHandoffMeta(): Record<string, unknown> | null {
+  const family = factValue('Family');
+  if (family !== 'email_triage') {
+    return null;
+  }
+  return {
+    signal_family: family,
+    sender: factValue('Sender'),
+    subject: factValue('Subject'),
+    recommended_action: factValue('Recommended action'),
+    recommended_detail: evidence.value?.summary ?? '',
+  };
+}
+
 function triggerAction(action: OperatorEvidenceRecord['actions'][number]): void {
   if (action.target === 'workspace' && action.workspace_id) {
     emit('openWorkspace', action.workspace_id);
@@ -119,6 +139,7 @@ function triggerAction(action: OperatorEvidenceRecord['actions'][number]): void 
       workspace_id: action.workspace_id ?? workspaceId.value,
       title: evidence.value.title,
       summary: evidence.value.summary,
+      meta: evidenceHandoffMeta(),
     });
   }
 }

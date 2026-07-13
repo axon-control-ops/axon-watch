@@ -6,12 +6,18 @@ export function resolveDefaultDockHeroMode(input: {
   pendingApprovals: number;
   criticalSignals: number;
   highSignals: number;
+  nextSafeActions?: number;
+  actionableInboxCount?: number;
 }): DockHeroMode {
   if (input.pendingApprovals > 0) {
     return 'briefing';
   }
 
   if (input.criticalSignals > 0 || input.highSignals > 0) {
+    return 'briefing';
+  }
+
+  if ((input.nextSafeActions ?? 0) > 0 || (input.actionableInboxCount ?? 0) > 0) {
     return 'briefing';
   }
 

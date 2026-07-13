@@ -150,8 +150,91 @@ def _signal_evidence(signal_id: str) -> dict[str, Any]:
         facts.append({"label": "Monitor status", "value": str(meta.get("monitor_status"))})
     if str(meta.get("signal_family") or "").strip():
         facts.append({"label": "Family", "value": str(meta.get("signal_family"))})
+    if str(meta.get("sender") or "").strip():
+        facts.append({"label": "Sender", "value": str(meta.get("sender"))})
+    if str(meta.get("subject") or "").strip():
+        facts.append({"label": "Subject", "value": str(meta.get("subject"))})
+    if str(meta.get("recommended_action") or "").strip():
+        facts.append({"label": "Recommended action", "value": str(meta.get("recommended_action"))})
 
     sections: list[dict[str, Any]] = []
+    if str(meta.get("signal_family") or "").strip() == "email_triage":
+        detail_items: list[dict[str, Any]] = []
+        snippet = str(meta.get("snippet") or "").strip()
+        if snippet:
+            detail_items.append(
+                {
+                    "title": "Snippet",
+                    "detail": snippet,
+                    "source_ref": _source_ref(
+                        "signal",
+                        signal_id,
+                        label="Email triage",
+                        workspace_id=workspace_id,
+                    ),
+                }
+            )
+        recommended_detail = str(meta.get("recommended_detail") or "").strip()
+        if recommended_detail:
+            detail_items.append(
+                {
+                    "title": "Recommended detail",
+                    "detail": recommended_detail,
+                    "source_ref": _source_ref(
+                        "signal",
+                        signal_id,
+                        label="Email triage",
+                        workspace_id=workspace_id,
+                    ),
+                }
+            )
+        if detail_items:
+            sections.append({"title": "Email", "items": detail_items})
+
+        risks = meta.get("risks")
+        if isinstance(risks, list) and risks:
+            sections.append(
+                {
+                    "title": "Risks",
+                    "items": [
+                        {
+                            "title": str(risk),
+                            "detail": "",
+                            "source_ref": _source_ref(
+                                "signal",
+                                signal_id,
+                                label="Email triage",
+                                workspace_id=workspace_id,
+                            ),
+                        }
+                        for risk in risks
+                        if str(risk).strip()
+                    ][:5],
+                }
+            )
+
+        action_requests = meta.get("action_requests")
+        if isinstance(action_requests, list) and action_requests:
+            sections.append(
+                {
+                    "title": "Action requests",
+                    "items": [
+                        {
+                            "title": str(action),
+                            "detail": "",
+                            "source_ref": _source_ref(
+                                "signal",
+                                signal_id,
+                                label="Email triage",
+                                workspace_id=workspace_id,
+                            ),
+                        }
+                        for action in action_requests
+                        if str(action).strip()
+                    ][:5],
+                }
+            )
+
     sentry_issues = meta.get("sentry_issues")
     if isinstance(sentry_issues, list) and sentry_issues:
         sections.append(

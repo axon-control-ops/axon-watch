@@ -11,6 +11,7 @@ export type OperatorIncidentFeedItem = {
   source: 'signal' | 'fleet';
   workspaceId: string | null;
   monitorSignal: boolean;
+  meta?: Record<string, unknown> | null;
 };
 
 export type OperatorIncidentFeedView = {
@@ -73,6 +74,7 @@ export function buildOperatorIncidentFeed(input: {
       source: 'signal',
       workspaceId: signal.workspace_id ?? null,
       monitorSignal: isMonitorSignal(signal),
+      meta: signal.meta ?? null,
     });
   }
 

@@ -7,6 +7,7 @@ export type SignalHandoffInput = {
   summary?: string | null;
   /** When set, used as the IDE agent prompt instead of rebuilding from title/summary. */
   task?: string | null;
+  meta?: Record<string, unknown> | null;
 };
 
 export type WorkspaceHandoffTarget = {
@@ -22,11 +23,42 @@ export type ResolvedSignalHandoff = {
   reason: string;
 };
 
+function buildEmailHandoffTask(signal: SignalHandoffInput): string | null {
+  const family = String(signal.meta?.signal_family ?? '').trim();
+  if (family !== 'email_triage') {
+    return null;
+  }
+
+  const sender = String(signal.meta?.sender ?? 'unknown sender').trim() || 'unknown sender';
+  const subject =
+    String(signal.meta?.subject ?? '').trim() ||
+    signal.title.replace(/^Email needs follow-up:\s*/i, '').trim() ||
+    signal.title;
+  const detail =
+    String(signal.meta?.recommended_detail ?? '').trim() || signal.summary?.trim() || '';
+  const action = String(signal.meta?.recommended_action ?? '').trim();
+
+  const parts = [`Triage email from ${sender}: "${subject}".`];
+  if (detail) {
+    parts.push(detail);
+  }
+  if (action) {
+    parts.push(`Recommended action: ${action}.`);
+  }
+  return parts.join(' ');
+}
+
 export function buildSignalHandoffTask(signal: SignalHandoffInput): string {
   const providedTask = signal.task?.trim();
   if (providedTask) {
     return providedTask;
   }
+
+  const emailTask = buildEmailHandoffTask(signal);
+  if (emailTask) {
+    return emailTask;
+  }
+
   const summary = signal.summary?.trim();
   if (summary) {
     return `Investigate signal "${signal.title}": ${summary}`;

@@ -1,6 +1,7 @@
 export * from './chat-api';
 export * from './connectors-api';
 export * from './data-api';
+export * from './email-settings-api';
 export * from './inbox-api';
 export * from './operator-api';
 export * from './runs-api';
