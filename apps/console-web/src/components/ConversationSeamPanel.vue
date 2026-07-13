@@ -40,9 +40,9 @@ import {
 } from '../lib/agent-transcript-blocks';
 import { createTranscriptSegmentCache } from '../lib/conversation-transcript-segment-cache';
 import { sanitizeAgentThinkingForOperator } from '../lib/agent-live-line-view';
-import { shouldShowAgentTerminalBackgroundControl } from '../lib/agent-terminal-background-view';
-import { buildAgentTerminalMirrorText } from '../lib/agent-terminal-mirror';
-import { queueAgentShellMirrorText } from '../lib/agent-shell-mirror-state';
+import { prepareAgentTerminalOpen } from '../lib/agent-terminal-open';
+import { shouldShowAgentTerminalBackgroundControl, agentTerminalMirrorBadgeLabel } from '../lib/agent-terminal-background-view';
+import { armAgentShellMirror, agentShellMirrorActive } from '../lib/agent-shell-mirror-state';
 import { resolveChatAttachmentUrl } from '../api/control-plane';
 import { threadAttachmentUrlForImagePath } from '../lib/thread-image-url';
 import { useShellStore } from '../stores/shell';
@@ -88,7 +88,6 @@ const rootRef = ref<HTMLElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
 const expandedErrorByMessageId = ref<Record<string, boolean>>({});
 const expandedSystemByMessageId = ref<Record<string, boolean>>({});
-const loggedSuppressedDebugReproduceIds = new Set<string>();
 
 const { handleWheel, handleContentChange } = useConversationSeamScroll({
   rootRef,
@@ -101,16 +100,6 @@ function toggleErrorExpanded(messageId: string): void {
     ...expandedErrorByMessageId.value,
     [messageId]: !expandedErrorByMessageId.value[messageId],
   };
-}
-
-function suppressInlineDebugReproduce(messageId: string): true {
-  if (!loggedSuppressedDebugReproduceIds.has(messageId)) {
-    loggedSuppressedDebugReproduceIds.add(messageId);
-    // #region agent log
-    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:messageId,hypothesisId:'R8',location:'ConversationSeamPanel.vue:suppressInlineDebugReproduce',message:'inline debug reproduce block suppressed',data:{messageId,actionableBannerOwnsPresentation:true},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }
-  return true;
 }
 
 function isMarkdownBlock(content: string, isComplete = true): boolean {
@@ -160,14 +149,7 @@ function segmentKey(messageId: string, index: number): string {
 }
 
 function revealTerminalPanel(segment: { command: string; output: string; open: boolean }): void {
-  queueAgentShellMirrorText(
-    buildAgentTerminalMirrorText({
-      kind: 'terminal',
-      command: segment.command,
-      output: segment.output,
-      open: segment.open,
-    }),
-  );
+  prepareAgentTerminalOpen(segment);
   void shell.backgroundIdeAgentRun();
 }
 
@@ -177,16 +159,15 @@ function backgroundAgentTerminalRun(segment?: {
   open: boolean;
 }): void {
   if (segment) {
-    queueAgentShellMirrorText(
-      buildAgentTerminalMirrorText({
-        kind: 'terminal',
-        command: segment.command,
-        output: segment.output,
-        open: segment.open,
-      }),
-    );
+    prepareAgentTerminalOpen(segment);
+  } else {
+    armAgentShellMirror();
   }
   void shell.backgroundIdeAgentRun();
+}
+
+async function continueTerminalInBash(command: string): Promise<void> {
+  await shell.runCommandInOperatorTerminal(command);
 }
 
 function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean): boolean {
@@ -194,6 +175,13 @@ function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean):
   return shouldShowAgentTerminalBackgroundControl({
     canStopIdeAgentRun: shell.canStopIdeAgentRun,
     terminalBlockRunning: segmentOpen && isStreamingMessage(messageId),
+  });
+}
+
+function terminalMirrorBadge(segmentOpen: boolean): string | null {
+  return agentTerminalMirrorBadgeLabel({
+    segmentOpen,
+    mirrorActive: agentShellMirrorActive.value,
   });
 }
 
@@ -564,7 +552,11 @@ watch(
                 <button
                   type="button"
                   class="agent-block__terminal-reveal"
-                  :title="`Open terminal panel for ${segment.command}`"
+                  :title="
+                    segment.open
+                      ? 'Show live shell output in the vaxon terminal'
+                      : 'Show this shell output in the vaxon terminal'
+                  "
                   @click="revealTerminalPanel(segment)"
                 >
                   <span class="agent-block__terminal-prompt" aria-hidden="true">$</span>
@@ -573,16 +565,30 @@ watch(
                     v-if="segment.open && isStreamingMessage(item.message.message_id)"
                     class="agent-block__terminal-running"
                   >running…</span>
+                  <span
+                    v-if="terminalMirrorBadge(segment.open)"
+                    class="agent-block__terminal-mirrored"
+                  >{{ terminalMirrorBadge(segment.open) }}</span>
                 </button>
                 <button
                   v-if="showTerminalBackgroundControl(item.message.message_id, segment.open)"
                   type="button"
                   class="agent-block__terminal-background"
-                  title="Mirror this shell into the vaxon terminal (Cursor CLI still owns the process)"
+                  title="Mirror live shell output into vaxon (Cursor CLI still owns the process — true detach is unavailable)"
                   aria-label="Background shell into vaxon terminal"
                   @click="backgroundAgentTerminalRun(segment)"
                 >
                   Background
+                </button>
+                <button
+                  v-if="!segment.open && segment.command.trim()"
+                  type="button"
+                  class="agent-block__terminal-background"
+                  title="Re-run this command in the interactive bash terminal"
+                  aria-label="Continue command in bash terminal"
+                  @click="continueTerminalInBash(segment.command)"
+                >
+                  Continue in bash
                 </button>
                 <button
                   v-if="segment.output"
@@ -610,12 +616,7 @@ watch(
             />
 
             <!-- The composer renders this segment once as its actionable Proceed/Dismiss banner. -->
-            <template
-              v-else-if="
-                segment.kind === 'debug-reproduce' &&
-                suppressInlineDebugReproduce(item.message.message_id)
-              "
-            ></template>
+            <template v-else-if="segment.kind === 'debug-reproduce'"></template>
 
             <AgentImageBlock
               v-else-if="segment.kind === 'image'"

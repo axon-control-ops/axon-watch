@@ -51,6 +51,15 @@ describe('collapseBackToBackThinkingEcho', () => {
   it('keeps non-echoed thinking intact', () => {
     expect(collapseBackToBackThinkingEcho(DASHBOARD_THOUGHT)).toBe(DASHBOARD_THOUGHT);
   });
+
+  it('collapses near-duplicate echoes with glued words and small wording drift', () => {
+    const first =
+      'You were clicking the right place. DashPro in the left Workspaces list, or theDASHPRO orb* in the middle — those are the intended targets. The detail panel was also telling you that click should open the workspace. What happened instead was only a camera zoom, because that open path was not wired up. fixed that: clicking a workspace in the list or on the orb now switches into the IDE for that workspace. Until the page reloads with this change, use theIDE tab in the top bar after selecting the workspace.';
+    const second =
+      'You were clicking the right place. DashPro in the left Workspaces list, or the DASHPRO orb in the middle — those are the intended targets. The detail panel was also telling you that click should open the workspace. What happened instead was only a camera zoom, because that open path was not wired up. I fixed that: clicking a workspace in the list or on the orb now switches into the IDE for that workspace. Until the page reloads with this change, use the IDE tab in the top bar after selecting the workspace.';
+    expect(collapseBackToBackThinkingEcho(first + second)).toBe(second);
+    expect(sanitizeAgentThinkingForOperator(first + second)).toBe(second);
+  });
 });
 
 describe('truncateAgentLiveLineForDisplay', () => {

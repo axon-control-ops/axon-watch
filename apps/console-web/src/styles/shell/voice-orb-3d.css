@@ -1,0 +1,170 @@
+/* Dimensional, continuously alive presentation for the draggable VAXON voice orb. */
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb__trigger {
+  position: relative;
+  isolation: isolate;
+  perspective: 34rem;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 0.9rem rgba(0, 210, 255, 0.26));
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb__trigger::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: 5.15rem;
+  height: 5.15rem;
+  border: 1px solid rgba(135, 239, 255, 0.72);
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 31% 24%, rgba(255, 255, 255, 0.96) 0 4%, rgba(188, 246, 255, 0.8) 8%, transparent 23%),
+    radial-gradient(circle at 38% 32%, #78eaff 0%, #168fc2 30%, #063b5b 58%, #01101d 82%);
+  box-shadow:
+    0 0 1.4rem rgba(0, 220, 255, 0.58),
+    0 0 2.8rem rgba(0, 150, 255, 0.24),
+    inset -1.1rem -1.2rem 1.8rem rgba(0, 4, 12, 0.8),
+    inset 0.65rem 0.7rem 1.15rem rgba(185, 248, 255, 0.38);
+  transform: translate(-50%, -50%);
+  animation: voice-orb-3d-breathe 3.4s ease-in-out infinite;
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb__trigger::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: 6.5rem;
+  height: 6.5rem;
+  border: 1px solid rgba(92, 224, 255, 0.44);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    0 0 0.7rem rgba(0, 220, 255, 0.3),
+    0 0 0.22rem rgba(180, 248, 255, 0.52) inset;
+  transform: translate(-50%, -50%) rotateX(67deg) rotateZ(0deg);
+  animation: voice-orb-3d-orbit 5.8s linear infinite;
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb__svg {
+  position: relative;
+  z-index: 1;
+  transform: translateZ(1.2rem);
+  filter:
+    drop-shadow(0 0 0.45rem rgba(0, 220, 255, 0.42))
+    drop-shadow(0 0 1rem rgba(0, 115, 210, 0.2));
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb__ticks,
+.brain-galaxy-stage--mockup .kairo-galaxy-orb__beads {
+  transform-origin: 100px 100px;
+  animation: voice-orb-hud-spin 26s linear infinite;
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb__beads {
+  animation-direction: reverse;
+  animation-duration: 17s;
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb__halo {
+  transform-origin: 100px 100px;
+  animation: voice-orb-halo-live 2.8s ease-in-out infinite;
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb--listening .kairo-galaxy-orb__trigger::before,
+.brain-galaxy-stage--mockup .kairo-galaxy-orb--ptt .kairo-galaxy-orb__trigger::before {
+  border-color: rgba(90, 255, 180, 0.88);
+  box-shadow:
+    0 0 1.6rem rgba(55, 255, 170, 0.66),
+    0 0 3rem rgba(0, 220, 255, 0.25),
+    inset -1.1rem -1.2rem 1.8rem rgba(0, 8, 14, 0.82),
+    inset 0.65rem 0.7rem 1.15rem rgba(185, 255, 228, 0.42);
+  animation-duration: 1.65s;
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb--speaking .kairo-galaxy-orb__trigger::before {
+  animation: voice-orb-speaking 0.82s ease-in-out infinite;
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb--thinking .kairo-galaxy-orb__trigger::before,
+.brain-galaxy-stage--mockup .kairo-galaxy-orb--busy .kairo-galaxy-orb__trigger::before {
+  border-color: rgba(255, 196, 72, 0.88);
+  box-shadow:
+    0 0 1.8rem rgba(255, 170, 55, 0.68),
+    0 0 3.2rem rgba(0, 210, 255, 0.22),
+    inset -1.1rem -1.2rem 1.8rem rgba(15, 5, 0, 0.8),
+    inset 0.65rem 0.7rem 1.15rem rgba(255, 235, 180, 0.4);
+  animation-duration: 1.05s;
+}
+
+.brain-galaxy-stage--mockup .kairo-galaxy-orb--voice-beat .kairo-galaxy-orb__trigger::before {
+  transform: translate(-50%, -50%) scale(1.09);
+  filter: brightness(1.35);
+}
+
+@keyframes voice-orb-3d-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.97);
+    filter: brightness(0.94) saturate(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.035);
+    filter: brightness(1.16) saturate(1.2);
+  }
+}
+
+@keyframes voice-orb-speaking {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.96);
+    filter: brightness(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    filter: brightness(1.38);
+  }
+}
+
+@keyframes voice-orb-3d-orbit {
+  from {
+    transform: translate(-50%, -50%) rotateX(67deg) rotateZ(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotateX(67deg) rotateZ(360deg);
+  }
+}
+
+@keyframes voice-orb-hud-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes voice-orb-halo-live {
+  0%,
+  100% {
+    opacity: 0.64;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brain-galaxy-stage--mockup .kairo-galaxy-orb__trigger::before,
+  .brain-galaxy-stage--mockup .kairo-galaxy-orb__trigger::after,
+  .brain-galaxy-stage--mockup .kairo-galaxy-orb__ticks,
+  .brain-galaxy-stage--mockup .kairo-galaxy-orb__beads,
+  .brain-galaxy-stage--mockup .kairo-galaxy-orb__halo {
+    animation: none;
+  }
+}

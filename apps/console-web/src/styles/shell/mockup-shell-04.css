@@ -143,6 +143,72 @@
   cursor: pointer;
 }
 
+.workspace-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  border-radius: var(--radius-shell);
+  background: rgba(0, 10, 16, 0.55);
+}
+
+.workspace-add-form__title {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(120, 220, 255, 0.82);
+}
+
+.workspace-add-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.68rem;
+  color: rgba(190, 220, 235, 0.78);
+}
+
+.workspace-add-form__field input {
+  border: 1px solid rgba(0, 242, 255, 0.2);
+  border-radius: 0.3rem;
+  background: rgba(0, 8, 14, 0.72);
+  color: var(--text-primary);
+  padding: 0.35rem 0.45rem;
+}
+
+.workspace-add-form__error {
+  margin: 0;
+  color: rgba(255, 140, 140, 0.92);
+  font-size: 0.68rem;
+}
+
+.workspace-add-form__actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.workspace-add-form__button {
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  border-radius: 0.3rem;
+  background: transparent;
+  color: rgba(180, 245, 255, 0.92);
+  padding: 0.3rem 0.55rem;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.workspace-add-form__button--primary {
+  background: rgba(0, 242, 255, 0.12);
+}
+
+.workspace-add-form__button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .console-shell--mockup .region-center-workbench.center-workbench--terminal-collapsed {
   grid-template-rows: minmax(0, 1fr);
 }

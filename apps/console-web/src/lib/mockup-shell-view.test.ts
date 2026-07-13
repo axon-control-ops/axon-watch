@@ -213,11 +213,12 @@ describe('mockup shell view helpers', () => {
 
   it('builds workspace status lines with idle and active run counts', () => {
     expect(workspaceStatusLine('workspace_smoke', true, { workspace_smoke: 13 })).toBe(
-      'Active • 13 runs',
+      'Active • 13 active runs',
     );
     expect(workspaceStatusLine('workspace_finance', false, { workspace_finance: 2 })).toBe(
-      'Idle • 2 runs',
+      '2 active runs',
     );
-    expect(workspaceStatusLine('workspace_finance', false)).toBe('Idle • 0 runs');
+    expect(workspaceStatusLine('workspace_finance', false)).toBe('Idle');
+    expect(workspaceStatusLine('workspace_smoke', true)).toBe('Selected • idle');
   });
 });

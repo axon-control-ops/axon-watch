@@ -70,7 +70,7 @@ describe('brain-galaxy-hud-view', () => {
     expect(galaxyInspectorCopy(null).title).toBe('Node inspector');
     expect(galaxyInspectorCopy(null).body).toContain('workspace');
     expect(galaxyInspectorCopy(snapshot.nodes[3]).hint).toContain('prove-source');
-    expect(galaxyInspectorCopy(snapshot.nodes[1]).hint).toContain('opens evidence');
+    expect(galaxyInspectorCopy(snapshot.nodes[1]).hint).toContain('open it in the IDE');
   });
 
   it('resolves workspace navigation targets from hub clicks', () => {

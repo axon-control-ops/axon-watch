@@ -1,20 +1,37 @@
-import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue';
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
-import { isKairoConversationBusy, kairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
+import {
+  isKairoConversationBusy,
+  kairoConversationPhase,
+} from '../kairo-conversation/kairo-conversation-state';
 import { BrainGalaxyScene } from './brain-galaxy-scene';
+import {
+  resolveGalaxyPresence,
+  type GalaxyPresencePhase,
+  type GalaxyPresenceResolved,
+} from './galaxy-presence-state';
 
 export type UseBrainGalaxyOptions = {
   container: Ref<HTMLElement | null>;
   snapshot: Ref<BrainGraphSnapshot | null>;
   onNodeClick: (node: BrainGraphNode) => void;
+  speechCapturing?: Ref<boolean>;
+  kairoSpeechActive?: Ref<boolean>;
+  agentStreamActive?: Ref<boolean>;
+  pendingApprovals?: Ref<number>;
+  criticalSignals?: Ref<number>;
+  highSignals?: Ref<number>;
 };
 
 export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   webglReady: Ref<boolean>;
   webglFailed: Ref<boolean>;
   selectedNode: Ref<BrainGraphNode | null>;
+  presence: Ref<GalaxyPresenceResolved>;
+  presencePhase: Ref<GalaxyPresencePhase>;
   resetView: () => void;
+  clearSelection: () => void;
   focusNode: (nodeId: string) => void;
   selectNode: (node: BrainGraphNode) => void;
 } {
@@ -23,9 +40,29 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   const selectedNode = ref<BrainGraphNode | null>(null);
   const sceneRef = shallowRef<BrainGalaxyScene | null>(null);
 
-  function resetView(): void {
+  const presence = computed(() =>
+    resolveGalaxyPresence({
+      selectedNodeId: selectedNode.value?.node_id ?? null,
+      selectedNodeKind: selectedNode.value?.kind ?? null,
+      conversationPhase: kairoConversationPhase.value,
+      speechCapturing: options.speechCapturing?.value ?? false,
+      kairoSpeechActive: options.kairoSpeechActive?.value ?? false,
+      agentStreamActive: options.agentStreamActive?.value ?? false,
+      pendingApprovals: options.pendingApprovals?.value ?? 0,
+      criticalSignals: options.criticalSignals?.value ?? 0,
+      highSignals: options.highSignals?.value ?? 0,
+    }),
+  );
+
+  const presencePhase = computed(() => presence.value.phase);
+
+  function clearSelection(): void {
     selectedNode.value = null;
     sceneRef.value?.setSelectedNode(null);
+  }
+
+  function resetView(): void {
+    clearSelection();
     sceneRef.value?.resetView();
   }
 
@@ -42,7 +79,15 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       selectNode(node);
       return;
     }
-    selectedNode.value = null;
+    clearSelection();
+  }
+
+  function syncPresenceToScene(): void {
+    const scene = sceneRef.value;
+    if (!scene) {
+      return;
+    }
+    scene.setVaxonCoreMode(presence.value.coreOrbMode);
   }
 
   function mountScene(): void {
@@ -61,10 +106,16 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       return;
     }
 
-    const scene = new BrainGalaxyScene(container, (node) => {
-      selectedNode.value = node;
-      options.onNodeClick(node);
-    });
+    const scene = new BrainGalaxyScene(
+      container,
+      (node) => {
+        selectedNode.value = node;
+        options.onNodeClick(node);
+      },
+      () => {
+        selectedNode.value = null;
+      },
+    );
     const ok = scene.init();
     if (!ok) {
       webglFailed.value = true;
@@ -75,6 +126,10 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     sceneRef.value = scene;
     scene.setSnapshot(options.snapshot.value);
     scene.setVaxonBusy(isKairoConversationBusy());
+    syncPresenceToScene();
+    if (selectedNode.value) {
+      scene.setSelectedNode(selectedNode.value.node_id);
+    }
     webglReady.value = true;
   }
 
@@ -98,9 +153,18 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   );
 
   watch(
+    presence,
+    () => {
+      syncPresenceToScene();
+    },
+    { immediate: true },
+  );
+
+  watch(
     kairoConversationPhase,
     () => {
       sceneRef.value?.setVaxonBusy(isKairoConversationBusy());
+      syncPresenceToScene();
     },
     { immediate: true },
   );
@@ -110,5 +174,15 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     sceneRef.value = null;
   });
 
-  return { webglReady, webglFailed, selectedNode, resetView, focusNode, selectNode };
+  return {
+    webglReady,
+    webglFailed,
+    selectedNode,
+    presence,
+    presencePhase,
+    resetView,
+    clearSelection,
+    focusNode,
+    selectNode,
+  };
 }

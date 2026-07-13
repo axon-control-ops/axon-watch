@@ -297,8 +297,11 @@ export function workspaceStatusLine(
   countsByWorkspace: Record<string, number> = {},
 ): string {
   const count = workspaceRunCount(workspaceId, countsByWorkspace);
-  const runLabel = `${count} run${count === 1 ? '' : 's'}`;
-  return isActive ? `Active • ${runLabel}` : `Idle • ${runLabel}`;
+  if (count === 0) {
+    return isActive ? 'Selected • idle' : 'Idle';
+  }
+  const runLabel = `${count} active run${count === 1 ? '' : 's'}`;
+  return isActive ? `Active • ${runLabel}` : runLabel;
 }
 
 function formatSummaryAge(isoTimestamp: string): string {

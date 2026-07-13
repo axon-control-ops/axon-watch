@@ -5,6 +5,7 @@ import {
   contentHasDebugReproduceMarker,
   extractDebugReproduceRequest,
   parseDebugReproduceSteps,
+  sanitizeDebugReproduceSteps,
   shouldShowDebugReproduceBanner,
 } from './debug-reproduce-view';
 
@@ -19,6 +20,47 @@ describe('debug-reproduce-view', () => {
     ].join('\n');
     expect(parseDebugReproduceSteps(content)).toEqual(['Open settings', 'Click Save']);
     expect(contentHasDebugReproduceMarker(content)).toBe(true);
+  });
+
+  it('strips markdown, drops hypotheses, dedupes, and caps at four actions', () => {
+    expect(
+      sanitizeDebugReproduceSteps([
+        '**H1** — Stream was interrupted',
+        'Open the workspace menu',
+        'Open the workspace menu',
+        '+ **H2** — Folder picker missing',
+        'Click **+ New Workspace**',
+        'Fill in `project_root`',
+        'Submit the form',
+        'Watch the NDJSON log file',
+        'Extra step five should be dropped',
+      ]),
+    ).toEqual([
+      'Open the workspace menu',
+      'Click + New Workspace',
+      'Fill in project_root',
+      'Submit the form',
+    ]);
+  });
+
+  it('sanitizes noisy model dumps inside the reproduce block', () => {
+    const content = [
+      ':::debug-reproduce',
+      '1. **H1** — The ID field feels like a secret',
+      '2. Open Settings',
+      '3. Open Settings',
+      '4. Click Save',
+      '5. Confirm the toast',
+      '6. Check debug-session.ndjson',
+      '7. Extra',
+      ':::',
+    ].join('\n');
+    expect(parseDebugReproduceSteps(content)).toEqual([
+      'Open Settings',
+      'Click Save',
+      'Confirm the toast',
+      'Extra',
+    ]);
   });
 
   it('ignores marker mentions inside edit diffs and prose', () => {

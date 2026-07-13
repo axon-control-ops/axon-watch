@@ -119,6 +119,13 @@
   font-size: 0.58rem;
 }
 
+.agent-block__terminal-mirrored {
+  color: rgba(160, 220, 180, 0.88);
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .agent-block__terminal-output {
   margin: 0;
   padding: 0.45rem 0.55rem;

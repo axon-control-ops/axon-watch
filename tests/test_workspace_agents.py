@@ -19,6 +19,7 @@ from app.main import app  # noqa: E402
 from app.persistence import run_store  # noqa: E402
 from app.workspace_agents import (  # noqa: E402
     _derive_agent_status,
+    build_company_roster,
     build_workspace_agent_record,
     load_workspace_agent_configs,
 )
@@ -58,7 +59,7 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            configs, defaults = load_workspace_agent_configs(agents_file)
+            configs, defaults, _companies, _template = load_workspace_agent_configs(agents_file)
             self.assertEqual("Demo Agent", configs["workspace_demo"].agent_name)
             self.assertEqual("Demo-only work", configs["workspace_demo"].owns)
             self.assertEqual("{display_name} Agent", defaults["name_template"])
@@ -72,10 +73,80 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
                 "connection_kind": "project_path",
             },
             configs={},
-            defaults={"role": "workspace_agent", "name_template": "{display_name} Workspace Agent"},
+            defaults={
+                "role": "lead",
+                "name_template": "{display_name} Workspace Agent",
+                "company_name_template": "{display_name}",
+            },
+            companies={},
+            staffing_template=[{"role": "lead", "schedule": "on_demand"}],
         )
-        self.assertEqual("DashPro Workspace Agent", record["agent_name"])
+        self.assertEqual("DashPro Lead", record["agent_name"])
         self.assertEqual("workspace-agent-workspace_demo", record["agent_id"])
+        self.assertEqual("lead", record["role"])
+
+    def test_company_roster_applies_role_staffing(self) -> None:
+        roster = build_company_roster(
+            "workspace_demo",
+            record={
+                "workspace_id": "workspace_demo",
+                "display_name": "Demo Co",
+                "connection_kind": "project_path",
+            },
+            configs={},
+            defaults={
+                "role": "lead",
+                "name_template": "{display_name} Lead",
+                "company_name_template": "{display_name}",
+            },
+            companies={},
+            staffing_template=[
+                {"role": "lead", "schedule": "on_demand"},
+                {"role": "watcher", "schedule": "always_on"},
+                {"role": "frontend", "schedule": "continuous"},
+            ],
+        )
+        self.assertEqual("Demo Co", roster["company_name"])
+        self.assertEqual(3, roster["employee_count"])
+        roles = [str(row["role"]) for row in roster["employees"]]  # type: ignore[index]
+        self.assertEqual(["lead", "watcher", "frontend"], roles)
+        watcher = next(row for row in roster["employees"] if row["role"] == "watcher")  # type: ignore[index]
+        self.assertEqual("always_on", watcher["schedule"])
+        self.assertEqual("watching", watcher["status"])
+
+    def test_loads_company_employees_from_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            agents_file = Path(tempdir) / "agents.json"
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_demo": {
+                                "company_name": "Demo Corp",
+                                "employees": [
+                                    {
+                                        "name": "Lead Bot",
+                                        "role": "lead",
+                                        "primary": True,
+                                        "schedule": "on_demand",
+                                    },
+                                    {
+                                        "name": "Watch Bot",
+                                        "role": "watcher",
+                                        "schedule": "always_on",
+                                        "owns": "alerts only",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            _configs, _defaults, companies, _template = load_workspace_agent_configs(agents_file)
+            self.assertEqual("Demo Corp", companies["workspace_demo"].company_name)
+            self.assertEqual(2, len(companies["workspace_demo"].employees))
+            self.assertEqual("watcher", companies["workspace_demo"].employees[1].role)
 
 
 class ControlPlaneWorkspaceAgentsTests(unittest.TestCase):
@@ -222,6 +293,77 @@ class ControlPlaneWorkspaceAgentsTests(unittest.TestCase):
 
         self.assertEqual(200, response.status_code)
         self.assertIn(response.json()["status"], {"executing", "watching", "planning"})
+
+    def test_workspace_company_returns_role_based_employees(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "bound-project"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            agents_file = Path(tempdir) / "agents.json"
+            bindings_file.write_text(
+                json.dumps(
+                    {
+                        "bindings": {
+                            "workspace_bound_demo": {
+                                "project_root": str(project_root),
+                                "display_name": "Bound demo",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_bound_demo": {
+                                "company_name": "Bound Co",
+                                "employees": [
+                                    {
+                                        "name": "Bound Lead",
+                                        "role": "lead",
+                                        "primary": True,
+                                        "schedule": "on_demand",
+                                    },
+                                    {
+                                        "name": "Bound Watch",
+                                        "role": "watcher",
+                                        "schedule": "always_on",
+                                    },
+                                    {
+                                        "name": "Bound UI",
+                                        "role": "frontend",
+                                        "schedule": "continuous",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_BINDINGS_FILE": str(bindings_file),
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(tempdir),
+                },
+                clear=False,
+            ):
+                response = self.client.get("/api/workspaces/workspace_bound_demo/company")
+                roles = self.client.get("/api/company-roles")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertEqual("Bound Co", payload["company"]["company_name"])
+        self.assertEqual(3, payload["company"]["employee_count"])
+        role_ids = [item["role"] for item in payload["company"]["employees"]]
+        self.assertEqual(["lead", "watcher", "frontend"], role_ids)
+        self.assertEqual(200, roles.status_code)
+        self.assertGreaterEqual(roles.json()["count"], 5)
 
 
 if __name__ == "__main__":

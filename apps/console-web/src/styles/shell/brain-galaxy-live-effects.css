@@ -1,0 +1,96 @@
+/* Busy-state UI motion paired with the WebGL galaxy effects. */
+
+.brain-galaxy-node-label--selected {
+  border-color: rgba(140, 245, 255, 0.82) !important;
+  background: rgba(0, 30, 44, 0.92) !important;
+  box-shadow:
+    0 0 0.85rem rgba(0, 225, 255, 0.62),
+    0 0 0.4rem rgba(120, 240, 255, 0.2) inset;
+  color: #effdff !important;
+  transform: translate(-50%, -100%) scale(1.12);
+}
+
+.brain-galaxy-stage--mockup.brain-galaxy-stage--vaxon-busy
+  .galaxy-workspaces-rail__glyph {
+  animation: galaxy-workspace-live-glow 1.35s ease-in-out infinite;
+}
+
+.brain-galaxy-stage--mockup.brain-galaxy-stage--vaxon-busy
+  .galaxy-workspaces-rail__item--active {
+  animation: galaxy-workspace-card-live 1.7s ease-in-out infinite;
+}
+
+.brain-galaxy-stage--mockup.brain-galaxy-stage--vaxon-busy
+  .brain-galaxy-node-label--core {
+  animation: galaxy-vaxon-label-live 1.1s ease-in-out infinite;
+}
+
+.brain-galaxy-stage--mockup.brain-galaxy-stage--vaxon-busy
+  .brain-galaxy-stage__jarvis-float {
+  animation: galaxy-vaxon-dock-live 1.3s ease-in-out infinite;
+}
+
+@keyframes galaxy-workspace-live-glow {
+  0%,
+  100% {
+    border-color: rgba(0, 210, 255, 0.28);
+    box-shadow:
+      0 0 0.35rem rgba(0, 200, 255, 0.2),
+      0 0 0.15rem rgba(0, 230, 255, 0.25) inset;
+  }
+  50% {
+    border-color: rgba(110, 240, 255, 0.72);
+    box-shadow:
+      0 0 0.9rem rgba(0, 225, 255, 0.55),
+      0 0 0.35rem rgba(150, 245, 255, 0.42) inset;
+  }
+}
+
+@keyframes galaxy-workspace-card-live {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0.8rem rgba(0, 200, 255, 0.18),
+      0 0 0.6rem rgba(0, 210, 255, 0.08) inset;
+  }
+  50% {
+    box-shadow:
+      0 0 1.25rem rgba(0, 225, 255, 0.42),
+      0 0 0.9rem rgba(0, 220, 255, 0.18) inset;
+  }
+}
+
+@keyframes galaxy-vaxon-label-live {
+  0%,
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 0.85rem rgba(0, 210, 255, 0.28);
+  }
+  50% {
+    filter: brightness(1.35);
+    box-shadow: 0 0 1.5rem rgba(0, 230, 255, 0.65);
+  }
+}
+
+@keyframes galaxy-vaxon-dock-live {
+  0%,
+  100% {
+    filter: brightness(1) drop-shadow(0 0 0.5rem rgba(0, 210, 255, 0.2));
+  }
+  50% {
+    filter: brightness(1.22) drop-shadow(0 0 1.2rem rgba(0, 225, 255, 0.55));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brain-galaxy-stage--mockup.brain-galaxy-stage--vaxon-busy
+    .galaxy-workspaces-rail__glyph,
+  .brain-galaxy-stage--mockup.brain-galaxy-stage--vaxon-busy
+    .galaxy-workspaces-rail__item--active,
+  .brain-galaxy-stage--mockup.brain-galaxy-stage--vaxon-busy
+    .brain-galaxy-node-label--core,
+  .brain-galaxy-stage--mockup.brain-galaxy-stage--vaxon-busy
+    .brain-galaxy-stage__jarvis-float {
+    animation: none;
+  }
+}

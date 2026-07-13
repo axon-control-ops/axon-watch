@@ -63,5 +63,6 @@ describe('useAgentTerminalMirror', () => {
     expect(writeMirrorSnapshot).toHaveBeenCalled();
     expect(exitMirrorMode).not.toHaveBeenCalled();
     expect(mirrorActive.value).toBe(false);
+    expect(forcedText.value).toContain('$ cd /tmp && ls');
   });
 });

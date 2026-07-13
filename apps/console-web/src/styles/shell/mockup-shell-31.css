@@ -1,0 +1,499 @@
+@import './brain-galaxy-live-effects.css';
+@import './voice-orb-3d.css';
+@import '../../features/brain-galaxy/galaxy-presence-effects.css';
+
+/* Brain galaxy mockup chase — glass rails + operator console. 3D orb stays. */
+
+.brain-galaxy-stage--mockup {
+  border-color: rgba(0, 210, 255, 0.18);
+  background: #03080c;
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__viewport {
+  background:
+    radial-gradient(circle at 50% 44%, rgba(0, 220, 255, 0.17), transparent 48%),
+    radial-gradient(circle at 18% 72%, rgba(0, 160, 220, 0.1), transparent 40%),
+    radial-gradient(circle at 82% 18%, rgba(45, 110, 255, 0.08), transparent 34%),
+    #03080c;
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__viewport::after {
+  background:
+    radial-gradient(circle at 50% 45%, transparent 20%, rgba(0, 16, 26, 0.08) 58%),
+    radial-gradient(ellipse at center, transparent 50%, rgba(1, 5, 9, 0.42) 100%);
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--top {
+  top: 0.65rem;
+  left: calc(min(16.5rem, 24vw) + 1.2rem);
+  right: calc(min(23rem, 34vw) + 1.2rem);
+  z-index: 5;
+}
+
+.brain-galaxy-stage--mockup:not(:has(.brain-galaxy-stage__hud--inspector)) .brain-galaxy-stage__hud--top {
+  right: 0.75rem;
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__title-row {
+  padding: 0.22rem 0.55rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.14);
+  background: rgba(0, 8, 14, 0.55);
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--left {
+  top: 0.65rem;
+  left: 0.65rem;
+  bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.45rem);
+  width: min(16.5rem, 24vw);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  overflow: hidden;
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--inspector {
+  top: 0.65rem;
+  right: 0.65rem;
+  bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.45rem);
+  width: min(23rem, 34vw);
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--right {
+  top: 0.65rem;
+  right: 0.65rem;
+}
+
+.brain-galaxy-stage--mockup:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-stage__hud--right {
+  right: calc(min(23rem, 34vw) + 1rem);
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--bottom {
+  left: 0.65rem;
+  right: 0.65rem;
+  bottom: 0.45rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Left workspaces rail (mockup) */
+.galaxy-workspaces-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  height: 100%;
+  padding: 0.7rem 0.65rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(0, 210, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(4, 14, 22, 0.94) 0%, rgba(2, 8, 14, 0.92) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 210, 255, 0.05) inset,
+    0 0 1.4rem rgba(0, 160, 220, 0.1);
+  backdrop-filter: blur(14px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.galaxy-workspaces-rail .company-roster {
+  margin-top: 0.15rem;
+  padding-left: 0;
+  padding-right: 0;
+  flex: 0 0 auto;
+}
+
+.galaxy-workspaces-rail .company-roster__list {
+  max-height: min(18rem, 42vh);
+}
+
+.galaxy-workspaces-rail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.galaxy-workspaces-rail__title {
+  margin: 0;
+  color: rgba(170, 200, 220, 0.88);
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.galaxy-workspaces-rail__add-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  border-radius: 0.28rem;
+  background: rgba(0, 18, 28, 0.8);
+  color: rgba(0, 230, 255, 0.95);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.galaxy-workspaces-rail__search {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.16);
+  background: rgba(0, 10, 16, 0.72);
+}
+
+.galaxy-workspaces-rail__search-icon {
+  color: rgba(0, 210, 255, 0.7);
+  font-size: 0.72rem;
+}
+
+.galaxy-workspaces-rail__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(220, 240, 255, 0.95);
+  font: inherit;
+  font-size: 0.68rem;
+  outline: none;
+}
+
+.galaxy-workspaces-rail__search input::placeholder {
+  color: rgba(130, 160, 180, 0.72);
+}
+
+.galaxy-workspaces-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.galaxy-workspaces-rail__item {
+  display: grid;
+  grid-template-columns: 1.35rem minmax(0, 1fr) 0.45rem;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.42rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 0.38rem;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.galaxy-workspaces-rail__item:hover {
+  border-color: rgba(0, 210, 255, 0.18);
+  background: rgba(0, 210, 255, 0.05);
+}
+
+.galaxy-workspaces-rail__item--active {
+  border-color: rgba(0, 230, 255, 0.45);
+  background: rgba(0, 210, 255, 0.1);
+  box-shadow:
+    0 0 0.9rem rgba(0, 200, 255, 0.2),
+    0 0 0.6rem rgba(0, 210, 255, 0.08) inset;
+}
+
+.galaxy-workspaces-rail__glyph {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 0.28rem;
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(180, 240, 255, 0.35), transparent 55%),
+    rgba(0, 24, 36, 0.9);
+  box-shadow:
+    0 0 0.4rem rgba(0, 200, 255, 0.2),
+    0 0 0.15rem rgba(0, 230, 255, 0.25) inset;
+}
+
+.galaxy-workspaces-rail__glyph--core {
+  box-shadow: 0 0 0.55rem rgba(0, 230, 255, 0.35);
+}
+
+.galaxy-workspaces-rail__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.galaxy-workspaces-rail__copy strong {
+  color: rgba(235, 248, 255, 0.96);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.galaxy-workspaces-rail__item--active .galaxy-workspaces-rail__copy strong {
+  color: rgba(120, 235, 255, 0.98);
+}
+
+.galaxy-workspaces-rail__copy span {
+  color: rgba(140, 175, 195, 0.82);
+  font-size: 0.56rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.galaxy-workspaces-rail__dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: rgba(90, 120, 140, 0.55);
+  justify-self: end;
+}
+
+.galaxy-workspaces-rail__item--active .galaxy-workspaces-rail__dot {
+  background: #2dff9a;
+  box-shadow: 0 0 0.45rem rgba(45, 255, 154, 0.65);
+}
+
+.galaxy-workspaces-rail__item--attention .galaxy-workspaces-rail__dot {
+  background: #ffa040;
+}
+
+.galaxy-workspaces-rail__item--critical .galaxy-workspaces-rail__dot {
+  background: #ff5050;
+}
+
+.galaxy-workspaces-rail__new {
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 1px dashed rgba(0, 210, 255, 0.28);
+  border-radius: 0.35rem;
+  background: rgba(0, 16, 24, 0.45);
+  color: rgba(160, 220, 240, 0.92);
+  font: inherit;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.galaxy-workspaces-rail__new:hover {
+  border-style: solid;
+  border-color: rgba(0, 230, 255, 0.45);
+  color: #fff;
+}
+
+/* Inspector denser mockup chrome */
+.brain-galaxy-stage--mockup .galaxy-inspector {
+  gap: 0.65rem;
+  padding: 0.85rem 0.85rem 0.9rem;
+  border-color: rgba(0, 220, 255, 0.32);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__eyebrow {
+  color: rgba(230, 248, 255, 0.96);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__entity {
+  align-items: center;
+  padding: 0.55rem 0.55rem;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__glyph {
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 1.15rem;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__entity-label {
+  margin: 0;
+  color: rgba(0, 210, 255, 0.78);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__id {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.08rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(0, 210, 255, 0.78);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  cursor: pointer;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__summary {
+  color: rgba(190, 215, 230, 0.9);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__evidence {
+  gap: 0.35rem;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__evidence li {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr);
+  gap: 0.45rem;
+  padding: 0.42rem 0.4rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.1);
+  background: rgba(0, 14, 22, 0.45);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__evidence-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
+  border-radius: 0.28rem;
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(180, 240, 255, 0.4), transparent 60%),
+    rgba(0, 28, 40, 0.95);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__tags-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.35rem;
+  margin-top: auto;
+  border-width: 1.5px;
+  border-color: rgba(0, 230, 255, 0.55);
+  box-shadow: 0 0 1rem rgba(0, 210, 255, 0.18);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+/* Bottom operator console */
+.galaxy-operator-console {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) minmax(11rem, 15rem);
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 210, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(4, 14, 22, 0.94) 0%, rgba(2, 8, 14, 0.92) 100%);
+  box-shadow: 0 0 1.2rem rgba(0, 160, 220, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.galaxy-operator-console__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.galaxy-operator-console__mark {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  color: rgba(0, 230, 255, 0.95);
+}
+
+.galaxy-operator-console__brand strong {
+  display: block;
+  color: rgba(230, 248, 255, 0.95);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.galaxy-operator-console__online {
+  color: #2dff9a;
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+}
+
+.galaxy-operator-console__command {
+  min-width: 0;
+}
+
+.galaxy-operator-console__command .kairo-conversation-bar {
+  margin: 0;
+}
+
+.galaxy-operator-console__command .kairo-conversation-bar__command-row {
+  border-color: rgba(0, 210, 255, 0.2);
+  background: rgba(0, 10, 16, 0.72);
+}
+
+.galaxy-operator-console__stats {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.galaxy-operator-console__stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+}
+
+.galaxy-operator-console__stats span {
+  color: rgba(130, 165, 185, 0.85);
+  font-size: 0.48rem;
+  letter-spacing: 0.12em;
+}
+
+.galaxy-operator-console__stats strong {
+  color: rgba(220, 245, 255, 0.96);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.galaxy-operator-console__stats time {
+  color: rgba(160, 210, 230, 0.9);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+/* Keep 3D VAXON orb visible but tucked when inspector is open */
+.brain-galaxy-stage--mockup:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-stage__jarvis-float {
+  opacity: 0.96 !important;
+  pointer-events: auto !important;
+  transform: scale(0.94);
+}
+
+@media (max-width: 1100px) {
+  .galaxy-operator-console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .galaxy-operator-console__brand,
+  .galaxy-operator-console__stats {
+    display: none;
+  }
+}

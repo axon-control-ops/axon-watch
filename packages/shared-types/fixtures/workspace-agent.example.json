@@ -1,12 +1,15 @@
 {
   "agent_id": "workspace-agent-workspace_axon_watch",
   "workspace_id": "workspace_axon_watch",
-  "agent_name": "Axon-X Workspace Agent",
+  "agent_name": "Axon-X Lead",
   "agent_key": "axon_watch_workspace_agent",
-  "role": "workspace_agent",
+  "role": "lead",
   "status": "idle",
-  "owns": "axon-watch product and control-plane work",
+  "owns": "priorities, handoffs, and product direction",
   "enabled": true,
+  "schedule": "on_demand",
+  "primary": true,
+  "company_name": "Axon-X",
   "display_name": "axon-watch",
   "project_root": "/home/edp/axon-nvme/repos/axon-watch"
 }

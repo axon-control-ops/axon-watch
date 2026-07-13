@@ -1,21 +1,97 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "defaults": {
-    "role": "workspace_agent",
-    "name_template": "{display_name} Workspace Agent"
+    "role": "lead",
+    "name_template": "{display_name} Lead",
+    "company_name_template": "{display_name}",
+    "staffing_template": [
+      { "role": "lead", "schedule": "on_demand" },
+      { "role": "watcher", "schedule": "always_on" },
+      { "role": "frontend", "schedule": "continuous" },
+      { "role": "backend", "schedule": "continuous" },
+      { "role": "integrations", "schedule": "continuous" }
+    ]
   },
-  "agents": {
+  "companies": {
     "workspace_axon_watch": {
-      "agent_name": "Axon-X Workspace Agent",
-      "owns": "axon-watch product, control-plane, and console shell work"
-    },
-    "workspace_axon_local": {
-      "agent_name": "Axon Local Workspace Agent",
-      "owns": "legacy axon-local reference and donor patterns"
+      "company_name": "Axon-X",
+      "employees": [
+        {
+          "name": "Axon-X Lead",
+          "role": "lead",
+          "owns": "priorities, handoffs, and product direction",
+          "schedule": "on_demand",
+          "primary": true
+        },
+        {
+          "name": "Night Watch",
+          "role": "watcher",
+          "owns": "signals, connectors, and runtime health",
+          "schedule": "always_on"
+        },
+        {
+          "name": "Shell Craft",
+          "role": "frontend",
+          "owns": "console UI/UX, dock, and shell polish",
+          "schedule": "continuous"
+        },
+        {
+          "name": "Control Plane",
+          "role": "backend",
+          "owns": "APIs, runs, approvals, and persistence",
+          "schedule": "continuous"
+        },
+        {
+          "name": "Bridge",
+          "role": "integrations",
+          "owns": "connectors, watch service, and cross-repo wiring",
+          "schedule": "continuous"
+        }
+      ]
     },
     "workspace_dashpro": {
-      "agent_name": "DashPro Workspace Agent",
-      "owns": "DashPro product and platform work only"
+      "company_name": "DashPro",
+      "employees": [
+        {
+          "name": "DashPro Lead",
+          "role": "lead",
+          "owns": "DashPro product priorities and handoffs",
+          "schedule": "on_demand",
+          "primary": true
+        },
+        {
+          "name": "DashPro Night Watch",
+          "role": "watcher",
+          "owns": "DashPro signals and runtime health",
+          "schedule": "always_on"
+        },
+        {
+          "name": "DashPro Frontend",
+          "role": "frontend",
+          "owns": "DashPro UI/UX",
+          "schedule": "continuous"
+        },
+        {
+          "name": "DashPro Backend",
+          "role": "backend",
+          "owns": "DashPro APIs and services",
+          "schedule": "continuous"
+        },
+        {
+          "name": "DashPro Integrations",
+          "role": "integrations",
+          "owns": "DashPro connectors and integrated services",
+          "schedule": "continuous"
+        }
+      ]
+    }
+  },
+  "agents": {
+    "workspace_axon_local": {
+      "agent_name": "Axon Local Lead",
+      "role": "lead",
+      "owns": "legacy axon-local reference and donor patterns",
+      "schedule": "on_demand"
     }
   }
 }

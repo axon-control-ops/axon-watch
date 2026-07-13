@@ -34,6 +34,7 @@ interface CreateDockLayoutSliceInput {
   inboxItems: Ref<InboxItem[]>;
   primaryActiveRun: ComputedRef<RunRecord | null>;
   currentWorkspaceId: ComputedRef<string | null>;
+  operatorThreadMessageCount: ComputedRef<number>;
   leftSidebarMode: Ref<LeftSidebarMode>;
   leftSidebarModeTouched: Ref<boolean>;
   dockHeroMode: Ref<DockHeroMode>;
@@ -64,18 +65,23 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
       return;
     }
     const next = new Set(input.expandedDockSeams.value);
+    const workspaceId = input.currentWorkspaceId.value;
+    const fleetActiveRuns =
+      input.runtimeSummary.value?.active_runs ??
+      input.operatorBriefing.value?.active_runs ??
+      [];
+    const workspaceActiveRunCount = workspaceId
+      ? fleetActiveRuns.filter((run) => run.workspace_id === workspaceId).length
+      : fleetActiveRuns.length;
     const openLoopOptions = {
       primaryActiveRun: input.primaryActiveRun.value,
-      fleetActiveRuns:
-        input.runtimeSummary.value?.active_runs ??
-        input.operatorBriefing.value?.active_runs ??
-        [],
-      workspaceId: input.currentWorkspaceId.value,
+      fleetActiveRuns,
+      workspaceId,
     };
     const openLoops = briefingHasOpenLoops(input.operatorBriefing.value, openLoopOptions);
     if (!input.dockThreadSeamTouched.value) {
-      if (openLoops) {
-        // Prefer KAIRO Open loops over command-thread stdout when loops exist.
+      if (openLoops || input.operatorThreadMessageCount.value === 0) {
+        // Prefer KAIRO Open loops; never dominate the dock with an empty thread.
         next.delete('thread');
       } else {
         next.add('thread');
@@ -91,8 +97,7 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
     if (!input.dockHeroModeTouched.value) {
       const activeRunCount = Math.max(
         input.primaryActiveRun.value ? 1 : 0,
-        input.runtimeSummary.value?.active_runs.length ?? 0,
-        input.operatorBriefing.value?.active_runs.length ?? 0,
+        workspaceActiveRunCount,
       );
       input.dockHeroMode.value = resolveDefaultDockHeroMode({
         pendingApprovals: input.pendingApprovalsCount.value,
@@ -101,6 +106,7 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
         nextSafeActions: input.operatorBriefing.value?.next_safe_actions.length ?? 0,
         actionableInboxCount: countActionableOpenSignals(input.inboxItems.value),
         activeRunCount,
+        hasOpenLoops: openLoops,
       });
     }
   }

@@ -88,6 +88,10 @@ export async function fetchJson<T>(
       throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
     }
     if (error instanceof Error && error.name === 'AbortError') {
+      // Caller-supplied cancellation must not be mislabeled as a timeout.
+      if (init.signal?.aborted) {
+        throw error;
+      }
       throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
     }
     throw error;
@@ -114,6 +118,9 @@ export async function fetchBlob(
       throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
     }
     if (error instanceof Error && error.name === 'AbortError') {
+      if (init.signal?.aborted) {
+        throw error;
+      }
       throw new Error(errorLabel ?? `request timed out after ${timeoutMs}ms`);
     }
     throw error;

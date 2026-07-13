@@ -3,6 +3,7 @@ import type {
   BrainGraphNode,
   BrainGraphSnapshot,
 } from '../../lib/operator-brain-graph-view';
+import { VAXON_CORE_ORB_RADIUS } from './vaxon-core-orb-3d';
 
 export type PositionedBrainNode3D = BrainGraphNode & {
   x: number;
@@ -22,7 +23,7 @@ export type BrainGraphLayout3D = {
 };
 
 const NODE_RADIUS: Record<string, number> = {
-  core: 0.42,
+  core: VAXON_CORE_ORB_RADIUS,
   workspace: 0.28,
   connector: 0.14,
   signal: 0.16,

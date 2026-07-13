@@ -68,6 +68,12 @@ class CreateWorkspaceHandoffRequest(BaseModel):
     reason: str = ""
 
 
+class RegisterWorkspaceBindingRequest(BaseModel):
+    workspace_id: str
+    project_root: str
+    display_name: str | None = None
+
+
 class WatchCommandRequest(BaseModel):
     command_id: str | None = None
     command_type: str

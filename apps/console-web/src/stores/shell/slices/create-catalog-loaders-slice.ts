@@ -1,6 +1,6 @@
 import type { Ref } from 'vue';
 
-import { fetchRunHistory, fetchRuns, fetchWorkspaces } from '../../../api/control-plane';
+import { fetchRunHistory, fetchRuns, fetchWorkspaces, registerWorkspaceBinding } from '../../../api/control-plane';
 import type { RunRecord, WorkspaceRecord } from '../../../contracts/canonical';
 import { mergeOperatorWorkspaceCatalog } from '../../../lib/operator-workspace-catalog';
 import { persistOperatorWorkspaceId } from '../../../lib/operator-workspace-selection';
@@ -111,11 +111,26 @@ export function createCatalogLoadersSlice(input: CreateCatalogLoadersSliceInput)
     }
   }
 
+  async function registerWorkspace(options: {
+    workspaceId: string;
+    projectRoot: string;
+    displayName?: string;
+  }): Promise<WorkspaceRecord> {
+    const response = await registerWorkspaceBinding({
+      workspace_id: options.workspaceId,
+      project_root: options.projectRoot,
+      display_name: options.displayName ?? null,
+    });
+    await loadWorkspaces({ sync: false });
+    return response.workspace;
+  }
+
   return {
     syncCurrentWorkspace,
     shouldAutoSyncWorkspaceFromRuns,
     loadWorkspaces,
     loadRuns,
     loadRunHistory,
+    registerWorkspace,
   };
 }

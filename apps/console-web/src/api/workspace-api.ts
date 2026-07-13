@@ -1,4 +1,9 @@
-import type { WorkspaceRecord, WorkspaceAgentListSnapshot, WorkspaceAgentRecord } from '../contracts/canonical';
+import type {
+  WorkspaceRecord,
+  WorkspaceAgentListSnapshot,
+  WorkspaceAgentRecord,
+  CompanyRosterSnapshot,
+} from '../contracts/canonical';
 
 import { fetchJson, apiUrl } from './client';
 
@@ -95,6 +100,35 @@ export async function fetchWorkspaces(options?: {
   );
 }
 
+export interface RegisterWorkspaceBindingRequest {
+  workspace_id: string;
+  project_root: string;
+  display_name?: string | null;
+}
+
+export interface RegisterWorkspaceBindingResponse {
+  workspace: WorkspaceRecord;
+  created: boolean;
+}
+
+export async function registerWorkspaceBinding(
+  body: RegisterWorkspaceBindingRequest,
+): Promise<RegisterWorkspaceBindingResponse> {
+  return fetchJson<RegisterWorkspaceBindingResponse>(
+    '/api/workspaces',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workspace_id: body.workspace_id,
+        project_root: body.project_root,
+        display_name: body.display_name ?? null,
+      }),
+    },
+    'workspace register failed',
+  );
+}
+
 export async function fetchWorkspace(workspaceId: string): Promise<WorkspaceRecord> {
   return fetchJson<WorkspaceRecord>(
     `/api/workspaces/${workspaceId}`,
@@ -121,6 +155,15 @@ export async function fetchWorkspaceAgent(workspaceId: string): Promise<Workspac
     `/api/workspaces/${encoded}/agent`,
     {},
     'workspace agent request failed',
+  );
+}
+
+export async function fetchWorkspaceCompany(workspaceId: string): Promise<CompanyRosterSnapshot> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<CompanyRosterSnapshot>(
+    `/api/workspaces/${encoded}/company`,
+    {},
+    'workspace company request failed',
   );
 }
 

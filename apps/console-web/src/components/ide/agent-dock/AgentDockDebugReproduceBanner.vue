@@ -48,8 +48,7 @@ watch(
 <template>
   <div class="agent-dock-composer__debug-reproduce-banner" role="status">
     <p class="agent-dock-composer__debug-reproduce-copy">
-      Debug is waiting for runtime evidence. Follow the steps in the thread, then proceed so the
-      agent can read <code>.axon/debug-session.ndjson</code> and continue.
+      Reproduce the bug with these steps, then proceed so Debug can read runtime logs and continue.
     </p>
     <ol class="agent-dock-composer__debug-reproduce-steps">
       <li v-for="(step, index) in request.steps" :key="index">{{ step }}</li>

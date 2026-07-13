@@ -18,7 +18,7 @@ const { resizing, resetDockWidth, startDockResize } = useRightDockResize({ dockR
   <AgentDock v-if="shell.layoutMode === 'ide'" />
 
   <aside
-    v-else
+    v-else-if="!shell.operatorBrainGalaxyActive"
     ref="dockRef"
     class="region region-right-dock dock-stack dock-stack--mockup dock-stack--operator-conversation right-dock--resizable"
     :class="{ 'right-dock--resizing': resizing }"

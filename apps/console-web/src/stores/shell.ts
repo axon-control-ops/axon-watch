@@ -467,14 +467,15 @@ export const useShellStore = defineStore('shell', () => {
     readOpenIdeThreadIdsByWorkspace(),
   );
   const dockContext = ref<DockContextDescriptor>(DEFAULT_DOCK_CONTEXT);
-  const expandedDockSeams = ref<Set<DockSeamId>>(new Set(['thread']));
+  const expandedDockSeams = ref<Set<DockSeamId>>(new Set());
   const dockThreadSeamTouched = ref(false);
   const briefingSeamEmphasized = ref(false);
   const missionControlEmphasized = ref(false);
   const signalsSeamEmphasized = ref(false);
   const highlightedSignalId = ref<string | null>(null);
   const dockHeroMode = ref<DockHeroMode>(readStoredDockHeroMode() ?? 'command');
-  const dockHeroModeTouched = ref(readStoredDockHeroMode() !== null);
+  // Session-only: allow smart defaults (Open loops → briefing) each boot.
+  const dockHeroModeTouched = ref(false);
   const commandFocusToken = ref(0);
   const leftSidebarMode = ref<LeftSidebarMode>(readStoredLeftSidebarMode() ?? 'workspaces');
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
@@ -815,6 +816,7 @@ export const useShellStore = defineStore('shell', () => {
     inboxItems,
     primaryActiveRun,
     currentWorkspaceId: computed(() => currentWorkspace.value?.workspace_id ?? null),
+    operatorThreadMessageCount: computed(() => operatorThreadMessages.value.length),
     leftSidebarMode,
     leftSidebarModeTouched,
     dockHeroMode,
@@ -1786,9 +1788,9 @@ export const useShellStore = defineStore('shell', () => {
           }
           if (!terminalAutoRevealSeen && streamIncremental.toCounts().terminal > 0) {
             terminalAutoRevealSeen = true;
-            // A real autonomous terminal tool is now in-flight. Merely
-            // provisioning an agent terminal session does not open the dock.
-            revealIdeTerminalPanel();
+            // Cursor parity ceiling: surface the in-flight shell in vaxon immediately.
+            // True process detach is unavailable — Cursor CLI still owns the shell.
+            void backgroundIdeAgentRun();
           }
           const activity = getWorkspaceStreamUi(workspaceId).activity as IdeComposerActivity | null;
           if (activity) {
@@ -2414,6 +2416,7 @@ export const useShellStore = defineStore('shell', () => {
     loadWorkspaces,
     loadRuns,
     loadRunHistory,
+    registerWorkspace,
   } = createCatalogLoadersSlice({
     workspaces,
     currentWorkspace,
@@ -2437,6 +2440,11 @@ export const useShellStore = defineStore('shell', () => {
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
     applyOperatorDockDefaults();
+    if (mode === 'ide') {
+      // Galaxy hide-right-dock CSS must not leave AgentDock collapsed/gone after IDE entry.
+      agentDockCollapsed.value = false;
+      persistAgentDockCollapsed(false);
+    }
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
       if (mode === 'operator') {
@@ -2486,6 +2494,7 @@ export const useShellStore = defineStore('shell', () => {
     createVaxonTerminalSession,
     loadTerminalSessions,
     renameTerminalSession,
+    runCommandInOperatorTerminal,
     setActiveTerminalSession,
     splitTerminalSession,
   } = terminalSessionStore;
@@ -3862,10 +3871,12 @@ export const useShellStore = defineStore('shell', () => {
     createTerminalSession,
     createVaxonTerminalSession,
     backgroundIdeAgentRun,
+    runCommandInOperatorTerminal,
     splitTerminalSession,
     renameTerminalSession,
     closeTerminalSession,
     loadWorkspaces,
+    registerWorkspace,
     markPrimaryRunReviewReady,
     operatorBrainGraph,
     operatorBrainGraphError,

@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue';
 
 import {
-  captureOperatorResearch,
   createOperatorMemory,
   fetchOperatorEvidence,
   fetchOperatorMemories,
@@ -18,6 +17,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  dismiss: [];
   openWorkspace: [workspaceId: string];
   openSignal: [signalId: string];
   handoffSignal: [
@@ -35,9 +35,9 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const evidence = ref<OperatorEvidenceRecord | null>(null);
 const memories = ref<OperatorMemoryRecord[]>([]);
+const memoryExpanded = ref(false);
 const memoryTitle = ref('');
 const memoryContent = ref('');
-const researchQuery = ref('');
 const statusLine = ref('');
 
 const workspaceId = computed(() => {
@@ -47,25 +47,91 @@ const workspaceId = computed(() => {
 
 const shownTitle = computed(() => evidence.value?.title ?? props.fallbackTitle);
 const shownBody = computed(() => evidence.value?.summary ?? props.fallbackBody);
-const shownHint = computed(() => props.fallbackHint);
+const shownHint = computed(() => {
+  if (evidence.value && !loading.value && !error.value) {
+    return '';
+  }
+  return props.fallbackHint;
+});
+const kindLabel = computed(() => {
+  const kind = evidence.value?.kind ?? 'node';
+  if (kind === 'core') {
+    return 'System Node';
+  }
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
+});
+
+const EVIDENCE_ICONS = ['doc', 'link', 'db', 'pulse', 'shield', 'mail'] as const;
+
+const evidenceRows = computed(() => {
+  const rows: Array<{
+    id: string;
+    title: string;
+    detail: string;
+    source: string;
+    ago: string;
+    icon: (typeof EVIDENCE_ICONS)[number];
+  }> = [];
+  const sections = evidence.value?.sections ?? [];
+  if (sections.length) {
+    for (const section of sections) {
+      for (const item of section.items) {
+        rows.push({
+          id: `section:${section.title}:${item.title}`,
+          title: item.title,
+          detail: item.detail,
+          source: item.source_ref?.label || section.title,
+          ago: '',
+          icon: EVIDENCE_ICONS[rows.length % EVIDENCE_ICONS.length] ?? 'doc',
+        });
+      }
+    }
+  } else {
+    for (const fact of evidence.value?.facts ?? []) {
+      rows.push({
+        id: `fact:${fact.label}`,
+        title: fact.label,
+        detail: fact.value,
+        source: 'Evidence',
+        ago: '',
+        icon: EVIDENCE_ICONS[rows.length % EVIDENCE_ICONS.length] ?? 'doc',
+      });
+    }
+  }
+  return rows.slice(0, 8);
+});
+
+const tags = computed(() => {
+  const kind = evidence.value?.kind;
+  const next = [kind, workspaceId.value ? 'workspace' : null].filter(Boolean) as string[];
+  if (kind === 'core') {
+    return ['core', 'system', 'high_value', 'trusted'];
+  }
+  if (kind === 'signal') {
+    next.push('attention');
+  }
+  return next.slice(0, 4);
+});
+
+const primaryAction = computed(() => evidence.value?.actions[0] ?? null);
 
 async function loadPanel(nodeId: string | null): Promise<void> {
   evidence.value = null;
   memories.value = [];
   error.value = null;
   statusLine.value = '';
+  memoryExpanded.value = false;
   if (!nodeId) {
     return;
   }
   loading.value = true;
   try {
     evidence.value = await fetchOperatorEvidence(nodeId);
-    researchQuery.value = evidence.value.title;
     const scopedWorkspaceId =
       evidence.value.sources.find((item) => item.workspace_id?.trim())?.workspace_id ?? '';
     const response = await fetchOperatorMemories({
       workspaceId: scopedWorkspaceId,
-      limit: 6,
+      limit: 4,
     });
     memories.value = response.items;
   } catch (nextError) {
@@ -87,24 +153,10 @@ async function saveMemory(): Promise<void> {
     content: memoryContent.value.trim(),
     source_refs: evidence.value.sources,
   });
-  memories.value = [response.item, ...memories.value].slice(0, 6);
+  memories.value = [response.item, ...memories.value].slice(0, 4);
   memoryTitle.value = '';
   memoryContent.value = '';
-  statusLine.value = 'Memory saved with citations.';
-}
-
-async function captureResearch(): Promise<void> {
-  if (!researchQuery.value.trim()) {
-    return;
-  }
-  const response = await captureOperatorResearch({
-    workspace_id: workspaceId.value,
-    title: researchQuery.value.trim(),
-    query: researchQuery.value.trim(),
-    source_refs: evidence.value?.sources ?? [],
-  });
-  memories.value = [response.memory, ...memories.value].slice(0, 6);
-  statusLine.value = 'Research captured and stored as cited memory.';
+  statusLine.value = 'Memory saved.';
 }
 
 function factValue(label: string): string {
@@ -144,6 +196,14 @@ function triggerAction(action: OperatorEvidenceRecord['actions'][number]): void 
   }
 }
 
+async function copyNodeId(): Promise<void> {
+  if (!props.nodeId || !navigator.clipboard) {
+    return;
+  }
+  await navigator.clipboard.writeText(props.nodeId);
+  statusLine.value = 'ID copied.';
+}
+
 watch(
   () => props.nodeId,
   (nodeId) => {
@@ -151,130 +211,129 @@ watch(
   },
   { immediate: true },
 );
-
-// #region agent log
-watch(
-  [shownTitle, shownBody, () => props.nodeId],
-  () => {
-    globalThis.requestAnimationFrame?.(() => {
-      const el = document.querySelector('.brain-galaxy-stage__hud--inspector') as HTMLElement | null;
-      if (!el) {
-        return;
-      }
-      const styles = getComputedStyle(el);
-      fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
-        body: JSON.stringify({
-          sessionId: 'df24bc',
-          hypothesisId: 'D',
-          location: 'OperatorEvidencePanel.vue:layout',
-          message: 'inspector panel layout metrics',
-          data: {
-            nodeId: props.nodeId,
-            title: shownTitle.value.slice(0, 40),
-            clientHeight: el.clientHeight,
-            scrollHeight: el.scrollHeight,
-            clipped: el.scrollHeight > el.clientHeight + 2,
-            maxHeight: styles.maxHeight,
-            overflowY: styles.overflowY,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    });
-  },
-  { immediate: true },
-);
-// #endregion
 </script>
 
 <template>
-  <aside class="brain-galaxy-stage__hud brain-galaxy-stage__hud--inspector">
-    <p class="brain-galaxy-stage__inspector-title">{{ shownTitle }}</p>
-    <p class="brain-galaxy-stage__inspector-body">{{ shownBody }}</p>
-    <p class="brain-galaxy-stage__inspector-hint">{{ shownHint }}</p>
+  <aside class="galaxy-inspector" role="dialog" aria-label="Node evidence inspector">
+    <header class="galaxy-inspector__header">
+      <p class="galaxy-inspector__eyebrow">{{ shownTitle }}</p>
+      <button
+        type="button"
+        class="galaxy-inspector__close"
+        aria-label="Dismiss evidence panel"
+        title="Dismiss (Esc)"
+        @click="emit('dismiss')"
+      >
+        ×
+      </button>
+    </header>
 
-    <p v-if="loading" class="region-copy">Loading evidence…</p>
-    <p v-else-if="error" class="region-copy region-copy--degraded">{{ error }}</p>
+    <div class="galaxy-inspector__entity">
+      <span class="galaxy-inspector__glyph" aria-hidden="true">⬡</span>
+      <div class="galaxy-inspector__entity-copy">
+        <p class="galaxy-inspector__entity-label">Entity</p>
+        <strong>{{ shownTitle }}</strong>
+        <span>Type: {{ kindLabel }}</span>
+        <button
+          v-if="nodeId"
+          type="button"
+          class="galaxy-inspector__id"
+          title="Copy node ID"
+          @click="copyNodeId"
+        >
+          ID: {{ nodeId }}
+        </button>
+      </div>
+    </div>
 
-    <template v-else-if="evidence">
-      <div v-if="evidence.facts.length" class="briefing-panel__section">
-        <p class="briefing-panel__section-label">Evidence facts</p>
-        <ul class="briefing-panel__list">
-          <li v-for="fact in evidence.facts" :key="fact.label" class="briefing-panel__item">
-            <span class="briefing-panel__item-title">{{ fact.label }}</span>
-            <span class="region-copy">{{ fact.value }}</span>
+    <p class="galaxy-inspector__summary">{{ shownBody }}</p>
+    <p v-if="shownHint" class="galaxy-inspector__hint">{{ shownHint }}</p>
+
+    <p v-if="loading" class="galaxy-inspector__status">Loading evidence…</p>
+    <p v-else-if="error" class="galaxy-inspector__status galaxy-inspector__status--error">
+      {{ error }}
+    </p>
+
+    <template v-else>
+      <section v-if="evidenceRows.length" class="galaxy-inspector__section">
+        <p class="galaxy-inspector__section-label">
+          Evidence
+          <span>{{ evidenceRows.length }}</span>
+        </p>
+        <ul class="galaxy-inspector__evidence">
+          <li v-for="row in evidenceRows" :key="row.id">
+            <span
+              class="galaxy-inspector__evidence-icon"
+              :class="`galaxy-inspector__evidence-icon--${row.icon}`"
+              aria-hidden="true"
+            />
+            <div>
+              <strong>{{ row.title }}</strong>
+              <p>{{ row.detail }}</p>
+              <span>Source: {{ row.source }}</span>
+            </div>
           </li>
         </ul>
-      </div>
+      </section>
 
-      <div v-for="section in evidence.sections" :key="section.title" class="briefing-panel__section">
-        <p class="briefing-panel__section-label">{{ section.title }}</p>
-        <ul class="briefing-panel__list">
-          <li v-for="item in section.items" :key="`${section.title}:${item.title}`" class="briefing-panel__item">
-            <span class="briefing-panel__item-title">{{ item.title }}</span>
-            <span class="region-copy">{{ item.detail }}</span>
-            <span v-if="item.source_ref" class="briefing-panel__kind">
-              {{ item.source_ref.label }}
-            </span>
-          </li>
-        </ul>
-      </div>
-
-      <div v-if="evidence.actions.length" class="briefing-panel__section">
-        <p class="briefing-panel__section-label">Panel actions</p>
-        <div class="briefing-panel__chips">
-          <button
-            v-for="action in evidence.actions"
-            :key="action.label"
-            type="button"
-            class="briefing-panel__chip"
-            @click="triggerAction(action)"
-          >
-            {{ action.label }}
-          </button>
+      <div v-if="tags.length" class="galaxy-inspector__tags-wrap">
+        <p class="galaxy-inspector__section-label">Tags</p>
+        <div class="galaxy-inspector__tags">
+          <span v-for="tag in tags" :key="tag">{{ tag }}</span>
         </div>
       </div>
 
-      <div class="briefing-panel__section">
-        <p class="briefing-panel__section-label">Remember this</p>
-        <input v-model="memoryTitle" class="kairo-conversation-bar__input" type="text" placeholder="Short note title" />
-        <textarea
-          v-model="memoryContent"
-          class="briefing-panel__memory-input"
-          rows="3"
-          placeholder="Confirmed note, tied to the evidence above…"
-        />
-        <button type="button" class="briefing-panel__cta" @click="saveMemory">Save cited memory</button>
-      </div>
+      <button
+        v-if="primaryAction"
+        type="button"
+        class="galaxy-inspector__cta"
+        @click="triggerAction(primaryAction)"
+      >
+        <span aria-hidden="true">◎</span>
+        {{ primaryAction.label }}
+      </button>
 
-      <div class="briefing-panel__section">
-        <p class="briefing-panel__section-label">Research capture</p>
-        <input
-          v-model="researchQuery"
-          class="kairo-conversation-bar__input"
-          type="text"
-          placeholder="Question to research and capture"
-        />
-        <button type="button" class="briefing-panel__cta" @click="captureResearch">
-          Capture research
-        </button>
-      </div>
+      <button
+        v-for="action in (evidence?.actions ?? []).slice(1)"
+        :key="action.label"
+        type="button"
+        class="galaxy-inspector__cta galaxy-inspector__cta--ghost"
+        @click="triggerAction(action)"
+      >
+        {{ action.label }}
+      </button>
 
-      <div v-if="memories.length" class="briefing-panel__section">
-        <p class="briefing-panel__section-label">Recent memories</p>
-        <ul class="briefing-panel__list">
-          <li v-for="memory in memories" :key="memory.memory_id" class="briefing-panel__item">
-            <span class="briefing-panel__item-title">{{ memory.title }}</span>
-            <span class="region-copy">{{ memory.content }}</span>
-            <span class="briefing-panel__kind">{{ memory.kind }}</span>
-          </li>
-        </ul>
-      </div>
-
-      <p v-if="statusLine" class="region-copy">{{ statusLine }}</p>
+      <details class="galaxy-inspector__more" :open="memoryExpanded">
+        <summary @click.prevent="memoryExpanded = !memoryExpanded">Remember / notes</summary>
+        <div class="galaxy-inspector__more-body">
+          <input
+            v-model="memoryTitle"
+            class="galaxy-inspector__input"
+            type="text"
+            placeholder="Short note title"
+          />
+          <textarea
+            v-model="memoryContent"
+            class="galaxy-inspector__textarea"
+            rows="3"
+            placeholder="Confirmed note tied to this evidence…"
+          />
+          <button type="button" class="galaxy-inspector__cta galaxy-inspector__cta--ghost" @click="saveMemory">
+            Save cited memory
+          </button>
+          <ul v-if="memories.length" class="galaxy-inspector__evidence">
+            <li v-for="memory in memories" :key="memory.memory_id">
+              <span class="galaxy-inspector__evidence-icon galaxy-inspector__evidence-icon--doc" aria-hidden="true" />
+              <div>
+                <strong>{{ memory.title }}</strong>
+                <p>{{ memory.content }}</p>
+                <span>{{ memory.kind }}</span>
+              </div>
+            </li>
+          </ul>
+          <p v-if="statusLine" class="galaxy-inspector__status">{{ statusLine }}</p>
+        </div>
+      </details>
     </template>
   </aside>
 </template>
-

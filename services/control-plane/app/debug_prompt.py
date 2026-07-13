@@ -10,6 +10,21 @@ _REPLY_STYLE = (
     "Never address the listener as \"operator\", \"user\", or \"human\"."
 )
 
+_REPRODUCE_BLOCK_RULES = (
+    "When you are ready for reproduction, pause with this exact block. "
+    "Put ONLY 2–4 short plain-text user actions inside it — the steps a person must "
+    "perform to reproduce the bug. Do not put hypotheses, instrumentation notes, "
+    "markdown bold, or H1/H2 labels inside the block:\n"
+    ":::debug-reproduce\n"
+    "1. …\n"
+    "2. …\n"
+    ":::\n"
+    "Keep ranked hypotheses in the normal reply above the block (at most 5, plain "
+    "prose like \"H1: …\" — no markdown emphasis). "
+    "Do not continue past this pause until the next message confirms reproduction "
+    "or asks you to proceed."
+)
+
 
 def build_debug_system_prompt(
     *,
@@ -32,22 +47,14 @@ def build_debug_system_prompt(
             "log instrumentation, and runtime analysis — not guesswork. "
             "Do the work first, then reply with a short summary of what changed.\n\n"
             "Follow this loop:\n"
-            "1. Explore and hypothesize — read relevant files, form multiple concrete "
-            "hypotheses about the root cause, and rank them by likelihood.\n"
+            "1. Explore and hypothesize — read relevant files, form at most five concrete "
+            "hypotheses about the root cause, and rank them by likelihood in plain prose.\n"
             "2. Add instrumentation — insert lightweight log statements that write one "
             f"NDJSON line per event to `{log_path}` (create `.axon/` if needed). "
             "Each line must include hypothesisId, location, message, data, and timestamp. "
             "Prefer existing logging helpers when present; otherwise append to that file.\n"
-            "3. Reproduce — give clear reproduction steps and pause for the bug to be "
-            "reproduced so real runtime evidence is captured. Do not claim a fix is proven "
-            "before logs from a reproduction are reviewed. When you are ready for "
-            "reproduction, end your turn with this exact block (steps as a numbered list):\n"
-            ":::debug-reproduce\n"
-            "1. …\n"
-            "2. …\n"
-            ":::\n"
-            "Do not continue past this pause until the next message confirms reproduction "
-            "or asks you to proceed.\n"
+            "3. Reproduce — "
+            f"{_REPRODUCE_BLOCK_RULES}\n"
             "4. Analyze logs — read `{log_path}`, confirm or reject each hypothesis with "
             "evidence, and identify the actual root cause.\n"
             "5. Make a targeted fix — change only what the evidence supports, usually a "
@@ -63,8 +70,8 @@ def build_debug_system_prompt(
     return (
         "You are Axon-X in Debug mode (consultative). "
         "Help diagnose bugs with an evidence-first approach: explore the codebase, "
-        "list ranked hypotheses, and outline the instrumentation and reproduction steps "
-        "that would confirm the root cause. "
+        "list at most five ranked hypotheses in plain prose, and outline the "
+        "instrumentation and 2–4 short reproduction steps that would confirm the root cause. "
         "Do not claim you edited files or ran commands. "
         "If instrumentation or a fix is needed, say Full Access must be enabled in the "
         f"composer so Debug can write logs to `{log_path}` and apply a targeted fix."

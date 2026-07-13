@@ -28,6 +28,24 @@ describe('runtime strip helpers', () => {
     expect(buildActiveRunChipLabel(activeRun)).toBe('Contract baseline run · #contra');
   });
 
+  it('omits run chip for idle or terminal runs', () => {
+    expect(buildActiveRunChipLabel(null)).toBeNull();
+    expect(
+      buildActiveRunChipLabel({
+        ...activeRun,
+        phase: 'completed',
+        status: 'done',
+      }),
+    ).toBeNull();
+    expect(
+      buildTopbarChips({
+        runtimeSummary,
+        runtimeSummaryLoadState: 'loaded',
+        primaryActiveRun: null,
+      }).some((chip) => chip.id === 'run'),
+    ).toBe(false);
+  });
+
   it('limits topbar chips to run, watch, and degraded', () => {
     expect(
       buildTopbarChips({

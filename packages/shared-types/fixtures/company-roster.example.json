@@ -1,0 +1,52 @@
+{
+  "company": {
+    "workspace_id": "workspace_axon_watch",
+    "company_name": "Axon-X",
+    "employee_count": 5,
+    "primary_employee_id": "employee-workspace_axon_watch-lead",
+    "display_name": "axon-watch",
+    "project_root": "/home/edp/axon-nvme/repos/axon-watch",
+    "employees": [
+      {
+        "employee_id": "employee-workspace_axon_watch-lead",
+        "workspace_id": "workspace_axon_watch",
+        "name": "Axon-X Lead",
+        "role": "lead",
+        "role_label": "Company Lead",
+        "schedule": "on_demand",
+        "schedule_label": "On demand",
+        "status": "idle",
+        "owns": "priorities, handoffs, and product direction",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "employee_id": "employee-workspace_axon_watch-watcher",
+        "workspace_id": "workspace_axon_watch",
+        "name": "Night Watch",
+        "role": "watcher",
+        "role_label": "Night Watch",
+        "schedule": "always_on",
+        "schedule_label": "Always on (24/7)",
+        "status": "watching",
+        "owns": "signals, connectors, and runtime health",
+        "enabled": true,
+        "primary": false
+      }
+    ]
+  },
+  "role_catalog": [
+    {
+      "id": "lead",
+      "label": "Company Lead",
+      "summary": "Owns priorities, handoffs, and final review",
+      "default_schedule": "on_demand"
+    },
+    {
+      "id": "watcher",
+      "label": "Night Watch",
+      "summary": "Monitors signals and runtime health around the clock",
+      "default_schedule": "always_on"
+    }
+  ]
+}

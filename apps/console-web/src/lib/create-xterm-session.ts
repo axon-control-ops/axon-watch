@@ -38,6 +38,8 @@ export interface XtermSessionController {
   writeMirrorSnapshot: (text: string) => void;
   /** Leave mirror mode and reconnect the agent PTY websocket. */
   exitMirrorMode: () => void;
+  /** Send keystrokes to the live PTY (operator sessions only). */
+  writeInput: (data: string) => void;
 }
 
 interface TerminalServerMessage {
@@ -101,6 +103,7 @@ export async function createXtermSession(
   let pendingInputLine = '';
   let mirrorMode = false;
   let lastMirrorText = '';
+  let socketSendInput: ((data: string) => void) | null = null;
 
   const clearScreen = (): void => {
     terminal.clear();
@@ -178,6 +181,7 @@ export async function createXtermSession(
     }
     disposeSocket();
     pendingInputLine = '';
+    socketSendInput = null;
     attachedWorkspaceId = workspaceId;
     attachedSessionId = sessionId;
     attachedSessionRole = sessionRole;
@@ -227,6 +231,7 @@ export async function createXtermSession(
 
         nextSocket.send(JSON.stringify({ type: 'input', data: sanitized }));
       };
+      socketSendInput = sendInput;
 
       pasteDisposable = attachTerminalPasteHandler(container, sendInput);
 
@@ -319,6 +324,12 @@ export async function createXtermSession(
       }
     },
     writeMirrorSnapshot,
+    writeInput(data: string) {
+      if (readOnly || mirrorMode || attachedSessionRole === 'agent') {
+        return;
+      }
+      socketSendInput?.(data);
+    },
     exitMirrorMode() {
       if (!mirrorMode) {
         return;

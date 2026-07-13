@@ -96,6 +96,32 @@ class WorkspaceProjectBindingsTests(unittest.TestCase):
             ):
                 self.assertIsNone(get_workspace_project_binding("workspace_missing"))
 
+    def test_upsert_workspace_project_binding_persists_and_reloads(self) -> None:
+        from app.workspace_project_bindings import upsert_workspace_project_binding
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "project"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(tempdir),
+                    "AXON_WATCH_WORKSPACE_BINDINGS_FILE": str(bindings_file),
+                },
+                clear=False,
+            ):
+                created = upsert_workspace_project_binding(
+                    workspace_id="workspace_new",
+                    project_root=str(project_root),
+                    display_name="New Project",
+                    bindings_file=bindings_file,
+                )
+                self.assertEqual(created.workspace_id, "workspace_new")
+                reloaded = load_workspace_project_bindings(bindings_file)
+                self.assertIn("workspace_new", reloaded)
+                self.assertEqual(reloaded["workspace_new"].display_name, "New Project")
+
 
 if __name__ == "__main__":
     unittest.main()

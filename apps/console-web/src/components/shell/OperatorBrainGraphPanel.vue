@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
+import GalaxyWorkspacesRail from '../../features/brain-galaxy/GalaxyWorkspacesRail.vue';
 import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
 import OperatorEvidencePanel from '../../features/operator-evidence/OperatorEvidencePanel.vue';
@@ -15,6 +16,7 @@ import {
   galaxyTopHubs,
   resolveGalaxyWorkspaceNavigation,
 } from '../../features/brain-galaxy/brain-galaxy-hud-view';
+import type { GalaxyMockupRailItem } from '../../features/brain-galaxy/galaxy-mockup-rail-view';
 import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
 import { resolveBrainGalaxyNodeSelection } from '../../features/brain-galaxy/brain-galaxy-node-selection';
 import {
@@ -50,24 +52,6 @@ function syncGalaxyBottomReserve(): void {
   stage.style.setProperty('--galaxy-bottom-reserve', `${reservePx}px`);
 }
 
-onMounted(() => {
-  if (shell.operatorBrainGraphLoadState === 'idle') {
-    void shell.loadOperatorBrainGraph();
-  }
-  syncGalaxyBottomReserve();
-  if (typeof ResizeObserver !== 'undefined' && bottomHud.value) {
-    bottomHudObserver = new ResizeObserver(() => {
-      syncGalaxyBottomReserve();
-    });
-    bottomHudObserver.observe(bottomHud.value);
-  }
-});
-
-onBeforeUnmount(() => {
-  bottomHudObserver?.disconnect();
-  bottomHudObserver = null;
-});
-
 const snapshot = computed(() => shell.operatorBrainGraph);
 const layout = computed(() =>
   layoutBrainGraph(snapshot.value, { width: 640, height: 400 }),
@@ -76,7 +60,17 @@ const headline = computed(() => brainGraphHeadline(snapshot.value));
 const legend = computed(() => galaxyLegendItems());
 const topHubs = computed(() => galaxyTopHubs(snapshot.value));
 const nodeCounts = computed(() => galaxyNodeCounts(snapshot.value));
-const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
+const graphStats = computed(() => ({
+  nodes: snapshot.value?.node_count ?? 0,
+  links: snapshot.value?.edge_count ?? 0,
+  sources: shell.workspaces.length,
+}));
+const utcClock = ref('');
+let clockTimer: number | null = null;
+
+function tickClock(): void {
+  utcClock.value = new Date().toISOString().slice(11, 19) + ' UTC';
+}
 
 function enterWorkspace(workspaceId: string, nodeId: string, label: string): void {
   setBrainGalaxyConversationFocus({
@@ -87,52 +81,125 @@ function enterWorkspace(workspaceId: string, nodeId: string, label: string): voi
   });
   shell.setCurrentWorkspace(workspaceId);
   shell.setLeftSidebarMode('workspaces');
-  // Dive into the workspace IDE — camera-only focus felt like a dead end.
   shell.setLayoutMode('ide');
 }
 
 function handleNodeClick(node: BrainGraphNode): void {
-  const selection = resolveBrainGalaxyNodeSelection(node);
-  setBrainGalaxyConversationFocus(selection.focus);
-
   if (node.kind === 'workspace' && node.workspace_id) {
     enterWorkspace(node.workspace_id, node.node_id, node.label || node.workspace_id);
     return;
   }
-
-  if (node.kind === 'signal' && selection.focus?.signalId) {
-    if (node.workspace_id) {
-      shell.setCurrentWorkspace(node.workspace_id);
-    }
-    shell.focusAttentionSidebar(selection.focus.signalId);
-  }
+  const selection = resolveBrainGalaxyNodeSelection(node);
+  setBrainGalaxyConversationFocus(selection.focus);
 }
 
-const { webglReady, webglFailed, selectedNode, resetView, focusNode, selectNode } = useBrainGalaxy({
+const pendingApprovals = computed(
+  () =>
+    shell.operatorBriefing?.pending_approvals.count ??
+    shell.runtimeSummary?.approvals.pending_count ??
+    0,
+);
+const criticalSignals = computed(
+  () =>
+    shell.operatorBriefing?.top_signals.filter((signal) => signal.severity === 'critical').length ??
+    0,
+);
+const highSignals = computed(
+  () =>
+    shell.operatorBriefing?.top_signals.filter((signal) => signal.severity === 'high').length ?? 0,
+);
+const speechCapturing = computed(() => false);
+const kairoSpeechActive = computed(() => shell.kairoSpeechActive);
+const agentStreamActive = computed(() => shell.agentStreamActive);
+
+const {
+  webglReady,
+  webglFailed,
+  selectedNode,
+  presence,
+  resetView,
+  clearSelection,
+  selectNode,
+  focusNode,
+} = useBrainGalaxy({
   container: galaxyHost,
   snapshot,
   onNodeClick: handleNodeClick,
+  speechCapturing,
+  kairoSpeechActive,
+  agentStreamActive,
+  pendingApprovals,
+  criticalSignals,
+  highSignals,
 });
 
 const inspector = computed(() => galaxyInspectorCopy(selectedNode.value));
 const showLoading = computed(() => !webglReady.value && !webglFailed.value);
 const showSvgFallback = computed(() => webglFailed.value);
-const vaxonBusy = computed(() => isKairoConversationBusy());
+const vaxonBusy = computed(() => isKairoConversationBusy() || presence.value.busy);
+const stagePresenceClass = computed(() => presence.value.stageClass);
 
-function handleHubClick(hub: {
-  node_id: string;
-  workspace_id: string | null;
-  label: string;
-}): void {
-  focusNode(hub.node_id);
-  if (hub.workspace_id) {
-    enterWorkspace(hub.workspace_id, hub.node_id, hub.label);
+function onEscapeClear(event: KeyboardEvent): void {
+  if (event.key !== 'Escape' || !selectedNode.value) {
+    return;
+  }
+  clearSelection();
+}
+
+onMounted(() => {
+  if (shell.operatorBrainGraphLoadState === 'idle') {
+    void shell.loadOperatorBrainGraph();
+  }
+  tickClock();
+  clockTimer = window.setInterval(tickClock, 1000);
+  syncGalaxyBottomReserve();
+  if (typeof ResizeObserver !== 'undefined' && bottomHud.value) {
+    bottomHudObserver = new ResizeObserver(() => {
+      syncGalaxyBottomReserve();
+    });
+    bottomHudObserver.observe(bottomHud.value);
+  }
+  window.addEventListener('keydown', onEscapeClear);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onEscapeClear);
+  bottomHudObserver?.disconnect();
+  bottomHudObserver = null;
+  if (clockTimer !== null) {
+    window.clearInterval(clockTimer);
+    clockTimer = null;
+  }
+});
+
+watch(
+  [() => snapshot.value?.nodes, webglReady],
+  ([nodes]) => {
+    if (selectedNode.value || !nodes?.length) {
+      return;
+    }
+    const core = nodes.find((node) => node.kind === 'core') ?? null;
+    if (core) {
+      selectNode(core);
+    }
+  },
+  { immediate: true },
+);
+
+function handleRailSelect(item: GalaxyMockupRailItem): void {
+  focusNode(item.id);
+  if (item.kind === 'workspace' && item.workspace_id) {
+    enterWorkspace(item.workspace_id, item.id, item.label);
+    return;
+  }
+  if (item.workspace_id) {
+    shell.setCurrentWorkspace(item.workspace_id);
   }
 }
 
 function handleSvgNodeClick(node: BrainGraphNode): void {
-  // SVG fallback has no WebGL selection path — drive evidence + focus here.
   selectNode(node);
+  handleNodeClick(node);
 }
 
 function handleEvidenceWorkspace(workspaceId: string): void {
@@ -165,8 +232,9 @@ function handleEvidenceHandoff(signal: {
 <template>
   <section
     ref="galaxyStage"
-    class="brain-galaxy-stage"
-    :class="{ 'brain-galaxy-stage--vaxon-busy': vaxonBusy }"
+    class="brain-galaxy-stage brain-galaxy-stage--mockup"
+    :class="[stagePresenceClass, { 'brain-galaxy-stage--vaxon-busy': vaxonBusy }]"
+    :data-galaxy-presence="presence.phase"
     aria-label="Brain galaxy mission control"
   >
     <div
@@ -220,12 +288,15 @@ function handleEvidenceHandoff(signal: {
 
     <header class="brain-galaxy-stage__hud brain-galaxy-stage__hud--top">
       <div class="brain-galaxy-stage__title-row">
-        <p class="brain-galaxy-stage__eyebrow">Mission control</p>
-        <h2 class="brain-galaxy-stage__title">Brain galaxy</h2>
         <span class="brain-galaxy-stage__stats">{{ headline }}</span>
       </div>
       <div class="brain-galaxy-stage__top-actions">
-        <button type="button" class="brain-galaxy-stage__chip" title="Reset camera" @click="resetView">
+        <button
+          type="button"
+          class="brain-galaxy-stage__chip"
+          title="Fit camera and clear selection"
+          @click="resetView"
+        >
           Fit
         </button>
         <button type="button" class="brain-galaxy-stage__chip" @click="emit('switchGrid')">
@@ -242,43 +313,31 @@ function handleEvidenceHandoff(signal: {
       </div>
     </header>
 
-    <aside class="brain-galaxy-stage__hud brain-galaxy-stage__hud--left">
-      <p class="brain-galaxy-stage__panel-label">Workspaces</p>
-      <ul class="brain-galaxy-stage__hub-list">
-        <li v-for="hub in topHubs" :key="hub.node_id">
-          <button
-            type="button"
-            class="brain-galaxy-stage__hub"
-            :class="[
-              `brain-galaxy-stage__hub--${hub.tone}`,
-              {
-                'brain-galaxy-stage__hub--active':
-                  currentWorkspaceId === hub.workspace_id ||
-                  selectedNode?.node_id === hub.node_id,
-              },
-            ]"
-            :title="`Open ${hub.label} in IDE`"
-            @click="handleHubClick(hub)"
-          >
-            <span class="brain-galaxy-stage__hub-dot" aria-hidden="true" />
-            <span class="brain-galaxy-stage__hub-copy">
-              <strong>{{ hub.label }}</strong>
-              <span>{{ hub.detail }}</span>
-            </span>
-          </button>
-        </li>
-      </ul>
-    </aside>
+    <div class="brain-galaxy-stage__hud brain-galaxy-stage__hud--left">
+      <GalaxyWorkspacesRail
+        :snapshot="snapshot"
+        :workspaces="shell.workspaces"
+        :selected-id="selectedNode?.node_id ?? null"
+        :current-workspace-id="shell.currentWorkspace?.workspace_id ?? null"
+        @select="handleRailSelect"
+      />
+    </div>
 
-    <OperatorEvidencePanel
-      :node-id="selectedNode?.node_id ?? null"
-      :fallback-title="inspector.title"
-      :fallback-body="inspector.body"
-      :fallback-hint="inspector.hint"
-      @open-workspace="handleEvidenceWorkspace"
-      @open-signal="handleEvidenceSignal"
-      @handoff-signal="handleEvidenceHandoff"
-    />
+    <div
+      v-if="selectedNode"
+      class="brain-galaxy-stage__hud brain-galaxy-stage__hud--inspector"
+    >
+      <OperatorEvidencePanel
+        :node-id="selectedNode.node_id"
+        :fallback-title="inspector.title"
+        :fallback-body="inspector.body"
+        :fallback-hint="inspector.hint"
+        @dismiss="clearSelection"
+        @open-workspace="handleEvidenceWorkspace"
+        @open-signal="handleEvidenceSignal"
+        @handoff-signal="handleEvidenceHandoff"
+      />
+    </div>
 
     <aside class="brain-galaxy-stage__hud brain-galaxy-stage__hud--right">
       <button
@@ -298,8 +357,32 @@ function handleEvidenceHandoff(signal: {
       </ul>
     </aside>
 
-    <footer ref="bottomHud" class="brain-galaxy-stage__hud brain-galaxy-stage__hud--bottom">
-      <KairoConversationBar />
+    <footer ref="bottomHud" class="brain-galaxy-stage__hud brain-galaxy-stage__hud--bottom galaxy-operator-console">
+      <div class="galaxy-operator-console__brand">
+        <span class="galaxy-operator-console__mark" aria-hidden="true">⬡</span>
+        <div>
+          <strong>VAXON // OPERATOR CONSOLE</strong>
+          <span class="galaxy-operator-console__online">● ONLINE</span>
+        </div>
+      </div>
+      <div class="galaxy-operator-console__command">
+        <KairoConversationBar />
+      </div>
+      <div class="galaxy-operator-console__stats" aria-label="Graph stats">
+        <div>
+          <span>NODES</span>
+          <strong>{{ graphStats.nodes.toLocaleString() }}</strong>
+        </div>
+        <div>
+          <span>LINKS</span>
+          <strong>{{ graphStats.links.toLocaleString() }}</strong>
+        </div>
+        <div>
+          <span>SOURCES</span>
+          <strong>{{ graphStats.sources.toLocaleString() }}</strong>
+        </div>
+        <time>{{ utcClock }}</time>
+      </div>
     </footer>
 
     <KairoGalaxyOrb />

@@ -20,8 +20,10 @@ export interface StatusBarSegment {
 
 export type RuntimeSummaryLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 
+const TERMINAL_RUN_PHASES = new Set(['completed', 'failed', 'cancelled']);
+
 export function buildActiveRunChipLabel(run: RunRecord | null): string | null {
-  if (!run) {
+  if (!run || TERMINAL_RUN_PHASES.has(run.phase)) {
     return null;
   }
   return `${formatRunDisplayName(run)} · #${formatRunShortId(run.run_id)}`;

@@ -9,6 +9,7 @@ import StatusBar from './components/shell/StatusBar.vue';
 import TopBar from './components/shell/TopBar.vue';
 import VaultSurface from './components/vault/VaultSurface.vue';
 import DataSurface from './components/data/DataSurface.vue';
+import SkillsSurface from './components/skills/SkillsSurface.vue';
 import OperatorMobileShell from './components/shell/OperatorMobileShell.vue';
 import OperatorSettingsSurface from './components/settings/OperatorSettingsSurface.vue';
 import ScanHierarchyPreview from './dev/ScanHierarchyPreview.vue';
@@ -32,12 +33,14 @@ let liveEventsSession: ReturnType<typeof startLiveEventsSession> | null = null;
 const { appSurface } = useAppSurface();
 const isVaultSurface = computed(() => appSurface.value === 'vault');
 const isDataSurface = computed(() => appSurface.value === 'data');
+const isSkillsSurface = computed(() => appSurface.value === 'skills');
 const isMobileSurface = computed(() => appSurface.value === 'mobile');
 const isSettingsSurface = computed(() => appSurface.value === 'settings');
 const isFoundationSurface = computed(
   () =>
     isVaultSurface.value ||
     isDataSurface.value ||
+    isSkillsSurface.value ||
     isMobileSurface.value ||
     isSettingsSurface.value,
 );
@@ -63,7 +66,11 @@ watch(
   (surface, previous) => {
     if (
       surface === 'console' &&
-      (previous === 'vault' || previous === 'data' || previous === 'settings')
+      (previous === 'vault' ||
+        previous === 'data' ||
+        previous === 'skills' ||
+        previous === 'settings' ||
+        previous === 'mobile')
     ) {
       void shell.refreshRunSurfaces();
       void shell.loadWorkspaceFiles();
@@ -121,9 +128,11 @@ onUnmounted(() => {
         'console-shell--mobile-compact': shell.mobileCompactLayout,
         'console-shell--ide': shell.layoutMode === 'ide',
         'console-shell--operator': shell.layoutMode === 'operator',
-        'console-shell--brain-galaxy': shell.operatorBrainGalaxyActive,
+        'console-shell--brain-galaxy':
+          shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
         'console-shell--vault': isVaultSurface,
         'console-shell--data': isDataSurface,
+        'console-shell--skills': isSkillsSurface,
         'console-shell--mobile': isMobileSurface,
         'console-shell--settings': isSettingsSurface,
       }"
@@ -138,6 +147,7 @@ onUnmounted(() => {
       </template>
       <VaultSurface v-if="isVaultSurface" />
       <DataSurface v-if="isDataSurface" />
+      <SkillsSurface v-if="isSkillsSurface" />
       <OperatorMobileShell v-if="isMobileSurface" />
       <OperatorSettingsSurface v-if="isSettingsSurface" />
       <StatusBar />

@@ -89,7 +89,8 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     const chips = buildTopbarChips({
       runtimeSummary: input.runtimeSummary.value,
       runtimeSummaryLoadState: input.runtimeSummaryLoadState.value,
-      primaryActiveRun: input.activeRun.value,
+      // Workspace-scoped primary only — fleet `activeRun` caused stale Resume chips while IDLE.
+      primaryActiveRun: input.primaryActiveRun.value,
     });
     return filterTopbarChipsForIde(
       chips,

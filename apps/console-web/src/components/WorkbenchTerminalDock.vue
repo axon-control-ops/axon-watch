@@ -8,11 +8,18 @@ import { useAgentTerminalMirror } from '../composables/useAgentTerminalMirror';
 import {
   agentShellMirrorActive,
   agentShellMirrorForcedText,
+  armAgentShellMirror,
   clearAgentShellMirror,
+  pendingOperatorTerminalCommand,
+  takePendingOperatorTerminalCommand,
 } from '../lib/agent-shell-mirror-state';
 import { agentContentHasTranscriptBlocks } from '../lib/agent-transcript-blocks';
 import { findAgentTerminalMirrorSegment } from '../lib/agent-terminal-mirror';
 import { terminalSessionTabLabel } from '../lib/terminal-session-view';
+import {
+  resolveActiveVisibleTerminalSessionIds,
+  resolveMirrorVisibleTerminalSessionIds,
+} from '../lib/workbench-terminal-visible-panes';
 import { useShellStore } from '../stores/shell';
 
 const props = defineProps<{
@@ -113,14 +120,8 @@ watch(
     if (!forced && !resolveMirrorTranscriptContent()) {
       return;
     }
-    // Prefer the agent pane when mirroring so the operator is not left staring at empty bash.
-    const current = visibleTerminalSessionIds.value;
-    if (current[0] !== sessionId) {
-      visibleTerminalSessionIds.value = [sessionId, ...current.filter((id) => id !== sessionId)].slice(
-        0,
-        2,
-      );
-    }
+    // Focus the existing agent/vaxon pane only — never auto-split beside bash.
+    visibleTerminalSessionIds.value = resolveMirrorVisibleTerminalSessionIds(sessionId);
     // Host may mount one tick after the agent session becomes active.
     requestAnimationFrame(() => {
       syncAgentTerminalMirror();
@@ -148,10 +149,63 @@ function setTerminalHostRef(sessionId: string, host: TerminalHostInstance | null
     ...terminalHostRefs.value,
     [sessionId]: host,
   };
-  if (host && agentShellMirrorActive.value && sessionId === agentSessionId.value) {
-    syncAgentTerminalMirror();
+  if (!host) {
+    return;
   }
+  if (sessionId === agentSessionId.value) {
+    if (agentShellMirrorForcedText.value || agentShellMirrorActive.value) {
+      if (agentShellMirrorForcedText.value) {
+        armAgentShellMirror();
+      }
+      syncAgentTerminalMirror();
+    }
+  }
+  flushPendingOperatorCommand(sessionId);
 }
+
+function flushPendingOperatorCommand(sessionId?: string): void {
+  const command = pendingOperatorTerminalCommand.value;
+  if (!command) {
+    return;
+  }
+  const operatorSession = shell.terminalSessions.find((session) => session.role === 'operator');
+  if (!operatorSession) {
+    return;
+  }
+  if (sessionId && sessionId !== operatorSession.id) {
+    return;
+  }
+  if (shell.activeTerminalSessionId !== operatorSession.id) {
+    return;
+  }
+  const host = terminalHostRefs.value[operatorSession.id];
+  if (!host?.writeInput) {
+    return;
+  }
+  takePendingOperatorTerminalCommand();
+  visibleTerminalSessionIds.value = [operatorSession.id];
+  // Give the PTY a tick to finish ready handshake when freshly focused.
+  requestAnimationFrame(() => {
+    host.writeInput(`${command}\r`);
+  });
+}
+
+watch(pendingOperatorTerminalCommand, (command) => {
+  if (!command) {
+    return;
+  }
+  const operatorSession = shell.terminalSessions.find((session) => session.role === 'operator');
+  if (!operatorSession) {
+    return;
+  }
+  visibleTerminalSessionIds.value = [operatorSession.id];
+  if (shell.activeTerminalSessionId !== operatorSession.id) {
+    shell.setActiveTerminalSession(operatorSession.id);
+  }
+  requestAnimationFrame(() => {
+    flushPendingOperatorCommand(operatorSession.id);
+  });
+});
 
 function closeNewTerminalMenu(): void {
   showNewTerminalMenu.value = false;
@@ -233,17 +287,11 @@ watch(
   () => [shell.activeTerminalSessionId, shell.terminalSessions.map((session) => session.id).join('|')],
   () => {
     const existingIds = new Set(shell.terminalSessions.map((session) => session.id));
-    let kept = visibleTerminalSessionIds.value.filter((id) => existingIds.has(id)).slice(0, 2);
-    if (!existingIds.has(shell.activeTerminalSessionId)) {
-      visibleTerminalSessionIds.value = kept;
-      return;
-    }
-    if (kept.length === 0) {
-      kept = [shell.activeTerminalSessionId];
-    } else if (!kept.includes(shell.activeTerminalSessionId) && kept.length > 1) {
-      kept = [kept[0]!, shell.activeTerminalSessionId];
-    }
-    visibleTerminalSessionIds.value = kept;
+    visibleTerminalSessionIds.value = resolveActiveVisibleTerminalSessionIds({
+      visibleSessionIds: visibleTerminalSessionIds.value,
+      existingSessionIds: existingIds,
+      activeSessionId: shell.activeTerminalSessionId,
+    });
   },
   { immediate: true },
 );

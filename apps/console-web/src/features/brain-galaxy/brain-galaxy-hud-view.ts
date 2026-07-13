@@ -92,7 +92,7 @@ export function galaxyInspectorCopy(node: BrainGraphNode | null): {
 
   const hints: Record<string, string> = {
     core: 'KAIRO control plane — the center of your operator brain.',
-    workspace: 'Click opens evidence and enters the workspace IDE.',
+    workspace: 'Click this workspace (list or orb) to open it in the IDE.',
     run: 'Active execution lane tied to a workspace.',
     signal: 'Evidence panel loads prove-source facts; open Attention or Continue in IDE from actions.',
     connector: 'Live connector health bound to a workspace.',

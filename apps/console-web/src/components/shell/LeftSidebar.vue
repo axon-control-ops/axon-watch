@@ -7,7 +7,9 @@ import IdeBriefingPanel from '../ide/IdeBriefingPanel.vue';
 import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
 import KairoSidebarPanel from '../ide/KairoSidebarPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
+import CompanyRosterPanel from './CompanyRosterPanel.vue';
 import KairoVoiceDeckPanel from './KairoVoiceDeckPanel.vue';
+import WorkspaceAddForm from './WorkspaceAddForm.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import {
@@ -17,6 +19,7 @@ import {
   workspaceIconKind,
 } from '../../lib/mockup-workspace-icons';
 import { workspaceStatusLine } from '../../lib/mockup-shell-view';
+import { isActiveRun } from '../../stores/shell-run-selection';
 import {
   clampSidebarWidth,
   readStoredSidebarWidth,
@@ -29,12 +32,12 @@ import {
 
 const shell = useShellStore();
 const workspaceFilter = ref('');
+const showAddWorkspaceForm = ref(false);
 const sidebarRef = ref<HTMLElement | null>(null);
 const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? 280);
 const resizing = ref(false);
 
 const catalogWorkspaces = computed(() => shell.workspaces);
-const usesProductionCatalog = computed(() => shell.usesProductionWorkspaceCatalog);
 
 const filteredWorkspaces = computed(() => {
   const query = workspaceFilter.value.trim().toLowerCase();
@@ -49,6 +52,9 @@ const filteredWorkspaces = computed(() => {
 const runCountsByWorkspace = computed(() => {
   const counts: Record<string, number> = {};
   for (const run of shell.runs) {
+    if (!isActiveRun(run)) {
+      continue;
+    }
     const workspaceId = run.workspace_id;
     counts[workspaceId] = (counts[workspaceId] ?? 0) + 1;
   }
@@ -266,13 +272,20 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
+          <WorkspaceAddForm
+            v-if="showAddWorkspaceForm"
+            @registered="showAddWorkspaceForm = false"
+            @cancel="showAddWorkspaceForm = false"
+          />
           <button
-            v-if="!usesProductionCatalog"
+            v-else
             type="button"
             class="workspace-new-button"
+            @click="showAddWorkspaceForm = true"
           >
             + New Workspace
           </button>
+          <CompanyRosterPanel />
           <p v-if="shell.workspacesError" class="region-copy">{{ shell.workspacesError }}</p>
         </div>
 

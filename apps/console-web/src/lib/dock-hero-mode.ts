@@ -9,7 +9,12 @@ export function resolveDefaultDockHeroMode(input: {
   nextSafeActions?: number;
   actionableInboxCount?: number;
   activeRunCount?: number;
+  hasOpenLoops?: boolean;
 }): DockHeroMode {
+  if (input.hasOpenLoops) {
+    return 'briefing';
+  }
+
   if (input.pendingApprovals > 0) {
     return 'briefing';
   }

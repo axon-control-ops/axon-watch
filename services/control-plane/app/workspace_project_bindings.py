@@ -122,3 +122,63 @@ def get_workspace_project_binding(workspace_id: str) -> WorkspaceProjectBinding 
     if not normalized_id:
         return None
     return load_workspace_project_bindings().get(normalized_id)
+
+
+def _normalize_workspace_id(workspace_id: str) -> str:
+    normalized = workspace_id.strip()
+    if not normalized:
+        raise WorkspaceBindingError("workspace_id is required")
+    if any(ch.isspace() for ch in normalized):
+        raise WorkspaceBindingError("workspace_id must not contain whitespace")
+    if not all(ch.isalnum() or ch in ("_", "-", ".") for ch in normalized):
+        raise WorkspaceBindingError(
+            "workspace_id may only contain letters, numbers, '_', '-', and '.'",
+        )
+    return normalized
+
+
+def upsert_workspace_project_binding(
+    *,
+    workspace_id: str,
+    project_root: str,
+    display_name: str | None = None,
+    bindings_file: Path | None = None,
+) -> WorkspaceProjectBinding:
+    """Persist a project-bound workspace into the bindings JSON file."""
+    path = bindings_file or default_bindings_file()
+    normalized_id = _normalize_workspace_id(workspace_id)
+    resolved_root = _resolve_project_root(project_root, bindings_file=path)
+    label = (display_name or "").strip() or None
+
+    payload: dict[str, object] = {"bindings": {}}
+    if path.is_file():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise WorkspaceBindingError(f"unable to read bindings file: {path}") from exc
+        if not isinstance(loaded, dict):
+            raise WorkspaceBindingError("bindings file must contain a JSON object")
+        entries = loaded.get("bindings", {})
+        if entries is None:
+            entries = {}
+        if not isinstance(entries, dict):
+            raise WorkspaceBindingError("bindings file must contain a bindings object")
+        payload = {"bindings": dict(entries)}
+
+    bindings = payload["bindings"]
+    assert isinstance(bindings, dict)
+    entry: dict[str, str] = {"project_root": str(resolved_root)}
+    if label:
+        entry["display_name"] = label
+    bindings[normalized_id] = entry
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(f"{path.suffix}.tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
+
+    return WorkspaceProjectBinding(
+        workspace_id=normalized_id,
+        project_root=resolved_root,
+        display_name=label,
+    )

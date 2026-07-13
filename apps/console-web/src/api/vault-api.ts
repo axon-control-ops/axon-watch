@@ -4,7 +4,7 @@ import type {
   VaultStatusSnapshot,
 } from '../lib/vault-surface-view';
 
-import { apiUrl, fetchBlob, fetchJson } from './client';
+import { apiUrl, DEFAULT_FETCH_TIMEOUT_MS, fetchBlob } from './client';
 
 export interface VaultImportResult {
   imported_keys: string[];
@@ -31,28 +31,62 @@ export interface VaultUnlockResponse {
   migrated_settings: string[];
 }
 
-async function vaultRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(apiUrl(path), init);
-  if (!response.ok) {
-    let detail = `request failed with status ${response.status}`;
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) {
-        detail = payload.detail;
-      }
-    } catch {
-      // ignore parse errors
+async function vaultRequest<T>(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException(`request timed out after ${timeoutMs}ms`, 'TimeoutError'));
+  }, timeoutMs);
+  const onExternalAbort = () => {
+    controller.abort(init.signal?.reason);
+  };
+  if (init.signal) {
+    if (init.signal.aborted) {
+      onExternalAbort();
+    } else {
+      init.signal.addEventListener('abort', onExternalAbort, { once: true });
     }
-    throw new Error(detail);
   }
-  if (response.status === 204) {
-    return {} as T;
+  try {
+    const response = await fetch(apiUrl(path), { ...init, signal: controller.signal });
+    if (!response.ok) {
+      let detail = `request failed with status ${response.status}`;
+      try {
+        const payload = (await response.json()) as { detail?: string };
+        if (payload.detail) {
+          detail = payload.detail;
+        }
+      } catch {
+        // ignore parse errors
+      }
+      throw new Error(detail);
+    }
+    if (response.status === 204) {
+      return {} as T;
+    }
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.includes('application/json')) {
+      return (await response.blob()) as T;
+    }
+    return response.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new Error(`request timed out after ${timeoutMs}ms`);
+    }
+    if (error instanceof Error && error.name === 'AbortError') {
+      if (init.signal?.aborted) {
+        throw error;
+      }
+      throw new Error(`request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    init.signal?.removeEventListener('abort', onExternalAbort);
   }
-  const contentType = response.headers.get('content-type') ?? '';
-  if (!contentType.includes('application/json')) {
-    return (await response.blob()) as T;
-  }
-  return response.json() as Promise<T>;
 }
 
 export async function fetchVaultStatus(): Promise<VaultStatusResponse> {
@@ -170,11 +204,10 @@ export async function importVaultBackupFile(
   form.append('file', file);
   form.append('backup_password', options.backupPassword ?? '');
   form.append('mode', options.mode ?? 'merge');
-  const response = await fetch(apiUrl('/api/vault/import'), { method: 'POST', body: form });
-  if (!response.ok) {
-    throw new Error(`vault backup import failed with status ${response.status}`);
-  }
-  return response.json() as Promise<Record<string, unknown>>;
+  return vaultRequest<Record<string, unknown>>('/api/vault/import', {
+    method: 'POST',
+    body: form,
+  });
 }
 
 export async function exportVaultBackup(backupPassword: string): Promise<Blob> {

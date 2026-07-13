@@ -1,11 +1,20 @@
 export type { ApprovalRecord, ThreadMessage, WorkspaceRecord } from './control-plane';
 export type {
+  CompanyEmployeeRecord,
+  CompanyRoleCatalogEntry,
+  CompanyRosterRecord,
+  CompanyRosterSnapshot,
+  EmployeeSchedule,
   WorkspaceAgentListSnapshot,
   WorkspaceAgentRecord,
   WorkspaceAgentRole,
   WorkspaceAgentStatus,
 } from './workspace-agent';
-export { WORKSPACE_AGENT_ROLES, WORKSPACE_AGENT_STATUSES } from './workspace-agent';
+export {
+  EMPLOYEE_SCHEDULES,
+  WORKSPACE_AGENT_ROLES,
+  WORKSPACE_AGENT_STATUSES,
+} from './workspace-agent';
 export type {
   BriefingAction,
   BriefingActionKind,

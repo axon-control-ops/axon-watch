@@ -15,11 +15,15 @@ const isFoundationSurface = computed(
   () =>
     activeSurface.value === 'vault' ||
     activeSurface.value === 'data' ||
+    activeSurface.value === 'skills' ||
     activeSurface.value === 'settings',
 );
 const topbarSubtitle = computed(() => {
   if (activeSurface.value === 'settings') {
     return 'SETTINGS';
+  }
+  if (activeSurface.value === 'skills') {
+    return 'SKILLS';
   }
   if (isFoundationSurface.value) {
     return 'OPERATOR CONSOLE';
@@ -117,6 +121,14 @@ function openSettings(): void {
             @click="openSurface('data')"
           >
             DATA
+          </button>
+          <button
+            v-if="activeSurface !== 'skills'"
+            type="button"
+            class="layout-toggle__button"
+            @click="openSurface('skills')"
+          >
+            SKILLS
           </button>
         </div>
         <div

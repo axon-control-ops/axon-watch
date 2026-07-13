@@ -7,7 +7,7 @@ export type GalaxyNodeColors = {
 };
 
 const KIND_BASE: Record<BrainNodeKind | string, number> = {
-  core: 0x48c4ff,
+  core: 0x7aebff,
   workspace: 0x3a9fd4,
   run: 0x6b8fa8,
   signal: 0xffa040,
@@ -32,7 +32,7 @@ export function galaxyNodeColors(node: BrainGraphNode): GalaxyNodeColors {
   const emissive = TONE_EMISSIVE[node.tone] ?? TONE_EMISSIVE.nominal;
   const emissiveIntensity =
     node.kind === 'core'
-      ? 1.4
+      ? 1.85
       : (TONE_INTENSITY[node.tone] ?? TONE_INTENSITY.nominal);
 
   return { base, emissive, emissiveIntensity };

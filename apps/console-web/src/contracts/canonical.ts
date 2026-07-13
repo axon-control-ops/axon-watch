@@ -13,4 +13,7 @@ export type {
   ThreadMessage,
   WorkspaceRecord,
   WorkspaceAgentRecord,
+  CompanyEmployeeRecord,
+  CompanyRosterRecord,
+  CompanyRosterSnapshot,
 } from '../../../../packages/shared-types/src/index';

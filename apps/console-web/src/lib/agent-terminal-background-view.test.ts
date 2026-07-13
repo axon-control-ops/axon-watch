@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CURSOR_SHELL_PROCESS_DETACH_AVAILABLE,
+  agentTerminalMirrorBadgeLabel,
   agentTranscriptHasOpenTerminalBlock,
   shouldShowAgentTerminalBackgroundControl,
 } from './agent-terminal-background-view';
@@ -39,5 +41,21 @@ describe('agent terminal background visibility', () => {
       agentTranscriptHasOpenTerminalBlock([':::terminal npm test', 'ok', ':::'].join('\n')),
     ).toBe(false);
     expect(agentTranscriptHasOpenTerminalBlock(':::thinking\nstill going')).toBe(false);
+  });
+
+  it('labels mirrored in-flight shells honestly while process detach is unavailable', () => {
+    expect(CURSOR_SHELL_PROCESS_DETACH_AVAILABLE).toBe(false);
+    expect(
+      agentTerminalMirrorBadgeLabel({
+        segmentOpen: true,
+        mirrorActive: true,
+      }),
+    ).toBe('mirrored in vaxon');
+    expect(
+      agentTerminalMirrorBadgeLabel({
+        segmentOpen: true,
+        mirrorActive: false,
+      }),
+    ).toBeNull();
   });
 });

@@ -73,6 +73,7 @@ describe('shell run selection', () => {
     });
 
     expect(selectWorkspacePrimaryRun([completed])).toBeNull();
+    expect(selectPrimaryRun([completed])).toBeNull();
   });
 
   it('scopes workspace primary run to the provided workspace items only', () => {

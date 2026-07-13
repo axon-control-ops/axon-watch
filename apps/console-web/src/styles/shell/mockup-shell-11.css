@@ -176,6 +176,24 @@
   min-height: 0;
 }
 
+/* Galaxy mode (operator only): inspector lives inside the stage — never hide IDE AgentDock.
+   Full-bleed canvas: left shell rail hidden; mockup workspaces live inside the stage. */
+.console-shell--mockup.console-shell--operator.console-shell--brain-galaxy {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-left-sidebar {
+  display: none;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-right-dock {
+  display: none;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-center-workbench {
+  grid-column: leftSidebar / rightDock;
+}
+
 @keyframes kairo-voice-pulse {
   0%,
   100% {

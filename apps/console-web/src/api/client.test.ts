@@ -26,4 +26,28 @@ describe('fetchJson timeout', () => {
     await vi.advanceTimersByTimeAsync(60);
     await expectation;
   });
+
+  it('rethrows AbortError when the caller cancels via init.signal', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+      }),
+    );
+
+    const pending = fetchJson(
+      '/api/runtime/summary',
+      { signal: controller.signal },
+      'runtime summary request failed',
+      5_000,
+    );
+    const expectation = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort();
+    await expectation;
+  });
 });

@@ -160,6 +160,17 @@
   background: rgba(0, 242, 255, 0.08);
 }
 
+.agent-dock-workspace-menu__item--add {
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(0, 242, 255, 0.12);
+  border-radius: 0;
+  color: rgba(120, 220, 255, 0.9);
+}
+
+.agent-dock-workspace-menu__add-form {
+  padding: 0.45rem;
+}
+
 .agent-dock-thread-tabbar {
   width: 100%;
   min-width: 0;

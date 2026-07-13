@@ -7,7 +7,7 @@ import {
   renameWorkspaceTerminalSession,
   type TerminalSessionRecord,
 } from '../api/control-plane';
-import { armAgentShellMirror } from './agent-shell-mirror-state';
+import { armAgentShellMirror, queueOperatorTerminalCommand } from './agent-shell-mirror-state';
 import {
   DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
   upsertTerminalSession,
@@ -147,6 +147,23 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     await createVaxonTerminalSession(input.ideAgentRunId.value);
   }
 
+  async function runCommandInOperatorTerminal(command: string): Promise<void> {
+    const trimmed = command.trim();
+    if (!trimmed) {
+      return;
+    }
+    queueOperatorTerminalCommand(trimmed);
+    input.revealIdeTerminalPanel();
+    const operatorSession = input.terminalSessions.value.find(
+      (session) => session.role === 'operator',
+    );
+    if (operatorSession) {
+      input.activeTerminalSessionId.value = operatorSession.id;
+      return;
+    }
+    await createTerminalSession({ role: 'operator', title: 'bash' });
+  }
+
   async function splitTerminalSession(sessionId: string): Promise<string | null> {
     const source = input.terminalSessions.value.find((session) => session.id === sessionId);
     if (!source) {
@@ -207,6 +224,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     createVaxonTerminalSession,
     loadTerminalSessions,
     renameTerminalSession,
+    runCommandInOperatorTerminal,
     setActiveTerminalSession,
     splitTerminalSession,
     terminalSessions: input.terminalSessions,

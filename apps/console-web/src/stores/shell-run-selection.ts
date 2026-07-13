@@ -10,7 +10,7 @@ export function isActiveRun(run: RunRecord): boolean {
 export function selectPrimaryRun(items: RunRecord[]): RunRecord | null {
   const activeRuns = items.filter(isActiveRun);
   if (activeRuns.length === 0) {
-    return items[0] ?? null;
+    return null;
   }
 
   const reviewReady = activeRuns.find((run) => run.phase === 'review_ready');

@@ -9,6 +9,9 @@ export const agentShellMirrorActive = ref(false);
  */
 export const agentShellMirrorForcedText = ref<string | null>(null);
 
+/** Queued command to inject into the interactive operator bash PTY. */
+export const pendingOperatorTerminalCommand = ref<string | null>(null);
+
 export function armAgentShellMirror(): void {
   agentShellMirrorActive.value = true;
 }
@@ -28,4 +31,18 @@ export function queueAgentShellMirrorText(text: string): void {
 
 export function clearAgentShellMirrorForcedText(): void {
   agentShellMirrorForcedText.value = null;
+}
+
+export function queueOperatorTerminalCommand(command: string): void {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return;
+  }
+  pendingOperatorTerminalCommand.value = trimmed;
+}
+
+export function takePendingOperatorTerminalCommand(): string | null {
+  const command = pendingOperatorTerminalCommand.value;
+  pendingOperatorTerminalCommand.value = null;
+  return command;
 }

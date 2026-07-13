@@ -9,6 +9,7 @@ import { agentShellMirrorForcedText } from '../lib/agent-shell-mirror-state';
 export type AgentTerminalMirrorHost = {
   writeMirrorSnapshot: (text: string) => void;
   exitMirrorMode?: () => void;
+  writeInput?: (data: string) => void;
 };
 
 type MaybeStringRef = Ref<string | null> | Ref<string> | { readonly value: string | null };
@@ -122,9 +123,13 @@ export function useAgentTerminalMirror(input: {
       if (!wasStreaming || streaming) {
         return;
       }
-      // Final paint, then stop watching further deltas — but leave the snapshot visible.
+      // Final paint, then pin the snapshot so remounts do not fall back to an idle agent PTY.
       if (input.mirrorActive.value) {
         syncNow();
+        const snapshot = resolveSnapshot();
+        if (snapshot && !forcedText.value) {
+          forcedText.value = snapshot;
+        }
       }
       input.clearMirror();
     },

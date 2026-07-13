@@ -102,6 +102,9 @@ function transcriptTimeLabel(value: string): string {
       <p v-if="summaryLine" class="briefing-panel__summary-line">{{ summaryLine }}</p>
       <p class="briefing-panel__galaxy-compact-copy">{{ heroAdvise || heroNotice }}</p>
       <BriefingOpenLoopsStrip :briefing="briefing" compact />
+      <p v-if="briefing?.degraded.active" class="region-copy region-copy--degraded">
+        Degraded state · {{ briefing.degraded.reasons.join(', ') }}
+      </p>
       <button type="button" class="briefing-panel__galaxy-compact-link" @click="emit('openChat')">
         Full briefing →
       </button>
@@ -127,6 +130,9 @@ function transcriptTimeLabel(value: string): string {
           <p class="briefing-panel__section-label briefing-panel__section-label--hero">Advise</p>
           <p class="briefing-panel__kairo-advise">{{ heroAdvise }}</p>
           <BriefingOpenLoopsStrip :briefing="briefing" />
+          <p v-if="briefing?.degraded.active" class="region-copy region-copy--degraded">
+            Degraded state · {{ briefing.degraded.reasons.join(', ') }}
+          </p>
         </div>
       </div>
     </template>

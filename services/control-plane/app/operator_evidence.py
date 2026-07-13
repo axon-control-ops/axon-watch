@@ -320,18 +320,92 @@ def _connector_evidence(connector_id: str) -> dict[str, Any]:
 def _core_evidence() -> dict[str, Any]:
     workspaces = list_workspace_records(operator_surface=True)
     active_runs = list_active_runs()
+    primary_workspace_id = ""
+    preferred_ids = (
+        "workspace_axon_watch",
+        "workspace_axon_local",
+        "workspace_axon",
+    )
+    by_id = {
+        str(record.get("workspace_id") or "").strip(): record
+        for record in workspaces
+        if str(record.get("workspace_id") or "").strip()
+    }
+    for preferred in preferred_ids:
+        if preferred in by_id:
+            primary_workspace_id = preferred
+            break
+    if not primary_workspace_id and by_id:
+        primary_workspace_id = next(iter(by_id))
+    actions: list[dict[str, Any]] = []
+    if primary_workspace_id:
+        actions.append(
+            {
+                "label": "Open in Workspace",
+                "target": "workspace",
+                "workspace_id": primary_workspace_id,
+            }
+        )
     return {
         "node_id": "core_kairo",
         "kind": "core",
         "title": "VAXON control plane",
-        "summary": "Control plane, watch, runs, and connectors",
+        "summary": (
+            "Primary knowledge hub and orchestration node for the operator brain — "
+            "control plane, watch, runs, and connectors."
+        ),
         "facts": [
             {"label": "Visible workspaces", "value": str(len(workspaces))},
             {"label": "Active runs", "value": str(len(active_runs))},
+            {"label": "Role", "value": "Fleet orchestration core"},
+            {"label": "Status", "value": "online"},
         ],
-        "sources": [_source_ref("core", "core_kairo", label="Control-plane projection")],
-        "actions": [],
-        "sections": [],
+        "sources": [
+            _source_ref(
+                "core",
+                "core_kairo",
+                label="Control-plane projection",
+                workspace_id=primary_workspace_id,
+            )
+        ],
+        "actions": actions,
+        "sections": [
+            {
+                "title": "System",
+                "items": [
+                    {
+                        "title": "System initialization record",
+                        "detail": "Control-plane projection online for the operator brain.",
+                        "source_ref": _source_ref("core", "core_kairo", label="System Log"),
+                    },
+                    {
+                        "title": "Watch fabric link",
+                        "detail": "Signals and monitors feed attention into this core node.",
+                        "source_ref": _source_ref("core", "core_kairo", label="Watch"),
+                    },
+                    {
+                        "title": "Run orchestration index",
+                        "detail": f"{len(active_runs)} active run(s) across the visible fleet.",
+                        "source_ref": _source_ref("core", "core_kairo", label="Runs"),
+                    },
+                    {
+                        "title": "Workspace catalog",
+                        "detail": f"{len(workspaces)} operator-visible workspace(s) bound to the graph.",
+                        "source_ref": _source_ref("core", "core_kairo", label="Catalog"),
+                    },
+                    {
+                        "title": "Evidence projection",
+                        "detail": "Node inspector loads prove-source facts for selected entities.",
+                        "source_ref": _source_ref("core", "core_kairo", label="Evidence"),
+                    },
+                    {
+                        "title": "Voice / command surface",
+                        "detail": "VAXON conversation bar and orb remain live on the mission canvas.",
+                        "source_ref": _source_ref("core", "core_kairo", label="VAXON"),
+                    },
+                ],
+            }
+        ],
     }
 
 

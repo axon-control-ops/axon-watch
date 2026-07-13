@@ -188,7 +188,7 @@ defineExpose({
             class="workspace-file-tree__inline-input"
             :aria-label="inlineCreate.kind === 'folder' ? 'New folder name' : 'New file name'"
             @keydown="handleInlineKeydown"
-            @blur="commitInlineCreate"
+            @blur="cancelInlineCreate"
           />
         </div>
         <p v-if="inlineError" class="workspace-file-tree__inline-error">{{ inlineError }}</p>
@@ -237,7 +237,7 @@ defineExpose({
               class="workspace-file-tree__inline-input"
               :aria-label="inlineCreate.kind === 'folder' ? 'New folder name' : 'New file name'"
               @keydown="handleInlineKeydown"
-              @blur="commitInlineCreate"
+              @blur="cancelInlineCreate"
             />
           </div>
           <p v-if="inlineError" class="workspace-file-tree__inline-error">{{ inlineError }}</p>

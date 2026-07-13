@@ -8,6 +8,7 @@ describe('app surface route', () => {
     expect(readAppSurface('/data')).toBe('data');
     expect(readAppSurface('/mobile')).toBe('mobile');
     expect(readAppSurface('/settings')).toBe('settings');
+    expect(readAppSurface('/skills')).toBe('skills');
     expect(readAppSurface('/')).toBe('console');
   });
 });

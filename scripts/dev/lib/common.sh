@@ -36,8 +36,17 @@ load_env() {
   # Always pin an absolute control-plane DB path so service cwd cannot create/wipe a second store.
   if [[ "${AXON_WATCH_STATE_DIR}" != /* ]]; then
     AXON_WATCH_STATE_DIR="${repo_root}/${AXON_WATCH_STATE_DIR#./}"
+  elif [[ "${AXON_WATCH_STATE_DIR}" != "${repo_root}"/* ]]; then
+    # Inherited absolute paths (e.g. $HOME/.local/state) silently fork an empty chat DB.
+    echo "WARN: AXON_WATCH_STATE_DIR=${AXON_WATCH_STATE_DIR} is outside repo; using ${repo_root}/.local/state" >&2
+    AXON_WATCH_STATE_DIR="${repo_root}/.local/state"
   fi
-  : "${AXON_WATCH_CONTROL_PLANE_DB:=${AXON_WATCH_STATE_DIR}/control-plane.sqlite3}"
+  # Prefer derived DB path under the resolved state dir unless an in-repo absolute override is set.
+  if [[ -z "${AXON_WATCH_CONTROL_PLANE_DB:-}" ]] \
+    || [[ "${AXON_WATCH_CONTROL_PLANE_DB}" != /* ]] \
+    || [[ "${AXON_WATCH_CONTROL_PLANE_DB}" != "${repo_root}"/* ]]; then
+    AXON_WATCH_CONTROL_PLANE_DB="${AXON_WATCH_STATE_DIR}/control-plane.sqlite3"
+  fi
   : "${AXON_WATCH_PUBLIC_BASE_URL:=http://127.0.0.1:${AXON_WATCH_CONSOLE_WEB_PORT}}"
   : "${AXON_WATCH_CONTROL_PLANE_BASE_URL:=http://127.0.0.1:${AXON_WATCH_CONTROL_PLANE_PORT}}"
   : "${AXON_WATCH_WATCH_SERVICE_BASE_URL:=http://127.0.0.1:${AXON_WATCH_WATCH_SERVICE_PORT}}"

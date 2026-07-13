@@ -2,7 +2,6 @@ import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
 
 import { fetchWorkspaceAgents } from '../../api/workspace-api';
 import type { WorkspaceAgentRecord } from '../../contracts/canonical';
-import { axonDebugSessionLog } from '../../lib/axon-debug-session-log';
 
 const AGENT_STATUS_REFRESH_MS = 12_000;
 
@@ -31,22 +30,6 @@ export function useWorkspaceAgents(currentWorkspaceId: Ref<string | null | undef
       }
       agentsByWorkspaceId.value = next;
       loadState.value = 'loaded';
-      // #region agent log
-      axonDebugSessionLog({
-        hypothesisId: 'EA4',
-        location: 'use-workspace-agents.ts:loadWorkspaceAgents',
-        message: 'employee agents snapshot loaded into UI cache',
-        data: {
-          count: snapshot.items.length,
-          statuses: Object.fromEntries(
-            snapshot.items.map((agent) => [agent.workspace_id, agent.status]),
-          ),
-          reason: options?.reason ?? 'unspecified',
-          cacheOnlyUntilRemount: false,
-        },
-        workspaceId: 'workspace_axon_watch',
-      });
-      // #endregion
     } catch (error) {
       loadState.value = 'error';
       loadError.value = error instanceof Error ? error.message : 'workspace agents request failed';

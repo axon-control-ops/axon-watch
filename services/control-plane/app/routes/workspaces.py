@@ -16,6 +16,7 @@ from app.routes.schemas import (
     CreateTerminalSessionRequest,
     CreateWorkspaceChatThreadRequest,
     CreateWorkspaceHandoffRequest,
+    RegisterWorkspaceBindingRequest,
     RenameTerminalSessionRequest,
     RenameWorkspaceFileRequest,
     WriteWorkspaceFileRequest,
@@ -31,6 +32,10 @@ from app.terminal.session_registry import (
 )
 from app.terminal.session_runtime import terminate_runtime
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record, list_workspace_records
+from app.workspace_project_bindings import (
+    WorkspaceBindingError,
+    upsert_workspace_project_binding,
+)
 from app.workspace_files import (
     WorkspaceFileError,
     list_workspace_files,
@@ -41,7 +46,9 @@ from app.workspace_files import (
 )
 from app.workspace_agents import (
     WorkspaceAgentError,
+    get_company_roster,
     get_workspace_agent_record,
+    list_role_catalog,
     list_workspace_agent_records,
 )
 from app.workspace_handoffs import (
@@ -75,6 +82,22 @@ def workspaces_index(scope: str = "") -> dict[str, Any]:
     return {"items": items, "count": len(items), "scope": "operator" if operator_surface else "all"}
 
 
+@router.post("/api/workspaces")
+def workspaces_register(body: RegisterWorkspaceBindingRequest) -> dict[str, Any]:
+    try:
+        binding = upsert_workspace_project_binding(
+            workspace_id=body.workspace_id,
+            project_root=body.project_root,
+            display_name=body.display_name,
+        )
+        record = get_workspace_record(binding.workspace_id)
+    except WorkspaceBindingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"workspace": record, "created": True}
+
+
 @router.get("/api/workspaces/{workspace_id}")
 def workspaces_show(workspace_id: str) -> dict[str, str]:
     try:
@@ -97,6 +120,21 @@ def workspace_agent_show(workspace_id: str) -> dict[str, object]:
     except WorkspaceAgentError as exc:
         status_code = 404 if "not found" in str(exc).lower() else 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@router.get("/api/workspaces/{workspace_id}/company")
+def workspace_company_show(workspace_id: str) -> dict[str, object]:
+    try:
+        return get_company_roster(workspace_id)
+    except WorkspaceAgentError as exc:
+        status_code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@router.get("/api/company-roles")
+def company_roles_index() -> dict[str, object]:
+    items = list_role_catalog()
+    return {"items": items, "count": len(items)}
 
 
 @router.post("/api/workspaces/{workspace_id}/handoffs")

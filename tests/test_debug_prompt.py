@@ -20,6 +20,7 @@ class DebugPromptTests(unittest.TestCase):
         self.assertIn(".axon/debug-session.ndjson", prompt)
         self.assertIn("Reproduce", prompt)
         self.assertIn(":::debug-reproduce", prompt)
+        self.assertIn("2–4 short plain-text user actions", prompt)
         self.assertIn("targeted fix", prompt.lower())
         self.assertIn("remove instrumentation", prompt.lower())
 
@@ -28,6 +29,7 @@ class DebugPromptTests(unittest.TestCase):
         self.assertIn("consultative", prompt.lower())
         self.assertIn("Do not claim you edited files", prompt)
         self.assertIn("Full Access", prompt)
+        self.assertIn("2–4 short reproduction steps", prompt)
 
 
 if __name__ == "__main__":

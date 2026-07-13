@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import WorkspaceIcon from '../WorkspaceIcon.vue';
+import WorkspaceAddForm from '../shell/WorkspaceAddForm.vue';
 import { useWorkspaceAgents } from '../../features/workspace-agents/use-workspace-agents';
 import { workspaceAgentLabel } from '../../features/workspace-agents/workspace-agent-label';
 import { workspaceIconKind } from '../../lib/mockup-workspace-icons';
@@ -13,6 +14,7 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const menuOpen = ref(false);
+const showAddWorkspaceForm = ref(false);
 const menuRef = ref<HTMLElement | null>(null);
 
 const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
@@ -59,7 +61,13 @@ function toggleMenu(event: MouseEvent): void {
 
 function selectWorkspace(workspaceId: string): void {
   shell.setCurrentWorkspace(workspaceId);
+  showAddWorkspaceForm.value = false;
   menuOpen.value = false;
+}
+
+function openAddWorkspaceForm(event: MouseEvent): void {
+  event.stopPropagation();
+  showAddWorkspaceForm.value = true;
 }
 
 function handleDocumentClick(event: MouseEvent): void {
@@ -68,6 +76,7 @@ function handleDocumentClick(event: MouseEvent): void {
     return;
   }
   menuOpen.value = false;
+  showAddWorkspaceForm.value = false;
 }
 
 onMounted(() => {
@@ -158,6 +167,20 @@ onUnmounted(() => {
           aria-hidden="true"
         />
       </button>
+      <button
+        v-if="!showAddWorkspaceForm"
+        type="button"
+        class="agent-dock-workspace-menu__item agent-dock-workspace-menu__item--add"
+        @click="openAddWorkspaceForm"
+      >
+        + Add workspace
+      </button>
+      <div v-else class="agent-dock-workspace-menu__add-form" @click.stop>
+        <WorkspaceAddForm
+          @registered="selectWorkspace"
+          @cancel="showAddWorkspaceForm = false"
+        />
+      </div>
     </div>
   </div>
 </template>

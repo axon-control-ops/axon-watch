@@ -1,4 +1,12 @@
-export const WORKSPACE_AGENT_ROLES = ['workspace_agent', 'overview_agent'] as const;
+export const WORKSPACE_AGENT_ROLES = [
+  'lead',
+  'watcher',
+  'frontend',
+  'backend',
+  'integrations',
+  'workspace_agent',
+  'overview_agent',
+] as const;
 export type WorkspaceAgentRole = (typeof WORKSPACE_AGENT_ROLES)[number];
 
 export const WORKSPACE_AGENT_STATUSES = [
@@ -13,20 +21,63 @@ export const WORKSPACE_AGENT_STATUSES = [
 ] as const;
 export type WorkspaceAgentStatus = (typeof WORKSPACE_AGENT_STATUSES)[number];
 
+export const EMPLOYEE_SCHEDULES = ['always_on', 'continuous', 'on_demand'] as const;
+export type EmployeeSchedule = (typeof EMPLOYEE_SCHEDULES)[number];
+
 export interface WorkspaceAgentRecord {
   agent_id: string;
   workspace_id: string;
   agent_name: string;
   agent_key: string;
-  role: WorkspaceAgentRole;
+  role: WorkspaceAgentRole | string;
   status: WorkspaceAgentStatus;
   owns: string;
   enabled: boolean;
+  schedule?: EmployeeSchedule | string;
+  primary?: boolean;
   display_name?: string;
   project_root?: string;
+  company_name?: string;
 }
 
 export interface WorkspaceAgentListSnapshot {
   items: WorkspaceAgentRecord[];
   count: number;
+  scope?: 'all' | 'operator';
+}
+
+export interface CompanyRoleCatalogEntry {
+  id: string;
+  label: string;
+  summary: string;
+  default_schedule: EmployeeSchedule | string;
+}
+
+export interface CompanyEmployeeRecord {
+  employee_id: string;
+  workspace_id: string;
+  name: string;
+  role: WorkspaceAgentRole | string;
+  role_label: string;
+  schedule: EmployeeSchedule | string;
+  schedule_label: string;
+  status: WorkspaceAgentStatus;
+  owns: string;
+  enabled: boolean;
+  primary: boolean;
+}
+
+export interface CompanyRosterRecord {
+  workspace_id: string;
+  company_name: string;
+  employee_count: number;
+  employees: CompanyEmployeeRecord[];
+  primary_employee_id: string | null;
+  display_name?: string;
+  project_root?: string;
+}
+
+export interface CompanyRosterSnapshot {
+  company: CompanyRosterRecord;
+  role_catalog: CompanyRoleCatalogEntry[];
 }

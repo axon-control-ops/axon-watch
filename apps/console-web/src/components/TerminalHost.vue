@@ -34,11 +34,16 @@ function exitMirrorMode(): void {
   terminalController?.exitMirrorMode();
 }
 
+function writeInput(data: string): void {
+  terminalController?.writeInput(data);
+}
+
 defineExpose({
   clearTerminal,
   persistTerminalScrollback,
   writeMirrorSnapshot,
   exitMirrorMode,
+  writeInput,
 });
 
 function handleBeforeUnload(): void {

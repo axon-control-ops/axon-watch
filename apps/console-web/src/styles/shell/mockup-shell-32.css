@@ -1,0 +1,131 @@
+/* Company roster — workspace-as-company employee staffing */
+
+.company-roster {
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.75rem 0.8rem;
+  border-top: 1px solid rgba(120, 170, 210, 0.14);
+  background: linear-gradient(180deg, rgba(8, 18, 28, 0.55), rgba(6, 12, 18, 0.2));
+}
+
+.company-roster__header {
+  margin-bottom: 0.55rem;
+}
+
+.company-roster__eyebrow {
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(150, 190, 220, 0.72);
+}
+
+.company-roster__title {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(230, 242, 255, 0.94);
+}
+
+.company-roster__hint {
+  margin: 0.28rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: rgba(160, 190, 215, 0.68);
+}
+
+.company-roster__empty {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: rgba(160, 190, 215, 0.7);
+}
+
+.company-roster__empty--error {
+  color: rgba(255, 160, 140, 0.9);
+}
+
+.company-roster__list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.company-roster__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: start;
+  padding: 0.42rem 0.48rem;
+  border: 1px solid rgba(110, 160, 200, 0.12);
+  border-radius: 0.35rem;
+  background: rgba(10, 20, 30, 0.45);
+}
+
+.company-roster__row--primary {
+  border-color: rgba(90, 190, 255, 0.28);
+  background: rgba(12, 28, 42, 0.65);
+}
+
+.company-roster__identity {
+  min-width: 0;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.company-roster__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(235, 245, 255, 0.95);
+}
+
+.company-roster__badge {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.08rem 0.28rem;
+  border-radius: 0.2rem;
+  color: rgba(150, 220, 255, 0.95);
+  background: rgba(40, 120, 180, 0.28);
+}
+
+.company-roster__meta,
+.company-roster__owns {
+  font-size: 0.64rem;
+  line-height: 1.3;
+  color: rgba(155, 185, 210, 0.72);
+}
+
+.company-roster__owns {
+  color: rgba(140, 170, 195, 0.62);
+}
+
+.company-roster__status {
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  padding: 0.12rem 0.3rem;
+  border-radius: 999px;
+  color: rgba(180, 210, 230, 0.88);
+  background: rgba(70, 100, 130, 0.28);
+  white-space: nowrap;
+}
+
+.company-roster__status[data-status='watching'],
+.company-roster__status[data-status='executing'],
+.company-roster__status[data-status='planning'] {
+  color: rgba(140, 235, 200, 0.95);
+  background: rgba(20, 120, 90, 0.28);
+}
+
+.company-roster__status[data-status='blocked'],
+.company-roster__status[data-status='waiting_approval'] {
+  color: rgba(255, 190, 140, 0.95);
+  background: rgba(140, 80, 30, 0.3);
+}

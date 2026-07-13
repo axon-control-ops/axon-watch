@@ -12,6 +12,8 @@ const USER_META_PREFIX_RE =
 const LEADING_WHETHER_RE = /^(?:whether|if)\s+/i;
 
 const THINKING_ECHO_MIN = 40;
+/** Near-duplicate paragraphs (typos / glued words) still count as an echo. */
+const THINKING_ECHO_SIMILARITY = 0.82;
 
 export function flattenLiveLineText(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
@@ -24,6 +26,54 @@ function normalizeThinkingEchoCompare(text: string): string {
     .replace(/^I\s+/i, '')
     .replace(/^./, (char) => char.toLowerCase())
     .trim();
+}
+
+/** Strip markup/noise and split glued words so near-echoes compare cleanly. */
+function normalizeThinkingEchoTokens(text: string): string {
+  return text
+    .replace(/[*_`~]/g, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Za-z])(\d)/g, '$1 $2')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function thinkingEchoTokenSimilarity(left: string, right: string): number {
+  const aTokens = normalizeThinkingEchoTokens(left).split(' ').filter(Boolean);
+  const bTokens = normalizeThinkingEchoTokens(right).split(' ').filter(Boolean);
+  if (aTokens.length === 0 || bTokens.length === 0) {
+    return 0;
+  }
+  const aSet = new Set(aTokens);
+  const bSet = new Set(bTokens);
+  let intersection = 0;
+  for (const token of aSet) {
+    if (bSet.has(token)) {
+      intersection += 1;
+    }
+  }
+  const union = aSet.size + bSet.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function preferThinkingEchoCopy(left: string, right: string): string {
+  // Prefer the copy that reads more naturally (spaces, leading "I ").
+  const score = (value: string): number => {
+    let points = value.length;
+    if (/^I\s/i.test(value)) {
+      points += 8;
+    }
+    if (!/\bthe[A-Z]/.test(value) && !/\buse[A-Z]/.test(value)) {
+      points += 4;
+    }
+    if (!/\*/.test(value)) {
+      points += 2;
+    }
+    return points;
+  };
+  return score(right) >= score(left) ? right : left;
 }
 
 /**
@@ -51,17 +101,20 @@ export function collapseBackToBackThinkingEcho(text: string, minLength = THINKIN
       return left;
     }
     if (normalizeThinkingEchoCompare(left) === normalizeThinkingEchoCompare(right)) {
-      return right.length >= left.length ? right : left;
+      return preferThinkingEchoCopy(left, right);
     }
     const shorter = left.length <= right.length ? left : right;
     const longer = left.length <= right.length ? right : left;
     const lengthDelta = Math.abs(left.length - right.length);
-    const maxDelta = Math.max(12, Math.floor(shorter.length * 0.15));
-    if (
-      lengthDelta <= maxDelta &&
-      longer.includes(shorter.slice(0, Math.floor(shorter.length * 0.85)))
-    ) {
-      return longer;
+    const maxDelta = Math.max(24, Math.floor(shorter.length * 0.2));
+    if (lengthDelta <= maxDelta) {
+      const prefix = shorter.slice(0, Math.floor(shorter.length * 0.85));
+      if (longer.includes(prefix)) {
+        return preferThinkingEchoCopy(left, right);
+      }
+      if (thinkingEchoTokenSimilarity(left, right) >= THINKING_ECHO_SIMILARITY) {
+        return preferThinkingEchoCopy(left, right);
+      }
     }
     return null;
   };
