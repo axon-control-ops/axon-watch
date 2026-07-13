@@ -10,8 +10,12 @@ from unittest.mock import patch
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.chat.lane_b_git_dispatch import try_lane_b_git_commit_dispatch  # noqa: E402
+from app.chat.lane_b_git_dispatch import (  # noqa: E402
+    split_commit_then_remainder,
+    try_lane_b_git_commit_dispatch,
+)
 from app.chat.workspace_git import derive_commit_message, git_commit, git_status, git_working_tree_is_clean  # noqa: E402
+from app.chat.lane_b_agent import LaneBContext, generate_lane_b_result  # noqa: E402
 
 
 class WorkspaceGitTests(unittest.TestCase):
@@ -139,6 +143,114 @@ class LaneBGitDispatchTests(unittest.TestCase):
         self.assertTrue(git_working_tree_is_clean("## dev...origin/dev"))
         self.assertFalse(git_working_tree_is_clean("## dev...origin/dev\n M notes.txt"))
 
+    def test_derive_commit_message_prefers_plan_after_commit_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            (root / "notes.txt").write_text("hello\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                message = derive_commit_message(
+                    "workspace_alpha",
+                    turn_subject=(
+                        "commit first and then check this plan : "
+                        "Slice 1 — Right dock as second brain"
+                    ),
+                )
+
+            self.assertEqual(message, "Slice 1 — Right dock as second brain")
+            self.assertNotIn("check this plan", message.lower())
+            self.assertNotIn("notes.txt", message)
+
+    def test_commit_then_refuses_blind_add_on_mixed_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            for area in ("apps", "services", "docs"):
+                (root / area).mkdir()
+            for index in range(6):
+                (root / "apps" / f"a{index}.ts").write_text("a\n", encoding="utf-8")
+                (root / "services" / f"s{index}.py").write_text("s\n", encoding="utf-8")
+                (root / "docs" / f"d{index}.md").write_text("d\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                payload = try_lane_b_git_commit_dispatch(
+                    workspace_id="workspace_alpha",
+                    user_prompt="commit first and then start Slice 1",
+                    execution_access="full",
+                )
+
+            self.assertIsNotNone(payload)
+            assert payload is not None
+            self.assertFalse(payload["dispatched"])
+            self.assertIn("blind `git add -A`", str(payload["content"]))
+            self.assertIsNone(payload.get("continue_prompt"))
+
+    def test_split_commit_then_remainder(self) -> None:
+        self.assertEqual(
+            split_commit_then_remainder(
+                "commit first and then check this plan : Slice 1 — Right dock"
+            ),
+            "check this plan : Slice 1 — Right dock",
+        )
+        self.assertEqual(
+            split_commit_then_remainder("commit these changes, then rename the seam"),
+            "rename the seam",
+        )
+        self.assertIsNone(split_commit_then_remainder("commit these changes"))
+        self.assertIsNone(split_commit_then_remainder("explain README.md"))
+
+    def test_commit_then_continues_to_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=root,
+                capture_output=True,
+                check=False,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Axon Test"],
+                cwd=root,
+                capture_output=True,
+                check=False,
+            )
+            (root / "notes.txt").write_text("hello\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                with patch(
+                    "app.chat.lane_b_agent.dispatch_ide_composer",
+                    return_value={
+                        "content": "Starting Slice 1 — Right dock as second brain",
+                        "dispatched": True,
+                        "runtime_id": "cursor_local",
+                        "runtime_label": "Cursor",
+                        "reason": "ok",
+                    },
+                ) as mock_dispatch:
+                    result = generate_lane_b_result(
+                        context=LaneBContext(
+                            workspace_id="workspace_alpha",
+                            composer_mode="agent",
+                        ),
+                        user_prompt=(
+                            "commit first and then check this plan : "
+                            "Slice 1 — Right dock as second brain"
+                        ),
+                        execution_access="full",
+                    )
+
+            self.assertIn("Committed successfully", str(result["content"]))
+            self.assertIn(":::terminal", str(result["content"]))
+            self.assertIn("Starting Slice 1", str(result["content"]))
+            mock_dispatch.assert_called_once()
+            self.assertIn("Slice 1", mock_dispatch.call_args.kwargs["user_prompt"])
+            self.assertNotIn("commit first", mock_dispatch.call_args.kwargs["user_prompt"].lower())
+
     def test_full_access_commit_dispatch(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir) / "workspace_alpha"
@@ -169,6 +281,8 @@ class LaneBGitDispatchTests(unittest.TestCase):
             assert payload is not None
             self.assertTrue(payload["dispatched"])
             self.assertIn("Ship notes", str(payload["content"]))
+            self.assertIn(":::terminal", str(payload["content"]))
+            self.assertIsNone(payload.get("continue_prompt"))
 
     def test_requires_explicit_message_when_generic_fallback_would_be_used(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

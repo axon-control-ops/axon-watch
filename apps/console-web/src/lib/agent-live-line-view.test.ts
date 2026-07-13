@@ -38,6 +38,13 @@ describe('sanitizeAgentThinkingForOperator', () => {
       DASHBOARD_THOUGHT;
     expect(sanitizeAgentThinkingForOperator(glued)).toBe(DASHBOARD_THOUGHT);
   });
+
+  it('collapses leading-apostrophe thinking echoes', () => {
+    const body =
+      "got the current README and the local setup docs open. I'm going to turn the root guide into a cleaner day-to-day entry point so it matches the actual workflow in this repo.";
+    const echoed = `'ve ${body}I've ${body}`;
+    expect(sanitizeAgentThinkingForOperator(echoed)).toBe(`I've ${body}`);
+  });
 });
 
 describe('collapseBackToBackThinkingEcho', () => {

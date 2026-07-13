@@ -10,6 +10,7 @@ router = APIRouter()
 
 
 @router.get("/api/health")
+@router.get("/health")
 def health() -> dict[str, str]:
     return {
         "service": "control-plane",

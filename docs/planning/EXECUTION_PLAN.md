@@ -110,7 +110,7 @@ Detail: `docs/planning/KAIRO_CONVERSATION_PLAN.md`
 | C7 | **V1+V4+V6** | Honest mode labels, persona parity for thinking, error/fallback narration | Manual: minimal thinking uses Vaxon tone; agent error spoken | **Done** |
 | C8 | **M1+M2** | Unified session id + SQLite-backed turn/entity memory | pytest: follow-up survives CP restart | **Done** |
 | C9 | **M3+M5+M6** | Chat tail in context pack, 10 s DTO refresh, unified voice-log dedup | pytest context pack + TTL; manual: no repeated phrasing across channels | **Done** |
-| C10 | **M4** | Agent continuation — inject KAIRO memory into Lane B dispatch | Manual: IDE agent continues KAIRO topic after handoff | **Done** |
+| C10 | **M4** | Agent continuation — inject KAIRO memory into Lane B dispatch | Manual: IDE agent continues KAIRO topic after handoff | **Partial** — KAIRO memory appendix only (regex-gated); IDE thread history is **not** packed into Cursor prompts yet |
 | C11 | **V2+V3+V7+V8** | Throttled thinking, optional tool narration, stale-speak cancel, IDE voice hint | Optional depth — does not block Phase D |
 | C12 | **V11** | Cloud TTS | **Deferred** until Phase F exit |
 

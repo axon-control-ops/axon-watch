@@ -37,6 +37,25 @@ class ReplyVerificationTests(unittest.TestCase):
         self.assertTrue(warnings)
         self.assertIn("Verification notice", content)
 
+    def test_git_commit_receipt_clears_consultative_claim(self) -> None:
+        content = (
+            "Committed successfully with message: Slice 1 — Right dock\n\n"
+            ":::terminal git commit -m \"Slice 1 — Right dock\"\n"
+            "[main abc1234] Slice 1 — Right dock\n"
+            ":::"
+        )
+        warnings = scan_unverified_claims(content, execution_tier="consultative")
+        self.assertFalse(
+            any("past-tense execution claims" in item for item in warnings),
+            warnings,
+        )
+        verified, verified_warnings = verify_lane_b_reply(
+            content,
+            execution_tier="executing",
+        )
+        self.assertNotIn("Verification notice", verified)
+        self.assertEqual(verified_warnings, [])
+
 
 class RouterFallbackTests(unittest.TestCase):
     def test_fallback_reply_does_not_leak_internal_prompt(self) -> None:

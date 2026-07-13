@@ -19,6 +19,8 @@ export function flattenLiveLineText(text: string): string {
 
 function normalizeThinkingEchoCompare(text: string): string {
   return text
+    .replace(/^I['']ve\b/i, 've')
+    .replace(/^['']ve\b/i, 've')
     .replace(/^I\s+/i, '')
     .replace(/^./, (char) => char.toLowerCase())
     .trim();
@@ -41,16 +43,9 @@ export function collapseBackToBackThinkingEcho(text: string, minLength = THINKIN
     }
   }
 
-  for (let index = minLength; index <= flattened.length - minLength; index += 1) {
-    const prev = flattened[index - 1];
-    const next = flattened[index];
-    if (!prev || !next || !/[.!?]/.test(prev) || !/[A-Z]/.test(next)) {
-      continue;
-    }
-    const left = flattened.slice(0, index).trim();
-    const right = flattened.slice(index).trim();
+  const tryPair = (left: string, right: string): string | null => {
     if (left.length < minLength || right.length < minLength) {
-      continue;
+      return null;
     }
     if (left === right) {
       return left;
@@ -67,6 +62,29 @@ export function collapseBackToBackThinkingEcho(text: string, minLength = THINKIN
       longer.includes(shorter.slice(0, Math.floor(shorter.length * 0.85)))
     ) {
       return longer;
+    }
+    return null;
+  };
+
+  for (let index = minLength; index <= flattened.length - minLength; index += 1) {
+    const prev = flattened[index - 1];
+    const next = flattened[index];
+    if (!prev || !next || !/[.!?]/.test(prev) || !/[A-Z']/.test(next)) {
+      continue;
+    }
+    const collapsed = tryPair(flattened.slice(0, index).trim(), flattened.slice(index).trim());
+    if (collapsed) {
+      return collapsed;
+    }
+  }
+
+  // Glued echoes without a sentence boundary — scan near the midpoint.
+  const midStart = Math.floor(flattened.length * 0.4);
+  const midEnd = Math.ceil(flattened.length * 0.6);
+  for (let index = midStart; index <= midEnd; index += 1) {
+    const collapsed = tryPair(flattened.slice(0, index).trim(), flattened.slice(index).trim());
+    if (collapsed) {
+      return collapsed;
     }
   }
 

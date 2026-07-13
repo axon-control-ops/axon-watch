@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -277,6 +278,14 @@ def _collapse_echo_text(text: str) -> str:
     return collapse_duplicated_body(text)
 
 
+def _norm_stream_text(text: str) -> str:
+    cleaned = re.sub(r"\s+", " ", text or "").strip().lstrip("'\"“”").lower()
+    cleaned = re.sub(r"^i['']?ve\b", "ve", cleaned)
+    cleaned = re.sub(r"^ve\b", "ve", cleaned)
+    cleaned = re.sub(r"^i\s+", "", cleaned)
+    return cleaned.strip()
+
+
 def assistant_text_delta(accumulated: str, incoming: str) -> str:
     """Return only the suffix of *incoming* that is not already in *accumulated*.
 
@@ -289,6 +298,16 @@ def assistant_text_delta(accumulated: str, incoming: str) -> str:
         return ""
     if incoming == accumulated:
         return ""
+    if accumulated:
+        norm_acc = _norm_stream_text(accumulated)
+        norm_in = _norm_stream_text(incoming)
+        if norm_acc and norm_acc == norm_in:
+            return ""
+        # Near-echo with a short prefix difference ("I " / leading apostrophe).
+        if norm_in.endswith(norm_acc) and 0 < len(norm_in) - len(norm_acc) <= 4:
+            return ""
+        if norm_acc.endswith(norm_in) and 0 < len(norm_acc) - len(norm_in) <= 4:
+            return ""
     if accumulated and incoming.startswith(accumulated):
         suffix = incoming[len(accumulated) :]
         if not suffix:

@@ -32,6 +32,18 @@ def scan_unverified_claims(content: str, *, execution_tier: str) -> list[str]:
         if re.search(r"\b(?:edited|saved|updated|created)\b", text, re.I):
             warnings.append("reply claims file changes but no edit receipts were recorded")
 
+    # Git commits via workspace_git emit :::terminal receipts — treat as verified.
+    if (
+        re.search(r"\bCommitted successfully\b", text, re.I)
+        and ":::terminal" in text
+        and re.search(r"git commit", text, re.I)
+    ):
+        warnings = [
+            item
+            for item in warnings
+            if "past-tense execution claims" not in item
+        ]
+
     if re.search(r"\b(?:web consensus|Healthline|Allrecipes|according to online)\b", text, re.I):
         if ":::research" not in text:
             warnings.append("reply cites online sources without a research receipt block")

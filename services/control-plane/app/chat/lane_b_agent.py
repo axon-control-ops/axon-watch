@@ -129,7 +129,48 @@ def generate_lane_b_result(
         execution_access=execution_access,
     )
     if git_result is not None:
-        return git_result
+        continue_prompt = str(git_result.get("continue_prompt") or "").strip()
+        # Commit-only turns stop here. "commit … then <rest>" continues to Cursor.
+        if not continue_prompt or not git_result.get("dispatched"):
+            return git_result
+        try:
+            follow = dispatch_ide_composer(
+                workspace_id=context.workspace_id,
+                composer_mode=context.composer_mode,
+                user_prompt=continue_prompt,
+                context_block=context_block,
+                run_id=run_id,
+                runtime_target=runtime_target,
+                runtime_model=runtime_model,
+                execution_access=execution_access,
+                on_chunk=on_chunk,
+            )
+        except RuntimeError as exc:
+            return {
+                "content": (
+                    f"{git_result.get('content') or ''}\n\n"
+                    f"{_fallback_reply(context=context, user_prompt=continue_prompt, reason=str(exc))}"
+                ).strip(),
+                "dispatched": bool(git_result.get("dispatched")),
+                "runtime_id": str(git_result.get("runtime_id") or ""),
+                "runtime_label": str(git_result.get("runtime_label") or ""),
+                "reason": str(exc),
+            }
+        follow_content = str(follow.get("content") or "").strip()
+        git_content = str(git_result.get("content") or "").strip()
+        merged = "\n\n".join(part for part in (git_content, follow_content) if part)
+        return {
+            "content": merged,
+            "dispatched": bool(follow.get("dispatched", True)),
+            "execution_tier": str(
+                follow.get("execution_tier") or git_result.get("execution_tier") or "executing"
+            ),
+            "runtime_id": str(follow.get("runtime_id") or git_result.get("runtime_id") or ""),
+            "runtime_label": str(
+                follow.get("runtime_label") or git_result.get("runtime_label") or ""
+            ),
+            "reason": str(follow.get("reason") or git_result.get("reason") or ""),
+        }
 
     try:
         return dispatch_ide_composer(

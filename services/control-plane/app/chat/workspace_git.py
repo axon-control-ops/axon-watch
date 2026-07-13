@@ -105,6 +105,23 @@ def git_add_all(workspace_id: str) -> GitCommandResult:
     return run_git(workspace_id, ["git", "add", "-A"])
 
 
+def git_add_paths(workspace_id: str, paths: list[str]) -> GitCommandResult:
+    cleaned = [str(path).strip() for path in paths if str(path).strip()]
+    if not cleaned:
+        return GitCommandResult(
+            args=["git", "add"],
+            success=False,
+            output="No paths provided to git add",
+            receipt_summary="Git command failed",
+        )
+    return run_git(workspace_id, ["git", "add", "--", *cleaned])
+
+
+def collect_changed_paths(workspace_id: str) -> list[str]:
+    """Public wrapper — pending tracked + untracked paths."""
+    return _collect_changed_paths(workspace_id)
+
+
 def git_commit(workspace_id: str, message: str) -> GitCommandResult:
     cleaned = message.strip()
     if not cleaned:
@@ -131,6 +148,22 @@ def _normalize_turn_subject(turn_subject: str | None) -> str | None:
         return None
     if _COMMIT_INTENT_ONLY_RE.match(text):
         return None
+    # Drop leading "commit first and then …" scaffolding so the plan title wins.
+    text = re.sub(
+        r"^\s*(?:please\s+)?commit(?:\s+first)?(?:\s+(?:these|my|the|all))?(?:\s+changes?)?"
+        r"(?:\s+and\s+push)?\s*(?:[,.]?\s*|\s+)(?:and\s+)?(?:then|afterwards|after\s+that)\b\s*[:,\-]?\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    ).strip(" :,-")
+    # Drop "check/review this plan :" wrappers left after commit-then splits.
+    text = re.sub(
+        r"^(?:please\s+)?(?:check|review|read|see)\s+this\s+plan\s*[:\-–—]?\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    ).strip(" :,-")
+    text = re.sub(r"^plan\s*[:\-–—]\s*", "", text, flags=re.IGNORECASE).strip(" :,-")
     # Drop trailing commit instructions glued onto a real subject.
     text = re.sub(
         r"(?:,?\s+)?(?:and\s+)?(?:please\s+)?(?:commit(?:\s+and\s+push)?|git\s+commit).*$",
@@ -239,14 +272,11 @@ def derive_commit_message(workspace_id: str, turn_subject: str | None = None) ->
     files = _collect_changed_paths(workspace_id)
     from_diff = _summarize_diff_stat(workspace_id, files)
 
-    if from_turn and from_diff and from_turn.lower() not in from_diff.lower():
-        # Keep the human intent when it already names the work.
-        if any(token in from_turn.lower() for token in ("fix", "add", "update", "extract", "harden", "land")):
-            return from_turn
-    if from_diff:
-        return from_diff
+    # Prefer a real human/plan subject over a filename dump.
     if from_turn:
         return from_turn
+    if from_diff:
+        return from_diff
     if files:
         areas = sorted({path.split("/")[0] for path in files if "/" in path})
         if areas:

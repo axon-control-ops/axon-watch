@@ -100,6 +100,14 @@ class CursorStreamPartialDedupeTests(unittest.TestCase):
         )
         self.assertEqual("", assistant_text_delta(sentence, sentence + sentence))
 
+    def test_assistant_text_delta_skips_near_duplicate_thinking_prefix(self) -> None:
+        body = (
+            "got the current README and the local setup docs open. "
+            "I'm going to turn the root guide into a cleaner day-to-day entry point."
+        )
+        self.assertEqual("", assistant_text_delta(f"'ve {body}", f"I've {body}"))
+        self.assertEqual("", assistant_text_delta(f"I've {body}", f"'ve {body}"))
+
     def test_stream_assembler_does_not_duplicate_thinking_echo(self) -> None:
         assembler = CursorStreamAssembler()
         thought = (
