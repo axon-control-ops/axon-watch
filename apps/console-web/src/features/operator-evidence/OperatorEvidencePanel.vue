@@ -24,7 +24,8 @@ const props = defineProps<{
   pendingApprovals?: number;
   runPhase?: string | null;
   actionTier?: string | null;
-  autoAllowed?: boolean;
+  executionAccess: 'consultative' | 'full' | null;
+  workspaceSelected: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -77,7 +78,8 @@ const autonomyStatus = computed(() =>
     pendingApprovals: props.pendingApprovals ?? 0,
     runPhase: props.runPhase ?? null,
     actionTier: props.actionTier ?? null,
-    autoAllowed: props.autoAllowed === true,
+    executionAccess: props.executionAccess,
+    workspaceSelected: props.workspaceSelected,
   }),
 );
 

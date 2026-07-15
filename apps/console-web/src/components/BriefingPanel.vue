@@ -221,7 +221,9 @@ function transcriptTimeLabel(value: string): string {
       </div>
 
       <div v-if="briefing && briefing.pending_approvals.count > 0" class="briefing-panel__section">
-        <p class="briefing-panel__section-label">Pending approvals</p>
+        <p class="briefing-panel__section-label">
+          Pending approvals · act in Mission Control
+        </p>
         <ul class="briefing-panel__list">
           <li
             v-for="item in briefing.pending_approvals.items"
@@ -237,7 +239,10 @@ function transcriptTimeLabel(value: string): string {
       </div>
 
       <div v-if="showActions" class="briefing-panel__section">
-        <p class="briefing-panel__section-label">Next safe actions</p>
+        <p class="briefing-panel__section-label">Suggested actions · guidance only</p>
+        <p class="region-copy">
+          Open Mission Control to approve, reject, or resume a run.
+        </p>
         <ul class="briefing-panel__list">
           <li
             v-for="action in briefing?.next_safe_actions"

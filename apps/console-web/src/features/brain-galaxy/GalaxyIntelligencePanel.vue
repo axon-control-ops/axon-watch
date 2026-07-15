@@ -81,7 +81,9 @@ const view = computed(() =>
     </section>
 
     <section v-if="view.safeActions.length" class="galaxy-intelligence-panel__section">
-      <p class="galaxy-intelligence-panel__section-label">Safe next actions</p>
+      <p class="galaxy-intelligence-panel__section-label">
+        Suggested actions · guidance only
+      </p>
       <ul>
         <li v-for="action in view.safeActions" :key="`${action.kind}:${action.action_id}`">
           {{ action.title }}

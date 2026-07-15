@@ -90,13 +90,19 @@ Update an item only when its stated evidence is attached.
     action tier, routing receipt, and model receipt. Typecheck PASS; KAIRO
     submission/dispatch set **9/9 PASS**.
 
-- [ ] **12. Make autonomy status data-driven**
+- [x] **12. Make autonomy status data-driven**
   - Remove UI literals that claim “Bounded auto” without evaluating execution access, policy, approval state, and workspace constraints.
-  - Evidence: projector/UI proof: _TBD_
+  - Evidence: 2026-07-15 — evidence autonomy projection now combines live
+    action tier, execution access, pending approvals, active run phase, and
+    workspace selection. The deprecated boolean bypass was removed; **4/4**
+    projector tests cover bounded, full, unknown, workspace, and approval
+    gates.
 
-- [ ] **13. Make safe-next-action and approval surfaces actionable**
+- [x] **13. Make safe-next-action and approval surfaces actionable**
   - Or label them explicitly as informational.
-  - Evidence: UI copy + behavior: _TBD_
+  - Evidence: 2026-07-15 — Briefing and Galaxy Intelligence now label suggested
+    actions “guidance only”; pending approvals point explicitly to actionable
+    Mission Control controls. Label contract tests **2/2 PASS**.
 
 - [ ] **14. Add tests**
   - Dispatch idempotency, action-tier defense in depth, run-state transitions, KAIRO-path parity, evidence projection, and voice persistence failures.

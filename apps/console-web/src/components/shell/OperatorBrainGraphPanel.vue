@@ -365,6 +365,8 @@ function handleEvidenceHandoff(signal: {
         :pending-approvals="pendingApprovals"
         :run-phase="shell.primaryActiveRun?.phase ?? null"
         :action-tier="kairoLastActionTier"
+        :execution-access="shell.agentExecutionAccess"
+        :workspace-selected="Boolean(shell.currentWorkspace?.workspace_id)"
         @dismiss="clearSelection"
         @open-workspace="handleEvidenceWorkspace"
         @open-signal="handleEvidenceSignal"

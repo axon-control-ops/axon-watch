@@ -73,10 +73,10 @@ export function projectEvidenceTags(
 export function projectEvidenceAutonomyStatus(input: {
   pendingApprovals: number;
   runPhase: string | null;
+  executionAccess: 'consultative' | 'full' | null;
+  workspaceSelected: boolean;
   /** Last converse action_tier from live KAIRO policy, when known. */
   actionTier?: string | null;
-  /** @deprecated Prefer actionTier; kept for older callers. */
-  autoAllowed?: boolean;
 }): EvidenceAutonomyStatus {
   if (input.pendingApprovals > 0) {
     return { label: 'Approval gated', tone: 'critical' };
@@ -84,8 +84,17 @@ export function projectEvidenceAutonomyStatus(input: {
   if (input.runPhase === 'awaiting_approval' || input.runPhase === 'review_ready') {
     return { label: `Run · ${input.runPhase.replace('_', ' ')}`, tone: 'attention' };
   }
+  if (!input.workspaceSelected) {
+    return { label: 'Manual · select workspace', tone: 'attention' };
+  }
   const tier = (input.actionTier || '').trim();
   if (tier === 'reversible_auto') {
+    if (input.executionAccess === 'full') {
+      return { label: 'Full access · reversible', tone: 'info' };
+    }
+    if (input.executionAccess !== 'consultative') {
+      return { label: 'Manual · access unknown', tone: 'attention' };
+    }
     return { label: 'Bounded auto', tone: 'info' };
   }
   if (tier === 'approval_gated') {
@@ -94,8 +103,8 @@ export function projectEvidenceAutonomyStatus(input: {
   if (tier === 'unsupported') {
     return { label: 'Unsupported', tone: 'attention' };
   }
-  if (input.autoAllowed === true) {
-    return { label: 'Bounded auto', tone: 'info' };
+  if (input.executionAccess === 'full') {
+    return { label: 'Full access · manual', tone: 'nominal' };
   }
   return { label: 'Manual', tone: 'nominal' };
 }
