@@ -152,7 +152,11 @@ Update an item only when its stated evidence is attached.
 
 - [ ] **21. Implement self-improvement only after items 0–18 are green**
   - No agent may alter policy, secrets, approval rules, or production state autonomously.
-  - Evidence: gated implementation note: _TBD_
+  - Progress: 2026-07-15 — prematurely mounted routes are now default-off and
+    require `AXON_SAFE_IMPROVEMENT_ENABLED=1`; expired approvals fail and
+    reserved policy/secret/production effects cannot execute. Item remains open
+    because item 16's server-side required-check prerequisite is entitlement
+    blocked.
 
 - [ ] **22. Complete the one-week `:4173`-only dry run**
   - Sign retirement/discard acknowledgments only after all required gates pass.

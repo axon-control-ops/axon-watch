@@ -85,6 +85,7 @@ main_tests=(
   tests.test_voice_transcript_store
   tests.test_debug_session_log_endpoint
   tests.test_safe_improvement
+  tests.test_safe_improvement_gate
 )
 
 watch_vault_tests=(

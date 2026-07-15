@@ -26,6 +26,11 @@ def _now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _approval_expired(approval: EffectApproval) -> bool:
+    expires_at = datetime.fromisoformat(approval.expires_at.replace("Z", "+00:00"))
+    return expires_at <= datetime.now(UTC)
+
+
 def _append_receipt(proposal: Proposal, receipt: dict[str, Any]) -> None:
     proposal.receipts.append(receipt)
 
@@ -215,6 +220,8 @@ def approve_exact_effect(
         raise ValueError(f"unknown proposal `{proposal_id}`")
     if proposal.status != "awaiting_approval" or proposal.approval is None:
         raise ValueError("proposal is not awaiting exact-effect approval")
+    if _approval_expired(proposal.approval):
+        raise ValueError("exact-effect approval expired; request a new approval")
     if not fingerprints_match(proposal.approval.effect_fingerprint, effect_fingerprint):
         raise ValueError(
             "exact-effect fingerprint mismatch; re-request approval for the "
@@ -253,6 +260,18 @@ def execute_approved_proposal(proposal_id: str) -> Proposal:
         raise ValueError(f"unknown proposal `{proposal_id}`")
     if proposal.status != "approved" or proposal.approval is None:
         raise ValueError("proposal must be approved before execution")
+    if _approval_expired(proposal.approval):
+        raise ValueError("exact-effect approval expired; execution blocked")
+    if proposal.effect_kind != "merge":
+        raise ValueError(
+            f"effect `{proposal.effect_kind}` is reserved; real policy, secret, "
+            "and production mutations are prohibited"
+        )
+    if proposal.approval.effect_kind != proposal.effect_kind or not fingerprints_match(
+        proposal.effect_fingerprint,
+        proposal.approval.effect_fingerprint,
+    ):
+        raise ValueError("approved effect no longer matches the proposal")
     if not proposal.isolation_root:
         raise ValueError("proposal missing isolation root")
     proposal.status = "executing"

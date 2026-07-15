@@ -5,9 +5,10 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
-from app.safe_improvement import isolated_executor, proposal_service
+from app.safe_improvement import isolated_executor, proposal_service, store
 from app.safe_improvement.policy import effect_fingerprint
 from app.safe_improvement.verifier import evaluate_against_threshold
 from app.safe_improvement.models import EvaluationCase
@@ -22,6 +23,34 @@ class SafeImprovementTests(unittest.TestCase):
     def tearDown(self) -> None:
         self._tmpdir.cleanup()
         os.environ.pop("AXON_WATCH_CONTROL_PLANE_DB", None)
+
+    def _awaiting_proposal(self, effect_kind: str = "merge"):
+        trace = proposal_service.capture_trace(
+            workspace_id="ws_demo",
+            source_kind="run",
+            source_ref="run_gate",
+            summary="gate test",
+        )
+        case = proposal_service.upsert_evaluation_case(
+            name="gate metric",
+            metric="latency_ms",
+            threshold=10.0,
+            comparator="lte",
+            baseline_value=100.0,
+        )
+        proposal = proposal_service.create_proposal(
+            workspace_id="ws_demo",
+            trace_id=trace.trace_id,
+            case_id=case.case_id,
+            title="bounded candidate",
+            effect_kind=effect_kind,
+            target_ref="main",
+        )
+        proposal_service.evaluate_proposal(proposal.proposal_id, candidate_value=95.0)
+        return proposal_service.request_exact_approval(
+            proposal.proposal_id,
+            target_ref="main",
+        )
 
     def test_threshold_blocks_regression(self) -> None:
         case = EvaluationCase(
@@ -126,6 +155,29 @@ class SafeImprovementTests(unittest.TestCase):
             payload={"title": "x"},
         )
         self.assertNotEqual(left, right)
+
+    def test_expired_exact_effect_approval_is_rejected(self) -> None:
+        awaiting = self._awaiting_proposal()
+        assert awaiting.approval is not None
+        awaiting.approval = replace(awaiting.approval, expires_at="2000-01-01T00:00:00Z")
+        store.save_proposal(awaiting)
+
+        with self.assertRaisesRegex(ValueError, "approval expired"):
+            proposal_service.approve_exact_effect(
+                awaiting.proposal_id,
+                effect_fingerprint=awaiting.approval.effect_fingerprint,
+            )
+
+    def test_reserved_effect_cannot_execute(self) -> None:
+        awaiting = self._awaiting_proposal(effect_kind="policy")
+        assert awaiting.approval is not None
+        approved = proposal_service.approve_exact_effect(
+            awaiting.proposal_id,
+            effect_fingerprint=awaiting.approval.effect_fingerprint,
+        )
+
+        with self.assertRaisesRegex(ValueError, "effect `policy` is reserved"):
+            proposal_service.execute_approved_proposal(approved.proposal_id)
 
 
 if __name__ == "__main__":
