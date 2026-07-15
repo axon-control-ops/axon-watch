@@ -1,0 +1,175 @@
+.email-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.email-settings-panel__toggles,
+.email-settings-panel__form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.email-settings-panel__field,
+.email-settings-panel__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+}
+
+.email-settings-panel__field span,
+.email-settings-panel__form label > span {
+  color: rgba(180, 210, 230, 0.72);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+}
+
+.email-settings-panel__field input,
+.email-settings-panel__form input,
+.email-settings-panel__form select {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.4rem;
+  background: rgba(6, 16, 28, 0.72);
+  color: inherit;
+  font: inherit;
+  padding: 0.45rem 0.65rem;
+}
+
+.email-settings-panel__toggle {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.55rem !important;
+}
+
+.email-settings-panel__toggle span {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 0.8rem !important;
+  color: inherit !important;
+}
+
+.email-settings-panel__links,
+.email-settings-panel__form-actions,
+.email-settings-panel__account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.email-settings-panel__accounts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.email-settings-panel__account {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.55rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(6, 16, 28, 0.55);
+}
+
+.email-settings-panel__account p {
+  margin: 0.25rem 0 0;
+  font-size: 0.72rem;
+  color: rgba(180, 210, 230, 0.7);
+}
+
+.email-settings-panel__account-actions button,
+.email-settings-panel__form-actions button,
+.email-settings-panel__links button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.35rem 0.7rem;
+}
+
+.email-settings-panel__form h3 {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.78);
+}
+
+.settings-surface__primary {
+  border-color: rgba(0, 242, 255, 0.45) !important;
+  background: rgba(0, 242, 255, 0.16) !important;
+}
+
+.email-settings-panel__vault-callout {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 0.65rem;
+  padding: 0.9rem 1rem;
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.email-settings-panel__vault-callout--locked {
+  border-color: rgba(255, 180, 70, 0.4);
+  background: rgba(255, 160, 40, 0.08);
+}
+
+.email-settings-panel__vault-title {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.9);
+}
+
+.email-settings-panel__vault-callout--locked .email-settings-panel__vault-title {
+  color: rgba(255, 196, 90, 0.95);
+}
+
+.email-settings-panel__vault-copy {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(210, 230, 240, 0.88);
+}
+
+.email-settings-panel__vault-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.email-settings-panel__vault-status {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(180, 210, 230, 0.75);
+}
+
+.email-settings-panel__inline-hint {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.email-settings-panel__inline-hint--warn {
+  border: 1px solid rgba(255, 180, 70, 0.35);
+  background: rgba(255, 160, 40, 0.08);
+  color: rgba(255, 220, 160, 0.95);
+}
+
+.settings-feedback-banner--warn {
+  border-color: rgba(255, 180, 70, 0.4);
+  background: rgba(255, 160, 40, 0.1);
+  color: rgba(255, 220, 160, 0.95);
+}
