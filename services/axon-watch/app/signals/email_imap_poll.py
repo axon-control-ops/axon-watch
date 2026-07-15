@@ -91,7 +91,13 @@ def _plain_text(msg: email.message.Message) -> str:
         return payload.decode(charset, errors="replace") if isinstance(payload, bytes) else str(payload)
 
 
-def _message_summary(raw_message: bytes, *, uid: str, account_email: str) -> dict[str, Any]:
+def _message_summary(
+    raw_message: bytes,
+    *,
+    uid: str,
+    account_id: str,
+    account_email: str,
+) -> dict[str, Any]:
     msg = BytesParser(policy=policy.default).parsebytes(raw_message)
     body_text = _plain_text(msg)
     snippet = " ".join(body_text.split())[:240]
@@ -112,6 +118,7 @@ def _message_summary(raw_message: bytes, *, uid: str, account_email: str) -> dic
         "text": body_text,
         "snippet": snippet,
         "sent_at": sent_at,
+        "account_id": account_id,
         "account_email": account_email,
     }
 
@@ -127,6 +134,7 @@ def _fetch_account_messages(account: dict[str, Any], *, limit: int) -> list[dict
     folder = str(imap.get("folder") or "INBOX").strip() or "INBOX"
     use_ssl = bool(imap.get("ssl", True))
     password = _resolve_password(str(imap.get("password_ref") or ""))
+    account_id = str(account.get("account_id") or "").strip()
     account_email = str(account.get("email_address") or username).strip()
     if not (host and username and password):
         return []
@@ -157,7 +165,14 @@ def _fetch_account_messages(account: dict[str, Any], *, limit: int) -> list[dict
                     break
             if not raw_bytes:
                 continue
-            messages.append(_message_summary(raw_bytes, uid=uid, account_email=account_email))
+            messages.append(
+                _message_summary(
+                    raw_bytes,
+                    uid=uid,
+                    account_id=account_id,
+                    account_email=account_email,
+                )
+            )
         return messages
     except Exception:  # noqa: BLE001 — poll failures fall through to bridge/stub
         return []

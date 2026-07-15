@@ -116,6 +116,8 @@ def analyze_email_message(
 
     return {
         "message_id": str(message.get("message_id") or message.get("uid") or "").strip(),
+        "account_id": str(message.get("account_id") or "").strip(),
+        "account_email": str(message.get("account_email") or "").strip(),
         "subject": subject,
         "sender": sender,
         "snippet": snippet[:280],

@@ -254,6 +254,8 @@ def email_inbox_item(
     recommended_action = str(analysis.get("recommended_action") or "monitor_email").strip()
     recommended_detail = str(analysis.get("recommended_detail") or "").strip()
     snippet = str(analysis.get("snippet") or "").strip()
+    account_id = str(analysis.get("account_id") or "").strip()
+    account_email = str(analysis.get("account_email") or "").strip()
     now = utc_now_iso()
     suggestion = suggest_email_reply(
         {
@@ -293,6 +295,8 @@ def email_inbox_item(
             "workspace_hints": list(analysis.get("workspace_hints") or [])[:5],
             "suggested_reply_subject": suggestion.get("reply_subject"),
             "suggested_reply_body": suggestion.get("reply_body"),
+            "email_account_id": account_id,
+            "email_account_address": account_email,
         },
     }
 

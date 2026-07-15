@@ -100,6 +100,8 @@ class EmailTriageTests(unittest.TestCase):
             return_value=[
                 {
                     "message_id": "<native@example.com>",
+                    "account_id": "account-1",
+                    "account_email": "operator@example.com",
                     "from": "Ops <ops@example.com>",
                     "subject": "Urgent: please fix DashPro today",
                     "text": "We cannot ship until this is fixed.",
@@ -111,6 +113,8 @@ class EmailTriageTests(unittest.TestCase):
         self.assertEqual(1, len(items))
         self.assertIn("suggested_reply_subject", items[0]["meta"])
         self.assertTrue(str(items[0]["meta"]["suggested_reply_subject"]).startswith("Re:"))
+        self.assertEqual("account-1", items[0]["meta"]["email_account_id"])
+        self.assertEqual("operator@example.com", items[0]["meta"]["email_account_address"])
 
     def test_resolve_email_workspace_id_from_hints(self) -> None:
         from app.signals.email_signal import resolve_email_workspace_id

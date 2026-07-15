@@ -228,6 +228,82 @@ class EmailSettingsApiTests(unittest.TestCase):
         self.assertTrue(body["reply_subject"].startswith("Re:"))
         self.assertIn("reply_body", body)
 
+    def test_send_route_requires_confirm(self) -> None:
+        response = self.client.post(
+            "/api/email/send",
+            json={
+                "account_id": "missing",
+                "to": "user@example.com",
+                "subject": "Hello",
+                "body": "Body",
+                "confirm_send": False,
+            },
+        )
+        self.assertEqual(400, response.status_code)
+
+    def test_send_route_sends_when_confirmed(self) -> None:
+        email_settings_store.save_settings(
+            {
+                "accounts": [
+                    {
+                        "account_id": "acct-1",
+                        "workspace_id": "workspace_dashpro",
+                        "label": "Ops",
+                        "email_address": "ops@example.com",
+                        "provider": "custom",
+                        "enabled": True,
+                        "imap": {
+                            "host": "imap.example.com",
+                            "port": 993,
+                            "ssl": True,
+                            "username": "ops@example.com",
+                            "folder": "INBOX",
+                            "password_ref": "",
+                        },
+                        "smtp": {
+                            "host": "smtp.example.com",
+                            "port": 465,
+                            "ssl": True,
+                            "starttls": False,
+                            "username": "ops@example.com",
+                            "from_email": "ops@example.com",
+                            "password_ref": "",
+                        },
+                        "monitor_enabled": True,
+                        "poll_seconds": 60,
+                    }
+                ],
+                "bridge_enabled": False,
+                "stub_enabled": True,
+            }
+        )
+        with patch(
+            "app.routes.email_reply.send_smtp_message",
+            return_value={
+                "ok": True,
+                "from": "ops@example.com",
+                "to": "user@example.com",
+                "subject": "Hello",
+                "account_id": "acct-1",
+                "email_address": "ops@example.com",
+                "refused": {},
+            },
+        ) as send_mock:
+            response = self.client.post(
+                "/api/email/send",
+                json={
+                    "account_id": "acct-1",
+                    "to": "user@example.com",
+                    "subject": "Hello",
+                    "body": "Body text",
+                    "confirm_send": True,
+                    "password_smtp": "secret",
+                },
+            )
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.json()["ok"])
+        send_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

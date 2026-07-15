@@ -73,9 +73,8 @@ const {
       <header class="operator-settings-form__section-header">
         <h2>Ingest mode</h2>
         <p>
-          Axon-X polls configured IMAP mailboxes directly (Vault passwords required). Optional:
-          pull triage from Axon Signal (:7734) as a bridge. Stub messages are only used when no
-          live mailbox credentials are available.
+          Axon-X polls IMAP mailboxes with Vault passwords. Optional :7734 bridge; stubs only when
+          no live credentials are available.
         </p>
       </header>
 
