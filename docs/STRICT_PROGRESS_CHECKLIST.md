@@ -120,12 +120,13 @@ Update an item only when its stated evidence is attached.
 
 ### Assurance & platform (16–22)
 
-- [ ] **16. Establish CI**
+- [x] **16. Establish CI**
   - PR fast gate plus nightly live-evidence gate; make autonomy-critical tests mandatory.
-  - Progress: 2026-07-15 — fast PR/push gate and nightly isolated live-evidence
-    gate are implemented and contract-tested; see `docs/CI_GATES.md`. Remaining
-    blocker: GitHub branch-protection API returned `403` because required
-    checks on a private repository need GitHub Pro (or a public repository).
+  - Evidence: 2026-07-15 — fast PR/push and nightly isolated live-evidence
+    workflows are implemented and contract-tested; see `docs/CI_GATES.md`.
+    Fast Gate run `29406066700` passed on `063cc53`. GitHub branch protection
+    on `dev` now strictly requires the `fast-gate` check, applies to admins,
+    and forbids force-pushes and deletions.
 
 - [x] **17. Make PENDING verification fail in CI**
   - Or explicitly allowlist each pending metric with owner and expiry.
@@ -157,13 +158,13 @@ Update an item only when its stated evidence is attached.
     required subsystems, state transitions, exact-effect approval, forbidden
     real effects, default-off enablement, evidence requirements, and rollback.
 
-- [ ] **21. Implement self-improvement only after items 0–18 are green**
+- [x] **21. Implement self-improvement only after items 0–18 are green**
   - No agent may alter policy, secrets, approval rules, or production state autonomously.
-  - Progress: 2026-07-15 — prematurely mounted routes are now default-off and
-    require `AXON_SAFE_IMPROVEMENT_ENABLED=1`; expired approvals fail and
-    reserved policy/secret/production effects cannot execute. Item remains open
-    because item 16's server-side required-check prerequisite is entitlement
-    blocked.
+  - Evidence: 2026-07-15 — items 0–18 are green, including server-side
+    `fast-gate` enforcement. Safe-improvement routes remain default-off and
+    require `AXON_SAFE_IMPROVEMENT_ENABLED=1`; exact-effect approvals expire,
+    and policy, secret, approval-rule, and production effects cannot execute.
+    The supported contract suite passed on `063cc53`.
 
 - [ ] **22. Complete the one-week `:4173`-only dry run**
   - Sign retirement/discard acknowledgments only after all required gates pass.
