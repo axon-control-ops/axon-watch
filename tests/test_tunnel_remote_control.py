@@ -22,6 +22,17 @@ from app.tunnel.tunnel_probe import build_tunnel_diagnostics  # noqa: E402
 
 
 class TunnelCredentialsWatchTests(unittest.TestCase):
+    def test_skips_zero_byte_cloudflared_on_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            fake_bin = Path(tempdir) / "cloudflared"
+            fake_bin.write_text("", encoding="utf-8")
+            fake_bin.chmod(0o755)
+            with patch.dict(os.environ, {"PATH": str(tempdir)}, clear=False):
+                from app.tunnel.cloudflared_binary import find_cloudflared_binary
+
+                resolved = find_cloudflared_binary(["cloudflared"])
+        self.assertEqual("/usr/bin/cloudflared", resolved)
+
     def test_prefers_environment_token(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             home = Path(tempdir)
@@ -32,7 +43,7 @@ class TunnelCredentialsWatchTests(unittest.TestCase):
 
     def test_uses_vault_import_when_present(self) -> None:
         with patch(
-            "app.tunnel.tunnel_probe.load_vault_import",
+            "app.tunnel.tunnel_probe.load_tunnel_vault_secrets",
             return_value={"AXON_CLOUDFLARE_TUNNEL_TOKEN": "vault-token"},
         ), patch(
             "app.tunnel.tunnel_probe.find_cloudflared_binary",
@@ -53,6 +64,39 @@ class TunnelCredentialsWatchTests(unittest.TestCase):
             )
         self.assertEqual("vault", diagnostics["tunnel"]["auth_source"])
         self.assertTrue(diagnostics["tunnel"]["auth_ready"])
+
+    def test_uses_unlocked_vault_secret_when_import_missing(self) -> None:
+        with patch(
+            "app.tunnel.tunnel_credentials.load_vault_import",
+            return_value={},
+        ), patch(
+            "app.tunnel.tunnel_credentials.VaultSession.is_unlocked",
+            return_value=True,
+        ), patch(
+            "app.tunnel.tunnel_credentials.vault_resolve_named_secret",
+            side_effect=lambda name: "vault-db-token" if name == "cloudflare_tunnel_token" else "",
+        ), patch(
+            "app.tunnel.tunnel_probe.find_cloudflared_binary",
+            return_value="/usr/bin/cloudflared",
+        ), patch(
+            "app.tunnel.tunnel_probe._tunnel_process_running",
+            return_value=False,
+        ):
+            diagnostics = build_tunnel_diagnostics(
+                {
+                    "enabled": True,
+                    "connector_id": "cloudflare_tunnel",
+                    "display_name": "Cloudflare tunnel",
+                    "tunnel_mode": "named",
+                    "public_base_url": "https://example.test",
+                    "binary_candidates": ["cloudflared"],
+                }
+            )
+        self.assertTrue(diagnostics["tunnel"]["auth_ready"])
+        self.assertIn(
+            diagnostics["tunnel"]["auth_source"],
+            {"settings", "vault"},
+        )
 
 
 class TunnelProbeWatchTests(unittest.TestCase):
