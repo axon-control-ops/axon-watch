@@ -36,7 +36,7 @@
 }
 
 .brain-galaxy-stage--mockup:not(:has(.brain-galaxy-stage__hud--inspector)) .brain-galaxy-stage__hud--top {
-  right: 0.75rem;
+  right: calc(clamp(13rem, 24vw, 16rem) + 1rem);
 }
 
 .brain-galaxy-stage--mockup .brain-galaxy-stage__title-row {
@@ -69,6 +69,7 @@
 .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--right {
   top: 0.65rem;
   right: 0.65rem;
+  width: clamp(13rem, 24vw, 16rem);
 }
 
 .brain-galaxy-stage--mockup:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-stage__hud--right {
