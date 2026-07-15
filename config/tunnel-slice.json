@@ -8,16 +8,15 @@
   "tunnel_mode": "named",
   "public_base_url": "https://axon.edudashpro.org.za",
   "stable_domain": "axon.edudashpro.org.za",
-  "axon_local_root": "${AXON_LOCAL_ROOT}",
-  "binary_candidates": [
-    "${AXON_WATCH_STATE_DIR}/cloudflared",
-    "${AXON_LOCAL_ROOT}/cloudflared",
-    "cloudflared"
-  ],
+  "binary_candidates": ["${AXON_WATCH_STATE_DIR}/cloudflared", "cloudflared"],
+  "native_process_state_path": "${AXON_WATCH_STATE_DIR}/tunnel/cloudflared-process.json",
+  "native_log_path": "${AXON_WATCH_STATE_DIR}/tunnel/cloudflared.log",
   "tunnel_log_paths": [
+    "${AXON_WATCH_STATE_DIR}/tunnel/cloudflared.log",
     "${AXON_STATE_HOME}/logs/axon-tunnel.log",
     "${HOME}/.local/share/axon/logs/axon-tunnel.log",
     "${HOME}/.devbrain/axon-tunnel.log"
   ],
-  "local_health_url": "http://127.0.0.1:7734/api/health"
+  "local_origin_url": "http://127.0.0.1:4173",
+  "local_health_url": "http://127.0.0.1:4173/api/health"
 }

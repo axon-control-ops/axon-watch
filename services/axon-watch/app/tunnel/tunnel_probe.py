@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 from app.signals.iso_time import utc_now_iso
 from app.tunnel.cloudflared_binary import cloudflared_version, find_cloudflared_binary
+from app.tunnel.native_process import managed_process_snapshot
 from app.tunnel.slice_registry import load_tunnel_slice
 from app.tunnel.tunnel_credentials import named_tunnel_ready, resolve_cloudflare_tunnel_token_state
 from app.vault.credential_resolver import load_vault_import
@@ -117,7 +118,8 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
         token_state=token_state,
         stored_value=stored_token,
     )
-    process_running = _tunnel_process_running(binary_path)
+    managed_process = managed_process_snapshot(config)
+    process_running = _tunnel_process_running(binary_path) or bool(managed_process["managed"])
     tunnel_url = _resolve_tunnel_url(config, process_running=process_running)
 
     public_health_url = f"{public_base_url}/api/health" if public_base_url else ""
@@ -136,6 +138,9 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
     elif not process_running:
         status = "degraded"
         detail = f"tunnel stopped (auth={auth_source})"
+    elif not managed_process["managed"]:
+        status = "degraded"
+        detail = "tunnel process is running but is not managed by Axon-X"
     elif tunnel_mode == "named" and public_health_url and not public_ok:
         status = "degraded"
         detail = f"process up; public health failed ({public_detail})"
@@ -148,6 +153,8 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
             detail = f"active {tunnel_url}"
         else:
             detail = "tunnel process running"
+    if process_running and not managed_process["managed"] and "not managed" not in detail:
+        detail = f"{detail}; process is not managed by Axon-X"
 
     latency_ms = public_latency_ms
     health_url = public_health_url or str(config.get("local_health_url") or "").strip()
@@ -173,9 +180,11 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
             "public_base_url": public_base_url,
             "public_health_ok": public_ok,
             "public_health_detail": public_detail,
-            "axon_local_root": str(
-                os.path.expandvars(str(config.get("axon_local_root") or "")).strip()
-            ),
+            "control_backend": "native",
+            "managed_process": bool(managed_process["managed"]),
+            "managed_pid": managed_process["pid"],
+            "process_state_path": managed_process["process_state_path"],
+            "log_path": managed_process["log_path"],
         },
     }
     if latency_ms is not None:

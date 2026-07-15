@@ -72,7 +72,7 @@ function openTunnelUrl(url: string): void {
             Start tunnel
           </button>
           <button
-            v-if="row.isTunnelConnector && row.tunnelRunning"
+            v-if="row.isTunnelConnector && row.tunnelRunning && row.tunnelManaged"
             type="button"
             class="connectors-rail-panel__action"
             :disabled="shell.connectorMutationPending"

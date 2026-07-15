@@ -34,6 +34,7 @@ main_tests=(
   tests.test_control_plane_workspace_files
   tests.test_control_plane_terminal
   tests.test_control_plane_chat
+  tests.test_control_plane_chat_health
   tests.test_command_executor
   tests.test_chat_orchestration
   tests.test_watch_bootstrap_signal
@@ -98,6 +99,10 @@ watch_signal_tests=(
   tests.test_email_signal
 )
 
+watch_tunnel_tests=(
+  tests.test_tunnel_remote_control
+)
+
 status=0
 
 run_modules() {
@@ -123,5 +128,7 @@ run_modules "axon-watch vault (isolated PYTHONPATH)" \
   "${repo_root}/services/axon-watch" "${watch_vault_tests[@]}"
 run_modules "axon-watch email signals (isolated PYTHONPATH)" \
   "${repo_root}/services/axon-watch" "${watch_signal_tests[@]}"
+run_modules "axon-watch native tunnel control (isolated PYTHONPATH)" \
+  "${repo_root}/services/axon-watch" "${watch_tunnel_tests[@]}"
 
 exit "${status}"

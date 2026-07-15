@@ -181,7 +181,9 @@ Env fallback: `AXON_WATCH_AGENT_TOOL_EXECUTION=1` (same gate as composer Full Ac
 ### 2026-07-07 — G4.3 tunnel remote control on Axon-X
 
 - `services/axon-watch/app/tunnel/*` probes cloudflared binary, auth sources (env/vault/legacy), process state, and public health.
-- Connectors rail shows `cloudflare_tunnel` with Start/Stop (via axon-local `tunnel.sh`) and Open tunnel URL.
+- Connectors rail shows `cloudflare_tunnel` with Start/Stop and Open tunnel URL.
+- Updated 2026-07-15: Start/Stop now uses Axon-X native process ownership;
+  the axon-local `tunnel.sh` dependency has been removed.
 - Gate: `npm run verify:tunnel-remote-control` (`test22-tunnel-remote-control.sh`).
 
 ### 2026-07-07 — G4.1 legacy connector inventory

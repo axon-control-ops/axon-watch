@@ -142,7 +142,14 @@ Update an item only when its stated evidence is attached.
 
 - [ ] **19. Implement native tunnel control**
   - Resolve, migrate, or explicitly discard WhatsApp monitoring before retirement.
-  - Evidence: decision + proof: _TBD_
+  - Progress: 2026-07-15 — Axon-X now owns bounded native cloudflared
+    start/stop/status control with state-dir process ownership, token-safe
+    arguments, and refusal to kill unmanaged processes. The
+    `verify:tunnel-remote-control` gate passes (11 tunnel unit tests, 2 proxy
+    tests, and connector inventory). Live diagnostics find `/usr/bin/cloudflared`
+    but report an unmanaged running process and missing Axon-X auth, so operator
+    cutover is still required. WhatsApp remains explicitly deferred and is
+    still a retirement blocker.
 
 - [x] **20. Define the actual self-improvement contract**
   - Trace store, evaluation dataset, verifier, regression thresholds, proposal workflow, isolated execution, approval, and rollback.

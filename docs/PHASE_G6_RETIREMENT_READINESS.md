@@ -19,7 +19,7 @@ Reassess `config/parity-snapshot.json` → `blockers_for_full_retirement` with G
 | Blocker ID (inventory) | G1–G5 evidence | Current status | Retire `:7734` for this? |
 |------------------------|----------------|----------------|--------------------------|
 | `agent_orchestration` | G3 green, `verify:agent-orchestration-parity` | **Replaced** | Yes — agent file edits on Axon-X |
-| `cloudflare_tunnel` | G4.3 green; start/stop via axon-local script when `AXON_LOCAL_ROOT` set | **Partial** | No — keep fallback until native start/stop |
+| `cloudflare_tunnel` | G4.3 native control green; live probe finds unmanaged process and missing Axon-X auth | **Partial** | No — operator auth/process cutover remains |
 | `voice_deck_mobile_cockpit` | G4.4 green; foreground-only v1 | **Partial** | Operator choice — accept v1 or keep `:7734` voice |
 | `agent_dock_legacy_parity` | G4.5 green | **Closed** | Yes |
 | `whatsapp_web_monitor` | G4.2 **deferred** | **Unmigrated** | No — DashPro WhatsApp on `:7734` |
@@ -31,7 +31,7 @@ Reassess `config/parity-snapshot.json` → `blockers_for_full_retirement` with G
 
 1. WhatsApp Web monitor unmigrated (G4.2 deferred)
 2. Legacy settings paths without Axon-X owner (G5.1 partial rows)
-3. Tunnel start/stop dependency on axon-local script (G4.3 partial)
+3. Tunnel operator cutover: supply Axon-X auth and replace the unmanaged legacy process (G4.3 partial)
 4. Operator has not completed one-week `:4173`-only dry-run (G6.2)
 
 ---

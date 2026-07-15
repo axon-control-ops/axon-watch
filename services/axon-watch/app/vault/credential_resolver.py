@@ -9,6 +9,7 @@ from pathlib import Path
 from app.vault.import_contract import ALLOWED_IMPORT_KEYS
 from app.vault.import_store import load_vault_import, save_vault_import
 from app.vault.operations import vault_named_secrets_map, vault_runtime_env
+from app.vault.paths import vault_import_path
 from app.vault.session import VaultSession
 
 

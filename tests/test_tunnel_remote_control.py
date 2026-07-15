@@ -7,11 +7,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 WATCH_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
 sys.path.insert(0, str(WATCH_ROOT))
 
+from app.tunnel import tunnel_control  # noqa: E402
+from app.tunnel import native_process  # noqa: E402
+from app.tunnel.native_process import build_cloudflared_command  # noqa: E402
 from app.tunnel.tunnel_credentials import (  # noqa: E402
     resolve_cloudflare_tunnel_token_state,
 )
@@ -96,6 +99,132 @@ class TunnelProbeWatchTests(unittest.TestCase):
             )
         self.assertEqual("degraded", diagnostics["status"])
         self.assertIn("stopped", diagnostics["detail"].lower())
+
+
+class NativeTunnelControlTests(unittest.TestCase):
+    def test_named_command_keeps_token_out_of_process_arguments(self) -> None:
+        command, env = build_cloudflared_command(
+            {"tunnel_mode": "named"},
+            "/usr/bin/cloudflared",
+            token="secret-token",
+        )
+
+        self.assertEqual(
+            ["/usr/bin/cloudflared", "--no-autoupdate", "tunnel", "run"],
+            command,
+        )
+        self.assertNotIn("secret-token", command)
+        self.assertEqual("secret-token", env["TUNNEL_TOKEN"])
+
+    def test_trycloudflare_command_uses_configured_local_origin(self) -> None:
+        command, _ = build_cloudflared_command(
+            {
+                "tunnel_mode": "trycloudflare",
+                "local_origin_url": "http://127.0.0.1:4173",
+            },
+            "/usr/bin/cloudflared",
+        )
+
+        self.assertIn("http://127.0.0.1:4173", command)
+
+    def test_trycloudflare_defaults_to_axon_x_operator_origin(self) -> None:
+        command, _ = build_cloudflared_command(
+            {"tunnel_mode": "trycloudflare"},
+            "/usr/bin/cloudflared",
+        )
+
+        self.assertIn("http://127.0.0.1:4173", command)
+        self.assertNotIn("http://127.0.0.1:7734", command)
+
+    def test_start_uses_native_process_manager(self) -> None:
+        stopped = {
+            "running": False,
+            "mode": "named",
+            "binary_path": "/usr/bin/cloudflared",
+            "named_tunnel_ready": True,
+        }
+        running = {**stopped, "running": True, "managed": True, "pid": 4321}
+        with patch.object(
+            tunnel_control,
+            "tunnel_status",
+            side_effect=[stopped, running],
+        ), patch.object(
+            tunnel_control,
+            "_resolved_tunnel_token",
+            return_value="token",
+        ), patch.object(
+            tunnel_control,
+            "start_managed_process",
+            return_value=4321,
+        ) as start_process:
+            result = tunnel_control.tunnel_start({"tunnel_mode": "named"})
+
+        start_process.assert_called_once_with(
+            {"tunnel_mode": "named"},
+            binary_path="/usr/bin/cloudflared",
+            token="token",
+        )
+        self.assertEqual("Tunnel started natively (PID 4321)", result["msg"])
+
+    def test_stop_refuses_to_kill_unmanaged_tunnel(self) -> None:
+        with patch.object(
+            tunnel_control,
+            "tunnel_status",
+            return_value={"running": True, "managed": False},
+        ):
+            with self.assertRaisesRegex(
+                tunnel_control.TunnelControlError,
+                "not managed by Axon-X",
+            ):
+                tunnel_control.tunnel_stop({"tunnel_mode": "named"})
+
+    def test_start_reports_unmanaged_tunnel_without_taking_ownership(self) -> None:
+        with patch.object(
+            tunnel_control,
+            "tunnel_status",
+            return_value={"running": True, "managed": False},
+        ), patch.object(tunnel_control, "start_managed_process") as start_process:
+            result = tunnel_control.tunnel_start({"tunnel_mode": "named"})
+
+        start_process.assert_not_called()
+        self.assertIn("not managed by Axon-X", result["msg"])
+
+    def test_start_terminates_process_when_ownership_state_cannot_persist(self) -> None:
+        process = Mock(pid=4321)
+        process.poll.return_value = None
+        process.wait.return_value = 0
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = {
+                "tunnel_mode": "trycloudflare",
+                "native_log_path": str(Path(tempdir) / "cloudflared.log"),
+            }
+            with patch.object(
+                native_process,
+                "managed_process_snapshot",
+                return_value={"managed": False, "pid": None},
+            ), patch.object(
+                native_process.subprocess,
+                "Popen",
+                return_value=process,
+            ), patch.object(
+                native_process,
+                "_write_process_state",
+                side_effect=PermissionError("read only"),
+            ), patch.object(
+                native_process.os,
+                "killpg",
+            ) as kill_group, patch.object(
+                native_process.time,
+                "sleep",
+            ):
+                with self.assertRaises(PermissionError):
+                    native_process.start_managed_process(
+                        config,
+                        binary_path="/usr/bin/cloudflared",
+                    )
+
+        kill_group.assert_called_once_with(4321, native_process.signal.SIGTERM)
+        process.wait.assert_called_once_with(timeout=5)
 
 
 if __name__ == "__main__":

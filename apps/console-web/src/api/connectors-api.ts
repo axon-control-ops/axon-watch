@@ -16,6 +16,9 @@ export interface ConnectorProbeRecord {
     process_running?: boolean;
     auth_ready?: boolean;
     binary_path?: string;
+    control_backend?: string;
+    managed_process?: boolean;
+    managed_pid?: number | null;
   };
 }
 
@@ -28,6 +31,11 @@ export interface TunnelStatusSnapshot {
   binary_path: string;
   status: string;
   detail: string;
+  control_backend: string;
+  managed: boolean;
+  pid: number | null;
+  process_state_path: string;
+  log_path: string;
   msg?: string;
 }
 

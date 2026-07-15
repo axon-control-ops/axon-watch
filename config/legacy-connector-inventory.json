@@ -105,13 +105,13 @@
       "probe": {
         "kind": "gate",
         "gate": "verify:tunnel-remote-control",
-        "note": "Binary + auth probe and connectors rail status; start/stop via axon-local tunnel.sh when AXON_LOCAL_ROOT is set."
+        "note": "Native Axon-X binary, auth, process ownership, start/stop, and connectors-rail diagnostics; no axon-local script dependency."
       },
       "fallback": {
         "url": "http://127.0.0.1:7734",
-        "ui_entry": "axon-local tunnel / remote control settings"
+        "ui_entry": "legacy process owner until operator auth cutover"
       },
-      "removal_criteria": "Tunnel slice stays green on operator host with live connectors rail status; axon-local fallback only needed when start/stop or auth paths regress."
+      "removal_criteria": "Tunnel slice stays green, Axon-X auth is available, and the operator replaces the currently unmanaged tunnel process with the native owner."
     },
     {
       "id": "voice_deck_mobile_cockpit",

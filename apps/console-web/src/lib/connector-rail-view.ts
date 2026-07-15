@@ -15,6 +15,7 @@ export interface ConnectorRailRow {
   isTunnelConnector: boolean;
   tunnelUrl: string | null;
   tunnelRunning: boolean;
+  tunnelManaged: boolean;
   tunnelStartAllowed: boolean;
 }
 
@@ -39,6 +40,7 @@ export function buildConnectorRailRows(items: ConnectorProbeRecord[]): Connector
     const tunnelMeta = item.tunnel;
     const tunnelUrl = String(tunnelMeta?.tunnel_url ?? '').trim() || null;
     const tunnelRunning = Boolean(tunnelMeta?.process_running);
+    const tunnelManaged = Boolean(tunnelMeta?.managed_process);
     const tunnelStartAllowed = isTunnel && Boolean(tunnelMeta?.auth_ready) && !tunnelRunning;
     return {
       connectorId,
@@ -52,6 +54,7 @@ export function buildConnectorRailRows(items: ConnectorProbeRecord[]): Connector
       isTunnelConnector: isTunnel,
       tunnelUrl,
       tunnelRunning,
+      tunnelManaged,
       tunnelStartAllowed,
     };
   });
