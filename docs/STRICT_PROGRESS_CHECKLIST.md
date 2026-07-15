@@ -64,16 +64,23 @@ Update an item only when its stated evidence is attached.
 
 ### Autonomy correctness (8–15)
 
-- [ ] **8. Runtime-reproduce and instrument the suspected stale `pending_command` duplicate-dispatch flow**
-  - Evidence: reproduction + fix receipt: _TBD_
+- [x] **8. Runtime-reproduce and instrument the suspected stale `pending_command` duplicate-dispatch flow**
+  - Evidence: 2026-07-15 — TestClient runtime proof sends `health`, then `yes`
+    in the same KAIRO session and asserts the follow-up cannot return a second
+    `dispatch_command`. See `docs/AUTONOMY_RUNTIME_PROOFS.md`.
 
-- [ ] **9. Runtime-reproduce the health versus check health command-tier mismatch**
+- [x] **9. Runtime-reproduce the health versus check health command-tier mismatch**
   - Choose and document one policy.
-  - Evidence: policy + proof: _TBD_
+  - Evidence: 2026-07-15 — `health`, `check health`, `check-health`, and the
+    explicit health script all resolve to read-only `reversible_auto` without
+    approval. Endpoint, autonomy-tier, and shortcut tests pass.
 
-- [ ] **10. Runtime-reproduce run-finalization failures**
+- [x] **10. Runtime-reproduce run-finalization failures**
   - Guarantee that failed phase transitions create an operator-visible error and receipt.
-  - Evidence: reproduction + receipt: _TBD_
+  - Evidence: 2026-07-15 — isolated SQLite runtime proofs force completion
+    failure and double-finalization failure. The first persists `run_failed`;
+    the fallback persists `finalization_error` with `success=False`. Targeted
+    autonomy set: **38/38 PASS**.
 
 - [ ] **11. Consolidate KAIRO turn submission**
   - One awaited dispatch path with consistent context, `action_tier`, routing receipt, model receipt, and error handling.

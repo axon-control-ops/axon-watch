@@ -45,6 +45,10 @@ _MOCK_GRAPH = {"nodes": [{"node_id": "n1"}], "edges": []}
 from app.kairo.context_pack_cache import clear_pack_cache_for_tests  # noqa: E402
 from app.kairo.turn_memory import clear_memory_for_tests  # noqa: E402
 
+_BRIEFING_PATCH = "app.kairo.conversation_context_pack.build_operator_briefing"
+_FLEET_PATCH = "app.kairo.conversation_context_pack.build_operator_fleet_health"
+_GRAPH_PATCH = "app.kairo.conversation_context_pack.build_operator_brain_graph"
+
 
 class KairoConversationEndpointTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -54,9 +58,9 @@ class KairoConversationEndpointTests(unittest.TestCase):
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 
-    @patch("app.kairo_conversation.build_operator_brain_graph", return_value=_MOCK_GRAPH)
-    @patch("app.kairo_conversation.build_operator_fleet_health", return_value=_MOCK_FLEET)
-    @patch("app.kairo_conversation.build_operator_briefing", return_value=_MOCK_BRIEFING)
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
     def test_converse_endpoint_shape(self, *_mocks: object) -> None:
         response = self.client.post(
             "/api/kairo/converse",
@@ -83,3 +87,48 @@ class KairoConversationEndpointTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertTrue(mock_converse.called)
         self.assertTrue(mock_converse.call_args.kwargs["force_refresh"])
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    def test_auto_dispatch_does_not_leave_endpoint_confirmation_target(
+        self,
+        *_mocks: object,
+    ) -> None:
+        session_id = "endpoint-auto-dispatch"
+        first = self.client.post(
+            "/api/kairo/converse",
+            json={"content": "health", "session_id": session_id},
+        )
+        self.assertEqual(200, first.status_code)
+        self.assertEqual("command", first.json()["turn_kind"])
+        self.assertEqual("reversible_auto", first.json()["action_tier"])
+        self.assertFalse(first.json()["requires_confirmation"])
+
+        followup = self.client.post(
+            "/api/kairo/converse",
+            json={"content": "yes", "session_id": session_id},
+        )
+        self.assertEqual(200, followup.status_code)
+        action = followup.json().get("action")
+        self.assertFalse(
+            isinstance(action, dict) and action.get("type") == "dispatch_command",
+            followup.json(),
+        )
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    def test_health_command_variants_share_runtime_policy(self, *_mocks: object) -> None:
+        for index, content in enumerate(
+            ("health", "check health", "check-health", "run ./scripts/dev/check-health.sh")
+        ):
+            response = self.client.post(
+                "/api/kairo/converse",
+                json={"content": content, "session_id": f"health-policy-{index}"},
+            )
+            self.assertEqual(200, response.status_code, content)
+            payload = response.json()
+            self.assertEqual("command", payload["turn_kind"], content)
+            self.assertEqual("reversible_auto", payload["action_tier"], content)
+            self.assertFalse(payload["requires_confirmation"], content)
