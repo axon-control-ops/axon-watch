@@ -6,6 +6,17 @@ import os
 import shlex
 from pathlib import Path
 
+from app.vault.import_store import load_vault_import
+from app.vault.operations import vault_resolve_named_secret
+from app.vault.session import VaultSession
+
+_TUNNEL_VAULT_SECRET_NAMES: tuple[str, ...] = (
+    "AXON_CLOUDFLARE_TUNNEL_TOKEN",
+    "CLOUDFLARE_TUNNEL_TOKEN",
+    "cloudflare_tunnel_token",
+    "TUNNEL_TOKEN",
+)
+
 
 def legacy_tunnel_env_file(*, home_path: Path | None = None) -> Path:
     root = home_path or Path.home()
@@ -23,6 +34,18 @@ def _clean_token(value: str | None) -> str:
 
 def _is_vault_reference(value: str | None) -> bool:
     return _clean_token(value).startswith("vault:")
+
+
+def load_tunnel_vault_secrets() -> dict[str, str]:
+    """Merge plain vault import with unlocked encrypted vault secrets for tunnel auth."""
+    secrets = dict(load_vault_import())
+    if not VaultSession.is_unlocked():
+        return secrets
+    for name in _TUNNEL_VAULT_SECRET_NAMES:
+        value = _clean_token(vault_resolve_named_secret(name))
+        if value and not _is_vault_reference(value):
+            secrets[name] = value
+    return secrets
 
 
 def read_tunnel_token_from_env_file(path: Path) -> str:

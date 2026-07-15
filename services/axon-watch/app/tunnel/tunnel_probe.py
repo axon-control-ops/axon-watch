@@ -15,8 +15,11 @@ from app.signals.iso_time import utc_now_iso
 from app.tunnel.cloudflared_binary import cloudflared_version, find_cloudflared_binary
 from app.tunnel.native_process import managed_process_snapshot
 from app.tunnel.slice_registry import load_tunnel_slice
-from app.tunnel.tunnel_credentials import named_tunnel_ready, resolve_cloudflare_tunnel_token_state
-from app.vault.credential_resolver import load_vault_import
+from app.tunnel.tunnel_credentials import (
+    load_tunnel_vault_secrets,
+    named_tunnel_ready,
+    resolve_cloudflare_tunnel_token_state,
+)
 
 _TRYCF_URL_RE = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com", re.IGNORECASE)
 
@@ -98,7 +101,7 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
     workspace_id = str(config.get("workspace_id") or "workspace_axon_watch").strip()
     tunnel_mode = str(config.get("tunnel_mode") or "trycloudflare").strip().lower()
     public_base_url = str(config.get("public_base_url") or "").strip().rstrip("/")
-    vault_secrets = load_vault_import()
+    vault_secrets = load_tunnel_vault_secrets()
     stored_token = str(vault_secrets.get("cloudflare_tunnel_token") or "")
     token_state = resolve_cloudflare_tunnel_token_state(
         stored_token,

@@ -8,9 +8,8 @@ from app.tunnel.native_process import (
     stop_managed_process,
 )
 from app.tunnel.slice_registry import load_tunnel_slice
-from app.tunnel.tunnel_credentials import resolve_cloudflare_tunnel_token_state
+from app.tunnel.tunnel_credentials import load_tunnel_vault_secrets, resolve_cloudflare_tunnel_token_state
 from app.tunnel.tunnel_probe import build_tunnel_diagnostics
-from app.vault.credential_resolver import load_vault_import
 
 
 class TunnelControlError(ValueError):
@@ -18,7 +17,7 @@ class TunnelControlError(ValueError):
 
 
 def _resolved_tunnel_token() -> str:
-    vault_secrets = load_vault_import()
+    vault_secrets = load_tunnel_vault_secrets()
     stored_token = str(vault_secrets.get("cloudflare_tunnel_token") or "")
     token_state = resolve_cloudflare_tunnel_token_state(
         stored_token,
