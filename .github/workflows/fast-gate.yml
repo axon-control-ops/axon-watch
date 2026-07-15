@@ -45,3 +45,4 @@ jobs:
           --shell-boot-report scripts/verify/fixtures/shell-boot-report.dev.json
           --runtime-latency-samples scripts/verify/fixtures/runtime-summary-latency.ci.json
           --watch-latency-samples scripts/verify/fixtures/watch-summary-latency.ci.json
+          --strict-pending

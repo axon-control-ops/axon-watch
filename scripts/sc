@@ -5,7 +5,6 @@
 #   ./scripts/sc
 #   ./scripts/sc -m "fix: something"
 #   ./scripts/sc -n
-#   ./scripts/sc -q
 #   ./scripts/sc --help
 #
 # Optional shell alias (add to ~/.zshrc):
@@ -18,7 +17,6 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 DRY_RUN=0
 SUGGEST_ONLY=0
-SKIP_PREFLIGHT=0
 COMMIT_MESSAGE=""
 ALLOW_SECRETS=0
 SC_TEMP_INDEX=""
@@ -28,13 +26,12 @@ usage() {
 sc - Axon-X Hot-Command (stage all + commit)
 
 Usage:
-  sc [-m MESSAGE] [-n] [--suggest-only] [-q] [--allow-secrets]
+  sc [-m MESSAGE] [-n] [--suggest-only] [--allow-secrets]
 
 Options:
   -m MESSAGE       Commit message (required for non-interactive use)
   -n, --dry-run    Stage in a temp index and show summary; no commit
   --suggest-only   Analyze the staged preview and print a suggested message only
-  -q, --quick      Skip verify preflight hints
   --allow-secrets  Do not abort when likely secret files would be staged
   -h, --help       Show this help
 
@@ -284,16 +281,9 @@ secret_paths_in_tree() {
 }
 
 run_preflight() {
-  if [[ "$SKIP_PREFLIGHT" == "1" ]]; then
-    return 0
-  fi
-  log "preflight: dependency directions"
-  if ! python3 "$REPO_ROOT/scripts/verify/check_dependency_directions.py" >/dev/null 2>&1; then
-    log "warning: check_dependency_directions.py failed (commit will still proceed)"
-  fi
-  log "preflight: DTO size budget"
-  if ! python3 "$REPO_ROOT/scripts/verify/check_dto_sizes.py" >/dev/null 2>&1; then
-    log "warning: check_dto_sizes.py failed (commit will still proceed)"
+  log "preflight: dependency directions, DTO budgets, and file sizes"
+  if ! npm --prefix "$REPO_ROOT" run verify:preflight; then
+    die "verification preflight failed; commit aborted"
   fi
 }
 
@@ -350,9 +340,6 @@ parse_args() {
         ;;
       --suggest-only)
         SUGGEST_ONLY=1
-        ;;
-      -q|--quick)
-        SKIP_PREFLIGHT=1
         ;;
       --allow-secrets)
         ALLOW_SECRETS=1

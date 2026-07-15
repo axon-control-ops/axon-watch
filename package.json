@@ -20,6 +20,7 @@
     "verify:shared-types": "npm run verify -w @contracts/shared-types",
     "verify:file-sizes": "./scripts/dev/python.sh scripts/guardrails/check_file_sizes.py",
     "verify:hotspot-changes": "./scripts/dev/python.sh scripts/guardrails/check_hotspot_changes.py",
+    "verify:preflight": "./scripts/dev/python.sh scripts/verify/check_dependency_directions.py --strict-pending && ./scripts/dev/python.sh scripts/verify/check_dto_sizes.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json --strict-pending && npm run verify:file-sizes",
     "verify:contracts": "npm run verify:shared-types && npm run verify:file-sizes && ./scripts/verify/run_contract_unit_tests.sh",
     "verify:test0": "./scripts/verify/test0-workspace-smoke.sh",
     "verify:test1": "./scripts/verify/test1-workspace-project-connection.sh",

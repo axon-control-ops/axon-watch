@@ -122,15 +122,23 @@ Update an item only when its stated evidence is attached.
 
 - [ ] **16. Establish CI**
   - PR fast gate plus nightly live-evidence gate; make autonomy-critical tests mandatory.
-  - Evidence: workflow paths + required checks: _TBD_
+  - Progress: 2026-07-15 — fast PR/push gate and nightly isolated live-evidence
+    gate are implemented and contract-tested; see `docs/CI_GATES.md`. Remaining
+    blocker: GitHub branch-protection API returned `403` because required
+    checks on a private repository need GitHub Pro (or a public repository).
 
-- [ ] **17. Make PENDING verification fail in CI**
+- [x] **17. Make PENDING verification fail in CI**
   - Or explicitly allowlist each pending metric with owner and expiry.
-  - Evidence: strict mode / allowlist: _TBD_
+  - Evidence: 2026-07-15 — both fast and nightly workflows invoke the
+    verification harness with `--strict-pending`; nightly additionally rejects
+    fixture fallback with `--require-live-evidence`.
 
-- [ ] **18. Add dependency-direction and hotspot-change enforcement**
+- [x] **18. Add dependency-direction and hotspot-change enforcement**
   - Make preflight failures blocking.
-  - Evidence: scripts + CI wiring: _TBD_
+  - Evidence: 2026-07-15 — fast CI blocks on dependency directions, file-size
+    ratchets, and hotspot-change ratchets. `scripts/sc` now runs
+    `npm run verify:preflight`, aborts on failure, and has no quick bypass.
+    CI/preflight contract and hotspot policy tests are in the supported suite.
 
 - [ ] **19. Implement native tunnel control**
   - Resolve, migrate, or explicitly discard WhatsApp monitoring before retirement.

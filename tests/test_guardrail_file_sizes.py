@@ -32,6 +32,34 @@ class GuardrailCommonTests(unittest.TestCase):
             manifest["ratcheted_oversize_files"],
         )
 
+    def test_critical_hotspot_change_requires_shrink_or_active_waiver(self):
+        self.assertIn(
+            "changed without shrinking",
+            common.evaluate_critical_hotspot_change(
+                "server.py",
+                lines=100,
+                budget=100,
+                has_active_waiver=False,
+            )
+            or "",
+        )
+        self.assertIsNone(
+            common.evaluate_critical_hotspot_change(
+                "server.py",
+                lines=99,
+                budget=100,
+                has_active_waiver=False,
+            )
+        )
+        self.assertIsNone(
+            common.evaluate_critical_hotspot_change(
+                "server.py",
+                lines=100,
+                budget=100,
+                has_active_waiver=True,
+            )
+        )
+
 
 class GuardrailScriptTests(unittest.TestCase):
     def test_check_file_sizes_passes_on_repo_baseline(self):
