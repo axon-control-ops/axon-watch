@@ -73,8 +73,9 @@ const {
       <header class="operator-settings-form__section-header">
         <h2>Ingest mode</h2>
         <p>
-          Optional: pull live triage from Axon Signal (:7734) if that server is already monitoring
-          mail. Stub messages keep the pipe working offline for demos.
+          Axon-X polls configured IMAP mailboxes directly (Vault passwords required). Optional:
+          pull triage from Axon Signal (:7734) as a bridge. Stub messages are only used when no
+          live mailbox credentials are available.
         </p>
       </header>
 

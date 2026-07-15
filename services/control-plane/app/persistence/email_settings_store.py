@@ -186,6 +186,17 @@ def reset_store() -> None:
         connection.commit()
 
 
+def _read_projection_file() -> dict[str, Any] | None:
+    path = projection_path()
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def load_settings() -> dict[str, Any]:
     with _managed_connection() as connection:
         row = connection.execute(
@@ -193,6 +204,14 @@ def load_settings() -> dict[str, Any]:
             (_SETTINGS_KEY,),
         ).fetchone()
     if row is None:
+        projection = _read_projection_file()
+        if projection and (
+            projection.get("accounts")
+            or projection.get("bridge_enabled")
+            or projection.get("stub_enabled") is False
+        ):
+            # Recover after DB wipe/path drift: projection is the durable operator mirror.
+            return save_settings(normalize_settings(projection))["settings"]
         return default_settings()
     payload = json.loads(str(row["settings_json"]))
     if not isinstance(payload, dict):

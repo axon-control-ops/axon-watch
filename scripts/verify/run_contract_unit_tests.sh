@@ -77,6 +77,7 @@ main_tests=(
   tests.test_lane_b_agent
   tests.test_runtime_vault_integration
   tests.test_email_settings_store
+  tests.test_email_reply_suggest
   tests.test_operator_evidence
   tests.test_kairo_conversation_endpoints
   tests.test_voice_autonomy

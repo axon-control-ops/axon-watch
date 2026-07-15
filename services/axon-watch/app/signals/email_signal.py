@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 from app.connectors.catalog import load_watch_connector_definitions
 from app.connectors.probe import probe_connector
+from app.signals.email_reply_suggest import suggest_email_reply
 from app.signals.email_triage import analyze_email_message
 from app.signals.iso_time import utc_now_iso
 
@@ -200,7 +201,9 @@ def load_email_messages(
     *,
     stub_path: Path | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Load email messages from live bridge when healthy, else stub config."""
+    """Load email messages: native IMAP → Signal bridge → optional stub."""
+
+    from app.signals.email_imap_poll import fetch_native_email_messages
 
     stub_config = _load_stub_config(stub_path)
     operator_settings = _load_operator_email_settings()
@@ -215,6 +218,16 @@ def load_email_messages(
             }
         )
         stub_config["workspace_hint_map"] = merged_hints
+    if operator_settings.get("accounts"):
+        # Prefer the first configured workspace as fallback when native poll is live.
+        first = operator_settings["accounts"][0]
+        if isinstance(first, dict) and str(first.get("workspace_id") or "").strip():
+            stub_config = dict(stub_config)
+            stub_config["workspace_id"] = str(first["workspace_id"]).strip()
+
+    native = fetch_native_email_messages()
+    if native is not None:
+        return native, stub_config
 
     live = _messages_from_live_bridge()
     if live is not None:
@@ -242,6 +255,15 @@ def email_inbox_item(
     recommended_detail = str(analysis.get("recommended_detail") or "").strip()
     snippet = str(analysis.get("snippet") or "").strip()
     now = utc_now_iso()
+    suggestion = suggest_email_reply(
+        {
+            "subject": subject,
+            "from": sender,
+            "text": snippet,
+            "snippet": snippet,
+            "message_id": message_id,
+        }
+    )
 
     return {
         "signal_id": f"signal_email_{_safe_signal_token(message_id)}",
@@ -260,8 +282,8 @@ def email_inbox_item(
             "sender": sender,
             "subject": subject,
             "snippet": snippet,
-            "recommended_action": recommended_action,
-            "recommended_detail": recommended_detail,
+            "recommended_action": str(suggestion.get("recommended_action") or recommended_action),
+            "recommended_detail": str(suggestion.get("recommended_detail") or recommended_detail),
             "priority": priority,
             "risk_level": risk_level,
             "action_requests": list(analysis.get("action_requests") or [])[:5],
@@ -269,6 +291,8 @@ def email_inbox_item(
             "commitments": list(analysis.get("commitments") or [])[:5],
             "due_markers": list(analysis.get("due_markers") or [])[:5],
             "workspace_hints": list(analysis.get("workspace_hints") or [])[:5],
+            "suggested_reply_subject": suggestion.get("reply_subject"),
+            "suggested_reply_body": suggestion.get("reply_body"),
         },
     }
 
