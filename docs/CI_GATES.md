@@ -37,10 +37,13 @@ Fixture fallback is rejected by `--require-live-evidence`.
 budget failures, missing strict inputs, or file-size failures abort the commit.
 There is no quick bypass.
 
-## Required-check entitlement
+## Required-check enforcement
 
-The repository should require `Axon-X Fast Gate / fast-gate` before merging to
-`dev`. On 2026-07-15 GitHub’s branch-protection API returned `403`: private
-branch protection requires a GitHub Pro upgrade or a public repository.
-Therefore the workflow is installed and mandatory within CI execution, but
-server-side merge enforcement remains an external entitlement blocker.
+The public repository's `dev` integration branch is protected server-side.
+GitHub strictly requires the `fast-gate` check before update, enforces the rule
+for administrators, and disallows force-pushes and branch deletion. Fast Gate
+run `29406066700` passed on commit `063cc53` before protection was enabled.
+
+The default `master` branch predates the Fast Gate workflow and remains
+unprotected. Integration and pull requests for current Axon-X work target
+`dev`.
