@@ -1,6 +1,10 @@
 import type { OperatorPresence } from './presence';
 import type { ApprovalRecord } from './control-plane';
-import type { RuntimeSummaryActiveRun, RuntimeSummaryDegradedState } from './runtime';
+import type {
+  CliRuntimeReadiness,
+  RuntimeSummaryActiveRun,
+  RuntimeSummaryDegradedState,
+} from './runtime';
 import type { InboxItem } from './signals';
 
 export const BRIEFING_ACTION_KINDS = [
@@ -67,6 +71,7 @@ export interface OperatorBriefing {
   active_runs: RuntimeSummaryActiveRun[];
   next_safe_actions: BriefingAction[];
   degraded: RuntimeSummaryDegradedState;
+  cli_runtime?: CliRuntimeReadiness;
   connectivity: OperatorBriefingConnectivity;
   memory_highlights?: OperatorBriefingMemoryHighlight[];
   operator_presence?: OperatorPresence;

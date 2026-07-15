@@ -26,25 +26,34 @@ fi
 : "${AXON_WATCH_WATCH_SERVICE_PORT:=8788}"
 : "${AXON_WATCH_STATE_DIR:=${AXON_WATCH_REPO_ROOT}/.local/state}"
 
+# Prefer an explicit interpreter, then the repo virtualenv, then PATH python3.
+if [[ -z "${AXON_WATCH_PYTHON:-}" ]]; then
+  if [[ -x "${AXON_WATCH_REPO_ROOT}/.venv/bin/python3" ]]; then
+    AXON_WATCH_PYTHON="${AXON_WATCH_REPO_ROOT}/.venv/bin/python3"
+  else
+    AXON_WATCH_PYTHON="$(command -v python3)"
+  fi
+fi
+
 mkdir -p "${AXON_WATCH_STATE_DIR}"
 
 case "${service_name}" in
   axon-watch)
     cd "${AXON_WATCH_REPO_ROOT}/services/axon-watch"
-    exec python3 -m uvicorn app.main:app \
+    exec "${AXON_WATCH_PYTHON}" -m uvicorn app.main:app \
       --host "${AXON_WATCH_BIND_HOST}" \
       --port "${AXON_WATCH_WATCH_SERVICE_PORT}"
     ;;
   control-plane)
     cd "${AXON_WATCH_REPO_ROOT}/services/control-plane"
-    exec python3 -m uvicorn app.main:app \
+    exec "${AXON_WATCH_PYTHON}" -m uvicorn app.main:app \
       --host "${AXON_WATCH_BIND_HOST}" \
       --port "${AXON_WATCH_CONTROL_PLANE_PORT}"
     ;;
   console-web)
     cd "${AXON_WATCH_REPO_ROOT}/apps/console-web"
     if [[ -d dist ]]; then
-      exec python3 -m http.server "${AXON_WATCH_CONSOLE_WEB_PORT}" \
+      exec "${AXON_WATCH_PYTHON}" -m http.server "${AXON_WATCH_CONSOLE_WEB_PORT}" \
         --bind "${AXON_WATCH_BIND_HOST}" \
         --directory dist
     fi

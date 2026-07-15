@@ -1,0 +1,275 @@
+.console-shell--mockup.console-shell--settings,
+.console-shell--mockup.console-shell--settings[data-layout-mode="ide"],
+.console-shell--mockup.console-shell--settings[data-layout-mode="operator"] {
+  grid-template-areas:
+    "topbar topbar topbar"
+    "centerWorkbench centerWorkbench centerWorkbench"
+    "statusBar statusBar statusBar";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr) var(
+      --statusbar-height
+    );
+}
+
+.console-shell--mockup.console-shell--settings .region-left-sidebar,
+.console-shell--mockup.console-shell--settings .region-right-dock,
+.console-shell--mockup.console-shell--settings
+  .center-workbench:not(.settings-surface) {
+  display: none !important;
+}
+
+.console-shell--mockup.console-shell--settings
+  .region-center-workbench.settings-surface {
+  grid-area: centerWorkbench;
+  align-self: stretch;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  padding: 0;
+  overflow: auto;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.settings-surface__shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: min(100%, 72rem);
+  max-width: 72rem;
+  margin: 0 auto;
+  min-height: min(100%, 100%);
+  padding: 1.1rem 1.35rem 1.35rem;
+  filter: var(--hud-frame-glow);
+}
+
+.settings-surface__shell.hud-panel-frame {
+  --hud-surface-fill: rgba(0, 8, 14, 0.88);
+}
+
+.settings-surface__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-surface__eyebrow {
+  margin: 0;
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.72);
+}
+
+.settings-surface__title {
+  margin: 0.2rem 0 0;
+  font-size: 1.65rem;
+  letter-spacing: 0.04em;
+}
+
+.settings-surface__section-head {
+  margin-bottom: 0.15rem;
+}
+
+.settings-surface__section-title {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(0, 242, 255, 0.92);
+}
+
+.settings-surface__section-subtitle {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  opacity: 0.72;
+  line-height: 1.45;
+  max-width: 42rem;
+}
+
+.settings-surface__panel {
+  padding: 1rem;
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  border-radius: 0.65rem;
+  background: rgba(0, 8, 14, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.settings-surface__subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
+  opacity: 0.78;
+  max-width: 40rem;
+  line-height: 1.45;
+}
+
+.settings-surface__back {
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 242, 255, 0.24);
+  border-radius: 0.35rem;
+  background: rgba(0, 242, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  padding: 0.45rem 0.75rem;
+}
+
+.settings-surface__back:hover {
+  border-color: rgba(0, 242, 255, 0.45);
+  background: rgba(0, 242, 255, 0.14);
+}
+
+.settings-surface__footer {
+  display: none;
+}
+
+.settings-section-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.15rem;
+}
+
+.settings-section-toolbar__copy {
+  margin: 0;
+  font-size: 0.74rem;
+  opacity: 0.72;
+  line-height: 1.45;
+  max-width: 36rem;
+}
+
+.settings-feedback-banner {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  background: rgba(0, 242, 255, 0.06);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: rgba(0, 242, 255, 0.88);
+}
+
+.settings-feedback-banner--inline {
+  margin-top: 0;
+}
+
+.settings-feedback-banner--ok {
+  border-color: rgba(120, 255, 180, 0.28);
+  background: rgba(120, 255, 180, 0.08);
+  color: rgba(120, 255, 180, 0.92);
+}
+
+.settings-feedback-banner--error {
+  border-color: rgba(255, 140, 120, 0.28);
+  background: rgba(255, 140, 120, 0.08);
+  color: rgba(255, 180, 160, 0.95);
+}
+
+.settings-feedback-banner--pending {
+  border-color: rgba(255, 196, 72, 0.28);
+  background: rgba(255, 196, 72, 0.08);
+  color: rgba(255, 224, 170, 0.92);
+}
+
+.settings-surface__status {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(0, 242, 255, 0.82);
+}
+
+.settings-surface__status--ok {
+  color: rgba(120, 255, 180, 0.88);
+}
+
+.settings-surface__status--error {
+  color: rgba(255, 140, 120, 0.92);
+}
+
+.settings-surface__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .settings-surface__layout {
+    grid-template-columns: minmax(13.5rem, 15rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 1.25rem;
+  }
+}
+
+.settings-surface__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  position: sticky;
+  top: 0.75rem;
+}
+
+.settings-surface__nav-button {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.45rem;
+  background: rgba(0, 10, 18, 0.45);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.settings-surface__nav-button:hover {
+  border-color: rgba(0, 242, 255, 0.24);
+  background: rgba(0, 242, 255, 0.04);
+}
+
+.settings-surface__nav-button--active {
+  border-color: rgba(0, 242, 255, 0.42);
+  background: rgba(0, 242, 255, 0.08);
+  box-shadow:
+    inset 3px 0 0 rgba(0, 242, 255, 0.72),
+    inset 0 0 0 1px rgba(0, 242, 255, 0.1);
+}
+
+.settings-surface__nav-mark {
+  flex-shrink: 0;
+  width: 1.35rem;
+  padding-top: 0.05rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: rgba(0, 242, 255, 0.62);
+}
+
+.settings-surface__nav-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.settings-surface__nav-label {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.settings-surface__nav-hint {
+  font-size: 0.68rem;
+  opacity: 0.68;
+  line-height: 1.35;
+}
+
+.settings-surface__content {
+  min-width: 0;
+}

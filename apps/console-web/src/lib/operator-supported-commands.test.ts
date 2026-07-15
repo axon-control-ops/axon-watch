@@ -14,6 +14,7 @@ describe('operator supported commands', () => {
       'git_status',
       'resume_from_review',
       'shell_command',
+      'move_voice_orb',
     ]);
   });
 

@@ -8,7 +8,10 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.chat.command_executor import classify_command, execute_command  # noqa: E402
-from app.chat.command_intent import expand_command_shortcuts  # noqa: E402
+from app.chat.command_intent import (  # noqa: E402
+    command_requires_confirmation,
+    expand_command_shortcuts,
+)
 from app.chat.dispatch import build_command_dispatch_ack  # noqa: E402
 from app.chat.command_executor import CommandExecutionResult  # noqa: E402
 
@@ -36,6 +39,11 @@ class CommandShortcutTests(unittest.TestCase):
         self.assertEqual(classify_command("check-health"), "shell_command")
         self.assertEqual(classify_command("verify"), "shell_command")
         self.assertEqual(classify_command("ota canary"), "shell_command")
+
+    def test_check_health_does_not_require_confirmation(self) -> None:
+        self.assertFalse(command_requires_confirmation("check health"))
+        self.assertFalse(command_requires_confirmation("check-health"))
+        self.assertTrue(command_requires_confirmation("verify"))
 
     def test_questions_are_not_commands(self) -> None:
         for prompt in (

@@ -139,20 +139,20 @@ export function decorateVaxonCoreOrb(
   const shell = mesh.material as MeshStandardMaterial;
   shell.color = new Color(0x7aebff);
   shell.emissive = new Color(colors.emissive || 0x28b8ff);
-  shell.emissiveIntensity = Math.max(colors.emissiveIntensity, 1.6);
-  shell.metalness = 0.15;
-  shell.roughness = 0.22;
+  shell.emissiveIntensity = Math.max(colors.emissiveIntensity, 2.1);
+  shell.metalness = 0.12;
+  shell.roughness = 0.16;
   shell.transparent = true;
-  shell.opacity = 0.92;
+  shell.opacity = 0.94;
 
   const inner = new Mesh(
     new SphereGeometry(radius * 0.55, 32, 32),
     new MeshStandardMaterial({
       color: 0xe8fbff,
       emissive: new Color(0x48c4ff),
-      emissiveIntensity: 2.4,
+      emissiveIntensity: 3.2,
       metalness: 0.05,
-      roughness: 0.18,
+      roughness: 0.14,
     }),
   );
   (inner.userData as CoreRingUserData) = { coreEffect: 'inner', phase: 0 };
@@ -201,6 +201,10 @@ export function decorateVaxonCoreOrb(
   rings.add(buildCoreRing(radius * 1.42, 0.014, -0.009, -0.55));
   rings.add(buildCoreRing(radius * 1.68, 0.01, 0.007, 0.85));
   rings.add(buildCoreRing(radius * 0.82, 0.009, -0.016, 0.05));
+  // Tilted equatorial JARVIS ring for cinematic depth.
+  const tilted = buildCoreRing(radius * 1.32, 0.02, 0.015, 1.1);
+  tilted.rotation.x = Math.PI / 2.6;
+  rings.add(tilted);
   mesh.add(rings);
 
   mesh.add(buildEnergyOrbit(radius));

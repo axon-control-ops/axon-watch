@@ -9,8 +9,16 @@ from app.chat.command_executor import (
     execute_command,
     execute_resume_from_review,
 )
-from app.chat.command_intent import AUTO_COMPLETE_COMMAND_INTENTS
-from app.runs.service import RunLifecycleError, append_run_execution_receipt, complete_run, get_run, list_runs, mark_review_ready
+from app.chat.command_intent import AUTO_COMPLETE_COMMAND_INTENTS, is_reversible_shell_command
+from app.runs.service import (
+    RunLifecycleError,
+    append_run_execution_receipt,
+    complete_run,
+    fail_run,
+    get_run,
+    list_runs,
+    mark_review_ready,
+)
 
 
 def build_agent_command_reply(
@@ -101,11 +109,30 @@ def orchestrate_command_run(
     )
 
     try:
-        if execution.success and execution.intent in AUTO_COMPLETE_COMMAND_INTENTS:
+        if execution.success and (
+            execution.intent in AUTO_COMPLETE_COMMAND_INTENTS
+            or (
+                execution.intent == "shell_command"
+                and is_reversible_shell_command(content)
+            )
+        ):
             run_record = complete_run(run_id)
         else:
             run_record = mark_review_ready(run_id)
-    except RunLifecycleError:
-        pass
+    except RunLifecycleError as exc:
+        try:
+            run_record = fail_run(
+                run_id,
+                receipt_summary=f"Run finalization failed: {exc}",
+            )
+        except RunLifecycleError:
+            run_record = append_run_execution_receipt(
+                run_id,
+                receipt_type="finalization_error",
+                receipt_summary=str(exc),
+                actor="command_orchestrator",
+                success=False,
+                intent=execution.intent,
+            )
 
     return run_record, execution

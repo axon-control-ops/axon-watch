@@ -19,3 +19,18 @@ sudo systemctl enable --now axon-watch control-plane console-web
 Services invoke `scripts/ops/run-service.sh` with `EnvironmentFile=/etc/axon-watch/deployment.env`.
 
 See `docs/DEDICATED_SERVER_READINESS.md`.
+
+## User always-on (this machine stays powered)
+
+When the desktop stays on while you are away, install user units instead of
+system units:
+
+```bash
+./scripts/ops/install-user-always-on.sh
+./scripts/ops/install-user-always-on.sh --takeover   # hand ports to systemd
+```
+
+Units live under `infra/systemd/user/` and install to `~/.config/systemd/user/`.
+This keeps watch + control-plane restarting on failure; it does not invent
+cloud agent execution. Remote phone access still needs a working Cloudflare
+tunnel token.

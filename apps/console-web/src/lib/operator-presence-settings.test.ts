@@ -57,6 +57,9 @@ describe('operator-presence-settings', () => {
       hands_free_enabled: false,
       speech_rate: 1.0,
       speech_pitch: 1.04,
+      azure_voice_id: 'en-GB-RyanNeural',
+      stt_mode: 'browser',
+      voice_routing_mode: 'template_first',
     });
     expect(storage.getItem(OPERATOR_PRESENCE_SETTINGS_KEY)).toContain('"operator_persona_enabled":false');
   });
@@ -72,6 +75,9 @@ describe('operator-presence-settings', () => {
       hands_free_enabled: false,
       speech_rate: 1.0,
       speech_pitch: 1.04,
+      azure_voice_id: 'en-GB-RyanNeural',
+      stt_mode: 'browser',
+      voice_routing_mode: 'template_first',
     });
   });
 

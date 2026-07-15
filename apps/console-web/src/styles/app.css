@@ -34,8 +34,7 @@ body {
     auto;
 }
 
-button,
-input {
+button, input {
   font: inherit;
 }
 

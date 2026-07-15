@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { rectsOverlap, resolveAutoAvoidOrbCandidates } from './kairo-galaxy-orb-position';
+import {
+  rectsOverlap,
+  resolveAutoAvoidOrbCandidates,
+  resolveDockPresetPosition,
+  resolveSmartDodgeOrbPosition,
+} from './kairo-galaxy-orb-position';
 
 describe('kairo-galaxy-orb-position', () => {
   it('detects overlap between orb and conversation surface', () => {
@@ -50,5 +55,34 @@ describe('kairo-galaxy-orb-position', () => {
     });
 
     expect(candidates[2]).toEqual({ x: 428, y: 104 });
+  });
+
+  it('resolves viewport dock presets', () => {
+    const margins = { left: 12, top: 56, right: 12, bottom: 48 };
+    const viewport = { width: 1200, height: 800 };
+    const orb = { width: 200, height: 240 };
+    expect(resolveDockPresetPosition({ dock: 'top-left', viewport, orb, margins })).toEqual({
+      x: 12,
+      y: 56,
+    });
+    expect(resolveDockPresetPosition({ dock: 'bottom-right', viewport, orb, margins })).toEqual({
+      x: 988,
+      y: 512,
+    });
+  });
+
+  it('smart-dodges to a clear dock when the preferred corner is blocked', () => {
+    const margins = { left: 12, top: 56, right: 12, bottom: 48 };
+    const viewport = { width: 1200, height: 800 };
+    const orb = { width: 200, height: 240 };
+    const result = resolveSmartDodgeOrbPosition({
+      viewport,
+      orb,
+      margins,
+      preferredDock: 'top-right',
+      obstacles: [{ left: 900, top: 0, right: 1200, bottom: 400 }],
+    });
+    expect(result.dock).toBe('top-left');
+    expect(result.position).toEqual({ x: 12, y: 56 });
   });
 });

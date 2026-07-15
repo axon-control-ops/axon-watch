@@ -259,11 +259,6 @@ describe('briefing-open-loops-view', () => {
           workspace_id: 'workspace_axon_local',
           phase: 'executing',
           title: 'Elsewhere',
-          mode: 'agent',
-          status: 'running',
-          detail: '',
-          lane_id: 'control-plane',
-          updated_at: '2026-07-13T10:00:00Z',
         },
       ],
     });

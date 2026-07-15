@@ -68,11 +68,15 @@ export interface OperatorMemoryRecord {
 export async function fetchOperatorBriefing(options?: {
   viewportCompact?: boolean;
   workspaceId?: string | null;
+  light?: boolean;
 }): Promise<OperatorBriefing> {
   const compact = Boolean(options?.viewportCompact);
   const params = new URLSearchParams();
   if (compact) {
     params.set('viewport_compact', 'true');
+  }
+  if (options?.light) {
+    params.set('light', 'true');
   }
   const workspaceId = options?.workspaceId?.trim();
   if (workspaceId) {

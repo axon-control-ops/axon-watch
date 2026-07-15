@@ -1,4 +1,6 @@
 export type KairoNarrationLevel = 'off' | 'minimal' | 'conversational';
+export type VoiceRoutingMode = 'template_first' | 'runtime_on_deep' | 'runtime_aggressive';
+export type SttMode = 'browser' | 'browser_continuous' | 'cloud';
 
 /**
  * Continuous speech tuning — axon-local parity (`voice_speech_rate` / `voice_speech_pitch`).
@@ -16,6 +18,12 @@ export interface OperatorPresenceSettings {
   speech_rate: number;
   /** Azure + browser speech pitch (1.04 = axon-local Azure default). */
   speech_pitch: number;
+  /** Azure neural voice id for VAXON TTS. */
+  azure_voice_id: string;
+  /** Speech-to-text adapter mode (browser default; cloud optional). */
+  stt_mode: SttMode;
+  /** Independent VAXON voice routing (not IDE Composer). */
+  voice_routing_mode: VoiceRoutingMode;
 }
 
 export interface SpokenAlertEligibility {

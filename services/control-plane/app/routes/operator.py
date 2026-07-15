@@ -35,11 +35,16 @@ def _utc_now() -> str:
 
 
 @router.get("/api/briefing")
-def operator_briefing(viewport_compact: bool = False, workspace_id: str = "") -> dict[str, object]:
+def operator_briefing(
+    viewport_compact: bool = False,
+    workspace_id: str = "",
+    light: bool = Query(False),
+) -> dict[str, object]:
     scoped_workspace_id = workspace_id.strip() or None
     return build_operator_briefing(
         viewport_compact=viewport_compact,
         workspace_id=scoped_workspace_id,
+        light=light,
     )
 
 

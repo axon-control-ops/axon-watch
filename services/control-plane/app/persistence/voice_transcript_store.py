@@ -46,12 +46,19 @@ def _ensure_voice_log_table(connection: sqlite3.Connection) -> None:
         str(row["name"])
         for row in connection.execute("PRAGMA table_info(kairo_voice_log)").fetchall()
     }
-    if "duration_ms" not in columns:
-        connection.execute("ALTER TABLE kairo_voice_log ADD COLUMN duration_ms INTEGER")
-    if "runtime_dispatched" not in columns:
-        connection.execute(
+    migrations = {
+        "duration_ms": "ALTER TABLE kairo_voice_log ADD COLUMN duration_ms INTEGER",
+        "runtime_dispatched": (
             "ALTER TABLE kairo_voice_log ADD COLUMN runtime_dispatched INTEGER NOT NULL DEFAULT 0"
-        )
+        ),
+        "dispatch_lane": "ALTER TABLE kairo_voice_log ADD COLUMN dispatch_lane TEXT",
+        "action_tier": "ALTER TABLE kairo_voice_log ADD COLUMN action_tier TEXT",
+        "voice_routing_mode": "ALTER TABLE kairo_voice_log ADD COLUMN voice_routing_mode TEXT",
+        "model_receipt_json": "ALTER TABLE kairo_voice_log ADD COLUMN model_receipt_json TEXT",
+    }
+    for column, statement in migrations.items():
+        if column not in columns:
+            connection.execute(statement)
 
 
 def append_voice_transcript(
@@ -66,9 +73,14 @@ def append_voice_transcript(
     stt_note: str | None = None,
     duration_ms: int | None = None,
     runtime_dispatched: bool = False,
+    dispatch_lane: str | None = None,
+    action_tier: str | None = None,
+    model_receipt: dict[str, Any] | None = None,
+    voice_routing_mode: str | None = None,
 ) -> dict[str, str]:
     entry_id = f"voice_{uuid4().hex[:12]}"
     created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    receipt_json = json.dumps(model_receipt) if model_receipt else None
     with _connect() as connection:
         _ensure_voice_log_table(connection)
         connection.execute(
@@ -76,8 +88,9 @@ def append_voice_transcript(
             INSERT INTO kairo_voice_log (
                 entry_id, created_at, session_id, workspace_id,
                 raw_content, normalized_content, reply, turn_kind, source, stt_note,
-                duration_ms, runtime_dispatched
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                duration_ms, runtime_dispatched, dispatch_lane, action_tier,
+                voice_routing_mode, model_receipt_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 entry_id,
@@ -92,6 +105,10 @@ def append_voice_transcript(
                 stt_note,
                 duration_ms,
                 1 if runtime_dispatched else 0,
+                dispatch_lane,
+                action_tier,
+                voice_routing_mode,
+                receipt_json,
             ),
         )
         connection.commit()
@@ -112,7 +129,8 @@ def list_recent_voice_transcripts(
                 """
                 SELECT entry_id, created_at, session_id, workspace_id,
                        raw_content, normalized_content, reply, turn_kind, source, stt_note,
-                       duration_ms, runtime_dispatched
+                       duration_ms, runtime_dispatched, dispatch_lane, action_tier,
+                       voice_routing_mode, model_receipt_json
                 FROM kairo_voice_log
                 WHERE session_id = ?
                 ORDER BY created_at DESC, entry_id DESC
@@ -125,14 +143,27 @@ def list_recent_voice_transcripts(
                 """
                 SELECT entry_id, created_at, session_id, workspace_id,
                        raw_content, normalized_content, reply, turn_kind, source, stt_note,
-                       duration_ms, runtime_dispatched
+                       duration_ms, runtime_dispatched, dispatch_lane, action_tier,
+                       voice_routing_mode, model_receipt_json
                 FROM kairo_voice_log
                 ORDER BY created_at DESC, entry_id DESC
                 LIMIT ?
                 """,
                 (capped,),
             ).fetchall()
-    return [dict(row) for row in rows]
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        receipt_raw = item.pop("model_receipt_json", None)
+        if receipt_raw:
+            try:
+                item["model_receipt"] = json.loads(str(receipt_raw))
+            except json.JSONDecodeError:
+                item["model_receipt"] = None
+        else:
+            item["model_receipt"] = None
+        results.append(item)
+    return results
 
 
 def list_recent_spoken_lines(*, session_id: str, limit: int = 5) -> list[str]:

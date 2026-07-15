@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
-import OperatorPersonaMark from '../OperatorPersonaMark.vue';
 import { useAgentDockComposer } from '../../composables/useAgentDockComposer';
 import AgentDockComposerImageLightbox from './agent-dock/AgentDockComposerImageLightbox.vue';
 import AgentDockComposerInput from './agent-dock/AgentDockComposerInput.vue';
 import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue';
+import AgentDockApprovalBanner from './agent-dock/AgentDockApprovalBanner.vue';
 import AgentDockDebugReproduceBanner from './agent-dock/AgentDockDebugReproduceBanner.vue';
 import AgentDockFullAccessConsent from './agent-dock/AgentDockFullAccessConsent.vue';
+import AgentDockKairoComposerFooter from './agent-dock/AgentDockKairoComposerFooter.vue';
 
 const {
   MODE_OPTIONS,
@@ -16,7 +17,9 @@ const {
   autoModelRow,
   autoToggleChecked,
   canSubmitComposer,
+  canConvertInstructions,
   cancelFullAccessConsent,
+  convertDraftToInstructions,
   closeAddModelsPanel,
   closeComposerImageLightbox,
   composerActivityChips,
@@ -137,33 +140,13 @@ const {
       @proceed="handleDebugReproduceProceed(debugReproduceRequest.messageId)"
       @dismiss="handleDebugReproduceDismiss"
     />
-    <div
-      v-if="showApprovalBanner"
-      class="agent-dock-composer__approval-banner"
-      role="status"
-    >
-      <p class="agent-dock-composer__approval-copy">
-        Full Access is waiting for approval before tools can edit files or run commands.
-      </p>
-      <div class="agent-dock-composer__approval-actions">
-        <button
-          type="button"
-          class="agent-dock-composer__approval-btn agent-dock-composer__approval-btn--approve"
-          :disabled="!shell.canApproveIdeAgentRun"
-          @click="handleApproveRun"
-        >
-          Approve
-        </button>
-        <button
-          type="button"
-          class="agent-dock-composer__approval-btn agent-dock-composer__approval-btn--reject"
-          :disabled="shell.runMutationPending"
-          @click="handleRejectRun"
-        >
-          Reject
-        </button>
-      </div>
-    </div>
+    <AgentDockApprovalBanner
+      :show="showApprovalBanner"
+      :can-approve="shell.canApproveIdeAgentRun"
+      :reject-pending="shell.runMutationPending"
+      @approve="handleApproveRun"
+      @reject="handleRejectRun"
+    />
     <div
       class="agent-dock-composer__shell"
       :class="composerShellClasses"
@@ -256,9 +239,11 @@ const {
               :cursor-catalog-count="cursorCatalogCount"
               :model-search-query="modelSearchQuery"
               :runtime-hint="runtimeHint"
+              :can-convert-instructions="canConvertInstructions"
               @toggle-section="toggleSection"
               @toggle-context="toggleContext"
               @attach-files-media="attachFilesMedia"
+              @convert-to-instructions="convertDraftToInstructions"
               @toggle-runtime-targets="toggleRuntimeTargetsPanel"
               @select-runtime-target="selectRuntimeTarget"
               @select-composer-model="selectComposerModel"
@@ -276,23 +261,14 @@ const {
         </AgentDockComposerInput>
       </div>
     </div>
-    <div v-if="composerMode === 'kairo' && kairoConversationReply" class="agent-dock-composer__kairo-reply">
-      <span class="agent-dock-composer__kairo-reply-label">
-        <OperatorPersonaMark size="xs" />
-        <span>Reply</span>
-      </span>
-      <p class="agent-dock-composer__kairo-reply-text">{{ kairoConversationReply }}</p>
-    </div>
-    <p v-if="composerMode === 'kairo' && kairoConversationError" class="agent-dock-composer__error" role="alert">
-      {{ kairoConversationError }}
-    </p>
-    <p v-else-if="composerMode === 'kairo'" class="agent-dock-composer__kairo-hint">Tap header {{ OPERATOR_PERSONA_NAME }} to pause or continue · Esc stops speech · Mic barge-in</p>
-    <p v-if="!shell.currentWorkspace" class="agent-dock-composer__empty">Select a workspace to send commands.</p>
-    <p v-if="shell.commandMutationError" class="agent-dock-composer__error">
-      {{ shell.commandMutationError }}
-    </p>
-    <p v-if="shell.runMutationError" class="agent-dock-composer__error">
-      {{ shell.runMutationError }}
-    </p>
+    <AgentDockKairoComposerFooter
+      :composer-mode="composerMode"
+      :operator-persona-name="OPERATOR_PERSONA_NAME"
+      :kairo-conversation-reply="kairoConversationReply"
+      :kairo-conversation-error="kairoConversationError"
+      :command-mutation-error="shell.commandMutationError"
+      :run-mutation-error="shell.runMutationError"
+      :workspace-selected="Boolean(shell.currentWorkspace)"
+    />
   </form>
 </template>

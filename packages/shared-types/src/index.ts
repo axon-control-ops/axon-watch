@@ -32,6 +32,8 @@ export type {
   OperatorPresenceState,
   KairoNarrationLevel,
   SpokenAlertEligibility,
+  SttMode,
+  VoiceRoutingMode,
 } from './presence';
 export type {
   RunMode,
@@ -70,6 +72,7 @@ export {
 } from './signals';
 export type { WatchRuleMode as KairoWatchRuleMode } from './signals';
 export type {
+  CliRuntimeReadiness,
   RuntimeIdentity,
   RuntimeSummary,
   RuntimeSummaryActiveRun,

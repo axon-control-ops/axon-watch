@@ -26,6 +26,11 @@ describe('operator presence helpers', () => {
           kairo_narration: 'conversational',
           ide_voice_strip_enabled: false,
           hands_free_enabled: false,
+          speech_rate: 1.0,
+          speech_pitch: 1.04,
+          azure_voice_id: 'en-GB-RyanNeural',
+          stt_mode: 'browser',
+          voice_routing_mode: 'template_first',
         },
         spoken_alert: {
           eligible: false,

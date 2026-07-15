@@ -76,6 +76,10 @@ main_tests=(
   tests.test_runtime_vault_integration
   tests.test_email_settings_store
   tests.test_operator_evidence
+  tests.test_voice_autonomy
+  tests.test_command_shortcuts
+  tests.test_kairo_conversation_turns
+  tests.test_safe_improvement
 )
 
 watch_vault_tests=(
@@ -88,11 +92,30 @@ watch_signal_tests=(
   tests.test_email_signal
 )
 
-echo "contract unit tests: control-plane + shared suite"
-"${python_bin}" -m unittest "${main_tests[@]}"
+status=0
 
-echo "contract unit tests: axon-watch vault (isolated PYTHONPATH)"
-PYTHONPATH="${repo_root}/services/axon-watch" "${python_bin}" -m unittest "${watch_vault_tests[@]}"
+run_modules() {
+  local label="$1"
+  local pythonpath="$2"
+  shift 2
+  echo "contract unit tests: ${label}"
+  for test_module in "$@"; do
+    echo "contract module: ${test_module}"
+    if [[ -n "${pythonpath}" ]]; then
+      PYTHONPATH="${pythonpath}" "${python_bin}" -m unittest -v "${test_module}" || status=1
+    else
+      "${python_bin}" -m unittest -v "${test_module}" || status=1
+    fi
+  done
+}
 
-echo "contract unit tests: axon-watch email signals (isolated PYTHONPATH)"
-PYTHONPATH="${repo_root}/services/axon-watch" "${python_bin}" -m unittest "${watch_signal_tests[@]}"
+# Each service uses the top-level package name `app`. Running modules in
+# separate interpreter processes prevents a watch test's import/module state
+# from contaminating a later control-plane test (and vice versa).
+run_modules "control-plane + shared suite" "" "${main_tests[@]}"
+run_modules "axon-watch vault (isolated PYTHONPATH)" \
+  "${repo_root}/services/axon-watch" "${watch_vault_tests[@]}"
+run_modules "axon-watch email signals (isolated PYTHONPATH)" \
+  "${repo_root}/services/axon-watch" "${watch_signal_tests[@]}"
+
+exit "${status}"

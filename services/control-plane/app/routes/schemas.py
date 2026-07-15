@@ -131,6 +131,9 @@ class OperatorPresenceSettingsRequest(BaseModel):
     hands_free_enabled: bool | None = None
     speech_rate: float | None = None
     speech_pitch: float | None = None
+    azure_voice_id: str | None = None
+    stt_mode: str | None = None
+    voice_routing_mode: str | None = None
 
 
 class KairoSpeakRequest(BaseModel):

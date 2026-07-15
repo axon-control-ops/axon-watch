@@ -41,6 +41,13 @@ from app.chat.progress_milestones import (
     publish_stream_error_milestone,
 )
 from app.chat.stream_hub import close_chat_stream, clear_chat_stream_buffer, publish_chat_stream_event
+from app.chat.thread_service import (
+    create_workspace_chat_thread,
+    get_chat_thread,
+    get_chat_thread_history,
+    get_workspace_chat_thread,
+    list_workspace_chat_threads,
+)
 from app.chat.workspace_switch import (
     WorkspaceSwitchError,
     build_workspace_switch_reply,
@@ -61,6 +68,7 @@ from app.runs.service import (
 from app.terminal.session_registry import ensure_agent_session, serialize_session
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
+from app.chat.lane_b_post_message import post_lane_b_message as _post_lane_b_message
 
 
 class ChatValidationError(ValueError):
@@ -195,22 +203,6 @@ def _bind_message_attachments(
     serialized = [attachment_store.serialize_attachment(item) for item in bound]
     paths = tuple(str(item["storage_path"]) for item in bound)
     return serialized, paths
-
-
-def _enrich_message_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
-    message_ids = [str(item.get("message_id") or "") for item in records]
-    grouped = attachment_store.list_attachments_for_messages(message_ids)
-    enriched: list[dict[str, object]] = []
-    for record in records:
-        next_record = dict(record)
-        message_id = str(record.get("message_id") or "")
-        attachments = grouped.get(message_id, [])
-        if attachments:
-            next_record["attachments"] = [
-                attachment_store.serialize_attachment(item) for item in attachments
-            ]
-        enriched.append(next_record)
-    return enriched
 
 
 def _utc_now() -> str:
@@ -432,6 +424,11 @@ def post_chat_message(
         "run_id": dispatch_run_id,
         "dispatched": dispatched,
         "run": run_record,
+        **(
+            {"ui_action": execution.ui_action}
+            if execution is not None and getattr(execution, "ui_action", None)
+            else {}
+        ),
     }
 
 
@@ -503,8 +500,21 @@ def _finalize_lane_b_agent_run(
                 dispatch_run_id,
                 receipt_summary=receipt_summary,
             )
-    except RunLifecycleError:
-        pass
+    except RunLifecycleError as exc:
+        try:
+            run_record = fail_run(
+                dispatch_run_id,
+                receipt_summary=f"Lane B finalization failed: {exc}",
+            )
+        except RunLifecycleError:
+            run_record = append_run_execution_receipt(
+                dispatch_run_id,
+                receipt_type="finalization_error",
+                receipt_summary=str(exc),
+                actor="cli_runtime",
+                success=False,
+                intent="lane_b_agent",
+            )
     return dispatched, run_record
 
 
@@ -688,477 +698,3 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
     finally:
         close_chat_stream(job.thread_id)
         clear_chat_stream_buffer(job.thread_id)
-
-
-def _post_lane_b_message(
-    *,
-    workspace_id: str,
-    content: str,
-    thread_id: str | None,
-    run_id: str | None,
-    composer_mode: str,
-    active_file_path: str | None,
-    editor_selection: EditorSelectionContext | None,
-    terminal_snippet: str | None,
-    attachment_ids: list[str],
-    runtime_target: str | None,
-    runtime_model: str | None,
-    execution_access: str,
-    kairo_session_id: str | None,
-    created_at: str,
-) -> dict[str, object]:
-    try:
-        switch_intent = resolve_workspace_switch_intent(content)
-    except WorkspaceSwitchError as exc:
-        raise ChatValidationError(str(exc)) from exc
-    if switch_intent is not None:
-        return post_workspace_switch_message(
-            source_workspace_id=workspace_id,
-            target_workspace_id=switch_intent.target_workspace_id,
-            display_name=switch_intent.display_name,
-            content=content,
-            thread_id=thread_id,
-            created_at=created_at,
-            run_id=None,
-            agent_content=build_workspace_switch_reply(switch_intent),
-            ui_action=workspace_switch_ui_action(switch_intent),
-            resolve_thread=_resolve_chat_thread,
-            new_message_id=_new_message_id,
-        )
-
-    # Resolve the thread early so "show me the images" can re-embed known
-    # :::image blocks without launching another Lane B agent run.
-    early_thread, thread_id = _resolve_chat_thread(
-        workspace_id=workspace_id,
-        thread_id=thread_id,
-        thread_kind="ide",
-        run_id=run_id,
-        created_at=created_at,
-    )
-    redisplay_reply = maybe_generated_image_redisplay_reply(
-        content,
-        workspace_id=workspace_id,
-        thread_id=thread_id,
-    )
-    if redisplay_reply:
-        return post_image_redisplay_message(
-            workspace_id=workspace_id,
-            content=content,
-            thread_id=thread_id,
-            run_id=early_thread.get("run_id") or run_id or "",
-            created_at=created_at,
-            redisplay_reply=redisplay_reply,
-            resolve_thread=_resolve_chat_thread,
-            new_message_id=_new_message_id,
-        )
-
-    memory_appendix = _compose_lane_b_memory_appendix(
-        thread_id=thread_id,
-        content=content,
-        kairo_session_id=kairo_session_id,
-        composer_mode=composer_mode,
-    )
-    recent_turns = [
-        {
-            "role": str(item.get("role") or ""),
-            "content": str(item.get("content") or ""),
-        }
-        for item in chat_store.list_thread_messages(thread_id)
-    ]
-    persona_reply = (
-        build_lane_b_persona_reply(
-            content=content,
-            recent_turns=recent_turns,
-            session_id=f"ide-thread:{thread_id}",
-        )
-        if composer_mode == "agent"
-        else None
-    )
-    if persona_reply:
-        return post_lane_b_persona_message(
-            workspace_id=workspace_id,
-            content=content,
-            thread_id=thread_id,
-            created_at=created_at,
-            save_message=chat_store.save_message,
-            new_message_id=_new_message_id,
-            bind_attachments=lambda message_id: _bind_message_attachments(
-                attachment_ids=attachment_ids,
-                workspace_id=workspace_id,
-                message_id=message_id,
-                thread_id=thread_id,
-            )[0],
-            agent_content=persona_reply,
-        )
-
-    context = LaneBContext(
-        workspace_id=workspace_id,
-        composer_mode=composer_mode,
-        active_file_path=active_file_path,
-        editor_selection=editor_selection,
-        terminal_snippet=terminal_snippet,
-        memory_appendix=memory_appendix,
-    )
-    dispatch_run_id = ""
-    dispatched = False
-    run_record = None
-    agent_terminal_session = None
-
-    if is_tool_capable_composer_mode(composer_mode):
-        run_record = resolve_lane_b_agent_run(
-            workspace_id=workspace_id,
-            content=content,
-            linked_run_id=run_id,
-            execution_access=execution_access,
-            composer_mode=composer_mode,
-        )
-        dispatch_run_id = str(run_record["run_id"])
-        agent_terminal_session = ensure_agent_session(
-            workspace_id=workspace_id,
-            run_id=dispatch_run_id,
-        )
-
-    if _lane_b_streaming_enabled():
-        thread, thread_id = _resolve_chat_thread(
-            workspace_id=workspace_id,
-            thread_id=thread_id,
-            thread_kind="ide",
-            run_id=dispatch_run_id or None,
-            created_at=created_at,
-        )
-
-        operator_message = chat_store.save_message(
-            {
-                "message_id": _new_message_id("message_operator"),
-                "thread_id": thread_id,
-                "workspace_id": workspace_id,
-                "run_id": dispatch_run_id or thread.get("run_id"),
-                "role": "operator",
-                "content": content,
-                "created_at": created_at,
-            }
-        )
-        operator_attachments, image_paths = _bind_message_attachments(
-            attachment_ids=attachment_ids,
-            workspace_id=workspace_id,
-            message_id=str(operator_message["message_id"]),
-            thread_id=thread_id,
-        )
-        if operator_attachments:
-            operator_message = {**operator_message, "attachments": operator_attachments}
-        context = LaneBContext(
-            workspace_id=workspace_id,
-            composer_mode=composer_mode,
-            active_file_path=active_file_path,
-            editor_selection=editor_selection,
-            terminal_snippet=terminal_snippet,
-            image_paths=image_paths,
-            memory_appendix=memory_appendix,
-        )
-        system_message_id = _new_message_id("message_system")
-        system_message = chat_store.save_message(
-            {
-                "message_id": system_message_id,
-                "thread_id": thread_id,
-                "workspace_id": workspace_id,
-                "run_id": dispatch_run_id or thread.get("run_id"),
-                "role": "system",
-                "content": _lane_b_system_content(
-                    composer_mode=composer_mode,
-                    dispatch_run_id=dispatch_run_id,
-                    dispatched=False,
-                    streaming=True,
-                ),
-                "created_at": created_at,
-            }
-        )
-        agent_message_id = _new_message_id("message_agent")
-        agent_message = chat_store.save_message(
-            {
-                "message_id": agent_message_id,
-                "thread_id": thread_id,
-                "workspace_id": workspace_id,
-                "run_id": dispatch_run_id or thread.get("run_id"),
-                "role": "agent",
-                "content": "",
-                "created_at": created_at,
-            }
-        )
-        stream_job = LaneBStreamJob(
-            thread_id=thread_id,
-            agent_message_id=agent_message_id,
-            system_message_id=system_message_id,
-            workspace_id=workspace_id,
-            content=content,
-            composer_mode=composer_mode,
-            active_file_path=active_file_path,
-            editor_selection=editor_selection,
-            terminal_snippet=terminal_snippet,
-            image_paths=image_paths,
-            runtime_target=runtime_target,
-            runtime_model=runtime_model,
-            execution_access=execution_access,
-            dispatch_run_id=dispatch_run_id,
-            created_at=created_at,
-            memory_appendix=memory_appendix,
-            kairo_session_id=kairo_session_id,
-        )
-        payload: dict[str, object] = {
-            "thread_id": thread_id,
-            "messages": [operator_message, system_message, agent_message],
-            "run_id": dispatch_run_id or thread.get("run_id") or "",
-            "dispatched": False,
-            "run": run_record,
-            "streaming": True,
-            "stream_agent_message_id": agent_message_id,
-            "_stream_job": stream_job,
-        }
-        if agent_terminal_session is not None:
-            payload["agent_terminal_session"] = serialize_session(agent_terminal_session)
-        return payload
-
-    image_paths = _attachment_paths_for_ids(attachment_ids, workspace_id)
-    context = LaneBContext(
-        workspace_id=workspace_id,
-        composer_mode=composer_mode,
-        active_file_path=active_file_path,
-        editor_selection=editor_selection,
-        terminal_snippet=terminal_snippet,
-        image_paths=image_paths,
-        memory_appendix=memory_appendix,
-    )
-    system_content = _lane_b_system_content(
-        composer_mode=composer_mode,
-        dispatch_run_id="",
-        dispatched=False,
-    )
-    lane_b_result: dict[str, object]
-
-    if is_tool_capable_composer_mode(composer_mode) and run_record is not None:
-        lane_b_result = generate_lane_b_result(
-            context=context,
-            user_prompt=content,
-            run_id=dispatch_run_id,
-            runtime_target=runtime_target,
-            runtime_model=runtime_model,
-            execution_access=execution_access,
-        )
-    else:
-        lane_b_result = generate_lane_b_result(
-            context=context,
-            user_prompt=content,
-            runtime_target=runtime_target,
-            runtime_model=runtime_model,
-            execution_access=execution_access,
-        )
-
-    agent_content = str(lane_b_result.get("content") or "")
-
-    if is_tool_capable_composer_mode(composer_mode) and run_record is not None:
-        dispatched, run_record = _finalize_lane_b_agent_run(
-            dispatch_run_id=dispatch_run_id,
-            lane_b_result=lane_b_result,
-        )
-        system_content = _lane_b_system_content(
-            composer_mode=composer_mode,
-            dispatch_run_id=dispatch_run_id,
-            dispatched=dispatched,
-            run_phase=str(run_record["phase"]) if run_record is not None else None,
-        )
-
-    thread, thread_id = _resolve_chat_thread(
-        workspace_id=workspace_id,
-        thread_id=thread_id,
-        thread_kind="ide",
-        run_id=dispatch_run_id or None,
-        created_at=created_at,
-    )
-
-    operator_message = chat_store.save_message(
-        {
-            "message_id": _new_message_id("message_operator"),
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "run_id": dispatch_run_id or thread.get("run_id"),
-            "role": "operator",
-            "content": content,
-            "created_at": created_at,
-        }
-    )
-    operator_attachments, _ = _bind_message_attachments(
-        attachment_ids=attachment_ids,
-        workspace_id=workspace_id,
-        message_id=str(operator_message["message_id"]),
-        thread_id=thread_id,
-    )
-    if operator_attachments:
-        operator_message = {**operator_message, "attachments": operator_attachments}
-    system_message = chat_store.save_message(
-        {
-            "message_id": _new_message_id("message_system"),
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "run_id": dispatch_run_id or thread.get("run_id"),
-            "role": "system",
-            "content": system_content,
-            "created_at": created_at,
-        }
-    )
-    agent_message = chat_store.save_message(
-        {
-            "message_id": _new_message_id("message_agent"),
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "run_id": dispatch_run_id or thread.get("run_id"),
-            "role": "agent",
-            "content": agent_content,
-            "created_at": created_at,
-        }
-    )
-    agent_attachments = bind_agent_generated_images(
-        workspace_id=workspace_id,
-        message_id=str(agent_message["message_id"]),
-        thread_id=thread_id,
-        lane_b_result=lane_b_result,
-        agent_content=agent_content,
-        created_at=created_at,
-    )
-    if agent_attachments:
-        agent_message = {**agent_message, "attachments": agent_attachments}
-
-    _remember_lane_b_turn(
-        kairo_session_id=kairo_session_id,
-        operator_content=content,
-        agent_content=agent_content,
-    )
-
-    ui_action = lane_b_open_file_ui_action(
-        operator_content=content,
-        workspace_id=workspace_id,
-        thread_id=thread_id,
-        lane_b_result=lane_b_result,
-        agent_content=agent_content,
-    )
-
-    return {
-        "thread_id": thread_id,
-        "messages": [operator_message, system_message, agent_message],
-        "run_id": dispatch_run_id or thread.get("run_id") or "",
-        "dispatched": dispatched,
-        "run": run_record,
-        "streaming": False,
-        **(
-            {"agent_terminal_session": serialize_session(agent_terminal_session)}
-            if agent_terminal_session is not None
-            else {}
-        ),
-        **({"ui_action": ui_action} if ui_action else {}),
-    }
-
-
-def get_chat_thread(thread_id: str) -> dict[str, object]:
-    thread = chat_store.get_thread(thread_id)
-    if thread is None:
-        raise chat_store.ChatThreadNotFoundError(f"thread not found: {thread_id}")
-    return thread
-
-
-def get_chat_thread_history(thread_id: str) -> dict[str, object]:
-    from app.cli_runtime.research_stream_blocks import normalize_transcript_content
-
-    thread = chat_store.get_thread(thread_id)
-    if thread is None:
-        raise chat_store.ChatThreadNotFoundError(f"thread not found: {thread_id}")
-
-    items = chat_store.list_thread_messages(thread_id)
-    normalized_items: list[dict[str, object]] = []
-    for item in items:
-        record = dict(item)
-        if record.get("role") == "agent":
-            content = str(record.get("content") or "")
-            if content.strip():
-                record["content"] = normalize_transcript_content(content)
-        normalized_items.append(record)
-    enriched_items = _enrich_message_records(normalized_items)
-    return {
-        "thread_id": thread["thread_id"],
-        "workspace_id": thread["workspace_id"],
-        "run_id": thread["run_id"],
-        "items": enriched_items,
-        "count": len(enriched_items),
-    }
-
-
-def list_workspace_chat_threads(
-    workspace_id: str,
-    *,
-    thread_kind: str = "ide",
-    limit: int = 25,
-) -> dict[str, object]:
-    get_workspace_record(workspace_id)
-    kind = _normalize_thread_kind(thread_kind)
-    threads = chat_store.list_threads_for_workspace(
-        workspace_id,
-        thread_kind=kind,
-        limit=limit,
-    )
-    items = [
-        {
-            **thread,
-            "preview_label": chat_store.first_operator_message_preview(str(thread["thread_id"])),
-        }
-        for thread in threads
-    ]
-    return {
-        "workspace_id": workspace_id,
-        "thread_kind": kind,
-        "items": items,
-        "count": len(items),
-    }
-
-
-def create_workspace_chat_thread(
-    workspace_id: str,
-    *,
-    thread_kind: str = "ide",
-    run_id: str | None = None,
-) -> dict[str, object]:
-    get_workspace_record(workspace_id)
-    kind = _normalize_thread_kind(thread_kind)
-    created_at = _utc_now()
-    created = chat_store.create_thread(
-        workspace_id=workspace_id,
-        run_id=run_id,
-        created_at=created_at,
-        thread_kind=kind,
-    )
-    return {
-        **created,
-        "preview_label": "New chat",
-    }
-
-
-def get_workspace_chat_thread(
-    workspace_id: str,
-    *,
-    thread_kind: str = "operator",
-) -> dict[str, object]:
-    get_workspace_record(workspace_id)
-    kind = _normalize_thread_kind(thread_kind)
-    thread = chat_store.get_latest_thread_for_workspace(workspace_id, thread_kind=kind)
-    if thread is None:
-        return {
-            "thread_id": None,
-            "workspace_id": workspace_id,
-            "run_id": None,
-            "thread_kind": kind,
-            "updated_at": None,
-        }
-
-    return {
-        "thread_id": thread["thread_id"],
-        "workspace_id": thread["workspace_id"],
-        "run_id": thread["run_id"],
-        "thread_kind": thread.get("thread_kind", kind),
-        "updated_at": thread["updated_at"],
-    }

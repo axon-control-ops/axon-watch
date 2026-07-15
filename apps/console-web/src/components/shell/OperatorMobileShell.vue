@@ -63,7 +63,7 @@ const fleetItems = computed(() => shell.operatorFleetHealth?.items.slice(0, 4) ?
     </section>
 
     <section class="operator-mobile-shell__voice">
-      <KairoGalaxyOrb />
+      <KairoGalaxyOrb placement-mode="embedded" />
       <KairoConversationBar />
     </section>
 

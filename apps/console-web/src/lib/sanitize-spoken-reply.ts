@@ -4,6 +4,8 @@ import { stripLiteralSymbolWords } from './spoken-symbol-words';
 const STREAM_BLOCK_START_RE =
   /^:::(?:thinking|tool|edit|terminal|research|debug-reproduce)\b/i;
 const STREAM_BLOCK_CLOSE_RE = /^:::\s*$/;
+/** Tool headers are single-line in agent transcripts (see agent-transcript-blocks). */
+const SINGLE_LINE_STREAM_BLOCK_RE = /^:::tool\b/i;
 const PATH_ONLY_RE = /^[\w./_-]+$/;
 const MAX_DISPLAY_CHARS = 1600;
 const MAX_SPOKEN_CHARS = 1400;
@@ -15,6 +17,11 @@ function stripStreamBlocks(text: string): string {
   for (const line of text.split('\n')) {
     const stripped = line.trim();
     if (STREAM_BLOCK_START_RE.test(stripped)) {
+      // Tool headers are single-line (see agent-transcript-blocks); do not
+      // enter multi-line skip mode or later prose is discarded.
+      if (SINGLE_LINE_STREAM_BLOCK_RE.test(stripped)) {
+        continue;
+      }
       skipping = true;
       continue;
     }
@@ -138,25 +145,6 @@ export function cleanAgentReplyText(raw: string): string {
   text = dedupeDoubledText(text);
   text = stripPersonaPrefix(text);
   const cleaned = text.replace(/\n{3,}/g, '\n\n').trim();
-  // #region agent log
-  if (/:::debug-reproduce\b/m.test(original) || /^\s*\d+\.\s+/m.test(cleaned)) {
-    void import('./axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-      axonDebugSessionLog({
-        hypothesisId: 'H1',
-        location: 'sanitize-spoken-reply.ts:cleanAgentReplyText',
-        message: 'cleaned reply after stripStreamBlocks',
-        data: {
-          hadDebugReproduceHeader: /:::debug-reproduce\b/m.test(original),
-          cleanedPreview: cleaned.slice(0, 240),
-          cleanedStillHasNumberedSteps: /^\s*\d+\.\s+/m.test(cleaned),
-          streamBlockStartCoversReproduce: /debug-reproduce/.test(
-            String(STREAM_BLOCK_START_RE),
-          ),
-        },
-      });
-    });
-  }
-  // #endregion
   return cleaned;
 }
 

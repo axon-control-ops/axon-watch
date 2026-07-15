@@ -21,6 +21,7 @@ import { useVoiceDeckOnBoot } from './features/voice-deck/use-voice-deck';
 import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit-presence';
 import { useKairoAppVoice } from './features/kairo-conversation/use-kairo-app-voice';
 import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
+import VoiceOrbHost from './features/brain-galaxy/VoiceOrbHost.vue';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
@@ -90,7 +91,7 @@ watch(
 
     liveEventsSession?.disconnect();
     liveEventsSession = startLiveEventsSession({
-      onRefresh: () => shell.refreshRunSurfaces(),
+      onRefresh: () => shell.refreshRunSurfaces({ light: true }),
       onPresenceRefresh: () => shell.refreshOperatorPresence(),
       onSpokenBriefing: () => shell.speakOperatorBriefing(),
     });
@@ -152,5 +153,6 @@ onUnmounted(() => {
       <OperatorSettingsSurface v-if="isSettingsSurface" />
       <StatusBar />
     </div>
+    <VoiceOrbHost v-if="bootComplete && !isFoundationSurface" />
   </template>
 </template>

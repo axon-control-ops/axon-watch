@@ -1,6 +1,7 @@
 import { logKairoVoice } from './kairo-voice-debug';
 import { recordKairoVoicePlayback } from './kairo-voice-diagnostics';
 import { postKairoTts, type KairoTtsResponse } from './kairo-tts-client';
+import { speakAzureChunksWithPrefetch } from './kairo-voice-azure-prefetch';
 import { sanitizeSpokenReply, splitSpokenReplyChunks } from './sanitize-spoken-reply';
 import {
   isKairoPlaybackActive,
@@ -16,6 +17,7 @@ import {
   waitForSpeechQueueIdle,
   type SpeechPort,
 } from './speech-queue';
+import { notifyKairoVoiceUtterance } from './kairo-voice-utterance';
 
 export type KairoVoiceEngine = 'azure' | 'browser' | 'skipped' | 'idle';
 
@@ -35,31 +37,41 @@ export type SpeakKairoLineOptions = {
   speechRate?: number;
   /** Playback pitch for Azure SSML + browser utterance (axon-local 0.50–1.50). */
   speechPitch?: number;
+  /** Azure neural voice id (falls back to presence settings / server default). */
+  azureVoiceId?: string;
 };
 
 const speakingListeners = new Set<(active: boolean) => void>();
 const idleListeners = new Set<() => void>();
-const chunkListeners = new Set<() => void>();
+const chunkListeners = new Set<(chunkText: string) => void>();
 let speaking = false;
-let nextAzurePlaybackId = 0;
 
-type VoiceTuning = { rate: number; pitch: number };
+type VoiceTuning = { rate: number; pitch: number; voice: string };
 
-let speechTuningProvider: () => VoiceTuning = () => ({ rate: 1.0, pitch: 1.04 });
+let speechTuningProvider: () => VoiceTuning = () => ({
+  rate: 1.0,
+  pitch: 1.04,
+  voice: 'en-GB-RyanNeural',
+});
 
-/** Wire operator presence speech_rate / speech_pitch (axon-local parity). */
+/** Wire operator presence speech_rate / speech_pitch / azure_voice_id. */
 export function setKairoSpeechTuningProvider(provider: () => VoiceTuning): void {
   speechTuningProvider = provider;
 }
 
 /** @deprecated Use setKairoSpeechTuningProvider */
 export function setKairoSpeechRateProvider(provider: () => number): void {
-  speechTuningProvider = () => ({ rate: provider(), pitch: 1.04 });
+  speechTuningProvider = () => ({
+    rate: provider(),
+    pitch: 1.04,
+    voice: 'en-GB-RyanNeural',
+  });
 }
 
 function resolveSpeechTuning(options: {
   speechRate?: number;
   speechPitch?: number;
+  azureVoiceId?: string;
 } = {}): VoiceTuning {
   const fromSettings = speechTuningProvider();
   const rateRaw =
@@ -70,9 +82,14 @@ function resolveSpeechTuning(options: {
     typeof options.speechPitch === 'number' && Number.isFinite(options.speechPitch)
       ? options.speechPitch
       : fromSettings.pitch;
+  const voice =
+    typeof options.azureVoiceId === 'string' && options.azureVoiceId.trim()
+      ? options.azureVoiceId.trim()
+      : fromSettings.voice;
   return {
     rate: Math.max(0.5, Math.min(1.3, rateRaw)),
     pitch: Math.max(0.5, Math.min(1.5, pitchRaw)),
+    voice: voice || 'en-GB-RyanNeural',
   };
 }
 
@@ -122,6 +139,9 @@ function createAzureAudioHandle(
 
 function notifySpeaking(active: boolean): void {
   speaking = active;
+  if (!active) {
+    notifyKairoVoiceUtterance(null);
+  }
   for (const listener of speakingListeners) {
     listener(active);
   }
@@ -136,9 +156,10 @@ function notifyIdle(): void {
   }
 }
 
-function notifyChunk(): void {
+function notifyChunk(chunkText = ''): void {
+  const text = chunkText.trim();
   for (const listener of chunkListeners) {
-    listener();
+    listener(text);
   }
 }
 
@@ -172,7 +193,9 @@ export function onKairoVoiceIdle(listener: () => void): () => void {
   };
 }
 
-export function subscribeKairoVoiceChunk(listener: () => void): () => void {
+export function subscribeKairoVoiceChunk(
+  listener: (chunkText: string) => void,
+): () => void {
   chunkListeners.add(listener);
   return () => {
     chunkListeners.delete(listener);
@@ -182,6 +205,7 @@ export function subscribeKairoVoiceChunk(listener: () => void): () => void {
 export function stopKairoPlayback(): void {
   stopSharedPlayback();
   stopSpeech(speechPort());
+  notifyKairoVoiceUtterance(null);
   notifySpeaking(false);
   notifyIdle();
 }
@@ -245,7 +269,6 @@ async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
 }
 
 async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void> {
-  const playbackId = ++nextAzurePlaybackId;
   audio.preload = 'auto';
   await waitForAudioReady(audio);
   // Do not seek to 0 after buffering — that can discard the primed start and clip.
@@ -256,9 +279,6 @@ async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void
       if (settled) {
         return;
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:`azure-playback-${playbackId}`,hypothesisId:'R5',location:'kairo-voice-playback.ts:onended',message:'azure audio ended',data:{playbackId,currentTime:audio.currentTime,duration:audio.duration,ended:audio.ended,paused:audio.paused},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       settled = true;
       cleanup();
       resolve();
@@ -277,9 +297,6 @@ async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void
     };
     audio.onended = finish;
     audio.onerror = fail;
-    // #region agent log
-    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:`azure-playback-${playbackId}`,hypothesisId:'R5',location:'kairo-voice-playback.ts:play',message:'azure audio play invoked',data:{playbackId,currentTime:audio.currentTime,duration:audio.duration,ended:audio.ended,paused:audio.paused},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     void audio.play().then(undefined, fail);
   });
 }
@@ -292,32 +309,17 @@ async function speakAzureChunks(
   chunks: string[],
   tuning: VoiceTuning,
 ): Promise<KairoVoicePlaybackResult> {
-  // If a later Azure chunk fails after earlier ones already played, fall back with
-  // ONLY the remaining text. Falling back with chunks.join(' ') re-speaks the
-  // Azure audio in browser TTS (neural + robotic double voice).
-  for (let index = 0; index < chunks.length; index += 1) {
-    const chunk = chunks[index];
-    const remaining = chunks.slice(index).join(' ');
-    notifyChunk();
-    const response = await postKairoTts(chunk, { rate: tuning.rate, pitch: tuning.pitch });
-    if (!response.available || !response.audio_base64) {
-      return speakWithBrowser(remaining, resolveAzureFallbackReason(response), tuning);
-    }
-    const handle = createAzureAudioHandle(response.audio_base64, response.content_type);
-    registerKairoAudioElement(handle.audio);
-    try {
-      await playAzureAudioToCompletion(handle.audio);
-    } catch {
-      registerKairoAudioElement(null);
-      return speakWithBrowser(remaining, 'audio_playback_failed', tuning);
-    } finally {
-      registerKairoAudioElement(null);
-      handle.revoke();
-    }
-  }
-  notifySpeaking(false);
-  notifyIdle();
-  return finishPlayback({ engine: 'azure', reason: null }, chunks.join(' '));
+  return speakAzureChunksWithPrefetch(chunks, tuning, {
+    notifyChunk,
+    createAudioHandle: createAzureAudioHandle,
+    registerAudio: registerKairoAudioElement,
+    playToCompletion: playAzureAudioToCompletion,
+    speakBrowserFallback: speakWithBrowser,
+    resolveFallbackReason: resolveAzureFallbackReason,
+    finish: finishPlayback,
+    notifySpeaking,
+    notifyIdle,
+  });
 }
 
 function finishPlayback(
@@ -332,7 +334,7 @@ function finishPlayback(
 async function speakWithBrowser(
   text: string,
   reason: string | null = 'azure_unavailable',
-  tuning: VoiceTuning = { rate: 1.0, pitch: 1.04 },
+  tuning: VoiceTuning = { rate: 1.0, pitch: 1.04, voice: 'en-GB-RyanNeural' },
 ): Promise<KairoVoicePlaybackResult> {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -352,11 +354,17 @@ async function speakWithBrowser(
 
   // Ensure Azure HTMLAudioElement is fully released before browser TTS starts.
   stopSharedPlayback();
+  notifyKairoVoiceUtterance(trimmed);
   notifySpeaking(true);
   await delay(AUDIO_PREROLL_MS);
   for (const chunk of browserChunks) {
-    notifyChunk();
-    enqueueSpeech(chunk, port, { rate: tuning.rate, pitch: tuning.pitch });
+    enqueueSpeech(chunk, port, {
+      rate: tuning.rate,
+      pitch: tuning.pitch,
+      onStart: () => {
+        notifyChunk(chunk);
+      },
+    });
   }
   // Must wait for browser TTS to finish — returning early made callers start
   // the next line while the front of this one was still speaking (or clipped).
@@ -376,7 +384,12 @@ function resolveAzureFallbackReason(response: KairoTtsResponse): string {
  */
 export async function playKairoUtteranceNow(
   text: string,
-  options: { preferBrowser?: boolean; speechRate?: number; speechPitch?: number } = {},
+  options: {
+    preferBrowser?: boolean;
+    speechRate?: number;
+    speechPitch?: number;
+    azureVoiceId?: string;
+  } = {},
 ): Promise<KairoVoicePlaybackResult> {
   const trimmed = sanitizeSpokenReply(text);
   const tuning = resolveSpeechTuning(options);
@@ -388,24 +401,35 @@ export async function playKairoUtteranceNow(
     return speakWithBrowser(trimmed, 'preferred_browser', tuning);
   }
 
+  notifyKairoVoiceUtterance(trimmed);
   notifySpeaking(true);
   const chunks = splitSpokenReplyChunks(trimmed);
 
   try {
     if (chunks.length === 1) {
-      notifyChunk();
       const response = await postKairoTts(chunks[0], {
         rate: tuning.rate,
         pitch: tuning.pitch,
+        voice: tuning.voice,
       });
       if (response.available && response.audio_base64) {
         const handle = createAzureAudioHandle(response.audio_base64, response.content_type);
         registerKairoAudioElement(handle.audio);
         try {
+          notifyChunk(chunks[0]);
           await playAzureAudio(handle.audio);
           notifySpeaking(false);
           notifyIdle();
-          return finishPlayback({ engine: 'azure', reason: null }, trimmed);
+          return finishPlayback(
+            {
+              engine: 'azure',
+              reason:
+                typeof response.first_byte_ms === 'number'
+                  ? `first_byte_ms=${response.first_byte_ms}`
+                  : null,
+            },
+            trimmed,
+          );
         } catch {
           registerKairoAudioElement(null);
           return speakWithBrowser(trimmed, 'audio_playback_failed', tuning);
@@ -438,6 +462,7 @@ export async function speakKairoLine(
       preferBrowser: options.preferBrowser,
       speechRate: options.speechRate,
       speechPitch: options.speechPitch,
+      azureVoiceId: options.azureVoiceId,
     });
   }
   const { enqueueKairoSpeech } = await import('./kairo-voice-queue');
@@ -446,6 +471,7 @@ export async function speakKairoLine(
     preferBrowser: options.preferBrowser,
     speechRate: options.speechRate,
     speechPitch: options.speechPitch,
+    azureVoiceId: options.azureVoiceId,
   });
 }
 

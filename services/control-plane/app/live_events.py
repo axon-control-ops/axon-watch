@@ -11,8 +11,8 @@ from starlette.responses import StreamingResponse
 
 from app.live_event_hub import subscribe, unsubscribe
 
-REFRESH_INTERVAL_SECONDS = 10
-PRESENCE_REFRESH_INTERVAL_SECONDS = 5
+REFRESH_INTERVAL_SECONDS = 30
+PRESENCE_REFRESH_INTERVAL_SECONDS = 60
 _TICK_SECONDS = 1
 
 

@@ -129,6 +129,31 @@ class CursorStreamPartialDedupeTests(unittest.TestCase):
         )
         self.assertEqual("", assistant_text_delta(plain, formatted))
 
+    def test_assistant_text_delta_skips_glued_partial_section_echo(self) -> None:
+        opener = (
+            "No — that Working with starter line does not need to sit in the composer. "
+            "Talk already introduces the teammate. The composer should stay clear for the real ask."
+        )
+        day_to_day = "\n".join(
+            [
+                "**Day-to-day with Agents**",
+                "1. Open Team in the left bar — each person owns a slice of the business.",
+                "2. Working agents glow; they can speak a short status when you engage them.",
+                "3. Click a teammate, then type what you need in the composer.",
+                "4. Approve when Full Access asks; watch the dock for progress and handoffs.",
+                "5. Lead for priorities, Night Watch for signals — that is the daily loop.",
+            ]
+        )
+        good = f"{opener}\n\n{day_to_day}"
+        echo = f"{opener}\n\n{day_to_day}"
+        self.assertEqual("", assistant_text_delta(good, echo))
+        # Glued append path: stream concatenates without a separator.
+        self.assertEqual("", assistant_text_delta(good, echo))
+        from app.cli_runtime.research_stream_blocks import collapse_duplicated_body
+
+        collapsed = collapse_duplicated_body(good + echo)
+        self.assertEqual(good.strip(), collapsed.strip())
+
     def test_stream_assembler_does_not_duplicate_thinking_echo(self) -> None:
         assembler = CursorStreamAssembler()
         thought = (

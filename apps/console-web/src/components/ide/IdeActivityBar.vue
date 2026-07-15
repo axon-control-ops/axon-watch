@@ -11,6 +11,7 @@ const items: Array<{ id: IdeActivityView; label: string; title: string }> = [
   { id: 'search', label: 'Search', title: 'Search' },
   { id: 'git', label: 'Source Control', title: 'Source Control' },
   { id: 'run', label: 'Run', title: 'Run' },
+  { id: 'team', label: 'Team', title: 'Workspace team' },
   { id: 'terminal', label: 'Terminal', title: 'Terminal (Ctrl/Cmd+J)' },
   { id: 'agent', label: 'Agent Dock', title: 'Agent dock (Ctrl/Cmd+\\)' },
 ];

@@ -64,6 +64,15 @@ export interface RuntimeSummaryDegradedState {
   reasons: string[];
 }
 
+export interface CliRuntimeReadiness {
+  dispatch_ready: boolean;
+  ready_count: number;
+  local_count: number;
+  default_runtime: string;
+  default_ready: boolean;
+  blockers: string[];
+}
+
 export interface RuntimeSummaryConnectors {
   configured: number;
   ok: number;
@@ -84,4 +93,5 @@ export interface RuntimeSummary {
   connectors: RuntimeSummaryConnectors;
   capabilities: RuntimeSummaryCapabilities;
   degraded: RuntimeSummaryDegradedState;
+  cli_runtime?: CliRuntimeReadiness;
 }

@@ -3,11 +3,14 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import GalaxyWorkspacesRail from '../../features/brain-galaxy/GalaxyWorkspacesRail.vue';
-import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
+import GalaxyIntelligencePanel from '../../features/brain-galaxy/GalaxyIntelligencePanel.vue';
+import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
 import OperatorEvidencePanel from '../../features/operator-evidence/OperatorEvidencePanel.vue';
 import {
   isKairoConversationBusy,
+  kairoLastActionTier,
+  kairoLastRoutingReceipt,
 } from '../../features/kairo-conversation/kairo-conversation-state';
 import {
   galaxyInspectorCopy,
@@ -72,7 +75,8 @@ function tickClock(): void {
   utcClock.value = new Date().toISOString().slice(11, 19) + ' UTC';
 }
 
-function enterWorkspace(workspaceId: string, nodeId: string, label: string): void {
+/** Focus a workspace on the map and load its company team — stay on the map. */
+function selectWorkspaceCompany(workspaceId: string, nodeId: string, label: string): void {
   setBrainGalaxyConversationFocus({
     nodeId,
     workspaceId,
@@ -80,13 +84,22 @@ function enterWorkspace(workspaceId: string, nodeId: string, label: string): voi
     label,
   });
   shell.setCurrentWorkspace(workspaceId);
+}
+
+/** Leave the map and open the workspace coding surface. */
+function enterWorkspace(workspaceId: string, nodeId: string, label: string): void {
+  selectWorkspaceCompany(workspaceId, nodeId, label);
   shell.setLeftSidebarMode('workspaces');
   shell.setLayoutMode('ide');
 }
 
 function handleNodeClick(node: BrainGraphNode): void {
   if (node.kind === 'workspace' && node.workspace_id) {
-    enterWorkspace(node.workspace_id, node.node_id, node.label || node.workspace_id);
+    selectWorkspaceCompany(
+      node.workspace_id,
+      node.node_id,
+      node.label || node.workspace_id,
+    );
     return;
   }
   const selection = resolveBrainGalaxyNodeSelection(node);
@@ -150,6 +163,12 @@ onMounted(() => {
   if (shell.operatorBrainGraphLoadState === 'idle') {
     void shell.loadOperatorBrainGraph();
   }
+  if (shell.operatorFleetHealthLoadState === 'idle') {
+    void shell.loadOperatorFleetHealth();
+  }
+  if (shell.briefingLoadState === 'idle') {
+    void shell.loadOperatorBriefing();
+  }
   tickClock();
   clockTimer = window.setInterval(tickClock, 1000);
   syncGalaxyBottomReserve();
@@ -189,12 +208,19 @@ watch(
 function handleRailSelect(item: GalaxyMockupRailItem): void {
   focusNode(item.id);
   if (item.kind === 'workspace' && item.workspace_id) {
-    enterWorkspace(item.workspace_id, item.id, item.label);
+    selectWorkspaceCompany(item.workspace_id, item.id, item.label);
     return;
   }
   if (item.workspace_id) {
     shell.setCurrentWorkspace(item.workspace_id);
   }
+}
+
+function handleRailOpen(item: GalaxyMockupRailItem): void {
+  if (item.kind !== 'workspace' || !item.workspace_id) {
+    return;
+  }
+  enterWorkspace(item.workspace_id, item.id, item.label);
 }
 
 function handleSvgNodeClick(node: BrainGraphNode): void {
@@ -286,6 +312,8 @@ function handleEvidenceHandoff(signal: {
       </p>
     </div>
 
+    <GalaxySpeechCaptions />
+
     <header class="brain-galaxy-stage__hud brain-galaxy-stage__hud--top">
       <div class="brain-galaxy-stage__title-row">
         <span class="brain-galaxy-stage__stats">{{ headline }}</span>
@@ -319,7 +347,9 @@ function handleEvidenceHandoff(signal: {
         :workspaces="shell.workspaces"
         :selected-id="selectedNode?.node_id ?? null"
         :current-workspace-id="shell.currentWorkspace?.workspace_id ?? null"
+        :fleet-health="shell.operatorFleetHealth"
         @select="handleRailSelect"
+        @open="handleRailOpen"
       />
     </div>
 
@@ -332,6 +362,9 @@ function handleEvidenceHandoff(signal: {
         :fallback-title="inspector.title"
         :fallback-body="inspector.body"
         :fallback-hint="inspector.hint"
+        :pending-approvals="pendingApprovals"
+        :run-phase="shell.primaryActiveRun?.phase ?? null"
+        :action-tier="kairoLastActionTier"
         @dismiss="clearSelection"
         @open-workspace="handleEvidenceWorkspace"
         @open-signal="handleEvidenceSignal"
@@ -340,6 +373,10 @@ function handleEvidenceHandoff(signal: {
     </div>
 
     <aside class="brain-galaxy-stage__hud brain-galaxy-stage__hud--right">
+      <GalaxyIntelligencePanel
+        :presence-phase="presence.phase"
+        :routing-receipt="kairoLastRoutingReceipt"
+      />
       <button
         type="button"
         class="brain-galaxy-stage__legend-toggle"
@@ -384,7 +421,5 @@ function handleEvidenceHandoff(signal: {
         <time>{{ utcClock }}</time>
       </div>
     </footer>
-
-    <KairoGalaxyOrb />
   </section>
 </template>

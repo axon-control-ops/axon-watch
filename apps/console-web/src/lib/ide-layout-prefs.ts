@@ -20,7 +20,14 @@ export function resolveIdeSidebarWidthPx(input: {
   return clampSidebarWidth(input.expandedSidebarWidth, input.viewportWidth);
 }
 
-export type IdeActivityView = 'explorer' | 'search' | 'git' | 'run' | 'terminal' | 'agent';
+export type IdeActivityView =
+  | 'explorer'
+  | 'search'
+  | 'git'
+  | 'run'
+  | 'team'
+  | 'terminal'
+  | 'agent';
 
 export function readStoredLayoutMode(): LayoutMode | null {
   if (typeof window === 'undefined') {

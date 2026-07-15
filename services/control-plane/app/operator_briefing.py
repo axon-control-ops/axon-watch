@@ -144,17 +144,27 @@ def build_operator_briefing(
     inbox_fetcher: WatchInboxFetcher | None = None,
     viewport_compact: bool = False,
     workspace_id: str | None = None,
+    light: bool = False,
 ) -> dict[str, object]:
     runtime_summary = assemble_runtime_summary(
         watch_probe=watch_probe,
         inbox_fetcher=inbox_fetcher,
+        light=light,
     )
     watch_connected = bool(runtime_summary["watch"]["connected"])
-    inbox_snapshot = (
-        build_inbox_response(inbox_fetcher=inbox_fetcher)
-        if watch_connected
-        else {"items": [], "count": 0, "updated_at": runtime_summary["generated_at"]}
-    )
+    if light:
+        # Keep presence ticks cheap: reuse empty inbox; full briefing still loads signals.
+        inbox_snapshot = {
+            "items": [],
+            "count": 0,
+            "updated_at": runtime_summary["generated_at"],
+        }
+    else:
+        inbox_snapshot = (
+            build_inbox_response(inbox_fetcher=inbox_fetcher)
+            if watch_connected
+            else {"items": [], "count": 0, "updated_at": runtime_summary["generated_at"]}
+        )
     top_signals = [
         item for item in inbox_snapshot.get("items", []) if isinstance(item, dict)
     ]
@@ -236,10 +246,14 @@ def build_operator_briefing(
             "control_plane_ready": bool(runtime_summary["control_plane"]["ready"]),
             "watch_connected": bool(runtime_summary["watch"]["connected"]),
         },
-        "memory_highlights": _memory_highlights(
-            workspace_id=scoped_workspace_id,
-            top_signals=top_signals,
-            rhythm=rhythm,
+        "memory_highlights": (
+            []
+            if light
+            else _memory_highlights(
+                workspace_id=scoped_workspace_id,
+                top_signals=top_signals,
+                rhythm=rhythm,
+            )
         ),
         "operator_presence": build_operator_presence(
             {

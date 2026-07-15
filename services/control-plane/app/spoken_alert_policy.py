@@ -20,6 +20,9 @@ def default_operator_presence_settings() -> dict[str, bool | str | float]:
         # axon-local parity defaults (desktop voice deck).
         "speech_rate": 1.0,
         "speech_pitch": 1.04,
+        "azure_voice_id": "en-GB-RyanNeural",
+        "stt_mode": "browser",
+        "voice_routing_mode": "template_first",
     }
 
 

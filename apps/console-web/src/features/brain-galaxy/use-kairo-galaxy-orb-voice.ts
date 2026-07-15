@@ -117,6 +117,14 @@ export function useKairoGalaxyOrbVoice(options: UseKairoGalaxyOrbVoiceOptions) {
     }
   }
 
+  function cancelOrbPointerGesture(): void {
+    clearHoldTimer();
+    suppressModeToggleClick = true;
+    if (options.speechCapture.capturing.value) {
+      options.speechCapture.stopCapture();
+    }
+  }
+
   onMounted(() => {
     unsubscribeSpeaking = subscribeKairoVoiceSpeaking((active) => {
       kairoSpeaking.value = active;
@@ -149,5 +157,6 @@ export function useKairoGalaxyOrbVoice(options: UseKairoGalaxyOrbVoiceOptions) {
     handleOrbClick,
     handleOrbPointerDown,
     handleOrbPointerUp,
+    cancelOrbPointerGesture,
   };
 }

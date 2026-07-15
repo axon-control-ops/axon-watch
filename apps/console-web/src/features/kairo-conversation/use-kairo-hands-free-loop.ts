@@ -80,24 +80,6 @@ export function useKairoHandsFreeLoop(options: {
 
   function syncHandsFreeState(): void {
     const voiceOut = isVoiceOutputActive();
-    // #region agent log
-    void import('../../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-      axonDebugSessionLog({
-        hypothesisId: 'H3',
-        location: 'use-kairo-hands-free-loop.ts:syncHandsFreeState',
-        message: 'hands-free sync',
-        data: {
-          enabled: options.enabled(),
-          privacyBlocked: options.privacyBlocked(),
-          conversationPending: options.conversationPending(),
-          voiceOutputActive: voiceOut,
-          capturing: kairoCaptureCapturing.value,
-          phase: kairoConversationPhase.value,
-          consecutiveStartFailures,
-        },
-      });
-    });
-    // #endregion
     if (!options.enabled() || options.privacyBlocked()) {
       clearRestartTimer();
       clearKairoVoiceFollowupWindow();
@@ -120,8 +102,9 @@ export function useKairoHandsFreeLoop(options: {
     if (voiceOut) {
       wasVoiceOutputActive = true;
       clearRestartTimer();
-      if (kairoCaptureCapturing.value) {
-        stopKairoSpeechCapture();
+      // Keep a lightweight barge-in capture alive during TTS so stop/wake works.
+      if (!kairoCaptureCapturing.value) {
+        startKairoSpeechCapture('barge_in');
       }
       return;
     }

@@ -1,0 +1,108 @@
+/* Bottom operator console */
+.galaxy-operator-console {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) minmax(11rem, 15rem);
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 210, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(4, 14, 22, 0.94) 0%, rgba(2, 8, 14, 0.92) 100%);
+  box-shadow: 0 0 1.2rem rgba(0, 160, 220, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.galaxy-operator-console__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.galaxy-operator-console__mark {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  color: rgba(0, 230, 255, 0.95);
+}
+
+.galaxy-operator-console__brand strong {
+  display: block;
+  color: rgba(230, 248, 255, 0.95);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.galaxy-operator-console__online {
+  color: #2dff9a;
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+}
+
+.galaxy-operator-console__command {
+  min-width: 0;
+}
+
+.galaxy-operator-console__command .kairo-conversation-bar {
+  margin: 0;
+}
+
+.galaxy-operator-console__command .kairo-conversation-bar__command-row {
+  border-color: rgba(0, 210, 255, 0.2);
+  background: rgba(0, 10, 16, 0.72);
+}
+
+.galaxy-operator-console__stats {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.galaxy-operator-console__stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+}
+
+.galaxy-operator-console__stats span {
+  color: rgba(130, 165, 185, 0.85);
+  font-size: 0.48rem;
+  letter-spacing: 0.12em;
+}
+
+.galaxy-operator-console__stats strong {
+  color: rgba(220, 245, 255, 0.96);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.galaxy-operator-console__stats time {
+  color: rgba(160, 210, 230, 0.9);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+/* Keep 3D VAXON orb visible but tucked when inspector is open */
+.brain-galaxy-stage--mockup:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-stage__jarvis-float {
+  opacity: 0.96 !important;
+  pointer-events: auto !important;
+  transform: scale(0.94);
+}
+
+@media (max-width: 1100px) {
+  .galaxy-operator-console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .galaxy-operator-console__brand,
+  .galaxy-operator-console__stats {
+    display: none;
+  }
+}

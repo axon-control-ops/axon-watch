@@ -66,7 +66,9 @@ class ParityD2DeliveryChannelAdapterTests(unittest.TestCase):
             self.assertEqual("http://127.0.0.1:9999/delivery", url)
             self.assertTrue(str(payload.get("signal_id", "")).startswith("signal_"))
 
-        with patch("app.delivery.adapters.webhook.post_json", side_effect=fake_post):
+        with patch("app.main.probe_all_connectors", return_value=[
+            {"id": "connector_stub", "required": True, "status": "degraded"},
+        ]), patch("app.delivery.adapters.webhook.post_json", side_effect=fake_post):
             response = self.client.get("/internal/watch/inbox")
 
         self.assertEqual(200, response.status_code)

@@ -223,16 +223,6 @@ export function startKairoSpeechCapture(
       kairoCaptureInterim.value = '';
       kairoCaptureError.value = mapCaptureError(code);
       setKairoConversationPhase('idle');
-      // #region agent log
-      void import('../../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-        axonDebugSessionLog({
-          hypothesisId: 'H3',
-          location: 'kairo-shared-speech-capture.ts:onError',
-          message: 'speech capture error',
-          data: { code, mode, mapped: mapCaptureError(code) },
-        });
-      });
-      // #endregion
       notifyCaptureEnd();
     },
     onEnd: () => {

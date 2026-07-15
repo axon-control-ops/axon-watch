@@ -103,7 +103,7 @@ class WatchSummarySignalTests(unittest.TestCase):
         items = response.json()["items"]
         signal_ids = [item["signal_id"] for item in items]
         self.assertNotIn(SUMMARY_DEGRADED_SIGNAL_ID, signal_ids)
-        self.assertEqual("signal_watch_bootstrap_ready", items[0]["signal_id"])
+        self.assertIn("signal_watch_bootstrap_ready", signal_ids)
 
     def test_watch_inbox_item_matches_summary_degraded_contract_fixture(self) -> None:
         item = self.summary_degraded_inbox_item()

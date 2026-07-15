@@ -1,31 +1,35 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import CompanyRosterPanel from '../../components/shell/CompanyRosterPanel.vue';
 import WorkspaceAddForm from '../../components/shell/WorkspaceAddForm.vue';
 import type { BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
+import type { FleetHealthSnapshot } from '../../lib/operator-fleet-health-view';
 import type { WorkspaceRecord } from '../../contracts/canonical';
-import {
-  galaxyMockupRailItems,
-  type GalaxyMockupRailItem,
-} from './galaxy-mockup-rail-view';
+import type { GalaxyMockupRailItem } from './galaxy-mockup-rail-view';
+import { galaxyMockupRailItemsWithChips } from './galaxy-workspaces-rail-view';
 
 const props = defineProps<{
   snapshot: BrainGraphSnapshot | null;
   workspaces: WorkspaceRecord[];
   selectedId: string | null;
   currentWorkspaceId: string | null;
+  fleetHealth?: FleetHealthSnapshot | null;
 }>();
 
 const emit = defineEmits<{
   select: [item: GalaxyMockupRailItem];
+  open: [item: GalaxyMockupRailItem];
 }>();
 
 const query = ref('');
 const showAddForm = ref(false);
 
 const items = computed(() =>
-  galaxyMockupRailItems(props.snapshot, props.workspaces).filter((item) => {
+  galaxyMockupRailItemsWithChips(
+    props.snapshot,
+    props.workspaces,
+    props.fleetHealth ?? null,
+  ).filter((item) => {
     const q = query.value.trim().toLowerCase();
     if (!q) {
       return true;
@@ -45,6 +49,11 @@ function isActive(item: GalaxyMockupRailItem): boolean {
     return item.workspace_id === props.currentWorkspaceId && !props.selectedId;
   }
   return false;
+}
+
+function onOpen(event: Event, item: GalaxyMockupRailItem): void {
+  event.stopPropagation();
+  emit('open', item);
 }
 </script>
 
@@ -75,26 +84,52 @@ function isActive(item: GalaxyMockupRailItem): boolean {
 
     <ul class="galaxy-workspaces-rail__list">
       <li v-for="item in items" :key="item.id">
-        <button
-          type="button"
-          class="galaxy-workspaces-rail__item"
-          :class="[
-            `galaxy-workspaces-rail__item--${item.tone}`,
-            { 'galaxy-workspaces-rail__item--active': isActive(item) },
-          ]"
-          @click="emit('select', item)"
+        <div
+          class="galaxy-workspaces-rail__row"
+          :class="{ 'galaxy-workspaces-rail__row--active': isActive(item) }"
         >
-          <span
-            class="galaxy-workspaces-rail__glyph"
-            :class="`galaxy-workspaces-rail__glyph--${item.icon}`"
-            aria-hidden="true"
-          />
-          <span class="galaxy-workspaces-rail__copy">
-            <strong>{{ item.label }}</strong>
-            <span>{{ item.detail }}</span>
-          </span>
-          <span class="galaxy-workspaces-rail__dot" aria-hidden="true" />
-        </button>
+          <button
+            type="button"
+            class="galaxy-workspaces-rail__item"
+            :class="[
+              `galaxy-workspaces-rail__item--${item.tone}`,
+              { 'galaxy-workspaces-rail__item--active': isActive(item) },
+            ]"
+            @click="emit('select', item)"
+          >
+            <span
+              class="galaxy-workspaces-rail__glyph"
+              :class="`galaxy-workspaces-rail__glyph--${item.icon}`"
+              aria-hidden="true"
+            />
+            <span class="galaxy-workspaces-rail__copy">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.detail }}</span>
+              <span v-if="item.chips.length" class="galaxy-workspaces-rail__chips">
+                <span
+                  v-for="chip in item.chips"
+                  :key="chip.id"
+                  class="galaxy-workspaces-rail__chip"
+                  :class="`galaxy-workspaces-rail__chip--${chip.tone}`"
+                >
+                  {{ chip.label }}
+                </span>
+              </span>
+            </span>
+            <span class="galaxy-workspaces-rail__dot" aria-hidden="true" />
+          </button>
+          <button
+            v-if="item.kind === 'workspace'"
+            type="button"
+            class="galaxy-workspaces-rail__open"
+            :class="{ 'galaxy-workspaces-rail__open--visible': isActive(item) }"
+            title="Open workspace"
+            :aria-label="`Open ${item.label}`"
+            @click="onOpen($event, item)"
+          >
+            Open
+          </button>
+        </div>
       </li>
     </ul>
 
@@ -111,7 +146,5 @@ function isActive(item: GalaxyMockupRailItem): boolean {
     >
       + New Workspace
     </button>
-
-    <CompanyRosterPanel />
   </aside>
 </template>

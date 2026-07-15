@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   galaxyOrbBeads,
+  galaxyOrbGlassShards,
   galaxyOrbHint,
+  galaxyOrbMeshDots,
   galaxyOrbModeClass,
   galaxyOrbModeLabel,
   galaxyOrbModelLabel,
@@ -14,12 +16,21 @@ import {
 describe('kairo-galaxy-orb-view', () => {
   it('builds tick marks around the orb', () => {
     const ticks = galaxyOrbTicks();
-    expect(ticks).toHaveLength(48);
+    expect(ticks).toHaveLength(72);
     expect(ticks.some((tick) => tick.major)).toBe(true);
   });
 
   it('places five beads on the dial', () => {
     expect(galaxyOrbBeads()).toHaveLength(5);
+  });
+
+  it('builds denser mesh with pink accents and glass shards', () => {
+    const mesh = galaxyOrbMeshDots();
+    expect(mesh.length).toBeGreaterThan(64);
+    expect(mesh.some((dot) => dot.accent === 'pink')).toBe(true);
+    const shards = galaxyOrbGlassShards();
+    expect(shards).toHaveLength(12);
+    expect(shards[0]?.points.split(' ').length).toBe(4);
   });
 
   it('maps presence to orb classes', () => {

@@ -40,23 +40,6 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
       input.connectorsItems.value = snapshot.items;
       input.connectorsSummary.value = snapshot.summary;
       input.connectorsLoadState.value = 'loaded';
-      // #region agent log
-      void import('../../../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-        const unavailable = snapshot.items.filter((item) => item.status === 'unavailable');
-        const axonLocal = snapshot.items.find((item) => item.connector_id === 'axon_local');
-        axonDebugSessionLog({
-          hypothesisId: 'H2',
-          location: 'create-connectors-slice.ts:loadConnectors',
-          message: 'connectors snapshot loaded',
-          data: {
-            summary: snapshot.summary,
-            unavailableIds: unavailable.map((item) => item.connector_id),
-            axonLocalStatus: axonLocal?.status ?? null,
-            axonLocalDetail: axonLocal?.detail ?? null,
-          },
-        });
-      });
-      // #endregion
     } catch (error) {
       input.connectorsLoadState.value = 'error';
       input.connectorsError.value =

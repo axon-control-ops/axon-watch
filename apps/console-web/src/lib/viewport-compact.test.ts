@@ -19,6 +19,11 @@ const presence: OperatorPresence = {
     kairo_narration: 'conversational' as const,
     ide_voice_strip_enabled: false,
     hands_free_enabled: false,
+    speech_rate: 1.0,
+    speech_pitch: 1.04,
+    azure_voice_id: 'en-GB-RyanNeural',
+    stt_mode: 'browser' as const,
+    voice_routing_mode: 'template_first' as const,
   },
   spoken_alert: {
     eligible: false,

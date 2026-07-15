@@ -39,6 +39,14 @@ _REPLY_STYLE = (
     "Never address the listener as \"operator\", \"user\", or \"human\"."
 )
 
+_INSTRUCTION_TAKING = (
+    "Before acting, treat the request as binding Instructions when it includes "
+    "Goal / In scope / Out of scope / Steps / Constraints. "
+    "Out of scope is strict: if commit, push, merge, or release was not asked for, "
+    "do not add those steps or invent desk-clearing git chores. "
+    "Mentions like \"I never said anything about committing\" are a refusal, not commit intent."
+)
+
 
 def _operator_persona_enabled() -> bool:
     return bool(load_settings().get("operator_persona_enabled", True))
@@ -73,7 +81,7 @@ def _system_prompt(
             "symbols, or tests that should be checked next. Keep the plan practical: cover "
             "discovery, implementation, verification, and any material risks or open questions. "
             "Never invent source names, publications, or dates. Do not claim execution happened. "
-            f"{research_line} {_REPLY_STYLE}"
+            f"{_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
         )
     if composer_mode == "debug":
         return build_debug_system_prompt(
@@ -93,12 +101,12 @@ def _system_prompt(
             "Project root shown in workspace context as needed to complete the request "
             "now. Use workspace-relative paths such as README.md — never edit Cursor "
             "metadata directories. Do the work first, then reply with a short summary "
-            f"of what changed. {research_clause}{research_line} {_REPLY_STYLE}"
+            f"of what changed. {_INSTRUCTION_TAKING} {research_clause}{research_line} {_REPLY_STYLE}"
         )
     return (
         "You are Axon-X Lane B in Agent mode (consultative slice). Answer using the "
         "supplied workspace context, propose concrete next steps, and do not claim you "
-        f"edited files or ran commands. {research_line} {_REPLY_STYLE}"
+        f"edited files or ran commands. {_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
     )
 
 

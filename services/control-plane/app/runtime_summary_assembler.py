@@ -14,7 +14,6 @@ from app.adapters.watch_client import fetch_watch_inbox, fetch_watch_summary
 from app.cli_runtime.catalog import runtime_identity_snapshot, runtime_status_snapshot
 from app.cli_runtime.readiness import cli_runtime_degraded_reasons, summarize_cli_runtime_readiness
 from app.operator_briefing_signals import summarize_actionable_inbox
-from app.debug_session_log import append_debug_session_log
 from app.runs.service import approval_summary, list_active_runs, to_runtime_summary_active_run
 
 _APP_VERSION = "0.1.0"
@@ -67,9 +66,9 @@ def default_watch_probe(timeout_seconds: float = 0.5) -> tuple[bool, str, str | 
     return False, status, "watch health returned non-ok status", generated_at
 
 
-def _runtime_identity() -> dict[str, object]:
+def _runtime_identity(*, allow_stale: bool = False) -> dict[str, object]:
     try:
-        return runtime_identity_snapshot()
+        return runtime_identity_snapshot(allow_stale=allow_stale)
     except Exception:
         return {
             "provider_family": os.environ.get("AXON_WATCH_PROVIDER_FAMILY", "bootstrap"),
@@ -143,6 +142,7 @@ def assemble_runtime_summary(
     watch_probe: WatchProbe | None = None,
     inbox_fetcher: WatchInboxFetcher | None = None,
     watch_summary_fetcher: WatchSummaryFetcher | None = None,
+    light: bool = False,
 ) -> dict[str, object]:
     """Build a boot-safe runtime summary from live control-plane and watch probes."""
     probe = watch_probe or default_watch_probe
@@ -150,8 +150,15 @@ def assemble_runtime_summary(
     summary_loader = watch_summary_fetcher or fetch_watch_summary
     generated_at = _utc_now_iso()
     watch_connected, watch_status, watch_degraded_reason, last_summary_at = probe()
-    watch_inbox = inbox_loader() if watch_connected else None
-    watch_summary = summary_loader() if watch_connected else None
+    if light:
+        # Presence ticks must not wait on watch summary or CLI auth rebuilds.
+        watch_inbox = None
+        watch_summary = None
+        cli_status_snapshot = runtime_status_snapshot(allow_stale=True)
+    else:
+        watch_inbox = inbox_loader() if watch_connected else None
+        watch_summary = summary_loader() if watch_connected else None
+        cli_status_snapshot = runtime_status_snapshot(force_refresh=False)
 
     degraded_reasons: list[str] = []
     if not watch_connected and watch_degraded_reason:
@@ -163,66 +170,12 @@ def assemble_runtime_summary(
             f"{connectors['required_unavailable']} required connector(s) unavailable",
         )
 
-    cli_status_snapshot = runtime_status_snapshot(force_refresh=False)
     cli_runtime = summarize_cli_runtime_readiness(cli_status_snapshot)
     degraded_reasons.extend(cli_runtime_degraded_reasons(cli_status_snapshot))
 
     approvals = approval_summary()
     active_run_records = list_active_runs()
     active_runs = [to_runtime_summary_active_run(record) for record in active_run_records]
-
-    # #region agent log
-    try:
-        now = datetime.now(timezone.utc)
-        stale = []
-        for record in active_run_records:
-            updated = str(record.get("updated_at") or "")
-            age_s = None
-            try:
-                age_s = int(
-                    (
-                        now
-                        - datetime.fromisoformat(updated.replace("Z", "+00:00"))
-                    ).total_seconds()
-                )
-            except ValueError:
-                age_s = None
-            stale.append(
-                {
-                    "run_id": record.get("run_id"),
-                    "workspace_id": record.get("workspace_id"),
-                    "phase": record.get("phase"),
-                    "status": record.get("status"),
-                    "updated_at": updated,
-                    "age_seconds": age_s,
-                    "summary": str(record.get("summary") or "")[:80],
-                }
-            )
-        append_debug_session_log(
-            hypothesis_id="H1",
-            location="runtime_summary_assembler.py:assemble",
-            message="runtime summary active runs snapshot",
-            data={
-                "active_run_count": len(active_runs),
-                "runs": stale[:8],
-                "connectors_ok": connectors.get("ok"),
-                "connectors_unavailable": connectors.get("unavailable"),
-                "watch_connected": watch_connected,
-                "degraded": bool(degraded_reasons),
-            },
-        )
-        if any(
-            (item.get("age_seconds") or 0) > 300 for item in stale
-        ):
-            append_debug_session_log(
-                hypothesis_id="H1",
-                location="runtime_summary_assembler.py:stale_runs",
-                message="stale non-terminal runs older than 5 minutes",
-                data={"stale_count": sum(1 for item in stale if (item.get("age_seconds") or 0) > 300), "runs": stale},
-            )
-    except Exception:
-        pass
-    # #endregion
 
     return {
         "generated_at": generated_at,
@@ -238,7 +191,7 @@ def assemble_runtime_summary(
             "last_summary_at": last_summary_at,
             "degraded_reason": watch_degraded_reason,
         },
-        "runtime_identity": _runtime_identity(),
+        "runtime_identity": _runtime_identity(allow_stale=light),
         "active_runs": active_runs,
         "approvals": approvals,
         "signals": _signals_summary_from_inbox(watch_inbox, generated_at),

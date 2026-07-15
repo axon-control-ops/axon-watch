@@ -21,6 +21,7 @@ export type EnqueueKairoSpeechOptions = {
   preferBrowser?: boolean;
   speechRate?: number;
   speechPitch?: number;
+  azureVoiceId?: string;
 };
 
 type VoiceJob = {
@@ -30,6 +31,7 @@ type VoiceJob = {
   preferBrowser: boolean;
   speechRate?: number;
   speechPitch?: number;
+  azureVoiceId?: string;
   resolve: (result: KairoVoicePlaybackResult) => void;
   reject: (error: unknown) => void;
 };
@@ -91,6 +93,7 @@ async function pump(): Promise<void> {
           preferBrowser: job.preferBrowser,
           speechRate: job.speechRate,
           speechPitch: job.speechPitch,
+          azureVoiceId: job.azureVoiceId,
         });
         await settleAfterUtterance();
         job.resolve(result);
@@ -154,13 +157,10 @@ export function enqueueKairoSpeech(
       preferBrowser: options.preferBrowser === true,
       speechRate: options.speechRate,
       speechPitch: options.speechPitch,
+      azureVoiceId: options.azureVoiceId,
       resolve,
       reject,
     };
-    // #region agent log
-    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:`voice-job-${job.id}`,hypothesisId:'R6',location:'kairo-voice-queue.ts:enqueueKairoSpeech',message:'voice job enqueued',data:{jobId:job.id,line:trimmed.slice(0,280),priority,pendingJobIds:pending.map((item)=>item.id),activeJobId:activeJob?.id??null,pumping},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     if (priority === 'interrupt') {
       flushKairoSpeechQueue('preempted_by_interrupt');
       void stopKairoPlayback();

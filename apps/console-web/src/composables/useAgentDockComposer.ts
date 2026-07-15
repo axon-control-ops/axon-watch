@@ -1,32 +1,17 @@
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { nextTick, ref } from 'vue';
 
 import { agentExecutionAccessHint } from '../lib/agent-execution-access-prefs';
 import { resizeCommandComposer } from '../lib/command-composer-autosize';
-import { resolveActiveIdeAgentMessage } from '../lib/ide-agent-center-view';
-import {
-  summarizeIdeAgentActivity,
-  summarizeIdeAgentActivityFromCounts,
-} from '../lib/ide-agent-activity-view';
-import { filterMcpToolsForComposerMode } from '../lib/composer-mcp-tools-view';
-import { isToolCapableComposerMode } from '../lib/composer-tool-modes';
-import {
-  persistWorkspaceComposerMode,
-  readWorkspaceComposerMode,
-} from '../lib/composer-mode-prefs';
-import {
-  extractDebugReproduceRequest,
-  shouldShowDebugReproduceBanner,
-} from '../lib/debug-reproduce-view';
 import {
   kairoConversationError,
   kairoConversationReply,
 } from '../features/kairo-conversation/kairo-conversation-state';
 import { useKairoConversation } from '../features/kairo-conversation/use-kairo-conversation';
 import { OPERATOR_PERSONA_NAME } from '../lib/operator-persona-name';
-import { runContinueActionLabel } from '../lib/run-lifecycle-ui';
 import { useShellStore } from '../stores/shell';
 import { useComposerActions } from './agent-dock/use-composer-actions';
 import { useComposerContext } from './agent-dock/use-composer-context';
+import { useComposerDisplayState } from './agent-dock/use-composer-display-state';
 import { useComposerHistory } from './agent-dock/use-composer-history';
 import { useComposerImages } from './agent-dock/use-composer-images';
 import {
@@ -35,7 +20,10 @@ import {
   type ComposerMode,
 } from './agent-dock/use-composer-menus';
 import { useComposerModelRuntime } from './agent-dock/use-composer-model-runtime';
-import { useComposerRestoreModeFocus } from './agent-dock/use-composer-restore-mode-focus';
+import { useComposerWorkspaceSync } from './agent-dock/use-composer-workspace-sync';
+import {
+  readWorkspaceComposerMode,
+} from '../lib/composer-mode-prefs';
 
 export type { ComposerMode };
 export { MODE_OPTIONS };
@@ -59,7 +47,6 @@ export function useAgentDockComposer() {
 
   const defaultComposerMode =
     (shell.runtimeSummary?.runtime_identity.mode_default as ComposerMode) || 'agent';
-  let restoringWorkspaceComposerMode = false;
   const composerMode = ref<ComposerMode>(
     readWorkspaceComposerMode(shell.currentWorkspace?.workspace_id) ?? defaultComposerMode,
   );
@@ -217,233 +204,52 @@ export function useAgentDockComposer() {
     },
   });
 
-  const composerAgentBusy = computed(() => shell.composerAgentBusy);
-  const debugReproduceRequest = computed(() =>
-    extractDebugReproduceRequest({
-      messages: shell.threadMessages.map((message) => ({
-        message_id: message.message_id,
-        role: message.role,
-        content: message.content,
-      })),
-      streaming: shell.agentStreamActive,
-    }),
-  );
-  const showDebugReproduceBanner = computed(() =>
-    shouldShowDebugReproduceBanner({
-      composerMode: composerMode.value,
-      linkedRunMode: shell.ideAgentLinkedRun?.mode,
-      request: debugReproduceRequest.value,
-      dismissedMessageId: dismissedDebugReproduceMessageId.value,
-    }),
-  );
-
-  function handleDebugReproduceDismiss(): void {
-    dismissedDebugReproduceMessageId.value = debugReproduceRequest.value?.messageId ?? null;
-  }
-  const composerPlaceholder = computed(() => {
-    if (composerMode.value === 'kairo') {
-      return `Talk to ${OPERATOR_PERSONA_NAME} — answers are spoken aloud`;
-    }
-    if (composerAgentBusy.value && isToolCapableComposerMode(composerMode.value)) {
-      return 'Queue a follow-up or steer with Ctrl+Enter…';
-    }
-    if (composerMode.value === 'plan') {
-      return 'Plan your approach, constraints, and verification path…';
-    }
-    if (composerMode.value === 'ask') {
-      return 'Ask about this workspace, file, or runtime…';
-    }
-    if (composerMode.value === 'debug') {
-      return 'Describe the bug, expected vs actual, and how to reproduce…';
-    }
-    return 'Describe what you want to build or change…';
-  });
-  const mcpToolsForMode = computed(() => {
-    if (composerMode.value === 'kairo') {
-      return [];
-    }
-    return filterMcpToolsForComposerMode(shell.runtimeMcpTools, composerMode.value);
-  });
-  const showComposerResume = computed(() => shell.canResumeIdeAgentRun);
-  const composerResumeLabel = computed(() =>
-    runContinueActionLabel({
-      phase: shell.ideAgentLinkedRun?.phase,
-      agentStreamActive: shell.agentStreamActive,
-      mode: shell.ideAgentLinkedRun?.mode,
-      pending: shell.runMutationState === 'resuming',
-      continueLabel: 'Continue',
-      resumeLabel: 'Resume',
-      pendingLabel: 'Resuming…',
-    }),
-  );
-  const showComposerStop = computed(
-    () => shell.canStopIdeAgentRun && composerMode.value !== 'kairo',
-  );
-  const showComposerSteer = computed(
-    () =>
-      composerAgentBusy.value
-      && isToolCapableComposerMode(composerMode.value)
-      && Boolean(shell.ideComposerDraft.trim()),
-  );
-  const composerQueueHint = computed(() => {
-    if (!composerAgentBusy.value || !isToolCapableComposerMode(composerMode.value)) {
-      return '';
-    }
-    if (!shell.ideComposerDraft.trim()) {
-      return '';
-    }
-    const steerKey = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
-      ? '⌘'
-      : 'Ctrl';
-    return `Enter queues · ↑ steers now · ${steerKey}+Enter steers`;
-  });
-  const composerActivitySummary = computed(() => {
-    if (!shell.agentStreamActive && !shell.composerAgentBusy) {
-      return null;
-    }
-    const message = resolveActiveIdeAgentMessage(
-      shell.threadMessages,
-      shell.agentStreamActive,
-      shell.agentStreamMessageId,
-    );
-    if (!message) {
-      return null;
-    }
-    const streamCounts = shell.ideComposerActivity?.streamCounts;
-    if (streamCounts) {
-      return summarizeIdeAgentActivityFromCounts(streamCounts);
-    }
-    return summarizeIdeAgentActivity(message.content);
-  });
-  const composerActivityChips = computed(() =>
-    composerMode.value === 'kairo' ? [] : composerActivitySummary.value?.chips ?? [],
-  );
-  const composerDraftModel = computed({
-    get: () => (composerMode.value === 'kairo' ? kairoDraft.value : shell.ideComposerDraft),
-    set: (value: string) => {
-      if (composerMode.value === 'kairo') {
-        kairoDraft.value = value;
-        return;
-      }
-      shell.ideComposerDraft = value;
-    },
-  });
-  const canSubmitComposer = computed(() => {
-    if (composerMode.value === 'kairo') {
-      return kairoCanSubmit.value && Boolean(shell.currentWorkspace);
-    }
-    return shell.canSubmitIdeComposer;
-  });
-  const composerSubmitLabel = computed(() => {
-    if (composerMode.value === 'kairo') {
-      return kairoPending.value ? `Asking ${OPERATOR_PERSONA_NAME}` : `Ask ${OPERATOR_PERSONA_NAME}`;
-    }
-    if (shell.commandMutationState === 'submitting') {
-      return 'Sending command';
-    }
-    if (composerAgentBusy.value && isToolCapableComposerMode(composerMode.value)) {
-      return 'Queue message';
-    }
-    return 'Send command';
-  });
-  const composerShellClasses = computed(() => ({
-    [`agent-dock-composer__shell--${composerMode.value}`]: true,
-    'agent-dock-composer__shell--full-access': isFullAccessAgent.value,
-    'agent-dock-composer__shell--drag-over': composerDragOver.value,
-  }));
-
-  function handleDocumentClick(): void {
-    closeMenus();
-  }
-
-  watch(
-    () => shell.ideComposerDraft,
-    () => {
-      const fromHistory = applyingHistoryDraft.value;
-      if (fromHistory) {
-        applyingHistoryDraft.value = false;
-      } else if (composerHistoryIndex.value >= 0) {
-        composerHistoryIndex.value = -1;
-        composerHistoryScratch.value = '';
-      }
-      void nextTick(syncComposerHeight);
-      syncContextFromDraft();
-    },
-  );
-
-  watch(
-    () => shell.currentWorkspace?.workspace_id ?? null,
-    (workspaceId) => {
-      dismissedDebugReproduceMessageId.value = null;
-      const restoredMode = readWorkspaceComposerMode(workspaceId) ?? defaultComposerMode;
-      if (composerMode.value !== restoredMode) {
-        restoringWorkspaceComposerMode = true;
-        composerMode.value = restoredMode;
-      }
-      loadComposerHistoryForWorkspace(workspaceId);
-      loadComposerImagesForWorkspace(workspaceId);
-    },
-    { immediate: true },
-  );
-
-  watch(composerMode, (mode) => {
-    if (restoringWorkspaceComposerMode) {
-      restoringWorkspaceComposerMode = false;
-    } else {
-      persistWorkspaceComposerMode(shell.currentWorkspace?.workspace_id, mode);
-    }
-    shell.setIdeDebugModeSelected(mode === 'debug');
-  }, { immediate: true });
-
-  watch(
-    () => shell.ideAgentLinkedRun?.mode,
-    (linkedMode) => {
-      const workspaceId = shell.currentWorkspace?.workspace_id;
-      const storedMode = readWorkspaceComposerMode(workspaceId);
-      if (!storedMode && (linkedMode === 'agent' || linkedMode === 'debug')) {
-        composerMode.value = linkedMode;
-      }
-      // #region agent log
-      fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
-        body: JSON.stringify({
-          sessionId: 'df24bc',
-          runId: 'axon-x-debug-mode',
-          hypothesisId: 'D3',
-          location: 'useAgentDockComposer.ts:linkedRunModeWatch',
-          message: 'composer mode reconciled with persisted and linked state',
-          data: {
-            workspaceId: workspaceId ?? null,
-            storedMode,
-            linkedMode: linkedMode ?? null,
-            effectiveMode: composerMode.value,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-    },
-  );
-
-  useComposerRestoreModeFocus({
-    commandFocusToken: () => shell.commandFocusToken,
+  const {
+    composerActivityChips,
+    composerDraftModel,
+    canConvertInstructions,
+    convertDraftToInstructions,
+    composerPlaceholder,
+    composerQueueHint,
+    composerResumeLabel,
+    composerShellClasses,
+    composerSubmitLabel,
+    canSubmitComposer,
+    debugReproduceRequest,
+    handleDebugReproduceDismiss,
+    mcpToolsForMode,
+    showComposerResume,
+    showComposerSteer,
+    showComposerStop,
+    showDebugReproduceBanner,
+  } = useComposerDisplayState({
+    shell,
     composerMode,
-    inputRef,
+    composerDragOver,
+    isFullAccessAgent,
+    kairoDraft,
+    kairoCanSubmit,
+    kairoPending,
+    dismissedDebugReproduceMessageId,
     syncComposerHeight,
   });
 
-  onMounted(() => {
-    syncComposerHeight();
-    syncContextFromDraft();
-    document.addEventListener('click', handleDocumentClick);
-  });
-
-  onUnmounted(() => {
-    document.removeEventListener('click', handleDocumentClick);
-    disposeComposerImagesPersistTimer();
-    void persistCurrentComposerImages();
-    revokeAllComposerImagePreviews();
+  useComposerWorkspaceSync({
+    shell,
+    composerMode,
+    defaultComposerMode,
+    inputRef,
+    applyingHistoryDraft,
+    composerHistoryIndex,
+    composerHistoryScratch,
+    closeMenus,
+    syncComposerHeight,
+    syncContextFromDraft,
+    loadComposerHistoryForWorkspace,
+    loadComposerImagesForWorkspace,
+    disposeComposerImagesPersistTimer,
+    persistCurrentComposerImages,
+    revokeAllComposerImagePreviews,
   });
 
   return {
@@ -459,6 +265,8 @@ export function useAgentDockComposer() {
     closeComposerImageLightbox,
     composerActivityChips,
     composerDraftModel,
+    canConvertInstructions,
+    convertDraftToInstructions,
     composerImages,
     composerMode,
     composerPlaceholder,

@@ -316,6 +316,51 @@ class CursorStreamResearchBlockTests(unittest.TestCase):
         self.assertIn("More details.", normalized)
         self.assertIn(":::tool Read README.md", normalized)
 
+    def test_normalize_collapses_glued_partial_section_echo(self) -> None:
+        """Cursor can glue a partial aggregate after a list: ``loop.No — …`` + section again."""
+        from app.cli_runtime.research_stream_blocks import collapse_duplicated_body
+
+        opener = (
+            "No — that “Working with …” starter line does not need to sit in the composer. "
+            "Talk already introduces the teammate. The composer should stay clear for the real ask."
+        )
+        changed = "\n".join(
+            [
+                "**What I changed**",
+                "- Clicking **Talk** opens chat without stuffing a boilerplate sentence.",
+                "- **Status** and **Assign** still prefill useful prompts.",
+            ]
+        )
+        day_to_day = "\n".join(
+            [
+                "**Day-to-day with Agents**",
+                "1. Open **Team** in the left bar — each person owns a slice of the business.",
+                "2. Working agents **glow**; they can **speak** a short status when you engage them.",
+                "3. Click a teammate, then type what you need in the composer.",
+                "4. Approve when Full Access asks; watch the dock for progress and handoffs.",
+                "5. Lead for priorities, Night Watch for signals/health — that is the daily loop.",
+            ]
+        )
+        # Real Cursor shape: echo skips the middle "What I changed" section.
+        prose = f"{opener}\n\n{changed}\n\n{day_to_day}{opener}\n\n{day_to_day}"
+        collapsed = collapse_duplicated_body(prose)
+        self.assertEqual(1, collapsed.count("Day-to-day with Agents"))
+        self.assertEqual(1, collapsed.count("No —"))
+        self.assertIn("What I changed", collapsed)
+        self.assertTrue(collapsed.rstrip().endswith("daily loop."))
+
+        wrapped = "\n".join(
+            [
+                ":::thinking",
+                "Answer both questions.",
+                ":::",
+                prose,
+            ]
+        )
+        normalized = normalize_transcript_content(wrapped)
+        self.assertEqual(1, normalized.count("Day-to-day with Agents"))
+        self.assertEqual(1, normalized.count("No —"))
+
     def test_generic_tool_research_label_is_upgraded(self) -> None:
         content = "Answer\n:::tool Axon research search cursor cli\nMore text"
         upgraded = ensure_research_blocks_in_content(content)

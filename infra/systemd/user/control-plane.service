@@ -1,0 +1,16 @@
+[Unit]
+Description=Axon-X Control Plane (user always-on)
+After=network.target axon-watch.service
+Wants=network-online.target
+Requires=axon-watch.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/axon-watch/deployment.env
+WorkingDirectory=%h
+ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/run-service.sh control-plane
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

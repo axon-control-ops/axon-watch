@@ -48,6 +48,16 @@ describe('parseChatUiAction', () => {
       open_file_path: 'src/app.ts',
     });
   });
+  it('parses move_voice_orb actions', () => {
+    expect(parseChatUiAction({ type: 'move_voice_orb', dock: 'bottom-left' })).toEqual({
+      type: 'move_voice_orb',
+      dock: 'bottom-left',
+    });
+    expect(parseChatUiAction({ type: 'move_voice_orb', mode: 'smart_dodge' })).toEqual({
+      type: 'move_voice_orb',
+      mode: 'smart_dodge',
+    });
+  });
 });
 
 describe('applyChatUiAction', () => {
@@ -88,5 +98,32 @@ describe('applyChatUiAction', () => {
       title: 'Investigate signal',
       summary: 'Investigate signal',
     }, { autoSubmit: true });
+  });
+
+  it('moves the voice orb dock and smart-dodges on command', () => {
+    const setVoiceOrbDock = vi.fn();
+    const requestVoiceOrbSmartDodge = vi.fn();
+
+    applyChatUiAction(
+      {
+        setCurrentWorkspace: vi.fn(),
+        openWorkspaceFile: vi.fn(),
+        setVoiceOrbDock,
+        requestVoiceOrbSmartDodge,
+      },
+      { type: 'move_voice_orb', dock: 'bottom-left' },
+    );
+    expect(setVoiceOrbDock).toHaveBeenCalledWith('bottom-left');
+
+    applyChatUiAction(
+      {
+        setCurrentWorkspace: vi.fn(),
+        openWorkspaceFile: vi.fn(),
+        setVoiceOrbDock,
+        requestVoiceOrbSmartDodge,
+      },
+      { type: 'move_voice_orb', mode: 'smart_dodge' },
+    );
+    expect(requestVoiceOrbSmartDodge).toHaveBeenCalledWith({ force: true });
   });
 });

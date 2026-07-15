@@ -15,6 +15,7 @@ from app.chat.command_intent import (
     expand_command_shortcuts,
     is_auto_complete_run_summary,
 )
+from app.chat.move_voice_orb import move_voice_orb_ack, parse_move_voice_orb_ui_action
 from app.chat.shell_command import execute_shell_command
 from app.runs.service import RunLifecycleError, complete_run, list_pending_review_runs, resume_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
@@ -42,6 +43,7 @@ class CommandExecutionResult:
     output: str
     receipt_summary: str
     run_id: str | None = None
+    ui_action: dict[str, object] | None = None
 
 
 
@@ -285,6 +287,8 @@ def execute_unsupported(content: str) -> CommandExecutionResult:
         "• ota canary — run DashPro operator-canary OTA from workspace_dashpro\n"
         "• verify — run production-operator smoke gate\n"
         "• check-health — run ./scripts/dev/check-health.sh\n"
+        "• put the orb bottom-left — move the voice orb dock\n"
+        "• dodge the orb — smart-dodge the voice orb away from busy panels\n"
         "• run npm test — run a bounded shell command in the workspace root"
     )
     return CommandExecutionResult(
@@ -292,6 +296,21 @@ def execute_unsupported(content: str) -> CommandExecutionResult:
         success=False,
         output=_truncate_output(f"Unsupported command: {content.strip()}\n\n{hints}"),
         receipt_summary="Unsupported operator command",
+    )
+
+
+def execute_move_voice_orb(content: str) -> CommandExecutionResult:
+    ui_action = parse_move_voice_orb_ui_action(content) or {
+        "type": "move_voice_orb",
+        "dock": "top-right",
+    }
+    ack = move_voice_orb_ack(ui_action)
+    return CommandExecutionResult(
+        intent="move_voice_orb",
+        success=True,
+        output=ack,
+        receipt_summary=ack,
+        ui_action=ui_action,
     )
 
 
@@ -308,6 +327,8 @@ def execute_command(*, workspace_id: str, content: str) -> CommandExecutionResul
         return execute_git_status(workspace_id)
     if intent == "resume_from_review":
         return execute_resume_from_review(workspace_id)
+    if intent == "move_voice_orb":
+        return execute_move_voice_orb(normalized)
     if intent == "shell_command":
         return execute_shell_command_intent(workspace_id, normalized)
     return execute_unsupported(normalized)

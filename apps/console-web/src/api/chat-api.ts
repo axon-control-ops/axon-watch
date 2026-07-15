@@ -2,7 +2,12 @@ import type { RunRecord } from '../contracts/canonical';
 
 import type { ChatUiAction } from '../lib/chat-ui-action';
 
-import { apiUrl, controlPlaneBaseUrl, fetchJson } from './client';
+import {
+  apiUrl,
+  controlPlaneBaseUrl,
+  fetchJson,
+  THREAD_HISTORY_FETCH_TIMEOUT_MS,
+} from './client';
 import type { TerminalSessionRecord } from './workspace-api';
 
 export interface ChatAttachmentRecord {
@@ -133,6 +138,7 @@ export async function fetchThreadHistory(threadId: string): Promise<ThreadHistor
     `/api/chat/threads/${encodedThreadId}/history`,
     {},
     'thread history fetch failed',
+    THREAD_HISTORY_FETCH_TIMEOUT_MS,
   );
 }
 

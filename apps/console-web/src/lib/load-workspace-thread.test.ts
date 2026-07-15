@@ -13,6 +13,7 @@ import {
 } from '../api/control-plane';
 import { ApiRequestError } from '../api/client';
 import { loadWorkspaceThreadOnce, type LoadWorkspaceThreadDeps } from './load-workspace-thread';
+import type { OperatorThreadEntry, ThreadMessageRole } from './operator-thread';
 
 describe('loadWorkspaceThreadOnce', () => {
   const fetchHistory = vi.mocked(fetchThreadHistory);
@@ -39,11 +40,13 @@ describe('loadWorkspaceThreadOnce', () => {
       clearIdeAgentRunLink: vi.fn(),
       setOperatorThreadEmpty: vi.fn(),
       setLoadError: vi.fn(),
-      mapChatMessages: (items) =>
+      mapChatMessages: (items): OperatorThreadEntry[] =>
         items.map((item) => ({
           message_id: item.message_id,
           thread_id: item.thread_id,
-          role: item.role,
+          run_id: item.run_id ?? null,
+          workspace_id: item.workspace_id ?? null,
+          role: item.role as ThreadMessageRole,
           content: item.content,
           created_at: item.created_at,
         })),

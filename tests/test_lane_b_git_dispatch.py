@@ -139,6 +139,17 @@ class LaneBGitDispatchTests(unittest.TestCase):
         )
         self.assertIsNone(payload)
 
+    def test_skips_when_commit_is_explicitly_out_of_scope(self) -> None:
+        payload = try_lane_b_git_commit_dispatch(
+            workspace_id="workspace_alpha",
+            user_prompt=(
+                "Look at Dashpro CI notes and plan agent handling. "
+                "I never said anything about committing."
+            ),
+            execution_access="full",
+        )
+        self.assertIsNone(payload)
+
     def test_git_working_tree_is_clean_with_branch_header_only(self) -> None:
         self.assertTrue(git_working_tree_is_clean("## dev...origin/dev"))
         self.assertFalse(git_working_tree_is_clean("## dev...origin/dev\n M notes.txt"))

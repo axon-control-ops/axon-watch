@@ -1,5 +1,5 @@
 import type { ConnectorProbeRecord } from '../api/control-plane';
-import { LEGACY_AXON_LOCAL_FALLBACK_URL } from '../api/control-plane';
+import { LEGACY_AXON_LOCAL_FALLBACK_URL } from '../api/connectors-api';
 
 export type ConnectorRailTone = 'ok' | 'degraded' | 'unavailable' | 'unknown';
 

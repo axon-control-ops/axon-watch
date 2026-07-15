@@ -9,20 +9,10 @@ import {
 } from '../../../lib/composer-mcp-tools-view';
 import PersonaTitle from '../../PersonaTitle.vue';
 import { useShellStore } from '../../../stores/shell';
-
-type RuntimeTarget = {
-  id: string;
-  label: string;
-  ready: boolean;
-  available: boolean;
-  auth: { message?: string };
-};
-
-type AttachmentChip = {
-  key: string;
-  label: string;
-  kind: string;
-};
+import type {
+  AgentDockComposerAttachmentChip,
+  AgentDockComposerRuntimeTarget,
+} from './agent-dock-composer-toolbar-types';
 
 defineProps<{
   showContextMenu: boolean;
@@ -35,7 +25,7 @@ defineProps<{
   showExtraPinnedRows: boolean;
   showCursorCatalog: boolean;
   showVaultAction: boolean;
-  attachmentChips: AttachmentChip[];
+  attachmentChips: AgentDockComposerAttachmentChip[];
   composerImageCount: number;
   mcpToolsForMode: ComposerMcpTool[];
   composerMode: ComposerMode;
@@ -54,7 +44,7 @@ defineProps<{
   runtimeDetail: string;
   runtimeLabel: string;
   selectedRuntimeSummary: string;
-  runtimeTargets: RuntimeTarget[];
+  runtimeTargets: AgentDockComposerRuntimeTarget[];
   selectedModelId: string;
   selectedModelLabel: string;
   autoModelRow: CursorCatalogRow;
@@ -69,12 +59,14 @@ defineProps<{
   cursorCatalogCount: string;
   modelSearchQuery: string;
   runtimeHint: string;
+  canConvertInstructions?: boolean;
 }>();
 
 const emit = defineEmits<{
   'toggle-section': [section: 'context' | 'tools' | 'model' | 'mode'];
   'toggle-context': [kind: 'workspace' | 'selection' | 'terminal' | 'ide' | 'pin'];
   'attach-files-media': [];
+  'convert-to-instructions': [];
   'toggle-runtime-targets': [];
   'select-runtime-target': [runtimeId: string];
   'select-composer-model': [modelId: string];
@@ -91,7 +83,7 @@ const emit = defineEmits<{
 
 const shell = useShellStore();
 
-function runtimeStatusLine(record: RuntimeTarget): string {
+function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
   if (record.ready) return 'Ready';
   if (!record.available) return 'Not installed';
   return record.auth.message || 'Installed but not ready';
@@ -185,6 +177,19 @@ function runtimeStatusLine(record: RuntimeTarget): string {
           <small>Keep current context across turns</small>
         </button>
       </div>
+    </div>
+
+    <div class="agent-dock-composer__tool-group">
+      <button
+        type="button"
+        class="agent-dock-composer__tool"
+        title="Turn the draft into concise Instructions markdown"
+        aria-label="Convert draft to Instructions markdown"
+        :disabled="!canConvertInstructions"
+        @click="emit('convert-to-instructions')"
+      >
+        <span>Instructions</span>
+      </button>
     </div>
 
     <div class="agent-dock-composer__tool-group">

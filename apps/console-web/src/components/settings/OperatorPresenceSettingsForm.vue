@@ -8,6 +8,7 @@ import {
   formatVoiceTuningValue,
   normalizeOperatorPresenceSettings,
 } from '../../lib/operator-presence-settings';
+import OperatorPresenceVoiceRoutingFields from './OperatorPresenceVoiceRoutingFields.vue';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
@@ -137,31 +138,17 @@ function onSpeechPitchInput(event: Event): void {
 }
 
 function resetVoiceTuning(): void {
-  patchDraft({ speech_rate: 1.0, speech_pitch: 1.04 });
+  patchDraft({
+    speech_rate: 1.0,
+    speech_pitch: 1.04,
+    azure_voice_id: 'en-GB-RyanNeural',
+  });
 }
 
 async function commitSave(): Promise<void> {
   if (props.saving || !dirty.value) {
     return;
   }
-  // #region agent log
-  fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
-    body: JSON.stringify({
-      sessionId: 'df24bc',
-      runId: 'post-fix',
-      hypothesisId: 'SAVE',
-      location: 'OperatorPresenceSettingsForm.vue:commitSave',
-      message: 'explicit save clicked',
-      data: {
-        speech_rate: draft.value.speech_rate,
-        speech_pitch: draft.value.speech_pitch,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   try {
     await props.persist(normalizeOperatorPresenceSettings(draft.value));
     dirty.value = false;
@@ -174,24 +161,6 @@ async function flushIfDirty(): Promise<boolean> {
   if (!dirty.value || props.saving) {
     return false;
   }
-  // #region agent log
-  fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
-    body: JSON.stringify({
-      sessionId: 'df24bc',
-      runId: 'post-fix',
-      hypothesisId: 'SAVE',
-      location: 'OperatorPresenceSettingsForm.vue:flushIfDirty',
-      message: 'auto-save on exit',
-      data: {
-        speech_rate: draft.value.speech_rate,
-        speech_pitch: draft.value.speech_pitch,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   try {
     await props.persist(normalizeOperatorPresenceSettings(draft.value));
     dirty.value = false;
@@ -420,6 +389,12 @@ defineExpose({
           <h2>Voice &amp; alerts</h2>
           <p>When KAIRO may speak aloud during operator work.</p>
         </header>
+        <OperatorPresenceVoiceRoutingFields
+          :draft="draft"
+          :saving="Boolean(saving)"
+          :privacy-mode="privacyMode"
+          @patch="patchDraft"
+        />
         <label class="operator-settings-form__row">
           <input v-model="handsFreeEnabled" type="checkbox" :disabled="saving || privacyMode" />
           <span class="operator-settings-form__copy">

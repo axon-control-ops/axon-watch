@@ -85,7 +85,7 @@ npm run verify:shared-types
 npm run verify:contracts
 npm run verify:console-web
 npm run verify
-python3 -m unittest discover -s tests
+./scripts/verify/run_contract_unit_tests.sh
 ./scripts/dev/down.sh
 ./scripts/dev/up.sh
 ./scripts/dev/check-health.sh
@@ -94,9 +94,15 @@ python3 -m unittest discover -s tests
 Existing verification entrypoints remain in place:
 
 ```bash
-python3 -m unittest discover -s tests
+./scripts/verify/run_contract_unit_tests.sh
 python3 scripts/verify/all.py
 ```
+
+Use the contract runner for backend unit tests. Both Python services expose a
+top-level package named `app`; the runner selects the managed virtualenv and
+isolates control-plane and watch test groups so imports resolve to the intended
+service. A repo-root `pytest` or unrestricted `unittest discover` invocation is
+not a supported substitute.
 
 See `scripts/verify/README.md` for the verification contract.
 

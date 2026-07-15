@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-10",
-  "file_count": 38,
+  "generated_on": "2026-07-15",
+  "file_count": 40,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -29,6 +29,10 @@
       "sha256": "f35109fa206d3658b397f1fdf4ad78236fe225c5a52226ac7e5f765dca302051",
       "bytes": 2894
     },
+    "AGENT_SHELL_BACKGROUND_DETACH.md": {
+      "sha256": "300cc2f101af45785e4e5c187a47f5d67bdd777640ecf612eeaadc6857df3797",
+      "bytes": 2825
+    },
     "ARCHITECTURE.md": {
       "sha256": "5e5a9430ba1c4110209ddbd43e831a7a6f89ccb9001041c85657078c0b417710",
       "bytes": 4131
@@ -37,13 +41,17 @@
       "sha256": "c4081b0ac81cc283dfed0f32b82633115a06d0808dcdb1a0373a29b27d31edb4",
       "bytes": 3647
     },
+    "DASHPRO_CI_AGENT_PLAYBOOK.md": {
+      "sha256": "e7290a6468ec2f3bd3286813f2610d7a70cebb6d48cb21d5d60bc497174f3ba6",
+      "bytes": 10448
+    },
     "DELIVERY_PLAN.md": {
       "sha256": "8b5053cfaa554a7a650a7ceae4a1f7bcb01ef752d27a483ac88093b083e8975a",
       "bytes": 3278
     },
     "EXECUTION_PLAN.md": {
-      "sha256": "3af2922d34ff541ed46134ff070a593d4c948073b355822f9a0796647c032355",
-      "bytes": 14054
+      "sha256": "034bec38b8ba9c3bb0659f6d1649f2de9062f36c3739ff28f766e6c357006a31",
+      "bytes": 15574
     },
     "FITNESS_FUNCTIONS.md": {
       "sha256": "f688b05666210bf2d4fb5870adbd6f0e91e39ecfd8c2a7b4552d25e275af5e2f",
@@ -70,12 +78,12 @@
       "bytes": 13053
     },
     "KAIRO_VOICE_IMPROVEMENT_PLAN.md": {
-      "sha256": "9ffb85b7027088f9e20e894bc311c05a5b4687af60429dc717e6b30cb0e70c36",
-      "bytes": 12077
+      "sha256": "dc5a878201a395ef40a8192c5ba5c57f5801603fac7d9b25eb919f212e130474",
+      "bytes": 14738
     },
     "OPERATOR_BRAIN_PIVOT.md": {
-      "sha256": "e2203ee05310977c36ba62eaa421228da7c93c4a9f83bed0f9373cf918fa031e",
-      "bytes": 17559
+      "sha256": "5b789c0ee500d04a699686a8f9bffd641199df9e6af3d18546d894d65af7ad68",
+      "bytes": 17546
     },
     "OPERATOR_REFRESH_POLICY.md": {
       "sha256": "005fcb07f2ba778d3519ef7088abbfae4c5127b8305f57fed989bd77785ba7ae",
@@ -90,8 +98,8 @@
       "bytes": 3178
     },
     "README.md": {
-      "sha256": "94460d5f4563aa3af9c7641d8830689a2f3130f6d9e2db1906a3bf5ee7d513b7",
-      "bytes": 3688
+      "sha256": "570af5a2b98222969cb7fed1346bf7a32c059be29d752ec2d179e51862bc165b",
+      "bytes": 3785
     },
     "REPO_BOOTSTRAP_SPEC.md": {
       "sha256": "b8617bb75e4b9224f5a6970dc4c43daed46701bd9f7417bfde6b5cfcac5050c9",
@@ -106,8 +114,8 @@
       "bytes": 6124
     },
     "SLICE-FS-003-shell-store-split.md": {
-      "sha256": "bda2278b9034e001c7023f8e75596b5f5da289dd0606017ae8c02f70be601b77",
-      "bytes": 4286
+      "sha256": "a62f56973faf9e395e1d9af1adcfd5e3923b436fae3677f7229e5352626bd90c",
+      "bytes": 6843
     },
     "TEST_STRATEGY.md": {
       "sha256": "3f6d93a3076313249a031c1c4e8ddce1db5c6f7594f9974c64ec3369b9f1ef1f",

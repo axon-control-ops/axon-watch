@@ -23,43 +23,12 @@ export function createRuntimeSummarySlice(input: CreateRuntimeSummarySliceInput)
       const summary = await fetchRuntimeSummary();
       input.runtimeSummary.value = summary;
       input.runtimeSummaryLoadState.value = 'loaded';
-      // #region agent log
-      void import('../../../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-        const runs = summary.active_runs ?? [];
-        axonDebugSessionLog({
-          hypothesisId: 'H1',
-          location: 'create-runtime-summary-slice.ts:loadRuntimeSummary',
-          message: 'frontend loaded runtime summary',
-          data: {
-            activeRunCount: runs.length,
-            runIds: runs.map((run) => run.run_id).slice(0, 8),
-            watchConnected: summary.watch?.connected ?? null,
-            connectorsUnavailable: summary.connectors?.unavailable ?? null,
-            degraded: summary.degraded?.active ?? null,
-            background,
-          },
-        });
-      });
-      // #endregion
     } catch (error) {
       if (!background) {
         input.runtimeSummaryLoadState.value = 'error';
         input.runtimeSummaryError.value =
           error instanceof Error ? error.message : 'runtime summary request failed';
       }
-      // #region agent log
-      void import('../../../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-        axonDebugSessionLog({
-          hypothesisId: 'H1',
-          location: 'create-runtime-summary-slice.ts:loadRuntimeSummary',
-          message: 'frontend runtime summary failed',
-          data: {
-            error: error instanceof Error ? error.message : String(error),
-            background,
-          },
-        });
-      });
-      // #endregion
     }
   }
 

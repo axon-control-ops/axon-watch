@@ -13,6 +13,7 @@ type QueuedUtterance = {
   text: string;
   rate: number;
   pitch: number;
+  onStart?: (text: string) => void;
 };
 
 let queue: QueuedUtterance[] = [];
@@ -141,6 +142,12 @@ function drainQueue(speech: SpeechPort): void {
 
   utterance.onend = finish;
   utterance.onerror = finish;
+  utterance.onstart = () => {
+    if (epoch !== queueEpoch) {
+      return;
+    }
+    next.onStart?.(next.text);
+  };
 
   clearPendingSpeakTimer();
   pendingSpeakTimer = globalThis.setTimeout(() => {
@@ -155,7 +162,7 @@ function drainQueue(speech: SpeechPort): void {
 export function enqueueSpeech(
   message: string,
   speech: SpeechPort | null,
-  options: { rate?: number; pitch?: number } = {},
+  options: { rate?: number; pitch?: number; onStart?: (text: string) => void } = {},
 ): void {
   const trimmed = message.trim();
   if (!trimmed || !speech) {
@@ -166,6 +173,7 @@ export function enqueueSpeech(
     text: trimmed,
     rate: options.rate ?? 1.0,
     pitch: options.pitch ?? 1.04,
+    onStart: options.onStart,
   });
   drainQueue(speech);
 }

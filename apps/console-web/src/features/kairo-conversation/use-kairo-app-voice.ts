@@ -7,9 +7,15 @@ import { formatConversationDisplayReply, sanitizeSpokenReply } from '../../lib/s
 import { recordOperatorArtifacts } from '../../lib/operator-artifact-view';
 import { useShellStore } from '../../stores/shell';
 import { registerKairoConversationSubmit, type KairoConversationSubmitOptions } from './kairo-conversation-bus';
-import { kairoConversationError, kairoConversationReply, kairoConversationPhase, setKairoConversationPhase } from './kairo-conversation-state';
+import {
+  kairoConversationError,
+  kairoConversationReply,
+  kairoConversationPhase,
+  setKairoConversationPhase,
+} from './kairo-conversation-state';
 import { mentionsBriefingSurfaceOffer, scheduleBriefingSurfaceOffer } from './conversation-briefing-surface';
-import { shouldAutoDispatchConverseCommand } from './conversation-command-policy';
+import { dispatchKairoConverseOutcome } from './kairo-conversation-dispatch';
+import { executeKairoConverseAction } from './execute-kairo-converse-action';
 import { useKairoHandsFreeLoop } from './use-kairo-hands-free-loop';
 import { useKairoConversation } from './use-kairo-conversation';
 import { setKairoSpeechPrivacyBlocked } from './kairo-shared-speech-capture';
@@ -22,6 +28,7 @@ import { setKairoSpeechTuningProvider } from '../../lib/kairo-voice-playback';
  */
 export function useKairoAppVoice(): void {
   const shell = useShellStore();
+  // Speech/TTS helpers only — do not create a second draft/input conversation instance.
   const { speakReplyFromExternal } = useKairoConversation();
   let lastOperatorPrompt = '';
 
@@ -29,6 +36,7 @@ export function useKairoAppVoice(): void {
   setKairoSpeechTuningProvider(() => ({
     rate: shell.operatorPresenceSettings.speech_rate ?? 1.0,
     pitch: shell.operatorPresenceSettings.speech_pitch ?? 1.04,
+    voice: shell.operatorPresenceSettings.azure_voice_id ?? 'en-GB-RyanNeural',
   }));
   useKairoVoiceInterrupt();
 
@@ -54,7 +62,8 @@ export function useKairoAppVoice(): void {
           content: trimmed,
           session_id: shell.kairoSpeechSessionId(),
           workspace_id: shell.currentWorkspace?.workspace_id ?? '',
-          use_runtime: false,
+          use_runtime:
+            shell.operatorPresenceSettings.voice_routing_mode === 'runtime_aggressive',
           answer_tier: 'fast',
           context_workspace_id: shell.currentWorkspace?.workspace_id ?? '',
         });
@@ -64,28 +73,12 @@ export function useKairoAppVoice(): void {
         kairoConversationReply.value = normalizeKairoCopy(
           formatConversationDisplayReply(response.reply) || sanitizeSpokenReply(response.reply),
         );
-        if (response.action) {
-          if (response.action.type === 'focus_briefing') {
-            shell.focusKairoBriefing();
-          } else if (response.action.type === 'dispatch_command') {
-            await shell.submitOperatorCommandContent(response.action.content);
-          } else if (response.action.type === 'handoff_signal') {
-            await shell.handoffSignalToIde(
-              {
-                signal_id: response.action.signal_id,
-                workspace_id: response.action.target_workspace_id,
-                title:
-                  response.action.task.replace(/^Investigate signal "/, '').split('"')[0] ??
-                  response.action.task,
-                summary: response.action.task,
-                task: response.action.task,
-              },
-              { autoSubmit: true },
-            );
-          }
-        } else if (shouldAutoDispatchConverseCommand(response)) {
-          await shell.submitOperatorCommandContent(response.command_content!);
-        }
+        await dispatchKairoConverseOutcome(
+          shell,
+          response,
+          (action) => executeKairoConverseAction(shell, action),
+          'voice',
+        );
         if (mentionsBriefingSurfaceOffer(response.reply)) {
           scheduleBriefingSurfaceOffer();
         }

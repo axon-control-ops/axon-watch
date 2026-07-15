@@ -43,6 +43,15 @@ export const OPERATOR_SUPPORTED_COMMANDS: OperatorSupportedCommand[] = [
     ],
     description: 'Run a bounded shell command in the workspace project root',
   },
+  {
+    id: 'move_voice_orb',
+    examples: [
+      'put the orb bottom-left',
+      'move voice orb to top right',
+      'dodge the orb',
+    ],
+    description: 'Move or smart-dodge the Voice Orb over the console',
+  },
 ];
 
 export function formatSupportedCommandsHint(): string {

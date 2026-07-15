@@ -4,6 +4,9 @@ export const DEFAULT_FETCH_TIMEOUT_MS = 12_000;
 /** Runtime status / auth refresh can wait on `cursor agent status` (~7s) plus Codex probes. */
 export const RUNTIME_STATUS_FETCH_TIMEOUT_MS = 30_000;
 
+/** Thread history can include dozens of large agent transcripts; keep above normalize+transfer. */
+export const THREAD_HISTORY_FETCH_TIMEOUT_MS = 45_000;
+
 export class ApiRequestError extends Error {
   readonly status: number;
   readonly label: string;

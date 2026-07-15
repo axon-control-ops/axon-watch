@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+from app.chat.move_voice_orb import is_move_voice_orb_command
+
 _READ_PREFIX = re.compile(r"^(?:read|cat)\s+(.+)$", re.IGNORECASE)
 _GIT_STATUS_PREFIX = re.compile(r"^git\s+status\b", re.IGNORECASE)
 _RESUME_FROM_REVIEW = re.compile(
@@ -36,6 +38,7 @@ AUTO_COMPLETE_COMMAND_INTENTS = frozenset(
         "health_probe",
         "list_files",
         "read_file",
+        "move_voice_orb",
     }
 )
 
@@ -61,6 +64,13 @@ _SHORTCUT_SHELL_COMMANDS = {
     "verify": "npm run verify:production-operator",
 }
 
+# Read-only shell shortcuts that may auto-dispatch / auto-complete like health_probe.
+_REVERSIBLE_SHELL_SCRIPTS = frozenset(
+    {
+        "./scripts/dev/check-health.sh",
+    }
+)
+
 
 def expand_command_shortcuts(content: str) -> str:
     """Normalize allowlisted shortcuts and explicit question-commands."""
@@ -74,12 +84,29 @@ def expand_command_shortcuts(content: str) -> str:
     return f"run {mapped}"
 
 
+def _shell_script_from_run_command(content: str) -> str | None:
+    match = re.match(r"^run\s+(.+)$", content.strip(), re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1).strip()
+
+
+def is_reversible_shell_command(content: str) -> bool:
+    """True for allowlisted read-only shell shortcuts (e.g. check-health)."""
+    normalized = expand_command_shortcuts(content.strip())
+    script = _shell_script_from_run_command(normalized)
+    return bool(script and script in _REVERSIBLE_SHELL_SCRIPTS)
+
+
 def is_auto_complete_run_summary(summary: str) -> bool:
     """True when a run summary maps to a read-only one-shot operator command."""
     trimmed = summary.strip()
     if not trimmed:
         return False
-    return classify_command(trimmed) in AUTO_COMPLETE_COMMAND_INTENTS
+    intent = classify_command(trimmed)
+    if intent in AUTO_COMPLETE_COMMAND_INTENTS:
+        return True
+    return intent == "shell_command" and is_reversible_shell_command(trimmed)
 
 
 def command_requires_confirmation(content: str) -> bool:
@@ -87,7 +114,12 @@ def command_requires_confirmation(content: str) -> bool:
     normalized = expand_command_shortcuts(content.strip())
     if not normalized:
         return True
-    return classify_command(normalized) not in AUTO_COMPLETE_COMMAND_INTENTS
+    intent = classify_command(normalized)
+    if intent in AUTO_COMPLETE_COMMAND_INTENTS:
+        return False
+    if intent == "shell_command" and is_reversible_shell_command(normalized):
+        return False
+    return True
 
 
 def classify_command(content: str) -> str:
@@ -119,6 +151,8 @@ def classify_command(content: str) -> str:
         "resume-from-review",
     }:
         return "resume_from_review"
+    if is_move_voice_orb_command(content):
+        return "move_voice_orb"
     return "unsupported"
 
 
@@ -145,6 +179,8 @@ def command_display_name(content: str) -> str:
         return f"Read {_extract_read_path(trimmed)}"
     if intent == "resume_from_review":
         return "Resume from review"
+    if intent == "move_voice_orb":
+        return "Move voice orb"
     if intent == "shell_command":
         from app.chat.shell_command import extract_shell_command_line
 

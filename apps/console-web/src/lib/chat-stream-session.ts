@@ -113,8 +113,11 @@ export function startChatStreamSession(options: ChatStreamSessionOptions): ChatS
 
     if (payload.type === 'chat_stream_done' && payload.message_id === options.messageId) {
       options.onDelta(String(payload.content ?? ''));
-      options.onDone?.(payload);
-      disconnectEventSource();
+      try {
+        options.onDone?.(payload);
+      } finally {
+        disconnectEventSource();
+      }
       return;
     }
 

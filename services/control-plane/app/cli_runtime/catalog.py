@@ -182,11 +182,26 @@ def _choose_default_runtime(local: list[StatusRecord], cloud: list[StatusRecord]
     return "cursor_local"
 
 
-def runtime_status_snapshot(*, force_refresh: bool = False) -> StatusRecord:
+def runtime_status_snapshot(
+    *,
+    force_refresh: bool = False,
+    allow_stale: bool = False,
+) -> StatusRecord:
     cached = _SNAPSHOT_CACHE.get("payload")
     fetched_at = float(_SNAPSHOT_CACHE.get("fetched_at") or 0.0)
     if not force_refresh and cached is not None and (time.monotonic() - fetched_at) < _CACHE_TTL_SECONDS:
         return copy.deepcopy(cached)
+    # Presence/background callers must not block on multi-second CLI auth probes.
+    if allow_stale and not force_refresh:
+        if cached is not None:
+            return copy.deepcopy(cached)
+        return {
+            "updated_at": _utc_now_iso(),
+            "default_runtime": "",
+            "vault_runtime": {},
+            "local": [],
+            "cloud": [],
+        }
 
     # Coalesce concurrent bootstrap callers (summary + status + fleet) so CLI
     # auth probes run once per TTL window instead of stacking on the worker pool.
@@ -276,37 +291,4 @@ def runtime_status_snapshot(*, force_refresh: bool = False) -> StatusRecord:
         return copy.deepcopy(payload)
 
 
-def runtime_identity_snapshot() -> StatusRecord:
-    snapshot = runtime_status_snapshot()
-    default_runtime = str(snapshot.get("default_runtime") or "")
-    records = [*list(snapshot.get("local") or []), *list(snapshot.get("cloud") or [])]
-    selected = next((record for record in records if record.get("id") == default_runtime), None)
-
-    if not selected:
-        return {
-            "provider_family": "bootstrap",
-            "provider_name": "Axon-X Bootstrap",
-            "model_name": "bootstrap-model",
-            "mode_default": os.environ.get("AXON_WATCH_MODE_DEFAULT", "agent"),
-            "tool_calling_supported": False,
-            "reasoning_supported": False,
-        }
-
-    family = str(selected.get("family") or "cursor")
-    provider_name = "Cursor CLI" if family == "cursor" else "Codex CLI"
-    model_name = (
-        os.environ.get("AXON_WATCH_CURSOR_MODEL", "cursor-default")
-        if family == "cursor"
-        else os.environ.get("AXON_WATCH_CODEX_MODEL", "gpt-5.5")
-    )
-    if str(selected.get("target_type") or "") == "cloud":
-        provider_name = "Cursor Cloud Agent" if family == "cursor" else "Codex Cloud Task"
-
-    return {
-        "provider_family": f"{family}_{selected.get('target_type')}",
-        "provider_name": provider_name,
-        "model_name": model_name,
-        "mode_default": os.environ.get("AXON_WATCH_MODE_DEFAULT", "agent"),
-        "tool_calling_supported": bool(selected.get("ready")),
-        "reasoning_supported": bool(selected.get("available")),
-    }
+from app.cli_runtime.catalog_identity import runtime_identity_snapshot  # noqa: E402

@@ -1,4 +1,3 @@
-/* Operator shell presentation — split into bounded chunks under styles/shell/ */
 @import './shell/mockup-shell-01.css';
 @import './shell/mockup-shell-02.css';
 @import './shell/mockup-shell-03.css';
@@ -29,5 +28,4 @@
 @import './shell/mockup-shell-28.css';
 @import './shell/mockup-shell-29.css';
 @import './shell/mockup-shell-30.css';
-@import './shell/mockup-shell-31.css';
-@import './shell/mockup-shell-32.css';
+@import './shell/mockup-shell-tail.css';

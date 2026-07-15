@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 
-import { axonDebugSessionLog } from '../../lib/axon-debug-session-log';
 import { useShellStore } from '../../stores/shell';
 
 const emit = defineEmits<{
@@ -23,56 +22,7 @@ const canSubmit = computed(
     !busy.value,
 );
 
-onMounted(() => {
-  // #region agent log
-  axonDebugSessionLog({
-    hypothesisId: 'H1',
-    location: 'WorkspaceAddForm.vue:onMounted',
-    message: 'Add workspace form opened',
-    data: {
-      requiresWorkspaceId: true,
-      requiresProjectRoot: true,
-      hasBrowseControl: false,
-      hasNativeDirectoryPickerApi:
-        typeof (window as Window & { showDirectoryPicker?: unknown }).showDirectoryPicker ===
-        'function',
-      fieldNames: ['workspace_id', 'project_root', 'display_name'],
-    },
-  });
-  // #endregion
-});
-
-function onProjectRootInput(): void {
-  // #region agent log
-  axonDebugSessionLog({
-    hypothesisId: 'H2',
-    location: 'WorkspaceAddForm.vue:onProjectRootInput',
-    message: 'Project root typed manually (no folder picker invoked)',
-    data: {
-      projectRootLength: projectRoot.value.trim().length,
-      looksAbsolute: projectRoot.value.trim().startsWith('/'),
-      workspaceIdEmpty: !workspaceId.value.trim(),
-      displayNameEmpty: !displayName.value.trim(),
-    },
-  });
-  // #endregion
-}
-
 async function submit(): Promise<void> {
-  // #region agent log
-  axonDebugSessionLog({
-    hypothesisId: 'H1',
-    location: 'WorkspaceAddForm.vue:submit',
-    message: 'Add workspace submit attempted',
-    data: {
-      canSubmit: canSubmit.value,
-      workspaceIdLength: workspaceId.value.trim().length,
-      projectRootLength: projectRoot.value.trim().length,
-      hasDisplayName: Boolean(displayName.value.trim()),
-      workspaceIdPrefixOk: workspaceId.value.trim().startsWith('workspace_'),
-    },
-  });
-  // #endregion
   if (!canSubmit.value) {
     return;
   }
@@ -84,27 +34,10 @@ async function submit(): Promise<void> {
       projectRoot: projectRoot.value.trim(),
       displayName: displayName.value.trim() || undefined,
     });
-    // #region agent log
-    axonDebugSessionLog({
-      hypothesisId: 'H4',
-      location: 'WorkspaceAddForm.vue:submit:success',
-      message: 'Workspace registered successfully',
-      data: { registeredId: workspace.workspace_id },
-      workspaceId: workspace.workspace_id,
-    });
-    // #endregion
     shell.setCurrentWorkspace(workspace.workspace_id);
     emit('registered', workspace.workspace_id);
   } catch (exc) {
     const message = exc instanceof Error ? exc.message : 'Failed to add workspace';
-    // #region agent log
-    axonDebugSessionLog({
-      hypothesisId: 'H4',
-      location: 'WorkspaceAddForm.vue:submit:error',
-      message: 'Workspace register failed',
-      data: { error: message },
-    });
-    // #endregion
     error.value = message;
   } finally {
     busy.value = false;
@@ -135,7 +68,6 @@ async function submit(): Promise<void> {
         autocomplete="off"
         placeholder="/home/edp/path/to/repo"
         required
-        @input="onProjectRootInput"
       />
     </label>
     <label class="workspace-add-form__field">

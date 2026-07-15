@@ -29,10 +29,16 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
   async function loadOperatorBriefing(options?: {
     viewportCompact?: boolean;
     background?: boolean;
+    light?: boolean;
   }): Promise<void> {
     const requestedWorkspaceKey = input.currentWorkspaceId()?.trim() || '';
+    const light = options?.light === true;
 
     if (operatorBriefingFetchInFlight) {
+      // Light presence ticks must not wait on a cold full briefing rebuild.
+      if (light) {
+        return;
+      }
       if (operatorBriefingFetchWorkspaceKey === requestedWorkspaceKey) {
         return operatorBriefingFetchInFlight;
       }
@@ -66,14 +72,32 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
         const briefing = await fetchOperatorBriefing({
           viewportCompact,
           workspaceId: input.currentWorkspaceId(),
+          light,
         });
         // Drop stale responses if the operator switched workspaces mid-flight.
         if ((input.currentWorkspaceId()?.trim() || '') !== requestedWorkspaceKey) {
           return;
         }
-        input.operatorBriefing.value = briefing;
+        // Do not let a light presence payload wipe full briefing signals.
+        if (light && input.operatorBriefing.value && (briefing.top_signals?.length ?? 0) === 0) {
+          input.operatorBriefing.value = {
+            ...input.operatorBriefing.value,
+            notice: briefing.notice,
+            advise: briefing.advise,
+            executive_rhythm: briefing.executive_rhythm,
+            operator_presence: briefing.operator_presence,
+            degraded: briefing.degraded,
+            cli_runtime: briefing.cli_runtime,
+            connectivity: briefing.connectivity,
+            active_runs: briefing.active_runs,
+            pending_approvals: briefing.pending_approvals,
+            next_safe_actions: briefing.next_safe_actions,
+          };
+        } else {
+          input.operatorBriefing.value = briefing;
+          input.approvals.value = briefing.pending_approvals.items;
+        }
         input.setLastViewportCompactRequested(viewportCompact);
-        input.approvals.value = briefing.pending_approvals.items;
         input.briefingLoadState.value = 'loaded';
         input.applyOperatorDockDefaults();
       } catch (error) {

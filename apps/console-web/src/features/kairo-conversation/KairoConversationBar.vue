@@ -78,6 +78,18 @@ const inputPlaceholder = computed(() => {
   return `Ask ${OPERATOR_PERSONA_NAME} or dispatch a command… (Space hold-to-talk)`;
 });
 
+/** Block typing only while thinking/PTT — hands-free ambient listen must stay typeable. */
+const inputDisabled = computed(
+  () =>
+    pending.value ||
+    kairoConversationPhase.value === 'thinking' ||
+    (speechCapture.capturing.value && speechCapture.captureMode.value === 'manual'),
+);
+
+function handleInputFocus(): void {
+  handleFocus();
+}
+
 const micDisabled = computed(
   () =>
     pending.value ||
@@ -124,6 +136,16 @@ const voiceDebugLine = computed(() => {
 
 const showInterrupt = computed(
   () => shell.kairoSpeechActive || kairoConversationPhase.value === 'thinking',
+);
+
+/** Floating Galaxy captions carry the spoken reply; keep the sticky Reply strip off the HUD. */
+const showStickyReply = computed(
+  () => Boolean(kairoConversationReply.value) && !shell.operatorBrainGalaxyActive,
+);
+
+/** Gate rejection copy stays useful; the verbose Heard/Accepted debug line does not on Galaxy. */
+const showVoiceDebugLine = computed(
+  () => Boolean(voiceDebugLine.value) && !shell.operatorBrainGalaxyActive,
 );
 
 function handleInterrupt(): void {
@@ -273,8 +295,8 @@ onUnmounted(() => {
           autocomplete="off"
           spellcheck="false"
           :placeholder="inputPlaceholder"
-          :disabled="pending || kairoConversationPhase === 'thinking' || speechCapture.capturing.value"
-          @focus="handleFocus"
+          :disabled="inputDisabled"
+          @focus="handleInputFocus"
           @blur="handleBlur"
         />
         <button
@@ -367,7 +389,7 @@ onUnmounted(() => {
     >
       {{ voiceGateFeedback }}
     </p>
-    <div v-if="kairoConversationReply" class="kairo-conversation-bar__reply">
+    <div v-if="showStickyReply" class="kairo-conversation-bar__reply">
       <span class="kairo-conversation-bar__reply-heading">
         <OperatorPersonaMark size="xs" />
         <span class="kairo-conversation-bar__reply-label">Reply</span>
@@ -377,7 +399,7 @@ onUnmounted(() => {
     <p v-if="speechCaptureError" class="kairo-conversation-bar__error" role="alert">
       {{ speechCaptureError }}
     </p>
-    <p v-if="voiceDebugLine" class="kairo-conversation-bar__interim kairo-conversation-bar__interim--debug">
+    <p v-if="showVoiceDebugLine" class="kairo-conversation-bar__interim kairo-conversation-bar__interim--debug">
       {{ voiceDebugLine }}
     </p>
     <p v-if="kairoConversationError" class="kairo-conversation-bar__error" role="alert">

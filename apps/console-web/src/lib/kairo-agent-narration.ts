@@ -159,9 +159,10 @@ export function spokenCompletionSummary(content: string): string {
   const flat = cleaned.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
   const sentences = flat.match(/[^.!?]+[.!?]+/g) ?? [];
   if (sentences.length > 0) {
-    let summary = sentences[0].trim();
-    if (summary.length < 120 && sentences.length > 1) {
-      summary = `${summary} ${sentences[1].trim()}`;
+    let summary = (sentences[0] ?? '').trim();
+    const second = sentences[1];
+    if (summary.length < 120 && second) {
+      summary = `${summary} ${second.trim()}`;
     }
     if (summary.length > COMPLETION_SUMMARY_MAX) {
       return `${summary.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`;
@@ -180,23 +181,6 @@ export function narrationForCompletion(content: string): NarrationMilestone {
   }
   const summary = spokenCompletionSummary(content);
   const hasReproduceMarker = /:::debug-reproduce\b/m.test(content);
-  // #region agent log
-  void import('./axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-    axonDebugSessionLog({
-      hypothesisId: hasReproduceMarker ? 'H1' : 'H2',
-      location: 'kairo-agent-narration.ts:narrationForCompletion',
-      message: hasReproduceMarker
-        ? 'completion narration using reproduce waiting line'
-        : 'completion narration without reproduce marker',
-      data: {
-        hasReproduceMarker,
-        summaryPreview: summary.slice(0, 220),
-        summaryHasNumberedSteps: /^\s*\d+\.\s+/m.test(summary) || /\b1\.\s+/.test(summary),
-        contentLen: content.length,
-      },
-    });
-  });
-  // #endregion
   // Reproduce pause: speak a short waiting cue, never the numbered steps.
   if (hasReproduceMarker) {
     return {

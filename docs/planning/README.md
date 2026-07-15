@@ -31,6 +31,7 @@ python3 scripts/ops/sync_planning_mirror_to_axon_local.py
 - `KAIRO_BRAIN_UI_ARCHITECTURE.md` — JARVIS pack mapping, Operator vs IDE subscriptions (UI deferred)
 - `OPERATOR_REFRESH_POLICY.md` — anti-freeze refresh rules (G4.4 guards)
 - `agent-orchestration-contract.md` — G3 orchestration contract (add to MANIFEST on triage)
+- `DASHPRO_CI_AGENT_PLAYBOOK.md` — how Dash Pro company agents handle CI (no invented commits)
 - `watch-api.md` — internal watch ↔ control-plane contract
 - `control-api.md` — control-plane public API contract
 - `runtime-summary.md` — runtime identity and watch-backed summaries

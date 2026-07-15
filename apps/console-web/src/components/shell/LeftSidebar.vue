@@ -5,9 +5,9 @@ import IdeActivityBar from '../ide/IdeActivityBar.vue';
 import IdeAttentionPanel from '../ide/IdeAttentionPanel.vue';
 import IdeBriefingPanel from '../ide/IdeBriefingPanel.vue';
 import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
+import IdeTeamPanel from '../ide/IdeTeamPanel.vue';
 import KairoSidebarPanel from '../ide/KairoSidebarPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
-import CompanyRosterPanel from './CompanyRosterPanel.vue';
 import KairoVoiceDeckPanel from './KairoVoiceDeckPanel.vue';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
@@ -165,6 +165,7 @@ onBeforeUnmount(() => {
         <div class="left-sidebar-mockup__ide-main">
           <IdeAttentionPanel v-if="shell.ideAttentionPanelOpen" />
           <IdeBriefingPanel v-else-if="shell.ideBriefingPanelOpen" />
+          <IdeTeamPanel v-else-if="shell.ideActivityView === 'team'" />
           <IdeExplorerPanel v-else />
         </div>
       </div>
@@ -285,7 +286,6 @@ onBeforeUnmount(() => {
           >
             + New Workspace
           </button>
-          <CompanyRosterPanel />
           <p v-if="shell.workspacesError" class="region-copy">{{ shell.workspacesError }}</p>
         </div>
 

@@ -2,44 +2,27 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.adapters.watch_client import fetch_watch_delivery_receipts
-from app.cli_runtime.routes import get_runtime_mcp_tools, get_runtime_status
+from app.bootstrap import control_plane_lifespan, probe_all_connectors
 from app.config import _cors_origins
-from app.data.routes import get_data_export, get_data_snapshot
 from app.routes import register_routes
-from app.routes.health import _BOOT_ID
-from app.runs.service import reconcile_orphaned_runs_on_startup
-
-
-@asynccontextmanager
-async def _lifespan(_app: FastAPI):
-    reconcile_orphaned_runs_on_startup(boot_id=_BOOT_ID)
-    yield
-
 
 app = FastAPI(
     title="Axon-X Control Plane",
     version="0.1.0",
     docs_url=None,
     redoc_url=None,
-    lifespan=_lifespan,
+    lifespan=control_plane_lifespan,
 )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
-
 register_routes(app)
 
-
-def probe_all_connectors() -> list[dict[str, object]]:
-    """Compatibility stub for tests/support/stable_connector_probe.py patch sites."""
-    return []
+# Re-export for tests/support/stable_connector_probe.py patch sites.
+__all__ = ["app", "probe_all_connectors"]

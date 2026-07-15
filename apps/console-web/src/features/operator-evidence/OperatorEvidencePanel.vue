@@ -8,12 +8,23 @@ import {
   type OperatorEvidenceRecord,
   type OperatorMemoryRecord,
 } from '../../api/operator-api';
+import {
+  evidenceKindLabel,
+  projectEmailTriageHandoffMeta,
+  projectEvidenceAutonomyStatus,
+  projectEvidenceRows,
+  projectEvidenceTags,
+} from './operator-evidence-projector';
 
 const props = defineProps<{
   nodeId: string | null;
   fallbackTitle: string;
   fallbackBody: string;
   fallbackHint: string;
+  pendingApprovals?: number;
+  runPhase?: string | null;
+  actionTier?: string | null;
+  autoAllowed?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -53,67 +64,22 @@ const shownHint = computed(() => {
   }
   return props.fallbackHint;
 });
-const kindLabel = computed(() => {
-  const kind = evidence.value?.kind ?? 'node';
-  if (kind === 'core') {
-    return 'System Node';
-  }
-  return kind.charAt(0).toUpperCase() + kind.slice(1);
-});
+const kindLabel = computed(() => evidenceKindLabel(evidence.value?.kind));
 
-const EVIDENCE_ICONS = ['doc', 'link', 'db', 'pulse', 'shield', 'mail'] as const;
+const evidenceRows = computed(() => projectEvidenceRows(evidence.value));
 
-const evidenceRows = computed(() => {
-  const rows: Array<{
-    id: string;
-    title: string;
-    detail: string;
-    source: string;
-    ago: string;
-    icon: (typeof EVIDENCE_ICONS)[number];
-  }> = [];
-  const sections = evidence.value?.sections ?? [];
-  if (sections.length) {
-    for (const section of sections) {
-      for (const item of section.items) {
-        rows.push({
-          id: `section:${section.title}:${item.title}`,
-          title: item.title,
-          detail: item.detail,
-          source: item.source_ref?.label || section.title,
-          ago: '',
-          icon: EVIDENCE_ICONS[rows.length % EVIDENCE_ICONS.length] ?? 'doc',
-        });
-      }
-    }
-  } else {
-    for (const fact of evidence.value?.facts ?? []) {
-      rows.push({
-        id: `fact:${fact.label}`,
-        title: fact.label,
-        detail: fact.value,
-        source: 'Evidence',
-        ago: '',
-        icon: EVIDENCE_ICONS[rows.length % EVIDENCE_ICONS.length] ?? 'doc',
-      });
-    }
-  }
-  return rows.slice(0, 8);
-});
-
-const tags = computed(() => {
-  const kind = evidence.value?.kind;
-  const next = [kind, workspaceId.value ? 'workspace' : null].filter(Boolean) as string[];
-  if (kind === 'core') {
-    return ['core', 'system', 'high_value', 'trusted'];
-  }
-  if (kind === 'signal') {
-    next.push('attention');
-  }
-  return next.slice(0, 4);
-});
+const tags = computed(() => projectEvidenceTags(evidence.value, workspaceId.value));
 
 const primaryAction = computed(() => evidence.value?.actions[0] ?? null);
+
+const autonomyStatus = computed(() =>
+  projectEvidenceAutonomyStatus({
+    pendingApprovals: props.pendingApprovals ?? 0,
+    runPhase: props.runPhase ?? null,
+    actionTier: props.actionTier ?? null,
+    autoAllowed: props.autoAllowed === true,
+  }),
+);
 
 async function loadPanel(nodeId: string | null): Promise<void> {
   evidence.value = null;
@@ -159,25 +125,6 @@ async function saveMemory(): Promise<void> {
   statusLine.value = 'Memory saved.';
 }
 
-function factValue(label: string): string {
-  const facts = evidence.value?.facts ?? [];
-  return facts.find((fact) => fact.label === label)?.value?.trim() ?? '';
-}
-
-function evidenceHandoffMeta(): Record<string, unknown> | null {
-  const family = factValue('Family');
-  if (family !== 'email_triage') {
-    return null;
-  }
-  return {
-    signal_family: family,
-    sender: factValue('Sender'),
-    subject: factValue('Subject'),
-    recommended_action: factValue('Recommended action'),
-    recommended_detail: evidence.value?.summary ?? '',
-  };
-}
-
 function triggerAction(action: OperatorEvidenceRecord['actions'][number]): void {
   if (action.target === 'workspace' && action.workspace_id) {
     emit('openWorkspace', action.workspace_id);
@@ -191,7 +138,7 @@ function triggerAction(action: OperatorEvidenceRecord['actions'][number]): void 
       workspace_id: action.workspace_id ?? workspaceId.value,
       title: evidence.value.title,
       summary: evidence.value.summary,
-      meta: evidenceHandoffMeta(),
+      meta: projectEmailTriageHandoffMeta(evidence.value),
     });
   }
 }
@@ -247,6 +194,12 @@ watch(
     </div>
 
     <p class="galaxy-inspector__summary">{{ shownBody }}</p>
+    <p
+      class="galaxy-inspector__autonomy"
+      :class="`galaxy-inspector__autonomy--${autonomyStatus.tone}`"
+    >
+      {{ autonomyStatus.label }}
+    </p>
     <p v-if="shownHint" class="galaxy-inspector__hint">{{ shownHint }}</p>
 
     <p v-if="loading" class="galaxy-inspector__status">Loading evidence…</p>

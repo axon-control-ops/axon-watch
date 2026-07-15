@@ -98,12 +98,13 @@ import {
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
 import {
   clearIdeRunRecovery,
+  decideIdeRunRecovery,
   fetchControlPlaneBootId,
   persistIdeRunRecovery,
   readIdeRunRecovery,
   SERVER_RESTART_CONTINUATION_PROMPT,
+  waitForStableControlPlaneBootId,
 } from '../lib/ide-run-recovery';
-import { buildKairoSpeechSessionId } from '../lib/kairo-speech-session';
 import {
   appendBriefingVoiceTranscriptEntry,
   readBriefingVoiceTranscript,
@@ -248,6 +249,8 @@ import {
 } from '../lib/ide-agent-edit-review';
 import { normalizeEditedFilePath } from '../lib/agent-transcript-blocks';
 import {
+  resolveRunHistoryRunId,
+  selectRunSeamDisplayRun,
   selectWorkspacePrimaryRun,
 } from './shell-run-selection';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../lib/kairo-presence';
@@ -309,6 +312,10 @@ import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary
 import { createShellDisplaySlice } from './shell/slices/create-shell-display-slice';
 import { createThreadSurfaceSlice } from './shell/slices/create-thread-surface-slice';
 import { createViewportCompactSlice } from './shell/slices/create-viewport-compact-slice';
+import { createKairoVoiceSlice } from './shell/slices/create-kairo-voice-slice';
+import { createChatStreamSessionSlice } from './shell/slices/create-chat-stream-session-slice';
+import { createWorkspaceStreamUiSlice } from './shell/slices/create-workspace-stream-ui-slice';
+import { createVoiceOrbPlacementController } from './shell/slices/create-voice-orb-placement-slice';
 import {
   DEFAULT_DOCK_CONTEXT,
   DEFAULT_EDITOR_TABS,
@@ -435,6 +442,31 @@ export const useShellStore = defineStore('shell', () => {
   const ideAgentRunId = ref<string | null>(null);
   const ideComposerActivity = ref<IdeComposerActivity | null>(null);
   const ideDebugModeSelected = ref(false);
+
+  const {
+    disconnectChatStreamSession,
+    disconnectAllChatStreamSessions,
+    patchThreadMessageContent,
+  } = createChatStreamSessionSlice({
+    currentWorkspace,
+    threadMessages,
+    workspaceIdeThreadMessagesById,
+    chatStreamSessionsByWorkspace,
+  });
+
+  const {
+    getWorkspaceStreamUi,
+    applyWorkspaceStreamUiToGlobals,
+    setWorkspaceStreamUi,
+  } = createWorkspaceStreamUiSlice({
+    currentWorkspace,
+    workspaceStreamUiById,
+    agentStreamActive,
+    agentStreamMessageId,
+    ideComposerActivity,
+    ideAgentRunId,
+  });
+
   const ideAgentLinkedRun = computed(() => {
     const runId = ideAgentRunId.value;
     if (!runId) {
@@ -459,6 +491,10 @@ export const useShellStore = defineStore('shell', () => {
   const editorTabs = ref<EditorTabDescriptor[]>(DEFAULT_EDITOR_TABS);
   const activeEditorTabId = ref<string>(DEFAULT_EDITOR_TABS[0].id);
   const activeEditorDocumentId = ref<string>('file:README.md');
+  const activeWorkspaceFilePath = computed(() => {
+    const path = filePathFromDocumentId(activeEditorDocumentId.value);
+    return path && openedFilePaths.value.includes(path) ? path : null;
+  });
   const editorSelection = ref<EditorSelectionSnapshot | null>(null);
   const terminalSessions = ref<TerminalSessionDescriptor[]>(DEFAULT_TERMINAL_SESSIONS);
   const activeTerminalSessionId = ref<string>(DEFAULT_OPERATOR_TERMINAL_SESSION_ID);
@@ -498,6 +534,7 @@ export const useShellStore = defineStore('shell', () => {
       : runs.value,
   );
   const primaryActiveRun = computed(() => selectWorkspacePrimaryRun(workspaceRuns.value));
+  const runSeamDisplayRun = computed(() => selectRunSeamDisplayRun(workspaceRuns.value));
 
   let idePresenceProfile: ComputedRef<IdePresenceProfile>;
 
@@ -823,36 +860,6 @@ export const useShellStore = defineStore('shell', () => {
     dockHeroModeTouched,
     briefingSeamEmphasized,
   });
-
-  function getWorkspaceStreamUi(workspaceId: string): WorkspaceStreamUiState {
-    return workspaceStreamUiById.value[workspaceId] ?? defaultWorkspaceStreamUi();
-  }
-
-  function applyWorkspaceStreamUiToGlobals(workspaceId: string): void {
-    if (!shouldSyncWorkspaceStreamGlobals(currentWorkspace.value?.workspace_id, workspaceId)) {
-      return;
-    }
-    const next = getWorkspaceStreamUi(workspaceId);
-    const globals = workspaceStreamGlobalsFromState(next);
-    agentStreamActive.value = globals.agentStreamActive;
-    agentStreamMessageId.value = globals.agentStreamMessageId;
-    ideComposerActivity.value = globals.ideComposerActivity as IdeComposerActivity | null;
-    ideAgentRunId.value = globals.ideAgentRunId;
-  }
-
-  function setWorkspaceStreamUi(
-    workspaceId: string,
-    partial: Partial<WorkspaceStreamUiState>,
-  ): void {
-    workspaceStreamUiById.value = {
-      ...workspaceStreamUiById.value,
-      [workspaceId]: {
-        ...getWorkspaceStreamUi(workspaceId),
-        ...partial,
-      },
-    };
-    applyWorkspaceStreamUiToGlobals(workspaceId);
-  }
 
   function stashWorkspaceIdeView(workspaceId: string): void {
     workspaceIdeThreadMessagesById.value = {
@@ -1285,6 +1292,19 @@ export const useShellStore = defineStore('shell', () => {
       }
       operatorCommandDraft.value = '';
       commandMutationState.value = 'idle';
+      const uiAction = parseChatUiAction(response.ui_action);
+      if (uiAction) {
+        applyChatUiAction(
+          {
+            setCurrentWorkspace,
+            openWorkspaceFile,
+            setLayoutMode,
+            setVoiceOrbDock,
+            requestVoiceOrbSmartDodge,
+          },
+          uiAction,
+        );
+      }
       await refreshRunSurfaces();
 
       const next = new Set(expandedDockSeams.value);
@@ -1360,376 +1380,83 @@ export const useShellStore = defineStore('shell', () => {
     await handoffSignalToIde(lastDiscussedSignal.value);
   }
 
-  function disconnectChatStreamSession(workspaceId?: string): void {
-    if (workspaceId) {
-      const session = chatStreamSessionsByWorkspace.get(workspaceId);
-      if (session) {
-        session.disconnect();
-        chatStreamSessionsByWorkspace.delete(workspaceId);
-      }
+  function restoreComposerDraft(content: string): void {
+    const trimmed = content.trim();
+    commandMutationError.value = null;
+    if (layoutMode.value === 'operator') {
+      operatorCommandDraft.value = trimmed;
+      setDockHeroMode('command');
+      commandFocusToken.value += 1;
       return;
     }
-    disconnectAllChatStreamSessions();
+    openIdeComposerWithDraft(trimmed, { keepActivityView: false });
   }
 
-  function disconnectAllChatStreamSessions(): void {
-    for (const session of chatStreamSessionsByWorkspace.values()) {
-      session.disconnect();
-    }
-    chatStreamSessionsByWorkspace.clear();
-  }
+  const {
+    focusAttentionSidebar,
+    closeIdeAttentionPanel,
+    closeIdeBriefingPanel,
+    openIdeBriefingPanel,
+    toggleSignalDetails,
+    focusMissionControl,
+    setOperatorCenterView,
+    afterRunLifecycleMutation,
+    focusKairoBriefing,
+    focusCommandSeam,
+  } = createOperatorFocusSlice({
+    layoutMode,
+    operatorBriefing,
+    highlightedSignalId,
+    ideAttentionPanelOpen,
+    ideBriefingPanelOpen,
+    ideExplorerCollapsed,
+    signalsSeamEmphasized,
+    missionControlEmphasized,
+    briefingSeamEmphasized,
+    operatorCenterView,
+    dockHeroMode,
+    setLeftSidebarMode,
+    setDockHeroMode,
+    restoreComposerDraft,
+  });
 
-  function patchThreadMessageContent(
-    workspaceId: string,
-    messageId: string,
-    content: string,
-    attachments?: OperatorThreadEntry['attachments'],
-  ): void {
-    const updateMessages = (messages: OperatorThreadEntry[]) =>
-      messages.map((message) => {
-        if (message.message_id !== messageId) {
-          return message;
-        }
-        const next: OperatorThreadEntry = { ...message, content };
-        if (attachments?.length) {
-          next.attachments = attachments;
-        }
-        return next;
-      });
-
-    if (currentWorkspace.value?.workspace_id === workspaceId) {
-      threadMessages.value = updateMessages(threadMessages.value);
-    }
-
-    const cached = workspaceIdeThreadMessagesById.value[workspaceId];
-    if (cached) {
-      workspaceIdeThreadMessagesById.value = {
-        ...workspaceIdeThreadMessagesById.value,
-        [workspaceId]: updateMessages(cached),
-      };
-    }
-  }
-
-  function kairoSpeechSessionId(): string {
-    const workspaceId = currentWorkspace.value?.workspace_id ?? '';
-    const threadId = workspaceId
-      ? getWorkspaceSurfaceThreadId(workspaceId, currentThreadSurface())
-      : null;
-    return buildKairoSpeechSessionId(workspaceId, threadId);
-  }
-
-  function voiceDeliveryAllowed(): boolean {
-    return ideVoiceSpeechAllowed({
-      layoutMode: layoutMode.value,
-      settings: operatorPresenceSettings.value,
-    });
-  }
-
-  function stopKairoSpeech(): void {
-    flushKairoSpeechQueue('stopped');
-    stopKairoPlayback();
-    kairoVoicePaused.value = false;
-    if (kairoConversationPhase.value === 'speaking') {
-      setKairoConversationPhase('idle');
-    }
-  }
-
-  function pauseKairoSpeech(): boolean {
-    const paused = pauseKairoPlayback();
-    kairoVoicePaused.value = paused;
-    return paused;
-  }
-
-  function resumeKairoSpeech(): boolean {
-    const resumed = resumeKairoPlayback();
-    if (resumed) {
-      kairoVoicePaused.value = false;
-      if (kairoConversationPhase.value === 'idle') {
-        setKairoConversationPhase('speaking');
-      }
-    }
-    return resumed;
-  }
-
-  function interruptKairoVoice(): void {
-    void interruptKairoSpeechQueue('barge_in');
-    kairoVoicePaused.value = false;
-    if (kairoConversationPhase.value === 'speaking') {
-      setKairoConversationPhase('idle');
-    }
-  }
-
-  async function speakKairoConversationLine(
-    line: string,
-    options?: { operatorPrompt?: string; skipSpeakApi?: boolean },
-  ): Promise<void> {
-    const trimmed = line.trim();
-    const configuredNarration = operatorPresenceSettings.value.kairo_narration ?? 'minimal';
-    if (
-      !trimmed ||
-      !voiceDeliveryAllowed() ||
-      operatorPresenceSettings.value.privacy_mode ||
-      configuredNarration === 'off'
-    ) {
-      if (kairoConversationPhase.value === 'thinking') {
-        setKairoConversationPhase('idle');
-      }
-      return;
-    }
-
-    setKairoConversationPhase('speaking');
-    kairoVoicePaused.value = false;
-    let message = trimmed;
-    const narration = configuredNarration;
-    const operatorPrompt = options?.operatorPrompt?.trim() ?? '';
-    const skipSpeakApi = options?.skipSpeakApi === true;
-
-    if (!skipSpeakApi) {
-      try {
-        const response = await postKairoSpeak({
-          event_type: 'conversation_reply',
-          context: {
-            fallback: trimmed,
-            reply: trimmed,
-            operator_prompt: operatorPrompt,
-            pending_approvals: pendingApprovalsCount.value,
-            top_signal_title: operatorBriefing.value?.top_signals[0]?.title ?? '',
-            active_run_count: operatorBriefing.value?.active_runs.length ?? 0,
-            degraded_active: operatorBriefing.value?.degraded.active ?? false,
-          },
-          session_id: kairoSpeechSessionId(),
-          workspace_id: currentWorkspace.value?.workspace_id ?? '',
-          narration,
-          use_runtime: narration === 'conversational',
-        });
-        if (response.line?.trim()) {
-          message = response.line.trim();
-        }
-      } catch {
-        // Fall back to the raw reply when the speak endpoint is unavailable.
-      }
-    }
-
-    await speakKairoLine(message, {
-      priority: 'conversation',
-      speechRate: operatorPresenceSettings.value.speech_rate,
-      speechPitch: operatorPresenceSettings.value.speech_pitch,
-    });
-  }
-
-  function handleKairoPresenceAction(): void {
-    const target = resolveKairoPresenceClickTarget({
-      paused: kairoVoicePaused.value,
-      voiceBusy:
-        kairoSpeechQueueActive.value ||
-        kairoVoiceEngineActive.value ||
-        isKairoSpeechQueueBusy() ||
-        kairoConversationPhase.value === 'speaking' ||
-        kairoConversationPhase.value === 'thinking',
-      layoutMode: layoutMode.value,
-      state: kairoPresenceState.value,
-    });
-    if (target === 'resume') {
-      resumeKairoSpeech();
-      return;
-    }
-    if (target === 'pause') {
-      pauseKairoSpeech();
-      return;
-    }
-    if (target === 'interrupt') {
-      interruptKairoVoice();
-      setKairoConversationPhase('idle');
-      return;
-    }
-    if (target === 'attention') {
-      focusAttentionSidebar();
-      return;
-    }
-    focusKairoBriefing();
-  }
-
-  if (typeof window !== 'undefined') {
-    subscribeSpeechQueueSpeaking((active) => {
-      kairoSpeechQueueActive.value = active;
-    });
-    subscribeKairoVoiceSpeaking((active) => {
-      kairoVoiceEngineActive.value = active;
-    });
-    const finishKairoSpeechPhase = (): void => {
-      kairoVoicePaused.value = false;
-      if (kairoConversationPhase.value === 'speaking' && !isKairoVoiceSpeaking()) {
-        setKairoConversationPhase('idle');
-      }
-    };
-    onSpeechQueueIdle(finishKairoSpeechPhase);
-    onKairoVoiceIdle(finishKairoSpeechPhase);
-  }
-
-  async function deliverKairoSpokenAlert(alert: SpokenAlertEligibility): Promise<void> {
-    if (!voiceDeliveryAllowed()) {
-      return;
-    }
-    if (!alert.eligible || !operatorPresenceSettings.value.spoken_alerts_enabled) {
-      return;
-    }
-    if (operatorPresenceSettings.value.privacy_mode) {
-      return;
-    }
-    if (effectiveKairoNarrationLevel.value === 'off') {
-      return;
-    }
-
-    let eventType = 'alert';
-    const topSignal = operatorBriefing.value?.top_signals[0];
-    const context: Record<string, unknown> = {
-      fallback: alert.message,
-      pending_approvals: pendingApprovalsCount.value,
-      top_signal_title: topSignal?.title ?? '',
-      top_signal_workspace_id: topSignal?.workspace_id ?? '',
-      top_signal_summary: topSignal?.summary ?? '',
-      degraded_active: Boolean(runtimeSummary.value?.degraded.active),
-    };
-
-    if (alert.reason === 'operator_approval_required') {
-      eventType = 'approval_literal';
-      context.literal_line = alert.message.replace(/^(?:VAXON|NAXON|X|KAIRO):\s*/i, '').trim();
-    }
-
-    let message = '';
-    try {
-      const response = await postKairoSpeak({
-        event_type: eventType,
-        context,
-        session_id: kairoSpeechSessionId(),
-        workspace_id: currentWorkspace.value?.workspace_id ?? '',
-        narration: effectiveKairoNarrationLevel.value,
-      });
-      if (response.source === 'skipped' || !response.line?.trim()) {
-        return;
-      }
-      message = response.line.trim();
-    } catch {
-      return;
-    }
-
-    void deliverSpokenOperatorAlert({
-      eligible: true,
-      reason: alert.reason,
-      signal_id: alert.signal_id,
-      message,
-    });
-  }
-
-  async function speakOperatorBriefing(): Promise<void> {
-    if (!voiceDeliveryAllowed() || operatorPresenceSettings.value.privacy_mode) {
-      return;
-    }
-    if (effectiveKairoNarrationLevel.value === 'off') {
-      return;
-    }
-
-    const notice = operatorBriefing.value?.notice?.trim() ?? '';
-    const advise = operatorBriefing.value?.advise?.trim() ?? '';
-    if (!notice && !advise) {
-      return;
-    }
-
-    try {
-      const response = await postKairoSpeak({
-        event_type: 'briefing',
-        context: {
-          notice,
-          advise,
-          workspace_id: currentWorkspace.value?.workspace_id ?? '',
-          pending_approvals: pendingApprovalsCount.value,
-          top_signal_title: operatorBriefing.value?.top_signals[0]?.title ?? '',
-        },
-        session_id: kairoSpeechSessionId(),
-        workspace_id: currentWorkspace.value?.workspace_id ?? '',
-        narration: effectiveKairoNarrationLevel.value,
-        use_runtime: true,
-      });
-      if (response.source === 'skipped' || !response.line?.trim()) {
-        return;
-      }
-      const channel = await deliverSpokenOperatorAlert({
-        eligible: true,
-        reason: 'operator_briefing_spoken',
-        signal_id: null,
-        message: response.line.trim(),
-      }, sessionStorage, { dedupe: false });
-      if (channel !== 'skipped') {
-        briefingVoiceTranscript.value = appendBriefingVoiceTranscriptEntry({
-          message: response.line.trim(),
-          workspaceId: currentWorkspace.value?.workspace_id ?? null,
-        });
-      }
-      scheduleBriefingSurfaceOffer();
-    } catch {
-      // Voice line unavailable — operator can read briefing in dock.
-    }
-  }
-
-  async function maybeSpeakBootGreeting(): Promise<void> {
-    if (!voiceDeliveryAllowed()) {
-      return;
-    }
-    const greetingKey = 'axon-x:kairo-greeting-spoken';
-    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(greetingKey) === '1') {
-      return;
-    }
-    if (effectiveKairoNarrationLevel.value === 'off' || operatorPresenceSettings.value.privacy_mode) {
-      return;
-    }
-
-    let message = '';
-    try {
-      const response = await postKairoSpeak({
-        event_type: 'greeting',
-        context: {
-          workspace_count: workspaces.value.length,
-          pending_approvals: pendingApprovalsCount.value,
-        },
-        session_id: kairoSpeechSessionId(),
-        workspace_id: currentWorkspace.value?.workspace_id ?? '',
-        narration: effectiveKairoNarrationLevel.value,
-      });
-      if (response.source === 'skipped' || !response.line?.trim()) {
-        return;
-      }
-      message = response.line.trim();
-    } catch {
-      return;
-    }
-
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem(greetingKey, '1');
-    }
-
-    void deliverSpokenOperatorAlert({
-      eligible: true,
-      reason: 'boot_greeting',
-      signal_id: null,
-      message,
-    });
-  }
-
-  function kairoVoiceContext(): {
-    fullAccess: boolean;
-    activeFile?: string | null;
-  } {
-    return {
-      fullAccess: ideComposerActivity.value?.executionAccess === 'full',
-      activeFile: activeWorkspaceFilePath.value,
-    };
-  }
+  const {
+    kairoSpeechSessionId,
+    voiceDeliveryAllowed,
+    stopKairoSpeech,
+    pauseKairoSpeech,
+    resumeKairoSpeech,
+    interruptKairoVoice,
+    speakKairoConversationLine,
+    handleKairoPresenceAction,
+    deliverKairoSpokenAlert,
+    speakOperatorBriefing,
+    maybeSpeakBootGreeting,
+    kairoVoiceContext,
+  } = createKairoVoiceSlice({
+    currentWorkspace,
+    operatorPresenceSettings,
+    operatorBriefing,
+    runtimeSummary,
+    layoutMode,
+    pendingApprovalsCount,
+    kairoSpeechQueueActive,
+    kairoVoiceEngineActive,
+    kairoVoicePaused,
+    ideComposerActivity,
+    activeWorkspaceFilePath,
+    workspaces,
+    effectiveKairoNarrationLevel,
+    kairoPresenceState,
+    briefingVoiceTranscript,
+    getWorkspaceSurfaceThreadId,
+    currentThreadSurface,
+    focusAttentionSidebar,
+    focusKairoBriefing,
+  });
 
   function attachChatStream(workspaceId: string, threadId: string, messageId: string): void {
     const attachedRunId = ideAgentRunId.value;
-    // #region agent log
-    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:messageId,hypothesisId:'R3',location:'shell.ts:attachChatStream',message:'chat stream narrator attached',data:{workspaceId,threadId,messageId,attachedRunId},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     disconnectChatStreamSession(workspaceId);
     setWorkspaceStreamUi(workspaceId, {
       active: true,
@@ -1838,81 +1565,70 @@ export const useShellStore = defineStore('shell', () => {
           });
         },
         onDone: (payload) => {
-          clearIdeRunRecovery(attachedRunId ?? undefined);
-          if (payload.system_message_id && payload.system_content) {
-            patchThreadMessageContent(
-              workspaceId,
-              payload.system_message_id,
-              payload.system_content,
-            );
-          }
-          const streamAttachments = (payload.attachments ?? [])
-            .map((item) => ({
-              attachment_id: String(item.attachment_id ?? '').trim(),
-              filename: String(item.filename ?? '').trim(),
-              mime_type: String(item.mime_type ?? '').trim(),
-              url: String(item.url ?? '').trim(),
-            }))
-            .filter((item) => item.attachment_id && item.url);
-          if (streamAttachments.length) {
-            patchThreadMessageContent(
-              workspaceId,
-              messageId,
-              payload.content ?? streamedContent,
-              streamAttachments,
-            );
-          }
-          const uiAction = parseChatUiAction(payload.ui_action);
-          if (uiAction) {
-            applyChatUiAction(
-              {
-                setCurrentWorkspace,
-                openWorkspaceFile,
-                setLayoutMode,
-              },
-              uiAction,
-            );
-          }
-          const finalContent = payload.content ?? streamedContent;
-          if (narrationEnabled) {
-            const completion = narrationForCompletion(finalContent);
-            // #region agent log
-            void import('../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-              axonDebugSessionLog({
-                hypothesisId: /:::debug-reproduce\b/m.test(finalContent) ? 'H1' : 'H2',
-                location: 'shell.ts:attachChatStream.onDone',
-                message: 'agent turn complete — narrating',
-                data: {
-                  hasReproduce: /:::debug-reproduce\b/m.test(finalContent),
-                  milestoneKey: completion.key,
-                  spokenPreview: completion.message.slice(0, 220),
-                  narrationLevel: effectiveKairoNarrationLevel.value,
-                  voiceDeliveryAllowed: voiceDeliveryAllowed(),
+          try {
+            clearIdeRunRecovery(attachedRunId ?? undefined);
+            if (payload.system_message_id && payload.system_content) {
+              patchThreadMessageContent(
+                workspaceId,
+                payload.system_message_id,
+                payload.system_content,
+              );
+            }
+            const streamAttachments = (payload.attachments ?? [])
+              .map((item) => ({
+                attachment_id: String(item.attachment_id ?? '').trim(),
+                filename: String(item.filename ?? '').trim(),
+                mime_type: String(item.mime_type ?? '').trim(),
+                url: String(item.url ?? '').trim(),
+              }))
+              .filter((item) => item.attachment_id && item.url);
+            if (streamAttachments.length) {
+              patchThreadMessageContent(
+                workspaceId,
+                messageId,
+                payload.content ?? streamedContent,
+                streamAttachments,
+              );
+            }
+            const uiAction = parseChatUiAction(payload.ui_action);
+            if (uiAction) {
+              applyChatUiAction(
+                {
+                  setCurrentWorkspace,
+                  openWorkspaceFile,
+                  setLayoutMode,
+                  setVoiceOrbDock,
+                  requestVoiceOrbSmartDodge,
                 },
-              });
-            });
-            // #endregion
-            agentMilestoneNarrator?.narrate(completion);
-          }
-          if (currentWorkspace.value?.workspace_id === workspaceId) {
-            for (const path of editedFilePathsFromTranscript(finalContent)) {
-              if (openedFilePaths.value.includes(path)) {
-                void reloadWorkspaceFile(path);
+                uiAction,
+              );
+            }
+            const finalContent = payload.content ?? streamedContent;
+            if (narrationEnabled) {
+              const completion = narrationForCompletion(finalContent);
+              agentMilestoneNarrator?.narrate(completion);
+            }
+            if (currentWorkspace.value?.workspace_id === workspaceId) {
+              for (const path of editedFilePathsFromTranscript(finalContent)) {
+                if (openedFilePaths.value.includes(path)) {
+                  void reloadWorkspaceFile(path);
+                }
               }
             }
+          } finally {
+            streamUiBatcher.flushNow(workspaceId);
+            setWorkspaceStreamUi(workspaceId, {
+              active: false,
+              messageId: null,
+              activity: null,
+              ideAgentRunId: null,
+            });
+            streamUiBatcher.cancel(workspaceId);
+            disconnectChatStreamSession(workspaceId);
+            void refreshRunSurfaces().finally(() => {
+              void flushIdeComposerQueueIfIdle();
+            });
           }
-          streamUiBatcher.flushNow(workspaceId);
-          setWorkspaceStreamUi(workspaceId, {
-            active: false,
-            messageId: null,
-            activity: null,
-            ideAgentRunId: null,
-          });
-          streamUiBatcher.cancel(workspaceId);
-          disconnectChatStreamSession(workspaceId);
-          void refreshRunSurfaces().finally(() => {
-            void flushIdeComposerQueueIfIdle();
-          });
         },
         onError: (message, payload) => {
           if (narrationEnabled) {
@@ -1959,20 +1675,27 @@ export const useShellStore = defineStore('shell', () => {
     ideDebugModeSelected.value = selected;
   }
 
-  function restoreComposerDraft(content: string): void {
-    const trimmed = content.trim();
+  /** Open the IDE chat dock without changing the draft. Keep Team (or other) left panel when requested. */
+  function openIdeComposer(options: { keepActivityView?: boolean } = {}): void {
     commandMutationError.value = null;
-    if (layoutMode.value === 'operator') {
-      operatorCommandDraft.value = trimmed;
-      setDockHeroMode('command');
-      commandFocusToken.value += 1;
-      return;
+    if (layoutMode.value !== 'ide') {
+      setLayoutMode('ide');
     }
-    ideComposerDraft.value = trimmed;
     agentDockCollapsed.value = false;
     persistAgentDockCollapsed(false);
-    ideActivityView.value = 'agent';
+    if (!options.keepActivityView) {
+      ideActivityView.value = 'agent';
+    }
     commandFocusToken.value += 1;
+  }
+
+  /** Open the IDE chat dock with a draft. Keep Team (or other) left panel when requested. */
+  function openIdeComposerWithDraft(
+    content: string,
+    options: { keepActivityView?: boolean } = {},
+  ): void {
+    ideComposerDraft.value = content.trim();
+    openIdeComposer(options);
   }
 
   function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {
@@ -2111,6 +1834,8 @@ export const useShellStore = defineStore('shell', () => {
           {
             setCurrentWorkspace,
             openWorkspaceFile,
+            setVoiceOrbDock,
+            requestVoiceOrbSmartDodge,
           },
           uiAction,
         );
@@ -2139,27 +1864,6 @@ export const useShellStore = defineStore('shell', () => {
             controlPlaneBootId,
             recoveryCount: options.recoveryCountOverride ?? 0,
           });
-          // #region agent log
-          fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
-            body: JSON.stringify({
-              sessionId: 'df24bc',
-              runId: 'axon-x-debug-mode',
-              hypothesisId: 'D5',
-              location: 'shell.ts:dispatchIdeComposerMessage',
-              message: 'active run recovery marker persisted',
-              data: {
-                workspaceId,
-                threadId: response.thread_id,
-                runId: response.run_id,
-                mode: composerMode,
-                bootIdCaptured: true,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
         }
         attachChatStream(workspaceId, response.thread_id, response.stream_agent_message_id);
         const next = new Set(expandedDockSeams.value);
@@ -2192,23 +1896,6 @@ export const useShellStore = defineStore('shell', () => {
       commandMutationState.value = 'error';
       commandMutationError.value =
         error instanceof Error ? error.message : 'Failed to submit IDE composer message';
-      // #region agent log
-      void import('../lib/axon-debug-session-log').then(({ axonDebugSessionLog }) => {
-        axonDebugSessionLog({
-          hypothesisId: 'H4',
-          location: 'shell.ts:dispatchIdeComposerMessage',
-          message: 'composer submit failed',
-          data: {
-            composerMode,
-            error: error instanceof Error ? error.message : String(error),
-            linkedRunId: ideAgentRunId.value,
-            linkedRunPhase: ideAgentLinkedRun.value?.phase ?? null,
-            linkedRunMode: ideAgentLinkedRun.value?.mode ?? null,
-            contentPreview: content.slice(0, 120),
-          },
-        });
-      });
-      // #endregion
       return false;
     } finally {
       if (!agentStreamActive.value) {
@@ -2384,34 +2071,6 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   const {
-    focusAttentionSidebar,
-    closeIdeAttentionPanel,
-    closeIdeBriefingPanel,
-    openIdeBriefingPanel,
-    toggleSignalDetails,
-    focusMissionControl,
-    setOperatorCenterView,
-    afterRunLifecycleMutation,
-    focusKairoBriefing,
-    focusCommandSeam,
-  } = createOperatorFocusSlice({
-    layoutMode,
-    operatorBriefing,
-    highlightedSignalId,
-    ideAttentionPanelOpen,
-    ideBriefingPanelOpen,
-    ideExplorerCollapsed,
-    signalsSeamEmphasized,
-    missionControlEmphasized,
-    briefingSeamEmphasized,
-    operatorCenterView,
-    dockHeroMode,
-    setLeftSidebarMode,
-    setDockHeroMode,
-    restoreComposerDraft,
-  });
-
-  const {
     syncCurrentWorkspace,
     loadWorkspaces,
     loadRuns,
@@ -2499,10 +2158,6 @@ export const useShellStore = defineStore('shell', () => {
     splitTerminalSession,
   } = terminalSessionStore;
 
-  const activeWorkspaceFilePath = computed(() => {
-    const path = filePathFromDocumentId(activeEditorDocumentId.value);
-    return path && openedFilePaths.value.includes(path) ? path : null;
-  });
   const hasEditorSelection = computed(() => Boolean(editorSelection.value?.text.trim()));
 
   function setEditorSelection(selection: EditorSelectionSnapshot | null): void {
@@ -2918,9 +2573,12 @@ export const useShellStore = defineStore('shell', () => {
       syncIdeComposerDraftForWorkspace(workspaceId);
       void refreshOperatorThreadMessages(workspaceId);
       void restoreWorkspaceIdeView(workspaceId);
-      void loadRunHistory(selectWorkspacePrimaryRun(
-        runs.value.filter((run) => run.workspace_id === workspaceId),
-      )?.run_id ?? null);
+      void loadRunHistory(
+        resolveRunHistoryRunId(
+          runs.value.filter((run) => run.workspace_id === workspaceId),
+          ideAgentRunId.value,
+        ),
+      );
       void loadOperatorBriefing({ background: briefingLoadState.value === 'loaded' });
       void loadTerminalSessions(workspaceId);
     }
@@ -3217,6 +2875,24 @@ export const useShellStore = defineStore('shell', () => {
   });
 
   const {
+    voiceOrbDock,
+    voiceOrbPosition,
+    voiceOrbUserPinned,
+    voiceOrbDragging,
+    voiceOrbVisible,
+    voiceOrbAnchorStyle,
+    setVoiceOrbDock,
+    setVoiceOrbPosition,
+    resetVoiceOrbDock,
+    setVoiceOrbVisible,
+    hideVoiceOrb,
+    showVoiceOrb,
+    requestVoiceOrbSmartDodge,
+    ensureVoiceOrbPosition,
+    persistVoiceOrbPlacement,
+  } = createVoiceOrbPlacementController();
+
+  const {
     loadOperatorBriefing,
   } = createOperatorBriefingSlice({
     operatorBriefing,
@@ -3280,59 +2956,12 @@ export const useShellStore = defineStore('shell', () => {
   });
 
   async function refreshOperatorPresence(): Promise<void> {
-    await loadOperatorBriefing({ background: true });
+    await loadOperatorBriefing({ background: true, light: true });
   }
 
   async function autoContinueInterruptedIdeRun(): Promise<void> {
     const recovery = readIdeRunRecovery();
-    // #region agent log
-    fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
-      body: JSON.stringify({
-        sessionId: 'df24bc',
-        runId: 'axon-x-debug-mode',
-        hypothesisId: 'D6',
-        location: 'shell.ts:autoContinueInterruptedIdeRun:entry',
-        message: 'server restart recovery candidate checked',
-        data: {
-          hasRecovery: Boolean(recovery),
-          recoveryWorkspaceId: recovery?.workspaceId ?? null,
-          currentWorkspaceId: currentWorkspace.value?.workspace_id ?? null,
-          recoveryRunId: recovery?.runId ?? null,
-          recoveryCount: recovery?.recoveryCount ?? null,
-          streamActive: agentStreamActive.value,
-          mutationState: commandMutationState.value,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    if (
-      !recovery ||
-      autoRunRecoveryInFlight ||
-      agentStreamActive.value ||
-      commandMutationState.value === 'submitting' ||
-      currentWorkspace.value?.workspace_id !== recovery.workspaceId
-    ) {
-      return;
-    }
-
-    const run = runs.value.find((item) => item.run_id === recovery.runId) ?? null;
-    if (!run) {
-      clearIdeRunRecovery(recovery.runId);
-      return;
-    }
-    if (recovery.recoveryCount >= 1) {
-      clearIdeRunRecovery(recovery.runId);
-      commandMutationError.value =
-        'Automatic continuation stopped after a repeated server restart. Review the run before continuing manually.';
-      return;
-    }
-    if (run.phase !== 'executing') {
-      if (run.phase === 'completed' || run.phase === 'failed') {
-        clearIdeRunRecovery(recovery.runId);
-      }
+    if (!recovery || autoRunRecoveryInFlight) {
       return;
     }
 
@@ -3340,49 +2969,119 @@ export const useShellStore = defineStore('shell', () => {
     let currentBootId = '';
     let dispatched = false;
     try {
-      currentBootId = await fetchControlPlaneBootId();
-      if (!currentBootId || currentBootId === recovery.controlPlaneBootId) {
+      currentBootId =
+        (await waitForStableControlPlaneBootId({
+          previousBootId: recovery.controlPlaneBootId,
+        })) ?? '';
+      if (!currentBootId) {
+        // Same control-plane boot (or timeout): never leave a completed/failed
+        // recovery marker to re-check on every live refresh.
+        await loadRuns({ sync: false });
+        const run = runs.value.find((item) => item.run_id === recovery.runId) ?? null;
+        const phase = run?.phase ?? null;
+        if (
+          !run ||
+          phase === 'completed' ||
+          phase === 'failed' ||
+          phase === 'cancelled' ||
+          phase === 'review_ready'
+        ) {
+          clearIdeRunRecovery(recovery.runId);
+        }
         return;
       }
-      ideAgentRunId.value = recovery.runId;
+      // Refresh runs so orphaned phases from startup reconcile are visible.
+      await loadRuns({ sync: false });
+      const run = runs.value.find((item) => item.run_id === recovery.runId) ?? null;
+      const decision = decideIdeRunRecovery({
+        recovery,
+        currentBootId,
+        runPhase: run?.phase ?? null,
+        streamActive: agentStreamActive.value,
+        mutationBusy: commandMutationState.value === 'submitting',
+        currentWorkspaceId: currentWorkspace.value?.workspace_id ?? null,
+      });
+
+      if (decision.action === 'clear') {
+        clearIdeRunRecovery(recovery.runId);
+        return;
+      }
+      if (decision.action === 'stop_retry') {
+        clearIdeRunRecovery(recovery.runId);
+        commandMutationError.value = decision.reason;
+        return;
+      }
+      if (decision.action !== 'continue') {
+        return;
+      }
+
+      if (decision.linkExistingRun) {
+        ideAgentRunId.value = recovery.runId;
+      }
+      // Clear the old marker before dispatch so a failed continue can persist a fresh one.
+      clearIdeRunRecovery(recovery.runId);
       dispatched = await dispatchIdeComposerMessage(recovery.mode, {
         contentOverride: SERVER_RESTART_CONTINUATION_PROMPT,
-        linkedRunIdOverride: recovery.runId,
+        linkedRunIdOverride: decision.linkExistingRun ? recovery.runId : null,
         threadIdOverride: recovery.threadId,
-        recoveryCountOverride: recovery.recoveryCount + 1,
+        recoveryCountOverride: decision.nextRecoveryCount,
         clearDraftOnSuccess: false,
       });
+      if (!dispatched) {
+        // Restore so a later refresh can retry while attempts remain.
+        persistIdeRunRecovery({
+          ...recovery,
+          recoveryCount: decision.nextRecoveryCount - 1,
+        });
+      }
     } finally {
-      // #region agent log
-      fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df24bc' },
-        body: JSON.stringify({
-          sessionId: 'df24bc',
-          runId: 'axon-x-debug-mode',
-          hypothesisId: 'D4',
-          location: 'shell.ts:autoContinueInterruptedIdeRun',
-          message: 'server restart recovery evaluated',
-          data: {
-            runId: recovery.runId,
-            mode: recovery.mode,
-            phase: run.phase,
-            bootChanged:
-              Boolean(currentBootId) && currentBootId !== recovery.controlPlaneBootId,
-            dispatched,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       autoRunRecoveryInFlight = false;
     }
   }
 
-  async function refreshRunSurfaces(): Promise<void> {
+  async function refreshRunSurfaces(options?: { light?: boolean; forceFull?: boolean }): Promise<void> {
+    // During an active stream/run, full surface refresh (CLI status + briefing +
+    // fleet + brain) routinely takes 5–8s and trips Chrome "Page Unresponsive".
+    const activeBusy =
+      agentStreamActive.value ||
+      primaryActiveRun.value?.phase === 'executing' ||
+      primaryActiveRun.value?.phase === 'planning' ||
+      primaryActiveRun.value?.phase === 'starting' ||
+      primaryActiveRun.value?.phase === 'queued';
+    const light =
+      options?.forceFull === true
+        ? false
+        : options?.light === true || activeBusy;
+    if (light) {
+      // Live SSE ticks must stay cheap: skip CLI status/summary AND watch inbox
+      // (inbox watch probe regularly hits a ~5s timeout and freezes the console).
+      await loadRuns({ sync: false });
+      await autoContinueInterruptedIdeRun();
+      await flushIdeComposerQueueIfIdle();
+      return;
+    }
     const briefingBackground = briefingLoadState.value === 'loaded';
     const runtimeBackground = runtimeSummaryLoadState.value === 'loaded';
     const inboxBackground = inboxLoadState.value === 'loaded';
+    // Soft full refresh: when surfaces are already loaded, only refresh runs +
+    // inbox + history. Avoid stacking cold CLI/briefing probes on every mutation.
+    if (
+      briefingBackground &&
+      runtimeBackground &&
+      inboxBackground &&
+      runtimeStatusLoadState.value === 'loaded'
+    ) {
+      await Promise.all([
+        loadRuns({ sync: false }),
+        loadInbox({ background: true }),
+      ]);
+      await loadRunHistory(
+        resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
+      );
+      await autoContinueInterruptedIdeRun();
+      await flushIdeComposerQueueIfIdle();
+      return;
+    }
     await Promise.all([
       loadRuns(),
       loadRuntimeStatus(),
@@ -3395,7 +3094,9 @@ export const useShellStore = defineStore('shell', () => {
         ? loadOperatorBrainGraph({ background: true })
         : Promise.resolve(),
     ]);
-    await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
+    await loadRunHistory(
+      resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
+    );
     await autoContinueInterruptedIdeRun();
     await flushIdeComposerQueueIfIdle();
   }
@@ -3721,15 +3422,22 @@ export const useShellStore = defineStore('shell', () => {
       syncIdeComposerDraftForWorkspace(workspaceId);
     }
 
+    // Warm CLI status once before parallel summary/briefing/fleet so they hit
+    // the snapshot cache instead of stacking multi-second auth probes.
+    await loadRuntimeStatus();
     await Promise.all([
-      loadRuntimeStatus(),
-      loadRuntimeSummary(),
-      loadInbox(),
+      loadRuntimeSummary({ background: true }),
+      loadInbox({ background: true }),
       loadConnectors(),
-      loadOperatorBriefing(),
-      loadOperatorFleetHealth(),
+      // Light briefing keeps first paint under ~100ms; full briefing fills signals
+      // in the background without blocking bootstrap_complete.
+      loadOperatorBriefing({ background: true, light: true }),
+      loadOperatorFleetHealth({ background: true }),
     ]);
-    await loadRunHistory(primaryActiveRun.value?.run_id ?? null);
+    void loadOperatorBriefing({ background: true });
+    await loadRunHistory(
+      resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
+    );
     if (workspaceId) {
       await loadWorkspaceThread(workspaceId, 'operator');
       await hydrateWorkspaceIdeChat(workspaceId);
@@ -3899,6 +3607,7 @@ export const useShellStore = defineStore('shell', () => {
     createWorkspaceFolder,
     pendingApprovalsCount,
     primaryActiveRun,
+    runSeamDisplayRun,
     primaryApprovalRun,
     primaryInboxItem,
     refreshRunSurfaces,
@@ -3991,6 +3700,8 @@ export const useShellStore = defineStore('shell', () => {
     editorRevealRequest,
     focusCommandSeam,
     restoreComposerDraft,
+    openIdeComposer,
+    openIdeComposerWithDraft,
     focusAttentionSidebar,
     focusMissionControl,
     focusKairoBriefing,
@@ -4028,5 +3739,20 @@ export const useShellStore = defineStore('shell', () => {
     workspaceTrailLabel,
     workspaces,
     usesProductionWorkspaceCatalog,
+    voiceOrbDock,
+    voiceOrbPosition,
+    voiceOrbUserPinned,
+    voiceOrbDragging,
+    voiceOrbVisible,
+    voiceOrbAnchorStyle,
+    setVoiceOrbDock,
+    setVoiceOrbPosition,
+    resetVoiceOrbDock,
+    setVoiceOrbVisible,
+    hideVoiceOrb,
+    showVoiceOrb,
+    requestVoiceOrbSmartDodge,
+    ensureVoiceOrbPosition,
+    persistVoiceOrbPlacement,
   };
 });

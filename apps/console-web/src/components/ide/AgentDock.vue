@@ -12,6 +12,10 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
 
+const dockAlive = computed(
+  () => shell.agentStreamActive || shell.pendingApprovalsCount > 0,
+);
+
 const { resizing, resetDockWidth, startDockResize } = useRightDockResize({
   dockRef,
   collapsed: computed(() => shell.agentDockCollapsed),
@@ -40,7 +44,11 @@ onMounted(() => {
     v-if="!shell.agentDockCollapsed"
     ref="dockRef"
     class="region region-right-dock agent-dock"
-    :class="{ 'agent-dock--resizing': resizing }"
+    :class="{
+      'agent-dock--resizing': resizing,
+      'agent-dock--alive': dockAlive,
+      'agent-dock--streaming': shell.agentStreamActive,
+    }"
   >
     <div
       class="agent-dock__resize-handle"

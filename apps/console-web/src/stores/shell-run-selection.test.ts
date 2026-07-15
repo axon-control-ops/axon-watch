@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RunRecord } from '../contracts/canonical';
-import { selectPrimaryApprovalRun, selectPrimaryRun, selectWorkspacePrimaryRun } from './shell-run-selection';
+import {
+  isRunOnLocalCalendarDay,
+  resolveRunHistoryRunId,
+  selectLatestWorkspaceRun,
+  selectPrimaryApprovalRun,
+  selectPrimaryRun,
+  selectRunSeamDisplayRun,
+  selectWorkspacePrimaryRun,
+} from './shell-run-selection';
 
 function run(overrides: Partial<RunRecord> & Pick<RunRecord, 'run_id' | 'phase'>): RunRecord {
   return {
@@ -74,6 +82,77 @@ describe('shell run selection', () => {
 
     expect(selectWorkspacePrimaryRun([completed])).toBeNull();
     expect(selectPrimaryRun([completed])).toBeNull();
+  });
+
+  it('selects the latest workspace run by updated_at', () => {
+    const older = run({
+      run_id: 'run_old',
+      phase: 'completed',
+      status: 'done',
+      updated_at: '2026-07-14T08:00:00Z',
+    });
+    const newer = run({
+      run_id: 'run_new',
+      phase: 'completed',
+      status: 'done',
+      updated_at: '2026-07-14T12:00:00Z',
+    });
+
+    expect(selectLatestWorkspaceRun([older, newer])?.run_id).toBe('run_new');
+  });
+
+  it('shows the latest completed run from today in the run seam when idle', () => {
+    const now = new Date();
+    const todayStamp = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      12,
+      0,
+      0,
+    ).toISOString();
+    const yesterdayStamp = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 1,
+      12,
+      0,
+      0,
+    ).toISOString();
+
+    const completed = run({
+      run_id: 'run_done',
+      phase: 'completed',
+      status: 'done',
+      updated_at: todayStamp,
+      can_stop: false,
+    });
+
+    expect(selectRunSeamDisplayRun([completed])?.run_id).toBe('run_done');
+    expect(isRunOnLocalCalendarDay(completed, now)).toBe(true);
+    expect(
+      isRunOnLocalCalendarDay(completed, new Date(yesterdayStamp)),
+    ).toBe(false);
+
+    const yesterday = run({
+      run_id: 'run_yesterday',
+      phase: 'completed',
+      status: 'done',
+      updated_at: yesterdayStamp,
+    });
+    expect(selectRunSeamDisplayRun([yesterday])).toBeNull();
+  });
+
+  it('resolves run history to linked run when workspace is idle', () => {
+    const completed = run({
+      run_id: 'run_done',
+      phase: 'completed',
+      status: 'done',
+      updated_at: '2026-07-14T12:00:00Z',
+    });
+
+    expect(resolveRunHistoryRunId([completed], 'run_done')).toBe('run_done');
+    expect(resolveRunHistoryRunId([completed])).toBe('run_done');
   });
 
   it('scopes workspace primary run to the provided workspace items only', () => {

@@ -186,6 +186,40 @@ describe('parseAgentTranscriptBlocks', () => {
     expect(prose.text).toBe(line);
   });
 
+  it('collapses glued partial Day-to-day section echoes in AgentDock prose', () => {
+    const opener =
+      'No — that “Working with …” starter line does not need to sit in the composer. ' +
+      'Talk already introduces the teammate. The composer should stay clear for the real ask.';
+    const changed = [
+      '**What I changed**',
+      '- Clicking **Talk** opens chat without stuffing a boilerplate sentence.',
+      '- **Status** and **Assign** still prefill useful prompts.',
+    ].join('\n');
+    const dayToDay = [
+      '**Day-to-day with Agents**',
+      '1. Open **Team** in the left bar — each person owns a slice of the business.',
+      '2. Working agents **glow**; they can **speak** a short status when you engage them.',
+      '3. Click a teammate, then type what you need in the composer.',
+      '4. Approve when Full Access asks; watch the dock for progress and handoffs.',
+      '5. Lead for priorities, Night Watch for signals/health — that is the daily loop.',
+    ].join('\n');
+    // Real Cursor shape: echo skips the middle "What I changed" section.
+    const content = [
+      ':::thinking',
+      'Answer both questions.',
+      ':::',
+      `${opener}\n\n${changed}\n\n${dayToDay}${opener}\n\n${dayToDay}`,
+    ].join('\n');
+    const segments = parseAgentTranscriptBlocks(content);
+    const prose = segments.find((segment) => segment.kind === 'text');
+    expect(prose?.kind).toBe('text');
+    if (prose?.kind !== 'text') throw new Error('expected text segment');
+    expect(prose.text.match(/Day-to-day with Agents/g)?.length ?? 0).toBe(1);
+    expect(prose.text.match(/No —/g)?.length ?? 0).toBe(1);
+    expect(prose.text).toContain('What I changed');
+    expect(prose.text.trim().endsWith('daily loop.')).toBe(true);
+  });
+
   it('merges adjacent duplicate research segments', () => {
     const content = [
       ':::research vite configuration',

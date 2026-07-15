@@ -26,19 +26,25 @@ from __future__ import annotations
 import json
 import os
 import re
-import time
-from difflib import SequenceMatcher
-from pathlib import Path
 from typing import Any, Callable
 
 from app.cli_runtime.research_stream_blocks import (
-    collapse_duplicated_body,
     normalize_transcript_content,
     research_completed_block_from_event,
     research_items_from_result,
     research_query_from_tool_call,
     research_started_block_from_event,
 )
+from app.cli_runtime.stream_blocks.terminal_blocks import (
+    _relative_path,
+    shell_command_from_tool_call,
+    shell_completion_from_event,
+    terminal_block,
+    terminal_close_body,
+    terminal_started_block_from_event,
+)
+from app.cli_runtime.stream_blocks.text_delta import assistant_text_delta
+from app.cli_runtime.stream_blocks.transcript_dedupe import collapse_duplicated_body
 from app.cli_runtime.generated_image_paths import image_paths_from_tool_call_event
 
 
@@ -77,134 +83,12 @@ def result_from_event(event: dict[str, Any]) -> tuple[str, bool] | None:
     return str(event.get("result") or ""), is_error
 
 
-def _relative_path(path: str, workspace_root: str) -> str:
-    path = path.strip()
-    if not path:
-        return path
-
-    root = Path(workspace_root).expanduser().resolve() if workspace_root else None
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        return path.lstrip("./")
-
-    try:
-        resolved = candidate.resolve()
-    except OSError:
-        resolved = candidate
-
-    if root is not None:
-        try:
-            return resolved.relative_to(root).as_posix()
-        except ValueError:
-            pass
-        basename = resolved.name
-        if basename:
-            if (root / basename).is_file():
-                return basename
-            if (root / "assets" / basename).is_file():
-                return f"assets/{basename}"
-            return basename
-
-    parts = resolved.as_posix().split("/")
-    if "README.md" in parts:
-        return "README.md"
-    return resolved.name or path
-
 
 _TERMINAL_OUTPUT_LIMIT = 4000
 
 
-def _shell_output_from_result(result: Any) -> str:
-    """Best-effort extraction of command output from a shell tool result."""
-    if not isinstance(result, dict):
-        return ""
-    for container in (result.get("success"), result):
-        if not isinstance(container, dict):
-            continue
-        parts: list[str] = []
-        for key in ("stdout", "output", "stderr"):
-            value = container.get(key)
-            if isinstance(value, str) and value.strip():
-                parts.append(value.rstrip())
-        if parts:
-            return "\n".join(parts)
-    return ""
 
-
-_SHELL_TOOL_KEYS = ("shellToolCall", "runTerminalCommandToolCall", "terminalToolCall")
-
-
-def _shell_command_from_tool_call(tool_call: dict[str, Any]) -> str:
-    for shell_key in _SHELL_TOOL_KEYS:
-        shell_call = tool_call.get(shell_key)
-        if not isinstance(shell_call, dict):
-            continue
-        args = shell_call.get("args") if isinstance(shell_call.get("args"), dict) else {}
-        command = str(args.get("command") or args.get("commandLine") or "").strip()
-        if command:
-            return command
-    return ""
-
-
-def _shell_call_from_tool_call(tool_call: dict[str, Any]) -> dict[str, Any] | None:
-    for shell_key in _SHELL_TOOL_KEYS:
-        shell_call = tool_call.get(shell_key)
-        if isinstance(shell_call, dict):
-            return shell_call
-    return None
-
-
-def _terminal_block(command: str, output: str) -> str:
-    trimmed = output.strip()
-    if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
-        trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
-    body = f"\n{trimmed}\n" if trimmed else "\n"
-    return f"\n:::terminal {command}{body}:::\n"
-
-
-def _terminal_started_block(command: str) -> str:
-    trimmed = command.strip()
-    if not trimmed:
-        return ""
-    return f"\n:::terminal {trimmed}\n"
-
-
-def _terminal_close_body(output: str) -> str:
-    trimmed = output.strip()
-    if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
-        trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
-    if trimmed:
-        return f"{trimmed}\n:::\n"
-    return ":::\n"
-
-
-def terminal_started_block_from_event(event: dict[str, Any]) -> str:
-    """Open a live `:::terminal` block when a shell tool call starts (Cursor parity)."""
-    if event.get("type") != "tool_call" or event.get("subtype") != "started":
-        return ""
-    tool_call = event.get("tool_call")
-    if not isinstance(tool_call, dict):
-        return ""
-    return _terminal_started_block(_shell_command_from_tool_call(tool_call))
-
-
-def _shell_completion_from_event(event: dict[str, Any]) -> tuple[str, str] | None:
-    if event.get("type") != "tool_call" or event.get("subtype") != "completed":
-        return None
-    tool_call = event.get("tool_call")
-    if not isinstance(tool_call, dict):
-        return None
-    shell_call = _shell_call_from_tool_call(tool_call)
-    if shell_call is None:
-        return None
-    command = _shell_command_from_tool_call(tool_call)
-    if not command:
-        return None
-    output = _shell_output_from_result(shell_call.get("result"))
-    return command, output
-
-
-def _image_block_from_event(
+def image_block_from_event(
     event: dict[str, Any],
     workspace_root: str,
 ) -> str:
@@ -219,13 +103,87 @@ def _image_block_from_event(
     return "".join(blocks)
 
 
-def _tool_block_from_event(
+def tool_block_from_event(
     event: dict[str, Any],
     workspace_root: str,
     *,
     open_query: str | None = None,
 ) -> str:
     """Render a completed tool_call event as a transcript block, or ''."""
+    if event.get("type") != "tool_call" or event.get("subtype") != "completed":
+        return ""
+    tool_call = event.get("tool_call")
+    if not isinstance(tool_call, dict):
+        return ""
+
+    research_block = research_completed_block_from_event(event, open_query=open_query)
+    if research_block:
+        return research_block
+
+    image_block = image_block_from_event(event, workspace_root)
+    if image_block:
+        return image_block
+
+    edit = tool_call.get("editToolCall")
+    if isinstance(edit, dict):
+        args = edit.get("args") if isinstance(edit.get("args"), dict) else {}
+        success = (edit.get("result") or {}).get("success") if isinstance(edit.get("result"), dict) else None
+        path = _relative_path(str((success or args).get("path") or ""), workspace_root)
+        if not isinstance(success, dict):
+            return f"\n:::tool Edit failed {path}\n"
+        added = int(success.get("linesAdded") or 0)
+        removed = int(success.get("linesRemoved") or 0)
+        diff = str(success.get("diffString") or "").strip()
+        return f"\n:::edit {path} +{added} -{removed}\n{diff}\n:::\n"
+
+    read = tool_call.get("readToolCall")
+    if isinstance(read, dict):
+        args = read.get("args") if isinstance(read.get("args"), dict) else {}
+        path = _relative_path(str(args.get("path") or ""), workspace_root)
+        return f"\n:::tool Read {path}\n"
+
+    shell_completion = shell_completion_from_event(event)
+    if shell_completion is not None:
+        command, output = shell_completion
+        return terminal_block(command, output)
+
+    for key, value in tool_call.items():
+        if not key.endswith("ToolCall") or not isinstance(value, dict):
+            continue
+        label = key[: -len("ToolCall")].replace("_", " ").capitalize()
+        args = value.get("args") if isinstance(value.get("args"), dict) else {}
+        target = str(args.get("path") or args.get("command") or "").strip()
+        target = _relative_path(target, workspace_root)
+        suffix = f" {target}" if target else ""
+        return f"\n:::tool {label}{suffix}\n"
+    return ""
+
+
+
+
+
+def collapse_echo_text(text: str) -> str:
+    return collapse_duplicated_body(text)
+
+
+def _image_block_from_event(event: dict[str, Any], workspace_root: str) -> str:
+    paths = image_paths_from_tool_call_event(event)
+    if not paths:
+        return ""
+    blocks: list[str] = []
+    for raw_path in paths:
+        path = _relative_path(raw_path, workspace_root)
+        if path:
+            blocks.append(f"\n:::image {path}\n:::\n")
+    return "".join(blocks)
+
+
+def tool_block_from_event(
+    event: dict[str, Any],
+    workspace_root: str,
+    *,
+    open_query: str | None = None,
+) -> str:
     if event.get("type") != "tool_call" or event.get("subtype") != "completed":
         return ""
     tool_call = event.get("tool_call")
@@ -258,10 +216,10 @@ def _tool_block_from_event(
         path = _relative_path(str(args.get("path") or ""), workspace_root)
         return f"\n:::tool Read {path}\n"
 
-    shell_completion = _shell_completion_from_event(event)
+    shell_completion = shell_completion_from_event(event)
     if shell_completion is not None:
         command, output = shell_completion
-        return _terminal_block(command, output)
+        return terminal_block(command, output)
 
     for key, value in tool_call.items():
         if not key.endswith("ToolCall") or not isinstance(value, dict):
@@ -274,74 +232,6 @@ def _tool_block_from_event(
         return f"\n:::tool {label}{suffix}\n"
     return ""
 
-
-def _collapse_echo_text(text: str) -> str:
-    """Drop a single-chunk assistant payload that repeats itself back-to-back."""
-    return collapse_duplicated_body(text)
-
-
-def _norm_stream_text(text: str) -> str:
-    cleaned = re.sub(r"\s+", " ", text or "").strip().lstrip("'\"“”").lower()
-    cleaned = re.sub(r"^i['']?ve\b", "ve", cleaned)
-    cleaned = re.sub(r"^ve\b", "ve", cleaned)
-    cleaned = re.sub(r"^i\s+", "", cleaned)
-    return cleaned.strip()
-
-
-def assistant_text_delta(accumulated: str, incoming: str) -> str:
-    """Return only the suffix of *incoming* that is not already in *accumulated*.
-
-    Cursor CLI with ``--stream-partial-output`` emits incremental assistant chunks
-    (e.g. ``hello``, `` world``) and then a final aggregate event (``hello world``).
-    Appending every event verbatim duplicates the full reply.
-    """
-    incoming = collapse_duplicated_body(incoming)
-    if not incoming:
-        return ""
-    if incoming == accumulated:
-        return ""
-    if accumulated:
-        norm_acc = _norm_stream_text(accumulated)
-        norm_in = _norm_stream_text(incoming)
-        if norm_acc and norm_acc == norm_in:
-            return ""
-        if len(accumulated) >= 200 and len(incoming) >= 200:
-            semantic_acc = re.sub(r"\W+", "", accumulated).lower()
-            semantic_in = re.sub(r"\W+", "", incoming).lower()
-            similarity = SequenceMatcher(None, semantic_acc, semantic_in).ratio()
-            hypothesis_counts_match = len(
-                re.findall(r"\bH\d+\b", accumulated)
-            ) == len(re.findall(r"\bH\d+\b", incoming))
-            reproduce_counts_match = accumulated.count(
-                ":::debug-reproduce"
-            ) == incoming.count(":::debug-reproduce")
-            if (
-                similarity >= 0.86
-                and hypothesis_counts_match
-                and reproduce_counts_match
-            ):
-                # Cursor can emit token deltas followed by a formatted aggregate
-                # of the same Debug reply. Appending that aggregate repeats the
-                # complete hypothesis/reproduce section.
-                return ""
-        # Near-echo with a short prefix difference ("I " / leading apostrophe).
-        if norm_in.endswith(norm_acc) and 0 < len(norm_in) - len(norm_acc) <= 4:
-            return ""
-        if norm_acc.endswith(norm_in) and 0 < len(norm_acc) - len(norm_in) <= 4:
-            return ""
-    if accumulated and incoming.startswith(accumulated):
-        suffix = incoming[len(accumulated) :]
-        if not suffix:
-            return ""
-        if suffix == accumulated or suffix.strip() == accumulated.strip():
-            return ""
-        collapsed_combined = collapse_duplicated_body(accumulated + suffix)
-        if collapsed_combined.strip() == accumulated.strip():
-            return ""
-        return suffix
-    if accumulated and accumulated.startswith(incoming):
-        return ""
-    return incoming
 
 
 class CursorStreamAssembler:
@@ -398,7 +288,7 @@ class CursorStreamAssembler:
     def _close_open_terminal(self, *, output: str = "") -> None:
         if not self._terminal_open_active:
             return
-        self._append(_terminal_close_body(output))
+        self._append(terminal_close_body(output))
         self._terminal_open_command = None
         self._terminal_open_active = False
 
@@ -414,7 +304,7 @@ class CursorStreamAssembler:
                 return
             # Cursor can emit incremental thinking chunks and then a cumulative
             # echo of the full block — same failure mode as assistant text.
-            incoming = _collapse_echo_text(str(event.get("text") or ""))
+            incoming = collapse_echo_text(str(event.get("text") or ""))
             if incoming:
                 delta = assistant_text_delta(self._thinking_accumulated, incoming)
                 if delta:
@@ -427,58 +317,9 @@ class CursorStreamAssembler:
 
         if event_type == "assistant":
             self._close_thinking()
-            text = _collapse_echo_text(assistant_text_from_event(event))
+            text = collapse_echo_text(assistant_text_from_event(event))
             if text:
                 delta = assistant_text_delta(self._assistant_accumulated, text)
-                if self._assistant_accumulated:
-                    accumulated_semantic = re.sub(
-                        r"\W+", "", self._assistant_accumulated
-                    ).lower()
-                    incoming_semantic = re.sub(r"\W+", "", text).lower()
-                    # region agent log
-                    try:
-                        debug_payload = {
-                            "sessionId": "df24bc",
-                            "runId": "axon-x-debug-mode",
-                            "hypothesisId": "D1",
-                            "location": "cursor_stream_events.py:CursorStreamAssembler.feed_line",
-                            "message": "assistant stream delta compared",
-                            "data": {
-                                "accumulatedLength": len(self._assistant_accumulated),
-                                "incomingLength": len(text),
-                                "deltaLength": len(delta),
-                                "semanticSimilarity": round(
-                                    SequenceMatcher(
-                                        None,
-                                        accumulated_semantic,
-                                        incoming_semantic,
-                                    ).ratio(),
-                                    4,
-                                ),
-                                "accumulatedHypotheses": len(
-                                    re.findall(
-                                        r"\bH\d+\b", self._assistant_accumulated
-                                    )
-                                ),
-                                "incomingHypotheses": len(
-                                    re.findall(r"\bH\d+\b", text)
-                                ),
-                                "accumulatedReproduceBlocks": self._assistant_accumulated.count(
-                                    ":::debug-reproduce"
-                                ),
-                                "incomingReproduceBlocks": text.count(
-                                    ":::debug-reproduce"
-                                ),
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                        with Path(
-                            "/home/edp/axon-nvme/repos/axon-local/.cursor/debug-df24bc.log"
-                        ).open("a") as debug_log:
-                            debug_log.write(json.dumps(debug_payload) + "\n")
-                    except Exception:
-                        pass
-                    # endregion
                 if delta:
                     self._saw_assistant_text = True
                     self._assistant_accumulated += delta
@@ -506,23 +347,23 @@ class CursorStreamAssembler:
                     self._append(terminal_started)
                     tool_call = event.get("tool_call")
                     if isinstance(tool_call, dict):
-                        self._terminal_open_command = _shell_command_from_tool_call(tool_call) or None
+                        self._terminal_open_command = shell_command_from_tool_call(tool_call) or None
                         self._terminal_open_active = True
                     return
             if subtype == "completed":
                 for image_path in image_paths_from_tool_call_event(event):
                     if image_path not in self._generated_image_paths:
                         self._generated_image_paths.append(image_path)
-                shell_completion = _shell_completion_from_event(event)
+                shell_completion = shell_completion_from_event(event)
                 if shell_completion is not None:
                     command, output = shell_completion
                     if self._terminal_open_active:
                         self._close_open_terminal(output=output)
                     else:
-                        self._append(_terminal_block(command, output))
+                        self._append(terminal_block(command, output))
                     return
                 open_query = self._research_open_query if self._research_open_active else None
-                block = _tool_block_from_event(
+                block = tool_block_from_event(
                     event,
                     self._workspace_root,
                     open_query=open_query,
@@ -547,33 +388,6 @@ class CursorStreamAssembler:
         self._close_open_terminal()
         raw_content = self.content.strip()
         content = normalize_transcript_content(raw_content)
-        # region agent log
-        try:
-            debug_payload = {
-                "sessionId": "df24bc",
-                "runId": "axon-x-debug-mode",
-                "hypothesisId": "D2",
-                "location": "cursor_stream_events.py:CursorStreamAssembler.finalize",
-                "message": "debug transcript normalized",
-                "data": {
-                    "rawLength": len(raw_content),
-                    "normalizedLength": len(content),
-                    "rawHypotheses": len(re.findall(r"\bH\d+\b", raw_content)),
-                    "normalizedHypotheses": len(re.findall(r"\bH\d+\b", content)),
-                    "rawReproduceBlocks": raw_content.count(":::debug-reproduce"),
-                    "normalizedReproduceBlocks": content.count(
-                        ":::debug-reproduce"
-                    ),
-                },
-                "timestamp": int(time.time() * 1000),
-            }
-            with Path(
-                "/home/edp/axon-nvme/repos/axon-local/.cursor/debug-df24bc.log"
-            ).open("a") as debug_log:
-                debug_log.write(json.dumps(debug_payload) + "\n")
-        except Exception:
-            pass
-        # endregion
         if not self._saw_assistant_text and self.result_text and not content:
             return normalize_transcript_content(self.result_text.strip())
         return content

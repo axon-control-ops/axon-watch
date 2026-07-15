@@ -1,10 +1,17 @@
-import type { OperatorPresenceSettings } from '../contracts/canonical';
+import type {
+  OperatorPresenceSettings,
+  SttMode,
+  VoiceRoutingMode,
+} from '../contracts/canonical';
 
 export const OPERATOR_PRESENCE_SETTINGS_KEY = 'axon-x:operator-presence-settings';
 
 /** axon-local desktop voice deck defaults. */
 export const DEFAULT_SPEECH_RATE = 1.0;
 export const DEFAULT_SPEECH_PITCH = 1.04;
+export const DEFAULT_AZURE_VOICE_ID = 'en-GB-RyanNeural';
+export const DEFAULT_STT_MODE: SttMode = 'browser';
+export const DEFAULT_VOICE_ROUTING_MODE: VoiceRoutingMode = 'template_first';
 
 export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
   return {
@@ -17,6 +24,9 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     hands_free_enabled: false,
     speech_rate: DEFAULT_SPEECH_RATE,
     speech_pitch: DEFAULT_SPEECH_PITCH,
+    azure_voice_id: DEFAULT_AZURE_VOICE_ID,
+    stt_mode: DEFAULT_STT_MODE,
+    voice_routing_mode: DEFAULT_VOICE_ROUTING_MODE,
   };
 }
 
@@ -34,6 +44,31 @@ function normalizeSpeechPitch(raw: unknown): number {
     return DEFAULT_SPEECH_PITCH;
   }
   return Math.round(Math.max(0.5, Math.min(1.5, value)) * 100) / 100;
+}
+
+function normalizeAzureVoiceId(raw: unknown): string {
+  const value = String(raw ?? '').trim();
+  return value || DEFAULT_AZURE_VOICE_ID;
+}
+
+function normalizeSttMode(raw: unknown): SttMode {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (value === 'browser' || value === 'browser_continuous' || value === 'cloud') {
+    return value;
+  }
+  return DEFAULT_STT_MODE;
+}
+
+function normalizeVoiceRoutingMode(raw: unknown): VoiceRoutingMode {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (
+    value === 'template_first' ||
+    value === 'runtime_on_deep' ||
+    value === 'runtime_aggressive'
+  ) {
+    return value;
+  }
+  return DEFAULT_VOICE_ROUTING_MODE;
 }
 
 export function normalizeOperatorPresenceSettings(
@@ -58,6 +93,11 @@ export function normalizeOperatorPresenceSettings(
     hands_free_enabled: raw.hands_free_enabled ?? defaults.hands_free_enabled,
     speech_rate: normalizeSpeechRate(raw.speech_rate ?? defaults.speech_rate),
     speech_pitch: normalizeSpeechPitch(raw.speech_pitch ?? defaults.speech_pitch),
+    azure_voice_id: normalizeAzureVoiceId(raw.azure_voice_id ?? defaults.azure_voice_id),
+    stt_mode: normalizeSttMode(raw.stt_mode ?? defaults.stt_mode),
+    voice_routing_mode: normalizeVoiceRoutingMode(
+      raw.voice_routing_mode ?? defaults.voice_routing_mode,
+    ),
   };
 }
 

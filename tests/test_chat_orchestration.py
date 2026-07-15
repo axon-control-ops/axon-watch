@@ -87,6 +87,76 @@ class ChatOrchestrationTests(unittest.TestCase):
             self.assertEqual(record["phase"], "completed")
             self.assertIs(exec_result, execution)
 
+    def test_orchestrate_auto_completes_reversible_shell_check_health(self) -> None:
+        execution = CommandExecutionResult(
+            intent="shell_command",
+            success=True,
+            output="ok",
+            receipt_summary="check-health succeeded",
+        )
+        from unittest.mock import patch
+
+        with patch("app.chat.orchestration.execute_command", return_value=execution), patch(
+            "app.chat.orchestration.append_run_execution_receipt",
+            return_value={
+                "run_id": "run_health",
+                "phase": "executing",
+                "summary": "check-health",
+            },
+        ), patch(
+            "app.chat.orchestration.complete_run",
+            return_value={
+                "run_id": "run_health",
+                "phase": "completed",
+                "summary": "check-health",
+            },
+        ) as complete_mock, patch(
+            "app.chat.orchestration.mark_review_ready",
+        ) as review_mock:
+            record, _exec = orchestrate_command_run(
+                workspace_id="workspace_alpha",
+                content="check health",
+                run_record={
+                    "run_id": "run_health",
+                    "phase": "executing",
+                    "summary": "check-health",
+                },
+                dispatched=True,
+            )
+            complete_mock.assert_called_once_with("run_health")
+            review_mock.assert_not_called()
+            self.assertEqual(record["phase"], "completed")
+
+    def test_orchestrate_finalization_error_fails_run(self) -> None:
+        from unittest.mock import patch
+
+        from app.runs.service import RunLifecycleError
+
+        execution = CommandExecutionResult(
+            intent="health_probe",
+            success=True,
+            output="ok",
+            receipt_summary="health ok",
+        )
+        with patch("app.chat.orchestration.execute_command", return_value=execution), patch(
+            "app.chat.orchestration.append_run_execution_receipt",
+            return_value={"run_id": "run_stuck", "phase": "executing", "summary": "health"},
+        ), patch(
+            "app.chat.orchestration.complete_run",
+            side_effect=RunLifecycleError("complete blocked"),
+        ), patch(
+            "app.chat.orchestration.fail_run",
+            return_value={"run_id": "run_stuck", "phase": "failed", "summary": "health"},
+        ) as fail_mock:
+            record, _exec = orchestrate_command_run(
+                workspace_id="workspace_alpha",
+                content="health",
+                run_record={"run_id": "run_stuck", "phase": "executing", "summary": "health"},
+                dispatched=True,
+            )
+            fail_mock.assert_called_once()
+            self.assertEqual(record["phase"], "failed")
+
     def test_build_agent_reply_for_attach_notes_active_run(self) -> None:
         content = build_agent_command_reply(
             content="add context",

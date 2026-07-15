@@ -75,7 +75,7 @@ describe('kairo voice playback', () => {
       src = '';
       preload = '';
       currentTime = 0;
-      readyState = 2;
+      readyState = 3;
       paused = true;
       ended = false;
       onended: (() => void) | null = null;
@@ -107,6 +107,7 @@ describe('kairo voice playback', () => {
     vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio);
     vi.stubGlobal('HTMLMediaElement', {
       HAVE_CURRENT_DATA: 2,
+      HAVE_FUTURE_DATA: 3,
       HAVE_ENOUGH_DATA: 4,
       NETWORK_EMPTY: 0,
     });
@@ -130,7 +131,7 @@ describe('kairo voice playback', () => {
       });
 
     const promise = speakKairoLine(longText, { immediate: true });
-    await vi.advanceTimersByTimeAsync(800);
+    await vi.advanceTimersByTimeAsync(3500);
     const result = await promise;
 
     expect(result.engine).toBe('browser');
@@ -199,6 +200,7 @@ describe('kairo voice playback', () => {
     );
     vi.stubGlobal('HTMLMediaElement', {
       HAVE_CURRENT_DATA: 2,
+      HAVE_FUTURE_DATA: 3,
       HAVE_ENOUGH_DATA: 4,
       NETWORK_EMPTY: 0,
     });
@@ -216,7 +218,7 @@ describe('kairo voice playback', () => {
     });
 
     const promise = speakKairoLine('Systems nominal.', { immediate: true });
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(3500);
     const result = await promise;
 
     expect(result.engine).toBe('azure');

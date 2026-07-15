@@ -55,32 +55,32 @@
         {
           "name": "DashPro Lead",
           "role": "lead",
-          "owns": "DashPro product priorities and handoffs",
+          "owns": "DashPro product priorities, CI triage decisions, and handoffs",
           "schedule": "on_demand",
           "primary": true
         },
         {
           "name": "DashPro Night Watch",
           "role": "watcher",
-          "owns": "DashPro signals and runtime health",
+          "owns": "DashPro signals, runtime health, and CI red-build alerts",
           "schedule": "always_on"
         },
         {
           "name": "DashPro Frontend",
           "role": "frontend",
-          "owns": "DashPro UI/UX",
+          "owns": "DashPro UI/UX and Expo/Android app-config CI breaks",
           "schedule": "continuous"
         },
         {
           "name": "DashPro Backend",
           "role": "backend",
-          "owns": "DashPro APIs and services",
+          "owns": "DashPro APIs, services, and quality-gate CI failures",
           "schedule": "continuous"
         },
         {
           "name": "DashPro Integrations",
           "role": "integrations",
-          "owns": "DashPro connectors and integrated services",
+          "owns": "DashPro connectors, GitHub Actions, runner/SDK/secrets CI wiring",
           "schedule": "continuous"
         }
       ]

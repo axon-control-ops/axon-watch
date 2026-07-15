@@ -1,7 +1,7 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    name: 'explorer' | 'search' | 'git' | 'run' | 'terminal' | 'agent';
+    name: 'explorer' | 'search' | 'git' | 'run' | 'team' | 'terminal' | 'agent';
     size?: number;
   }>(),
   { size: 18 },
@@ -35,6 +35,12 @@ withDefaults(
     </template>
     <template v-else-if="name === 'run'">
       <polygon points="8 5 19 12 8 19 8 5" />
+    </template>
+    <template v-else-if="name === 'team'">
+      <circle cx="9" cy="8" r="2.4" />
+      <circle cx="16" cy="9" r="2" />
+      <path d="M4.5 18.2c0.4-3.1 2.5-4.7 4.5-4.7s4.1 1.6 4.5 4.7" />
+      <path d="M13.2 18.2c0.25-1.9 1.2-3.2 2.8-3.2 1.7 0 2.85 1.35 3.05 3.2" />
     </template>
     <template v-else-if="name === 'terminal'">
       <polyline points="4 17 10 11 4 5" />

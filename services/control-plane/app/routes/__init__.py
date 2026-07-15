@@ -13,6 +13,7 @@ from app.routes import (
     operator,
     runs,
     runtime,
+    safe_improvement,
     skills,
     vault_http,
     workspaces,
@@ -31,3 +32,4 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(runs.router)
     app.include_router(workspaces.router)
     app.include_router(skills.router)
+    app.include_router(safe_improvement.router)

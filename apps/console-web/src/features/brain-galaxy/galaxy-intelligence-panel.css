@@ -1,0 +1,128 @@
+
+.galaxy-intelligence-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  max-height: min(48vh, 28rem);
+  overflow: auto;
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(72, 210, 255, 0.38);
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(0, 180, 255, 0.12), transparent 55%),
+    linear-gradient(180deg, rgba(4, 16, 24, 0.92) 0%, rgba(2, 8, 14, 0.88) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 210, 255, 0.06) inset,
+    0 0 1.6rem rgba(0, 170, 255, 0.18);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+.galaxy-intelligence-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.galaxy-intelligence-panel__eyebrow {
+  margin: 0;
+  color: rgba(160, 200, 220, 0.88);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.galaxy-intelligence-panel__phase {
+  color: rgba(120, 230, 255, 0.95);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.galaxy-intelligence-panel__headline {
+  margin: 0;
+  color: rgba(235, 248, 255, 0.96);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.galaxy-intelligence-panel__notice,
+.galaxy-intelligence-panel__advise {
+  margin: 0;
+  color: rgba(180, 210, 230, 0.9);
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.galaxy-intelligence-panel__advise {
+  color: rgba(150, 220, 255, 0.92);
+}
+
+.galaxy-intelligence-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.galaxy-intelligence-panel__chip {
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 210, 255, 0.22);
+  background: rgba(0, 18, 28, 0.75);
+  color: rgba(190, 230, 245, 0.92);
+  font-size: 0.5rem;
+  letter-spacing: 0.04em;
+}
+
+.galaxy-intelligence-panel__chip--critical {
+  border-color: rgba(255, 90, 90, 0.5);
+  color: #ff8a8a;
+}
+
+.galaxy-intelligence-panel__chip--attention {
+  border-color: rgba(255, 170, 70, 0.5);
+  color: #ffb45a;
+}
+
+.galaxy-intelligence-panel__chip--info {
+  border-color: rgba(72, 196, 255, 0.5);
+  color: #7ad8ff;
+}
+
+.galaxy-intelligence-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.galaxy-intelligence-panel__section-label {
+  margin: 0;
+  color: rgba(0, 210, 255, 0.78);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.galaxy-intelligence-panel__section ul {
+  margin: 0;
+  padding-left: 0.9rem;
+  color: rgba(200, 225, 240, 0.9);
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
+.galaxy-intelligence-panel__receipt {
+  margin: 0;
+  color: rgba(130, 180, 200, 0.85);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  line-height: 1.35;
+}
+
+.brain-galaxy-stage__hud--right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: stretch;
+}

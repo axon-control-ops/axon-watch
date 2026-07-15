@@ -26,7 +26,6 @@ export function createKairoAgentMilestoneNarrator(
 ) {
   let chain = Promise.resolve();
   const spokenKeys = new Set<string>();
-  const deliveredLines: Array<{ key: string; line: string }> = [];
 
   function narrate(milestone: NarrationMilestone): void {
     const narration = options.narration();
@@ -95,14 +94,6 @@ export function createKairoAgentMilestoneNarrator(
           return;
         }
 
-        const normalizedMessage = message.toLowerCase().replace(/\s+/g, ' ').trim();
-        const matchingDelivery = deliveredLines.find(
-          (item) => item.line.toLowerCase().replace(/\s+/g, ' ').trim() === normalizedMessage,
-        );
-        // #region agent log
-        fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:options.messageId,hypothesisId:'R1',location:'kairo-agent-milestone-narrator.ts:beforeDelivery',message:'agent milestone narration resolved',data:{key:milestone.key,line:message.slice(0,280),matchesPriorKey:matchingDelivery?.key??null,priorDeliveries:deliveredLines.map((item)=>item.key)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        deliveredLines.push({ key: milestone.key, line: message });
         await deliverSpokenOperatorAlert(
           {
             eligible: true,

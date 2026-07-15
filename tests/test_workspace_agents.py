@@ -18,17 +18,17 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.main import app  # noqa: E402
 from app.persistence import run_store  # noqa: E402
 from app.workspace_agents import (  # noqa: E402
-    _derive_agent_status,
     build_company_roster,
     build_workspace_agent_record,
     load_workspace_agent_configs,
 )
+from app.workspace_agents.status import derive_agent_status, employee_status  # noqa: E402
 
 
 class WorkspaceAgentsModuleTests(unittest.TestCase):
     def test_review_ready_run_marks_agent_verifying(self) -> None:
         with patch(
-            "app.workspace_agents.list_runs",
+            "app.workspace_agents.status.list_runs",
             return_value=[
                 {
                     "run_id": "run_review",
@@ -40,7 +40,45 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
                 }
             ],
         ):
-            self.assertEqual("verifying", _derive_agent_status("workspace_demo"))
+            self.assertEqual("verifying", derive_agent_status("workspace_demo"))
+
+    def test_employee_status_keeps_specialists_idle_during_workspace_run(self) -> None:
+        self.assertEqual(
+            "executing",
+            employee_status(
+                role="lead",
+                schedule="on_demand",
+                workspace_status="executing",
+                primary=True,
+            ),
+        )
+        self.assertEqual(
+            "watching",
+            employee_status(
+                role="watcher",
+                schedule="always_on",
+                workspace_status="executing",
+                primary=False,
+            ),
+        )
+        self.assertEqual(
+            "idle",
+            employee_status(
+                role="frontend",
+                schedule="continuous",
+                workspace_status="executing",
+                primary=False,
+            ),
+        )
+        self.assertEqual(
+            "waiting_approval",
+            employee_status(
+                role="frontend",
+                schedule="continuous",
+                workspace_status="waiting_approval",
+                primary=False,
+            ),
+        )
 
     def test_loads_agent_overrides_from_config(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -113,6 +151,38 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
         watcher = next(row for row in roster["employees"] if row["role"] == "watcher")  # type: ignore[index]
         self.assertEqual("always_on", watcher["schedule"])
         self.assertEqual("watching", watcher["status"])
+
+    def test_company_roster_only_lead_mirrors_active_run(self) -> None:
+        with patch(
+            "app.workspace_agents.derive_agent_status",
+            return_value="executing",
+        ):
+            roster = build_company_roster(
+                "workspace_demo",
+                record={
+                    "workspace_id": "workspace_demo",
+                    "display_name": "Demo Co",
+                    "connection_kind": "project_path",
+                },
+                configs={},
+                defaults={
+                    "role": "lead",
+                    "name_template": "{display_name} Lead",
+                    "company_name_template": "{display_name}",
+                },
+                companies={},
+                staffing_template=[
+                    {"role": "lead", "schedule": "on_demand"},
+                    {"role": "watcher", "schedule": "always_on"},
+                    {"role": "frontend", "schedule": "continuous"},
+                    {"role": "backend", "schedule": "continuous"},
+                ],
+            )
+        statuses = {str(row["role"]): str(row["status"]) for row in roster["employees"]}  # type: ignore[index]
+        self.assertEqual("executing", statuses["lead"])
+        self.assertEqual("watching", statuses["watcher"])
+        self.assertEqual("idle", statuses["frontend"])
+        self.assertEqual("idle", statuses["backend"])
 
     def test_loads_company_employees_from_config(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

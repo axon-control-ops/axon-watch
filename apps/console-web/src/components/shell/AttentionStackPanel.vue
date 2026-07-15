@@ -34,6 +34,10 @@ const props = withDefaults(
 const shell = useShellStore();
 
 const activeRun = computed(() => shell.primaryActiveRun);
+const displayRun = computed(() => shell.runSeamDisplayRun);
+const showingRecentCompletedRun = computed(
+  () => Boolean(displayRun.value && !activeRun.value),
+);
 
 const recentReceipts = computed(() => {
   const limit = props.variant === 'sidebar' ? 2 : 3;
@@ -137,39 +141,45 @@ function signalHint(signal: {
   >
     <HudSeamCard
       seam-id="dock-seam-run"
-      :title="shell.dockSeamState('run')?.title ?? 'Active Run'"
+      :title="
+        shell.dockSeamState('run')?.title ??
+        (showingRecentCompletedRun ? 'Latest Run Today' : 'Active Run')
+      "
       seam-class="dock-seam dock-seam--run"
       :show-view-all="variant === 'dock'"
     >
       <div
-        v-if="activeRun"
+        v-if="displayRun"
         class="dock-run-seam"
-        :class="{ 'dock-run-seam--sidebar': variant === 'sidebar' }"
+        :class="{
+          'dock-run-seam--sidebar': variant === 'sidebar',
+          'dock-run-seam--recent': showingRecentCompletedRun,
+        }"
       >
         <div class="dock-run-seam__header">
           <div class="dock-run-seam__title-block">
-            <strong>{{ formatRunDisplayName(activeRun) }}</strong>
-            <span class="dock-run-seam__short-id">#{{ formatRunShortId(activeRun.run_id) }}</span>
+            <strong>{{ formatRunDisplayName(displayRun) }}</strong>
+            <span class="dock-run-seam__short-id">#{{ formatRunShortId(displayRun.run_id) }}</span>
           </div>
-          <span class="dock-tag" :class="phaseTagClass(activeRun.phase)">
-            {{ runPhaseTag(activeRun.phase) }}
+          <span class="dock-tag" :class="phaseTagClass(displayRun.phase)">
+            {{ showingRecentCompletedRun ? 'COMPLETED' : runPhaseTag(displayRun.phase) }}
           </span>
         </div>
 
-        <div class="dock-progress" role="progressbar" :aria-valuenow="runPhaseProgress(activeRun.phase)">
+        <div class="dock-progress" role="progressbar" :aria-valuenow="runPhaseProgress(displayRun.phase)">
           <div
             class="dock-progress__fill"
-            :class="{ 'dock-progress__fill--review': activeRun.phase === 'review_ready' }"
-            :style="{ width: `${runPhaseProgress(activeRun.phase)}%` }"
+            :class="{ 'dock-progress__fill--review': displayRun.phase === 'review_ready' }"
+            :style="{ width: `${runPhaseProgress(displayRun.phase)}%` }"
           />
         </div>
 
         <p
-          v-if="activeRun.current_step"
+          v-if="displayRun.current_step"
           class="dock-run-seam__step"
-          :title="activeRun.current_step"
+          :title="displayRun.current_step"
         >
-          {{ activeRun.current_step }}
+          {{ displayRun.current_step }}
         </p>
 
         <ul v-if="recentReceipts.length" class="dock-run-receipts" aria-label="Recent run receipts">
@@ -204,7 +214,14 @@ function signalHint(signal: {
           </p>
         </div>
 
-        <div v-if="showReviewActions || showStopAction" class="run-actions run-actions--sidebar">
+        <p v-if="showingRecentCompletedRun" class="region-copy dock-run-seam__recent-note">
+          Finished earlier today. Send a new message in the agent dock to start another run.
+        </p>
+
+        <div
+          v-if="!showingRecentCompletedRun && (showReviewActions || showStopAction)"
+          class="run-actions run-actions--sidebar"
+        >
           <button
             v-if="shell.canResumePrimaryRun"
             type="button"
@@ -227,14 +244,16 @@ function signalHint(signal: {
             v-if="showStopAction"
             type="button"
             class="run-actions__button run-actions__button--ghost"
-            :disabled="!shell.canStopPrimaryRun && activeRun.phase !== 'executing'"
+            :disabled="!shell.canStopPrimaryRun && activeRun?.phase !== 'executing'"
             @click="shell.stopPrimaryRun()"
           >
             {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP' }}
           </button>
         </div>
       </div>
-      <p v-else class="region-copy dock-run-seam__empty">No active run — send a command from the right dock.</p>
+      <p v-else class="region-copy dock-run-seam__empty">
+        No runs yet today — send a message from the agent dock to start one.
+      </p>
     </HudSeamCard>
 
     <HudSeamCard

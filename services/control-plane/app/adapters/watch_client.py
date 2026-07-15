@@ -15,7 +15,7 @@ def watch_base_url() -> str:
     ).rstrip("/")
 
 
-def fetch_watch_inbox(timeout_seconds: float = 5.0) -> dict[str, object] | None:
+def fetch_watch_inbox(timeout_seconds: float = 1.5) -> dict[str, object] | None:
     url = f"{watch_base_url()}/internal/watch/inbox"
 
     try:
@@ -30,7 +30,7 @@ def fetch_watch_inbox(timeout_seconds: float = 5.0) -> dict[str, object] | None:
     return payload
 
 
-def fetch_watch_summary(timeout_seconds: float = 5.0) -> dict[str, object] | None:
+def fetch_watch_summary(timeout_seconds: float = 1.5) -> dict[str, object] | None:
     url = f"{watch_base_url()}/internal/watch/summary"
 
     try:

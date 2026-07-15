@@ -70,6 +70,21 @@ def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str | fl
             if 0.5 <= pitch <= 1.5:
                 normalized[key] = round(pitch, 2)
             continue
+        if key == "azure_voice_id":
+            value = str(raw[key] or defaults[key]).strip()
+            if value:
+                normalized[key] = value[:80]
+            continue
+        if key == "stt_mode":
+            value = str(raw[key] or defaults[key]).strip().lower()
+            if value in {"browser", "browser_continuous", "cloud"}:
+                normalized[key] = value
+            continue
+        if key == "voice_routing_mode":
+            value = str(raw[key] or defaults[key]).strip().lower()
+            if value in {"template_first", "runtime_on_deep", "runtime_aggressive"}:
+                normalized[key] = value
+            continue
         normalized[key] = bool(raw[key])
     return normalized
 

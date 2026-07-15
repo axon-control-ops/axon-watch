@@ -1,0 +1,9 @@
+export const EDIT_HEADER_RE = /^:::edit\s+(.+?)\s+\+(\d+)\s+-(\d+)\s*$/;
+export const TOOL_HEADER_RE = /^:::tool\s+(.+)$/;
+export const RESEARCH_HEADER_RE = /^:::research\s+(.+)$/;
+export const RESEARCH_ITEM_RE = /^-\s+(.+?)\s+\|\s+(\S+)\s*$/;
+export const RESEARCH_PROVIDER_RE = /^@provider\s+(.+)$/;
+export const RESEARCH_KIND_RE = /^@kind\s+(search|fetch)\s*$/i;
+export const TERMINAL_HEADER_RE = /^:::terminal\s+(.+)$/;
+export const IMAGE_HEADER_RE = /^:::image\s+(.+)$/;
+export const DEBUG_REPRODUCE_HEADER_RE = /^:::debug-reproduce\s*$/;

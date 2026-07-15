@@ -22,11 +22,18 @@ export interface SurfaceArtifactUiAction {
   artifact_id: string;
 }
 
+export interface MoveVoiceOrbUiAction {
+  type: 'move_voice_orb';
+  dock?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+  mode?: 'smart_dodge';
+}
+
 export type ChatUiAction =
   | SwitchWorkspaceUiAction
   | OpenSourceUiAction
   | HandoffIdeUiAction
-  | SurfaceArtifactUiAction;
+  | SurfaceArtifactUiAction
+  | MoveVoiceOrbUiAction;
 
 export function parseChatUiAction(value: unknown): ChatUiAction | null {
   if (!value || typeof value !== 'object') {
@@ -87,6 +94,27 @@ export function parseChatUiAction(value: unknown): ChatUiAction | null {
     };
   }
 
+  if (record.type === 'move_voice_orb') {
+    const mode = String(record.mode ?? '').trim().toLowerCase();
+    if (mode === 'smart_dodge') {
+      return { type: 'move_voice_orb', mode: 'smart_dodge' };
+    }
+    const dock = String(record.dock ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, '-');
+    if (
+      dock === 'top-left' ||
+      dock === 'top-right' ||
+      dock === 'bottom-left' ||
+      dock === 'bottom-right' ||
+      dock === 'center'
+    ) {
+      return { type: 'move_voice_orb', dock };
+    }
+    return { type: 'move_voice_orb', mode: 'smart_dodge' };
+  }
+
   return null;
 }
 
@@ -105,6 +133,8 @@ export interface WorkspaceSwitchShell {
     options?: { autoSubmit?: boolean },
   ) => Promise<void>;
   surfaceOperatorArtifact?: (artifactId: string) => void;
+  setVoiceOrbDock?: (dock: string) => void;
+  requestVoiceOrbSmartDodge?: (options?: { force?: boolean }) => void;
 }
 
 export function applyChatUiAction(
@@ -142,5 +172,16 @@ export function applyChatUiAction(
 
   if (action.type === 'surface_artifact') {
     shell.surfaceOperatorArtifact?.(action.artifact_id);
+    return;
+  }
+
+  if (action.type === 'move_voice_orb') {
+    if (action.mode === 'smart_dodge') {
+      shell.requestVoiceOrbSmartDodge?.({ force: true });
+      return;
+    }
+    if (action.dock) {
+      shell.setVoiceOrbDock?.(action.dock);
+    }
   }
 }

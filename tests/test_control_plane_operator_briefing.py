@@ -69,6 +69,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "next_safe_actions",
                 "degraded",
                 "connectivity",
+                "memory_highlights",
                 "operator_presence",
                 "cli_runtime",
             },

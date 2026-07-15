@@ -25,6 +25,11 @@ export type KairoConverseAction =
     }
   | {
       type: 'focus_briefing';
+    }
+  | {
+      type: 'move_voice_orb';
+      dock?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+      mode?: 'smart_dodge';
     };
 
 export interface KairoConverseArtifactAction {
@@ -63,6 +68,11 @@ export interface KairoConverseResponse {
   source: KairoConverseSource;
   command_content: string | null;
   requires_confirmation?: boolean | null;
+  action_tier?: string | null;
+  dispatch_lane?: string | null;
+  voice_routing_mode?: string | null;
+  routing_receipt?: string | null;
+  model_receipt?: Record<string, unknown> | null;
   action: KairoConverseAction | null;
   artifacts: KairoConverseArtifact[];
 }

@@ -13,13 +13,12 @@ import {
   pendingOperatorTerminalCommand,
   takePendingOperatorTerminalCommand,
 } from '../lib/agent-shell-mirror-state';
-import { agentContentHasTranscriptBlocks } from '../lib/agent-transcript-blocks';
-import { findAgentTerminalMirrorSegment } from '../lib/agent-terminal-mirror';
 import { terminalSessionTabLabel } from '../lib/terminal-session-view';
 import {
   resolveActiveVisibleTerminalSessionIds,
   resolveMirrorVisibleTerminalSessionIds,
 } from '../lib/workbench-terminal-visible-panes';
+import { resolveAgentTerminalMirrorTranscript } from '../lib/workbench-terminal-mirror-transcript';
 import { useShellStore } from '../stores/shell';
 
 const props = defineProps<{
@@ -79,26 +78,10 @@ const agentSessionId = computed(
 const agentStreamActive = computed(() => shell.agentStreamActive);
 
 function resolveMirrorTranscriptContent(): string {
-  const streamId = shell.agentStreamMessageId;
-  if (streamId) {
-    return (
-      shell.threadMessages.find((message) => message.message_id === streamId)?.content ?? ''
-    );
-  }
-  for (let index = shell.threadMessages.length - 1; index >= 0; index -= 1) {
-    const message = shell.threadMessages[index];
-    if (message?.role !== 'agent') {
-      continue;
-    }
-    // Cheap prefilter — avoid full transcript parses on every agent message.
-    if (
-      agentContentHasTranscriptBlocks(message.content) &&
-      findAgentTerminalMirrorSegment(message.content)
-    ) {
-      return message.content;
-    }
-  }
-  return '';
+  return resolveAgentTerminalMirrorTranscript({
+    streamMessageId: shell.agentStreamMessageId,
+    threadMessages: shell.threadMessages,
+  });
 }
 
 const { syncNow: syncAgentTerminalMirror } = useAgentTerminalMirror({

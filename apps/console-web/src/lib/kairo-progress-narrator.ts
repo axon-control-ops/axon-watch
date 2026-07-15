@@ -102,9 +102,6 @@ export function createKairoProgressNarrator(options: CreateKairoProgressNarrator
         if (rank < latestRank && latestRank >= 4) {
           return;
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7852/ingest/0173158c-fd82-46b4-a14c-d55e0685ee25',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'df24bc'},body:JSON.stringify({sessionId:'df24bc',runId:options.messageId,hypothesisId:'R2',location:'kairo-progress-narrator.ts:beforeDelivery',message:'progress narration resolved',data:{eventKey:milestone.eventKey,eventType:milestone.eventType,line:line.slice(0,280),rank,latestRank},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         await deliverSpokenOperatorAlert(
           {
             eligible: true,

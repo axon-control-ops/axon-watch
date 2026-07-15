@@ -76,9 +76,13 @@ export function createCatalogLoadersSlice(input: CreateCatalogLoadersSliceInput)
     }
   }
 
-  async function loadRuns(options: { sync?: boolean } = {}): Promise<void> {
-    input.runsLoadState.value = 'loading';
-    input.runsError.value = null;
+  async function loadRuns(options: { sync?: boolean; background?: boolean } = {}): Promise<void> {
+    const background =
+      options.background === true || input.runsLoadState.value === 'loaded';
+    if (!background) {
+      input.runsLoadState.value = 'loading';
+      input.runsError.value = null;
+    }
 
     try {
       const snapshot = await fetchRuns();
@@ -89,8 +93,10 @@ export function createCatalogLoadersSlice(input: CreateCatalogLoadersSliceInput)
       }
       input.runsLoadState.value = 'loaded';
     } catch (error) {
-      input.runsLoadState.value = 'error';
-      input.runsError.value = error instanceof Error ? error.message : 'runs request failed';
+      if (!background) {
+        input.runsLoadState.value = 'error';
+        input.runsError.value = error instanceof Error ? error.message : 'runs request failed';
+      }
     }
   }
 

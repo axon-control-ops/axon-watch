@@ -51,15 +51,31 @@ def scan_unverified_claims(content: str, *, execution_tier: str) -> list[str]:
     return warnings
 
 
+def resolve_edit_receipt_path(workspace_root: Path, receipt_path: str) -> Path:
+    """Resolve a :::edit receipt path under the workspace or as an absolute path."""
+    raw = (receipt_path or "").strip()
+    if not raw:
+        return (workspace_root / raw).resolve()
+
+    candidate = Path(raw).expanduser()
+    if candidate.is_absolute():
+        try:
+            return candidate.resolve()
+        except OSError:
+            return candidate
+
+    return (workspace_root / raw).resolve()
+
+
 def verify_edit_paths(workspace_root: Path, paths: list[str], *, run_started_epoch: float) -> list[str]:
     warnings: list[str] = []
-    for relative in paths:
-        candidate = (workspace_root / relative).resolve()
+    for receipt_path in paths:
+        candidate = resolve_edit_receipt_path(workspace_root, receipt_path)
         if not candidate.is_file():
-            warnings.append(f"edit receipt path missing on disk: {relative}")
+            warnings.append(f"edit receipt path missing on disk: {receipt_path}")
             continue
         if candidate.stat().st_mtime + 1 < run_started_epoch:
-            warnings.append(f"edit receipt path not modified during this run: {relative}")
+            warnings.append(f"edit receipt path not modified during this run: {receipt_path}")
     return warnings
 
 

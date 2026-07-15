@@ -1,0 +1,47 @@
+name: Axon-X Fast Gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  fast-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Contracts + file sizes + unit tests
+        run: npm run verify:contracts
+
+      - name: Critical hotspot change guardrails
+        run: npm run verify:hotspot-changes
+        env:
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+
+      - name: Console typecheck, Vitest, and build
+        run: npm run verify:console-web
+
+      - name: Import boundaries + DTO/ADR/latency scaffold
+        run: >
+          ./scripts/dev/python.sh scripts/verify/all.py
+          --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json
+          --watch-payload packages/shared-types/fixtures/watch-summary.example.json
+          --shell-boot-report scripts/verify/fixtures/shell-boot-report.dev.json
+          --runtime-latency-samples scripts/verify/fixtures/runtime-summary-latency.ci.json
+          --watch-latency-samples scripts/verify/fixtures/watch-summary-latency.ci.json

@@ -1,7 +1,9 @@
+import type { IdeComposerActivity } from './agent-dock-activity-view';
+
 export type WorkspaceStreamUiState = {
   active: boolean;
   messageId: string | null;
-  activity: unknown | null;
+  activity: IdeComposerActivity | null;
   ideAgentRunId: string | null;
 };
 
@@ -27,7 +29,7 @@ export function workspaceStreamGlobalsFromState(
 ): {
   agentStreamActive: boolean;
   agentStreamMessageId: string | null;
-  ideComposerActivity: unknown | null;
+  ideComposerActivity: IdeComposerActivity | null;
   ideAgentRunId: string | null;
 } {
   return {

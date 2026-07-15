@@ -15,6 +15,7 @@ from app.chat.workspace_git import (
     git_working_tree_is_clean,
 )
 from app.cli_runtime.approval_gate import full_access_requested
+from app.plain_text_to_instructions import prompt_requests_git_actions
 
 _COMMIT_INTENT_RE = re.compile(
     r"\b(?:commit(?:\s+(?:these|my|the|all))?(?:\s+changes?)?(?:\s+and\s+push)?"
@@ -148,7 +149,7 @@ def try_lane_b_git_commit_dispatch(
         return None
     if _is_question(user_prompt):
         return None
-    if not _COMMIT_INTENT_RE.search(user_prompt):
+    if not prompt_requests_git_actions(user_prompt):
         return None
 
     continue_prompt = split_commit_then_remainder(user_prompt)

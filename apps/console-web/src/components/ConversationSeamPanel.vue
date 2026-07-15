@@ -1,21 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { ref } from 'vue';
 
-import AgentResearchBlock from './ide/AgentResearchBlock.vue';
-import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
-import AgentFileReadBlock from './ide/AgentFileReadBlock.vue';
-import AgentEditBlock from './ide/AgentEditBlock.vue';
-import AgentImageBlock from './ide/AgentImageBlock.vue';
-import IdeActivityIcon from './ide/IdeActivityIcon.vue';
-import IdeAgentThreadStatusStrip from './ide/IdeAgentThreadStatusStrip.vue';
 import { useConversationSeamScroll } from '../composables/useConversationSeamScroll';
 import {
-  isMarkdownFileAgentResponse,
-  shouldHideAgentReportInThread,
-  shouldUseAgentMarkdownBlock,
-} from '../lib/agent-message-markdown';
-import {
-  agentContentLooksLikeErrorDump,
   formatThreadRole,
   formatThreadTimestamp,
   shouldCollapseSystemMessage,
@@ -23,262 +10,66 @@ import {
   summarizeAgentErrorContent,
   systemMessagePreview,
 } from '../lib/thread-message-view';
-import {
-  prepareOperatorConversationDock,
-  type ConversationDisplayItem,
-} from '../lib/operator-conversation-view';
-import OperatorMessageActions from './conversation/OperatorMessageActions.vue';
-import { applyChatUiAction, type ChatUiAction } from '../lib/chat-ui-action';
-import { operatorArtifactRecords } from '../lib/operator-artifact-view';
-import {
-  type OperatorThreadEntry,
-  type ThreadMessageAttachment,
-} from '../lib/operator-thread';
-import {
-  agentContentHasTranscriptBlocks,
-  thinkingPreview,
-} from '../lib/agent-transcript-blocks';
-import { createTranscriptSegmentCache } from '../lib/conversation-transcript-segment-cache';
-import { sanitizeAgentThinkingForOperator } from '../lib/agent-live-line-view';
-import { prepareAgentTerminalOpen } from '../lib/agent-terminal-open';
-import { shouldShowAgentTerminalBackgroundControl, agentTerminalMirrorBadgeLabel } from '../lib/agent-terminal-background-view';
-import { armAgentShellMirror, agentShellMirrorActive } from '../lib/agent-shell-mirror-state';
+import { thinkingPreview } from '../lib/agent-transcript-blocks';
 import { resolveChatAttachmentUrl } from '../api/control-plane';
-import { threadAttachmentUrlForImagePath } from '../lib/thread-image-url';
-import { useShellStore } from '../stores/shell';
+import AgentResearchBlock from './ide/AgentResearchBlock.vue';
+import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
+import AgentFileReadBlock from './ide/AgentFileReadBlock.vue';
+import AgentEditBlock from './ide/AgentEditBlock.vue';
+import AgentImageBlock from './ide/AgentImageBlock.vue';
+import IdeActivityIcon from './ide/IdeActivityIcon.vue';
+import IdeAgentThreadStatusStrip from './ide/IdeAgentThreadStatusStrip.vue';
+import OperatorMessageActions from './conversation/OperatorMessageActions.vue';
+import ConversationSeamAttachmentLightbox from './conversation/ConversationSeamAttachmentLightbox.vue';
+import { useConversationSeamPanel } from './conversation/useConversationSeamPanel';
 
-const shell = useShellStore();
-const conversationMessages = computed(() =>
-  shell.layoutMode === 'ide' ? shell.threadMessages : shell.operatorThreadMessages,
-);
-const conversationDisplayItems = computed((): ConversationDisplayItem[] => {
-  if (shell.layoutMode === 'ide') {
-    return conversationMessages.value.map((message) => ({
-      kind: 'message' as const,
-      message,
-    }));
-  }
-  return prepareOperatorConversationDock(conversationMessages.value, {
-    artifacts: operatorArtifactRecords.value,
-  }).items;
-});
-
-const conversationDockHint = computed(() =>
-  shell.layoutMode === 'operator'
-    ? 'Actions, KAIRO turns, and receipts — not the run queue. Open loops live in the KAIRO briefing below.'
-    : null,
-);
-const showAgentWorking = computed(
-  () =>
-    shell.agentStreamActive ||
-    (shell.layoutMode === 'ide' && Boolean(shell.ideComposerActivity)),
-);
-const agentWorkingLabel = computed(() => {
-  if (shell.agentStreamActive && shell.agentStreamMessageId) {
-    return shell.ideComposerActivity?.label?.includes('Full Access')
-      ? 'Full Access — streaming runtime output…'
-      : 'Streaming agent reply…';
-  }
-  if (shell.agentStreamActive) {
-    return 'Agent is thinking…';
-  }
-  return shell.ideComposerActivity?.label ?? 'Agent is working…';
-});
 const rootRef = ref<HTMLElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
-const expandedErrorByMessageId = ref<Record<string, boolean>>({});
-const expandedSystemByMessageId = ref<Record<string, boolean>>({});
-
 const { handleWheel, handleContentChange } = useConversationSeamScroll({
   rootRef,
   listRef,
   onContentChange: () => undefined,
 });
 
-function toggleErrorExpanded(messageId: string): void {
-  expandedErrorByMessageId.value = {
-    ...expandedErrorByMessageId.value,
-    [messageId]: !expandedErrorByMessageId.value[messageId],
-  };
-}
-
-function isMarkdownBlock(content: string, isComplete = true): boolean {
-  return shouldUseAgentMarkdownBlock(content, isComplete) && !isErrorDump(content);
-}
-
-function isMarkdownFileBlock(content: string): boolean {
-  return isMarkdownFileAgentResponse(content);
-}
-
-function shouldShowEditorStub(messageId: string, content: string): boolean {
-  return Boolean(shell.agentReportEditorLink(messageId)) && shouldHideAgentReportInThread(content);
-}
-
-function isErrorDump(content: string): boolean {
-  return agentContentLooksLikeErrorDump(content);
-}
-
-function isErrorExpanded(messageId: string): boolean {
-  return Boolean(expandedErrorByMessageId.value[messageId]);
-}
-
-function toggleSystemExpanded(messageId: string): void {
-  expandedSystemByMessageId.value = {
-    ...expandedSystemByMessageId.value,
-    [messageId]: !expandedSystemByMessageId.value[messageId],
-  };
-}
-
-function isSystemExpanded(messageId: string): boolean {
-  return Boolean(expandedSystemByMessageId.value[messageId]);
-}
-
-function isStreamingMessage(messageId: string): boolean {
-  return shell.agentStreamActive && shell.agentStreamMessageId === messageId;
-}
-
-const expandedThinkingKeys = ref<Record<string, boolean>>({});
-const { transcriptSegments } = createTranscriptSegmentCache();
-
-function hasTranscriptBlocks(content: string): boolean {
-  return agentContentHasTranscriptBlocks(content);
-}
-
-function segmentKey(messageId: string, index: number): string {
-  return `${messageId}:${index}`;
-}
-
-function revealTerminalPanel(segment: { command: string; output: string; open: boolean }): void {
-  prepareAgentTerminalOpen(segment);
-  void shell.backgroundIdeAgentRun();
-}
-
-function backgroundAgentTerminalRun(segment?: {
-  command: string;
-  output: string;
-  open: boolean;
-}): void {
-  if (segment) {
-    prepareAgentTerminalOpen(segment);
-  } else {
-    armAgentShellMirror();
-  }
-  void shell.backgroundIdeAgentRun();
-}
-
-async function continueTerminalInBash(command: string): Promise<void> {
-  await shell.runCommandInOperatorTerminal(command);
-}
-
-function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean): boolean {
-  // Cursor shows "Run in Background" only on an in-flight shell card.
-  return shouldShowAgentTerminalBackgroundControl({
-    canStopIdeAgentRun: shell.canStopIdeAgentRun,
-    terminalBlockRunning: segmentOpen && isStreamingMessage(messageId),
-  });
-}
-
-function terminalMirrorBadge(segmentOpen: boolean): string | null {
-  return agentTerminalMirrorBadgeLabel({
-    segmentOpen,
-    mirrorActive: agentShellMirrorActive.value,
-  });
-}
-
-function thinkingBodyText(text: string): string {
-  return sanitizeAgentThinkingForOperator(text) || 'Thinking…';
-}
-
-async function copyTerminalOutput(output: string): Promise<void> {
-  if (typeof navigator === 'undefined' || !navigator.clipboard || !output.trim()) {
-    return;
-  }
-  await navigator.clipboard.writeText(output);
-}
-
-function isThinkingExpanded(key: string, open: boolean): boolean {
-  return expandedThinkingKeys.value[key] ?? open;
-}
-
-function toggleThinking(key: string, open: boolean): void {
-  expandedThinkingKeys.value = {
-    ...expandedThinkingKeys.value,
-    [key]: !isThinkingExpanded(key, open),
-  };
-}
-
-function displayItemKey(item: ConversationDisplayItem): string {
-  if (item.kind === 'command_turn' || item.kind === 'dock_banner' || item.kind === 'artifact') {
-    return item.messageId;
-  }
-  return item.message.message_id;
-}
-
-function attachmentUrlForImagePath(
-  message: OperatorThreadEntry,
-  path: string,
-): string | null {
-  return threadAttachmentUrlForImagePath(path, message.attachments ?? []);
-}
-
-function applyArtifactAction(action: { uiAction: ChatUiAction | null }): void {
-  if (!action.uiAction) {
-    return;
-  }
-  applyChatUiAction(shell, action.uiAction);
-}
-
-function messageImageAttachments(message: OperatorThreadEntry): ThreadMessageAttachment[] {
-  return (message.attachments ?? []).filter((attachment) =>
-    attachment.mime_type.startsWith('image/'),
-  );
-}
-
-interface EnlargedAttachmentPreview {
-  url: string;
-  filename: string;
-}
-
-const enlargedAttachment = ref<EnlargedAttachmentPreview | null>(null);
-
-function openAttachmentPreview(attachment: ThreadMessageAttachment): void {
-  enlargedAttachment.value = {
-    url: resolveChatAttachmentUrl(attachment.url),
-    filename: attachment.filename,
-  };
-}
-
-function closeAttachmentLightbox(): void {
-  enlargedAttachment.value = null;
-}
-
-function handleAttachmentLightboxKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    closeAttachmentLightbox();
-  }
-}
-
-function compactCommandSummary(output: string): string {
-  const line = output.split('\n').map((part) => part.trim()).find(Boolean);
-  if (!line) {
-    return 'No output';
-  }
-  return line.length <= 96 ? line : `${line.slice(0, 93)}…`;
-}
-
-function isEmptyStreamingAgent(message: { role: string; message_id: string; content: string }): boolean {
-  return message.role === 'agent' && !message.content.trim() && isStreamingMessage(message.message_id);
-}
-
-watch(
+const {
+  shell,
   conversationDisplayItems,
-  () => {
-    handleContentChange();
-  },
-  { immediate: true, deep: true },
-);
+  conversationDockHint,
+  showAgentWorking,
+  agentWorkingLabel,
+  toggleErrorExpanded,
+  isMarkdownBlock,
+  isMarkdownFileBlock,
+  shouldShowEditorStub,
+  isErrorDump,
+  isErrorExpanded,
+  toggleSystemExpanded,
+  isSystemExpanded,
+  isStreamingMessage,
+  hasTranscriptBlocks,
+  segmentKey,
+  revealTerminalPanel,
+  backgroundAgentTerminalRun,
+  continueTerminalInBash,
+  showTerminalBackgroundControl,
+  terminalMirrorBadge,
+  thinkingBodyText,
+  copyTerminalOutput,
+  isThinkingExpanded,
+  toggleThinking,
+  displayItemKey,
+  attachmentUrlForImagePath,
+  applyArtifactAction,
+  messageImageAttachments,
+  enlargedAttachment,
+  openAttachmentPreview,
+  closeAttachmentLightbox,
+  handleAttachmentLightboxKeydown,
+  compactCommandSummary,
+  isEmptyStreamingAgent,
+  transcriptSegments,
+} = useConversationSeamPanel(rootRef, listRef, handleContentChange);
 </script>
-
 <template>
   <div ref="rootRef" class="conversation-seam" @wheel.capture="handleWheel">
     <p v-if="conversationDockHint" class="conversation-seam__dock-hint">{{ conversationDockHint }}</p>
@@ -765,35 +556,8 @@ watch(
     <p v-else class="region-copy conversation-seam__empty">No active conversation</p>
   </div>
 
-  <Teleport to="body">
-    <div
-      v-if="enlargedAttachment"
-      class="agent-dock-composer__image-lightbox"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="`Preview ${enlargedAttachment.filename}`"
-      tabindex="-1"
-      @click.self="closeAttachmentLightbox"
-      @keydown="handleAttachmentLightboxKeydown"
-    >
-      <figure class="agent-dock-composer__image-lightbox-body">
-        <img
-          class="agent-dock-composer__image-lightbox-img"
-          :src="enlargedAttachment.url"
-          :alt="enlargedAttachment.filename"
-        >
-        <figcaption class="agent-dock-composer__image-lightbox-caption">
-          {{ enlargedAttachment.filename }}
-        </figcaption>
-      </figure>
-      <button
-        type="button"
-        class="agent-dock-composer__image-lightbox-close"
-        aria-label="Close image preview"
-        @click="closeAttachmentLightbox"
-      >
-        ×
-      </button>
-    </div>
-  </Teleport>
+  <ConversationSeamAttachmentLightbox
+    :attachment="enlargedAttachment"
+    @close="closeAttachmentLightbox"
+  />
 </template>
