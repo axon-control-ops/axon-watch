@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { dispatchKairoConverseOutcome } from './kairo-conversation-dispatch';
-import { setKairoLastRoutingReceipt, kairoLastRoutingReceipt } from './kairo-conversation-state';
+import {
+  kairoLastModelReceipt,
+  kairoLastRoutingReceipt,
+  setKairoLastModelReceipt,
+  setKairoLastRoutingReceipt,
+} from './kairo-conversation-state';
 
 describe('dispatchKairoConverseOutcome', () => {
   beforeEach(() => {
     setKairoLastRoutingReceipt(null);
+    setKairoLastModelReceipt(null);
   });
 
   it('awaits auto command dispatch and sets routing receipt', async () => {
@@ -36,7 +42,6 @@ describe('dispatchKairoConverseOutcome', () => {
         artifacts: [],
       },
       execute,
-      'typed',
     );
 
     expect(result.commandDispatched).toBe(true);
@@ -63,14 +68,23 @@ describe('dispatchKairoConverseOutcome', () => {
         action: { type: 'dispatch_command', content: 'health' },
         artifacts: [],
         routing_receipt: 'lane=bounded_command',
+        model_receipt: {
+          lane: 'bounded_command',
+          runtime_id: 'cursor_local',
+          selected_model: 'cursor-default',
+        },
       },
       execute,
-      'voice',
     );
 
     expect(result.commandDispatched).toBe(true);
     expect(execute).toHaveBeenCalledOnce();
     expect(shell.submitOperatorCommandContent).not.toHaveBeenCalled();
+    expect(kairoLastModelReceipt.value).toEqual({
+      lane: 'bounded_command',
+      runtime_id: 'cursor_local',
+      selected_model: 'cursor-default',
+    });
   });
 
   it('records last action tier for autonomy UI', async () => {
@@ -94,7 +108,6 @@ describe('dispatchKairoConverseOutcome', () => {
         artifacts: [],
       },
       vi.fn(async () => undefined),
-      'typed',
     );
     expect(kairoLastActionTier.value).toBe('reversible_auto');
   });

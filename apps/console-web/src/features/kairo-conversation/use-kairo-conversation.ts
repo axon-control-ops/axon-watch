@@ -206,7 +206,7 @@ export function useKairoConversation() {
       draft.value = '';
       pending.value = false;
       thinkingLine.value = '';
-      await dispatchKairoConverseOutcome(shell, response, executeConverseAction, 'typed');
+      await dispatchKairoConverseOutcome(shell, response, executeConverseAction);
       if (mentionsBriefingSurfaceOffer(response.reply)) {
         scheduleBriefingSurfaceOffer();
       }

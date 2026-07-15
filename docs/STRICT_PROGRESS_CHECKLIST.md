@@ -82,9 +82,13 @@ Update an item only when its stated evidence is attached.
     the fallback persists `finalization_error` with `success=False`. Targeted
     autonomy set: **38/38 PASS**.
 
-- [ ] **11. Consolidate KAIRO turn submission**
+- [x] **11. Consolidate KAIRO turn submission**
   - One awaited dispatch path with consistent context, `action_tier`, routing receipt, model receipt, and error handling.
-  - Evidence: path + tests: _TBD_
+  - Evidence: 2026-07-15 — app-scoped voice registers the same
+    `useKairoConversation().submitTurn` used by typed surfaces; the duplicate
+    request/dispatch/error implementation was removed. Shared dispatch records
+    action tier, routing receipt, and model receipt. Typecheck PASS; KAIRO
+    submission/dispatch set **9/9 PASS**.
 
 - [ ] **12. Make autonomy status data-driven**
   - Remove UI literals that claim “Bounded auto” without evaluating execution access, policy, approval state, and workspace constraints.
