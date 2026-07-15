@@ -57,7 +57,33 @@ def _playwright_usable() -> bool:
 
 
 def _boot_init_script() -> str:
-    return "sessionStorage.setItem('axon-x-boot-complete', '1');"
+    return """
+sessionStorage.setItem('axon-x-boot-complete', '1');
+sessionStorage.setItem('axon.operator.center-view', 'grid');
+"""
+
+
+def _css_bundle_ok(console_base_url: str, timeout_seconds: float) -> None:
+    css_url = f"{console_base_url.rstrip('/')}/src/styles/app.css"
+    request = urllib.request.Request(css_url)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            if response.status != 200:
+                raise RuntimeError(f"console css returned HTTP {response.status}")
+            body = response.read(512).decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            "console css failed to compile; restart ./scripts/dev/up.sh --no-open "
+            f"({css_url} returned HTTP {exc.code})",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"console css probe failed for {css_url}: {exc}") from exc
+
+    if body.lstrip().startswith("<!DOCTYPE") or "Internal Server Error" in body:
+        raise RuntimeError(
+            "console css failed to compile; restart ./scripts/dev/up.sh --no-open "
+            f"({css_url} returned an HTML error page)",
+        )
 
 
 def _run_browser_checks(
@@ -175,6 +201,7 @@ def run_smoke(
     )
 
     _health_ok(base, timeout_seconds)
+    _css_bundle_ok(base, timeout_seconds)
     if not _playwright_usable():
         raise RuntimeError(
             "Playwright is unavailable. Install with: pip install playwright && playwright install chromium"

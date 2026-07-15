@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -65,9 +66,26 @@ class Test3WatchConnectorsAcceptance(unittest.TestCase):
         self.assertEqual(0, payload["summary"]["required_unavailable"])
 
     def test_runtime_summary_projects_connector_counts(self) -> None:
-        status, payload = _request("GET", f"{CONTROL_PLANE_BASE}/api/runtime/summary")
+        deadline = time.monotonic() + 20.0
+        last_payload: dict | list | str = {}
+        status = 0
+        while time.monotonic() < deadline:
+            status, payload = _request("GET", f"{CONTROL_PLANE_BASE}/api/runtime/summary")
+            last_payload = payload
+            if status == 200 and isinstance(payload, dict):
+                connectors = payload.get("connectors", {})
+                if (
+                    isinstance(connectors, dict)
+                    and int(connectors.get("configured", 0)) >= 2
+                    and int(connectors.get("ok", 0)) >= 2
+                    and int(connectors.get("required_unavailable", 0)) == 0
+                ):
+                    return
+            time.sleep(0.5)
+
         self.assertEqual(200, status)
-        connectors = payload.get("connectors", {})
+        self.assertIsInstance(last_payload, dict)
+        connectors = last_payload.get("connectors", {})
         self.assertGreaterEqual(connectors.get("configured", 0), 2)
         self.assertGreaterEqual(connectors.get("ok", 0), 2)
         self.assertEqual(0, connectors.get("required_unavailable"))

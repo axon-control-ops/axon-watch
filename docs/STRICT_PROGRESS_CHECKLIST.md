@@ -169,9 +169,11 @@ Update an item only when its stated evidence is attached.
 - [ ] **22. Complete the one-week `:4173`-only dry run**
   - Sign retirement/discard acknowledgments only after all required gates pass.
   - Progress: 2026-07-15 — a fresh seven-day evidence ledger is open at
-    `docs/PHASE_G6_DRY_RUN_2026-07-15.md`. Day 1 automated stack health passed,
-    but operator workflow, daily gates, `:7734` attestations, and all signatures
-    remain pending. No retirement acknowledgment has been inferred or signed.
+    `docs/PHASE_G6_DRY_RUN_2026-07-15.md`. Day 1 automated stack health passed;
+    headed-browser and connector-parity gates now pass locally after smoke and
+    acceptance repairs. Operator workflow, `:7734` attestation, and all
+    signatures remain pending. No retirement acknowledgment has been inferred or
+    signed.
 
 ---
 
