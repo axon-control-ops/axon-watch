@@ -12,6 +12,9 @@ export type AxonDebugSessionEvent = {
 };
 
 export function axonDebugSessionLog(event: AxonDebugSessionEvent): void {
+  if (import.meta.env.PROD || import.meta.env.VITE_AXON_DEBUG_SESSION_LOG !== '1') {
+    return;
+  }
   const payload = {
     hypothesisId: event.hypothesisId,
     location: event.location,

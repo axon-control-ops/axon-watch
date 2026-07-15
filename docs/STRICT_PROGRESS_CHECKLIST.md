@@ -104,13 +104,19 @@ Update an item only when its stated evidence is attached.
     actions “guidance only”; pending approvals point explicitly to actionable
     Mission Control controls. Label contract tests **2/2 PASS**.
 
-- [ ] **14. Add tests**
+- [x] **14. Add tests**
   - Dispatch idempotency, action-tier defense in depth, run-state transitions, KAIRO-path parity, evidence projection, and voice persistence failures.
-  - Evidence: test module list + pass: _TBD_
+  - Evidence: 2026-07-15 — all six themes have named frontend/backend proofs
+    in `docs/AUTONOMY_TEST_COVERAGE.md`. Frontend **744/744 PASS**;
+    `npm run verify:contracts` PASS with endpoint, transcript-failure,
+    voice-store, and debug-gate modules in the supported runner.
 
-- [ ] **15. Remove or feature-gate debug-ingest calls**
+- [x] **15. Remove or feature-gate debug-ingest calls**
   - Only after runtime debugging confirms they are no longer required.
-  - Evidence: gate/removal commit note: _TBD_
+  - Evidence: 2026-07-15 — no live frontend callers remain. Backend ingest and
+    helper require `AXON_DEBUG_SESSION_LOG=1`; frontend helper requires a
+    non-production build plus `VITE_AXON_DEBUG_SESSION_LOG=1`. Disabled API
+    returns `404`; enabled append proof **2/2 PASS**.
 
 ### Assurance & platform (16–22)
 

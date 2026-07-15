@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 from app.persistence.voice_transcript_store import append_voice_transcript
+
+logger = logging.getLogger(__name__)
 
 
 def log_voice_turn(
@@ -37,6 +41,6 @@ def log_voice_turn(
             model_receipt=receipt_dict,
             voice_routing_mode=str(payload.get("voice_routing_mode") or "") or None,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("voice transcript persistence failed: %s", exc)
     return payload

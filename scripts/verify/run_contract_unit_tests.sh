@@ -76,9 +76,13 @@ main_tests=(
   tests.test_runtime_vault_integration
   tests.test_email_settings_store
   tests.test_operator_evidence
+  tests.test_kairo_conversation_endpoints
   tests.test_voice_autonomy
   tests.test_command_shortcuts
   tests.test_kairo_conversation_turns
+  tests.test_conversation_transcript
+  tests.test_voice_transcript_store
+  tests.test_debug_session_log_endpoint
   tests.test_safe_improvement
 )
 

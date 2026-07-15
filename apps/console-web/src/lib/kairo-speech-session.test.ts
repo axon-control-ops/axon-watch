@@ -38,7 +38,7 @@ describe('M1 session identity contract', () => {
     expect(shellSource).not.toMatch(/sessionStorage.*kairo-speech-session/);
     expect(converseSource).toMatch(/session_id:\s*kairoSpeechSessionId\(\)/);
     expect(converseSource).toMatch(/return shell\.kairoSpeechSessionId\(\)/);
-    expect(appVoiceSource).toMatch(/session_id:\s*shell\.kairoSpeechSessionId\(\)/);
+    expect(appVoiceSource).toMatch(/registerKairoConversationSubmit\(submitTurn\)/);
     expect(voiceSliceSource).toMatch(/session_id:\s*kairoSpeechSessionId\(\)/);
   });
 

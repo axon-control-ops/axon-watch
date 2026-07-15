@@ -4,5 +4,8 @@ export function shouldAutoDispatchConverseCommand(response: KairoConverseRespons
   if (response.turn_kind !== 'command' || !response.command_content) {
     return false;
   }
-  return response.requires_confirmation === false;
+  return (
+    response.requires_confirmation === false &&
+    response.action_tier === 'reversible_auto'
+  );
 }

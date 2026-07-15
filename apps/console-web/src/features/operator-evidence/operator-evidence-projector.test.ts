@@ -1,6 +1,33 @@
 import { describe, expect, it } from 'vitest';
 
-import { projectEvidenceAutonomyStatus } from './operator-evidence-projector';
+import type { OperatorEvidenceRecord } from '../../api/operator-api';
+import {
+  projectEvidenceAutonomyStatus,
+  projectEvidenceRows,
+  projectEvidenceTags,
+} from './operator-evidence-projector';
+
+const evidence: OperatorEvidenceRecord = {
+  node_id: 'signal_1',
+  kind: 'signal',
+  title: 'Storage warning',
+  summary: 'Storage crossed its warning threshold.',
+  facts: [{ label: 'Severity', value: 'high' }],
+  sources: [],
+  actions: [],
+  sections: [
+    {
+      title: 'Monitor evidence',
+      items: [
+        {
+          title: 'Storage usage',
+          detail: '92%',
+          source_ref: { ref_type: 'monitor', ref_id: 'storage', label: 'Storage probe' },
+        },
+      ],
+    },
+  ],
+};
 
 describe('projectEvidenceAutonomyStatus', () => {
   it('uses live action tier instead of hardcoded auto', () => {
@@ -89,5 +116,26 @@ describe('projectEvidenceAutonomyStatus', () => {
         workspaceSelected: true,
       }).label,
     ).toBe('Run · awaiting approval');
+  });
+});
+
+describe('operator evidence projection', () => {
+  it('projects section evidence with source labels', () => {
+    expect(projectEvidenceRows(evidence)).toEqual([
+      expect.objectContaining({
+        id: 'section:Monitor evidence:Storage usage',
+        title: 'Storage usage',
+        detail: '92%',
+        source: 'Storage probe',
+      }),
+    ]);
+  });
+
+  it('projects signal and workspace tags without invented trust claims', () => {
+    expect(projectEvidenceTags(evidence, 'workspace_alpha')).toEqual([
+      'signal',
+      'workspace',
+      'attention',
+    ]);
   });
 });

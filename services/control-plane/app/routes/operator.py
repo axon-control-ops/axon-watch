@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
@@ -284,6 +285,9 @@ def dev_trigger_spoken_briefing() -> dict[str, object]:
 @router.post("/api/dev/debug-session-log")
 def dev_debug_session_log(body: DebugSessionLogRequest) -> dict[str, object]:
     """Append one NDJSON evidence line for Debug-mode instrumentation."""
+    if os.environ.get("AXON_DEBUG_SESSION_LOG") != "1":
+        raise HTTPException(status_code=404, detail="Not found")
+
     import json
     from pathlib import Path
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,9 @@ def append_debug_session_log(
     message: str,
     data: dict[str, Any] | None = None,
 ) -> None:
+    if os.environ.get("AXON_DEBUG_SESSION_LOG") != "1":
+        return
+
     payload = {
         "hypothesisId": hypothesis_id,
         "location": location,
