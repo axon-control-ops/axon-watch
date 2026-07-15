@@ -26,6 +26,23 @@ def _watch_probe_ok() -> tuple[bool, str, None, str]:
 class ParityA3ReviewReadyStateTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_control_plane_db(self, run_store)
+        runtime_patch = patch(
+            "app.runtime_summary_assembler.runtime_status_snapshot",
+            return_value={
+                "default_runtime": "cursor_local",
+                "local": [
+                    {
+                        "id": "cursor_local",
+                        "label": "Cursor CLI (local)",
+                        "ready": True,
+                        "available": True,
+                        "auth": {"message": "Test runtime ready."},
+                    }
+                ],
+            },
+        )
+        runtime_patch.start()
+        self.addCleanup(runtime_patch.stop)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
 

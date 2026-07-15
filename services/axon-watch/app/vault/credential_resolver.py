@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from pathlib import Path
+
+from app.vault.import_contract import ALLOWED_IMPORT_KEYS
+from app.vault.import_store import load_vault_import, save_vault_import
+from app.vault.operations import vault_named_secrets_map, vault_runtime_env
+from app.vault.session import VaultSession
 
 
 def _service_root() -> Path:
@@ -22,42 +26,6 @@ def _state_dir() -> Path:
     if not path.is_absolute():
         path = (_repo_root() / path).resolve()
     return path
-
-from app.vault.paths import vault_import_path
-
-
-def load_vault_import() -> dict[str, str]:
-    path = vault_import_path()
-    if not path.is_file():
-        return {}
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    entries = payload.get("secrets")
-    if not isinstance(entries, dict):
-        return {}
-    resolved: dict[str, str] = {}
-    for key, value in entries.items():
-        name = str(key).strip()
-        text = str(value).strip()
-        if name and text:
-            resolved[name] = text
-    return resolved
-
-
-def save_vault_import(secrets: dict[str, str]) -> Path:
-    path = vault_import_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_version": 1,
-        "source": "axon-x-vault-import",
-        "secrets": secrets,
-    }
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    path.chmod(0o600)
-    return path
-
 
 def parse_dotenv_file(path: Path) -> dict[str, str]:
     if not path.is_file():
@@ -77,9 +45,6 @@ def parse_dotenv_file(path: Path) -> dict[str, str]:
 
 def merge_monitor_env(*, project_root: Path | None = None) -> dict[str, str]:
     env = {key: value for key, value in os.environ.items() if value is not None}
-    from app.vault.session import VaultSession
-    from app.vault.operations import vault_named_secrets_map, vault_runtime_env
-    from app.vault.snapshot import ALLOWED_IMPORT_KEYS
 
     if VaultSession.is_unlocked():
         env.update(vault_named_secrets_map(ALLOWED_IMPORT_KEYS))

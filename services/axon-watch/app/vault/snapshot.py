@@ -6,18 +6,7 @@ from pathlib import Path
 
 from app.vault.cli_runtime_probe import probe_codex_cli_subscription, probe_cursor_cli_subscription
 from app.vault.credential_resolver import merge_monitor_env, vault_status
-
-ALLOWED_IMPORT_KEYS: tuple[str, ...] = (
-    "SENTRY_AUTH_TOKEN",
-    "SENTRY_API_TOKEN",
-    "SENTRY_ORG_SLUG",
-    "SENTRY_PROJECT_SLUG",
-    "POSTHOG_PERSONAL_API_KEY",
-    "DASHPRO_POSTHOG_PROJECT_ID",
-    "EXPO_PUBLIC_POSTHOG_KEY",
-    "EXPO_PUBLIC_POSTHOG_HOST",
-    "EXPO_PUBLIC_SENTRY_DSN",
-)
+from app.vault.import_contract import ALLOWED_IMPORT_KEYS
 
 _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
     {

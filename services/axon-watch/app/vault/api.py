@@ -20,7 +20,13 @@ from app.vault.csv_export import (
     secrets_to_bitwarden_csv,
     suggested_csv_filename,
 )
-from app.vault.csv_import import looks_like_axon_vault_csv, parse_axon_vault_csv
+from app.vault.credential_resolver import merge_vault_import
+from app.vault.csv_import import (
+    looks_like_axon_vault_csv,
+    parse_axon_vault_csv,
+    parse_vault_export_text,
+)
+from app.vault.import_contract import ALLOWED_IMPORT_KEYS
 from app.vault.import_apply import import_vault_secrets
 from app.vault.operations import (
     VaultSession,
@@ -43,6 +49,7 @@ from app.vault.operations import (
     vault_status_core,
     vault_update_secret,
 )
+from app.vault.session import auto_unlock_enabled
 from app.vault.snapshot import vault_operator_snapshot
 
 
@@ -114,8 +121,6 @@ def handle_vault_lock() -> dict[str, object]:
 
 
 def handle_auto_unlock_status() -> dict[str, object]:
-    from app.vault.session import auto_unlock_enabled
-
     return {"enabled": auto_unlock_enabled()}
 
 
@@ -284,10 +289,6 @@ async def handle_import_backup(
 
 
 def handle_monitor_import(body: VaultMonitorImportBody) -> dict[str, object]:
-    from app.vault.credential_resolver import merge_vault_import
-    from app.vault.csv_import import parse_vault_export_text
-    from app.vault.snapshot import ALLOWED_IMPORT_KEYS
-
     secrets = dict(body.secrets)
     if body.export_text.strip():
         secrets.update(parse_vault_export_text(body.export_text))

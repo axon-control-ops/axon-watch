@@ -7,6 +7,7 @@ from pathlib import Path
 from app.monitors.dashpro_posthog import check_posthog_recent_events
 from app.monitors.dashpro_sentry import check_sentry_recent_issues
 from app.monitors.dashpro_supabase_storage import check_supabase_storage_quota
+from app.monitors.slice_registry import load_monitor_slices
 from app.vault.credential_resolver import merge_monitor_env
 
 
@@ -72,8 +73,6 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
 
 
 def probe_all_monitor_slices(config_dir: Path | None = None) -> list[dict[str, object]]:
-    from app.monitors.slice_registry import load_monitor_slices
-
     records: list[dict[str, object]] = []
     for config in load_monitor_slices(config_dir):
         records.extend(probe_monitor_slice(config))

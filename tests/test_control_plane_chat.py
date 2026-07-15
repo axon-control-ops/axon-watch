@@ -14,6 +14,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
+from app.chat.command_executor import CommandExecutionResult  # noqa: E402
 from app.kairo.turn_memory import clear_memory_for_tests, remember_entities, remember_turn  # noqa: E402
 from app.persistence import chat_store  # noqa: E402
 from app.persistence import run_store  # noqa: E402
@@ -62,13 +63,22 @@ class ControlPlaneChatTests(unittest.TestCase):
         self.assertIsNotNone(run_store.get_run(payload["run_id"]))
 
     def test_post_chat_message_executes_health_probe_and_records_receipt(self) -> None:
-        response = self.client.post(
-            "/api/chat/messages",
-            json={
-                "workspace_id": "workspace_alpha",
-                "content": "curl -s http://127.0.0.1:8787/api/health",
-            },
-        )
+        with patch(
+            "app.chat.command_executor.execute_health_probe",
+            return_value=CommandExecutionResult(
+                intent="health_probe",
+                success=True,
+                output='{"status": "ok"}',
+                receipt_summary="Health probe succeeded",
+            ),
+        ):
+            response = self.client.post(
+                "/api/chat/messages",
+                json={
+                    "workspace_id": "workspace_alpha",
+                    "content": "curl -s http://127.0.0.1:8787/api/health",
+                },
+            )
 
         self.assertEqual(200, response.status_code)
         payload = response.json()

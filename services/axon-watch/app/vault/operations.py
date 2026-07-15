@@ -16,7 +16,12 @@ from app.vault.crypto import (
     hash_password_for_storage,
     verify_totp,
 )
-from app.vault.provider_aliases import PROVIDER_VAULT_NAMES, PROVIDER_VAULT_URLS
+from app.vault.import_store import load_vault_import
+from app.vault.provider_aliases import (
+    PROVIDER_VAULT_NAMES,
+    PROVIDER_VAULT_URLS,
+    RUNTIME_PROVIDER_IDS,
+)
 from app.vault.session import (
     VaultSession,
     auto_unlock_enabled,
@@ -329,7 +334,6 @@ def vault_runtime_env() -> dict[str, str]:
     """Resolve CLI runtime env keys from unlocked vault (internal control-plane use only)."""
     if not VaultSession.is_unlocked():
         return {}
-    from app.vault.provider_aliases import RUNTIME_PROVIDER_IDS
 
     env: dict[str, str] = {}
     named_bindings = (
@@ -369,8 +373,6 @@ def vault_runtime_env() -> dict[str, str]:
 
 def vault_runtime_posture() -> dict[str, object]:
     """Operator-safe runtime vault posture (no secret values)."""
-    from app.vault.provider_aliases import RUNTIME_PROVIDER_IDS
-
     unlocked = VaultSession.is_unlocked()
     resolved_map = vault_resolve_all_provider_keys() if unlocked else {}
     runtime_keys: dict[str, bool] = {}
@@ -463,8 +465,6 @@ def attempt_auto_unlock() -> tuple[bool, str]:
 
 def migrate_legacy_import_file() -> list[str]:
     """Import Phase F vault-import.json keys into encrypted vault as login secrets."""
-    from app.vault.credential_resolver import load_vault_import
-
     if not VaultSession.is_unlocked():
         return []
     key = VaultSession.get_key()
