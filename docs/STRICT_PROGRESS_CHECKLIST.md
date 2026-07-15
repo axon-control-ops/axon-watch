@@ -148,9 +148,10 @@ Update an item only when its stated evidence is attached.
     arguments, and refusal to kill unmanaged processes. Vault-backed tunnel
     auth (`cloudflare_tunnel_token`) and zero-byte `cloudflared` stub skipping
     landed via PR #5. The `verify:tunnel-remote-control` gate passes. Live
-    cutover is still required: an unmanaged legacy `cloudflared` must be
-    stopped so Axon-X can own `managed: true`. WhatsApp remains explicitly
-    deferred and is still a retirement blocker.
+    cutover is in progress: Axon-X started a managed cloudflared
+    (`managed: true`), but root `cloudflared.service` (PID 2237) still needs
+    `sudo systemctl disable --now cloudflared` so only Axon-X owns the tunnel.
+    WhatsApp remains explicitly deferred and is still a retirement blocker.
 
 - [x] **20. Define the actual self-improvement contract**
   - Trace store, evaluation dataset, verifier, regression thresholds, proposal workflow, isolated execution, approval, and rollback.

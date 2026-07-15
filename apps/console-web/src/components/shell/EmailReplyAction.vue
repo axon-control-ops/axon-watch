@@ -1,20 +1,41 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
-import { sendEmailReply } from '../../api/email-settings-api';
+import {
+  fetchEmailSettings,
+  sendEmailReply,
+  type EmailMailboxAccount,
+} from '../../api/email-settings-api';
 
 const props = defineProps<{
+  workspaceId?: string | null;
   meta?: Record<string, unknown> | null;
 }>();
 
-const accountId = computed(() => String(props.meta?.email_account_id ?? '').trim());
-const accountAddress = computed(() => String(props.meta?.email_account_address ?? '').trim());
+const accounts = ref<EmailMailboxAccount[]>([]);
+const settingsError = ref('');
+
+const workspaceId = computed(() => String(props.workspaceId || '').trim());
 const suggestedSubject = computed(() =>
   String(props.meta?.suggested_reply_subject ?? '').trim(),
 );
 const suggestedBody = computed(() => String(props.meta?.suggested_reply_body ?? '').trim());
 const recipient = computed(() => String(props.meta?.sender ?? '').trim());
 const isEmailSignal = computed(() => props.meta?.signal_family === 'email_triage');
+
+const workspaceAccount = computed(() => {
+  const workspace = workspaceId.value;
+  if (!workspace) {
+    return null;
+  }
+  return accounts.value.find((account) => account.workspace_id === workspace) ?? null;
+});
+
+const accountAddress = computed(
+  () => workspaceAccount.value?.email_address
+    || workspaceAccount.value?.smtp.from_email
+    || '',
+);
 
 const subject = ref('');
 const body = ref('');
@@ -23,12 +44,25 @@ const sending = ref(false);
 const sentReceipt = ref('');
 const sendError = ref('');
 
+async function loadAccounts(): Promise<void> {
+  settingsError.value = '';
+  try {
+    const snapshot = await fetchEmailSettings();
+    accounts.value = snapshot.settings.accounts;
+  } catch (error) {
+    settingsError.value =
+      error instanceof Error ? error.message : 'Failed to load email settings';
+    accounts.value = [];
+  }
+}
+
 watch(
   () => [
     suggestedSubject.value,
     suggestedBody.value,
     recipient.value,
-    accountId.value,
+    workspaceId.value,
+    workspaceAccount.value?.account_id ?? '',
   ],
   () => {
     subject.value = suggestedSubject.value;
@@ -40,10 +74,14 @@ watch(
   { immediate: true },
 );
 
+onMounted(() => {
+  void loadAccounts();
+});
+
 const canSend = computed(
   () =>
     Boolean(
-      accountId.value &&
+      workspaceAccount.value &&
         recipient.value &&
         subject.value.trim() &&
         body.value.trim() &&
@@ -52,7 +90,7 @@ const canSend = computed(
 );
 
 async function sendApprovedReply(): Promise<void> {
-  if (!canSend.value) {
+  if (!canSend.value || !workspaceAccount.value) {
     return;
   }
   sending.value = true;
@@ -60,7 +98,8 @@ async function sendApprovedReply(): Promise<void> {
   sentReceipt.value = '';
   try {
     const result = await sendEmailReply({
-      account_id: accountId.value,
+      workspace_id: workspaceId.value,
+      account_id: workspaceAccount.value.account_id,
       to: recipient.value,
       subject: subject.value.trim(),
       body: body.value.trim(),
@@ -80,7 +119,11 @@ async function sendApprovedReply(): Promise<void> {
   <section v-if="isEmailSignal && suggestedBody" class="email-reply-action">
     <p class="email-reply-action__label">Suggested reply · review before sending</p>
     <p class="email-reply-action__route">
-      {{ accountAddress ? `From ${accountAddress}` : 'Sending mailbox unavailable' }}
+      {{
+        accountAddress
+          ? `From ${accountAddress} (${workspaceId || 'workspace'})`
+          : 'No mailbox configured for this workspace'
+      }}
       · To {{ recipient }}
     </p>
     <label class="email-reply-action__field">
@@ -103,9 +146,11 @@ async function sendApprovedReply(): Promise<void> {
     >
       {{ sending ? 'SENDING…' : 'SEND APPROVED REPLY' }}
     </button>
-    <p v-if="!accountId" class="email-reply-action__error">
-      This signal has no source mailbox receipt. Refresh signals after IMAP reconnects.
+    <p v-if="!workspaceAccount" class="email-reply-action__error">
+      Configure this workspace mailbox under Settings → Email
+      {{ workspaceId ? `(${workspaceId})` : '' }}.
     </p>
+    <p v-if="settingsError" class="email-reply-action__error" role="alert">{{ settingsError }}</p>
     <p v-if="sentReceipt" class="email-reply-action__receipt">{{ sentReceipt }}</p>
     <p v-if="sendError" class="email-reply-action__error" role="alert">{{ sendError }}</p>
   </section>

@@ -166,7 +166,8 @@ export async function suggestEmailReply(body: {
 }
 
 export async function sendEmailReply(body: {
-  account_id: string;
+  workspace_id?: string;
+  account_id?: string;
   to: string;
   subject: string;
   body: string;

@@ -318,27 +318,6 @@ function handleEvidenceHandoff(signal: {
       <div class="brain-galaxy-stage__title-row">
         <span class="brain-galaxy-stage__stats">{{ headline }}</span>
       </div>
-      <div class="brain-galaxy-stage__top-actions">
-        <button
-          type="button"
-          class="brain-galaxy-stage__chip"
-          title="Fit camera and clear selection"
-          @click="resetView"
-        >
-          Fit
-        </button>
-        <button type="button" class="brain-galaxy-stage__chip" @click="emit('switchGrid')">
-          Grid
-        </button>
-        <button
-          type="button"
-          class="brain-galaxy-stage__chip"
-          :class="{ 'brain-galaxy-stage__chip--accent': !props.terminalVisible }"
-          @click="emit('toggleTerminal')"
-        >
-          {{ props.terminalVisible ? 'Terminal' : 'Terminal +' }}
-        </button>
-      </div>
     </header>
 
     <div class="brain-galaxy-stage__hud brain-galaxy-stage__hud--left">
@@ -407,20 +386,43 @@ function handleEvidenceHandoff(signal: {
       <div class="galaxy-operator-console__command">
         <KairoConversationBar />
       </div>
-      <div class="galaxy-operator-console__stats" aria-label="Graph stats">
-        <div>
-          <span>NODES</span>
-          <strong>{{ graphStats.nodes.toLocaleString() }}</strong>
+      <div class="galaxy-operator-console__footer-right">
+        <div class="galaxy-operator-console__actions" role="group" aria-label="Galaxy view controls">
+          <button
+            type="button"
+            class="brain-galaxy-stage__chip"
+            title="Fit camera and clear selection"
+            @click="resetView"
+          >
+            Fit
+          </button>
+          <button type="button" class="brain-galaxy-stage__chip" @click="emit('switchGrid')">
+            Grid
+          </button>
+          <button
+            type="button"
+            class="brain-galaxy-stage__chip"
+            :class="{ 'brain-galaxy-stage__chip--accent': !props.terminalVisible }"
+            @click="emit('toggleTerminal')"
+          >
+            {{ props.terminalVisible ? 'Terminal' : 'Terminal +' }}
+          </button>
         </div>
-        <div>
-          <span>LINKS</span>
-          <strong>{{ graphStats.links.toLocaleString() }}</strong>
+        <div class="galaxy-operator-console__stats" aria-label="Graph stats">
+          <div>
+            <span>NODES</span>
+            <strong>{{ graphStats.nodes.toLocaleString() }}</strong>
+          </div>
+          <div>
+            <span>LINKS</span>
+            <strong>{{ graphStats.links.toLocaleString() }}</strong>
+          </div>
+          <div>
+            <span>SOURCES</span>
+            <strong>{{ graphStats.sources.toLocaleString() }}</strong>
+          </div>
+          <time>{{ utcClock }}</time>
         </div>
-        <div>
-          <span>SOURCES</span>
-          <strong>{{ graphStats.sources.toLocaleString() }}</strong>
-        </div>
-        <time>{{ utcClock }}</time>
       </div>
     </footer>
   </section>
