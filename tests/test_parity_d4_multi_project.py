@@ -53,8 +53,11 @@ def _request(method: str, url: str, body: dict | None = None) -> tuple[int, dict
 
 
 def _stack_available() -> bool:
-    status, _ = _request("GET", f"{CONTROL_PLANE_BASE}/api/health")
-    return status == 200
+    try:
+        status, _ = _request("GET", f"{CONTROL_PLANE_BASE}/api/health")
+        return status == 200
+    except urllib.error.URLError:
+        return False
 
 
 class ParityD4MultiProjectTests(unittest.TestCase):

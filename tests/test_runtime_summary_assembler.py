@@ -4,6 +4,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tests.support.control_plane_db import isolate_control_plane_db
 
@@ -43,6 +44,23 @@ class RuntimeSummaryAssemblerTests(unittest.TestCase):
         from app.persistence import run_store
 
         isolate_control_plane_db(self, run_store)
+        runtime_patch = patch(
+            "app.runtime_summary_assembler.runtime_status_snapshot",
+            return_value={
+                "default_runtime": "cursor_local",
+                "local": [
+                    {
+                        "id": "cursor_local",
+                        "label": "Cursor CLI (local)",
+                        "ready": True,
+                        "available": True,
+                        "auth": {"message": "Test runtime ready."},
+                    }
+                ],
+            },
+        )
+        runtime_patch.start()
+        self.addCleanup(runtime_patch.stop)
 
     def test_assembler_returns_canonical_top_level_shape(self) -> None:
         payload = assemble_runtime_summary(watch_probe=_connected_probe, inbox_fetcher=lambda: None)

@@ -1,0 +1,16 @@
+{
+  "bindings": {
+    "workspace_axon_local": {
+      "display_name": "axon-local",
+      "project_root": "tests/fixtures/projects/axon-local"
+    },
+    "workspace_axon_watch": {
+      "display_name": "axon-watch",
+      "project_root": "."
+    },
+    "workspace_dashpro": {
+      "display_name": "DashPro",
+      "project_root": "tests/fixtures/projects/dashpro"
+    }
+  }
+}

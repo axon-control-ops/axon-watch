@@ -13,6 +13,7 @@ jobs:
     env:
       AXON_WATCH_SKIP_ENSURE_AXON_LOCAL: "1"
       AXON_WATCH_SHELL_BOOT_MODE: auto
+      AXON_WATCH_WORKSPACE_BINDINGS_FILE: config/workspace-project-bindings.ci.json
     steps:
       - uses: actions/checkout@v4
         with:

@@ -26,6 +26,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
 from app.persistence import run_store  # noqa: E402
+from app import runtime_summary_assembler  # noqa: E402
 
 
 class ControlPlaneWatchIntegrationTests(unittest.TestCase):
@@ -47,6 +48,25 @@ class ControlPlaneWatchIntegrationTests(unittest.TestCase):
         )
         self._env_patch.start()
         self.addCleanup(self._env_patch.stop)
+
+        self._runtime_patch = patch.object(
+            runtime_summary_assembler,
+            "runtime_status_snapshot",
+            return_value={
+                "default_runtime": "cursor_local",
+                "local": [
+                    {
+                        "id": "cursor_local",
+                        "label": "Cursor CLI (local)",
+                        "ready": True,
+                        "available": True,
+                        "auth": {"message": "Test runtime ready."},
+                    }
+                ],
+            },
+        )
+        self._runtime_patch.start()
+        self.addCleanup(self._runtime_patch.stop)
 
         self.client = TestClient(app)
         self.addCleanup(self.client.close)

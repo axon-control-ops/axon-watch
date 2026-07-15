@@ -18,7 +18,13 @@ def load_watch_app():
         del sys.modules[name]
 
     sys.path.insert(0, str(WATCH_ROOT))
-    from app.main import app as watch_app  # noqa: WPS433
+    try:
+        from app.main import app as watch_app  # noqa: WPS433
+    except Exception:
+        restore_app_modules(cached)
+        raise
+    finally:
+        sys.path.remove(str(WATCH_ROOT))
 
     return watch_app, cached
 

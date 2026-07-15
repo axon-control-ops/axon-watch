@@ -8,6 +8,8 @@ jobs:
   fast-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      AXON_WATCH_WORKSPACE_BINDINGS_FILE: config/workspace-project-bindings.ci.json
     steps:
       - uses: actions/checkout@v4
         with:
