@@ -24,7 +24,7 @@ Do not mark a day complete from automated health evidence alone.
 
 | Day | Date | Automated health | Operator workflow | Required gates | `:7734` attestation |
 |---|---|---|---|---|---|
-| 1 | 2026-07-15 | PASS | pending | pending | pending |
+| 1 | 2026-07-15 | PASS | pending | partial PASS | pending |
 | 2 | 2026-07-16 | pending | pending | pending | pending |
 | 3 | 2026-07-17 | pending | pending | pending | pending |
 | 4 | 2026-07-18 | pending | pending | pending | pending |
@@ -46,8 +46,26 @@ Recorded on 2026-07-15 after commit `022415d`.
 Open operator evidence:
 
 - [ ] Complete a normal operator workflow on `:4173`
-- [ ] Run the Day 1 headed-browser and connector-parity gates
+- [x] Run the Day 1 headed-browser and connector-parity gates
 - [ ] Attest whether `:7734` was used
+
+## Day 1 — automated gate evidence (2026-07-15 afternoon)
+
+Recorded after local verification on `dev` (`0e813e6`).
+
+- `./scripts/dev/check-health.sh`: PASS
+- `npm run verify:headed-browser-smoke`: PASS (7.8s; report at
+  `.local/verify/headed-smoke/headed-browser-smoke-report.json`)
+- `npm run verify:connector-parity`: PASS (TEST-25 bundle)
+
+Gate repairs in this slice:
+
+- Headed smoke now pins operator center view to `grid` so the conversation seam
+  is visible under the default brain-galaxy operator layout.
+- Headed smoke fails fast when Vite CSS compilation is stale after settings
+  stylesheet extraction.
+- Connector acceptance retries runtime-summary connector projection for 20s
+  after watch/control-plane restarts.
 
 ## Known retirement blockers
 
