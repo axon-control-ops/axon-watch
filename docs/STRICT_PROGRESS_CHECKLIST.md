@@ -144,9 +144,11 @@ Update an item only when its stated evidence is attached.
   - Resolve, migrate, or explicitly discard WhatsApp monitoring before retirement.
   - Evidence: decision + proof: _TBD_
 
-- [ ] **20. Define the actual self-improvement contract**
+- [x] **20. Define the actual self-improvement contract**
   - Trace store, evaluation dataset, verifier, regression thresholds, proposal workflow, isolated execution, approval, and rollback.
-  - Evidence: design doc path: _TBD_
+  - Evidence: 2026-07-15 — `docs/SELF_IMPROVEMENT_CONTRACT.md` defines all
+    required subsystems, state transitions, exact-effect approval, forbidden
+    real effects, default-off enablement, evidence requirements, and rollback.
 
 - [ ] **21. Implement self-improvement only after items 0–18 are green**
   - No agent may alter policy, secrets, approval rules, or production state autonomously.
