@@ -70,6 +70,7 @@ Gate repairs in this slice:
 ## Known retirement blockers
 
 - WhatsApp monitoring remains explicitly deferred.
-- The live Cloudflare process is unmanaged by Axon-X and Axon-X tunnel auth is
-  missing; native control is implemented but operator cutover is incomplete.
+- Native tunnel control and vault token resolution are implemented (PR #5),
+  but the live Cloudflare process is still unmanaged by Axon-X until operator
+  cutover stops the legacy process and starts Axon-X-managed cloudflared.
 - No retirement or discard acknowledgment is signed in this log.
