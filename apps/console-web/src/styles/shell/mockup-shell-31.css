@@ -39,6 +39,10 @@
   right: calc(clamp(13rem, 24vw, 16rem) + 1rem);
 }
 
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--top .brain-galaxy-stage__top-actions {
+  display: none;
+}
+
 .brain-galaxy-stage--mockup .brain-galaxy-stage__title-row {
   padding: 0.22rem 0.55rem;
   border-radius: 0.35rem;

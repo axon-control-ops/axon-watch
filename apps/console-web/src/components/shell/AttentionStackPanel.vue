@@ -407,7 +407,10 @@ function signalHint(signal: {
               :meta="signal.meta"
               compact
             />
-            <EmailReplyAction :meta="signal.meta" />
+            <EmailReplyAction
+              :workspace-id="signal.workspace_id"
+              :meta="signal.meta"
+            />
             <HandoffToIdeButton
               :signal-id="signal.signal_id"
               :workspace-id="signal.workspace_id"

@@ -79,6 +79,7 @@ main_tests=(
   tests.test_email_settings_store
   tests.test_email_reply_suggest
   tests.test_email_smtp_send
+  tests.test_email_account_resolve
   tests.test_operator_evidence
   tests.test_kairo_conversation_endpoints
   tests.test_voice_autonomy

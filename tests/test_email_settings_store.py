@@ -292,7 +292,7 @@ class EmailSettingsApiTests(unittest.TestCase):
             response = self.client.post(
                 "/api/email/send",
                 json={
-                    "account_id": "acct-1",
+                    "workspace_id": "workspace_dashpro",
                     "to": "user@example.com",
                     "subject": "Hello",
                     "body": "Body text",

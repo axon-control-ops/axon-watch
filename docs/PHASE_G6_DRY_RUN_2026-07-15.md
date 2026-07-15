@@ -70,7 +70,7 @@ Gate repairs in this slice:
 ## Known retirement blockers
 
 - WhatsApp monitoring remains explicitly deferred.
-- Native tunnel control and vault token resolution are implemented (PR #5),
-  but the live Cloudflare process is still unmanaged by Axon-X until operator
-  cutover stops the legacy process and starts Axon-X-managed cloudflared.
+- Native tunnel control and vault token resolution are implemented (PR #5).
+  Axon-X managed cloudflared is running, but root `cloudflared.service` still
+  needs `sudo systemctl disable --now cloudflared` to finish exclusive cutover.
 - No retirement or discard acknowledgment is signed in this log.

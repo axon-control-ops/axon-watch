@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.email_account_resolve import resolve_workspace_email_account
 from app.email_reply_suggest import suggest_email_reply
 from app.email_smtp_send import EmailSendError, send_smtp_message
 from app.persistence import email_settings_store
@@ -23,10 +24,11 @@ class EmailSuggestReplyRequest(BaseModel):
 
 
 class EmailSendRequest(BaseModel):
-    account_id: str
     to: str
     subject: str
     body: str
+    workspace_id: str = ""
+    account_id: str = ""
     confirm_send: bool = False
     password_smtp: str = ""
 
@@ -49,13 +51,19 @@ def email_send(body: EmailSendRequest) -> dict[str, Any]:
             detail="Set confirm_send=true after reviewing the draft. Sends are never automatic.",
         )
     settings = email_settings_store.load_settings()
-    account = None
-    for entry in settings.get("accounts") or []:
-        if str(entry.get("account_id")) == str(body.account_id).strip():
-            account = entry
-            break
+    account = resolve_workspace_email_account(
+        settings,
+        workspace_id=body.workspace_id,
+        account_id=body.account_id,
+    )
     if account is None:
-        raise HTTPException(status_code=404, detail="mailbox account not found")
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No mailbox configured for this workspace. "
+                "Add the workspace email under Settings → Email."
+            ),
+        )
 
     password = body.password_smtp.strip()
     if not password:
@@ -69,7 +77,10 @@ def email_send(body: EmailSendRequest) -> dict[str, Any]:
     if not password:
         raise HTTPException(
             status_code=409,
-            detail="Unlock Axon-X Vault or provide password_smtp before sending.",
+            detail=(
+                "Unlock Axon-X Vault and save the mailbox password under "
+                "Settings → Email before sending."
+            ),
         )
 
     try:
