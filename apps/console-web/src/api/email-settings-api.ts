@@ -142,6 +142,56 @@ export async function testEmailAccount(body: {
   );
 }
 
+export async function suggestEmailReply(body: {
+  subject?: string;
+  sender?: string;
+  text?: string;
+  operator_name?: string;
+}): Promise<{
+  reply_subject: string;
+  reply_body: string;
+  to: string;
+  recommended_action: string;
+  recommended_detail: string;
+}> {
+  return fetchJson(
+    '/api/email/suggest-reply',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'email reply suggest failed',
+  );
+}
+
+export async function sendEmailReply(body: {
+  account_id: string;
+  to: string;
+  subject: string;
+  body: string;
+  confirm_send: boolean;
+  password_smtp?: string;
+}): Promise<{
+  ok: boolean;
+  from: string;
+  to: string;
+  subject: string;
+  message_id: string;
+  account_id?: string;
+  email_address?: string;
+}> {
+  return fetchJson(
+    '/api/email/send',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    'email send failed',
+  );
+}
+
 export function emailSettingsUrl(): string {
   return apiUrl('/api/email/settings');
 }

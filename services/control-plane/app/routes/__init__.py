@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from app.routes import (
     chat,
     data,
+    email_reply,
     email_settings,
     health,
     inbox_watch,
@@ -29,6 +30,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(inbox_watch.router)
     app.include_router(operator.router)
     app.include_router(email_settings.router)
+    app.include_router(email_reply.router)
     app.include_router(chat.router)
     app.include_router(runs.router)
     app.include_router(workspaces.router)

@@ -69,6 +69,55 @@ class EmailSettingsStoreTests(unittest.TestCase):
         deleted = email_settings_store.delete_account(account_id)
         self.assertEqual([], deleted["settings"]["accounts"])
 
+    def test_load_settings_hydrates_from_projection_when_db_empty(self) -> None:
+        projection = email_settings_store.projection_path()
+        projection.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "bridge_enabled": False,
+                    "bridge_workspace_id": "5",
+                    "stub_enabled": False,
+                    "workspace_hint_map": {"DashPro": "workspace_dashpro"},
+                    "accounts": [
+                        {
+                            "account_id": "acct-1",
+                            "workspace_id": "workspace_dashpro",
+                            "email_address": "ops@example.com",
+                            "display_name": "Ops",
+                            "imap": {
+                                "host": "imap.example.com",
+                                "port": 993,
+                                "username": "ops@example.com",
+                                "ssl": True,
+                                "folder": "INBOX",
+                                "password_ref": "vault:email:ops:imap",
+                            },
+                            "smtp": {
+                                "host": "smtp.example.com",
+                                "port": 465,
+                                "username": "ops@example.com",
+                                "ssl": True,
+                                "starttls": False,
+                                "from_email": "ops@example.com",
+                                "password_ref": "vault:email:ops:smtp",
+                            },
+                            "monitor": {"enabled": True, "poll_seconds": 60},
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        email_settings_store.reset_store()
+        settings = email_settings_store.load_settings()
+        self.assertEqual(1, len(settings["accounts"]))
+        self.assertEqual("ops@example.com", settings["accounts"][0]["email_address"])
+        self.assertFalse(settings["stub_enabled"])
+        # Second load must come from DB, not re-import forever.
+        again = email_settings_store.load_settings()
+        self.assertEqual(1, len(again["accounts"]))
+
 
 class EmailSettingsApiTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -139,11 +188,7 @@ class EmailSettingsApiTests(unittest.TestCase):
     def test_upsert_with_passwords_while_vault_locked_still_saves_config(self) -> None:
         from app.routes import email_settings as email_routes
 
-        with patch.object(
-            email_routes.vault_routes,
-            "get_vault_status",
-            return_value={"vault": {"is_unlocked": False}},
-        ):
+        with patch.object(email_routes, "_vault_unlocked", return_value=False):
             response = self.client.post(
                 "/api/email/accounts",
                 json={
@@ -167,6 +212,97 @@ class EmailSettingsApiTests(unittest.TestCase):
         self.assertEqual(1, len(body["settings"]["accounts"]))
         self.assertIn("warning", body)
         self.assertIn("Vault", body["warning"])
+        self.assertEqual("", body["settings"]["accounts"][0]["imap"]["password_ref"])
+
+    def test_suggest_reply_route(self) -> None:
+        response = self.client.post(
+            "/api/email/suggest-reply",
+            json={
+                "subject": "Urgent blocker",
+                "sender": "Ops <ops@example.com>",
+                "text": "We cannot ship until this is fixed.",
+            },
+        )
+        self.assertEqual(200, response.status_code)
+        body = response.json()
+        self.assertTrue(body["reply_subject"].startswith("Re:"))
+        self.assertIn("reply_body", body)
+
+    def test_send_route_requires_confirm(self) -> None:
+        response = self.client.post(
+            "/api/email/send",
+            json={
+                "account_id": "missing",
+                "to": "user@example.com",
+                "subject": "Hello",
+                "body": "Body",
+                "confirm_send": False,
+            },
+        )
+        self.assertEqual(400, response.status_code)
+
+    def test_send_route_sends_when_confirmed(self) -> None:
+        email_settings_store.save_settings(
+            {
+                "accounts": [
+                    {
+                        "account_id": "acct-1",
+                        "workspace_id": "workspace_dashpro",
+                        "label": "Ops",
+                        "email_address": "ops@example.com",
+                        "provider": "custom",
+                        "enabled": True,
+                        "imap": {
+                            "host": "imap.example.com",
+                            "port": 993,
+                            "ssl": True,
+                            "username": "ops@example.com",
+                            "folder": "INBOX",
+                            "password_ref": "",
+                        },
+                        "smtp": {
+                            "host": "smtp.example.com",
+                            "port": 465,
+                            "ssl": True,
+                            "starttls": False,
+                            "username": "ops@example.com",
+                            "from_email": "ops@example.com",
+                            "password_ref": "",
+                        },
+                        "monitor_enabled": True,
+                        "poll_seconds": 60,
+                    }
+                ],
+                "bridge_enabled": False,
+                "stub_enabled": True,
+            }
+        )
+        with patch(
+            "app.routes.email_reply.send_smtp_message",
+            return_value={
+                "ok": True,
+                "from": "ops@example.com",
+                "to": "user@example.com",
+                "subject": "Hello",
+                "account_id": "acct-1",
+                "email_address": "ops@example.com",
+                "refused": {},
+            },
+        ) as send_mock:
+            response = self.client.post(
+                "/api/email/send",
+                json={
+                    "account_id": "acct-1",
+                    "to": "user@example.com",
+                    "subject": "Hello",
+                    "body": "Body text",
+                    "confirm_send": True,
+                    "password_smtp": "secret",
+                },
+            )
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.json()["ok"])
+        send_mock.assert_called_once()
 
 
 if __name__ == "__main__":

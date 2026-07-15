@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import EmailReplyAction from './EmailReplyAction.vue';
 import HudSeamCard from '../HudSeamCard.vue';
 import HandoffToIdeButton from './HandoffToIdeButton.vue';
 import SentryIssuesList from './SentryIssuesList.vue';
@@ -406,6 +407,7 @@ function signalHint(signal: {
               :meta="signal.meta"
               compact
             />
+            <EmailReplyAction :meta="signal.meta" />
             <HandoffToIdeButton
               :signal-id="signal.signal_id"
               :workspace-id="signal.workspace_id"
