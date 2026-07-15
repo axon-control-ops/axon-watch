@@ -24,14 +24,26 @@ from app.tunnel.tunnel_probe import build_tunnel_diagnostics  # noqa: E402
 class TunnelCredentialsWatchTests(unittest.TestCase):
     def test_skips_zero_byte_cloudflared_on_path(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
-            fake_bin = Path(tempdir) / "cloudflared"
-            fake_bin.write_text("", encoding="utf-8")
-            fake_bin.chmod(0o755)
-            with patch.dict(os.environ, {"PATH": str(tempdir)}, clear=False):
+            root = Path(tempdir)
+            bad_dir = root / "bad"
+            good_dir = root / "good"
+            bad_dir.mkdir()
+            good_dir.mkdir()
+            bad_bin = bad_dir / "cloudflared"
+            bad_bin.write_text("", encoding="utf-8")
+            bad_bin.chmod(0o755)
+            good_bin = good_dir / "cloudflared"
+            good_bin.write_text("#!/bin/sh\necho cloudflared\n", encoding="utf-8")
+            good_bin.chmod(0o755)
+            with patch.dict(
+                os.environ,
+                {"PATH": f"{bad_dir}{os.pathsep}{good_dir}"},
+                clear=False,
+            ):
                 from app.tunnel.cloudflared_binary import find_cloudflared_binary
 
                 resolved = find_cloudflared_binary(["cloudflared"])
-        self.assertEqual("/usr/bin/cloudflared", resolved)
+        self.assertEqual(str(good_bin), resolved)
 
     def test_prefers_environment_token(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
