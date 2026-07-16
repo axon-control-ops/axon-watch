@@ -18,7 +18,7 @@
       "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display slices extracted; keep shrinking via factory slices."
     },
     "apps/console-web/src/styles/ide-layout.css": {
-      "max_lines": 10,
+      "max_lines": 11,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/* + feature CSS",

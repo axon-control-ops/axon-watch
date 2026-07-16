@@ -1,7 +1,6 @@
 """Chat/composer orchestration for the control-plane thin slice."""
 
 from __future__ import annotations
-
 import os
 import re
 from dataclasses import dataclass

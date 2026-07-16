@@ -25,6 +25,7 @@ import type {
   CursorRuntimeStatusSnapshot,
   FleetHealthSnapshot,
   RuntimeMcpToolsSnapshot,
+  RuntimeStatusSnapshot,
   TerminalSessionRecord,
   WorkspaceChatThreadListItem,
 } from '../api/control-plane';
@@ -38,7 +39,6 @@ import {
   readPendingHandoffDismissSignalId,
   writePendingHandoffDismissSignalId,
 } from '../lib/signal-handoff-dismiss';
-import type { RuntimeStatusSnapshot } from '../api/control-plane';
 import type {
   ApprovalRecord,
   InboxItem,
@@ -51,9 +51,7 @@ import type {
   WorkspaceRecord,
 } from '../contracts/canonical';
 import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
-import {
-  editedFilePathsFromTranscript,
-} from '../lib/agent-transcript-blocks';
+import { editedFilePathsFromTranscript } from '../lib/agent-transcript-blocks';
 import { buildResearchEditorContent } from '../lib/prove-research-source';
 import { resolveResearchFlyToTarget } from '../lib/research-fly-to-source';
 import type { ResearchBlockKind } from '../lib/research-provider';
@@ -75,9 +73,7 @@ import { effectiveKairoNarration } from '../lib/kairo-narration-policy';
 import { postKairoSpeak } from '../lib/kairo-speak-client';
 import type { EditorRevealRequest } from '../components/EditorHost.vue';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
-import {
-  DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
-} from '../lib/terminal-session-view';
+import { DEFAULT_OPERATOR_TERMINAL_SESSION_ID } from '../lib/terminal-session-view';
 import {
   createTerminalSessionStore,
   DEFAULT_TERMINAL_SESSIONS,
