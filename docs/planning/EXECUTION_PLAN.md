@@ -108,7 +108,8 @@ Detail: `docs/planning/KAIRO_CONVERSATION_PLAN.md`
 | C4 | **OP-C4** | Navigation intents ("show DashPro", "open attention"); execute-tier confirm flow | vitest `conversation-intents.test.ts` PASS; manual nav + confirm dispatch | **Done** |
 | C5 | **OP-C5** | Session turn memory for follow-ups ("hand it off" after prior entity) | Contract tests for memory cap; manual follow-up without re-stating workspace | **Done** |
 | C6 | **V5+V9** | Narration plumbing cleanup + honest settings copy | vitest narration tests PASS; no speak API calls for filtered milestones | **Done** |
-| C6A | **Voice-A** | Remove generic briefing/response filler; stay quiet without a live fact/model reply | Focused backend/frontend voice tests + typecheck; no nominal copy beside live failure | **Implemented 2026-07-16** |
+| C6A | **Voice-A** | Remove generic briefing/response filler; stay quiet without a live fact/model reply | Focused backend/frontend voice tests + typecheck; no nominal copy beside live failure | **Done 2026-07-16** (`1c19f77`) |
+| C6B | **Voice-B / V10** | Ask/Plan answer-only narration without tool/run semantics | Answer-mode tests + shell extraction; Ask/Plan final answer speaks once | **Implemented 2026-07-16** |
 | C7 | **V1+V4+V6** | Honest mode labels, persona parity for thinking, error/fallback narration | Manual: minimal thinking uses Vaxon tone; agent error spoken | **Done** |
 | C8 | **M1+M2** | Unified session id + SQLite-backed turn/entity memory | pytest: follow-up survives CP restart | **Done** |
 | C9 | **M3+M5+M6** | Chat tail in context pack, 10 s DTO refresh, unified voice-log dedup | pytest context pack + TTL; manual: no repeated phrasing across channels | **Done** |

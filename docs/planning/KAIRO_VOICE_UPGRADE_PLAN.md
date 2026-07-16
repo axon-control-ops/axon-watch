@@ -67,6 +67,8 @@ Gate:
 
 ### Voice-B — Ask / Plan answer narration
 
+**Status:** implementation complete; verification recorded below.
+
 Work:
 
 - Attach an answer-only narrator to Ask and Plan streams.
@@ -132,7 +134,18 @@ barge-in, and no-double-speak proofs.
   unrelated failures: the same file-size baseline test, plus the current dirty
   email/vault import path causing `WatchInboxUnavailableError` in skeleton E2E.
   All focused Voice-A tests remained green.
+- Landed: commit `1c19f77` on `fix/clear-attention-blockers` (pushed).
+
+### 2026-07-16 — Voice-B
+
+- Added Ask/Plan answer-only narration via `composer-answer-narration.ts` and
+  `chat-stream-voice-narration.ts`.
+- Ask/Plan remain non-tool-capable; only final answer/failure bookends speak.
+- Extracted stream voice wiring from `shell.ts` (3734 → 3687) and lowered the
+  hotspot ratchet.
+- Focused frontend: answer-mode + stream-voice + narration-policy — **12/12 PASS**.
+- Console `vue-tsc --noEmit` — **PASS**.
 
 ## Next slice
 
-Voice-B: Ask / Plan answer-only narration.
+Voice-C: throttled mid-run thinking + opt-in tool milestones.
