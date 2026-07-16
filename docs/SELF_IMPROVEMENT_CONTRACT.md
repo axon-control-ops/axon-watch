@@ -78,22 +78,33 @@ operator-visible receipt.
 
 ## Isolated execution
 
-Evaluation and execution occur in a disposable proposal root. The bound
-workspace, policy files, vault, approval configuration, deployment targets,
-and production services are read-only.
+Evaluation and execution occur in a disposable proposal root: a temporary
+directory (`axon-si-…`) holding a git worktree (preferred) or local clone of the
+bound project, pinned to a recorded baseline commit. Threshold markers and
+metrics live under `.axon-si/` inside that disposable checkout only.
 
-The current executor is a marker-based testbed. It does not authorize real git
-merge, deployment, policy mutation, secret mutation, or production mutation.
-A future executor requires a separate reviewed contract revision.
+The bound workspace, policy files, vault, approval configuration, deployment
+targets, and production services stay read-only. Sandbox creation must not
+reset or discard dirty state in the live tree. If worktree and clone both fail,
+the executor fails closed and never writes the bound root.
+
+Agent and test commands that assist evaluation must use the disposable root as
+their workspace/cwd (`sandbox_agent_workspace` / `-C` / `--workspace`). They
+must not resolve paths back to the live bound project during evaluation.
+
+Passing checks inside the disposable root is evidence for an operator decision,
+not permission to ship. This executor still does not authorize real git merge
+into the live branch, deployment, policy mutation, secret mutation, or
+production mutation.
 
 ## Effect policy
 
-| Effect       | Current policy                                      |
-| ------------ | --------------------------------------------------- |
-| `merge`      | Evaluate and promote a marker only inside isolation |
-| `policy`     | Reserved; no real mutation permitted                |
-| `secret`     | Reserved; no real mutation permitted                |
-| `production` | Reserved; no real mutation permitted                |
+| Effect       | Current policy                                                        |
+| ------------ | --------------------------------------------------------------------- |
+| `merge`      | Promote a verified receipt inside the disposable root only (not live) |
+| `policy`     | Reserved; no real mutation permitted                                  |
+| `secret`     | Reserved; no real mutation permitted                                  |
+| `production` | Reserved; no real mutation permitted                                  |
 
 Reserved effects may be fingerprinted for workflow testing but must never be
 applied to real targets.
@@ -113,20 +124,39 @@ Execution rejects missing, expired, mismatched, or generic approvals.
 
 ## Rollback
 
-The executor captures a baseline marker before candidate work. Rollback must:
+The executor records the baseline commit and sidecar marker before candidate
+work. Rollback must:
 
-1. restore the isolated baseline;
-2. remove promoted candidate markers;
-3. persist a rollback receipt;
-4. set the proposal to `rolled_back`.
+1. restore the isolated sidecar baseline;
+2. remove promoted candidate markers inside the disposable root;
+3. remove the disposable worktree or clone (cleanup receipt);
+4. persist rollback and cleanup receipts;
+5. set the proposal to `rolled_back`.
 
 Rollback failure is an operator-visible failure and must never be swallowed.
 
+## How to use the sandbox
+
+1. Confirm checklist prerequisites, then enable only for a bounded session via
+   the console **Enable Sandbox** button (composer mode menu) or
+   `AXON_SAFE_IMPROVEMENT_ENABLED=1`.
+2. Capture a redacted trace, upsert a case, and create a proposal for the bound
+   workspace.
+3. Evaluate (creates the disposable checkout), request exact-effect approval,
+   approve with the exact fingerprint, then execute inside isolation.
+4. Review receipts. Confirm the live bound project root has no new writes from
+   the sandbox session.
+5. Roll back to restore the sidecar baseline and delete the disposable root.
+6. Turn Sandbox off in the composer menu, or unset
+   `AXON_SAFE_IMPROVEMENT_ENABLED`, to disable proposal routes without migration.
+
 ## Enablement and rollback of the capability
 
-The API is default-off. `AXON_SAFE_IMPROVEMENT_ENABLED=1` may be used only after
-the prerequisites above are met and only for a bounded operator session.
-Removing the variable disables the API without a data migration.
+The API is default-off. Enable for a bounded session with the console Sandbox
+button (`POST /api/safe-improvement/session/enable`) or
+`AXON_SAFE_IMPROVEMENT_ENABLED=1` after the prerequisites above are met.
+Disabling the session (or removing the variable) returns proposal routes to 404
+without a data migration.
 
 ## Verification evidence
 

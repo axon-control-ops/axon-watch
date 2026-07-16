@@ -87,6 +87,7 @@ class Proposal:
     effect_kind: EffectKind
     title: str
     isolation_root: str | None = None
+    baseline_commit: str | None = None
     baseline_marker: str | None = None
     candidate_marker: str | None = None
     verification: VerificationResult | None = None

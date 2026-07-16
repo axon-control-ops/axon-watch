@@ -56,6 +56,7 @@ def ensure_safe_improvement_schema(connection: sqlite3.Connection) -> None:
             effect_kind TEXT NOT NULL,
             title TEXT NOT NULL,
             isolation_root TEXT,
+            baseline_commit TEXT,
             baseline_marker TEXT,
             candidate_marker TEXT,
             verification_json TEXT,
@@ -69,6 +70,26 @@ def ensure_safe_improvement_schema(connection: sqlite3.Connection) -> None:
             ON safe_improvement_proposals(created_at DESC);
         """
     )
+    _ensure_column(
+        connection,
+        "safe_improvement_proposals",
+        "baseline_commit",
+        "TEXT",
+    )
+
+
+def _ensure_column(
+    connection: sqlite3.Connection,
+    table: str,
+    column: str,
+    column_type: str,
+) -> None:
+    existing = {
+        str(row["name"])
+        for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if column not in existing:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
 
 
 @contextmanager
@@ -184,6 +205,7 @@ def _proposal_from_row(row: sqlite3.Row) -> Proposal:
         effect_kind=row["effect_kind"],
         title=row["title"],
         isolation_root=row["isolation_root"],
+        baseline_commit=row["baseline_commit"] if "baseline_commit" in row.keys() else None,
         baseline_marker=row["baseline_marker"],
         candidate_marker=row["candidate_marker"],
         verification=verification,
@@ -200,9 +222,10 @@ def save_proposal(proposal: Proposal) -> Proposal:
             """
             INSERT OR REPLACE INTO safe_improvement_proposals (
                 proposal_id, created_at, workspace_id, trace_id, case_id, status,
-                effect_kind, title, isolation_root, baseline_marker, candidate_marker,
-                verification_json, effect_fingerprint, approval_json, receipts_json, error
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                effect_kind, title, isolation_root, baseline_commit, baseline_marker,
+                candidate_marker, verification_json, effect_fingerprint, approval_json,
+                receipts_json, error
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 proposal.proposal_id,
@@ -214,6 +237,7 @@ def save_proposal(proposal: Proposal) -> Proposal:
                 proposal.effect_kind,
                 proposal.title,
                 proposal.isolation_root,
+                proposal.baseline_commit,
                 proposal.baseline_marker,
                 proposal.candidate_marker,
                 (

@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from app.safe_improvement import isolated_executor, store
+from app.safe_improvement.isolated_executor import IsolationError
 from app.safe_improvement.models import (
     EffectApproval,
     EvaluationCase,
@@ -33,6 +34,30 @@ def _approval_expired(approval: EffectApproval) -> bool:
 
 def _append_receipt(proposal: Proposal, receipt: dict[str, Any]) -> None:
     proposal.receipts.append(receipt)
+
+
+def _resolve_bound_project_root(
+    workspace_id: str,
+    *,
+    bound_project_root: Path | str | None = None,
+) -> Path:
+    if bound_project_root is not None:
+        root = Path(bound_project_root).expanduser().resolve()
+        if not root.is_dir():
+            raise ValueError(f"bound project root is not a directory: {root}")
+        return root
+    try:
+        from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+
+        return resolve_workspace_root(workspace_id)
+    except WorkspaceRootError as exc:
+        raise ValueError(
+            f"bound project root unavailable for workspace `{workspace_id}`: {exc}"
+        ) from exc
+    except Exception as exc:
+        raise ValueError(
+            f"bound project root unavailable for workspace `{workspace_id}`: {exc}"
+        ) from exc
 
 
 def capture_trace(
@@ -120,6 +145,7 @@ def evaluate_proposal(
     proposal_id: str,
     *,
     candidate_value: float,
+    bound_project_root: Path | str | None = None,
 ) -> Proposal:
     proposal = store.get_proposal(proposal_id)
     if proposal is None:
@@ -128,7 +154,19 @@ def evaluate_proposal(
     if case is None:
         raise ValueError(f"unknown evaluation case `{proposal.case_id}`")
 
-    root = isolated_executor.create_isolation_root(proposal_id=proposal.proposal_id)
+    try:
+        bound = _resolve_bound_project_root(
+            proposal.workspace_id,
+            bound_project_root=bound_project_root,
+        )
+        root = isolated_executor.create_isolation_root(
+            proposal_id=proposal.proposal_id,
+            bound_project_root=bound,
+        )
+    except IsolationError as exc:
+        raise ValueError(str(exc)) from exc
+
+    meta = isolated_executor.read_baseline_metadata(root)
     baseline_value = (
         float(case.baseline_value)
         if case.baseline_value is not None
@@ -147,6 +185,7 @@ def evaluate_proposal(
         candidate_value=candidate_metric,
     )
     proposal.isolation_root = str(root)
+    proposal.baseline_commit = str(meta.get("baseline_commit") or "") or None
     proposal.baseline_marker = baseline_marker
     proposal.candidate_marker = isolated_executor.read_marker(root)
     proposal.verification = verification
@@ -167,6 +206,17 @@ def evaluate_proposal(
         proposal.error = None
     store.save_proposal(proposal)
     return proposal
+
+
+def sandbox_agent_workspace(proposal_id: str) -> Path:
+    """Return the disposable root agents must use for this proposal."""
+    proposal = store.get_proposal(proposal_id)
+    if proposal is None:
+        raise ValueError(f"unknown proposal `{proposal_id}`")
+    try:
+        return isolated_executor.agent_workspace_for_isolation(proposal.isolation_root)
+    except IsolationError as exc:
+        raise ValueError(str(exc)) from exc
 
 
 def request_exact_approval(
@@ -278,9 +328,9 @@ def execute_approved_proposal(proposal_id: str) -> Proposal:
     store.save_proposal(proposal)
     root = Path(proposal.isolation_root)
     # Merge-slice: promote candidate marker as the verified effect in isolation only.
-    (root / "PROMOTED").write_text(
-        f"{proposal.candidate_marker or 'candidate'}\n",
-        encoding="utf-8",
+    promoted = isolated_executor.promote_candidate_marker(
+        root,
+        marker=proposal.candidate_marker or "candidate",
     )
     _append_receipt(
         proposal,
@@ -288,7 +338,9 @@ def execute_approved_proposal(proposal_id: str) -> Proposal:
             "receipt_id": f"exec_{uuid4().hex[:12]}",
             "kind": "isolated_merge_execute",
             "isolation_root": str(root),
+            "baseline_commit": proposal.baseline_commit,
             "promoted_marker": proposal.candidate_marker,
+            "promoted_path": str(promoted),
         },
     )
     proposal.status = "verified"
@@ -312,11 +364,13 @@ def rollback_proposal(proposal_id: str) -> Proposal:
         baseline_metric_value=proposal.verification.baseline_value,
         metric=case.metric,
     )
-    promoted = root / "PROMOTED"
+    promoted = root / ".axon-si" / "PROMOTED"
     if promoted.exists():
         promoted.unlink()
-    _append_receipt(proposal, receipt)
-    proposal.status = "rolled_back"
     proposal.candidate_marker = isolated_executor.read_marker(root)
+    cleanup = isolated_executor.cleanup_isolation_root(root)
+    _append_receipt(proposal, receipt)
+    _append_receipt(proposal, cleanup)
+    proposal.status = "rolled_back"
     store.save_proposal(proposal)
     return proposal
