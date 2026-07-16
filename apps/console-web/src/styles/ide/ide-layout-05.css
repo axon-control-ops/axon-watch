@@ -346,3 +346,143 @@
   font-weight: 600;
 }
 
+/* Mode-colored IDE thread status strip (V mark + activity). */
+
+.agent-dock__transcript .conversation-seam__item--thread-status {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--ask {
+  border-color: rgba(100, 116, 139, 0.45);
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--ask .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--ask .conversation-seam__thread-status-label {
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--plan {
+  border-color: rgba(245, 158, 11, 0.42);
+  background: rgba(66, 32, 6, 0.55);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--plan .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--plan .conversation-seam__thread-status-label {
+  color: rgba(253, 224, 171, 0.96);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--agent {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(8, 47, 73, 0.42);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--agent .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--agent .conversation-seam__thread-status-label {
+  color: rgba(186, 230, 253, 0.94);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--agent-full,
+.agent-dock__transcript .conversation-seam__item--thread-status--debug-full {
+  border-color: rgba(244, 63, 94, 0.42);
+  background: rgba(76, 5, 25, 0.48);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--agent-full .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--agent-full .conversation-seam__thread-status-label,
+.agent-dock__transcript .conversation-seam__item--thread-status--debug-full .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--debug-full .conversation-seam__thread-status-label {
+  color: rgba(255, 205, 214, 0.96);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--debug {
+  border-color: rgba(167, 139, 250, 0.42);
+  background: rgba(46, 16, 101, 0.48);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--debug .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--debug .conversation-seam__thread-status-label {
+  color: rgba(221, 214, 254, 0.96);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--streaming::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 45%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 55%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: thread-status-shimmer 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--streaming .persona-glyph {
+  animation: thread-status-mark-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes thread-status-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes thread-status-mark-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.agent-dock-composer__plan-switch-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin-bottom: 0.45rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  background: rgba(66, 32, 6, 0.45);
+}
+
+.agent-dock-composer__plan-switch-copy {
+  margin: 0;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: rgba(253, 224, 171, 0.96);
+}
+
+.agent-dock-composer__plan-switch-btn {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 0.3rem;
+  background: rgba(120, 53, 15, 0.55);
+  color: rgba(254, 243, 199, 0.98);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.6rem;
+}
+
+.agent-dock-composer__plan-switch-btn:hover {
+  background: rgba(146, 64, 14, 0.7);
+}
+

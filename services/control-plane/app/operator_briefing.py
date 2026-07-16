@@ -161,7 +161,10 @@ def build_operator_briefing(
         }
     else:
         inbox_snapshot = (
-            build_inbox_response(inbox_fetcher=inbox_fetcher)
+            build_inbox_response(
+                inbox_fetcher=inbox_fetcher,
+                allow_empty_unavailable=True,
+            )
             if watch_connected
             else {"items": [], "count": 0, "updated_at": runtime_summary["generated_at"]}
         )

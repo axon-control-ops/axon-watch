@@ -62,7 +62,10 @@ class LaneBAgentTests(unittest.TestCase):
             user_prompt="figure out the next changes",
             context_block="ctx",
         )
-        self.assertIn("When external facts are required, call axon_research_search", plan)
+        self.assertIn(
+            "When external or vendor facts are required, call axon_research_search",
+            plan,
+        )
         self.assertIn("Online research", plan)
         self.assertIn("discovery, implementation, verification", plan)
         self.assertIn("Reply in first person", plan)

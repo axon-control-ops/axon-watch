@@ -85,7 +85,7 @@ class EmailTriageTests(unittest.TestCase):
             path = Path(tmp) / "email-stub.json"
             path.write_text(json.dumps(stub), encoding="utf-8")
             with patch(
-                "app.signals.email_imap_poll.fetch_native_email_messages",
+                "app.signals.email_signal.fetch_native_email_messages",
                 return_value=None,
             ), patch("app.signals.email_signal._messages_from_live_bridge", return_value=None):
                 items = email_inbox_items(stub_path=path)
@@ -96,7 +96,7 @@ class EmailTriageTests(unittest.TestCase):
 
     def test_email_inbox_items_prefers_native_imap(self) -> None:
         with patch(
-            "app.signals.email_imap_poll.fetch_native_email_messages",
+            "app.signals.email_signal.fetch_native_email_messages",
             return_value=[
                 {
                     "message_id": "<native@example.com>",
@@ -115,6 +115,46 @@ class EmailTriageTests(unittest.TestCase):
         self.assertTrue(str(items[0]["meta"]["suggested_reply_subject"]).startswith("Re:"))
         self.assertEqual("account-1", items[0]["meta"]["email_account_id"])
         self.assertEqual("operator@example.com", items[0]["meta"]["email_account_address"])
+
+    def test_email_inbox_items_use_mailbox_workspace_not_first_account_fallback(self) -> None:
+        settings = {
+            "bridge_enabled": False,
+            "stub_enabled": False,
+            "workspace_hint_map": {},
+            "accounts": [
+                {
+                    "account_id": "acct-axon",
+                    "workspace_id": "workspace_axon_watch",
+                    "email_address": "axonops@example.com",
+                },
+                {
+                    "account_id": "acct-dash",
+                    "workspace_id": "workspace_dashpro",
+                    "email_address": "superadmin@example.com",
+                },
+            ],
+        }
+        with patch(
+            "app.signals.email_signal._load_operator_email_settings",
+            return_value=settings,
+        ), patch(
+            "app.signals.email_signal.fetch_native_email_messages",
+            return_value=[
+                {
+                    "message_id": "<superadmin-mail@example.com>",
+                    "account_id": "acct-dash",
+                    "account_email": "superadmin@example.com",
+                    "from": "News <news@example.com>",
+                    "subject": "No workspace keyword here",
+                    "text": "Please review this invoice today. We cannot wait.",
+                    "snippet": "Please review this invoice today. We cannot wait.",
+                }
+            ],
+        ), patch("app.signals.email_signal._messages_from_live_bridge", return_value=None):
+            items = email_inbox_items()
+        self.assertEqual(1, len(items))
+        self.assertEqual("workspace_dashpro", items[0]["workspace_id"])
+        self.assertEqual("superadmin@example.com", items[0]["meta"]["email_account_address"])
 
     def test_resolve_email_workspace_id_from_hints(self) -> None:
         from app.signals.email_signal import resolve_email_workspace_id

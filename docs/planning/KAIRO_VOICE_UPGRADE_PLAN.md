@@ -128,8 +128,8 @@ barge-in, and no-double-speak proofs.
   unrelated Plan/composer WIP; those repairs are not part of Voice-A.
 - Python compile — **PASS**.
 - Planning manifest — **PASS**.
-- `verify:contracts` — **BLOCKED** by nine pre-existing file-size violations in
-  the dirty worktree; Voice-A changed none of those files.
+- `verify:contracts` — later cleared on the same dirty tree after size
+  extractions + email/inbox fixes (see post-Voice-B note below).
 - Direct full contract runner continued through the suite and reported two
   unrelated failures: the same file-size baseline test, plus the current dirty
   email/vault import path causing `WatchInboxUnavailableError` in skeleton E2E.
@@ -145,6 +145,15 @@ barge-in, and no-double-speak proofs.
   hotspot ratchet.
 - Focused frontend: answer-mode + stream-voice + narration-policy — **12/12 PASS**.
 - Console `vue-tsc --noEmit` — **PASS**.
+
+### 2026-07-16 — Contracts unblock (post Voice-B)
+
+- Cleared hard/ratchet file-size FAILs (toolbar/CSS/ide-layout/lane_b/composer
+  extractions; budgets lowered).
+- Eager-import `fetch_native_email_messages` in `email_signal.py` to avoid
+  control-plane/`app.vault` package collision; briefing uses
+  `allow_empty_unavailable` so inbox blips degrade instead of 500.
+- `npm run verify:contracts` — **PASS**.
 
 ## Next slice
 

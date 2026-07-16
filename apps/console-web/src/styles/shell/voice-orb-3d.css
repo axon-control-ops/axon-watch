@@ -1,4 +1,5 @@
 /* JARVIS-style living VAXON voice orb — volumetric plasma core + HUD dials. */
+@import './voice-orb-3d-motion.css';
 
 .brain-galaxy-stage__jarvis-float--mockup {
   width: 12.1rem;
@@ -226,6 +227,35 @@
   animation: voice-orb-hud-spin 16s linear infinite;
 }
 
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ring--dashed-counter {
+  fill: none;
+  stroke: rgba(100, 210, 255, 0.42);
+  stroke-width: 1.1;
+  stroke-dasharray: 1.8 5.2;
+  transform-origin: 110px 110px;
+  animation: voice-orb-hud-spin 22s linear infinite reverse;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ripple {
+  fill: none;
+  stroke: rgba(72, 255, 190, 0);
+  stroke-width: 1.4;
+  transform-origin: 110px 110px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__arc--sweep {
+  fill: none;
+  stroke: rgba(120, 230, 255, 0.55);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-dasharray: 28 72;
+  filter: drop-shadow(0 0 6px rgba(72, 196, 255, 0.45));
+  transform-origin: 110px 110px;
+  animation: voice-orb-arc-sweep 4.8s linear infinite;
+}
+
 .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ring--mid {
   stroke-width: 0.9;
   opacity: 0.4;
@@ -325,8 +355,39 @@
   animation-duration: 1.55s;
 }
 
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--listening .kairo-galaxy-orb__ripple,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--ptt .kairo-galaxy-orb__ripple {
+  stroke: rgba(72, 255, 190, 0.55);
+  animation: voice-orb-listen-ripple 1.8s ease-out infinite;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--listening .kairo-galaxy-orb__ripple--b,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--ptt .kairo-galaxy-orb__ripple--b {
+  animation-delay: 0.35s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--listening .kairo-galaxy-orb__ripple--c,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--ptt .kairo-galaxy-orb__ripple--c {
+  animation-delay: 0.7s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--listening .kairo-galaxy-orb__ticks,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--ptt .kairo-galaxy-orb__ticks {
+  animation-duration: 9s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--listening .kairo-galaxy-orb__ticks line,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--ptt .kairo-galaxy-orb__ticks line {
+  stroke: rgba(90, 255, 190, 0.7);
+}
+
 .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--speaking .kairo-galaxy-orb__plasma {
   animation: voice-orb-speaking-plasma 0.78s ease-in-out infinite;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--speaking .kairo-galaxy-orb__arc {
+  stroke-width: 8.5;
+  filter: drop-shadow(0 0 10px rgba(255, 154, 60, 0.85));
 }
 
 .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--thinking .kairo-galaxy-orb__trigger::before,
@@ -337,9 +398,36 @@
   animation-duration: 1s;
 }
 
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--thinking .kairo-galaxy-orb__arc--sweep,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--busy .kairo-galaxy-orb__arc--sweep,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--autonomous .kairo-galaxy-orb__arc--sweep {
+  stroke: rgba(255, 179, 71, 0.85);
+  stroke-width: 4.2;
+  animation-duration: 2.4s;
+  filter: drop-shadow(0 0 8px rgba(255, 154, 60, 0.65));
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--thinking .kairo-galaxy-orb__shards,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--busy .kairo-galaxy-orb__shards,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--autonomous .kairo-galaxy-orb__shards {
+  animation-duration: 18s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--autonomous .kairo-galaxy-orb__trigger::before {
+  box-shadow:
+    0 0 2.1rem rgba(255, 179, 71, 0.62),
+    0 0 3.6rem rgba(0, 210, 255, 0.2);
+  animation-duration: 0.9s;
+}
+
 .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--voice-beat .kairo-galaxy-orb__plasma {
-  transform: scale(1.08);
-  filter: brightness(1.35);
+  transform: scale(1.1);
+  filter: brightness(1.4);
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--voice-beat .kairo-galaxy-orb__arc {
+  stroke-width: 9;
+  filter: drop-shadow(0 0 12px rgba(255, 154, 60, 0.9));
 }
 
 .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--speaking .kairo-galaxy-orb__mesh-dot--accent,
@@ -365,135 +453,4 @@
   left: auto !important;
   top: auto !important;
   margin: 0 auto;
-}
-
-@keyframes voice-orb-shard-pulse {
-  0%,
-  100% {
-    opacity: 0.16;
-  }
-  50% {
-    opacity: 0.42;
-  }
-}
-
-@keyframes voice-orb-accent-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes voice-orb-3d-breathe {
-  0%,
-  100% {
-    transform: translate(-50%, -50%) scale(0.96);
-    opacity: 0.75;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.05);
-    opacity: 1;
-  }
-}
-
-@keyframes voice-orb-plasma-breathe {
-  0%,
-  100% {
-    transform: scale(0.985);
-  }
-  50% {
-    transform: scale(1.03);
-  }
-}
-
-@keyframes voice-orb-speaking-plasma {
-  0%,
-  100% {
-    transform: scale(0.97);
-    filter: brightness(1);
-  }
-  50% {
-    transform: scale(1.07);
-    filter: brightness(1.4);
-  }
-}
-
-@keyframes voice-orb-3d-orbit {
-  from {
-    transform: translate(-50%, -50%) rotateX(68deg) rotateZ(0deg);
-  }
-  to {
-    transform: translate(-50%, -50%) rotateX(68deg) rotateZ(360deg);
-  }
-}
-
-@keyframes voice-orb-ellipse-a {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes voice-orb-ellipse-b {
-  from {
-    transform: rotate(20deg);
-  }
-  to {
-    transform: rotate(380deg);
-  }
-}
-
-@keyframes voice-orb-hud-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes voice-orb-halo-live {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.96);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-}
-
-@keyframes voice-orb-beacon {
-  0%,
-  100% {
-    opacity: 0.75;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__trigger::before,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__trigger::after,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ticks,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__beads,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__mesh,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__shards,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__shard,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ellipse,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__halo,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__bloom,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__plasma,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__beacon,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ring--dashed,
-  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__mesh-dot--accent {
-    animation: none !important;
-  }
 }

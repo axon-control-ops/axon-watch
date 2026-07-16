@@ -18,7 +18,7 @@
       "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display slices extracted; keep shrinking via factory slices."
     },
     "apps/console-web/src/styles/ide-layout.css": {
-      "max_lines": 11,
+      "max_lines": 10,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/* + feature CSS",
@@ -32,7 +32,7 @@
       "rule": "bootstrap, registration, and compatibility only"
     },
     "services/control-plane/app/chat/service.py": {
-      "max_lines": 700,
+      "max_lines": 410,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/chat/* bounded slices",
@@ -41,7 +41,7 @@
   },
   "ratcheted_oversize_files": {
     "apps/console-web/src/components/ide/AgentDockComposer.vue": {
-      "max_lines": 274,
+      "max_lines": 194,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/agent-dock/*",
@@ -67,7 +67,7 @@
       "target": "services/control-plane/app/kairo/*"
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
-      "max_lines": 561,
+      "max_lines": 531,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*"
@@ -79,7 +79,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 682,
+      "max_lines": 675,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
@@ -116,7 +116,7 @@
       "target": "apps/console-web/src/features/settings/*"
     },
     "apps/console-web/src/features/brain-galaxy/KairoGalaxyOrb.vue": {
-      "max_lines": 220,
+      "max_lines": 218,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/brain-galaxy/*"
@@ -164,7 +164,7 @@
       "target": "tests/test_control_plane_chat_* slices"
     },
     "apps/console-web/src/composables/useAgentDockComposer.ts": {
-      "max_lines": 367,
+      "max_lines": 9,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/composables/agent-dock/*",
