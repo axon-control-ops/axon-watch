@@ -6,6 +6,7 @@ import {
 } from '../../lib/composer-mode-prefs';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
+import type { PlanSoftSwitchNotice } from './use-composer-actions';
 import { useComposerRestoreModeFocus } from './use-composer-restore-mode-focus';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -18,11 +19,15 @@ type UseComposerWorkspaceSyncOptions = {
   applyingHistoryDraft: Ref<boolean>;
   composerHistoryIndex: Ref<number>;
   composerHistoryScratch: Ref<string>;
+  planSoftSwitchNotice: Ref<PlanSoftSwitchNotice | null>;
   closeMenus: () => void;
   syncComposerHeight: () => void;
   syncContextFromDraft: () => void;
   loadComposerHistoryForWorkspace: (workspaceId: string | null) => void;
-  loadComposerImagesForWorkspace: (workspaceId: string | null) => void;
+  loadComposerImagesForWorkspace: (
+    workspaceId: string | null,
+    threadId?: string | null,
+  ) => void;
   disposeComposerImagesPersistTimer: () => void;
   persistCurrentComposerImages: () => Promise<void>;
   revokeAllComposerImagePreviews: () => void;
@@ -37,6 +42,7 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
     applyingHistoryDraft,
     composerHistoryIndex,
     composerHistoryScratch,
+    planSoftSwitchNotice,
     closeMenus,
     syncComposerHeight,
     syncContextFromDraft,
@@ -48,6 +54,8 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
   } = options;
 
   let restoringWorkspaceComposerMode = false;
+  let lastSyncedWorkspaceId: string | null = null;
+  let lastSyncedThreadId: string | null = null;
 
   function handleDocumentClick(): void {
     closeMenus();
@@ -69,15 +77,44 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
   );
 
   watch(
-    () => shell.currentWorkspace?.workspace_id ?? null,
-    (workspaceId) => {
-      const restoredMode = readWorkspaceComposerMode(workspaceId) ?? defaultComposerMode;
+    () => ({
+      workspaceId: shell.currentWorkspace?.workspace_id ?? null,
+      threadId: shell.activeIdeThreadId ?? null,
+    }),
+    ({ workspaceId, threadId }) => {
+      const workspaceChanged = workspaceId !== lastSyncedWorkspaceId;
+      const threadChanged = threadId !== lastSyncedThreadId;
+      if (!workspaceChanged && !threadChanged) {
+        return;
+      }
+
+      // Persist outgoing thread mode before restoring the incoming tab.
+      if (lastSyncedWorkspaceId && lastSyncedThreadId && !restoringWorkspaceComposerMode) {
+        persistWorkspaceComposerMode(
+          lastSyncedWorkspaceId,
+          composerMode.value,
+          sessionStorage,
+          lastSyncedThreadId,
+        );
+        void persistCurrentComposerImages();
+      }
+
+      lastSyncedWorkspaceId = workspaceId;
+      lastSyncedThreadId = threadId;
+
+      const restoredMode =
+        readWorkspaceComposerMode(workspaceId, sessionStorage, threadId) ?? defaultComposerMode;
       if (composerMode.value !== restoredMode) {
         restoringWorkspaceComposerMode = true;
         composerMode.value = restoredMode;
       }
-      loadComposerHistoryForWorkspace(workspaceId);
-      loadComposerImagesForWorkspace(workspaceId);
+      planSoftSwitchNotice.value = null;
+      if (workspaceChanged) {
+        loadComposerHistoryForWorkspace(workspaceId);
+      }
+      loadComposerImagesForWorkspace(workspaceId, threadId);
+      void nextTick(syncComposerHeight);
+      syncContextFromDraft();
     },
     { immediate: true },
   );
@@ -86,7 +123,12 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
     if (restoringWorkspaceComposerMode) {
       restoringWorkspaceComposerMode = false;
     } else {
-      persistWorkspaceComposerMode(shell.currentWorkspace?.workspace_id, mode);
+      persistWorkspaceComposerMode(
+        shell.currentWorkspace?.workspace_id,
+        mode,
+        sessionStorage,
+        shell.activeIdeThreadId,
+      );
     }
     shell.setIdeDebugModeSelected(mode === 'debug');
   }, { immediate: true });
@@ -94,7 +136,11 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
   watch(
     () => shell.ideAgentLinkedRun?.mode,
     (linkedMode) => {
-      const storedMode = readWorkspaceComposerMode(shell.currentWorkspace?.workspace_id);
+      const storedMode = readWorkspaceComposerMode(
+        shell.currentWorkspace?.workspace_id,
+        sessionStorage,
+        shell.activeIdeThreadId,
+      );
       if (!storedMode && (linkedMode === 'agent' || linkedMode === 'debug')) {
         composerMode.value = linkedMode;
       }

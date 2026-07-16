@@ -1,10 +1,11 @@
 import type { StoredComposerAttachment } from './composer-clipboard-paste';
+import { composerThreadScopeKey } from './composer-thread-scope-key';
 
 export type { StoredComposerAttachment };
 
 const IDE_COMPOSER_ATTACHMENTS_KEY = 'axon-x-ide-composer-attachments-v1';
 
-function readStoredComposerAttachmentsByWorkspace(): Record<string, StoredComposerAttachment[]> {
+function readStoredComposerAttachmentsByScope(): Record<string, StoredComposerAttachment[]> {
   if (typeof window === 'undefined') {
     return {};
   }
@@ -21,8 +22,8 @@ function readStoredComposerAttachmentsByWorkspace(): Record<string, StoredCompos
     }
 
     const output: Record<string, StoredComposerAttachment[]> = {};
-    for (const [workspaceId, attachments] of Object.entries(parsed)) {
-      const id = workspaceId.trim();
+    for (const [scopeKey, attachments] of Object.entries(parsed)) {
+      const id = scopeKey.trim();
       if (!id || !Array.isArray(attachments)) {
         continue;
       }
@@ -58,45 +59,84 @@ function readStoredComposerAttachmentsByWorkspace(): Record<string, StoredCompos
   }
 }
 
+function writeStoredComposerAttachmentsByScope(
+  map: Record<string, StoredComposerAttachment[]>,
+): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(IDE_COMPOSER_ATTACHMENTS_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore quota errors — draft text still persists.
+  }
+}
+
+function resolveAttachmentScopeKey(
+  workspaceId: string | null | undefined,
+  threadId?: string | null,
+): string | null {
+  const threadScope = composerThreadScopeKey(workspaceId, threadId);
+  if (threadScope) {
+    return threadScope;
+  }
+  const workspace = String(workspaceId ?? '').trim();
+  return workspace || null;
+}
+
 export function readStoredComposerAttachments(
   workspaceId: string | null | undefined,
+  threadId?: string | null,
 ): StoredComposerAttachment[] {
-  const id = workspaceId?.trim();
-  if (!id) {
+  const map = readStoredComposerAttachmentsByScope();
+  const threadScope = composerThreadScopeKey(workspaceId, threadId);
+  if (threadScope) {
+    if (Object.prototype.hasOwnProperty.call(map, threadScope)) {
+      return map[threadScope] ?? [];
+    }
+    const workspace = String(workspaceId ?? '').trim();
+    if (workspace && Object.prototype.hasOwnProperty.call(map, workspace)) {
+      const legacy = map[workspace] ?? [];
+      const { [workspace]: _removed, ...rest } = map;
+      if (legacy.length) {
+        writeStoredComposerAttachmentsByScope({ ...rest, [threadScope]: legacy });
+        return legacy;
+      }
+      writeStoredComposerAttachmentsByScope(rest);
+    }
     return [];
   }
-  return readStoredComposerAttachmentsByWorkspace()[id] ?? [];
+
+  const scopeKey = resolveAttachmentScopeKey(workspaceId, null);
+  if (!scopeKey) {
+    return [];
+  }
+  return map[scopeKey] ?? [];
 }
 
 export function persistComposerAttachments(
   workspaceId: string | null | undefined,
   attachments: StoredComposerAttachment[],
+  threadId?: string | null,
 ): void {
   if (typeof window === 'undefined') {
     return;
   }
 
-  const id = workspaceId?.trim();
-  if (!id) {
+  const scopeKey = resolveAttachmentScopeKey(workspaceId, threadId);
+  if (!scopeKey) {
     return;
   }
 
-  const current = readStoredComposerAttachmentsByWorkspace();
+  const current = readStoredComposerAttachmentsByScope();
   if (!attachments.length) {
-    const { [id]: _removed, ...rest } = current;
-    window.localStorage.setItem(IDE_COMPOSER_ATTACHMENTS_KEY, JSON.stringify(rest));
+    const { [scopeKey]: _removed, ...rest } = current;
+    writeStoredComposerAttachmentsByScope(rest);
     return;
   }
 
-  try {
-    window.localStorage.setItem(
-      IDE_COMPOSER_ATTACHMENTS_KEY,
-      JSON.stringify({
-        ...current,
-        [id]: attachments,
-      }),
-    );
-  } catch {
-    // Ignore quota errors — draft text still persists.
-  }
+  writeStoredComposerAttachmentsByScope({
+    ...current,
+    [scopeKey]: attachments,
+  });
 }

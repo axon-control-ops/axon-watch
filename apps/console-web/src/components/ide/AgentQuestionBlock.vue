@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
-import type { AgentQuestionOption } from '../../lib/agent-question-view';
+import {
+  AGENT_QUESTION_OTHER_ID,
+  isAgentQuestionOtherOption,
+  withOtherQuestionOption,
+  type AgentQuestionOption,
+} from '../../lib/agent-question-view';
 import { submitQuestionAnswer } from '../../lib/submit-question-answer';
 import { useShellStore } from '../../stores/shell';
 
@@ -15,7 +20,13 @@ const props = defineProps<{
 }>();
 
 const shell = useShellStore();
-const selectedId = ref(props.answeredOption?.id || props.options[0]?.id || '');
+const displayOptions = computed(() => withOtherQuestionOption(props.options));
+const selectedId = ref(props.answeredOption?.id || displayOptions.value[0]?.id || '');
+const otherText = ref(
+  props.answeredOption && isAgentQuestionOtherOption(props.answeredOption)
+    ? props.answeredOption.label
+    : '',
+);
 const submitting = ref(false);
 const error = ref('');
 const locallyAnswered = ref<AgentQuestionOption | null>(null);
@@ -24,25 +35,56 @@ const resolvedAnswer = computed(
   () => locallyAnswered.value ?? props.answeredOption ?? null,
 );
 const isAnswered = computed(() => Boolean(resolvedAnswer.value) && !props.live);
+const otherSelected = computed(() => {
+  const selected = displayOptions.value.find((option) => option.id === selectedId.value);
+  return Boolean(selected && isAgentQuestionOtherOption(selected));
+});
+const canContinue = computed(() => {
+  if (!selectedId.value || props.live || submitting.value || isAnswered.value) {
+    return false;
+  }
+  if (otherSelected.value) {
+    return otherText.value.trim().length > 0;
+  }
+  return true;
+});
 
 const radioGroupName = computed(
   () => `axon-agent-question-${props.prompt.slice(0, 40).replace(/\W+/g, '-').toLowerCase()}`,
 );
 
+watch(
+  () => props.options,
+  () => {
+    if (!displayOptions.value.some((option) => option.id === selectedId.value)) {
+      selectedId.value = displayOptions.value[0]?.id || '';
+    }
+  },
+);
+
 async function continueWithSelection(): Promise<void> {
-  const option = props.options.find((entry) => entry.id === selectedId.value) ?? props.options[0];
-  if (!option || submitting.value || props.live || isAnswered.value) {
+  const option =
+    displayOptions.value.find((entry) => entry.id === selectedId.value) ??
+    displayOptions.value[0];
+  if (!option || !canContinue.value) {
     return;
   }
+  const customText = otherSelected.value ? otherText.value.trim() : undefined;
+  const answeredOption: AgentQuestionOption =
+    otherSelected.value && customText
+      ? { id: option.id || AGENT_QUESTION_OTHER_ID, label: customText }
+      : option;
+
   submitting.value = true;
   error.value = '';
   try {
-    locallyAnswered.value = option;
+    locallyAnswered.value = answeredOption;
     await submitQuestionAnswer(shell, {
       workspaceId: shell.currentWorkspace?.workspace_id,
-      option,
+      option: answeredOption,
       prompt: props.prompt,
       messageId: props.messageId,
+      customText,
     });
   } catch (err) {
     locallyAnswered.value = null;
@@ -71,9 +113,13 @@ async function continueWithSelection(): Promise<void> {
     <template v-else>
       <p class="agent-block__question-kicker">Question</p>
       <p class="agent-block__question-prompt">{{ prompt }}</p>
-      <div class="agent-block__question-options">
+      <div
+        class="agent-block__question-options"
+        role="radiogroup"
+        :aria-label="prompt"
+      >
         <label
-          v-for="option in options"
+          v-for="option in displayOptions"
           :key="option.id"
           class="agent-block__question-option"
           :class="{ 'agent-block__question-option--selected': selectedId === option.id }"
@@ -90,11 +136,28 @@ async function continueWithSelection(): Promise<void> {
           <span class="agent-block__question-label">{{ option.label }}</span>
         </label>
       </div>
+      <div
+        v-if="otherSelected"
+        class="agent-block__question-other"
+      >
+        <label class="agent-block__question-other-label" :for="`${radioGroupName}-other`">
+          Your answer
+        </label>
+        <textarea
+          :id="`${radioGroupName}-other`"
+          v-model="otherText"
+          class="agent-block__question-other-input"
+          rows="3"
+          placeholder="Type a different answer…"
+          :disabled="live || submitting"
+          @keydown.enter.exact.prevent="continueWithSelection"
+        />
+      </div>
       <div class="agent-block__question-actions">
         <button
           type="button"
           class="agent-block__question-continue"
-          :disabled="live || submitting || !selectedId"
+          :disabled="!canContinue"
           @click="continueWithSelection"
         >
           {{ submitting ? 'Sending…' : live ? 'Waiting…' : 'Continue' }}

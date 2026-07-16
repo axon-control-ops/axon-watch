@@ -8,6 +8,23 @@ export type AgentQuestionView = {
   options: AgentQuestionOption[];
 };
 
+/** Synthetic Cursor-style free-response choice appended in the question card UI. */
+export const AGENT_QUESTION_OTHER_ID = 'other';
+
+export function isAgentQuestionOtherOption(option: Pick<AgentQuestionOption, 'id' | 'label'>): boolean {
+  const id = option.id.trim().toLowerCase();
+  const label = option.label.trim().toLowerCase();
+  return id === AGENT_QUESTION_OTHER_ID || label === 'other';
+}
+
+/** Ensure the card always offers an Other free-text choice without duplicating model options. */
+export function withOtherQuestionOption(options: AgentQuestionOption[]): AgentQuestionOption[] {
+  if (options.some((option) => isAgentQuestionOtherOption(option))) {
+    return options;
+  }
+  return [...options, { id: AGENT_QUESTION_OTHER_ID, label: 'Other' }];
+}
+
 const ASK_OPTION_PIPE_RE = /^\s*[-*]\s+(\d+)\s*\|\s+(.+?)\s*$/;
 const ASK_OPTION_DASH_RE = /^\s*[-*]\s+(\d+)[.)]\s+(.+?)\s*$/;
 const NUMBERED_OPTION_RE = /^\s*(\d+)[.)]\s+\*?(.+?)\*?\s*$/;
@@ -91,9 +108,11 @@ export function tryParseClarifyingMarkdown(text: string): AgentQuestionView | nu
 export function formatQuestionAnswer(
   option: AgentQuestionOption,
   prompt?: string,
+  customText?: string,
 ): string {
   const id = option.id.trim();
-  const label = option.label.trim();
+  const custom = customText?.trim() ?? '';
+  const label = (isAgentQuestionOtherOption(option) && custom ? custom : option.label).trim();
   if (!id && !label) {
     return '';
   }

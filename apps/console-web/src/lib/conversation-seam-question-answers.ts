@@ -1,6 +1,7 @@
 import type { Ref } from 'vue';
 
 import type { AgentQuestionOption } from '../lib/agent-question-view';
+import { withOtherQuestionOption } from '../lib/agent-question-view';
 import {
   isQuestionMarkedAnswered,
   matchQuestionAnswerFromUserText,
@@ -35,17 +36,18 @@ export function answeredOptionForQuestion(
   itemIndex: number,
 ): AgentQuestionOption | null {
   const followupText = nextUserMessageContent(items, itemIndex);
+  const matchOptions = withOtherQuestionOption(options);
   if (isQuestionMarkedAnswered(messageId, prompt)) {
-    const fromFollowup = matchQuestionAnswerFromUserText(options, followupText);
+    const fromFollowup = matchQuestionAnswerFromUserText(matchOptions, followupText);
     if (fromFollowup) {
       return fromFollowup;
     }
     const followup = followupText.trim();
     if (followup) {
-      return matchQuestionAnswerFromUserText(options, followup) ?? options[0] ?? null;
+      return matchQuestionAnswerFromUserText(matchOptions, followup) ?? matchOptions[0] ?? null;
     }
   }
-  return matchQuestionAnswerFromUserText(options, followupText);
+  return matchQuestionAnswerFromUserText(matchOptions, followupText);
 }
 
 export type ConversationSeamAnswerBridge = {

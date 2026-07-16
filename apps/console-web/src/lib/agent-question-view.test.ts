@@ -4,6 +4,7 @@ import {
   formatQuestionAnswer,
   parseAskOptions,
   tryParseClarifyingMarkdown,
+  withOtherQuestionOption,
 } from './agent-question-view';
 import { parseAgentTranscriptBlocks } from './agent-transcript-blocks';
 
@@ -66,6 +67,31 @@ describe('agent question view', () => {
       ['Selected option 3: Both, phased', '(answer to: What should this plan focus on?)'].join(
         '\n',
       ),
+    );
+  });
+
+  it('appends a single Other option and formats free-text answers', () => {
+    expect(withOtherQuestionOption([
+      { id: '1', label: 'Alpha' },
+      { id: '2', label: 'Beta' },
+    ])).toEqual([
+      { id: '1', label: 'Alpha' },
+      { id: '2', label: 'Beta' },
+      { id: 'other', label: 'Other' },
+    ]);
+    expect(
+      withOtherQuestionOption([
+        { id: '1', label: 'Alpha' },
+        { id: 'other', label: 'Other' },
+      ]),
+    ).toHaveLength(2);
+    expect(
+      formatQuestionAnswer({ id: 'other', label: 'Other' }, 'Ready?', 'Use local docs only'),
+    ).toBe(
+      [
+        'Selected option other: Use local docs only',
+        '(answer to: Ready?)',
+      ].join('\n'),
     );
   });
 });

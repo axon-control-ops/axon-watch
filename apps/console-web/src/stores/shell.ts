@@ -891,6 +891,9 @@ export const useShellStore = defineStore('shell', () => {
         commandMutationError.value = null;
       }
       await loadIdeThreads(workspaceId);
+      if (currentWorkspace.value?.workspace_id === workspaceId) {
+        syncIdeComposerDraftForWorkspace(workspaceId);
+      }
       return;
     }
 
@@ -902,6 +905,9 @@ export const useShellStore = defineStore('shell', () => {
       getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
     );
     applyIdeThreadMessagesToView(workspaceId);
+    if (currentWorkspace.value?.workspace_id === workspaceId) {
+      syncIdeComposerDraftForWorkspace(workspaceId);
+    }
   }
 
   function resetThreadContext(): void {
@@ -1152,8 +1158,11 @@ export const useShellStore = defineStore('shell', () => {
           ),
         ]),
       };
-      ideComposerDraft.value = '';
+      // Flush outgoing thread draft before switching; new tab starts empty.
+      flushIdeComposerDraft();
       await selectIdeThread(created.thread_id);
+      ideComposerDraft.value = '';
+      persistIdeComposerDraft(workspaceId, '', created.thread_id);
       return created.thread_id;
     } catch (error) {
       commandMutationError.value =
@@ -1168,6 +1177,16 @@ export const useShellStore = defineStore('shell', () => {
       return;
     }
 
+    const previousThreadId = activeIdeThreadId.value;
+    if (previousThreadId === threadId) {
+      ensureIdeThreadTabOpen(threadId);
+      return;
+    }
+
+    if (previousThreadId) {
+      flushIdeComposerDraft();
+    }
+
     disconnectChatStreamSession(workspaceId);
     setWorkspaceStreamUi(workspaceId, {
       active: false,
@@ -1179,6 +1198,7 @@ export const useShellStore = defineStore('shell', () => {
     setWorkspaceSurfaceThreadId(workspaceId, 'ide', threadId);
     activeThreadId.value = threadId;
     ensureIdeThreadTabOpen(threadId);
+    syncIdeComposerDraftForThread(workspaceId, threadId);
 
     if (layoutMode.value === 'ide') {
       threadMessages.value = [];
@@ -1648,7 +1668,38 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {
-    ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId);
+    const threadId =
+      (workspaceId && getWorkspaceSurfaceThreadId(workspaceId, 'ide')) ||
+      activeIdeThreadId.value ||
+      null;
+    syncIdeComposerDraftForThread(workspaceId, threadId);
+  }
+
+  function syncIdeComposerDraftForThread(
+    workspaceId: string | null | undefined,
+    threadId: string | null | undefined,
+  ): void {
+    if (ideComposerDraftPersistTimer) {
+      clearTimeout(ideComposerDraftPersistTimer);
+      ideComposerDraftPersistTimer = null;
+    }
+    ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId, threadId);
+  }
+
+  function flushIdeComposerDraft(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (ideComposerDraftPersistTimer) {
+      clearTimeout(ideComposerDraftPersistTimer);
+      ideComposerDraftPersistTimer = null;
+    }
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    const threadId = activeIdeThreadId.value;
+    if (!workspaceId || !threadId) {
+      return;
+    }
+    persistIdeComposerDraft(workspaceId, ideComposerDraft.value, threadId);
   }
 
   function schedulePersistIdeComposerDraft(): void {
@@ -1660,10 +1711,12 @@ export const useShellStore = defineStore('shell', () => {
     }
     ideComposerDraftPersistTimer = setTimeout(() => {
       ideComposerDraftPersistTimer = null;
-      persistIdeComposerDraft(
-        currentWorkspace.value?.workspace_id ?? null,
-        ideComposerDraft.value,
-      );
+      const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+      const threadId = activeIdeThreadId.value;
+      if (!workspaceId || !threadId) {
+        return;
+      }
+      persistIdeComposerDraft(workspaceId, ideComposerDraft.value, threadId);
     }, 140);
   }
 
@@ -2484,6 +2537,8 @@ export const useShellStore = defineStore('shell', () => {
   function setCurrentWorkspace(workspaceId: string): void {
     const previousWorkspaceId = currentWorkspace.value?.workspace_id ?? null;
     if (previousWorkspaceId && previousWorkspaceId !== workspaceId) {
+      // Persist outgoing composer draft while currentWorkspace is still the old one.
+      flushIdeComposerDraft();
       // Persist outgoing workspace tabs before we wipe/replace the open set.
       persistOpenEditorTabs(previousWorkspaceId);
       stashWorkspaceIdeView(previousWorkspaceId);

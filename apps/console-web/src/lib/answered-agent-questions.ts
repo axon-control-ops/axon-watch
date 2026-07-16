@@ -28,10 +28,13 @@ export function matchQuestionAnswerFromUserText(
     return null;
   }
 
-  const selectedMatch = text.match(/^Selected option\s+(\d+)\s*:\s*(.+)$/im);
+  const selectedMatch = text.match(/^Selected option\s+([^\s:]+)\s*:\s*(.+)$/im);
   if (selectedMatch) {
     const byId = options.find((option) => option.id === selectedMatch[1]);
     if (byId) {
+      if (selectedMatch[1].toLowerCase() === 'other') {
+        return { id: byId.id, label: selectedMatch[2].trim() || byId.label };
+      }
       return byId;
     }
   }
