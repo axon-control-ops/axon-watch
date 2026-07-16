@@ -1,10 +1,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue';
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
-import {
-  isKairoConversationBusy,
-  kairoConversationPhase,
-} from '../kairo-conversation/kairo-conversation-state';
+import { subscribeKairoVoiceChunk } from '../../lib/kairo-voice-playback';
+import { kairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
 import { BrainGalaxyScene } from './brain-galaxy-scene';
 import {
   resolveGalaxyPresence,
@@ -19,6 +17,7 @@ export type UseBrainGalaxyOptions = {
   speechCapturing?: Ref<boolean>;
   kairoSpeechActive?: Ref<boolean>;
   agentStreamActive?: Ref<boolean>;
+  streamWorkspaceId?: Ref<string | null>;
   pendingApprovals?: Ref<number>;
   criticalSignals?: Ref<number>;
   highSignals?: Ref<number>;
@@ -39,6 +38,8 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   const webglFailed = ref(false);
   const selectedNode = ref<BrainGraphNode | null>(null);
   const sceneRef = shallowRef<BrainGalaxyScene | null>(null);
+  let voiceEnergyDecayTimer: number | null = null;
+  let unsubscribeVoiceChunk: (() => void) | null = null;
 
   const presence = computed(() =>
     resolveGalaxyPresence({
@@ -88,6 +89,25 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       return;
     }
     scene.setVaxonCoreMode(presence.value.coreOrbMode);
+    scene.setAgentStream(
+      options.agentStreamActive?.value ?? false,
+      options.streamWorkspaceId?.value ?? null,
+    );
+  }
+
+  function pulseVoiceEnergy(): void {
+    const scene = sceneRef.value;
+    if (!scene) {
+      return;
+    }
+    scene.setVoiceEnergy(1);
+    if (voiceEnergyDecayTimer !== null) {
+      window.clearTimeout(voiceEnergyDecayTimer);
+    }
+    voiceEnergyDecayTimer = window.setTimeout(() => {
+      sceneRef.value?.setVoiceEnergy(0);
+      voiceEnergyDecayTimer = null;
+    }, 220);
   }
 
   function mountScene(): void {
@@ -125,7 +145,6 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
 
     sceneRef.value = scene;
     scene.setSnapshot(options.snapshot.value);
-    scene.setVaxonBusy(isKairoConversationBusy());
     syncPresenceToScene();
     if (selectedNode.value) {
       scene.setSelectedNode(selectedNode.value.node_id);
@@ -136,6 +155,9 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   onMounted(() => {
     void nextTick(() => {
       mountScene();
+    });
+    unsubscribeVoiceChunk = subscribeKairoVoiceChunk(() => {
+      pulseVoiceEnergy();
     });
   });
 
@@ -161,15 +183,19 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   );
 
   watch(
-    kairoConversationPhase,
+    [() => options.agentStreamActive?.value, () => options.streamWorkspaceId?.value],
     () => {
-      sceneRef.value?.setVaxonBusy(isKairoConversationBusy());
       syncPresenceToScene();
     },
-    { immediate: true },
   );
 
   onBeforeUnmount(() => {
+    unsubscribeVoiceChunk?.();
+    unsubscribeVoiceChunk = null;
+    if (voiceEnergyDecayTimer !== null) {
+      window.clearTimeout(voiceEnergyDecayTimer);
+      voiceEnergyDecayTimer = null;
+    }
     sceneRef.value?.dispose();
     sceneRef.value = null;
   });

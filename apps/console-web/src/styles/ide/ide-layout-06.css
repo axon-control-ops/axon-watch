@@ -249,6 +249,13 @@
   line-height: 1.45;
 }
 
+.agent-dock-full-access-consent__error {
+  margin: 0 0 0.65rem;
+  color: rgba(252, 165, 165, 0.96);
+  font-size: 0.62rem;
+  line-height: 1.4;
+}
+
 .agent-dock-full-access-consent__actions {
   display: flex;
   gap: 0.5rem;

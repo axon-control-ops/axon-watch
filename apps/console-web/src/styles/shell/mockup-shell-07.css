@@ -244,11 +244,8 @@
   height: 100%;
 }
 
-.console-shell--mockup .center-workbench__editor .monaco-editor .view-lines,
-.console-shell--mockup .center-workbench__editor .monaco-editor .view-line,
-.console-shell--mockup .center-workbench__editor .monaco-editor .view-line span {
-  color: #d8e8f4;
-}
+/* Do not style Monaco .view-line / span internals — that breaks glyph painting
+   (especially with EditContext). Theme colors come from defineMockupMonacoTheme. */
 
 .center-workbench__editor .surface-host__frame--editor::after {
   content: '';

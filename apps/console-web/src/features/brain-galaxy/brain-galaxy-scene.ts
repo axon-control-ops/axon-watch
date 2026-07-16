@@ -36,6 +36,8 @@ import { animateLiveEdge, buildLiveEdge } from './network-edge-effects';
 import { animateVaxonCoreOrb, decorateVaxonCoreOrb } from './vaxon-core-orb-3d';
 import { animateWorkspaceNode, decorateWorkspaceNode } from './workspace-node-effects';
 import type { GalaxyCoreOrbMode } from './galaxy-presence-state';
+import { presenceAmpForCoreMode } from './galaxy-presence-state';
+import { GALAXY_FOCUS_CAMERA_OFFSET, galaxyFocusCameraPosition } from './brain-galaxy-focus-camera';
 
 export type BrainGalaxyNodeClickHandler = (node: BrainGraphNode) => void;
 export type BrainGalaxyClearSelectionHandler = () => void;
@@ -72,9 +74,16 @@ export class BrainGalaxyScene {
   private selectedNodeId: string | null = null;
   private selectedWorkspaceId: string | null = null;
   private focusedNodeIds = new Set<string>();
-  private vaxonBusy = false;
+  private presenceAmp = 0;
+  private voiceEnergy = 0;
+  private agentStreamActive = false;
+  private streamWorkspaceId: string | null = null;
   private vaxonCoreMode: GalaxyCoreOrbMode = 'idle';
-  private readonly defaultCameraPosition = new Vector3(2.4, 3.8, 7.2);
+  private readonly defaultCameraPosition = new Vector3(
+    GALAXY_FOCUS_CAMERA_OFFSET.x,
+    GALAXY_FOCUS_CAMERA_OFFSET.y,
+    GALAXY_FOCUS_CAMERA_OFFSET.z,
+  );
   private readonly defaultTarget = new Vector3(0, 0, 0);
 
   constructor(
@@ -179,11 +188,10 @@ export class BrainGalaxyScene {
     }
     this.controls.autoRotate = false;
     this.controls.target.set(mesh.position.x, mesh.position.y, mesh.position.z);
-    this.camera.position.set(
-      mesh.position.x + 0.6,
-      mesh.position.y + 1.4,
-      mesh.position.z + 2.8,
-    );
+    // Keep the default orbit distance so workspace focus frames the node
+    // without filling the viewport (the old +2.8 Z dolly made orbs look giant).
+    const focusCamera = galaxyFocusCameraPosition(mesh.position);
+    this.camera.position.set(focusCamera.x, focusCamera.y, focusCamera.z);
     this.controls.update();
     this.setSelectedNode(nodeId);
   }
@@ -193,18 +201,27 @@ export class BrainGalaxyScene {
     this.applySelectionHighlight(nodeId);
   }
 
+  /** Graph amp only — does not override presence-owned core mode. */
   setVaxonBusy(busy: boolean): void {
-    this.vaxonBusy = busy;
-    if (busy && this.vaxonCoreMode === 'idle') {
-      this.vaxonCoreMode = 'busy';
-    } else if (!busy && this.vaxonCoreMode === 'busy') {
-      this.vaxonCoreMode = 'idle';
+    if (busy && this.presenceAmp < 1) {
+      this.presenceAmp = 1;
+    } else if (!busy && this.vaxonCoreMode === 'idle') {
+      this.presenceAmp = 0;
     }
   }
 
   setVaxonCoreMode(mode: GalaxyCoreOrbMode): void {
     this.vaxonCoreMode = mode;
-    this.vaxonBusy = mode === 'busy' || mode === 'speaking' || mode === 'autonomous';
+    this.presenceAmp = presenceAmpForCoreMode(mode);
+  }
+
+  setVoiceEnergy(energy: number): void {
+    this.voiceEnergy = Math.max(0, Math.min(1.4, energy));
+  }
+
+  setAgentStream(active: boolean, workspaceId: string | null = null): void {
+    this.agentStreamActive = active;
+    this.streamWorkspaceId = workspaceId;
   }
 
   private applySelectionHighlight(nodeId: string | null): void {
@@ -348,6 +365,9 @@ export class BrainGalaxyScene {
       return;
     }
     this.animationId = requestAnimationFrame(this.animate);
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return;
+    }
     this.clock += 0.016;
 
     if (this.controls) {
@@ -365,6 +385,7 @@ export class BrainGalaxyScene {
           this.clock,
           this.vaxonCoreMode,
           this.selectedNodeId === node.node_id,
+          this.voiceEnergy,
         );
       } else if (node.kind === 'workspace') {
         const focusStrength =
@@ -372,14 +393,23 @@ export class BrainGalaxyScene {
         animateWorkspaceNode(
           mesh,
           this.clock,
-          this.vaxonBusy,
+          this.presenceAmp,
           this.selectedNodeId === node.node_id,
           focusStrength,
         );
+      } else if (
+        node.kind === 'run' &&
+        this.agentStreamActive &&
+        (!this.streamWorkspaceId || node.workspace_id === this.streamWorkspaceId)
+      ) {
+        const pulse = 1 + Math.sin(this.clock * 5.4 + mesh.position.x) * 0.11;
+        mesh.scale.setScalar(pulse);
+        const material = mesh.material as MeshStandardMaterial;
+        material.emissiveIntensity = 1.55 + Math.sin(this.clock * 4.2) * 0.35;
       } else if (node.tone === 'attention' || node.tone === 'critical') {
         const pulse = 1 + Math.sin(this.clock * 3.2 + mesh.position.z) * 0.06;
         mesh.scale.setScalar(pulse);
-      } else if (this.vaxonBusy) {
+      } else if (this.presenceAmp >= 0.9) {
         const pulse = 1 + Math.sin(this.clock * 2.8 + mesh.position.x) * 0.04;
         mesh.scale.setScalar(pulse);
       } else {
@@ -387,13 +417,13 @@ export class BrainGalaxyScene {
       }
     }
 
-    this.liveEdges.forEach((edge) => animateLiveEdge(edge, this.clock, this.vaxonBusy));
+    this.liveEdges.forEach((edge) => animateLiveEdge(edge, this.clock, this.presenceAmp));
     if (this.scene) {
-      animateGalaxyAmbience(this.scene, this.starfield, this.clock, this.vaxonBusy);
+      animateGalaxyAmbience(this.scene, this.starfield, this.clock, this.presenceAmp);
     }
 
     if (this.graphGroup) {
-      this.graphGroup.rotation.y += this.vaxonBusy ? 0.0018 : 0.0005;
+      this.graphGroup.rotation.y += 0.0005 + this.presenceAmp * 0.0013;
     }
 
     if (this.renderer && this.scene && this.camera) {

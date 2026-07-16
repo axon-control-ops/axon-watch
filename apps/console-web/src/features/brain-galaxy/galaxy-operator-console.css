@@ -21,13 +21,6 @@
   min-width: 0;
 }
 
-.galaxy-operator-console__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.3rem;
-}
-
 .galaxy-operator-console__brand {
   display: flex;
   align-items: center;

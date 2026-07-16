@@ -95,13 +95,25 @@ const shards = galaxyOrbGlassShards();
     <!-- Concentric dials -->
     <circle class="kairo-galaxy-orb__ring kairo-galaxy-orb__ring--outer" cx="110" cy="110" r="82" />
     <circle class="kairo-galaxy-orb__ring kairo-galaxy-orb__ring--dashed" cx="110" cy="110" r="74" />
+    <circle class="kairo-galaxy-orb__ring kairo-galaxy-orb__ring--dashed-counter" cx="110" cy="110" r="88" />
     <circle class="kairo-galaxy-orb__ring kairo-galaxy-orb__ring--mid" cx="110" cy="110" r="66" />
+
+    <!-- Listening / presence ripple rings (CSS-driven opacity) -->
+    <circle class="kairo-galaxy-orb__ripple kairo-galaxy-orb__ripple--a" cx="110" cy="110" r="70" />
+    <circle class="kairo-galaxy-orb__ripple kairo-galaxy-orb__ripple--b" cx="110" cy="110" r="78" />
+    <circle class="kairo-galaxy-orb__ripple kairo-galaxy-orb__ripple--c" cx="110" cy="110" r="92" />
 
     <!-- Amber attention arc + beads (mockup 9–1 o'clock) -->
     <path
       class="kairo-galaxy-orb__arc"
       d="M 48 110 A 74 74 0 0 1 78 52"
       pathLength="100"
+    />
+    <path
+      class="kairo-galaxy-orb__arc kairo-galaxy-orb__arc--sweep"
+      d="M 142 48 A 74 74 0 0 1 172 110"
+      pathLength="100"
+      fill="none"
     />
     <g class="kairo-galaxy-orb__beads">
       <circle

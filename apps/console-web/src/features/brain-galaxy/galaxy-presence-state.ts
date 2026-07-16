@@ -28,6 +28,7 @@ export type GalaxyPresenceResolved = {
   stageClass: string;
   coreOrbMode: GalaxyCoreOrbMode;
   busy: boolean;
+  presenceAmp: number;
 };
 
 /**
@@ -59,6 +60,7 @@ export function resolveGalaxyPresence(input: GalaxyPresenceInput): GalaxyPresenc
     stageClass: `brain-galaxy-stage--presence-${phase}`,
     coreOrbMode: phaseToCoreMode(phase),
     busy: phase === 'thinking' || phase === 'speaking' || phase === 'autonomous',
+    presenceAmp: presenceAmpForPhase(phase),
   };
 }
 
@@ -76,5 +78,36 @@ function phaseToCoreMode(phase: GalaxyPresencePhase): GalaxyCoreOrbMode {
       return 'alerting';
     default:
       return 'idle';
+  }
+}
+
+/** Graph-wide energy: mild for mic/alerts, full for agent/speech work. */
+export function presenceAmpForPhase(phase: GalaxyPresencePhase): number {
+  switch (phase) {
+    case 'listening':
+    case 'alerting':
+      return 0.45;
+    case 'thinking':
+    case 'speaking':
+    case 'autonomous':
+      return 1;
+    case 'workspace_selected':
+      return 0.12;
+    default:
+      return 0;
+  }
+}
+
+export function presenceAmpForCoreMode(mode: GalaxyCoreOrbMode): number {
+  switch (mode) {
+    case 'listening':
+    case 'alerting':
+      return 0.45;
+    case 'busy':
+    case 'speaking':
+    case 'autonomous':
+      return 1;
+    default:
+      return 0;
   }
 }

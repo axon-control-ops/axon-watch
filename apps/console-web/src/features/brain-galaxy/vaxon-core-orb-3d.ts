@@ -283,11 +283,13 @@ export function animateVaxonCoreOrb(
   clock: number,
   modeOrBusy: GalaxyCoreOrbMode | boolean,
   selected = false,
+  voiceEnergy = 0,
 ): void {
   const mode: GalaxyCoreOrbMode =
     typeof modeOrBusy === 'boolean' ? (modeOrBusy ? 'busy' : 'idle') : modeOrBusy;
   const profile = CORE_MOTION[mode];
   const busyLike = mode !== 'idle';
+  const energy = Math.max(0, Math.min(1.4, voiceEnergy));
 
   mesh.traverse((child) => {
     const data = child.userData as Partial<CoreRingUserData>;
@@ -296,18 +298,19 @@ export function animateVaxonCoreOrb(
     }
     const wave = 0.78 + Math.sin(clock * profile.waveFreq + (data.phase ?? 0)) * 0.22;
     if (data.coreEffect === 'ring' && child instanceof Mesh) {
-      const speed = (data.spin ?? 0.01) * profile.spinMul;
+      const speed = (data.spin ?? 0.01) * profile.spinMul * (1 + energy * 0.35);
       child.rotation.z += speed;
       child.rotation.y += speed * 0.28;
       const ringMaterial = child.material as MeshStandardMaterial;
-      ringMaterial.opacity = (data.baseOpacity ?? 0.55) * wave * profile.opacityMul;
+      ringMaterial.opacity =
+        (data.baseOpacity ?? 0.55) * wave * profile.opacityMul * (1 + energy * 0.2);
       if (profile.tint) {
         ringMaterial.emissive = new Color(profile.tint);
       }
     } else if (data.coreEffect === 'inner' && child instanceof Mesh) {
-      child.scale.setScalar(0.94 + wave * profile.scaleSwing);
+      child.scale.setScalar(0.94 + wave * profile.scaleSwing + energy * 0.04);
       const innerMaterial = child.material as MeshStandardMaterial;
-      innerMaterial.emissiveIntensity = (busyLike ? 3.8 : 2.5) + wave * 0.6;
+      innerMaterial.emissiveIntensity = (busyLike ? 3.8 : 2.5) + wave * 0.6 + energy * 0.9;
       if (profile.tint) {
         innerMaterial.emissive = new Color(profile.tint);
       }
@@ -321,31 +324,38 @@ export function animateVaxonCoreOrb(
         wave *
         (busyLike ? 2.15 : 1) *
         (selected ? 1.25 : 1) *
-        (mode === 'alerting' ? 1.35 : 1);
-      child.scale.setScalar(0.97 + wave * (busyLike ? 0.08 : 0.035));
+        (mode === 'alerting' ? 1.35 : 1) *
+        (1 + energy * 0.35);
+      child.scale.setScalar(0.97 + wave * (busyLike ? 0.08 : 0.035) + energy * 0.03);
     } else if (data.coreEffect === 'light' && child instanceof PointLight) {
       child.intensity =
-        (data.baseIntensity ?? 2.4) * (0.85 + wave * 0.3) * profile.lightMul;
+        (data.baseIntensity ?? 2.4) *
+        (0.85 + wave * 0.3) *
+        profile.lightMul *
+        (1 + energy * 0.55);
       if (profile.tint) {
         child.color = new Color(profile.tint);
       }
     } else if (data.coreEffect === 'orbit' && child instanceof Group) {
-      child.rotation.z += (data.spin ?? 0.006) * profile.orbitMul;
+      child.rotation.z += (data.spin ?? 0.006) * profile.orbitMul * (1 + energy * 0.4);
       child.rotation.y += (data.spin ?? 0.006) * (busyLike ? 2.5 : 0.45);
     }
   });
 
   const pulse =
     1 +
-    Math.sin(clock * profile.pulseFreq) * profile.pulseAmp +
+    Math.sin(clock * profile.pulseFreq) * (profile.pulseAmp + energy * 0.04) +
+    energy * 0.06 +
     (selected ? 0.04 : 0);
   mesh.scale.setScalar(pulse);
-  mesh.rotation.y += profile.yawSpeed;
+  mesh.rotation.y += profile.yawSpeed * (1 + energy * 0.25);
 
   const material = mesh.material as MeshStandardMaterial;
   const base = selected && mode === 'idle' ? 1.85 : profile.emissiveBase;
   material.emissiveIntensity =
-    base + Math.sin(clock * profile.pulseFreq) * profile.emissiveSwing;
+    base +
+    Math.sin(clock * profile.pulseFreq) * profile.emissiveSwing +
+    energy * 0.75;
   if (profile.tint) {
     material.emissive = new Color(profile.tint);
   }

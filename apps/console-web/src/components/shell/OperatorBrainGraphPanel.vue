@@ -12,6 +12,7 @@ import {
   kairoLastActionTier,
   kairoLastRoutingReceipt,
 } from '../../features/kairo-conversation/kairo-conversation-state';
+import { kairoCaptureCapturing } from '../../features/kairo-conversation/kairo-shared-speech-capture';
 import {
   galaxyInspectorCopy,
   galaxyLegendItems,
@@ -121,9 +122,10 @@ const highSignals = computed(
   () =>
     shell.operatorBriefing?.top_signals.filter((signal) => signal.severity === 'high').length ?? 0,
 );
-const speechCapturing = computed(() => false);
+const speechCapturing = kairoCaptureCapturing;
 const kairoSpeechActive = computed(() => shell.kairoSpeechActive);
 const agentStreamActive = computed(() => shell.agentStreamActive);
+const streamWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 
 const {
   webglReady,
@@ -141,6 +143,7 @@ const {
   speechCapturing,
   kairoSpeechActive,
   agentStreamActive,
+  streamWorkspaceId,
   pendingApprovals,
   criticalSignals,
   highSignals,
@@ -160,7 +163,13 @@ function onEscapeClear(event: KeyboardEvent): void {
 }
 
 onMounted(() => {
-  if (shell.operatorBrainGraphLoadState === 'idle') {
+  // Retry after a prior timeout/error — otherwise the panel stays on
+  // "Loading brain graph…" with a null snapshot forever.
+  if (
+    shell.operatorBrainGraphLoadState === 'idle' ||
+    shell.operatorBrainGraphLoadState === 'error' ||
+    (shell.operatorBrainGraphLoadState === 'loaded' && !shell.operatorBrainGraph)
+  ) {
     void shell.loadOperatorBrainGraph();
   }
   if (shell.operatorFleetHealthLoadState === 'idle') {
@@ -387,27 +396,6 @@ function handleEvidenceHandoff(signal: {
         <KairoConversationBar />
       </div>
       <div class="galaxy-operator-console__footer-right">
-        <div class="galaxy-operator-console__actions" role="group" aria-label="Galaxy view controls">
-          <button
-            type="button"
-            class="brain-galaxy-stage__chip"
-            title="Fit camera and clear selection"
-            @click="resetView"
-          >
-            Fit
-          </button>
-          <button type="button" class="brain-galaxy-stage__chip" @click="emit('switchGrid')">
-            Grid
-          </button>
-          <button
-            type="button"
-            class="brain-galaxy-stage__chip"
-            :class="{ 'brain-galaxy-stage__chip--accent': !props.terminalVisible }"
-            @click="emit('toggleTerminal')"
-          >
-            {{ props.terminalVisible ? 'Terminal' : 'Terminal +' }}
-          </button>
-        </div>
         <div class="galaxy-operator-console__stats" aria-label="Graph stats">
           <div>
             <span>NODES</span>
@@ -425,5 +413,40 @@ function handleEvidenceHandoff(signal: {
         </div>
       </div>
     </footer>
+
+    <Teleport defer to="#status-bar-galaxy-actions">
+      <div class="status-bar-mockup__galaxy-actions-inner" role="group" aria-label="Galaxy view controls">
+        <button
+          type="button"
+          class="status-bar-mockup__chip status-bar-mockup__chip--galaxy"
+          title="Fit camera and clear selection"
+          @click="resetView"
+        >
+          <span class="status-bar-mockup__chip-label">Fit</span>
+        </button>
+        <button
+          type="button"
+          class="status-bar-mockup__chip status-bar-mockup__chip--galaxy"
+          title="Switch to grid mission control"
+          @click="emit('switchGrid')"
+        >
+          <span class="status-bar-mockup__chip-label">Grid</span>
+        </button>
+        <button
+          type="button"
+          class="status-bar-mockup__chip status-bar-mockup__chip--galaxy"
+          :class="{ 'status-bar-mockup__chip--galaxy-accent': !props.terminalVisible }"
+          :title="props.terminalVisible ? 'Hide terminal' : 'Show terminal'"
+          @click="emit('toggleTerminal')"
+        >
+          <span
+            class="status-bar-mockup__dot"
+            :class="{ 'status-bar-mockup__dot--warn': !props.terminalVisible }"
+            aria-hidden="true"
+          />
+          <span class="status-bar-mockup__chip-label">Terminal</span>
+        </button>
+      </div>
+    </Teleport>
   </section>
 </template>

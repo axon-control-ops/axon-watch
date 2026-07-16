@@ -151,7 +151,11 @@ export function galaxyOrbStateClass(
   speaking: boolean,
   conversationPhase: GalaxyOrbConversationPhase = 'idle',
   capturing = false,
+  agentStreamActive = false,
 ): string {
+  if (agentStreamActive) {
+    return 'kairo-galaxy-orb--thinking kairo-galaxy-orb--busy kairo-galaxy-orb--autonomous';
+  }
   if (conversationPhase === 'thinking') {
     return 'kairo-galaxy-orb--thinking kairo-galaxy-orb--busy';
   }

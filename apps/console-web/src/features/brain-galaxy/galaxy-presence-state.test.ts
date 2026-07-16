@@ -48,14 +48,23 @@ describe('resolveGalaxyPresence', () => {
       resolveGalaxyPresence({ ...base, speechCapturing: true }).phase,
     ).toBe('listening');
     expect(
+      resolveGalaxyPresence({ ...base, speechCapturing: true }).presenceAmp,
+    ).toBe(0.45);
+    expect(
       resolveGalaxyPresence({ ...base, conversationPhase: 'thinking' }).phase,
     ).toBe('thinking');
+    expect(
+      resolveGalaxyPresence({ ...base, conversationPhase: 'thinking' }).presenceAmp,
+    ).toBe(1);
   });
 
   it('maps alerting below conversation activity', () => {
     expect(
       resolveGalaxyPresence({ ...base, pendingApprovals: 1 }).phase,
     ).toBe('alerting');
+    expect(
+      resolveGalaxyPresence({ ...base, pendingApprovals: 1 }).presenceAmp,
+    ).toBe(0.45);
     expect(
       resolveGalaxyPresence({
         ...base,

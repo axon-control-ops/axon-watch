@@ -109,6 +109,12 @@ onUnmounted(() => {
           <span class="status-bar-mockup__chip-label">{{ operatorZone?.label }}</span>
         </div>
 
+        <div
+          id="status-bar-galaxy-actions"
+          class="status-bar-mockup__galaxy-actions"
+          aria-label="Galaxy view controls"
+        />
+
         <SupportedCommandsFooter v-if="shell.layoutMode === 'operator'" />
 
         <div class="status-bar-mockup__tail">

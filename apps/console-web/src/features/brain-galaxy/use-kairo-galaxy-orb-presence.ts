@@ -19,6 +19,7 @@ type PresenceShell = {
     hands_free_enabled?: boolean;
     privacy_mode: boolean;
   };
+  agentStreamActive?: boolean;
 };
 
 export function useKairoGalaxyOrbPresence(shell: PresenceShell) {
@@ -58,7 +59,9 @@ export function useKairoGalaxyOrbPresence(shell: PresenceShell) {
       speechCapture.lastAccepted.value,
     ),
   );
-  const orbBusy = computed(() => isKairoConversationBusy());
+  const orbBusy = computed(
+    () => isKairoConversationBusy() || shell.agentStreamActive === true,
+  );
   const voiceBlocked = computed(() => shell.operatorPresenceSettings.privacy_mode);
 
   return {

@@ -150,6 +150,50 @@ class OperatorBrainGraphTests(unittest.TestCase):
         core = next(node for node in payload["nodes"] if node["kind"] == "core")
         self.assertEqual("attention", core["tone"])
 
+    def test_inbox_fetched_once_even_when_slow(self) -> None:
+        calls = {"count": 0}
+
+        def slow_inbox() -> dict[str, object]:
+            calls["count"] += 1
+            return _INBOX
+
+        with patch(
+            "app.operator_brain_graph.assemble_runtime_summary",
+            side_effect=lambda **kwargs: (
+                kwargs["inbox_fetcher"](),
+                _RUNTIME_SUMMARY,
+            )[1],
+        ), patch(
+            "app.operator_brain_graph.fetch_watch_connectors",
+            return_value=_CONNECTORS,
+        ):
+            from app.operator_brain_graph import build_operator_brain_graph
+
+            payload = build_operator_brain_graph(inbox_fetcher=slow_inbox)
+
+        self.assertEqual(1, calls["count"])
+        self.assertGreaterEqual(int(payload["node_count"]), 1)
+
+    def test_graph_survives_unavailable_inbox(self) -> None:
+        with patch(
+            "app.operator_brain_graph.assemble_runtime_summary",
+            side_effect=lambda **kwargs: (
+                kwargs["inbox_fetcher"](),
+                _RUNTIME_SUMMARY,
+            )[1],
+        ), patch(
+            "app.operator_brain_graph.fetch_watch_connectors",
+            return_value=_CONNECTORS,
+        ):
+            from app.operator_brain_graph import build_operator_brain_graph
+
+            payload = build_operator_brain_graph(inbox_fetcher=lambda: None)
+
+        self.assertTrue(payload["watch_connected"])
+        self.assertIn("core_kairo", {node["node_id"] for node in payload["nodes"]})
+        kinds = {node["kind"] for node in payload["nodes"]}
+        self.assertNotIn("signal", kinds)
+
 
 if __name__ == "__main__":
     unittest.main()
