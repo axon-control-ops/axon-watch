@@ -143,12 +143,13 @@ plan or authorize retirement. Update an item only with its stated evidence.
   - [x] Verifier and regression thresholds
         (`safe_improvement/verifier.py`; failing delta blocks promotion).
   - [x] Isolated proposal execution with receipts and rollback
-        (`isolated_executor.py` + `proposal_service.py`).
+        (`isolated_executor.py` disposable worktree/clone + `proposal_service.py`).
   - [x] Exact approval for policy, secrets, production, and merge effects
         (fingerprint-bound `eap_*` approvals; mismatch rejected).
-  - **Exit evidence (2026-07-14):** `tests.test_safe_improvement` PASS (4);
-    API under `/api/safe-improvement`; docs in
-    `docs/SAFE_IMPROVEMENT_SLICE.md`.
+  - **Exit evidence (2026-07-14; sandbox upgrade 2026-07-15):**
+    `tests.test_safe_improvement` + gate PASS; disposable `axon-si-…` worktree/clone
+    isolation; API under `/api/safe-improvement`; docs in
+    `docs/SAFE_IMPROVEMENT_SLICE.md` + `docs/SELF_IMPROVEMENT_CONTRACT.md`.
 
 ## Current findings snapshot
 
@@ -157,4 +158,5 @@ plan or authorize retirement. Update an item only with its stated evidence.
 - Autonomy inspector shows Manual until a converse tier is recorded.
 - Fast gate + nightly strict workflows added under `.github/workflows/`.
 - Hotspot-change gate catches non-shrinking critical edits (session `2d7c56`).
-- Safe improvement executes only in isolated roots; exact-effect approval required.
+- Safe improvement executes only in disposable worktree/clone roots; exact-effect
+  approval required; live bound roots stay untouched.

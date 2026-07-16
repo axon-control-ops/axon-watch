@@ -188,8 +188,8 @@ Axon-X previously missed Unit 13855 **Set A** because the workbook was image-onl
 | --------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------- |
 | Diagnose miss                                       | [x]    | Documented 2026-07-15                                                                                           |
 | Assignment skill update (OCR/inventory-first rule)  | [x]    | `~/.claude/skills/assignment-completion/SKILL.md` — mandatory full-page inventory before answering scanned PDFs |
-| Durable product/agent fix in Axon-X control plane   | [ ]    | Not shipped yet (skill-level gate only)                                                                         |
-| Regression test / fixture for multi-set scanned PDF | [ ]    | Pending                                                                                                         |
+| Durable product/agent fix in Axon-X control plane   | [x]    | `scanned_workbook_gate.py` — prompt policy in Lane B router + post-reply gate via `reply_verification`; refuses premature COMPLETE when only one set is covered |
+| Regression test / fixture for multi-set scanned PDF | [x]    | `tests/fixtures/scanned_workbook/unit_13855_set_b_only.json` + `tests/test_scanned_workbook_gate.py` (in contract suite)                                     |
 
 ---
 
