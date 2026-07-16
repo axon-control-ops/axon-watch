@@ -20,5 +20,15 @@ describe('agent-dock-activity-view', () => {
 
   it('labels streaming for full access', () => {
     expect(buildIdeStreamActivityLabel('full')).toContain('Full Access');
+    expect(buildIdeStreamActivityLabel('full', 'agent')).toContain('Full Access');
+  });
+
+  it('keeps streaming labels mode-aware', () => {
+    expect(buildIdeStreamActivityLabel('consultative', 'plan')).toBe('Plan — streaming outline…');
+    expect(buildIdeStreamActivityLabel('consultative', 'ask')).toBe('Ask — streaming reply…');
+    expect(buildIdeStreamActivityLabel('full', 'debug')).toContain('Debug · Full Access');
+    expect(buildIdeStreamActivityLabel('consultative', 'agent')).toBe(
+      'Agent — streaming runtime output…',
+    );
   });
 });

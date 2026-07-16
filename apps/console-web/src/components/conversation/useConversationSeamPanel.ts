@@ -55,9 +55,10 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   );
   const agentWorkingLabel = computed(() => {
     if (shell.agentStreamActive && shell.agentStreamMessageId) {
-      return shell.ideComposerActivity?.label?.includes('Full Access')
-        ? 'Full Access — streaming runtime output…'
-        : 'Streaming agent reply…';
+      return (
+        shell.ideComposerActivity?.label ??
+        'Agent — streaming runtime output…'
+      );
     }
     if (shell.agentStreamActive) {
       return 'Agent is thinking…';

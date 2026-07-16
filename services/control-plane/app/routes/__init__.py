@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from fastapi import FastAPI
 
 from app.routes import (
@@ -14,8 +12,10 @@ from app.routes import (
     health,
     inbox_watch,
     operator,
+    plans,
     runs,
     runtime,
+    safe_improvement,
     skills,
     vault_http,
     workspaces,
@@ -32,10 +32,9 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(email_settings.router)
     app.include_router(email_reply.router)
     app.include_router(chat.router)
+    app.include_router(plans.router)
     app.include_router(runs.router)
     app.include_router(workspaces.router)
     app.include_router(skills.router)
-    if os.environ.get("AXON_SAFE_IMPROVEMENT_ENABLED") == "1":
-        from app.routes import safe_improvement
-
-        app.include_router(safe_improvement.router)
+    # Session toggle is always mounted; proposal routes stay 404 until enabled.
+    app.include_router(safe_improvement.router)

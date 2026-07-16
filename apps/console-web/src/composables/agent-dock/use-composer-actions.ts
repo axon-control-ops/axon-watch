@@ -14,13 +14,22 @@ import {
 } from '../../features/kairo-conversation/conversation-briefing-surface';
 import { kairoConversationReply } from '../../features/kairo-conversation/kairo-conversation-state';
 import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
+import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
 import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
-import { findIdeComposerQueueEntry } from '../../lib/ide-composer-queue';
+import {
+  findIdeComposerQueueEntry,
+  type IdeComposerMode,
+} from '../../lib/ide-composer-queue';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 
 type ShellStore = ReturnType<typeof useShellStore>;
+
+export type PlanSoftSwitchNotice = {
+  reason: string;
+  previousMode: 'agent';
+};
 
 type UseComposerActionsOptions = {
   shell: ShellStore;
@@ -37,6 +46,7 @@ type UseComposerActionsOptions = {
   startVoiceCapture: () => void;
   stopVoiceCapture: () => void;
   onDebugReproduceProceed?: (messageId: string) => void;
+  planSoftSwitchNotice: Ref<PlanSoftSwitchNotice | null>;
 };
 
 export function useComposerActions(options: UseComposerActionsOptions) {
@@ -55,6 +65,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     startVoiceCapture,
     stopVoiceCapture,
     onDebugReproduceProceed,
+    planSoftSwitchNotice,
   } = options;
 
   function handleApproveRun(): void {
@@ -110,9 +121,34 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       await submitKairoTurn(draft);
       return;
     }
+    let modeForSubmit: IdeComposerMode = composerMode.value;
+    if (modeForSubmit === 'agent') {
+      const decision = shouldSoftSwitchAgentToPlan(modeForSubmit, draft);
+      if (decision.shouldSwitch) {
+        planSoftSwitchNotice.value = {
+          reason: decision.reason,
+          previousMode: 'agent',
+        };
+        composerMode.value = 'plan';
+        modeForSubmit = 'plan';
+      }
+    }
     const attachmentFiles = composerImages.value.map((image) => image.file);
-    await shell.submitIdeComposer(composerMode.value, { attachmentFiles });
+    await shell.submitIdeComposer(modeForSubmit, { attachmentFiles });
     recordComposerHistoryIfSent(draft);
+  }
+
+  function undoPlanSoftSwitch(): void {
+    const notice = planSoftSwitchNotice.value;
+    if (!notice) {
+      return;
+    }
+    composerMode.value = notice.previousMode;
+    planSoftSwitchNotice.value = null;
+  }
+
+  function dismissPlanSoftSwitch(): void {
+    planSoftSwitchNotice.value = null;
   }
 
   async function handleSteer(event?: Event): Promise<void> {
@@ -207,6 +243,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
   }
 
   return {
+    dismissPlanSoftSwitch,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
@@ -220,5 +257,6 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     removeQueuedMessage,
     revealComposerTerminalPanel,
     toggleVoiceCapture,
+    undoPlanSoftSwitch,
   };
 }

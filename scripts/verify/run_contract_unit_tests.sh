@@ -75,6 +75,9 @@ main_tests=(
   tests.test_control_plane_runtime_status
   tests.test_cli_runtime_agents
   tests.test_lane_b_agent
+  tests.test_scanned_workbook_gate
+  tests.test_plan_store
+  tests.test_control_plane_plans
   tests.test_runtime_vault_integration
   tests.test_email_settings_store
   tests.test_email_reply_suggest

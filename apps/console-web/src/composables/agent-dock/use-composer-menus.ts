@@ -1,11 +1,20 @@
 import { computed, type Ref, ref } from 'vue';
 
 import {
+  disableSandboxSession,
+  enableSandboxSession,
+  fetchSandboxSessionStatus,
+} from '../../api/safe-improvement-api';
+import {
   agentExecutionAccessHint,
   agentExecutionAccessLabel,
 } from '../../lib/agent-execution-access-prefs';
 import { isToolCapableComposerMode } from '../../lib/composer-tool-modes';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
+import {
+  sandboxSessionHint,
+  sandboxSessionLabel,
+} from '../../lib/sandbox-session-view';
 import { useShellStore } from '../../stores/shell';
 
 export type ComposerMode = 'agent' | 'plan' | 'ask' | 'debug' | 'kairo';
@@ -43,6 +52,12 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
   const showModeMenu = ref(false);
   const showFullAccessConsent = ref(false);
   const fullAccessConsentChecked = ref(false);
+  const showSandboxConsent = ref(false);
+  const sandboxConsentChecked = ref(false);
+  const sandboxSessionEnabled = ref(false);
+  const sandboxEnvForced = ref(false);
+  const sandboxSessionPending = ref(false);
+  const sandboxSessionError = ref('');
   const showAddModelsPanel = ref(false);
   const showRuntimeTargetsPanel = ref(false);
   const modelSearchQuery = ref('');
@@ -66,12 +81,28 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     () =>
       isToolCapableComposerMode(composerMode.value) && shell.agentExecutionAccess === 'full',
   );
+  const sandboxHint = computed(() =>
+    sandboxSessionHint(sandboxSessionEnabled.value, sandboxEnvForced.value),
+  );
+  const sandboxLabel = computed(() => sandboxSessionLabel(sandboxSessionEnabled.value));
   const modeButtonLabel = computed(() => {
     if (isFullAccessAgent.value) {
       return composerMode.value === 'debug' ? 'Debug · Full' : 'Agent · Full';
     }
     return activeMode.value.label;
   });
+
+  async function refreshSandboxSession(): Promise<void> {
+    try {
+      const status = await fetchSandboxSessionStatus();
+      sandboxSessionEnabled.value = status.enabled;
+      sandboxEnvForced.value = status.env_forced;
+      sandboxSessionError.value = '';
+    } catch (error) {
+      sandboxSessionError.value =
+        error instanceof Error ? error.message : 'Could not load Sandbox status.';
+    }
+  }
 
   function closeMenus(): void {
     showContextMenu.value = false;
@@ -89,7 +120,8 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     showToolsMenu.value = openingTools;
     const openingModel = section === 'model' ? !showModelMenu.value : false;
     showModelMenu.value = openingModel;
-    showModeMenu.value = section === 'mode' ? !showModeMenu.value : false;
+    const openingMode = section === 'mode' ? !showModeMenu.value : false;
+    showModeMenu.value = openingMode;
     if (!openingModel) {
       showAddModelsPanel.value = false;
       showRuntimeTargetsPanel.value = false;
@@ -100,6 +132,9 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     }
     if (openingModel) {
       void Promise.all([shell.loadRuntimeStatus(), shell.loadCursorCatalog(true)]);
+    }
+    if (openingMode) {
+      void refreshSandboxSession();
     }
   }
 
@@ -137,12 +172,73 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     fullAccessConsentChecked.value = false;
   }
 
+  function requestSandboxSession(): void {
+    if (sandboxSessionEnabled.value) {
+      return;
+    }
+    sandboxConsentChecked.value = false;
+    sandboxSessionError.value = '';
+    showSandboxConsent.value = true;
+    showModeMenu.value = false;
+  }
+
+  function cancelSandboxConsent(): void {
+    if (sandboxSessionPending.value) {
+      return;
+    }
+    showSandboxConsent.value = false;
+    sandboxConsentChecked.value = false;
+    sandboxSessionError.value = '';
+  }
+
+  async function confirmSandboxConsent(): Promise<void> {
+    if (!sandboxConsentChecked.value || sandboxSessionPending.value) {
+      return;
+    }
+    sandboxSessionPending.value = true;
+    sandboxSessionError.value = '';
+    try {
+      const status = await enableSandboxSession();
+      sandboxSessionEnabled.value = status.enabled;
+      sandboxEnvForced.value = status.env_forced;
+      showSandboxConsent.value = false;
+      sandboxConsentChecked.value = false;
+    } catch (error) {
+      sandboxSessionError.value =
+        error instanceof Error ? error.message : 'Could not enable Sandbox.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
+  async function disableSandboxSessionAccess(): Promise<void> {
+    if (sandboxEnvForced.value || sandboxSessionPending.value) {
+      return;
+    }
+    sandboxSessionPending.value = true;
+    sandboxSessionError.value = '';
+    try {
+      const status = await disableSandboxSession();
+      sandboxSessionEnabled.value = status.enabled;
+      sandboxEnvForced.value = status.env_forced;
+      showModeMenu.value = false;
+    } catch (error) {
+      sandboxSessionError.value =
+        error instanceof Error ? error.message : 'Could not turn Sandbox off.';
+    } finally {
+      sandboxSessionPending.value = false;
+    }
+  }
+
   return {
     MODE_OPTIONS,
     activeMode,
     cancelFullAccessConsent,
+    cancelSandboxConsent,
     closeMenus,
     confirmFullAccessConsent,
+    confirmSandboxConsent,
+    disableSandboxSessionAccess,
     executionAccessHint,
     executionAccessLabel,
     fullAccessConsentChecked,
@@ -150,6 +246,14 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     modeButtonLabel,
     modelSearchQuery,
     requestFullAccess,
+    requestSandboxSession,
+    sandboxConsentChecked,
+    sandboxEnvForced,
+    sandboxHint,
+    sandboxLabel,
+    sandboxSessionEnabled,
+    sandboxSessionError,
+    sandboxSessionPending,
     selectMode,
     showAddModelsPanel,
     showApprovalBanner,
@@ -158,6 +262,7 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     showModeMenu,
     showModelMenu,
     showRuntimeTargetsPanel,
+    showSandboxConsent,
     showToolsMenu,
     switchToConsultativeAccess,
     toggleSection,

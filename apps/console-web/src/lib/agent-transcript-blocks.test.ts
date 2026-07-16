@@ -32,6 +32,26 @@ const SAMPLE = [
 ].join('\n');
 
 describe('parseAgentTranscriptBlocks', () => {
+  it('parses durable plan fences as View Plan segments', () => {
+    const content = [
+      '# Soft cutover',
+      '',
+      '1. Proxy public origin',
+      '',
+      ':::plan plan_abcdef123456 Soft cutover',
+      ':::',
+    ].join('\n');
+    expect(agentContentHasTranscriptBlocks(content)).toBe(true);
+    const segments = parseAgentTranscriptBlocks(content);
+    expect(segments.map((segment) => segment.kind)).toEqual(['text', 'plan']);
+    const plan = segments[1];
+    expect(plan.kind).toBe('plan');
+    if (plan.kind === 'plan') {
+      expect(plan.planId).toBe('plan_abcdef123456');
+      expect(plan.title).toBe('Soft cutover');
+    }
+  });
+
   it('parses debug reproduce steps as a dedicated segment', () => {
     const content = [
       'Instrumentation is ready.',

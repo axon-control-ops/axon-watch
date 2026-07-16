@@ -8,6 +8,8 @@ export type EditorDocumentLanguage =
   | 'javascript'
   | 'python'
   | 'shell'
+  | 'html'
+  | 'css'
   | 'image';
 
 export interface WorkspaceDocumentDescriptor {
@@ -20,6 +22,8 @@ export interface WorkspaceDocumentDescriptor {
   filePath?: string;
   readOnly?: boolean;
   dirty?: boolean;
+  /** Durable plan id when this draft is a View Plan artifact. */
+  planId?: string;
 }
 
 interface BuildWorkspaceDocumentsInput {

@@ -25,8 +25,13 @@ from app.cli_runtime.runtime_auth import (
 )
 from app.cli_runtime.vault_keys import runtime_subprocess_env
 from app.cli_runtime.research_mcp import ensure_workspace_research_mcp
+from app.chat.scanned_workbook_gate import assignment_workbook_policy_appendix
 from app.debug_prompt import build_debug_system_prompt
 from app.kairo_ask_prompt import build_ask_system_prompt
+from app.cli_runtime.plan_system_prompt import (
+    ask_fence_instruction,
+    build_plan_system_prompt,
+)
 from app.research.availability import format_capability_line, research_capability_snapshot
 from app.persistence.operator_presence_settings_store import load_settings
 from app.runs.service import RunNotFoundError, get_run
@@ -42,8 +47,9 @@ _REPLY_STYLE = (
 _INSTRUCTION_TAKING = (
     "Before acting, treat the request as binding Instructions when it includes "
     "Goal / In scope / Out of scope / Steps / Constraints. "
-    "Out of scope is strict: if commit, push, merge, or release was not asked for, "
-    "do not add those steps or invent desk-clearing git chores. "
+    "Out of scope is strict: if commit, push, merge, release, or git status was not asked for, "
+    "do not add those steps, invent desk-clearing git chores, or run git/shell "
+    "probes to \"get oriented\". "
     "Mentions like \"I never said anything about committing\" are a refusal, not commit intent."
 )
 
@@ -66,22 +72,20 @@ def _system_prompt(
     if composer_mode == "plan":
         offline_clause = (
             "Ground the plan in the local repo and provided context. "
-            "If online research is unavailable, do not suggest web search as a required step. "
+            "If online research is unavailable, do not suggest web search as a required step "
+            "and note offline limits in ## Sources. "
         )
         if (research_snapshot or research_capability_snapshot()).get("available"):
             offline_clause = (
-                "When external facts are required, call axon_research_search or axon_research_fetch first. "
-                "Do not rely on built-in webSearch/webFetch in this headless runtime. "
-                "Still ground implementation steps in the local repo. "
+                "When external or vendor facts are required, call axon_research_search or "
+                "axon_research_fetch first. Do not rely on built-in webSearch/webFetch in "
+                "this headless runtime. Still ground implementation steps in the local repo. "
             )
-        return (
-            "You are Axon-X Lane B in Plan mode. Produce a short numbered plan using the "
-            f"supplied workspace context. {offline_clause}"
-            "If key detail is missing, state the assumption plainly and identify the local files, "
-            "symbols, or tests that should be checked next. Keep the plan practical: cover "
-            "discovery, implementation, verification, and any material risks or open questions. "
-            "Never invent source names, publications, or dates. Do not claim execution happened. "
-            f"{_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
+        return build_plan_system_prompt(
+            offline_clause=offline_clause,
+            research_line=research_line,
+            instruction_taking=_INSTRUCTION_TAKING,
+            reply_style=_REPLY_STYLE,
         )
     if composer_mode == "debug":
         return build_debug_system_prompt(
@@ -96,17 +100,19 @@ def _system_prompt(
                 "Built-in webSearch/webFetch are unavailable in this headless runtime. "
             )
         return (
-            "You are Axon-X Lane B in Agent mode with Full Access. The operator has "
-            "consented to tool execution: edit files and run commands inside the "
-            "Project root shown in workspace context as needed to complete the request "
-            "now. Use workspace-relative paths such as README.md — never edit Cursor "
-            "metadata directories. Do the work first, then reply with a short summary "
-            f"of what changed. {_INSTRUCTION_TAKING} {research_clause}{research_line} {_REPLY_STYLE}"
+            "You are Axon-X Lane B in Agent mode with Full Access. Tool execution is "
+            "allowed: edit files and run commands inside the Project root shown in "
+            "workspace context as needed to complete the request now. Use "
+            "workspace-relative paths such as README.md — never edit Cursor metadata "
+            "directories. Do the work first, then reply with a short summary "
+            f"of what changed. {ask_fence_instruction()}"
+            f"{_INSTRUCTION_TAKING} {research_clause}{research_line} {_REPLY_STYLE}"
         )
     return (
         "You are Axon-X Lane B in Agent mode (consultative slice). Answer using the "
         "supplied workspace context, propose concrete next steps, and do not claim you "
-        f"edited files or ran commands. {_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
+        f"edited files or ran commands. {ask_fence_instruction()}"
+        f"{_INSTRUCTION_TAKING} {research_line} {_REPLY_STYLE}"
     )
 
 
@@ -119,8 +125,11 @@ def _build_prompt(
     research_snapshot: dict[str, object] | None = None,
 ) -> str:
     snapshot = research_snapshot or research_capability_snapshot()
+    workbook_policy = assignment_workbook_policy_appendix(user_prompt, context_block)
+    policy_block = f"\n\n{workbook_policy}" if workbook_policy else ""
     return (
-        f"{_system_prompt(composer_mode, execution_tier, research_snapshot=snapshot)}\n\n"
+        f"{_system_prompt(composer_mode, execution_tier, research_snapshot=snapshot)}"
+        f"{policy_block}\n\n"
         f"Workspace context:\n{context_block}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )

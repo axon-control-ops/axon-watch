@@ -1,3 +1,4 @@
+import { parseAskOptions, tryParseClarifyingMarkdown } from '../agent-question-view';
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';
 import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
 import type { AgentTranscriptSegment, ResearchTranscriptItem } from './types';
@@ -8,6 +9,7 @@ import {
   mergeAdjacentResearchSegments,
 } from './prose-dedupe';
 import {
+  ASK_HEADER_RE,
   DEBUG_REPRODUCE_HEADER_RE,
   EDIT_HEADER_RE,
   IMAGE_HEADER_RE,
@@ -16,8 +18,33 @@ import {
   RESEARCH_KIND_RE,
   RESEARCH_PROVIDER_RE,
   TERMINAL_HEADER_RE,
+  PLAN_HEADER_RE,
   TOOL_HEADER_RE,
 } from './transcript-regex';
+
+function upgradeClarifyingTextSegments(
+  segments: AgentTranscriptSegment[],
+): AgentTranscriptSegment[] {
+  const next: AgentTranscriptSegment[] = [];
+  for (const segment of segments) {
+    if (segment.kind !== 'text') {
+      next.push(segment);
+      continue;
+    }
+    const question = tryParseClarifyingMarkdown(segment.text);
+    if (!question) {
+      next.push(segment);
+      continue;
+    }
+    next.push({
+      kind: 'question',
+      prompt: question.prompt,
+      options: question.options,
+      open: false,
+    });
+  }
+  return next;
+}
 
 export type ParseAgentTranscriptOptions = {
   omitClosedEditDiffs?: boolean;
@@ -102,6 +129,56 @@ export function parseAgentTranscriptBlocksUncached(
       flushText();
       segments.push({ kind: 'tool', label: toolMatch[1].trim() });
       index += 1;
+      continue;
+    }
+
+    const planMatch = line.match(PLAN_HEADER_RE);
+    if (planMatch) {
+      flushText();
+      const planId = planMatch[1].trim();
+      const title = planMatch[2].trim() || 'Untitled plan';
+      index += 1;
+      if (index < lines.length && lines[index].trimEnd() === ':::') {
+        index += 1;
+      }
+      segments.push({ kind: 'plan', planId, title });
+      continue;
+    }
+
+    const askMatch = line.match(ASK_HEADER_RE);
+    if (askMatch) {
+      flushText();
+      const headerPrompt = (askMatch[1] || '').trim();
+      const body: string[] = [];
+      let closed = false;
+      index += 1;
+      while (index < lines.length) {
+        if (lines[index].trimEnd() === ':::') {
+          closed = true;
+          index += 1;
+          break;
+        }
+        body.push(lines[index]);
+        index += 1;
+      }
+      const options = parseAskOptions(body);
+      const promptFromBody = body
+        .map((entry) => entry.trim())
+        .filter((entry) => entry && !/^\s*[-*]?\s*\d+\s*[|.)]/.test(entry))
+        .join(' ')
+        .trim();
+      segments.push({
+        kind: 'question',
+        prompt: headerPrompt || promptFromBody || 'Choose an option to continue',
+        options:
+          options.length > 0
+            ? options
+            : [
+                { id: '1', label: 'Yes' },
+                { id: '2', label: 'No' },
+              ],
+        open: !closed,
+      });
       continue;
     }
 
@@ -251,7 +328,9 @@ export function parseAgentTranscriptBlocksUncached(
   }
 
   flushText();
-  return dedupeTextSegmentsGlobally(
-    mergeAdjacentDuplicateTextSegments(mergeAdjacentResearchSegments(segments)),
+  return upgradeClarifyingTextSegments(
+    dedupeTextSegmentsGlobally(
+      mergeAdjacentDuplicateTextSegments(mergeAdjacentResearchSegments(segments)),
+    ),
   );
 }

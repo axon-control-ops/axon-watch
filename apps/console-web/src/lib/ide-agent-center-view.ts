@@ -262,6 +262,7 @@ export function buildIdeAgentReviewComposerLabel(input: {
   editedFileCount: number;
   reviewReadyCount: number;
   expanded: boolean;
+  mode?: 'ask' | 'plan' | 'agent' | 'debug';
 }): string {
   if (input.agentStreamActive) {
     if (input.editedFileCount > 0) {
@@ -269,10 +270,23 @@ export function buildIdeAgentReviewComposerLabel(input: {
       const chevron = input.expanded ? '▾' : '▸';
       return `${chevron} ${count === 1 ? '1 file' : `${count} files`}`;
     }
+    const mode = input.mode ?? 'agent';
+    if (mode === 'ask') {
+      return 'Ask — streaming reply…';
+    }
+    if (mode === 'plan') {
+      return 'Plan — streaming outline…';
+    }
+    if (mode === 'debug' && input.executionAccess === 'full') {
+      return 'Debug · Full Access — streaming runtime output…';
+    }
+    if (mode === 'debug') {
+      return 'Debug — streaming runtime output…';
+    }
     if (input.executionAccess === 'full') {
       return 'Full Access — streaming runtime output…';
     }
-    return 'Streaming agent reply…';
+    return 'Agent — streaming runtime output…';
   }
   if (input.editedFileCount > 0) {
     const count = input.editedFileCount;

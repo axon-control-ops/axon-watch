@@ -1,6 +1,10 @@
 import type * as Monaco from 'monaco-editor';
 
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
+import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
 import {
   defineMockupMonacoTheme,
@@ -44,14 +48,97 @@ export interface MonacoEditorController {
 
 let monacoPromise: Promise<typeof Monaco> | null = null;
 
+type MonacoTsLanguageApi = {
+  typescriptDefaults: {
+    setDiagnosticsOptions: (options: {
+      noSemanticValidation?: boolean;
+      noSyntaxValidation?: boolean;
+      noSuggestionDiagnostics?: boolean;
+    }) => void;
+    setEagerModelSync: (value: boolean) => void;
+    setCompilerOptions: (options: Record<string, unknown>) => void;
+    getCompilerOptions: () => Record<string, unknown>;
+  };
+  javascriptDefaults: {
+    setDiagnosticsOptions: (options: {
+      noSemanticValidation?: boolean;
+      noSyntaxValidation?: boolean;
+      noSuggestionDiagnostics?: boolean;
+    }) => void;
+    setEagerModelSync: (value: boolean) => void;
+  };
+  ScriptTarget: { ESNext: number };
+  ModuleKind: { ESNext: number };
+  ModuleResolutionKind: { NodeJs: number };
+};
+
+function configureLanguageDefaults(monaco: typeof Monaco): void {
+  // Monaco 0.55 types mark languages.typescript as deprecated; runtime API is still present.
+  const tsApi = (monaco.languages as unknown as { typescript?: MonacoTsLanguageApi }).typescript;
+  if (tsApi?.typescriptDefaults && tsApi.javascriptDefaults) {
+    // Operator console is a viewer/editor shell, not a full language service host.
+    // Keep syntax highlighting; skip semantic work that freezes the tab on large TS files.
+    const diagnosticOptions = {
+      noSemanticValidation: true,
+      noSyntaxValidation: false,
+      noSuggestionDiagnostics: true,
+    };
+    tsApi.typescriptDefaults.setDiagnosticsOptions(diagnosticOptions);
+    tsApi.javascriptDefaults.setDiagnosticsOptions(diagnosticOptions);
+    tsApi.typescriptDefaults.setEagerModelSync(true);
+    tsApi.javascriptDefaults.setEagerModelSync(true);
+    tsApi.typescriptDefaults.setCompilerOptions({
+      ...tsApi.typescriptDefaults.getCompilerOptions(),
+      allowNonTsExtensions: true,
+      allowJs: true,
+      checkJs: false,
+      noLib: true,
+      target: tsApi.ScriptTarget.ESNext,
+      module: tsApi.ModuleKind.ESNext,
+      moduleResolution: tsApi.ModuleResolutionKind.NodeJs,
+    });
+  }
+
+  // Vue SFCs are opened as html for highlighting; turn off HTML schema validation noise.
+  const htmlDefaults = (
+    monaco.languages as unknown as {
+      html?: { htmlDefaults?: { setOptions: (options: Record<string, unknown>) => void } };
+    }
+  ).html?.htmlDefaults;
+  htmlDefaults?.setOptions({
+    validate: false,
+  });
+}
+
+function installMonacoEnvironment(): void {
+  globalThis.MonacoEnvironment = {
+    getWorker(_workerId: string, label: string) {
+      switch (label) {
+        case 'json':
+          return new JsonWorker();
+        case 'css':
+        case 'scss':
+        case 'less':
+          return new CssWorker();
+        case 'html':
+        case 'handlebars':
+        case 'razor':
+          return new HtmlWorker();
+        case 'typescript':
+        case 'javascript':
+          return new TsWorker();
+        default:
+          return new EditorWorker();
+      }
+    },
+  };
+}
+
 function loadMonaco(): Promise<typeof Monaco> {
   if (!monacoPromise) {
     monacoPromise = import('monaco-editor').then((monaco) => {
-      globalThis.MonacoEnvironment = {
-        getWorker() {
-          return new EditorWorker();
-        },
-      };
+      installMonacoEnvironment();
+      configureLanguageDefaults(monaco);
       return monaco;
     });
   }
@@ -74,6 +161,15 @@ export async function createMonacoEditor(
     model,
     theme: useMockupTheme ? MOCKUP_MONACO_THEME_ID : 'vs-dark',
     automaticLayout: true,
+    // Monaco 0.55 defaults editContext to true; with our shell CSS it can leave
+    // a blank pane while the model still has content (status bar line count OK).
+    editContext: false,
+    // Inlay hints / code actions hit the language worker; keep them off in this shell.
+    inlayHints: { enabled: 'off' },
+    quickSuggestions: false,
+    suggestOnTriggerCharacters: false,
+    parameterHints: { enabled: false },
+    hover: { enabled: true },
     minimap: {
       enabled: minimapEnabled,
       scale: 2,
