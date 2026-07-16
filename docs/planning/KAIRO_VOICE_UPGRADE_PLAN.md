@@ -93,7 +93,7 @@ Gate: policy/throttle tests and a long-run manual no-spam proof.
 
 ### Voice-D — Real cloud STT
 
-**Status:** CI-ready on `feat/voice-d-cloud-stt`; merge to `dev` in this close-out.
+**Status:** merged to `dev` at `1fb6340`; optional manual accent/noisy-room proof remains.
 
 Work:
 
