@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from app.kairo_conversation import converse_turn
 from app.kairo_voice import generate_spoken_line, narration_allows_event
@@ -233,6 +233,79 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         "voice": voice,
         "content_type": content_type,
         "audio_base64": base64.b64encode(audio).decode("ascii"),
+    }
+
+
+@router.get("/api/kairo/stt")
+def kairo_stt_status() -> dict[str, object]:
+    from app.azure_stt import stt_availability_payload
+
+    return stt_availability_payload()
+
+
+@router.post("/api/kairo/stt")
+async def kairo_stt_transcribe(
+    file: UploadFile = File(...),
+    language: str = Query(default="en-US"),
+) -> dict[str, object]:
+    from app.azure_stt import (
+        MAX_STT_UPLOAD_BYTES,
+        transcribe_azure_stt,
+    )
+
+    settings = operator_presence_settings_store.load_settings()
+    if bool(settings.get("privacy_mode")):
+        return {
+            "available": False,
+            "transcript": "",
+            "provider": "browser",
+            "confidence": None,
+            "reason": "privacy_mode",
+        }
+
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="audio payload must not be empty")
+    if len(raw_bytes) > MAX_STT_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"audio exceeds {MAX_STT_UPLOAD_BYTES} byte limit",
+        )
+
+    filename = str(file.filename or "capture.ogg")
+    mime_type = str(file.content_type or "application/octet-stream")
+    try:
+        result = transcribe_azure_stt(
+            raw_bytes,
+            filename=filename,
+            mime_type=mime_type,
+            language=language,
+        )
+    except ValueError as exc:
+        reason = str(exc)
+        return {
+            "available": False,
+            "transcript": "",
+            "provider": "browser",
+            "confidence": None,
+            "reason": reason,
+        }
+
+    if result is None:
+        return {
+            "available": False,
+            "transcript": "",
+            "provider": "browser",
+            "confidence": None,
+            "reason": "cloud_stt_unavailable",
+        }
+
+    return {
+        "available": True,
+        "transcript": result.transcript,
+        "provider": result.provider,
+        "confidence": result.confidence,
+        "reason": None,
     }
 
 

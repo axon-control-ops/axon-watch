@@ -10,10 +10,17 @@ import {
   type KairoVoiceCaptureMode,
 } from '../../lib/kairo-voice-gate';
 import { isSpeechCaptureSupported, SpeechCaptureSession } from './speech-capture';
+import { CloudAudioCaptureSession, isCloudAudioCaptureSupported } from './cloud-audio-capture';
+import {
+  probeCloudSttAvailability,
+  resolveSttCaptureMode,
+  transcribeCloudStt,
+} from '../../lib/kairo-cloud-stt';
 import { submitKairoConversationTranscript } from './kairo-conversation-bus';
 import { kairoConversationPhase, setKairoConversationPhase } from './kairo-conversation-state';
 
 const session = new SpeechCaptureSession();
+const cloudSession = new CloudAudioCaptureSession();
 
 export const kairoCaptureCapturing = ref(false);
 export const kairoCaptureInterim = ref('');
@@ -25,11 +32,13 @@ export const kairoCaptureLastAccepted = ref<boolean | null>(null);
 export const kairoCaptureLastSubmitState = ref<'submitted' | 'queued' | 'ignored' | 'dropped' | null>(null);
 
 let privacyBlocked: () => boolean = () => false;
+let sttMode: () => string = () => 'browser';
 let onVoiceInterrupt: () => void = () => {};
 let onCaptureEnd: () => void = () => {};
 const captureEndListeners = new Set<() => void>();
 
 let bargeInTriggered = false;
+let activeCaptureProvider: 'browser' | 'cloud' | null = null;
 
 export function registerKairoCaptureEndListener(listener: () => void): () => void {
   captureEndListeners.add(listener);
@@ -49,6 +58,10 @@ export function registerKairoVoiceInterruptHandler(handler: () => void): () => v
 
 export function setKairoSpeechPrivacyBlocked(check: () => boolean): void {
   privacyBlocked = check;
+}
+
+export function setKairoSpeechSttMode(check: () => string): void {
+  sttMode = check;
 }
 
 function notifyCaptureEnd(): void {
@@ -188,29 +201,15 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
   notifyCaptureEnd();
 }
 
-export function startKairoSpeechCapture(
-  mode: KairoVoiceCaptureMode = 'manual',
-  options?: { takeover?: boolean },
-): boolean {
-  if (kairoConversationPhase.value === 'thinking' || kairoConversationPhase.value === 'speaking') {
-    return false;
-  }
-  if (options?.takeover && kairoCaptureCapturing.value) {
-    // Space / Mic PTT while hands-free is already open — drop ambient session first.
-    session.stopImmediate();
-    kairoCaptureCapturing.value = false;
-    kairoCaptureInterim.value = '';
-  }
-  if (!canStartKairoSpeechCapture()) {
-    return false;
-  }
+function shouldUseCloudCapture(mode: KairoVoiceCaptureMode): boolean {
+  return (
+    resolveSttCaptureMode(sttMode(), privacyBlocked()) === 'cloud' &&
+    mode === 'manual' &&
+    isCloudAudioCaptureSupported()
+  );
+}
 
-  kairoCaptureMode.value = mode;
-  bargeInTriggered = false;
-  kairoCaptureError.value = null;
-  kairoCaptureInterim.value = '';
-  setKairoConversationPhase('listening');
-
+function startBrowserCapture(mode: KairoVoiceCaptureMode): boolean {
   const started = session.start({
     onInterim: (transcript) => {
       handleInterimTranscript(transcript, mode);
@@ -241,14 +240,112 @@ export function startKairoSpeechCapture(
   });
 
   kairoCaptureCapturing.value = started;
+  activeCaptureProvider = started ? 'browser' : null;
   if (!started) {
     setKairoConversationPhase('idle');
   } else {
-    logKairoVoice('capture_start', { mode });
+    logKairoVoice('capture_start', { mode, provider: 'browser' });
   }
   return started;
 }
 
+async function finishCloudCapture(mode: KairoVoiceCaptureMode): Promise<void> {
+  const blob = await cloudSession.stop();
+  kairoCaptureCapturing.value = false;
+  activeCaptureProvider = null;
+  kairoCaptureInterim.value = '';
+  if (!blob) {
+    kairoCaptureError.value = 'No audio captured — try again.';
+    setKairoConversationPhase('idle');
+    notifyCaptureEnd();
+    return;
+  }
+
+  const result = await transcribeCloudStt(blob, { privacyBlocked: privacyBlocked() });
+  if (!result.transcript.trim()) {
+    if (result.reason !== 'privacy_mode' && isSpeechCaptureSupported()) {
+      logKairoVoice('cloud_stt_fallback', { mode, reason: result.reason });
+      const started = startBrowserCapture(mode);
+      if (started) {
+        return;
+      }
+    }
+    kairoCaptureError.value =
+      result.reason === 'privacy_mode'
+        ? null
+        : 'Cloud speech could not transcribe that clip — try again or switch to browser STT.';
+    setKairoConversationPhase('idle');
+    notifyCaptureEnd();
+    return;
+  }
+
+  logKairoVoice('cloud_stt_ok', {
+    mode,
+    provider: result.provider,
+    confidence: result.confidence,
+  });
+  await handleFinalTranscript(result.transcript, mode);
+}
+
+async function startCloudCapture(mode: KairoVoiceCaptureMode): Promise<boolean> {
+  const probe = await probeCloudSttAvailability();
+  if (!probe.available) {
+    return startBrowserCapture(mode);
+  }
+  const started = await cloudSession.start();
+  if (!started) {
+    return startBrowserCapture(mode);
+  }
+  kairoCaptureCapturing.value = true;
+  activeCaptureProvider = 'cloud';
+  logKairoVoice('capture_start', { mode, provider: 'cloud' });
+  return true;
+}
+
+export function startKairoSpeechCapture(
+  mode: KairoVoiceCaptureMode = 'manual',
+  options?: { takeover?: boolean },
+): boolean {
+  if (kairoConversationPhase.value === 'thinking' || kairoConversationPhase.value === 'speaking') {
+    return false;
+  }
+  if (options?.takeover && kairoCaptureCapturing.value) {
+    // Space / Mic PTT while hands-free is already open — drop ambient session first.
+    session.stopImmediate();
+    cloudSession.stopImmediate();
+    kairoCaptureCapturing.value = false;
+    activeCaptureProvider = null;
+    kairoCaptureInterim.value = '';
+  }
+  if (!canStartKairoSpeechCapture()) {
+    return false;
+  }
+
+  kairoCaptureMode.value = mode;
+  bargeInTriggered = false;
+  kairoCaptureError.value = null;
+  kairoCaptureInterim.value = '';
+  setKairoConversationPhase('listening');
+
+  if (shouldUseCloudCapture(mode)) {
+    void startCloudCapture(mode).then((started) => {
+      if (!started) {
+        kairoCaptureCapturing.value = false;
+        if (kairoConversationPhase.value === 'listening') {
+          setKairoConversationPhase('idle');
+        }
+      }
+    });
+    return true;
+  }
+
+  return startBrowserCapture(mode);
+}
+
 export function stopKairoSpeechCapture(): void {
+  if (activeCaptureProvider === 'cloud' && kairoCaptureCapturing.value) {
+    void finishCloudCapture(kairoCaptureMode.value);
+    return;
+  }
   session.stop();
 }

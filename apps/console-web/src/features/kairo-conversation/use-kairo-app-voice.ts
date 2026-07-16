@@ -5,7 +5,7 @@ import { registerKairoConversationSubmit } from './kairo-conversation-bus';
 import { kairoConversationPhase } from './kairo-conversation-state';
 import { useKairoHandsFreeLoop } from './use-kairo-hands-free-loop';
 import { useKairoConversation } from './use-kairo-conversation';
-import { setKairoSpeechPrivacyBlocked } from './kairo-shared-speech-capture';
+import { setKairoSpeechPrivacyBlocked, setKairoSpeechSttMode } from './kairo-shared-speech-capture';
 import { useKairoVoiceInterrupt } from './use-kairo-voice-interrupt';
 import { setKairoSpeechTuningProvider } from '../../lib/kairo-voice-playback';
 
@@ -19,6 +19,7 @@ export function useKairoAppVoice(): void {
   const { submitTurn } = useKairoConversation();
 
   setKairoSpeechPrivacyBlocked(() => shell.operatorPresenceSettings.privacy_mode);
+  setKairoSpeechSttMode(() => shell.operatorPresenceSettings.stt_mode);
   setKairoSpeechTuningProvider(() => ({
     rate: shell.operatorPresenceSettings.speech_rate ?? 1.0,
     pitch: shell.operatorPresenceSettings.speech_pitch ?? 1.04,

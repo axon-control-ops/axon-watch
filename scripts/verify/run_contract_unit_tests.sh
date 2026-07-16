@@ -85,6 +85,7 @@ main_tests=(
   tests.test_email_account_resolve
   tests.test_operator_evidence
   tests.test_kairo_conversation_endpoints
+  tests.test_kairo_stt
   tests.test_voice_autonomy
   tests.test_command_shortcuts
   tests.test_kairo_conversation_turns

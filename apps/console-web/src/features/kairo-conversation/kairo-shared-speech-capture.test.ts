@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   canStartKairoSpeechCapture,
   setKairoSpeechPrivacyBlocked,
+  setKairoSpeechSttMode,
   startKairoSpeechCapture,
 } from './kairo-shared-speech-capture';
 import { kairoConversationPhase, setKairoConversationPhase } from './kairo-conversation-state';
@@ -48,6 +49,7 @@ describe('kairo-shared-speech-capture busy gating', () => {
     submitMock.mockClear();
     captureCallbacks = null;
     setKairoSpeechPrivacyBlocked(() => false);
+    setKairoSpeechSttMode(() => 'browser');
     setKairoConversationPhase('idle');
   });
 
