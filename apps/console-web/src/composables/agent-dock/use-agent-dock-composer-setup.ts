@@ -58,6 +58,7 @@ export function useAgentDockComposerSetup() {
     fullAccessConsentChecked,
     isFullAccessAgent,
     modeButtonLabel,
+    modeButtonTitle,
     modelSearchQuery,
     requestFullAccess,
     requestSandboxSession,
@@ -215,6 +216,8 @@ export function useAgentDockComposerSetup() {
   });
 
   const {
+    composerAccessBanner,
+    composerAccessToneValue,
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,
@@ -237,6 +240,7 @@ export function useAgentDockComposerSetup() {
     composerMode,
     composerDragOver,
     isFullAccessAgent,
+    sandboxSessionEnabled,
     kairoDraft,
     kairoCanSubmit,
     kairoPending,
@@ -270,6 +274,8 @@ export function useAgentDockComposerSetup() {
     canSubmitComposer,
     closeAddModelsPanel,
     closeComposerImageLightbox,
+    composerAccessBanner,
+    composerAccessToneValue,
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,
@@ -323,6 +329,7 @@ export function useAgentDockComposerSetup() {
     kairoPending,
     mcpToolsForMode,
     modeButtonLabel,
+    modeButtonTitle,
     modelSearchQuery,
     onAutoToggleClick,
     openAddModelsPanel,

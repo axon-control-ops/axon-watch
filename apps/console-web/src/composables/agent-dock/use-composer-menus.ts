@@ -12,6 +12,7 @@ import {
 import { isToolCapableComposerMode } from '../../lib/composer-tool-modes';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import {
+  buildComposerModeAccessLabel,
   sandboxSessionHint,
   sandboxSessionLabel,
 } from '../../lib/sandbox-session-view';
@@ -85,11 +86,24 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     sandboxSessionHint(sandboxSessionEnabled.value, sandboxEnvForced.value),
   );
   const sandboxLabel = computed(() => sandboxSessionLabel(sandboxSessionEnabled.value));
-  const modeButtonLabel = computed(() => {
-    if (isFullAccessAgent.value) {
-      return composerMode.value === 'debug' ? 'Debug · Full' : 'Agent · Full';
+  const modeButtonLabel = computed(() =>
+    buildComposerModeAccessLabel({
+      modeLabel: activeMode.value.label,
+      fullAccess: isFullAccessAgent.value,
+      sandboxEnabled: sandboxSessionEnabled.value,
+    }),
+  );
+  const modeButtonTitle = computed(() => {
+    if (sandboxSessionEnabled.value && isFullAccessAgent.value) {
+      return `${executionAccessHint.value} · ${sandboxHint.value}`;
     }
-    return activeMode.value.label;
+    if (sandboxSessionEnabled.value) {
+      return sandboxHint.value;
+    }
+    if (isFullAccessAgent.value) {
+      return executionAccessHint.value;
+    }
+    return activeMode.value.hint;
   });
 
   async function refreshSandboxSession(): Promise<void> {
@@ -244,6 +258,7 @@ export function useComposerMenus(shell: ShellStore, options: UseComposerMenusOpt
     fullAccessConsentChecked,
     isFullAccessAgent,
     modeButtonLabel,
+    modeButtonTitle,
     modelSearchQuery,
     requestFullAccess,
     requestSandboxSession,

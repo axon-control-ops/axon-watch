@@ -30,6 +30,7 @@ defineProps<{
   composerMode: ComposerMode;
   modeOptions: typeof MODE_OPTIONS;
   modeButtonLabel: string;
+  modeButtonTitle: string;
   activeMode: (typeof MODE_OPTIONS)[number];
   isFullAccessAgent: boolean;
   executionAccessHint: string;
@@ -439,6 +440,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
       :composer-mode="composerMode"
       :mode-options="modeOptions"
       :mode-button-label="modeButtonLabel"
+      :mode-button-title="modeButtonTitle"
       :active-mode="activeMode"
       :is-full-access-agent="isFullAccessAgent"
       :execution-access-hint="executionAccessHint"

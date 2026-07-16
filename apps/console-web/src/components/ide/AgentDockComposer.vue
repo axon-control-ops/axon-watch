@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 import { useAgentDockComposer } from '../../composables/useAgentDockComposer';
-import {
-  PLAN_SOFT_SWITCH_REASON_LABEL,
-  useAgentDockComposerToolbarProps,
-} from '../../composables/agent-dock/use-agent-dock-composer-toolbar-props';
+import { useAgentDockComposerToolbarProps } from '../../composables/agent-dock/use-agent-dock-composer-toolbar-props';
+import AgentDockComposerAccessBanner from './agent-dock/AgentDockComposerAccessBanner.vue';
 import AgentDockComposerChrome from './agent-dock/AgentDockComposerChrome.vue';
 import AgentDockComposerInput from './agent-dock/AgentDockComposerInput.vue';
 import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue';
@@ -30,6 +26,7 @@ const toolbarProps = useAgentDockComposerToolbarProps({
   composerMode: composer.composerMode,
   modeOptions: composer.MODE_OPTIONS,
   modeButtonLabel: composer.modeButtonLabel,
+  modeButtonTitle: composer.modeButtonTitle,
   activeMode: composer.activeMode,
   isFullAccessAgent: composer.isFullAccessAgent,
   executionAccessHint: composer.executionAccessHint,
@@ -66,10 +63,6 @@ const toolbarProps = useAgentDockComposerToolbarProps({
   canConvertInstructions: composer.canConvertInstructions,
 });
 
-const planSoftSwitchReason = computed(() => {
-  const notice = composer.planSoftSwitchNotice.value;
-  return notice ? PLAN_SOFT_SWITCH_REASON_LABEL[notice.reason] ?? notice.reason : undefined;
-});
 </script>
 
 <template>
@@ -89,7 +82,6 @@ const planSoftSwitchReason = computed(() => {
     :can-approve-ide-agent-run="composer.shell.canApproveIdeAgentRun"
     :run-mutation-pending="composer.shell.runMutationPending"
     :plan-soft-switch-notice="composer.planSoftSwitchNotice.value"
-    :plan-soft-switch-reason-label="planSoftSwitchReason"
     @update:full-access-consent-checked="composer.fullAccessConsentChecked.value = $event"
     @cancel-full-access-consent="composer.cancelFullAccessConsent()"
     @confirm-full-access-consent="composer.confirmFullAccessConsent()"
@@ -114,6 +106,10 @@ const planSoftSwitchReason = computed(() => {
     <BriefingSurfaceFollowupPrompt />
     <div class="agent-dock-composer__shell" :class="composer.composerShellClasses.value">
       <div class="agent-dock-composer__card">
+        <AgentDockComposerAccessBanner
+          v-if="composer.composerAccessBanner.value"
+          :banner="composer.composerAccessBanner.value"
+        />
         <AgentDockComposerInput
           :set-input-ref="composer.setInputRef"
           :draft="composer.composerDraftModel.value"
@@ -133,6 +129,7 @@ const planSoftSwitchReason = computed(() => {
           :show-composer-stop="composer.showComposerStop.value"
           :can-submit-composer="composer.canSubmitComposer.value"
           :composer-submit-label="composer.composerSubmitLabel.value"
+          :access-tone="composer.composerAccessToneValue.value"
           :command-mutation-state="composer.shell.commandMutationState"
           :run-mutation-state="composer.shell.runMutationState"
           :kairo-pending="composer.kairoPending.value"

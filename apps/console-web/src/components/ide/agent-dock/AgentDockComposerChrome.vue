@@ -9,6 +9,7 @@ import AgentDockSandboxConsent from './AgentDockSandboxConsent.vue';
 import AgentDockIdeVoiceHint from './AgentDockIdeVoiceHint.vue';
 import AgentDockPlanSwitchBanner from './AgentDockPlanSwitchBanner.vue';
 import type { PlanSoftSwitchNotice } from '../../../composables/agent-dock/use-composer-actions';
+import { PLAN_SOFT_SWITCH_REASON_LABEL } from '../../../composables/agent-dock/use-agent-dock-composer-toolbar-props';
 import type { DebugReproduceRequest } from '../../../lib/debug-reproduce-view';
 import type { ComposerClipboardImage } from '../../../lib/composer-clipboard-paste';
 import {
@@ -18,7 +19,7 @@ import {
 
 const ideVoiceNarrationHint = computed(() => getActiveIdeNarrationOverrideHint());
 
-defineProps<{
+const props = defineProps<{
   showFullAccessConsent: boolean;
   fullAccessConsentChecked: boolean;
   showSandboxConsent: boolean;
@@ -34,8 +35,12 @@ defineProps<{
   canApproveIdeAgentRun: boolean;
   runMutationPending: boolean;
   planSoftSwitchNotice: PlanSoftSwitchNotice | null;
-  planSoftSwitchReasonLabel?: string;
 }>();
+
+const planSoftSwitchReasonLabel = computed(() => {
+  const notice = props.planSoftSwitchNotice;
+  return notice ? PLAN_SOFT_SWITCH_REASON_LABEL[notice.reason] ?? notice.reason : undefined;
+});
 
 const emit = defineEmits<{
   'update:fullAccessConsentChecked': [checked: boolean];

@@ -41,7 +41,7 @@
   },
   "ratcheted_oversize_files": {
     "apps/console-web/src/components/ide/AgentDockComposer.vue": {
-      "max_lines": 194,
+      "max_lines": 190,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/agent-dock/*",

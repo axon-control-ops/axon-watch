@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+
 import type { ComposerMode } from '../../../composables/useAgentDockComposer';
 import type { ComposerClipboardImage } from '../../../lib/composer-clipboard-paste';
+import type { ComposerAccessTone } from '../../../lib/sandbox-session-view';
 
 type AttachmentChip = {
   key: string;
@@ -39,6 +42,7 @@ const props = defineProps<{
   showComposerStop: boolean;
   canSubmitComposer: boolean;
   composerSubmitLabel: string;
+  accessTone?: ComposerAccessTone | null;
   commandMutationState: string;
   runMutationState: string;
   kairoPending: boolean;
@@ -46,6 +50,10 @@ const props = defineProps<{
   speechCapturing: boolean;
   privacyMode: boolean;
 }>();
+
+const showAccessSubmitLabel = computed(
+  () => Boolean(props.accessTone) && props.composerMode !== 'kairo',
+);
 
 const emit = defineEmits<{
   'update:draft': [value: string];
@@ -256,14 +264,23 @@ const emit = defineEmits<{
         v-else
         type="submit"
         class="agent-dock-composer__send"
+        :class="{
+          'agent-dock-composer__send--labeled': showAccessSubmitLabel,
+          [`agent-dock-composer__send--${accessTone}`]: Boolean(accessTone),
+        }"
         :disabled="!canSubmitComposer"
         :aria-label="composerSubmitLabel"
+        :title="composerSubmitLabel"
       >
         <span
           v-if="commandMutationState === 'submitting' || (composerMode === 'kairo' && kairoPending)"
           class="agent-dock-composer__send-spinner"
           aria-hidden="true"
         />
+        <template v-else-if="showAccessSubmitLabel">
+          <span class="agent-dock-composer__send-text">{{ composerSubmitLabel }}</span>
+          <span class="agent-dock-composer__send-icon" aria-hidden="true">↗</span>
+        </template>
         <span v-else class="agent-dock-composer__send-icon" aria-hidden="true">
           {{ composerMode === 'kairo' ? 'Ask' : '↑' }}
         </span>

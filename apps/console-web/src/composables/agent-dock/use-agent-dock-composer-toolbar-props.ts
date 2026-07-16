@@ -26,6 +26,7 @@ type ToolbarPropsInput = {
   composerMode: MaybeRef<ComposerMode>;
   modeOptions: ModeOption[];
   modeButtonLabel: MaybeRef<string>;
+  modeButtonTitle: MaybeRef<string>;
   activeMode: MaybeRef<ModeOption>;
   isFullAccessAgent: MaybeRef<boolean>;
   executionAccessHint: MaybeRef<string>;
@@ -82,6 +83,7 @@ export function useAgentDockComposerToolbarProps(
     composerMode: toValue(input.composerMode),
     modeOptions: input.modeOptions,
     modeButtonLabel: toValue(input.modeButtonLabel),
+    modeButtonTitle: toValue(input.modeButtonTitle),
     activeMode: toValue(input.activeMode),
     isFullAccessAgent: toValue(input.isFullAccessAgent),
     executionAccessHint: toValue(input.executionAccessHint),
