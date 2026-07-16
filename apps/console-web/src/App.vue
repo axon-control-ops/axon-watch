@@ -91,8 +91,20 @@ watch(
 
     liveEventsSession?.disconnect();
     liveEventsSession = startLiveEventsSession({
-      onRefresh: () => shell.refreshRunSurfaces({ light: true }),
-      onPresenceRefresh: () => shell.refreshOperatorPresence(),
+      onRefresh: () => {
+        // IDE must stay interactive: skip heavy operator surface refresh while
+        // coding/streaming. Operator layout still needs light run refresh.
+        if (shell.layoutMode === 'ide') {
+          return;
+        }
+        return shell.refreshRunSurfaces({ light: true });
+      },
+      onPresenceRefresh: () => {
+        if (shell.layoutMode === 'ide') {
+          return;
+        }
+        return shell.refreshOperatorPresence();
+      },
       onSpokenBriefing: () => shell.speakOperatorBriefing(),
     });
   },

@@ -8,6 +8,8 @@ import {
 describe('research-provider', () => {
   it('formats known provider labels', () => {
     expect(formatResearchProviderLabel('duckduckgo_instant')).toBe('DuckDuckGo');
+    expect(formatResearchProviderLabel('google_cse')).toBe('Google');
+    expect(formatResearchProviderLabel('searxng')).toBe('SearXNG');
   });
 
   it('formats unknown providers from snake case', () => {

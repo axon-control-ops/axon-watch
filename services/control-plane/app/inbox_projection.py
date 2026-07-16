@@ -11,6 +11,10 @@ WatchInboxFetcher = Callable[[], dict[str, object] | None]
 _CONSISTENCY_FIELDS = ("signal_id", "severity", "status", "source")
 
 
+class WatchInboxUnavailableError(RuntimeError):
+    """Raised when the watch inbox fetch fails and must not look empty/healthy."""
+
+
 def project_inbox_item(item: dict[str, object]) -> dict[str, object]:
     projected = {field: item[field] for field in _CONSISTENCY_FIELDS if field in item}
     projected.update(
@@ -23,7 +27,10 @@ def project_inbox_item(item: dict[str, object]) -> dict[str, object]:
             "action_type": item.get("action_type", "none"),
             "delivery_state": item.get("delivery_state", "pending"),
             "latest_receipt_id": item.get("latest_receipt_id", ""),
-            "watch_rule": item.get("watch_rule", {"mode": "observe", "reason": "ambient_watch_signal", "interrupts": False}),
+            "watch_rule": item.get(
+                "watch_rule",
+                {"mode": "observe", "reason": "ambient_watch_signal", "interrupts": False},
+            ),
         }
     )
     if isinstance(item.get("meta"), dict):
@@ -33,9 +40,19 @@ def project_inbox_item(item: dict[str, object]) -> dict[str, object]:
 
 def project_watch_inbox(
     watch_inbox: dict[str, object] | None,
+    *,
+    allow_empty_unavailable: bool = False,
 ) -> dict[str, object]:
     if not watch_inbox:
-        return {"items": [], "count": 0, "updated_at": ""}
+        if allow_empty_unavailable:
+            return {
+                "items": [],
+                "count": 0,
+                "updated_at": "",
+                "degraded": True,
+                "error": "watch_unavailable",
+            }
+        raise WatchInboxUnavailableError("watch inbox unavailable")
 
     items = watch_inbox.get("items", [])
     if not isinstance(items, list):
@@ -46,12 +63,17 @@ def project_watch_inbox(
         "items": projected_items,
         "count": int(watch_inbox.get("count", len(projected_items))),
         "updated_at": str(watch_inbox.get("updated_at", "")),
+        "degraded": False,
     }
 
 
 def build_inbox_response(
     *,
     inbox_fetcher: WatchInboxFetcher | None = None,
+    allow_empty_unavailable: bool = False,
 ) -> dict[str, object]:
     fetcher = inbox_fetcher or fetch_watch_inbox
-    return project_watch_inbox(fetcher())
+    return project_watch_inbox(
+        fetcher(),
+        allow_empty_unavailable=allow_empty_unavailable,
+    )

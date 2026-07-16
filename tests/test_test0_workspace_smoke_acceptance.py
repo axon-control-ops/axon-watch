@@ -16,6 +16,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from tests.support.live_chat_mutations import (
+    LIVE_CHAT_MUTATION_SKIP_REASON,
+    live_chat_mutations_allowed,
+)
+
 WORKSPACE_ID = "workspace_smoke"
 CONTROL_PLANE_BASE = os.environ.get(
     "AXON_WATCH_CONTROL_PLANE_BASE",
@@ -92,6 +97,7 @@ class Test0WorkspaceSmokeAcceptance(unittest.TestCase):
         self.assertIn("top_signals", briefing_payload)
         self.assertIn("pending_approvals", briefing_payload)
 
+    @unittest.skipUnless(live_chat_mutations_allowed(), LIVE_CHAT_MUTATION_SKIP_REASON)
     def test_command_executor_git_status(self) -> None:
         status, payload = _request(
             "POST",
@@ -107,6 +113,7 @@ class Test0WorkspaceSmokeAcceptance(unittest.TestCase):
         self.assertNotIn("unsupported command", agent_copy)
         self.assertTrue("git" in agent_copy or "status" in agent_copy or "executed" in agent_copy)
 
+    @unittest.skipUnless(live_chat_mutations_allowed(), LIVE_CHAT_MUTATION_SKIP_REASON)
     def test_command_executor_resume_from_review(self) -> None:
         status, payload = _request(
             "POST",

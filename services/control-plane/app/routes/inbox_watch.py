@@ -16,7 +16,7 @@ from app.adapters.watch_client import (
     post_watch_sentry_probe_write,
     post_watch_tunnel_action,
 )
-from app.inbox_projection import build_inbox_response
+from app.inbox_projection import WatchInboxUnavailableError, build_inbox_response
 from app.inbox_signals import acknowledge_inbox_signals
 from app.routes.schemas import (
     AcknowledgeInboxSignalsRequest,
@@ -29,7 +29,10 @@ router = APIRouter()
 
 @router.get("/api/inbox")
 def inbox() -> dict[str, object]:
-    return build_inbox_response()
+    try:
+        return build_inbox_response()
+    except WatchInboxUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/api/inbox/signals/acknowledge")

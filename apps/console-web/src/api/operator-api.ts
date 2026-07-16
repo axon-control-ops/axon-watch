@@ -2,7 +2,7 @@ import type { OperatorBriefing, OperatorPresenceSettings, RuntimeSummary } from 
 
 import type { BrainGraphSnapshot } from '../lib/operator-brain-graph-view';
 
-import { fetchJson } from './client';
+import { BRAIN_GRAPH_FETCH_TIMEOUT_MS, fetchJson } from './client';
 
 export type FleetHealthSnapshot = {
   generated_at: string;
@@ -103,6 +103,7 @@ export async function fetchOperatorBrainGraph(): Promise<BrainGraphSnapshot> {
     '/api/operator/brain-graph',
     {},
     'operator brain graph request failed',
+    BRAIN_GRAPH_FETCH_TIMEOUT_MS,
   );
 }
 

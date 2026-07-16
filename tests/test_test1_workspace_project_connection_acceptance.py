@@ -17,6 +17,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from tests.support.live_chat_mutations import (
+    LIVE_CHAT_MUTATION_SKIP_REASON,
+    live_chat_mutations_allowed,
+)
+
 WORKSPACE_AXON_LOCAL = "workspace_axon_local"
 WORKSPACE_AXON_WATCH = "workspace_axon_watch"
 CONTROL_PLANE_BASE = os.environ.get(
@@ -100,6 +105,7 @@ class Test1WorkspaceProjectConnectionAcceptance(unittest.TestCase):
         self.assertEqual("isolated_root", record.get("connection_kind"))
         self.assertNotIn("project_root", record)
 
+    @unittest.skipUnless(live_chat_mutations_allowed(), LIVE_CHAT_MUTATION_SKIP_REASON)
     def test_git_status_runs_in_bound_axon_local_project(self) -> None:
         status, payload = _request(
             "POST",

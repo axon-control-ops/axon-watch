@@ -15,7 +15,13 @@ def watch_base_url() -> str:
     ).rstrip("/")
 
 
-def fetch_watch_inbox(timeout_seconds: float = 1.5) -> dict[str, object] | None:
+def fetch_watch_inbox(timeout_seconds: float = 10.0) -> dict[str, object] | None:
+    """Fetch watch inbox.
+
+    Native IMAP + monitor probes regularly exceed 1.5s on cache miss, so the
+    default timeout must cover a cold poll without projecting a false empty inbox.
+    """
+
     url = f"{watch_base_url()}/internal/watch/inbox"
 
     try:

@@ -23,6 +23,8 @@ def _build_codex_exec_command(
     execution_tier: str = "consultative",
     model: str = "",
 ) -> list[str]:
+    # Safe-improvement evaluation must pass the disposable isolation root here
+    # (see proposal_service.sandbox_agent_workspace), never the live bound project.
     command = [binary, "exec", "--json", "--ephemeral"]
     if workspace_root:
         command.extend(["-C", str(workspace_root), "--skip-git-repo-check"])
