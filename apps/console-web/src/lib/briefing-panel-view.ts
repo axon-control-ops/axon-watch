@@ -10,11 +10,16 @@ export type BriefingNoticeOptions = {
   primaryActiveRun?: Pick<RunRecord, 'run_id' | 'summary' | 'detail' | 'phase'> | null;
 };
 
-function isIdleNoRunsNotice(notice: string | undefined): boolean {
-  if (!notice?.trim()) {
+function isGenericIdleCopy(value: string | undefined): boolean {
+  if (!value?.trim()) {
     return true;
   }
-  return /no active runs/i.test(notice);
+  return (
+    /no active runs/i.test(value) ||
+    /systems nominal/i.test(value) ||
+    /describe the next action in command/i.test(value) ||
+    /standing by for your next command/i.test(value)
+  );
 }
 
 export function briefingPanelHeadline(
@@ -97,18 +102,23 @@ export function briefingNotice(
   }
 
   const primaryActiveRun = options?.primaryActiveRun ?? null;
-  if (primaryActiveRun && isIdleNoRunsNotice(briefing?.notice)) {
+  if (primaryActiveRun && isGenericIdleCopy(briefing?.notice)) {
     if (primaryActiveRun.phase === 'review_ready') {
       return `${formatRunDisplayName(primaryActiveRun)} is ready for your review.`;
     }
     return `${formatRunIdentityLabel(primaryActiveRun)} · ${runPhaseTag(primaryActiveRun.phase)}`;
   }
 
-  if (briefing?.notice) {
+  const primarySignal = briefing?.top_signals[0];
+  if (primarySignal && isGenericIdleCopy(briefing?.notice)) {
+    return primarySignal.summary?.trim() ?? '';
+  }
+
+  if (briefing?.notice && !isGenericIdleCopy(briefing.notice)) {
     return briefing.notice;
   }
 
-  return 'Awaiting briefing.';
+  return loadState === 'loaded' ? '' : 'Awaiting briefing.';
 }
 
 export function briefingAdvise(
@@ -123,11 +133,16 @@ export function briefingAdvise(
     return 'Review runtime summary and connectivity before continuing.';
   }
 
-  if (briefing?.advise) {
+  if (briefing?.advise && !isGenericIdleCopy(briefing.advise)) {
     return briefing.advise;
   }
 
-  return 'Describe the next action in Command.';
+  const action = briefing?.next_safe_actions[0];
+  if (action) {
+    return action.detail?.trim() || action.title?.trim() || '';
+  }
+
+  return '';
 }
 
 export function briefingRhythmField(

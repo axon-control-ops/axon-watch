@@ -65,7 +65,9 @@ def build_briefing_notice(
 
     count = len(active_runs)
     if count == 0:
-        return "No active runs. Systems nominal."
+        # No operational fact needs narration. Leave the idle state quiet
+        # instead of manufacturing a conversational status response.
+        return ""
 
     noun = "run" if count == 1 else "runs"
     return f"{count} active {noun} in flight."
@@ -89,7 +91,7 @@ def build_briefing_advise(
     if _review_ready_runs(active_runs):
         return "Review execution evidence in Command or Active Run when ready."
 
-    return "Describe the next action in Command."
+    return ""
 
 
 def build_briefing_decide(
@@ -126,12 +128,12 @@ def build_briefing_decide(
     if bool(degraded.get("active")):
         return "Decide whether to inspect degraded runtime before dispatching more work."
 
-    return "No immediate decision required. Assign the next focus when ready."
+    return ""
 
 
 def build_briefing_execute(*, next_safe_actions: list[dict[str, object]]) -> str:
     if not next_safe_actions:
-        return "Execute the next command from Command when you are ready."
+        return ""
 
     action = next_safe_actions[0]
     kind = str(action.get("kind", "")).strip()
@@ -174,7 +176,7 @@ def build_briefing_verify(
     if not watch_connected:
         return "Verify watch service connectivity before relying on the signal inbox."
 
-    return "Verify runtime summary and inbox agree before dispatching work."
+    return ""
 
 
 def build_briefing_report(
@@ -198,7 +200,7 @@ def build_briefing_report(
         parts.append("runtime degraded")
 
     if not parts:
-        return "Report: systems nominal; no active decisions."
+        return ""
 
     return f"Report: {', '.join(parts)}."
 

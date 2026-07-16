@@ -37,8 +37,8 @@ const view = computed(() =>
     </header>
 
     <p class="galaxy-intelligence-panel__headline">{{ view.headline }}</p>
-    <p class="galaxy-intelligence-panel__notice">{{ view.notice }}</p>
-    <p class="galaxy-intelligence-panel__advise">{{ view.advise }}</p>
+    <p v-if="view.notice" class="galaxy-intelligence-panel__notice">{{ view.notice }}</p>
+    <p v-if="view.advise" class="galaxy-intelligence-panel__advise">{{ view.advise }}</p>
 
     <div class="galaxy-intelligence-panel__chips" aria-label="Live signals">
       <span

@@ -7,7 +7,8 @@
 This plan turns the narration audit and the Axon-X context/continuation/memory gaps
 into **locked slices** with gates. Follow slice order; do not skip ahead.
 
----
+Current Voice-A, Ask/Plan narration, STT, and TTS execution detail is bounded in
+[`KAIRO_VOICE_UPGRADE_PLAN.md`](KAIRO_VOICE_UPGRADE_PLAN.md).
 
 ## Why this plan exists
 
@@ -57,7 +58,6 @@ Source: narration stack review 2026-07-09 (`kairo-narration-policy.ts`,
 | 8 | IDE voice gating surprises operators | **V8** |
 | 9 | Settings hints out of date (minimal thinking not mentioned) | **V9** |
 | 10 | Narration ≠ conversation (separate product slice) | Phase C (OP-C) |
-| 11 | Browser TTS quality | **Deferred V11** (cloud TTS, post Phase F) |
 
 ### V1 — Honest narration modes (settings + policy)
 
@@ -163,10 +163,8 @@ queue overlapping start + thinking paraphrases.
 
 **Gate:** visual review of settings form.
 
-### V11 — Cloud TTS (deferred)
-
-Deferred until Phase F exit. Track in `PARITY_LEDGER.md` only; no implementation
-in this plan.
+Voice-A and V10–V12 continue in
+[`KAIRO_VOICE_UPGRADE_PLAN.md`](KAIRO_VOICE_UPGRADE_PLAN.md).
 
 ---
 

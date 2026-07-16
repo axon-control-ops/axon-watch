@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-15",
-  "file_count": 40,
+  "generated_on": "2026-07-16",
+  "file_count": 41,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -50,8 +50,8 @@
       "bytes": 3278
     },
     "EXECUTION_PLAN.md": {
-      "sha256": "034bec38b8ba9c3bb0659f6d1649f2de9062f36c3739ff28f766e6c357006a31",
-      "bytes": 15574
+      "sha256": "53afd7caef690285262868dd75b391198ec46894de7129d4d1e723c154dea2ef",
+      "bytes": 16414
     },
     "FITNESS_FUNCTIONS.md": {
       "sha256": "f688b05666210bf2d4fb5870adbd6f0e91e39ecfd8c2a7b4552d25e275af5e2f",
@@ -78,8 +78,12 @@
       "bytes": 13053
     },
     "KAIRO_VOICE_IMPROVEMENT_PLAN.md": {
-      "sha256": "dc5a878201a395ef40a8192c5ba5c57f5801603fac7d9b25eb919f212e130474",
-      "bytes": 14738
+      "sha256": "41863af3389178c19d509cb5132c31291dc7f5dd266b05c651688a421a755069",
+      "bytes": 14770
+    },
+    "KAIRO_VOICE_UPGRADE_PLAN.md": {
+      "sha256": "4e68064f8405afabe1ac0d9c71fda55e0984944e122cbf2e7f56287088988a26",
+      "bytes": 5241
     },
     "OPERATOR_BRAIN_PIVOT.md": {
       "sha256": "5b789c0ee500d04a699686a8f9bffd641199df9e6af3d18546d894d65af7ad68",

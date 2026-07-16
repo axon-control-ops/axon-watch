@@ -97,9 +97,11 @@ const signalBriefing: OperatorBriefing = {
 };
 
 describe('briefing panel view helpers', () => {
-  it('reports nominal headline when no pending approvals exist', () => {
+  it('keeps a compact idle headline without manufacturing briefing copy', () => {
     expect(briefingPanelHeadline(emptyBriefing, 'loaded')).toBe('Systems nominal');
     expect(briefingIsEmpty(emptyBriefing)).toBe(true);
+    expect(briefingNotice(emptyBriefing, 'loaded')).toBe('');
+    expect(briefingAdvise(emptyBriefing, 'loaded')).toBe('');
   });
 
   it('surfaces pending approval count from OperatorBriefing', () => {
@@ -122,17 +124,15 @@ describe('briefing panel view helpers', () => {
     ).toEqual(['Control plane ready', 'Watch disconnected']);
   });
 
-  it('surfaces notice and advise from the briefing DTO', () => {
+  it('surfaces live notice and advice but suppresses generic idle filler', () => {
     expect(briefingNotice(approvalBriefing, 'loaded')).toBe(
       approvalBriefing.notice ?? '1 run awaiting explicit approval.',
     );
     expect(briefingAdvise(approvalBriefing, 'loaded')).toBe(
       'Approve test run to continue execution.',
     );
-    expect(briefingNotice(emptyBriefing, 'loaded')).toBe('No active runs. Systems nominal.');
-    expect(briefingAdvise(emptyBriefing, 'loaded')).toBe(
-      'Describe the next action in Command.',
-    );
+    expect(briefingNotice(signalBriefing, 'loaded')).toBe('Watch summary degraded.');
+    expect(briefingAdvise(signalBriefing, 'loaded')).toBe('');
     expect(briefingRhythmField(approvalBriefing, 'decide', 'loaded')).toContain('approve or reject');
   });
 
