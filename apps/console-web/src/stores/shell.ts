@@ -57,7 +57,11 @@ import {
 import { buildResearchEditorContent } from '../lib/prove-research-source';
 import { resolveResearchFlyToTarget } from '../lib/research-fly-to-source';
 import type { ResearchBlockKind } from '../lib/research-provider';
-import { createAgentStreamIncrementalState } from '../lib/agent-stream-incremental';
+import {
+  createAgentStreamIncrementalState,
+  createAgentStreamVoiceSession,
+  handleAgentStreamVoiceDelta,
+} from '../lib/agent-stream-voice-session';
 import { createRafStreamUiBatcher } from '../lib/stream-ui-raf-batch';
 import {
   resolveBootstrapIdeThreadId,
@@ -67,7 +71,6 @@ import {
   createWorkspaceThreadLoadQueue,
   loadWorkspaceThreadOnce,
 } from '../lib/load-workspace-thread';
-import { createChatStreamVoiceNarration } from '../lib/chat-stream-voice-narration';
 import { effectiveKairoNarration } from '../lib/kairo-narration-policy';
 import { postKairoSpeak } from '../lib/kairo-speak-client';
 import type { EditorRevealRequest } from '../components/EditorHost.vue';
@@ -1471,60 +1474,56 @@ export const useShellStore = defineStore('shell', () => {
     const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
     const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
     let streamedContent = '';
-    let spokenStartIntent = false;
     let terminalAutoRevealSeen = false;
     const streamIncremental = createAgentStreamIncrementalState();
     const streamUiBatcher = createRafStreamUiBatcher<Partial<WorkspaceStreamUiState>>(
       (wsId, partial) => setWorkspaceStreamUi(wsId, partial),
     );
     const voiceContext = kairoVoiceContext();
-    const voiceNarration = createChatStreamVoiceNarration({
+    const voiceNarration = createAgentStreamVoiceSession({
       composerMode,
       messageId,
       sessionId: kairoSpeechSessionId,
       workspaceId: () => workspaceId,
       narration: () => effectiveKairoNarrationLevel.value,
+      operatorPresenceSettings: () => operatorPresenceSettings.value,
       voiceDeliveryAllowed,
       operatorPrompt: () => operatorPrompt,
       fullAccess: () => voiceContext.fullAccess,
+      layoutMode: () => layoutMode.value,
+      idePresenceProfile: () => idePresenceProfile.value,
     });
-
-    chatStreamSessionsByWorkspace.set(
-      workspaceId,
-      startChatStreamSession({
+    chatStreamSessionsByWorkspace.set(workspaceId, startChatStreamSession({
         threadId,
         messageId,
         onDelta: (content) => {
           streamedContent = content;
           patchThreadMessageContent(workspaceId, messageId, content);
-          for (const milestone of streamIncremental.consumeFullContent(content)) {
-            if (voiceNarration.toolNarrationEnabled) {
-              voiceNarration.agentMilestoneNarrator?.narrate(milestone);
-            }
-          }
+          const activity = getWorkspaceStreamUi(workspaceId).activity as IdeComposerActivity | null;
+          handleAgentStreamVoiceDelta({
+            voiceNarration,
+            streamIncremental,
+            content,
+            fullAccessNarration,
+            patchActivity: (activityView) => {
+              if (!activity) {
+                return;
+              }
+              streamUiBatcher.schedule(workspaceId, {
+                activity: {
+                  ...activity,
+                  label: activityView.label,
+                  liveBodyFull: activityView.liveBodyFull,
+                  liveBodySpoken: activityView.liveBodySpoken,
+                  liveBodyTruncated: activityView.liveBodyTruncated,
+                  streamCounts: streamIncremental.toCounts(),
+                },
+              });
+            },
+          });
           if (!terminalAutoRevealSeen && streamIncremental.toCounts().terminal > 0) {
             terminalAutoRevealSeen = true;
-            // Cursor parity ceiling: surface the in-flight shell in vaxon immediately.
-            // True process detach is unavailable — Cursor CLI still owns the shell.
             void backgroundIdeAgentRun();
-          }
-          const activity = getWorkspaceStreamUi(workspaceId).activity as IdeComposerActivity | null;
-          if (activity) {
-            const activityView = streamIncremental.toStreamingActivityView(fullAccessNarration);
-            const nextActivity: IdeComposerActivity = {
-              ...activity,
-              label: activityView.label,
-              liveBodyFull: activityView.liveBodyFull,
-              liveBodySpoken: activityView.liveBodySpoken,
-              liveBodyTruncated: activityView.liveBodyTruncated,
-              streamCounts: streamIncremental.toCounts(),
-            };
-            streamUiBatcher.schedule(workspaceId, { activity: nextActivity });
-
-            const spokenBlock = streamIncremental.takeCompletedThinkingSpeech()?.trim() ?? '';
-            if (voiceNarration.maybeSpeakStartIntent(spokenBlock, spokenStartIntent)) {
-              spokenStartIntent = true;
-            }
           }
         },
         onMilestone: (payload) => {

@@ -80,6 +80,8 @@ Gate: focused mode tests plus one manual Ask and Plan turn, each spoken once.
 
 ### Voice-C — Narration depth without chatter
 
+**Status:** implementation complete; verification recorded below.
+
 Work:
 
 - Add throttled mid-run thinking (maximum three lines per turn).
@@ -155,6 +157,17 @@ barge-in, and no-double-speak proofs.
   `allow_empty_unavailable` so inbox blips degrade instead of 500.
 - `npm run verify:contracts` — **PASS**.
 
+### 2026-07-16 — Voice-C
+
+- Throttled mid-run thinking: up to three complete sentences per agent turn (45 s
+  interval after the first) via `kairo-narration-throttle.ts` and multi-block
+  `agent-stream-incremental` speech queue.
+- Opt-in `narrate_tool_progress` setting (conversational only, 30 s tool throttle).
+- Stale narration cancel: milestone/progress narrator `cancel()` +
+  `dropWaitingKairoNarration()` before run advances.
+- IDE Quiet hint: one-time composer banner when Minimal is muted in IDE Quiet.
+- Focused frontend: narration policy/throttle/override-hint/stream-voice tests.
+
 ## Next slice
 
-Voice-C: throttled mid-run thinking + opt-in tool milestones.
+Voice-D: real cloud STT (bounded POST, privacy + browser fallback).

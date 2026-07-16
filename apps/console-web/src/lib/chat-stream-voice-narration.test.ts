@@ -3,13 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./kairo-agent-milestone-narrator', () => ({
   createKairoAgentMilestoneNarrator: vi.fn(() => ({
     narrate: vi.fn(),
+    cancel: vi.fn(),
   })),
 }));
 
 vi.mock('./kairo-progress-narrator', () => ({
   createKairoProgressNarrator: vi.fn(() => ({
     narrate: vi.fn(),
+    cancel: vi.fn(),
   })),
+}));
+
+vi.mock('./kairo-voice-queue', () => ({
+  dropWaitingKairoNarration: vi.fn(),
 }));
 
 import { createKairoAgentMilestoneNarrator } from './kairo-agent-milestone-narrator';
@@ -27,6 +33,7 @@ describe('createChatStreamVoiceNarration', () => {
       sessionId: () => 'session',
       workspaceId: () => 'workspace_a',
       narration: () => 'minimal',
+      narrateToolProgress: () => false,
       voiceDeliveryAllowed: () => true,
       operatorPrompt: () => 'fix it',
       fullAccess: () => false,
@@ -45,6 +52,7 @@ describe('createChatStreamVoiceNarration', () => {
       sessionId: () => 'session',
       workspaceId: () => 'workspace_a',
       narration: () => 'minimal',
+      narrateToolProgress: () => false,
       voiceDeliveryAllowed: () => true,
       operatorPrompt: () => 'what needs attention?',
       fullAccess: () => false,
@@ -77,6 +85,7 @@ describe('createChatStreamVoiceNarration', () => {
       sessionId: () => 'session',
       workspaceId: () => 'workspace_a',
       narration: () => 'off',
+      narrateToolProgress: () => false,
       voiceDeliveryAllowed: () => true,
       operatorPrompt: () => 'draft a plan',
       fullAccess: () => false,

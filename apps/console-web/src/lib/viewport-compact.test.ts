@@ -24,6 +24,7 @@ const presence: OperatorPresence = {
     azure_voice_id: 'en-GB-RyanNeural',
     stt_mode: 'browser' as const,
     voice_routing_mode: 'template_first' as const,
+    narrate_tool_progress: false,
   },
   spoken_alert: {
     eligible: false,

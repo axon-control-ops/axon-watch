@@ -1,6 +1,7 @@
 import type { KairoNarrationLevel } from '../contracts/canonical';
 
 import { narrationForCompletion } from './kairo-agent-narration';
+import type { NarrationMilestone } from './kairo-agent-narration';
 import { createKairoAgentMilestoneNarrator } from './kairo-agent-milestone-narrator';
 import {
   isAnswerNarrationComposerMode,
@@ -8,7 +9,16 @@ import {
 } from './composer-answer-narration';
 import { isToolCapableComposerMode } from './composer-tool-modes';
 import { createKairoProgressNarrator } from './kairo-progress-narrator';
-import { shouldSpeakLiveThinkingBlock } from './kairo-narration-policy';
+import {
+  shouldNarrateAgentEvent,
+  shouldSpeakLiveThinkingBlock,
+} from './kairo-narration-policy';
+import {
+  createKairoIntervalThrottle,
+  createKairoThinkingSpeechThrottle,
+  TOOL_MILESTONE_INTERVAL_MS,
+} from './kairo-narration-throttle';
+import { dropWaitingKairoNarration } from './kairo-voice-queue';
 
 type Narrator = ReturnType<typeof createKairoAgentMilestoneNarrator>;
 type ProgressNarrator = ReturnType<typeof createKairoProgressNarrator>;
@@ -18,7 +28,8 @@ export type ChatStreamVoiceNarration = {
   progressNarrator: ProgressNarrator | null;
   agentMilestoneNarrator: Narrator | null;
   answerNarrator: Narrator | null;
-  maybeSpeakStartIntent: (spokenBlock: string, spokenStartIntent: boolean) => boolean;
+  maybeSpeakThinkingBlock: (spokenBlock: string) => boolean;
+  narrateAgentMilestone: (milestone: NarrationMilestone) => void;
   narrateProgress: (payload: {
     event_key?: string;
     event_type?: string;
@@ -34,12 +45,15 @@ export function createChatStreamVoiceNarration(input: {
   sessionId: () => string;
   workspaceId: () => string;
   narration: () => KairoNarrationLevel;
+  narrateToolProgress: () => boolean;
   voiceDeliveryAllowed: () => boolean;
   operatorPrompt: () => string;
   fullAccess: () => boolean;
 }): ChatStreamVoiceNarration {
   const toolNarrationEnabled = isToolCapableComposerMode(input.composerMode);
   const answerMode = isAnswerNarrationComposerMode(input.composerMode);
+  const thinkingThrottle = createKairoThinkingSpeechThrottle();
+  const toolThrottle = createKairoIntervalThrottle({ intervalMs: TOOL_MILESTONE_INTERVAL_MS });
 
   const progressNarrator = toolNarrationEnabled
     ? createKairoProgressNarrator({
@@ -57,6 +71,7 @@ export function createChatStreamVoiceNarration(input: {
         sessionId: input.sessionId,
         workspaceId: input.workspaceId,
         narration: input.narration,
+        narrateToolProgress: input.narrateToolProgress,
         voiceDeliveryAllowed: input.voiceDeliveryAllowed,
         operatorPrompt: input.operatorPrompt,
         fullAccess: input.fullAccess,
@@ -75,24 +90,59 @@ export function createChatStreamVoiceNarration(input: {
       })
     : null;
 
-  function maybeSpeakStartIntent(spokenBlock: string, spokenStartIntent: boolean): boolean {
+  function cancelStaleNarration(): void {
+    agentMilestoneNarrator?.cancel();
+    progressNarrator?.cancel();
+    dropWaitingKairoNarration('stale_run_advance');
+  }
+
+  function maybeSpeakThinkingBlock(spokenBlock: string): boolean {
     if (
       !toolNarrationEnabled ||
-      spokenStartIntent ||
       !spokenBlock ||
       !shouldSpeakLiveThinkingBlock({
         narration: input.narration(),
         spokenBlock,
-      })
+      }) ||
+      !thinkingThrottle.canSpeak() ||
+      !input.voiceDeliveryAllowed()
     ) {
       return false;
     }
+    cancelStaleNarration();
+    const milestoneKey =
+      thinkingThrottle.spokenCount() === 0 ? 'start' : `thinking:${thinkingThrottle.spokenCount()}`;
     agentMilestoneNarrator?.narrate({
-      key: 'start',
+      key: milestoneKey,
       message: spokenBlock,
       verbatim: true,
     });
+    thinkingThrottle.recordSpoken();
     return true;
+  }
+
+  function narrateAgentMilestone(milestone: NarrationMilestone): void {
+    if (!toolNarrationEnabled) {
+      return;
+    }
+    const narration = input.narration();
+    if (
+      !shouldNarrateAgentEvent({
+        eventKey: milestone.key,
+        narration,
+        narrateToolProgress: input.narrateToolProgress(),
+      })
+    ) {
+      return;
+    }
+    if (milestone.key.startsWith('tool:') && !toolThrottle.canSpeak()) {
+      return;
+    }
+    cancelStaleNarration();
+    agentMilestoneNarrator?.narrate(milestone);
+    if (milestone.key.startsWith('tool:')) {
+      toolThrottle.recordSpoken();
+    }
   }
 
   function narrateProgress(payload: {
@@ -103,6 +153,7 @@ export function createChatStreamVoiceNarration(input: {
     if (!toolNarrationEnabled || !payload.event_key || !payload.event_type) {
       return;
     }
+    cancelStaleNarration();
     progressNarrator?.narrate({
       eventKey: payload.event_key,
       eventType: payload.event_type,
@@ -116,6 +167,7 @@ export function createChatStreamVoiceNarration(input: {
   function narrateCompletion(finalContent: string): void {
     const completion = narrationForCompletion(finalContent);
     if (toolNarrationEnabled) {
+      cancelStaleNarration();
       agentMilestoneNarrator?.narrate(completion);
       return;
     }
@@ -128,7 +180,6 @@ export function createChatStreamVoiceNarration(input: {
     ) {
       return;
     }
-    // Ask/Plan: final answer only, never tool/edit/thinking milestones.
     answerNarrator?.narrate({
       ...completion,
       verbatim: true,
@@ -145,6 +196,7 @@ export function createChatStreamVoiceNarration(input: {
         : { key: 'failed' as const, message: errorSummary || 'Failed' };
 
     if (toolNarrationEnabled) {
+      cancelStaleNarration();
       agentMilestoneNarrator?.narrate(failure);
       return;
     }
@@ -168,7 +220,8 @@ export function createChatStreamVoiceNarration(input: {
     progressNarrator,
     agentMilestoneNarrator,
     answerNarrator,
-    maybeSpeakStartIntent,
+    maybeSpeakThinkingBlock,
+    narrateAgentMilestone,
     narrateProgress,
     narrateCompletion,
     narrateFailure,

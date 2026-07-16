@@ -31,6 +31,7 @@ describe('operator presence helpers', () => {
           azure_voice_id: 'en-GB-RyanNeural',
           stt_mode: 'browser',
           voice_routing_mode: 'template_first',
+          narrate_tool_progress: false,
         },
         spoken_alert: {
           eligible: false,

@@ -1,14 +1,22 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import BriefingSurfaceFollowupPrompt from '../../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 import AgentDockComposerImageLightbox from './AgentDockComposerImageLightbox.vue';
 import AgentDockApprovalBanner from './AgentDockApprovalBanner.vue';
 import AgentDockDebugReproduceBanner from './AgentDockDebugReproduceBanner.vue';
 import AgentDockFullAccessConsent from './AgentDockFullAccessConsent.vue';
 import AgentDockSandboxConsent from './AgentDockSandboxConsent.vue';
+import AgentDockIdeVoiceHint from './AgentDockIdeVoiceHint.vue';
 import AgentDockPlanSwitchBanner from './AgentDockPlanSwitchBanner.vue';
 import type { PlanSoftSwitchNotice } from '../../../composables/agent-dock/use-composer-actions';
 import type { DebugReproduceRequest } from '../../../lib/debug-reproduce-view';
 import type { ComposerClipboardImage } from '../../../lib/composer-clipboard-paste';
+import {
+  clearActiveIdeNarrationOverrideHint,
+  getActiveIdeNarrationOverrideHint,
+} from '../../../lib/ide-narration-override-hint';
+
+const ideVoiceNarrationHint = computed(() => getActiveIdeNarrationOverrideHint());
 
 defineProps<{
   showFullAccessConsent: boolean;
@@ -80,6 +88,11 @@ const emit = defineEmits<{
     :reject-pending="runMutationPending"
     @approve="emit('approveRun')"
     @reject="emit('rejectRun')"
+  />
+  <AgentDockIdeVoiceHint
+    v-if="ideVoiceNarrationHint"
+    :message="ideVoiceNarrationHint"
+    @dismiss="clearActiveIdeNarrationOverrideHint()"
   />
   <AgentDockPlanSwitchBanner
     :show="Boolean(planSoftSwitchNotice)"
