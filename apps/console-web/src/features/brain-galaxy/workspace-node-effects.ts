@@ -85,18 +85,19 @@ export function decorateWorkspaceNode(
 export function animateWorkspaceNode(
   mesh: Mesh,
   clock: number,
-  busy: boolean,
+  presenceAmp: number,
   selected: boolean,
   focusStrength = 1,
 ): void {
+  const amp = Math.max(0, Math.min(1, presenceAmp));
   const phase = mesh.position.x * 1.7 + mesh.position.z * 1.3;
-  const wave = Math.sin(clock * (busy ? 3.4 : 1.35) + phase);
-  const scale = 1 + wave * (busy ? 0.065 : 0.025) + (selected ? 0.06 : 0);
+  const wave = Math.sin(clock * (1.35 + amp * 2.05) + phase);
+  const scale = 1 + wave * (0.025 + amp * 0.04) + (selected ? 0.06 : 0);
   mesh.scale.setScalar(scale);
 
   const material = mesh.material as MeshStandardMaterial;
   material.emissiveIntensity =
-    ((selected ? 1.65 : busy ? 1.2 : 0.88) + wave * 0.18) * focusStrength;
+    ((selected ? 1.65 : 0.88 + amp * 0.32) + wave * 0.18) * focusStrength;
   material.opacity = focusStrength;
   material.transparent = focusStrength < 1;
 
@@ -105,17 +106,18 @@ export function animateWorkspaceNode(
     if (!data.workspaceEffect) {
       return;
     }
-    const effectWave = 0.82 + Math.sin(clock * (busy ? 4.2 : 1.7) + (data.phase ?? 0)) * 0.18;
+    const effectWave =
+      0.82 + Math.sin(clock * (1.7 + amp * 2.5) + (data.phase ?? 0)) * 0.18;
     if (data.workspaceEffect === 'halo' && child instanceof Mesh) {
       const haloMaterial = child.material as MeshStandardMaterial;
       haloMaterial.opacity =
         (data.baseOpacity ?? 0.14) *
         effectWave *
-        (busy ? 1.8 : 1) *
+        (1 + amp * 0.8) *
         (selected ? 1.35 : 1) *
         focusStrength;
     } else if (data.workspaceEffect === 'ring' && child instanceof Mesh) {
-      child.rotation.z += (data.spin ?? 0.006) * (busy ? 3.2 : 1);
+      child.rotation.z += (data.spin ?? 0.006) * (1 + amp * 2.2);
       const ringMaterial = child.material as MeshStandardMaterial;
       ringMaterial.opacity =
         (data.baseOpacity ?? 0.62) * effectWave * (selected ? 1.2 : 1) * focusStrength;
@@ -123,7 +125,7 @@ export function animateWorkspaceNode(
       child.intensity =
         (data.baseIntensity ?? 0.7) *
         effectWave *
-        (busy ? 1.9 : 1) *
+        (1 + amp * 0.9) *
         (selected ? 1.4 : 1) *
         focusStrength;
     }

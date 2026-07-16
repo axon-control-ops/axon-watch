@@ -23,6 +23,8 @@ export function formatResearchProviderLabel(provider: string): string {
     brave: 'Brave',
     bing: 'Bing',
     google: 'Google',
+    google_cse: 'Google',
+    searxng: 'SearXNG',
     serpapi: 'SerpAPI',
     tavily: 'Tavily',
   };

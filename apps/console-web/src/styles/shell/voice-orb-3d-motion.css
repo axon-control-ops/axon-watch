@@ -1,0 +1,156 @@
+@keyframes voice-orb-shard-pulse {
+  0%,
+  100% {
+    opacity: 0.16;
+  }
+  50% {
+    opacity: 0.42;
+  }
+}
+
+@keyframes voice-orb-accent-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes voice-orb-3d-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.96);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes voice-orb-plasma-breathe {
+  0%,
+  100% {
+    transform: scale(0.985);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes voice-orb-speaking-plasma {
+  0%,
+  100% {
+    transform: scale(0.97);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.07);
+    filter: brightness(1.4);
+  }
+}
+
+@keyframes voice-orb-3d-orbit {
+  from {
+    transform: translate(-50%, -50%) rotateX(68deg) rotateZ(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotateX(68deg) rotateZ(360deg);
+  }
+}
+
+@keyframes voice-orb-ellipse-a {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes voice-orb-ellipse-b {
+  from {
+    transform: rotate(20deg);
+  }
+  to {
+    transform: rotate(380deg);
+  }
+}
+
+@keyframes voice-orb-hud-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes voice-orb-halo-live {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes voice-orb-beacon {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes voice-orb-listen-ripple {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.92);
+  }
+  70% {
+    opacity: 0.25;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes voice-orb-arc-sweep {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__trigger::before,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__trigger::after,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ticks,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__beads,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__mesh,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__shards,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__shard,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ellipse,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__halo,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__bloom,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__plasma,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__beacon,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ripple,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__arc--sweep,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ring--dashed-counter,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ring--dashed,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__mesh-dot--accent {
+    animation: none !important;
+  }
+}

@@ -17,12 +17,11 @@ import { useKairoGalaxyOrbPresence } from './use-kairo-galaxy-orb-presence';
 import { useKairoGalaxyOrbVoice } from './use-kairo-galaxy-orb-voice';
 import { createOrbTriggerGestureHandlers } from './orb-trigger-gestures';
 import { resolveVoiceOrbPlacementApi } from './resolve-voice-orb-placement-api';
-import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
+import { handleKairoGalaxyOrbInterrupt } from './kairo-galaxy-orb-interrupt';
 import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_ORB_LABEL } from '../../lib/operator-persona-name';
 import {
   kairoConversationPhase,
   kairoConversationReply,
-  setKairoConversationPhase,
 } from '../kairo-conversation/kairo-conversation-state';
 import { useShellStore } from '../../stores/shell';
 
@@ -108,6 +107,7 @@ const orbStateClass = computed(() =>
     speaking.value,
     kairoConversationPhase.value,
     speechCapture.capturing.value,
+    shell.agentStreamActive,
   ),
 );
 const orbModeClass = computed(() => galaxyOrbModeClass(handsFreeEnabled.value));
@@ -139,9 +139,7 @@ const showIdeClose = computed(
 );
 
 function handleInterrupt(): void {
-  shell.interruptKairoVoice();
-  clearKairoVoiceFollowupWindow();
-  setKairoConversationPhase('idle');
+  handleKairoGalaxyOrbInterrupt(shell);
 }
 </script>
 

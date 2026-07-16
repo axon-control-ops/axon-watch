@@ -25,6 +25,7 @@ import type {
   CursorRuntimeStatusSnapshot,
   FleetHealthSnapshot,
   RuntimeMcpToolsSnapshot,
+  RuntimeStatusSnapshot,
   TerminalSessionRecord,
   WorkspaceChatThreadListItem,
 } from '../api/control-plane';
@@ -38,7 +39,6 @@ import {
   readPendingHandoffDismissSignalId,
   writePendingHandoffDismissSignalId,
 } from '../lib/signal-handoff-dismiss';
-import type { RuntimeStatusSnapshot } from '../api/control-plane';
 import type {
   ApprovalRecord,
   InboxItem,
@@ -51,14 +51,15 @@ import type {
   WorkspaceRecord,
 } from '../contracts/canonical';
 import { deliverSpokenOperatorAlert } from '../lib/spoken-alert-delivery';
-import {
-  editedFilePathsFromTranscript,
-} from '../lib/agent-transcript-blocks';
+import { editedFilePathsFromTranscript } from '../lib/agent-transcript-blocks';
 import { buildResearchEditorContent } from '../lib/prove-research-source';
 import { resolveResearchFlyToTarget } from '../lib/research-fly-to-source';
 import type { ResearchBlockKind } from '../lib/research-provider';
-import { createAgentStreamIncrementalState } from '../lib/agent-stream-incremental';
-import { narrationForCompletion } from '../lib/kairo-agent-narration';
+import {
+  createAgentStreamIncrementalState,
+  createAgentStreamVoiceSession,
+  handleAgentStreamVoiceDelta,
+} from '../lib/agent-stream-voice-session';
 import { createRafStreamUiBatcher } from '../lib/stream-ui-raf-batch';
 import {
   resolveBootstrapIdeThreadId,
@@ -68,15 +69,11 @@ import {
   createWorkspaceThreadLoadQueue,
   loadWorkspaceThreadOnce,
 } from '../lib/load-workspace-thread';
-import { createKairoAgentMilestoneNarrator } from '../lib/kairo-agent-milestone-narrator';
-import { effectiveKairoNarration, shouldSpeakLiveThinkingBlock } from '../lib/kairo-narration-policy';
-import { createKairoProgressNarrator } from '../lib/kairo-progress-narrator';
+import { effectiveKairoNarration } from '../lib/kairo-narration-policy';
 import { postKairoSpeak } from '../lib/kairo-speak-client';
 import type { EditorRevealRequest } from '../components/EditorHost.vue';
 import type { EditorSelectionSnapshot } from '../lib/create-monaco-editor';
-import {
-  DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
-} from '../lib/terminal-session-view';
+import { DEFAULT_OPERATOR_TERMINAL_SESSION_ID } from '../lib/terminal-session-view';
 import {
   createTerminalSessionStore,
   DEFAULT_TERMINAL_SESSIONS,
@@ -229,6 +226,7 @@ import {
   type WorkspaceDocumentDescriptor,
 } from '../lib/workspace-documents';
 import { persistEditorMarkdownPreviewEnabled } from '../lib/editor-markdown-preview-prefs';
+import { upsertAgentDraftDocument } from '../lib/agent-draft-document';
 import {
   readActiveEditorDocumentIdsByWorkspace,
   readOpenEditorFilePathsByWorkspace,
@@ -1468,101 +1466,64 @@ export const useShellStore = defineStore('shell', () => {
       ...workspaceIdeThreadMessagesById.value,
       [workspaceId]: [...threadMessages.value],
     };
-    const narrationEnabled = isToolCapableComposerMode(ideComposerActivity.value?.mode);
+    const composerMode = ideComposerActivity.value?.mode;
     const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
     const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
     let streamedContent = '';
-    let spokenStartIntent = false;
     let terminalAutoRevealSeen = false;
     const streamIncremental = createAgentStreamIncrementalState();
     const streamUiBatcher = createRafStreamUiBatcher<Partial<WorkspaceStreamUiState>>(
       (wsId, partial) => setWorkspaceStreamUi(wsId, partial),
     );
     const voiceContext = kairoVoiceContext();
-    const progressNarrator = narrationEnabled
-      ? createKairoProgressNarrator({
-          messageId,
-          sessionId: kairoSpeechSessionId,
-          workspaceId: () => workspaceId,
-          narration: () => effectiveKairoNarrationLevel.value,
-          voiceDeliveryAllowed,
-        })
-      : null;
-    const agentMilestoneNarrator = narrationEnabled
-      ? createKairoAgentMilestoneNarrator({
-          messageId,
-          sessionId: kairoSpeechSessionId,
-          workspaceId: () => workspaceId,
-          narration: () => effectiveKairoNarrationLevel.value,
-          voiceDeliveryAllowed,
-          operatorPrompt: () => operatorPrompt,
-          fullAccess: () => voiceContext.fullAccess,
-        })
-      : null;
-
-    chatStreamSessionsByWorkspace.set(
-      workspaceId,
-      startChatStreamSession({
+    const voiceNarration = createAgentStreamVoiceSession({
+      composerMode,
+      messageId,
+      sessionId: kairoSpeechSessionId,
+      workspaceId: () => workspaceId,
+      narration: () => effectiveKairoNarrationLevel.value,
+      operatorPresenceSettings: () => operatorPresenceSettings.value,
+      voiceDeliveryAllowed,
+      operatorPrompt: () => operatorPrompt,
+      fullAccess: () => voiceContext.fullAccess,
+      layoutMode: () => layoutMode.value,
+      idePresenceProfile: () => idePresenceProfile.value,
+    });
+    chatStreamSessionsByWorkspace.set(workspaceId, startChatStreamSession({
         threadId,
         messageId,
         onDelta: (content) => {
           streamedContent = content;
           patchThreadMessageContent(workspaceId, messageId, content);
-          for (const milestone of streamIncremental.consumeFullContent(content)) {
-            if (narrationEnabled) {
-              agentMilestoneNarrator?.narrate(milestone);
-            }
-          }
+          const activity = getWorkspaceStreamUi(workspaceId).activity as IdeComposerActivity | null;
+          handleAgentStreamVoiceDelta({
+            voiceNarration,
+            streamIncremental,
+            content,
+            fullAccessNarration,
+            patchActivity: (activityView) => {
+              if (!activity) {
+                return;
+              }
+              streamUiBatcher.schedule(workspaceId, {
+                activity: {
+                  ...activity,
+                  label: activityView.label,
+                  liveBodyFull: activityView.liveBodyFull,
+                  liveBodySpoken: activityView.liveBodySpoken,
+                  liveBodyTruncated: activityView.liveBodyTruncated,
+                  streamCounts: streamIncremental.toCounts(),
+                },
+              });
+            },
+          });
           if (!terminalAutoRevealSeen && streamIncremental.toCounts().terminal > 0) {
             terminalAutoRevealSeen = true;
-            // Cursor parity ceiling: surface the in-flight shell in vaxon immediately.
-            // True process detach is unavailable — Cursor CLI still owns the shell.
             void backgroundIdeAgentRun();
-          }
-          const activity = getWorkspaceStreamUi(workspaceId).activity as IdeComposerActivity | null;
-          if (activity) {
-            const activityView = streamIncremental.toStreamingActivityView(fullAccessNarration);
-            const nextActivity: IdeComposerActivity = {
-              ...activity,
-              label: activityView.label,
-              liveBodyFull: activityView.liveBodyFull,
-              liveBodySpoken: activityView.liveBodySpoken,
-              liveBodyTruncated: activityView.liveBodyTruncated,
-              streamCounts: streamIncremental.toCounts(),
-            };
-            streamUiBatcher.schedule(workspaceId, { activity: nextActivity });
-
-            const spokenBlock = streamIncremental.takeCompletedThinkingSpeech()?.trim() ?? '';
-            if (
-              narrationEnabled &&
-              !spokenStartIntent &&
-              spokenBlock &&
-              shouldSpeakLiveThinkingBlock({
-                narration: effectiveKairoNarrationLevel.value,
-                spokenBlock,
-              })
-            ) {
-              spokenStartIntent = true;
-              agentMilestoneNarrator?.narrate({
-                key: 'start',
-                message: spokenBlock,
-                verbatim: true,
-              });
-            }
           }
         },
         onMilestone: (payload) => {
-          if (!narrationEnabled || !payload.event_key || !payload.event_type) {
-            return;
-          }
-          progressNarrator?.narrate({
-            eventKey: payload.event_key,
-            eventType: payload.event_type,
-            context: {
-              operator_prompt: operatorPrompt,
-              ...(payload.context ?? {}),
-            },
-          });
+          voiceNarration.narrateProgress(payload);
         },
         onDone: (payload) => {
           try {
@@ -1604,10 +1565,7 @@ export const useShellStore = defineStore('shell', () => {
               );
             }
             const finalContent = payload.content ?? streamedContent;
-            if (narrationEnabled) {
-              const completion = narrationForCompletion(finalContent);
-              agentMilestoneNarrator?.narrate(completion);
-            }
+            voiceNarration.narrateCompletion(finalContent);
             if (currentWorkspace.value?.workspace_id === workspaceId) {
               for (const path of editedFilePathsFromTranscript(finalContent)) {
                 if (openedFilePaths.value.includes(path)) {
@@ -1631,16 +1589,7 @@ export const useShellStore = defineStore('shell', () => {
           }
         },
         onError: (message, payload) => {
-          if (narrationEnabled) {
-            const errorSummary = message.trim().slice(0, 120);
-            const failureContent = streamedContent || message;
-            const completion = narrationForCompletion(failureContent);
-            agentMilestoneNarrator?.narrate(
-              completion.key === 'failed'
-                ? { ...completion, message: errorSummary || completion.message }
-                : { key: 'failed', message: errorSummary || 'Failed' },
-            );
-          }
+          voiceNarration.narrateFailure(streamedContent, message);
           if (payload?.system_message_id && payload.system_content) {
             patchThreadMessageContent(
               workspaceId,
@@ -1846,7 +1795,7 @@ export const useShellStore = defineStore('shell', () => {
           applyAgentTerminalSession(response.agent_terminal_session);
         }
         ideComposerActivity.value = {
-          label: buildIdeStreamActivityLabel(agentExecutionAccess.value),
+          label: buildIdeStreamActivityLabel(agentExecutionAccess.value, composerMode),
           mode: composerMode,
           executionAccess: agentExecutionAccess.value,
           operatorPrompt: content,
@@ -2416,54 +2365,29 @@ export const useShellStore = defineStore('shell', () => {
     content: string;
     preferPreview?: boolean;
     focus?: boolean;
+    readOnly?: boolean;
+    planId?: string;
   }): string | null {
     const title = formatAgentDraftTitle(options.title.trim() || 'Agent response');
     const content = options.content.trim();
     if (!content) {
       return null;
     }
-    const shouldFocus = options.focus !== false;
-
-    const normalizedTitle = title.toLowerCase();
-    const existing = draftDocuments.value.find(
-      (document) => document.source === 'draft' && document.title.toLowerCase() === normalizedTitle,
-    );
-
-    if (existing) {
-      draftDocuments.value = draftDocuments.value.map((document) =>
-        document.id === existing.id
-          ? { ...document, value: content, dirty: document.value !== content }
-          : document,
-      );
-      if (shouldFocus) {
-        activeEditorDocumentId.value = existing.id;
-      }
-      return existing.id;
-    }
-
-    const slug = normalizedTitle.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
-    const id = `draft:agent-${slug || 'response'}-${Date.now().toString(36)}`;
-    draftDocuments.value = [
-      ...draftDocuments.value,
-      {
-        id,
-        title,
-        language: 'markdown',
-        value: content,
-        description: 'Agent response opened in the editor. Raw/Preview toggle is in the tab bar.',
-        source: 'draft',
-        readOnly: false,
-        dirty: false,
-      },
-    ];
-    if (shouldFocus) {
+    const { drafts, id } = upsertAgentDraftDocument({
+      drafts: draftDocuments.value,
+      title,
+      content,
+      readOnly: options.readOnly === true,
+      planId: options.planId?.trim() || undefined,
+      idFactory: (slug) => `draft:agent-${slug}-${Date.now().toString(36)}`,
+    });
+    draftDocuments.value = drafts;
+    if (options.focus !== false) {
       activeEditorDocumentId.value = id;
     }
-
     if (options.preferPreview !== false) {
       persistEditorMarkdownPreviewEnabled(id, true);
     }
-
     return id;
   }
 

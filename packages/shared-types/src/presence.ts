@@ -24,6 +24,8 @@ export interface OperatorPresenceSettings {
   stt_mode: SttMode;
   /** Independent VAXON voice routing (not IDE Composer). */
   voice_routing_mode: VoiceRoutingMode;
+  /** Speak tool milestones during agent runs (conversational only). */
+  narrate_tool_progress: boolean;
 }
 
 export interface SpokenAlertEligibility {

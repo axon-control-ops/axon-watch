@@ -16,6 +16,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from tests.support.live_chat_mutations import (
+    LIVE_CHAT_MUTATION_SKIP_REASON,
+    live_chat_mutations_allowed,
+)
+
 CONTROL_PLANE_BASE = os.environ.get(
     "AXON_WATCH_CONTROL_PLANE_BASE",
     "http://127.0.0.1:8787",
@@ -71,6 +76,7 @@ class ChildProjectWorkspaceAcceptance(unittest.TestCase):
         project_root = str(payload.get("project_root", ""))
         self.assertTrue(project_root.endswith("dashpro"))
 
+    @unittest.skipUnless(live_chat_mutations_allowed(), LIVE_CHAT_MUTATION_SKIP_REASON)
     def test_git_status_runs_in_bound_dashpro_project(self) -> None:
         status, payload = _request(
             "POST",

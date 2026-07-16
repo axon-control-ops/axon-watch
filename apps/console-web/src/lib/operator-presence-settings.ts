@@ -27,6 +27,7 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     azure_voice_id: DEFAULT_AZURE_VOICE_ID,
     stt_mode: DEFAULT_STT_MODE,
     voice_routing_mode: DEFAULT_VOICE_ROUTING_MODE,
+    narrate_tool_progress: false,
   };
 }
 
@@ -98,6 +99,7 @@ export function normalizeOperatorPresenceSettings(
     voice_routing_mode: normalizeVoiceRoutingMode(
       raw.voice_routing_mode ?? defaults.voice_routing_mode,
     ),
+    narrate_tool_progress: raw.narrate_tool_progress ?? defaults.narrate_tool_progress,
   };
 }
 

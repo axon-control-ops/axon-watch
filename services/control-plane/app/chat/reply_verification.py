@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from app.chat.scanned_workbook_gate import scan_scanned_workbook_completion_risks
+
 _EDIT_BLOCK_RE = re.compile(r":::edit\s+(\S+)", re.MULTILINE)
 _CLAIM_PATTERNS = (
     re.compile(r"\b(?:I(?:'ve| have)?|Successfully)\s+(?:committed|edited|created|updated|saved|switched|pushed)\b", re.I),
@@ -98,8 +100,17 @@ def verify_lane_b_reply(
     execution_tier: str,
     workspace_root: Path | None = None,
     run_started_epoch: float | None = None,
+    user_prompt: str = "",
+    context_block: str = "",
 ) -> tuple[str, list[str]]:
     warnings = scan_unverified_claims(content, execution_tier=execution_tier)
+    warnings.extend(
+        scan_scanned_workbook_completion_risks(
+            content,
+            user_prompt=user_prompt,
+            context_block=context_block,
+        )
+    )
     if workspace_root is not None and run_started_epoch is not None:
         warnings.extend(
             verify_edit_paths(

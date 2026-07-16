@@ -5,6 +5,7 @@ import WorkbenchIcon from '../WorkbenchIcon.vue';
 import WorkbenchTerminalDock from '../WorkbenchTerminalDock.vue';
 import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
+import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
 import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import {
   clampWorkbenchTerminalHeight,
@@ -44,8 +45,11 @@ import {
   readEditorMinimapEnabled,
 } from '../../lib/editor-surface-prefs';
 import { isAgentEditReviewDocumentId } from '../../lib/ide-agent-edit-review';
+import { buildWorkbenchProblemItems } from '../../lib/workbench-problem-items';
+import { useEditorPlanBuild } from '../../composables/use-editor-plan-build';
 
 const shell = useShellStore();
+const { activePlanId, buildingPlan, buildPlanError, buildActivePlan } = useEditorPlanBuild(shell);
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
 const workbenchLayoutMode = computed((): 'operator' | 'ide' =>
@@ -62,18 +66,7 @@ const editorCursorColumn = ref(1);
 const editorMinimapEnabled = ref(readEditorMinimapEnabled());
 const editorTabsRef = ref<HTMLElement | null>(null);
 
-const problemItems = computed(() => {
-  const items: string[] = [];
-  if (shell.fileSaveError) items.push(`Save failed: ${shell.fileSaveError}`);
-  if (shell.workspaceFilesError) items.push(`Workspace files: ${shell.workspaceFilesError}`);
-  if (shell.commandMutationError) items.push(`Command: ${shell.commandMutationError}`);
-  if (shell.runMutationError) items.push(`Run: ${shell.runMutationError}`);
-  if (shell.runtimeSummaryError) items.push(`Runtime summary: ${shell.runtimeSummaryError}`);
-  if (shell.briefingError) items.push(`Briefing: ${shell.briefingError}`);
-  if (shell.runsError) items.push(`Runs: ${shell.runsError}`);
-  if (shell.inboxError) items.push(`Inbox: ${shell.inboxError}`);
-  return items;
-});
+const problemItems = computed(() => buildWorkbenchProblemItems(shell));
 
 const editorBreadcrumbSegments = computed((): EditorBreadcrumbSegment[] => {
   const workspace = shell.currentWorkspace?.workspace_id ?? 'workspace_smoke';
@@ -128,6 +121,8 @@ const editorLanguageLabel = computed(() => {
     javascript: 'JavaScript',
     python: 'Python',
     shell: 'Shell',
+    html: 'HTML',
+    css: 'CSS',
     image: 'Image',
   };
   return labels[language] ?? language;
@@ -598,38 +593,23 @@ watch(
       </header>
 
       <section class="center-workbench__editor" :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }">
-        <div v-if="isMarkdownEditorDocument && shell.activeEditorDocument" class="editor-markdown-toolbar">
-          <div
-            class="conversation-seam__markdown-mode-toggle editor-markdown-toolbar__toggle"
-            role="group"
-            aria-label="Editor markdown view mode"
-          >
-            <button
-              type="button"
-              class="conversation-seam__markdown-mode-button"
-              :class="{ 'conversation-seam__markdown-mode-button--active': editorPreviewEnabled }"
-              :aria-pressed="editorPreviewEnabled"
-              @click="setEditorPreviewMode(true)"
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              class="conversation-seam__markdown-mode-button"
-              :class="{ 'conversation-seam__markdown-mode-button--active': !editorPreviewEnabled }"
-              :aria-pressed="!editorPreviewEnabled"
-              @click="setEditorPreviewMode(false)"
-            >
-              Raw
-            </button>
-          </div>
-        </div>
+        <EditorMarkdownToolbar
+          v-if="isMarkdownEditorDocument && shell.activeEditorDocument"
+          :preview-enabled="editorPreviewEnabled"
+          :plan-id="activePlanId"
+          :building-plan="buildingPlan"
+          :build-plan-error="buildPlanError"
+          :can-build-plan="Boolean(shell.currentWorkspace?.workspace_id)"
+          @set-preview="setEditorPreviewMode"
+          @build-plan="buildActivePlan"
+        />
         <AgentEditReviewViewer
           v-if="shell.activeEditorDocument && showAgentDiffReviewViewer"
           :content="shell.activeEditorDocument.value"
         />
         <EditorHost
           v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument"
+          :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
           :title="shell.activeEditorDocument.title"

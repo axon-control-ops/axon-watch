@@ -36,6 +36,20 @@ const loadState = ref<'loading' | 'ready' | 'error'>('loading');
 let editorController: Awaited<ReturnType<typeof createMonacoEditor>> | null = null;
 let suppressChangeEmit = false;
 let mountedDocumentKey = '';
+let resizeObserver: ResizeObserver | null = null;
+
+function scheduleEditorLayout(): void {
+  if (!editorController) {
+    return;
+  }
+  editorController.layout();
+  requestAnimationFrame(() => {
+    editorController?.layout();
+    requestAnimationFrame(() => {
+      editorController?.layout();
+    });
+  });
+}
 
 function applyDocumentToEditor(): void {
   if (!editorController) {
@@ -49,13 +63,14 @@ function applyDocumentToEditor(): void {
       suppressChangeEmit = false;
     }
     editorController.setReadOnly(Boolean(props.readOnly));
-    editorController.layout();
+    scheduleEditorLayout();
     return;
   }
 
   editorController.replaceDocument(props.value, props.language);
   editorController.setReadOnly(Boolean(props.readOnly));
   mountedDocumentKey = props.documentKey;
+  scheduleEditorLayout();
 }
 
 function focusEditor(): void {
@@ -105,6 +120,13 @@ onMounted(async () => {
     loadState.value = 'ready';
     applyDocumentToEditor();
     applyRevealRequest(props.revealRequest);
+    if (typeof ResizeObserver !== 'undefined' && containerRef.value) {
+      resizeObserver = new ResizeObserver(() => {
+        scheduleEditorLayout();
+      });
+      resizeObserver.observe(containerRef.value);
+    }
+    scheduleEditorLayout();
   } catch {
     loadState.value = 'error';
   }
@@ -134,6 +156,8 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
   editorController?.dispose();
   editorController = null;
   mountedDocumentKey = '';

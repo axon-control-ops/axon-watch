@@ -14,6 +14,7 @@ interface CreateKairoAgentMilestoneNarratorOptions {
   sessionId: () => string;
   workspaceId: () => string;
   narration: () => KairoNarrationLevel;
+  narrateToolProgress?: () => boolean;
   voiceDeliveryAllowed: () => boolean;
   operatorPrompt: () => string;
   fullAccess: () => boolean;
@@ -25,12 +26,21 @@ export function createKairoAgentMilestoneNarrator(
   options: CreateKairoAgentMilestoneNarratorOptions,
 ) {
   let chain = Promise.resolve();
+  let currentRequestId = 0;
   const spokenKeys = new Set<string>();
+
+  function cancel(): void {
+    currentRequestId += 1;
+  }
 
   function narrate(milestone: NarrationMilestone): void {
     const narration = options.narration();
     if (
-      !shouldNarrateAgentEvent({ eventKey: milestone.key, narration }) ||
+      !shouldNarrateAgentEvent({
+        eventKey: milestone.key,
+        narration,
+        narrateToolProgress: options.narrateToolProgress?.() ?? false,
+      }) ||
       !options.voiceDeliveryAllowed() ||
       narration === 'off' ||
       spokenKeys.has(milestone.key)
@@ -38,6 +48,7 @@ export function createKairoAgentMilestoneNarrator(
       return;
     }
     spokenKeys.add(milestone.key);
+    const requestId = ++currentRequestId;
 
     const eventType = mapMilestoneToSpeakEvent(milestone.key);
     const editPath = milestone.editPath ?? '';
@@ -56,6 +67,9 @@ export function createKairoAgentMilestoneNarrator(
 
     chain = chain
       .then(async () => {
+        if (requestId !== currentRequestId) {
+          return;
+        }
         const controller = new AbortController();
         const timeout = globalThis.setTimeout(() => controller.abort(), SPEAK_TIMEOUT_MS);
         const fallback = agentMilestoneFallbackLine({
@@ -78,11 +92,17 @@ export function createKairoAgentMilestoneNarrator(
               },
               { signal: controller.signal },
             );
+            if (requestId !== currentRequestId) {
+              return;
+            }
             if (response.source !== 'skipped' && response.line.trim()) {
               message = response.line.trim();
             }
           }
         } catch {
+          if (requestId !== currentRequestId) {
+            return;
+          }
           if (!message) {
             message = fallback || milestone.message.replace(/\.$/, '').trim();
           }
@@ -90,7 +110,7 @@ export function createKairoAgentMilestoneNarrator(
           globalThis.clearTimeout(timeout);
         }
 
-        if (!message) {
+        if (!message || requestId !== currentRequestId) {
           return;
         }
 
@@ -108,5 +128,5 @@ export function createKairoAgentMilestoneNarrator(
       .catch(() => undefined);
   }
 
-  return { narrate };
+  return { cancel, narrate };
 }

@@ -12,15 +12,17 @@ import {
 } from '../lib/thread-message-view';
 import { thinkingPreview } from '../lib/agent-transcript-blocks';
 import { resolveChatAttachmentUrl } from '../api/control-plane';
-import AgentResearchBlock from './ide/AgentResearchBlock.vue';
 import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from './ide/AgentFileReadBlock.vue';
+import ConversationAgentStructuredBlock from './ide/ConversationAgentStructuredBlock.vue';
 import AgentEditBlock from './ide/AgentEditBlock.vue';
 import AgentImageBlock from './ide/AgentImageBlock.vue';
 import IdeActivityIcon from './ide/IdeActivityIcon.vue';
 import IdeAgentThreadStatusStrip from './ide/IdeAgentThreadStatusStrip.vue';
+import ConversationSeamTerminalBlock from './conversation/ConversationSeamTerminalBlock.vue';
 import OperatorMessageActions from './conversation/OperatorMessageActions.vue';
 import ConversationSeamAttachmentLightbox from './conversation/ConversationSeamAttachmentLightbox.vue';
+import { createConversationSeamAnswerBridge } from '../lib/conversation-seam-question-answers';
 import { useConversationSeamPanel } from './conversation/useConversationSeamPanel';
 
 const rootRef = ref<HTMLElement | null>(null);
@@ -69,6 +71,8 @@ const {
   isEmptyStreamingAgent,
   transcriptSegments,
 } = useConversationSeamPanel(rootRef, listRef, handleContentChange);
+
+const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(conversationDisplayItems);
 </script>
 <template>
   <div ref="rootRef" class="conversation-seam" @wheel.capture="handleWheel">
@@ -79,7 +83,7 @@ const {
       class="conversation-seam__list"
     >
       <li
-        v-for="item in conversationDisplayItems"
+        v-for="(item, itemIndex) in conversationDisplayItems"
         :key="displayItemKey(item)"
         class="conversation-seam__item"
         :class="
@@ -329,73 +333,36 @@ const {
               <span>{{ segment.label }}</span>
             </div>
 
-            <AgentResearchBlock
-              v-else-if="segment.kind === 'research'"
-              :query="segment.query"
-              :items="segment.items"
-              :provider="segment.provider"
-              :kind="segment.kindLabel"
-              :live="segment.open && isStreamingMessage(item.message.message_id)"
+            <ConversationAgentStructuredBlock
+              v-else-if="segment.kind === 'plan' || segment.kind === 'question' || segment.kind === 'research'"
+              :segment="segment"
+              :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
+              :live="segment.kind !== 'plan' && segment.open && isStreamingMessage(item.message.message_id)"
+              :message-id="item.message.message_id"
+              :answered-option="
+                segment.kind === 'question'
+                  ? answeredOptionForQuestion(
+                    item.message.message_id,
+                    segment.prompt,
+                    segment.options,
+                    itemIndex,
+                  )
+                  : null
+              "
             />
 
-            <div v-else-if="segment.kind === 'terminal'" class="agent-block agent-block--terminal">
-              <div class="agent-block__terminal-header">
-                <button
-                  type="button"
-                  class="agent-block__terminal-reveal"
-                  :title="
-                    segment.open
-                      ? 'Show live shell output in the vaxon terminal'
-                      : 'Show this shell output in the vaxon terminal'
-                  "
-                  @click="revealTerminalPanel(segment)"
-                >
-                  <span class="agent-block__terminal-prompt" aria-hidden="true">$</span>
-                  <code class="agent-block__terminal-command">{{ segment.command }}</code>
-                  <span
-                    v-if="segment.open && isStreamingMessage(item.message.message_id)"
-                    class="agent-block__terminal-running"
-                  >running…</span>
-                  <span
-                    v-if="terminalMirrorBadge(segment.open)"
-                    class="agent-block__terminal-mirrored"
-                  >{{ terminalMirrorBadge(segment.open) }}</span>
-                </button>
-                <button
-                  v-if="showTerminalBackgroundControl(item.message.message_id, segment.open)"
-                  type="button"
-                  class="agent-block__terminal-background"
-                  title="Mirror live shell output into vaxon (Cursor CLI still owns the process — true detach is unavailable)"
-                  aria-label="Background shell into vaxon terminal"
-                  @click="backgroundAgentTerminalRun(segment)"
-                >
-                  Background
-                </button>
-                <button
-                  v-if="!segment.open && segment.command.trim()"
-                  type="button"
-                  class="agent-block__terminal-background"
-                  title="Re-run this command in the interactive bash terminal"
-                  aria-label="Continue command in bash terminal"
-                  @click="continueTerminalInBash(segment.command)"
-                >
-                  Continue in bash
-                </button>
-                <button
-                  v-if="segment.output"
-                  type="button"
-                  class="agent-block__terminal-copy"
-                  title="Copy terminal output"
-                  @click="copyTerminalOutput(segment.output)"
-                >
-                  Copy
-                </button>
-              </div>
-              <pre
-                v-if="segment.output"
-                class="agent-block__terminal-output"
-              >{{ segment.output }}</pre>
-            </div>
+            <ConversationSeamTerminalBlock
+              v-else-if="segment.kind === 'terminal'"
+              :segment="segment"
+              :message-id="item.message.message_id"
+              :streaming="isStreamingMessage(item.message.message_id)"
+              :terminal-mirror-badge="terminalMirrorBadge"
+              :show-terminal-background-control="showTerminalBackgroundControl"
+              @reveal="revealTerminalPanel"
+              @background="backgroundAgentTerminalRun"
+              @continue-in-bash="continueTerminalInBash"
+              @copy-output="copyTerminalOutput"
+            />
 
             <AgentEditBlock
               v-else-if="segment.kind === 'edit'"

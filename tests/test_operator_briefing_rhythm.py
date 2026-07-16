@@ -41,6 +41,34 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
 
         self.assertEqual("Smoke run is ready for your review.", notice)
 
+    def test_idle_rhythm_stays_quiet_instead_of_inventing_status_copy(self) -> None:
+        rhythm = build_operator_briefing_rhythm(
+            active_runs=[],
+            top_signals=[],
+            pending_approvals_count=0,
+            degraded={"active": False, "reasons": []},
+            watch_connected=True,
+            next_safe_actions=[],
+        )
+
+        self.assertEqual("", rhythm["notice"])
+        self.assertEqual("", rhythm["advise"])
+        self.assertEqual("", rhythm["decide"])
+        self.assertEqual("", rhythm["execute"])
+        self.assertEqual("", rhythm["verify"])
+        self.assertEqual("", rhythm["report"])
+
+    def test_notice_uses_live_signal_instead_of_idle_copy(self) -> None:
+        notice = build_briefing_notice(
+            active_runs=[],
+            top_signals=[{"title": "Fast Gate failed", "severity": "high"}],
+            pending_approvals_count=0,
+            degraded={"active": False, "reasons": []},
+            watch_connected=True,
+        )
+
+        self.assertEqual("High-priority signal: Fast Gate failed.", notice)
+
     def test_advise_uses_first_next_safe_action(self) -> None:
         advise = build_briefing_advise(
             next_safe_actions=[

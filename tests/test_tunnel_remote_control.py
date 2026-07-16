@@ -18,7 +18,11 @@ from app.tunnel.native_process import build_cloudflared_command  # noqa: E402
 from app.tunnel.tunnel_credentials import (  # noqa: E402
     resolve_cloudflare_tunnel_token_state,
 )
-from app.tunnel.tunnel_probe import build_tunnel_diagnostics  # noqa: E402
+from app.tunnel.tunnel_probe import (  # noqa: E402
+    _classify_public_health_body,
+    _remote_ingress_from_logs,
+    build_tunnel_diagnostics,
+)
 
 
 class TunnelCredentialsWatchTests(unittest.TestCase):
@@ -137,6 +141,17 @@ class TunnelProbeWatchTests(unittest.TestCase):
             "app.tunnel.tunnel_probe._tunnel_process_running",
             return_value=False,
         ), patch(
+            "app.tunnel.tunnel_probe._cloudflared_process_count",
+            return_value=0,
+        ), patch(
+            "app.tunnel.tunnel_probe.managed_process_snapshot",
+            return_value={
+                "managed": False,
+                "pid": None,
+                "process_state_path": "",
+                "log_path": "",
+            },
+        ), patch(
             "app.tunnel.tunnel_probe.resolve_cloudflare_tunnel_token_state",
             return_value={"token": "token", "source": "environment"},
         ), patch(
@@ -155,6 +170,90 @@ class TunnelProbeWatchTests(unittest.TestCase):
             )
         self.assertEqual("degraded", diagnostics["status"])
         self.assertIn("stopped", diagnostics["detail"].lower())
+
+    def test_parses_escaped_remote_ingress_from_cloudflared_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            log_path = Path(tempdir) / "cloudflared.log"
+            log_path.write_text(
+                'INF Updated to new configuration config="{\\"ingress\\":['
+                '{\\"hostname\\":\\"axon.edudashpro.org.za\\",'
+                '\\"service\\":\\"http://localhost:7734\\"},'
+                '{\\"service\\":\\"http_status:404\\"}],'
+                '\\"warp-routing\\":{\\"enabled\\":false}}" version=1\n',
+                encoding="utf-8",
+            )
+            hostname, service = _remote_ingress_from_logs([str(log_path)])
+        self.assertEqual("axon.edudashpro.org.za", hostname)
+        self.assertEqual("http://localhost:7734", service)
+
+    def test_classifies_control_plane_health_as_axon_x(self) -> None:
+        ok, detail = _classify_public_health_body(
+            '{"service":"control-plane","status":"ok"}'
+        )
+        self.assertTrue(ok)
+        self.assertIn("axon-x", detail)
+
+    def test_classifies_axon_local_health_as_not_axon_x(self) -> None:
+        ok, detail = _classify_public_health_body(
+            '{"status":"ok","port":7734,"runtime":{"repo_root":"/home/edp/axon-nvme/repos/axon-local"}}'
+        )
+        self.assertFalse(ok)
+        self.assertIn("axon-local", detail)
+
+    def test_soft_origin_cutover_ok_when_public_is_axon_x(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            log_path = Path(tempdir) / "cloudflared.log"
+            log_path.write_text(
+                'INF config="{\\"ingress\\":[{\\"hostname\\":\\"axon.example\\",'
+                '\\"service\\":\\"http://localhost:7734\\"},'
+                '{\\"service\\":\\"http_status:404\\"}]}"\n',
+                encoding="utf-8",
+            )
+            with patch(
+                "app.tunnel.tunnel_probe.find_cloudflared_binary",
+                return_value="/usr/bin/cloudflared",
+            ), patch(
+                "app.tunnel.tunnel_probe.cloudflared_version",
+                return_value="cloudflared version test",
+            ), patch(
+                "app.tunnel.tunnel_probe._tunnel_process_running",
+                return_value=True,
+            ), patch(
+                "app.tunnel.tunnel_probe._cloudflared_process_count",
+                return_value=1,
+            ), patch(
+                "app.tunnel.tunnel_probe.managed_process_snapshot",
+                return_value={
+                    "managed": True,
+                    "pid": 123,
+                    "process_state_path": "",
+                    "log_path": str(log_path),
+                },
+            ), patch(
+                "app.tunnel.tunnel_probe.resolve_cloudflare_tunnel_token_state",
+                return_value={"token": "token", "source": "environment"},
+            ), patch(
+                "app.tunnel.tunnel_probe.named_tunnel_ready",
+                return_value=True,
+            ), patch(
+                "app.tunnel.tunnel_probe._probe_public_axon_x",
+                return_value=(True, 12, "axon-x control-plane"),
+            ):
+                diagnostics = build_tunnel_diagnostics(
+                    {
+                        "enabled": True,
+                        "connector_id": "cloudflare_tunnel",
+                        "display_name": "Cloudflare tunnel",
+                        "tunnel_mode": "named",
+                        "public_base_url": "https://axon.example",
+                        "local_origin_url": "http://127.0.0.1:4173",
+                        "binary_candidates": ["cloudflared"],
+                        "tunnel_log_paths": [str(log_path)],
+                    }
+                )
+        self.assertEqual("ok", diagnostics["status"])
+        self.assertTrue(diagnostics["tunnel"]["soft_origin_cutover"])
+        self.assertIn("soft cutover", diagnostics["detail"])
 
 
 class NativeTunnelControlTests(unittest.TestCase):

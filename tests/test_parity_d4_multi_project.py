@@ -22,6 +22,11 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.main import app  # noqa: E402
 from app.persistence import handoff_store, run_store  # noqa: E402
 
+from tests.support.live_chat_mutations import (
+    LIVE_CHAT_MUTATION_SKIP_REASON,
+    live_chat_mutations_allowed,
+)
+
 WORKSPACE_AXON_LOCAL = "workspace_axon_local"
 WORKSPACE_AXON_WATCH = "workspace_axon_watch"
 CONTROL_PLANE_BASE = os.environ.get(
@@ -150,6 +155,7 @@ class ParityD4MultiProjectTests(unittest.TestCase):
     EXPECTED_AXON_LOCAL_ROOT.is_dir(),
     "sibling axon-local repo not present for default bindings",
 )
+@unittest.skipUnless(live_chat_mutations_allowed(), LIVE_CHAT_MUTATION_SKIP_REASON)
 class ParityD4MultiProjectLiveAcceptance(unittest.TestCase):
     def test_git_status_runs_in_bound_axon_watch_project(self) -> None:
         status, payload = _request(

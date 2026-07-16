@@ -38,11 +38,26 @@ export function buildIdeComposerActivityLabel(
   return 'Ask — generating reply…';
 }
 
-export function buildIdeStreamActivityLabel(executionAccess: AgentExecutionAccess): string {
+export function buildIdeStreamActivityLabel(
+  executionAccess: AgentExecutionAccess,
+  mode: 'ask' | 'plan' | 'agent' | 'debug' = 'agent',
+): string {
+  if (mode === 'ask') {
+    return 'Ask — streaming reply…';
+  }
+  if (mode === 'plan') {
+    return 'Plan — streaming outline…';
+  }
+  if (mode === 'debug' && executionAccess === 'full') {
+    return 'Debug · Full Access — streaming runtime output…';
+  }
+  if (mode === 'debug') {
+    return 'Debug — streaming runtime output…';
+  }
   if (executionAccess === 'full') {
     return 'Full Access — streaming runtime output…';
   }
-  return 'Streaming agent reply…';
+  return 'Agent — streaming runtime output…';
 }
 
 export const FULL_ACCESS_CONSENT_LINES = [

@@ -19,12 +19,23 @@ export function effectiveKairoNarration(input: {
 export function shouldNarrateAgentEvent(input: {
   eventKey: string;
   narration: KairoNarrationLevel;
+  narrateToolProgress?: boolean;
 }): boolean {
   if (input.narration === 'off') {
     return false;
   }
+  if (
+    input.narrateToolProgress &&
+    input.narration === 'conversational' &&
+    input.eventKey.startsWith('tool:')
+  ) {
+    return true;
+  }
+  if (input.eventKey.startsWith('thinking:')) {
+    return true;
+  }
   // Bookends only for both minimal and conversational. Tool/edit milestones stay
-  // silent until opt-in tool narration ships. Live thinking uses
+  // silent unless opt-in tool narration is enabled. Live thinking uses
   // shouldSpeakLiveThinkingBlock instead of this gate.
   return (
     input.eventKey === 'start' ||

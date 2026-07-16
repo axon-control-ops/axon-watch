@@ -14,6 +14,10 @@ import {
 } from '../../lib/debug-reproduce-view';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
+import {
+  composerAccessBannerCopy,
+  composerAccessTone,
+} from '../../lib/sandbox-session-view';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 
@@ -24,6 +28,7 @@ type UseComposerDisplayStateOptions = {
   composerMode: Ref<ComposerMode>;
   composerDragOver: Ref<boolean>;
   isFullAccessAgent: Ref<boolean>;
+  sandboxSessionEnabled: Ref<boolean>;
   kairoDraft: Ref<string>;
   kairoCanSubmit: Ref<boolean>;
   kairoPending: Ref<boolean>;
@@ -37,6 +42,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     composerMode,
     composerDragOver,
     isFullAccessAgent,
+    sandboxSessionEnabled,
     kairoDraft,
     kairoCanSubmit,
     kairoPending,
@@ -73,19 +79,42 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
       return `Talk to ${OPERATOR_PERSONA_NAME} — answers are spoken aloud`;
     }
     if (composerAgentBusy.value && isToolCapableComposerMode(composerMode.value)) {
-      return 'Queue a follow-up or steer with Ctrl+Enter…';
+      return sandboxSessionEnabled.value
+        ? 'Queue a Sandbox follow-up or steer with Ctrl+Enter…'
+        : 'Queue a follow-up or steer with Ctrl+Enter…';
     }
     if (composerMode.value === 'plan') {
-      return 'Plan your approach, constraints, and verification path…';
+      return sandboxSessionEnabled.value
+        ? 'Plan Sandbox changes, constraints, and verification…'
+        : 'Plan your approach, constraints, and verification path…';
     }
     if (composerMode.value === 'ask') {
       return 'Ask about this workspace, file, or runtime…';
     }
     if (composerMode.value === 'debug') {
-      return 'Describe the bug, expected vs actual, and how to reproduce…';
+      return sandboxSessionEnabled.value
+        ? 'Debug in Sandbox — describe expected vs actual and how to reproduce…'
+        : 'Describe the bug, expected vs actual, and how to reproduce…';
+    }
+    if (sandboxSessionEnabled.value) {
+      return 'Describe Sandbox changes — edits stay in the disposable session…';
     }
     return 'Describe what you want to build or change…';
   });
+
+  const composerAccessBanner = computed(() =>
+    composerAccessBannerCopy({
+      fullAccess: isFullAccessAgent.value,
+      sandboxEnabled: sandboxSessionEnabled.value,
+    }),
+  );
+
+  const composerAccessToneValue = computed(() =>
+    composerAccessTone({
+      fullAccess: isFullAccessAgent.value,
+      sandboxEnabled: sandboxSessionEnabled.value,
+    }),
+  );
 
   const mcpToolsForMode = computed(() => {
     if (composerMode.value === 'kairo') {
@@ -178,21 +207,28 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
       return kairoPending.value ? `Asking ${OPERATOR_PERSONA_NAME}` : `Ask ${OPERATOR_PERSONA_NAME}`;
     }
     if (shell.commandMutationState === 'submitting') {
-      return 'Sending command';
+      return sandboxSessionEnabled.value ? 'Sending in Sandbox' : 'Sending command';
     }
     if (composerAgentBusy.value && isToolCapableComposerMode(composerMode.value)) {
-      return 'Queue message';
+      return sandboxSessionEnabled.value ? 'Queue Sandbox' : 'Queue message';
     }
-    return 'Send command';
+    return sandboxSessionEnabled.value ? 'Send in Sandbox' : 'Send command';
   });
 
   const composerShellClasses = computed(() => ({
     [`agent-dock-composer__shell--${composerMode.value}`]: true,
-    'agent-dock-composer__shell--full-access': isFullAccessAgent.value,
+    'agent-dock-composer__shell--full-access':
+      isFullAccessAgent.value && !sandboxSessionEnabled.value,
+    'agent-dock-composer__shell--sandbox':
+      sandboxSessionEnabled.value && !isFullAccessAgent.value,
+    'agent-dock-composer__shell--sandbox-full':
+      sandboxSessionEnabled.value && isFullAccessAgent.value,
     'agent-dock-composer__shell--drag-over': composerDragOver.value,
   }));
 
   return {
+    composerAccessBanner,
+    composerAccessToneValue,
     composerActivityChips,
     composerDraftModel,
     canConvertInstructions,

@@ -17,6 +17,13 @@ export type AgentTranscriptSegment =
       open: boolean;
     }
   | { kind: 'tool'; label: string }
+  | { kind: 'plan'; planId: string; title: string }
+  | {
+      kind: 'question';
+      prompt: string;
+      options: Array<{ id: string; label: string }>;
+      open: boolean;
+    }
   | { kind: 'research'; query: string; items: ResearchTranscriptItem[]; open: boolean; provider?: string; kindLabel?: ResearchBlockKind }
   | { kind: 'terminal'; command: string; output: string; open: boolean }
   | { kind: 'image'; path: string; open: boolean }

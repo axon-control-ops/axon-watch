@@ -1,6 +1,9 @@
 /** Default budget for control-plane JSON calls so hung CLI probes cannot stall the shell forever. */
 export const DEFAULT_FETCH_TIMEOUT_MS = 12_000;
 
+/** Brain graph may wait on a cold watch inbox + connectors; keep above the default. */
+export const BRAIN_GRAPH_FETCH_TIMEOUT_MS = 30_000;
+
 /** Runtime status / auth refresh can wait on `cursor agent status` (~7s) plus Codex probes. */
 export const RUNTIME_STATUS_FETCH_TIMEOUT_MS = 30_000;
 

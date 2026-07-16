@@ -1,5 +1,7 @@
 export const EDIT_HEADER_RE = /^:::edit\s+(.+?)\s+\+(\d+)\s+-(\d+)\s*$/;
 export const TOOL_HEADER_RE = /^:::tool\s+(.+)$/;
+export const PLAN_HEADER_RE = /^:::plan\s+(plan_[a-f0-9]{12})\s+(.+)$/;
+export const ASK_HEADER_RE = /^:::ask(?:\s+(.+))?$/;
 export const RESEARCH_HEADER_RE = /^:::research\s+(.+)$/;
 export const RESEARCH_ITEM_RE = /^-\s+(.+?)\s+\|\s+(\S+)\s*$/;
 export const RESEARCH_PROVIDER_RE = /^@provider\s+(.+)$/;

@@ -39,6 +39,7 @@ describe('kairo-galaxy-orb-view', () => {
     expect(galaxyOrbStateClass('idle', false, 'thinking')).toContain('busy');
     expect(galaxyOrbStateClass('observing', false, 'idle')).toContain('standby');
     expect(galaxyOrbStateClass('observing', false, 'idle')).not.toContain('listening');
+    expect(galaxyOrbStateClass('observing', false, 'idle', false, true)).toContain('autonomous');
     expect(galaxyOrbModeClass(true)).toContain('hands-free');
     expect(galaxyOrbModeClass(false)).toContain('manual');
   });

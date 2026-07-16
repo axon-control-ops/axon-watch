@@ -22,10 +22,9 @@ import {
   parseAgentTranscriptBlocksUncached,
   type ParseAgentTranscriptOptions,
 } from './agent-transcript/parse-transcript-blocks';
-import { EDIT_HEADER_RE, TERMINAL_HEADER_RE, TOOL_HEADER_RE, RESEARCH_HEADER_RE, DEBUG_REPRODUCE_HEADER_RE } from './agent-transcript/transcript-regex';
 
 export function agentContentHasTranscriptBlocks(content: string): boolean {
-  return /^:::(thinking|edit|tool|terminal|research|image|debug-reproduce)\b/m.test(content);
+  return /^:::(thinking|edit|tool|plan|ask|terminal|research|image|debug-reproduce)\b/m.test(content);
 }
 
 export function countAgentTranscriptHeaders(content: string): {

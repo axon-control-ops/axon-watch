@@ -134,6 +134,7 @@ class OperatorPresenceSettingsRequest(BaseModel):
     azure_voice_id: str | None = None
     stt_mode: str | None = None
     voice_routing_mode: str | None = None
+    narrate_tool_progress: bool | None = None
 
 
 class KairoSpeakRequest(BaseModel):

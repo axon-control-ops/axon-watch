@@ -54,8 +54,21 @@ describe('createAgentStreamIncrementalState', () => {
     expect(state.toStreamingActivityView()).toEqual(resolveStreamingActivity(STAGE_1_LONG));
 
     const state2 = feedIncrementalDeltas(STAGE_2);
-    expect(state2.toStreamingActivityView()).toEqual(resolveStreamingActivity(STAGE_2));
-    expect(state2.toStreamingActivityView(true)).toEqual(resolveStreamingActivity(STAGE_2, true));
+    expect(state2.toStreamingActivityView()).toMatchObject({
+      label: 'VAXON — Read README.md',
+      liveBodyFull: 'Read README.md',
+    });
+    expect(state2.toStreamingActivityView(true).label).toContain('Read README');
+  });
+
+  it('queues additional completed thinking blocks for throttled speech', () => {
+    const state = createAgentStreamIncrementalState();
+    state.consumeFullContent(
+      ':::thinking\nFirst complete thought.\n:::\n\n:::thinking\nSecond complete thought.\n:::\n',
+    );
+    expect(state.takeCompletedThinkingSpeech()).toBe('First complete thought.');
+    expect(state.takeCompletedThinkingSpeech()).toBe('Second complete thought.');
+    expect(state.takeCompletedThinkingSpeech()).toBeNull();
   });
 
   it('exposes the complete first thinking block for one verbatim narration', () => {

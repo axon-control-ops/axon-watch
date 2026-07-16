@@ -19,6 +19,7 @@ from app.chat.workspace_switch import (
 )
 from app.cli_runtime.approval_gate import is_tool_capable_composer_mode
 from app.persistence import chat_store
+from app.plans.service import maybe_attach_plan_artifact
 from app.terminal.session_registry import ensure_agent_session, serialize_session
 
 
@@ -299,6 +300,7 @@ def post_lane_b_message(
         )
 
     agent_content = str(lane_b_result.get("content") or "")
+    # Thread id may still be unresolved here; capture after resolve below for plan mode.
 
     if is_tool_capable_composer_mode(composer_mode) and run_record is not None:
         dispatched, run_record = _finalize_lane_b_agent_run(
@@ -350,9 +352,18 @@ def post_lane_b_message(
             "created_at": created_at,
         }
     )
+    agent_message_id = _new_message_id("message_agent")
+    agent_content, plan_meta = maybe_attach_plan_artifact(
+        composer_mode=composer_mode,
+        workspace_id=workspace_id,
+        thread_id=thread_id,
+        source_message_id=agent_message_id,
+        agent_content=agent_content,
+        created_at=created_at,
+    )
     agent_message = chat_store.save_message(
         {
-            "message_id": _new_message_id("message_agent"),
+            "message_id": agent_message_id,
             "thread_id": thread_id,
             "workspace_id": workspace_id,
             "run_id": dispatch_run_id or thread.get("run_id"),
@@ -399,4 +410,5 @@ def post_lane_b_message(
             else {}
         ),
         **({"ui_action": ui_action} if ui_action else {}),
+        **({"plan": plan_meta} if plan_meta else {}),
     }

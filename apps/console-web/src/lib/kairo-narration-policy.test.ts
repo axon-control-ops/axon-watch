@@ -60,7 +60,7 @@ describe('kairo-narration-policy', () => {
 
     expect(
       shouldNarrateAgentEvent({ eventKey: 'thinking:0', narration: 'minimal' }),
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       shouldNarrateAgentEvent({ eventKey: 'done', narration: 'minimal' }),
@@ -79,8 +79,16 @@ describe('kairo-narration-policy', () => {
     ).toBe(false);
 
     expect(
-      shouldNarrateAgentEvent({ eventKey: 'thinking:0', narration: 'conversational' }),
-    ).toBe(false);
+      shouldNarrateAgentEvent({
+        eventKey: 'tool:0',
+        narration: 'conversational',
+        narrateToolProgress: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldNarrateAgentEvent({ eventKey: 'thinking:1', narration: 'minimal' }),
+    ).toBe(true);
 
     expect(
       shouldNarrateAgentEvent({ eventKey: 'start', narration: 'conversational' }),

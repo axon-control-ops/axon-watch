@@ -51,11 +51,19 @@ class ControlPlaneInboxProjectionTests(unittest.TestCase):
         source_item = BOOTSTRAP_WATCH_INBOX["items"][0]
         self.assertEqual(consistency_tuple(source_item), consistency_tuple(projected_item))
 
-    def test_build_inbox_response_returns_empty_snapshot_when_watch_unavailable(self) -> None:
-        payload = build_inbox_response(inbox_fetcher=lambda: None)
+    def test_build_inbox_response_fails_closed_when_watch_unavailable(self) -> None:
+        from app.inbox_projection import WatchInboxUnavailableError
 
-        self.assertEqual([], payload["items"])
-        self.assertEqual(0, payload["count"])
+        with self.assertRaises(WatchInboxUnavailableError):
+            build_inbox_response(inbox_fetcher=lambda: None)
+
+    def test_inbox_endpoint_returns_503_when_watch_unavailable(self) -> None:
+        with patch(
+            "app.inbox_projection.fetch_watch_inbox",
+            return_value=None,
+        ):
+            response = self.client.get("/api/inbox")
+        self.assertEqual(503, response.status_code)
 
 
 if __name__ == "__main__":

@@ -187,6 +187,34 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertIn("Two approvals", payload["line"])
         self.assertEqual(payload["source"], "fallback")
 
+    def test_briefing_fallback_drops_generic_idle_copy_beside_live_signal(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="briefing",
+                context={
+                    "notice": "No active runs. Systems nominal.",
+                    "advise": "Describe the next action in Command.",
+                    "top_signal_title": "Fast Gate failed on axon-watch.",
+                },
+                session_id="briefing-live-signal",
+                use_runtime=False,
+            )
+
+        self.assertEqual("Fast Gate failed on axon-watch.", payload["line"])
+        self.assertNotIn("systems nominal", payload["line"].lower())
+        self.assertNotIn("describe the next action", payload["line"].lower())
+
+    def test_conversation_reply_without_live_reply_stays_quiet(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="conversation_reply",
+                context={},
+                session_id="conversation-no-reply",
+                use_runtime=False,
+            )
+
+        self.assertEqual("", payload["line"])
+
     def test_guest_introduction_replaces_sir_in_fallback(self) -> None:
         from app.kairo_participant_memory import reset_participant_memory_for_tests
 

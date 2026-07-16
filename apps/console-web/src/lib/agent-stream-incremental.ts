@@ -35,10 +35,10 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
   let processedLength = 0;
   let lineBuffer = '';
   let inBlock: 'thinking' | 'other' | null = null;
-  let inFirstThinking = false;
-  let firstThinkingSeen = false;
-  let firstThinkingBody = '';
-  let completedThinkingSpeech: string | null = null;
+  let inThinkingBlock = false;
+  let thinkingBlockIndex = -1;
+  let currentThinkingBody = '';
+  const completedThinkingSpeechQueue: string[] = [];
   let thinkingMilestoneEmitted = false;
   let toolCount = 0;
   let editCount = 0;
@@ -50,10 +50,10 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
     processedLength = 0;
     lineBuffer = '';
     inBlock = null;
-    inFirstThinking = false;
-    firstThinkingSeen = false;
-    firstThinkingBody = '';
-    completedThinkingSpeech = null;
+    inThinkingBlock = false;
+    thinkingBlockIndex = -1;
+    currentThinkingBody = '';
+    completedThinkingSpeechQueue.length = 0;
     thinkingMilestoneEmitted = false;
     toolCount = 0;
     editCount = 0;
@@ -76,18 +76,21 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
   function processLine(line: string): NarrationMilestone[] {
     const milestones: NarrationMilestone[] = [];
 
-    if (inBlock === 'thinking' && inFirstThinking) {
+    if (inBlock === 'thinking' && inThinkingBlock) {
       if (BLOCK_CLOSE_RE.test(line.trimEnd())) {
-        const complete = sanitizeAgentThinkingForOperator(firstThinkingBody);
-        completedThinkingSpeech = complete || null;
+        const complete = sanitizeAgentThinkingForOperator(currentThinkingBody);
+        if (complete) {
+          completedThinkingSpeechQueue.push(complete);
+        }
         inBlock = null;
-        inFirstThinking = false;
+        inThinkingBlock = false;
+        currentThinkingBody = '';
         return milestones;
       }
-      if (firstThinkingBody) {
-        firstThinkingBody += '\n';
+      if (currentThinkingBody) {
+        currentThinkingBody += '\n';
       }
-      firstThinkingBody += line;
+      currentThinkingBody += line;
       return milestones;
     }
 
@@ -104,17 +107,13 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
     }
 
     if (THINKING_HEADER_RE.test(line.trimEnd())) {
-      if (!firstThinkingSeen) {
-        firstThinkingSeen = true;
-        inFirstThinking = true;
-        inBlock = 'thinking';
-        firstThinkingBody = '';
-        if (!thinkingMilestoneEmitted) {
-          thinkingMilestoneEmitted = true;
-          milestones.push({ key: 'thinking:0', message: 'Thinking…' });
-        }
-      } else {
-        inBlock = 'other';
+      thinkingBlockIndex += 1;
+      inThinkingBlock = true;
+      inBlock = 'thinking';
+      currentThinkingBody = '';
+      if (!thinkingMilestoneEmitted) {
+        thinkingMilestoneEmitted = true;
+        milestones.push({ key: 'thinking:0', message: 'Thinking…' });
       }
       return milestones;
     }
@@ -188,8 +187,8 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
   }
 
   function liveThinkingTextFromState(): string {
-    let body = firstThinkingBody;
-    if (inFirstThinking && lineBuffer) {
+    let body = currentThinkingBody;
+    if (inThinkingBlock && lineBuffer) {
       if (body) {
         body += '\n';
       }
@@ -252,9 +251,7 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
   }
 
   function takeCompletedThinkingSpeech(): string | null {
-    const completed = completedThinkingSpeech;
-    completedThinkingSpeech = null;
-    return completed;
+    return completedThinkingSpeechQueue.shift() ?? null;
   }
 
   return {

@@ -1,0 +1,91 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  SANDBOX_SESSION_CONSENT_LINES,
+  buildComposerModeAccessLabel,
+  composerAccessBannerCopy,
+  composerAccessMenuStatus,
+  composerAccessTone,
+  sandboxSessionHint,
+  sandboxSessionLabel,
+} from './sandbox-session-view';
+
+describe('sandbox session view', () => {
+  it('exposes consent lines for the enable dialog', () => {
+    expect(SANDBOX_SESSION_CONSENT_LINES.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('labels and hints reflect on/off and env force', () => {
+    expect(sandboxSessionLabel(false)).toBe('Sandbox');
+    expect(sandboxSessionLabel(true)).toBe('Sandbox · On');
+    expect(sandboxSessionHint(false, false).toLowerCase()).toContain('enable');
+    expect(sandboxSessionHint(true, false).toLowerCase()).toContain('on');
+    expect(sandboxSessionHint(true, true).toLowerCase()).toContain('forced');
+  });
+
+  it('builds mode chip labels for access and sandbox', () => {
+    expect(
+      buildComposerModeAccessLabel({
+        modeLabel: 'Agent',
+        fullAccess: false,
+        sandboxEnabled: false,
+      }),
+    ).toBe('Agent');
+    expect(
+      buildComposerModeAccessLabel({
+        modeLabel: 'Agent',
+        fullAccess: true,
+        sandboxEnabled: false,
+      }),
+    ).toBe('Agent · Full');
+    expect(
+      buildComposerModeAccessLabel({
+        modeLabel: 'Debug',
+        fullAccess: true,
+        sandboxEnabled: true,
+      }),
+    ).toBe('Debug · Sandbox · Full');
+    expect(
+      buildComposerModeAccessLabel({
+        modeLabel: 'Ask',
+        fullAccess: false,
+        sandboxEnabled: true,
+      }),
+    ).toBe('Ask · Sandbox');
+  });
+
+  it('returns banner copy only for Sandbox states (Full Access uses mode-pill hover)', () => {
+    expect(
+      composerAccessBannerCopy({ fullAccess: false, sandboxEnabled: false }),
+    ).toBeNull();
+    expect(
+      composerAccessBannerCopy({ fullAccess: true, sandboxEnabled: false }),
+    ).toBeNull();
+    expect(
+      composerAccessBannerCopy({ fullAccess: false, sandboxEnabled: true }),
+    ).toMatchObject({
+      title: 'Sandbox',
+      glyph: '▣',
+      tone: 'sandbox',
+    });
+    expect(
+      composerAccessBannerCopy({ fullAccess: true, sandboxEnabled: true }),
+    ).toMatchObject({
+      title: 'Sandbox · Full Access',
+      glyph: '▣',
+      tone: 'sandbox-full',
+    });
+  });
+
+  it('maps access tone and menu status lines', () => {
+    expect(composerAccessTone({ fullAccess: false, sandboxEnabled: false })).toBeNull();
+    expect(composerAccessTone({ fullAccess: true, sandboxEnabled: false })).toBe('full');
+    expect(composerAccessTone({ fullAccess: true, sandboxEnabled: true })).toBe('sandbox-full');
+    expect(
+      composerAccessMenuStatus({ fullAccess: true, sandboxEnabled: true }),
+    ).toEqual({
+      executionLine: 'Full Access active — tools after approval',
+      sandboxLine: 'Sandbox on — disposable copy',
+    });
+  });
+});

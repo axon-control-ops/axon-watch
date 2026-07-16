@@ -7,6 +7,10 @@ import {
   parseIdeAgentThreadStatusLabel,
   shouldShowIdeAgentThreadStatusStrip,
 } from '../../lib/ide-agent-center-view';
+import {
+  resolveThreadStatusStripTone,
+  threadStatusStripClassNames,
+} from '../../lib/thread-status-strip-tone';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -34,6 +38,20 @@ const visibleBody = computed(() =>
     : statusBody.value,
 );
 
+const stripTone = computed(() =>
+  resolveThreadStatusStripTone(
+    shell.ideComposerActivity?.mode,
+    shell.ideComposerActivity?.executionAccess ?? shell.agentExecutionAccess,
+  ),
+);
+
+const stripClasses = computed(() =>
+  threadStatusStripClassNames({
+    tone: stripTone.value,
+    streaming: shell.agentStreamActive,
+  }),
+);
+
 watch(
   () => shell.ideComposerActivity?.label,
   () => {
@@ -51,7 +69,8 @@ function toggleExpanded(event: Event): void {
 <template>
   <li
     v-if="showStatusStrip"
-    class="conversation-seam__item conversation-seam__item--thread-status"
+    class="conversation-seam__item"
+    :class="stripClasses"
     role="status"
     aria-live="polite"
   >

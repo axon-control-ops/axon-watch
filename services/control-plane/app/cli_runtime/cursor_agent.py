@@ -72,6 +72,8 @@ def run_cursor_local(
     if mode_flag:
         command.extend(["--mode", mode_flag])
     if workspace_root:
+        # Safe-improvement evaluation must pass the disposable isolation root
+        # (proposal_service.sandbox_agent_workspace), never the live bound project.
         command.extend(["--workspace", str(workspace_root.resolve())])
     if model:
         command.extend(["--model", model])

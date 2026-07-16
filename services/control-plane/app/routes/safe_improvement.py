@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.safe_improvement import proposal_service, store
+from app.safe_improvement import session as sandbox_session
 
 router = APIRouter(prefix="/api/safe-improvement", tags=["safe-improvement"])
 
@@ -53,8 +54,29 @@ class ApproveBody(BaseModel):
     approved_by: str = "operator"
 
 
+def _require_sandbox_enabled() -> None:
+    if not sandbox_session.is_enabled():
+        raise HTTPException(status_code=404, detail="sandbox session is not enabled")
+
+
+@router.get("/session")
+def get_sandbox_session() -> dict[str, Any]:
+    return sandbox_session.status()
+
+
+@router.post("/session/enable")
+def enable_sandbox_session() -> dict[str, Any]:
+    return sandbox_session.enable_session()
+
+
+@router.post("/session/disable")
+def disable_sandbox_session() -> dict[str, Any]:
+    return sandbox_session.disable_session()
+
+
 @router.post("/traces")
 def create_trace(body: TraceBody) -> dict[str, Any]:
+    _require_sandbox_enabled()
     trace = proposal_service.capture_trace(
         workspace_id=body.workspace_id,
         source_kind=body.source_kind,
@@ -68,6 +90,7 @@ def create_trace(body: TraceBody) -> dict[str, Any]:
 
 @router.post("/cases")
 def create_case(body: CaseBody) -> dict[str, Any]:
+    _require_sandbox_enabled()
     case = proposal_service.upsert_evaluation_case(
         name=body.name,
         metric=body.metric,
@@ -81,6 +104,7 @@ def create_case(body: CaseBody) -> dict[str, Any]:
 
 @router.post("/proposals")
 def create_proposal(body: ProposalBody) -> dict[str, Any]:
+    _require_sandbox_enabled()
     try:
         proposal = proposal_service.create_proposal(
             workspace_id=body.workspace_id,
@@ -97,11 +121,13 @@ def create_proposal(body: ProposalBody) -> dict[str, Any]:
 
 @router.get("/proposals")
 def list_proposals(limit: int = 20) -> dict[str, Any]:
+    _require_sandbox_enabled()
     return {"proposals": store.list_proposals(limit=limit)}
 
 
 @router.get("/proposals/{proposal_id}")
 def get_proposal(proposal_id: str) -> dict[str, Any]:
+    _require_sandbox_enabled()
     proposal = store.get_proposal(proposal_id)
     if proposal is None:
         raise HTTPException(status_code=404, detail="proposal not found")
@@ -110,6 +136,7 @@ def get_proposal(proposal_id: str) -> dict[str, Any]:
 
 @router.post("/proposals/{proposal_id}/evaluate")
 def evaluate_proposal(proposal_id: str, body: EvaluateBody) -> dict[str, Any]:
+    _require_sandbox_enabled()
     try:
         proposal = proposal_service.evaluate_proposal(
             proposal_id,
@@ -122,6 +149,7 @@ def evaluate_proposal(proposal_id: str, body: EvaluateBody) -> dict[str, Any]:
 
 @router.post("/proposals/{proposal_id}/request-approval")
 def request_approval(proposal_id: str, body: RequestApprovalBody) -> dict[str, Any]:
+    _require_sandbox_enabled()
     try:
         proposal = proposal_service.request_exact_approval(
             proposal_id,
@@ -135,6 +163,7 @@ def request_approval(proposal_id: str, body: RequestApprovalBody) -> dict[str, A
 
 @router.post("/proposals/{proposal_id}/approve")
 def approve_proposal(proposal_id: str, body: ApproveBody) -> dict[str, Any]:
+    _require_sandbox_enabled()
     try:
         proposal = proposal_service.approve_exact_effect(
             proposal_id,
@@ -148,6 +177,7 @@ def approve_proposal(proposal_id: str, body: ApproveBody) -> dict[str, Any]:
 
 @router.post("/proposals/{proposal_id}/execute")
 def execute_proposal(proposal_id: str) -> dict[str, Any]:
+    _require_sandbox_enabled()
     try:
         proposal = proposal_service.execute_approved_proposal(proposal_id)
     except ValueError as exc:
@@ -157,6 +187,7 @@ def execute_proposal(proposal_id: str) -> dict[str, Any]:
 
 @router.post("/proposals/{proposal_id}/rollback")
 def rollback_proposal(proposal_id: str) -> dict[str, Any]:
+    _require_sandbox_enabled()
     try:
         proposal = proposal_service.rollback_proposal(proposal_id)
     except ValueError as exc:

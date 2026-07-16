@@ -91,6 +91,11 @@ const handsFreeEnabled = computed({
   set: (value: boolean) => patchDraft({ hands_free_enabled: value }),
 });
 
+const narrateToolProgress = computed({
+  get: () => draft.value.narrate_tool_progress,
+  set: (value: boolean) => patchDraft({ narrate_tool_progress: value }),
+});
+
 const narrationOptions = [
   {
     value: 'off',
@@ -100,12 +105,12 @@ const narrationOptions = [
   {
     value: 'minimal',
     label: 'Minimal',
-    hint: 'Start, done, alerts, and one thinking sentence while the agent works (browser voice).',
+    hint: 'Start, done, alerts, and up to three thinking lines while the agent works (browser voice).',
   },
   {
     value: 'conversational',
     label: 'Conversational',
-    hint: 'Same as Minimal, with polished phrasing on those lines — not every tool step.',
+    hint: 'Same as Minimal with polished phrasing; optional tool milestones when enabled below.',
   },
 ] as const;
 
@@ -288,7 +293,7 @@ defineExpose({
         <label class="operator-settings-form__row operator-settings-form__row--select">
           <span class="operator-settings-form__copy">
             <strong>KAIRO narration</strong>
-            <small>Agent runs speak bookends and one thinking line — not every tool.</small>
+            <small>Agent runs speak bookends and throttled thinking — not every tool by default.</small>
           </span>
           <select
             class="operator-settings-form__select"
@@ -306,6 +311,19 @@ defineExpose({
               ''
             }}
           </p>
+        </label>
+        <label class="operator-settings-form__row">
+          <input
+            v-model="narrateToolProgress"
+            type="checkbox"
+            :disabled="saving || privacyMode || draft.kairo_narration !== 'conversational'"
+          />
+          <span class="operator-settings-form__copy">
+            <strong>Tool milestone narration</strong>
+            <small>
+              Conversational only — speak tool steps at most once every 30 seconds when enabled.
+            </small>
+          </span>
         </label>
         <div class="operator-settings-form__voice-tuning">
           <header class="operator-settings-form__copy">

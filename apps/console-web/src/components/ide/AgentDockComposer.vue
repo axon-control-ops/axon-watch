@@ -1,274 +1,190 @@
 <script setup lang="ts">
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 import { useAgentDockComposer } from '../../composables/useAgentDockComposer';
-import AgentDockComposerImageLightbox from './agent-dock/AgentDockComposerImageLightbox.vue';
+import { useAgentDockComposerToolbarProps } from '../../composables/agent-dock/use-agent-dock-composer-toolbar-props';
+import AgentDockComposerAccessBanner from './agent-dock/AgentDockComposerAccessBanner.vue';
+import AgentDockComposerChrome from './agent-dock/AgentDockComposerChrome.vue';
 import AgentDockComposerInput from './agent-dock/AgentDockComposerInput.vue';
 import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue';
-import AgentDockApprovalBanner from './agent-dock/AgentDockApprovalBanner.vue';
-import AgentDockDebugReproduceBanner from './agent-dock/AgentDockDebugReproduceBanner.vue';
-import AgentDockFullAccessConsent from './agent-dock/AgentDockFullAccessConsent.vue';
 import AgentDockKairoComposerFooter from './agent-dock/AgentDockKairoComposerFooter.vue';
 
-const {
-  MODE_OPTIONS,
-  OPERATOR_PERSONA_NAME,
-  activeMode,
-  attachmentChips,
-  autoModelRow,
-  autoToggleChecked,
-  canSubmitComposer,
-  canConvertInstructions,
-  cancelFullAccessConsent,
-  convertDraftToInstructions,
-  closeAddModelsPanel,
-  closeComposerImageLightbox,
-  composerActivityChips,
-  composerDraftModel,
-  composerImages,
-  composerMode,
-  debugReproduceRequest,
-  composerPlaceholder,
-  composerPickerRows,
-  composerQueueHint,
-  composerShellClasses,
-  composerSubmitLabel,
-  confirmFullAccessConsent,
-  attachFilesMedia,
-  contextIde,
-  contextPinned,
-  contextSelection,
-  contextTerminal,
-  contextWorkspace,
-  cursorAuthLine,
-  cursorCatalogCount,
-  cursorCatalogStatus,
-  cursorCatalogTotal,
-  cursorManageRows,
-  cursorStaleWarning,
-  enlargedComposerImage,
-  executionAccessHint,
-  extraPinnedRows,
-  fullAccessConsentChecked,
-  handleApproveRun,
-  handleComposerDragLeave,
-  handleComposerDragOver,
-  handleComposerDrop,
-  handleComposerKeydown,
-  handleComposerPaste,
-  handleDebugReproduceDismiss,
-  handleDebugReproduceProceed,
-  handleRejectRun,
-  handleResumeRun,
-  handleSteer,
-  handleSteerQueuedMessage,
-  handleStopRun,
-  handleSubmit,
-  hasTerminalSnippet,
-  setInputRef,
-  isFullAccessAgent,
-  kairoConversationError,
-  kairoConversationReply,
-  kairoPending,
-  mcpToolsForMode,
-  modeButtonLabel,
-  modelSearchQuery,
-  onAutoToggleClick,
-  openAddModelsPanel,
-  openComposerImage,
-  openVaultSurface,
-  removeChip,
-  removeComposerImage,
-  editQueuedMessage,
-  removeQueuedMessage,
-  requestFullAccess,
-  revealComposerTerminalPanel,
-  runtimeDetail,
-  runtimeHint,
-  runtimeLabel,
-  runtimeTargets,
-  selectComposerModel,
-  selectManageModelRow,
-  selectMode,
-  selectRuntimeTarget,
-  selectedModelId,
-  selectedModelLabel,
-  selectedRuntimeSummary,
-  selectionChipLabel,
-  shell,
-  showAddModelsEntry,
-  showAddModelsPanel,
-  showApprovalBanner,
-  showComposerResume,
-  composerResumeLabel,
-  showComposerSteer,
-  showComposerStop,
-  showContextMenu,
-  showDebugReproduceBanner,
-  showCursorCatalog,
-  showExtraPinnedRows,
-  showFullAccessConsent,
-  showModeMenu,
-  showModelMenu,
-  showRuntimeTargetsPanel,
-  showToolsMenu,
-  showVaultAction,
-  speechCapture,
-  switchToConsultativeAccess,
-  syncComposerHeight,
-  toggleContext,
-  toggleRuntimeTargetsPanel,
-  toggleSection,
-  toggleVoiceCapture,
-} = useAgentDockComposer();
+const composer = useAgentDockComposer();
+const toolbarProps = useAgentDockComposerToolbarProps({
+  showContextMenu: composer.showContextMenu,
+  showToolsMenu: composer.showToolsMenu,
+  showModelMenu: composer.showModelMenu,
+  showModeMenu: composer.showModeMenu,
+  showAddModelsPanel: composer.showAddModelsPanel,
+  showRuntimeTargetsPanel: composer.showRuntimeTargetsPanel,
+  showAddModelsEntry: composer.showAddModelsEntry,
+  showExtraPinnedRows: composer.showExtraPinnedRows,
+  showCursorCatalog: composer.showCursorCatalog,
+  showVaultAction: composer.showVaultAction,
+  attachmentChips: composer.attachmentChips,
+  composerImages: composer.composerImages,
+  mcpToolsForMode: composer.mcpToolsForMode,
+  composerMode: composer.composerMode,
+  modeOptions: composer.MODE_OPTIONS,
+  modeButtonLabel: composer.modeButtonLabel,
+  modeButtonTitle: composer.modeButtonTitle,
+  activeMode: composer.activeMode,
+  isFullAccessAgent: composer.isFullAccessAgent,
+  executionAccessHint: composer.executionAccessHint,
+  sandboxSessionEnabled: composer.sandboxSessionEnabled,
+  sandboxEnvForced: composer.sandboxEnvForced,
+  sandboxHint: composer.sandboxHint,
+  sandboxLabel: composer.sandboxLabel,
+  sandboxSessionPending: composer.sandboxSessionPending,
+  contextWorkspace: composer.contextWorkspace,
+  contextSelection: composer.contextSelection,
+  contextTerminal: composer.contextTerminal,
+  contextIde: composer.contextIde,
+  contextPinned: composer.contextPinned,
+  hasTerminalSnippet: composer.hasTerminalSnippet,
+  selectionChipLabel: composer.selectionChipLabel,
+  runtimeDetail: composer.runtimeDetail,
+  runtimeLabel: composer.runtimeLabel,
+  selectedRuntimeSummary: composer.selectedRuntimeSummary,
+  runtimeTargets: composer.runtimeTargets,
+  selectedModelId: composer.selectedModelId,
+  selectedModelLabel: composer.selectedModelLabel,
+  autoModelRow: composer.autoModelRow,
+  autoToggleChecked: composer.autoToggleChecked,
+  composerPickerRows: composer.composerPickerRows,
+  extraPinnedRows: composer.extraPinnedRows,
+  cursorCatalogTotal: composer.cursorCatalogTotal,
+  cursorCatalogStatus: composer.cursorCatalogStatus,
+  cursorAuthLine: composer.cursorAuthLine,
+  cursorStaleWarning: composer.cursorStaleWarning,
+  cursorManageRows: composer.cursorManageRows,
+  cursorCatalogCount: composer.cursorCatalogCount,
+  modelSearchQuery: composer.modelSearchQuery,
+  runtimeHint: composer.runtimeHint,
+  canConvertInstructions: composer.canConvertInstructions,
+});
 </script>
 
 <template>
-  <AgentDockFullAccessConsent :show="showFullAccessConsent" :checked="fullAccessConsentChecked" @update:checked="fullAccessConsentChecked = $event" @cancel="cancelFullAccessConsent" @confirm="confirmFullAccessConsent" />
-  <AgentDockComposerImageLightbox :image="enlargedComposerImage" @close="closeComposerImageLightbox" />
+  <AgentDockComposerChrome
+    :show-full-access-consent="composer.showFullAccessConsent.value"
+    :full-access-consent-checked="composer.fullAccessConsentChecked.value"
+    :show-sandbox-consent="composer.showSandboxConsent.value"
+    :sandbox-consent-checked="composer.sandboxConsentChecked.value"
+    :sandbox-session-pending="composer.sandboxSessionPending.value"
+    :sandbox-session-error="composer.sandboxSessionError.value"
+    :enlarged-composer-image="composer.enlargedComposerImage.value"
+    :show-debug-reproduce-banner="composer.showDebugReproduceBanner.value"
+    :debug-reproduce-request="composer.debugReproduceRequest.value"
+    :command-mutation-pending="composer.shell.commandMutationState === 'submitting'"
+    :agent-stream-active="composer.shell.agentStreamActive"
+    :show-approval-banner="composer.showApprovalBanner.value"
+    :can-approve-ide-agent-run="composer.shell.canApproveIdeAgentRun"
+    :run-mutation-pending="composer.shell.runMutationPending"
+    :plan-soft-switch-notice="composer.planSoftSwitchNotice.value"
+    @update:full-access-consent-checked="composer.fullAccessConsentChecked.value = $event"
+    @cancel-full-access-consent="composer.cancelFullAccessConsent()"
+    @confirm-full-access-consent="composer.confirmFullAccessConsent()"
+    @update:sandbox-consent-checked="composer.sandboxConsentChecked.value = $event"
+    @cancel-sandbox-consent="composer.cancelSandboxConsent()"
+    @confirm-sandbox-consent="composer.confirmSandboxConsent()"
+    @close-composer-image-lightbox="composer.closeComposerImageLightbox()"
+    @debug-reproduce-proceed="composer.handleDebugReproduceProceed"
+    @debug-reproduce-dismiss="composer.handleDebugReproduceDismiss()"
+    @approve-run="composer.handleApproveRun()"
+    @reject-run="composer.handleRejectRun()"
+    @undo-plan-soft-switch="composer.undoPlanSoftSwitch()"
+    @dismiss-plan-soft-switch="composer.dismissPlanSoftSwitch()"
+  />
   <form
     class="agent-dock-composer"
-    @submit="handleSubmit"
-    @dragover="handleComposerDragOver"
-    @dragleave="handleComposerDragLeave"
-    @drop="handleComposerDrop"
+    @submit="composer.handleSubmit"
+    @dragover="composer.handleComposerDragOver"
+    @dragleave="composer.handleComposerDragLeave"
+    @drop="composer.handleComposerDrop"
   >
     <BriefingSurfaceFollowupPrompt />
-    <AgentDockDebugReproduceBanner
-      v-if="showDebugReproduceBanner && debugReproduceRequest"
-      :request="debugReproduceRequest"
-      :pending="shell.commandMutationState === 'submitting' || shell.agentStreamActive"
-      @proceed="handleDebugReproduceProceed(debugReproduceRequest.messageId)"
-      @dismiss="handleDebugReproduceDismiss"
-    />
-    <AgentDockApprovalBanner
-      :show="showApprovalBanner"
-      :can-approve="shell.canApproveIdeAgentRun"
-      :reject-pending="shell.runMutationPending"
-      @approve="handleApproveRun"
-      @reject="handleRejectRun"
-    />
-    <div
-      class="agent-dock-composer__shell"
-      :class="composerShellClasses"
-    >
+    <div class="agent-dock-composer__shell" :class="composer.composerShellClasses.value">
       <div class="agent-dock-composer__card">
+        <AgentDockComposerAccessBanner
+          v-if="composer.composerAccessBanner.value"
+          :banner="composer.composerAccessBanner.value"
+        />
         <AgentDockComposerInput
-          :set-input-ref="setInputRef"
-          :draft="composerDraftModel"
-          :composer-mode="composerMode"
-          :operator-persona-name="OPERATOR_PERSONA_NAME"
-          :placeholder="composerPlaceholder"
-          :workspace-selected="Boolean(shell.currentWorkspace)"
-          :attachment-chips="attachmentChips"
-          :composer-images="composerImages"
-          :queue-items="shell.ideComposerQueue"
-          :queue-summary="shell.ideComposerQueueSummary"
-          :activity-chips="composerActivityChips"
-          :composer-queue-hint="composerQueueHint"
-          :show-composer-resume="showComposerResume"
-          :composer-resume-label="composerResumeLabel"
-          :show-composer-steer="showComposerSteer"
-          :show-composer-stop="showComposerStop"
-          :can-submit-composer="canSubmitComposer"
-          :composer-submit-label="composerSubmitLabel"
-          :command-mutation-state="shell.commandMutationState"
-          :run-mutation-state="shell.runMutationState"
-          :kairo-pending="kairoPending"
-          :speech-capture-supported="speechCapture.supported"
-          :speech-capturing="speechCapture.capturing.value"
-          :privacy-mode="shell.operatorPresenceSettings.privacy_mode"
-          @update:draft="composerDraftModel = $event"
-          @remove-chip="removeChip"
-          @open-image="openComposerImage"
-          @remove-image="removeComposerImage"
-          @edit-queued="editQueuedMessage"
-          @remove-queued="removeQueuedMessage"
-          @steer-queued="handleSteerQueuedMessage"
-          @sync-height="syncComposerHeight"
-          @keydown="handleComposerKeydown"
-          @paste="handleComposerPaste"
-          @reveal-terminal="revealComposerTerminalPanel"
-          @resume="handleResumeRun"
-          @steer="handleSteer"
-          @toggle-voice="toggleVoiceCapture"
-          @stop="handleStopRun"
+          :set-input-ref="composer.setInputRef"
+          :draft="composer.composerDraftModel.value"
+          :composer-mode="composer.composerMode.value"
+          :operator-persona-name="composer.OPERATOR_PERSONA_NAME"
+          :placeholder="composer.composerPlaceholder.value"
+          :workspace-selected="Boolean(composer.shell.currentWorkspace)"
+          :attachment-chips="composer.attachmentChips.value"
+          :composer-images="composer.composerImages.value"
+          :queue-items="composer.shell.ideComposerQueue"
+          :queue-summary="composer.shell.ideComposerQueueSummary"
+          :activity-chips="composer.composerActivityChips.value"
+          :composer-queue-hint="composer.composerQueueHint.value"
+          :show-composer-resume="composer.showComposerResume.value"
+          :composer-resume-label="composer.composerResumeLabel.value"
+          :show-composer-steer="composer.showComposerSteer.value"
+          :show-composer-stop="composer.showComposerStop.value"
+          :can-submit-composer="composer.canSubmitComposer.value"
+          :composer-submit-label="composer.composerSubmitLabel.value"
+          :access-tone="composer.composerAccessToneValue.value"
+          :command-mutation-state="composer.shell.commandMutationState"
+          :run-mutation-state="composer.shell.runMutationState"
+          :kairo-pending="composer.kairoPending.value"
+          :speech-capture-supported="composer.speechCapture.supported"
+          :speech-capturing="composer.speechCapture.capturing.value"
+          :privacy-mode="composer.shell.operatorPresenceSettings.privacy_mode"
+          @update:draft="composer.composerDraftModel.value = $event"
+          @remove-chip="composer.removeChip"
+          @open-image="composer.openComposerImage"
+          @remove-image="composer.removeComposerImage"
+          @edit-queued="composer.editQueuedMessage"
+          @remove-queued="composer.removeQueuedMessage"
+          @steer-queued="composer.handleSteerQueuedMessage"
+          @sync-height="composer.syncComposerHeight"
+          @keydown="composer.handleComposerKeydown"
+          @paste="composer.handleComposerPaste"
+          @reveal-terminal="composer.revealComposerTerminalPanel"
+          @resume="composer.handleResumeRun"
+          @steer="composer.handleSteer"
+          @toggle-voice="composer.toggleVoiceCapture"
+          @stop="composer.handleStopRun"
         >
           <template #toolbar>
             <AgentDockComposerToolbar
-              :show-context-menu="showContextMenu"
-              :show-tools-menu="showToolsMenu"
-              :show-model-menu="showModelMenu"
-              :show-mode-menu="showModeMenu"
-              :show-add-models-panel="showAddModelsPanel"
-              :show-runtime-targets-panel="showRuntimeTargetsPanel"
-              :show-add-models-entry="showAddModelsEntry"
-              :show-extra-pinned-rows="showExtraPinnedRows"
-              :show-cursor-catalog="showCursorCatalog"
-              :show-vault-action="showVaultAction"
-              :attachment-chips="attachmentChips"
-              :composer-image-count="composerImages.length"
-              :mcp-tools-for-mode="mcpToolsForMode"
-              :composer-mode="composerMode"
-              :mode-options="MODE_OPTIONS"
-              :mode-button-label="modeButtonLabel"
-              :active-mode="activeMode"
-              :is-full-access-agent="isFullAccessAgent"
-              :execution-access-hint="executionAccessHint"
-              :context-workspace="contextWorkspace"
-              :context-selection="contextSelection"
-              :context-terminal="contextTerminal"
-              :context-ide="contextIde"
-              :context-pinned="contextPinned"
-              :has-terminal-snippet="hasTerminalSnippet"
-              :selection-chip-label="selectionChipLabel"
-              :runtime-detail="runtimeDetail"
-              :runtime-label="runtimeLabel"
-              :selected-runtime-summary="selectedRuntimeSummary"
-              :runtime-targets="runtimeTargets"
-              :selected-model-id="selectedModelId"
-              :selected-model-label="selectedModelLabel"
-              :auto-model-row="autoModelRow"
-              :auto-toggle-checked="autoToggleChecked"
-              :composer-picker-rows="composerPickerRows"
-              :extra-pinned-rows="extraPinnedRows"
-              :cursor-catalog-total="cursorCatalogTotal"
-              :cursor-catalog-status="cursorCatalogStatus"
-              :cursor-auth-line="cursorAuthLine"
-              :cursor-stale-warning="cursorStaleWarning"
-              :cursor-manage-rows="cursorManageRows"
-              :cursor-catalog-count="cursorCatalogCount"
-              :model-search-query="modelSearchQuery"
-              :runtime-hint="runtimeHint"
-              :can-convert-instructions="canConvertInstructions"
-              @toggle-section="toggleSection"
-              @toggle-context="toggleContext"
-              @attach-files-media="attachFilesMedia"
-              @convert-to-instructions="convertDraftToInstructions"
-              @toggle-runtime-targets="toggleRuntimeTargetsPanel"
-              @select-runtime-target="selectRuntimeTarget"
-              @select-composer-model="selectComposerModel"
-              @select-manage-model="selectManageModelRow"
-              @open-add-models="openAddModelsPanel"
-              @close-add-models="closeAddModelsPanel"
-              @auto-toggle-click="onAutoToggleClick"
-              @update:model-search-query="modelSearchQuery = $event"
-              @select-mode="selectMode"
-              @request-full-access="requestFullAccess"
-              @switch-consultative="switchToConsultativeAccess"
-              @open-vault="openVaultSurface"
+              v-bind="toolbarProps"
+              @toggle-section="composer.toggleSection"
+              @toggle-context="composer.toggleContext"
+              @attach-files-media="composer.attachFilesMedia"
+              @convert-to-instructions="composer.convertDraftToInstructions"
+              @toggle-runtime-targets="composer.toggleRuntimeTargetsPanel"
+              @select-runtime-target="composer.selectRuntimeTarget"
+              @select-composer-model="composer.selectComposerModel"
+              @select-manage-model="composer.selectManageModelRow"
+              @open-add-models="composer.openAddModelsPanel"
+              @close-add-models="composer.closeAddModelsPanel"
+              @auto-toggle-click="composer.onAutoToggleClick"
+              @update:model-search-query="composer.modelSearchQuery.value = $event"
+              @select-mode="composer.selectMode"
+              @request-full-access="composer.requestFullAccess"
+              @switch-consultative="composer.switchToConsultativeAccess"
+              @request-sandbox-session="composer.requestSandboxSession"
+              @disable-sandbox-session="composer.disableSandboxSessionAccess"
+              @open-vault="composer.openVaultSurface"
             />
           </template>
         </AgentDockComposerInput>
       </div>
     </div>
     <AgentDockKairoComposerFooter
-      :composer-mode="composerMode"
-      :operator-persona-name="OPERATOR_PERSONA_NAME"
-      :kairo-conversation-reply="kairoConversationReply"
-      :kairo-conversation-error="kairoConversationError"
-      :command-mutation-error="shell.commandMutationError"
-      :run-mutation-error="shell.runMutationError"
-      :workspace-selected="Boolean(shell.currentWorkspace)"
+      :composer-mode="composer.composerMode.value"
+      :operator-persona-name="composer.OPERATOR_PERSONA_NAME"
+      :kairo-conversation-reply="composer.kairoConversationReply.value"
+      :kairo-conversation-error="composer.kairoConversationError.value"
+      :command-mutation-error="composer.shell.commandMutationError"
+      :run-mutation-error="composer.shell.runMutationError"
+      :workspace-selected="Boolean(composer.shell.currentWorkspace)"
     />
   </form>
 </template>

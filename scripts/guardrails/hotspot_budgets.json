@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3769,
+      "max_lines": 3686,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -32,7 +32,7 @@
       "rule": "bootstrap, registration, and compatibility only"
     },
     "services/control-plane/app/chat/service.py": {
-      "max_lines": 700,
+      "max_lines": 410,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/chat/* bounded slices",
@@ -41,7 +41,7 @@
   },
   "ratcheted_oversize_files": {
     "apps/console-web/src/components/ide/AgentDockComposer.vue": {
-      "max_lines": 274,
+      "max_lines": 190,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/agent-dock/*",
@@ -67,7 +67,7 @@
       "target": "services/control-plane/app/kairo/*"
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
-      "max_lines": 564,
+      "max_lines": 531,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*"
@@ -79,7 +79,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 701,
+      "max_lines": 675,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
@@ -116,7 +116,7 @@
       "target": "apps/console-web/src/features/settings/*"
     },
     "apps/console-web/src/features/brain-galaxy/KairoGalaxyOrb.vue": {
-      "max_lines": 220,
+      "max_lines": 218,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/brain-galaxy/*"
@@ -164,7 +164,7 @@
       "target": "tests/test_control_plane_chat_* slices"
     },
     "apps/console-web/src/composables/useAgentDockComposer.ts": {
-      "max_lines": 367,
+      "max_lines": 9,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/composables/agent-dock/*",
@@ -183,7 +183,7 @@
       "target": "apps/console-web/src/features/kairo-conversation/*"
     },
     "apps/console-web/src/lib/agent-transcript-blocks.ts": {
-      "max_lines": 173,
+      "max_lines": 172,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/lib/agent-transcript/*"

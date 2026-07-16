@@ -55,7 +55,10 @@ def list_workspace_records(
         workspace_ids.update(_DEFAULT_WORKSPACE_IDS)
     workspace_ids.update(bindings.keys())
 
-    inbox_snapshot = build_inbox_response(inbox_fetcher=inbox_fetcher)
+    inbox_snapshot = build_inbox_response(
+        inbox_fetcher=inbox_fetcher,
+        allow_empty_unavailable=True,
+    )
     for item in inbox_snapshot.get("items", []):
         if isinstance(item, dict):
             workspace_id = str(item.get("workspace_id", "")).strip()

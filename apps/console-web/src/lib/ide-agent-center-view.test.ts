@@ -161,6 +161,17 @@ describe('ide agent center view', () => {
         expanded: false,
       }),
     ).toBe('Full Access — streaming runtime output…');
+
+    expect(
+      buildIdeAgentReviewComposerLabel({
+        agentStreamActive: true,
+        executionAccess: 'consultative',
+        editedFileCount: 0,
+        reviewReadyCount: 0,
+        expanded: false,
+        mode: 'plan',
+      }),
+    ).toBe('Plan — streaming outline…');
   });
 
   it('builds review bar labels from file and review counts', () => {

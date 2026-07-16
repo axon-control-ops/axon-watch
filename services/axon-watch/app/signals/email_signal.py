@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 from app.connectors.catalog import load_watch_connector_definitions
 from app.connectors.probe import probe_connector
+from app.signals.email_imap_poll import fetch_native_email_messages
 from app.signals.email_reply_suggest import suggest_email_reply
 from app.signals.email_triage import analyze_email_message
 from app.signals.iso_time import utc_now_iso
@@ -203,8 +204,6 @@ def load_email_messages(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Load email messages: native IMAP → Signal bridge → optional stub."""
 
-    from app.signals.email_imap_poll import fetch_native_email_messages
-
     stub_config = _load_stub_config(stub_path)
     operator_settings = _load_operator_email_settings()
     if isinstance(operator_settings.get("workspace_hint_map"), dict):
@@ -219,11 +218,21 @@ def load_email_messages(
         )
         stub_config["workspace_hint_map"] = merged_hints
     if operator_settings.get("accounts"):
-        # Prefer the first configured workspace as fallback when native poll is live.
-        first = operator_settings["accounts"][0]
-        if isinstance(first, dict) and str(first.get("workspace_id") or "").strip():
-            stub_config = dict(stub_config)
-            stub_config["workspace_id"] = str(first["workspace_id"]).strip()
+        # Keep a generic fallback for stubs/bridge, but native messages carry
+        # per-account workspace ownership and must not inherit accounts[0].
+        stub_config = dict(stub_config)
+        account_workspaces: dict[str, str] = {}
+        for entry in operator_settings["accounts"]:
+            if not isinstance(entry, dict):
+                continue
+            account_id = str(entry.get("account_id") or "").strip()
+            account_email = str(entry.get("email_address") or "").strip().lower()
+            workspace_id = str(entry.get("workspace_id") or "").strip()
+            if workspace_id and account_id:
+                account_workspaces[account_id] = workspace_id
+            if workspace_id and account_email:
+                account_workspaces[account_email] = workspace_id
+        stub_config["account_workspaces"] = account_workspaces
 
     native = fetch_native_email_messages()
     if native is not None:
@@ -301,6 +310,56 @@ def email_inbox_item(
     }
 
 
+def _mapped_hint_workspace(
+    workspace_hints: list[str],
+    workspace_hint_map: dict[str, str],
+) -> str:
+    """Return a hint-mapped workspace id, or empty when no hint matches."""
+
+    merged: dict[str, str] = dict(_DEFAULT_WORKSPACE_HINT_MAP)
+    for raw_key, raw_value in workspace_hint_map.items():
+        key = _normalize_hint_key(str(raw_key or ""))
+        value = str(raw_value or "").strip()
+        if key and value:
+            merged[key] = value
+    for hint in workspace_hints:
+        key = _normalize_hint_key(str(hint or ""))
+        if not key:
+            continue
+        mapped = merged.get(key) or merged.get(key.replace(" ", ""))
+        if mapped:
+            return mapped
+    return ""
+
+
+def _workspace_for_message(
+    message: dict[str, Any],
+    *,
+    account_workspaces: dict[str, str],
+    fallback_workspace_id: str,
+    workspace_hints: list[str],
+    workspace_hint_map: dict[str, str],
+) -> str:
+    """Prefer the mailbox's configured workspace over generic body hints."""
+
+    account_id = str(message.get("account_id") or "").strip()
+    account_email = str(message.get("account_email") or "").strip().lower()
+    mailbox_workspace = (
+        account_workspaces.get(account_id)
+        or account_workspaces.get(account_email)
+        or ""
+    )
+    if mailbox_workspace:
+        return mailbox_workspace
+    hinted = _mapped_hint_workspace(workspace_hints, workspace_hint_map)
+    if hinted:
+        return hinted
+    return (
+        str(fallback_workspace_id or "").strip()
+        or "workspace_axon_watch"
+    )
+
+
 def email_inbox_items(
     *,
     stub_path: Path | None = None,
@@ -318,11 +377,19 @@ def email_inbox_items(
         if isinstance(raw_hint_map, dict)
         else {}
     )
+    raw_account_map = config.get("account_workspaces")
+    account_workspaces = (
+        {str(k): str(v) for k, v in raw_account_map.items() if str(k).strip() and str(v).strip()}
+        if isinstance(raw_account_map, dict)
+        else {}
+    )
 
     items: list[dict[str, object]] = []
     for message in messages:
         analysis = analyze_email_message(message, workspace_names=workspace_names)
-        workspace_id = resolve_email_workspace_id(
+        workspace_id = _workspace_for_message(
+            message,
+            account_workspaces=account_workspaces,
             fallback_workspace_id=fallback_workspace_id,
             workspace_hints=list(analysis.get("workspace_hints") or []),
             workspace_hint_map=workspace_hint_map,

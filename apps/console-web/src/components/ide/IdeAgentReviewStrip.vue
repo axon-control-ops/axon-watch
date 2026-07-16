@@ -69,6 +69,7 @@ const statusLabel = computed(() =>
     editedFileCount: editSummaries.value.length,
     reviewReadyCount: reviewReadyCount.value,
     expanded: expanded.value,
+    mode: shell.ideComposerActivity?.mode,
   }),
 );
 

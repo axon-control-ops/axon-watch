@@ -67,10 +67,22 @@ Gate repairs in this slice:
 - Connector acceptance retries runtime-summary connector projection for 20s
   after watch/control-plane restarts.
 
+## Cutover evidence (2026-07-15 afternoon)
+
+- `cloudflared.service` disabled and inactive; exclusive Axon-X managed PID only.
+- Soft public cutover: Cloudflare remote ingress still `http://localhost:7734`,
+  but local `:7734` reverse-proxies to Axon-X `:4173`. Public
+  `https://axon.edudashpro.org.za/api/health` returns Axon-X `control-plane`.
+- Legacy axon-local soft-rollback listens on `:7735` for WhatsApp / unmigrated
+  paths (`AXON_PORT=7735`, tunnel start disabled).
+- Optional hard cutover later:
+  `CF_API_TOKEN=... ./scripts/ops/set-tunnel-ingress-4173.sh`
+- Verify: `./scripts/verify/verify-attention-blockers.sh`
+
 ## Known retirement blockers
 
-- WhatsApp monitoring remains explicitly deferred.
-- Native tunnel control and vault token resolution are implemented (PR #5).
-  Axon-X managed cloudflared is running, but root `cloudflared.service` still
-  needs `sudo systemctl disable --now cloudflared` to finish exclusive cutover.
+- WhatsApp monitoring remains explicitly deferred with `:7735` soft-rollback
+  (operator previously chose defer; retirement still blocked until migrate or
+  G5.4 discard ack).
 - No retirement or discard acknowledgment is signed in this log.
+- Day 1 operator workflow / `:7734` attestation checkboxes remain human-only.

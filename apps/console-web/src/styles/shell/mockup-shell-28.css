@@ -72,6 +72,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  margin-left: 0.15rem;
 }
 
 .status-bar-mockup__chip--commands {
@@ -80,6 +81,50 @@
   background: rgba(0, 242, 255, 0.06);
   position: relative;
   z-index: 2;
+}
+
+.status-bar-mockup__galaxy-actions {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  margin-left: 0.35rem;
+}
+
+.status-bar-mockup__galaxy-actions:empty {
+  display: none;
+}
+
+.status-bar-mockup__galaxy-actions-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-bar-mockup__chip--galaxy {
+  cursor: pointer;
+  border-color: rgba(0, 242, 255, 0.22);
+  background: rgba(0, 242, 255, 0.04);
+  padding: 0.32rem 0.78rem;
+}
+
+.status-bar-mockup__chip--galaxy:hover {
+  border-color: rgba(0, 242, 255, 0.4);
+  background: rgba(0, 242, 255, 0.1);
+}
+
+.status-bar-mockup__chip--galaxy-accent {
+  border-color: rgba(255, 196, 72, 0.45);
+  background: rgba(255, 180, 40, 0.08);
+}
+
+.status-bar-mockup__chip--galaxy .status-bar-mockup__dot {
+  background: rgba(0, 242, 255, 0.75);
+  box-shadow: 0 0 6px rgba(0, 242, 255, 0.35);
+}
+
+.status-bar-mockup__chip--galaxy .status-bar-mockup__dot--warn {
+  background: rgba(255, 196, 72, 0.95);
+  box-shadow: 0 0 6px rgba(255, 180, 40, 0.45);
 }
 
 .status-bar-mockup__chip--commands:hover {

@@ -57,10 +57,26 @@ _QUESTION_START_RE = re.compile(
     r"^(?:what|how|why|did|do|does|can|should|were|was|is|are)\b",
     re.IGNORECASE,
 )
+_GENERIC_BRIEFING_FILLER_RE = re.compile(
+    r"^(?:"
+    r"no active runs[.!]?\s*(?:systems nominal[.!]?)?"
+    r"|systems nominal(?:\s*[—-]\s*standing by for your next command)?[.!]?"
+    r"|describe the next action in command[.!]?"
+    r"|standing by for your next command[.!]?"
+    r")$",
+    re.IGNORECASE,
+)
 
 
 def _operator_prompt(context: dict[str, Any]) -> str:
     return str(context.get("operator_prompt") or "").strip()
+
+
+def _live_briefing_line(value: object) -> str:
+    line = str(value or "").strip()
+    if not line or _GENERIC_BRIEFING_FILLER_RE.fullmatch(line):
+        return ""
+    return line
 
 
 def _contextual_agent_start_fallback(context: dict[str, Any]) -> str | None:
@@ -214,24 +230,21 @@ def fallback_for_event(
         return f"{line} {tail.capitalize()}."
 
     if event_type == "briefing":
-        notice = str(context.get("notice") or "").strip()
-        advise = str(context.get("advise") or "").strip()
-        if notice and advise:
-            return f"{notice} {advise}"
-        if notice:
-            return notice
-        if advise:
-            return advise
-        return "Systems nominal — standing by for your next command."
+        notice = _live_briefing_line(context.get("notice"))
+        advise = _live_briefing_line(context.get("advise"))
+        signal_title = _live_briefing_line(context.get("top_signal_title"))
+        lines: list[str] = []
+        for candidate in (notice or signal_title, advise):
+            normalized = normalize_spoken_line(candidate, max_chars=280)
+            if normalized and normalized.lower() not in {line.lower() for line in lines}:
+                lines.append(normalized)
+        return " ".join(lines)
 
     if event_type == "conversation_reply":
         literal = str(context.get("fallback") or context.get("reply") or "").strip()
         if literal:
             return apply_participant_address(literal, guest_name)
-        return apply_participant_address(
-            "Standing by for your next command.",
-            guest_name,
-        )
+        return ""
 
     if event_type == "tool":
         tool_label = str(context.get("tool_label") or "").strip().lower()

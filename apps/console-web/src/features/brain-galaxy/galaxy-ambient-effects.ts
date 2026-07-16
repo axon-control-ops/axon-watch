@@ -129,8 +129,9 @@ export function animateGalaxyAmbience(
   scene: Scene,
   starfield: Group | null,
   clock: number,
-  busy: boolean,
+  presenceAmp: number,
 ): void {
+  const amp = Math.max(0, Math.min(1, presenceAmp));
   if (starfield) {
     starfield.children.forEach((child) => {
       if (!(child instanceof Points)) {
@@ -142,8 +143,8 @@ export function animateGalaxyAmbience(
       }
       const material = child.material as PointsMaterial;
       const twinkle = 0.78 + Math.sin(clock * (data.speed ?? 1) + (data.phase ?? 0)) * 0.22;
-      material.opacity = (data.baseOpacity ?? 0.7) * twinkle * (busy ? 1.22 : 1);
-      child.rotation.y += (data.rotationSpeed ?? 0.0001) * (busy ? 2.4 : 1);
+      material.opacity = (data.baseOpacity ?? 0.7) * twinkle * (1 + amp * 0.22);
+      child.rotation.y += (data.rotationSpeed ?? 0.0001) * (1 + amp * 1.4);
       child.rotation.x += (data.rotationSpeed ?? 0.0001) * 0.18;
     });
   }
@@ -156,7 +157,7 @@ export function animateGalaxyAmbience(
     if (!data.liveLight) {
       return;
     }
-    const shimmer = 0.92 + Math.sin(clock * (busy ? 2.8 : 0.9) + (data.phase ?? 0)) * 0.08;
-    object.intensity = (data.baseIntensity ?? 1) * shimmer * (busy ? 1.35 : 1);
+    const shimmer = 0.92 + Math.sin(clock * (0.9 + amp * 1.9) + (data.phase ?? 0)) * 0.08;
+    object.intensity = (data.baseIntensity ?? 1) * shimmer * (1 + amp * 0.35);
   });
 }

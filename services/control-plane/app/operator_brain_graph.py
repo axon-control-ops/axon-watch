@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from app.adapters.watch_client import fetch_watch_connectors
+from app.adapters.watch_client import fetch_watch_connectors, fetch_watch_inbox
 from app.domain.run_state import is_terminal_phase
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.persistence import email_settings_store
@@ -24,6 +24,32 @@ ConnectorsFetcher = Callable[[], dict[str, object] | None]
 _CORE_NODE_ID = "core_kairo"
 _MAX_RUN_NODES_PER_WORKSPACE = 3
 _MAX_SIGNAL_NODES = 6
+# Galaxy must paint under the console fetch budget. Cold IMAP regularly exceeds
+# 10s; fetching inbox three times (summary + signals + workspaces) left the UI
+# stuck on "Loading brain graph…". Prefer a fast partial graph.
+_BRAIN_GRAPH_INBOX_TIMEOUT_SECONDS = 2.0
+_EMPTY_INBOX: dict[str, object] = {"items": [], "count": 0, "updated_at": ""}
+
+
+def _once_inbox_fetcher(inbox_fetcher: WatchInboxFetcher | None) -> WatchInboxFetcher:
+    """Fetch watch inbox at most once per brain-graph build."""
+
+    cached: dict[str, object] | None = None
+    fetched = False
+
+    def _fetch() -> dict[str, object] | None:
+        nonlocal cached, fetched
+        if fetched:
+            return cached
+        fetched = True
+        if inbox_fetcher is not None:
+            raw = inbox_fetcher()
+        else:
+            raw = fetch_watch_inbox(timeout_seconds=_BRAIN_GRAPH_INBOX_TIMEOUT_SECONDS)
+        cached = raw if isinstance(raw, dict) else dict(_EMPTY_INBOX)
+        return cached
+
+    return _fetch
 
 
 def _workspace_tone(
@@ -127,15 +153,22 @@ def build_operator_brain_graph(
     inbox_fetcher: WatchInboxFetcher | None = None,
     connectors_fetcher: ConnectorsFetcher | None = None,
 ) -> dict[str, object]:
+    inbox_once = _once_inbox_fetcher(inbox_fetcher)
+    # Runtime summary must not wait on cold IMAP; signals still come from the
+    # single short-budget inbox fetch below.
     runtime_summary = assemble_runtime_summary(
         watch_probe=watch_probe,
-        inbox_fetcher=inbox_fetcher,
+        inbox_fetcher=inbox_once,
+        light=True,
     )
     watch_connected = bool(runtime_summary["watch"]["connected"])
     generated_at = str(runtime_summary["generated_at"])
 
     inbox_snapshot = (
-        build_inbox_response(inbox_fetcher=inbox_fetcher)
+        build_inbox_response(
+            inbox_fetcher=inbox_once,
+            allow_empty_unavailable=True,
+        )
         if watch_connected
         else {"items": [], "count": 0, "updated_at": generated_at}
     )
@@ -145,7 +178,9 @@ def build_operator_brain_graph(
         if isinstance(item, dict) and item.get("status") == "open"
     ][:_MAX_SIGNAL_NODES]
 
-    connectors_loader = connectors_fetcher or fetch_watch_connectors
+    connectors_loader = connectors_fetcher or (
+        lambda: fetch_watch_connectors(timeout_seconds=1.5)
+    )
     connectors_payload = connectors_loader() if watch_connected else None
     connector_items = [
         item
@@ -160,7 +195,7 @@ def build_operator_brain_graph(
     ]
 
     workspace_records = list_workspace_records(
-        inbox_fetcher=inbox_fetcher,
+        inbox_fetcher=inbox_once,
         operator_surface=True,
     )
     runs_by_workspace: dict[str, list[dict[str, Any]]] = {}

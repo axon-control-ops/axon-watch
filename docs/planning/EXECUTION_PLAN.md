@@ -14,6 +14,7 @@ KAIRO conversation, and brain-galaxy polish into one locked order.
 - `docs/planning/OPERATOR_BRAIN_PIVOT.md` — operator second-brain direction
 - `docs/planning/KAIRO_CONVERSATION_PLAN.md` — OP-C slice detail
 - `docs/planning/KAIRO_VOICE_IMPROVEMENT_PLAN.md` — voice narration + context/memory slices
+- `docs/planning/KAIRO_VOICE_UPGRADE_PLAN.md` — current Voice-A, Ask/Plan, STT, and TTS execution
 - `docs/PHASE_G6_RETIREMENT_READINESS.md` — G6 blocker table + rollback
 
 ---
@@ -107,17 +108,22 @@ Detail: `docs/planning/KAIRO_CONVERSATION_PLAN.md`
 | C4 | **OP-C4** | Navigation intents ("show DashPro", "open attention"); execute-tier confirm flow | vitest `conversation-intents.test.ts` PASS; manual nav + confirm dispatch | **Done** |
 | C5 | **OP-C5** | Session turn memory for follow-ups ("hand it off" after prior entity) | Contract tests for memory cap; manual follow-up without re-stating workspace | **Done** |
 | C6 | **V5+V9** | Narration plumbing cleanup + honest settings copy | vitest narration tests PASS; no speak API calls for filtered milestones | **Done** |
+| C6A | **Voice-A** | Remove generic briefing/response filler; stay quiet without a live fact/model reply | Focused backend/frontend voice tests + typecheck; no nominal copy beside live failure | **Done 2026-07-16** (`1c19f77`) |
+| C6B | **Voice-B / V10** | Ask/Plan answer-only narration without tool/run semantics | Answer-mode tests + shell extraction; Ask/Plan final answer speaks once | **Implemented 2026-07-16** |
 | C7 | **V1+V4+V6** | Honest mode labels, persona parity for thinking, error/fallback narration | Manual: minimal thinking uses Vaxon tone; agent error spoken | **Done** |
 | C8 | **M1+M2** | Unified session id + SQLite-backed turn/entity memory | pytest: follow-up survives CP restart | **Done** |
 | C9 | **M3+M5+M6** | Chat tail in context pack, 10 s DTO refresh, unified voice-log dedup | pytest context pack + TTL; manual: no repeated phrasing across channels | **Done** |
 | C10 | **M4** | Agent continuation — inject KAIRO memory into Lane B dispatch | Manual: IDE agent continues KAIRO topic after handoff | **Done** — IDE thread pack always in Lane B context + KAIRO appendix on continuation cues; write-through to session memory |
 | C11 | **V2+V3+V7+V8** | Throttled thinking, optional tool narration, stale-speak cancel, IDE voice hint | Optional depth — does not block Phase D |
-| C12 | **V11** | Cloud TTS | **Deferred** until Phase F exit |
+| C12 | **V11** | Prefer Azure/cloud TTS when configured; retain one browser fallback path | Provider-routing tests + no-double-speak manual proof | Planned after stable G6 voice baseline |
+| C13 | **V10** | Ask/Plan answer bookend narration without granting tool/run semantics | Ask/Plan final-answer speech test; Agent/Debug behavior unchanged |
+| C14 | **V12** | Replace the cloud-STT placeholder with real audio upload/transcription | STT API contract + browser fallback + privacy-mode tests |
 
 Detail: `docs/planning/KAIRO_VOICE_IMPROVEMENT_PLAN.md`
 
-**Phase C exit gate:** C1–C10 gates green + `npm run verify:headed-browser-smoke` PASS.
-(C11 optional; C12 deferred.)
+**Phase C exit gate:** C1–C10 (including C6A) gates green +
+`npm run verify:headed-browser-smoke` PASS. C11–C14 are post-baseline voice
+quality/depth slices and land one verified commit at a time.
 
 **Deferred until Phase C exit:** OP-C6 wake word, OP-V1g mobile shell.
 

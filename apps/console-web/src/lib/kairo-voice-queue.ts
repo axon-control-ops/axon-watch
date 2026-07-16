@@ -69,6 +69,11 @@ function dropWaitingNarration(reason: string): void {
   pending = kept;
 }
 
+/** Drop queued narration jobs when a run advances past a stale milestone. */
+export function dropWaitingKairoNarration(reason = 'stale_run_advance'): void {
+  dropWaitingNarration(reason);
+}
+
 async function settleAfterUtterance(): Promise<void> {
   await new Promise<void>((resolve) => {
     globalThis.setTimeout(resolve, POST_UTTERANCE_SETTLE_MS);
