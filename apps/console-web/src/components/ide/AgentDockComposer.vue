@@ -62,7 +62,6 @@ const toolbarProps = useAgentDockComposerToolbarProps({
   runtimeHint: composer.runtimeHint,
   canConvertInstructions: composer.canConvertInstructions,
 });
-
 </script>
 
 <template>
