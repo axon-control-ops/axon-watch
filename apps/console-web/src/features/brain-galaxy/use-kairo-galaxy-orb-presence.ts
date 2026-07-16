@@ -18,6 +18,7 @@ type PresenceShell = {
   operatorPresenceSettings: {
     hands_free_enabled?: boolean;
     privacy_mode: boolean;
+    stt_mode?: string;
   };
   agentStreamActive?: boolean;
 };
@@ -49,6 +50,7 @@ export function useKairoGalaxyOrbPresence(shell: PresenceShell) {
 
   const speechCapture = useKairoSpeechCapture({
     privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
+    sttMode: () => shell.operatorPresenceSettings.stt_mode ?? 'browser',
     captureMode: 'manual',
     stopOnUnmount: 'manual_only',
   });

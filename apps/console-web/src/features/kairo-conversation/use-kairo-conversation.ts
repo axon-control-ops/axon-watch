@@ -53,7 +53,7 @@ export function useKairoConversation() {
 
   const speechCapture = useKairoSpeechCapture({
     privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
-    captureMode: 'manual',
+    sttMode: () => shell.operatorPresenceSettings.stt_mode, captureMode: 'manual',
     stopOnUnmount: 'manual_only',
   });
 

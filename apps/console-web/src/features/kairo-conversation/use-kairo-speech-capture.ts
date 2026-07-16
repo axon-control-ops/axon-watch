@@ -12,6 +12,7 @@ import {
   kairoCaptureMode,
   canStartKairoSpeechCapture,
   setKairoSpeechPrivacyBlocked,
+  setKairoSpeechSttMode,
   startKairoSpeechCapture,
   stopKairoSpeechCapture,
 } from './kairo-shared-speech-capture';
@@ -19,11 +20,15 @@ import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 
 export function useKairoSpeechCapture(options: {
   privacyBlocked: () => boolean;
+  sttMode?: () => string;
   captureMode?: KairoVoiceCaptureMode;
   /** Keep hands-free capture alive when this surface unmounts. */
   stopOnUnmount?: 'always' | 'manual_only' | 'never';
 }) {
   setKairoSpeechPrivacyBlocked(options.privacyBlocked);
+  if (options.sttMode) {
+    setKairoSpeechSttMode(options.sttMode);
+  }
 
   function canCapture(): boolean {
     return canStartKairoSpeechCapture();

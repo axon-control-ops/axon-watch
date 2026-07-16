@@ -93,9 +93,7 @@ Gate: policy/throttle tests and a long-run manual no-spam proof.
 
 ### Voice-D — Real cloud STT
 
-Current fact: `kairo-cloud-stt.ts` ignores `_audioBlob`, sends a GET probe to
-`/api/kairo/stt`, and returns `cloud_stt_not_configured`. This is a placeholder,
-not transcription.
+**Status:** CI-ready on `feat/voice-d-cloud-stt`; merge to `dev` in this close-out.
 
 Work:
 
@@ -168,6 +166,20 @@ barge-in, and no-double-speak proofs.
 - IDE Quiet hint: one-time composer banner when Minimal is muted in IDE Quiet.
 - Focused frontend: narration policy/throttle/override-hint/stream-voice tests.
 
+### 2026-07-16 — Voice-D
+
+- Bounded `POST /api/kairo/stt` accepts recorded audio (2 MiB cap) and returns
+  transcript, provider, confidence, and failure reason.
+- Azure Speech REST STT when credentials are configured; privacy mode blocks
+  upload server-side; browser STT remains the fallback path.
+- Manual PTT cloud capture uses `MediaRecorder` + `transcribeCloudStt`; failed
+  cloud turns fall back to browser recognition for that clip.
+- Focused backend: `tests.test_kairo_stt` — contract, privacy, fallback.
+- Focused frontend: `kairo-cloud-stt.test.ts` + `cloud-audio-capture.test.ts`.
+- `tests.test_kairo_stt` wired into `verify:contracts`.
+- Cloud upload accepts **ogg/wav only**; WebM stays on browser STT fallback.
+- Manual accent/noisy-room comparison: **deferred** (operator proof when Azure keys live).
+
 ## Next slice
 
-Voice-D: real cloud STT (bounded POST, privacy + browser fallback).
+Voice-E: Azure / cloud TTS routing (provider receipts, no double-speak).
