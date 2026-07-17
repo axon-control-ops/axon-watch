@@ -503,6 +503,7 @@ export const useShellStore = defineStore('shell', () => {
   const dockThreadSeamTouched = ref(false);
   const briefingSeamEmphasized = ref(false);
   const missionControlEmphasized = ref(false);
+  const connectorsEmphasized = ref(false);
   const signalsSeamEmphasized = ref(false);
   const highlightedSignalId = ref<string | null>(null);
   const dockHeroMode = ref<DockHeroMode>(readStoredDockHeroMode() ?? 'command');
@@ -518,6 +519,7 @@ export const useShellStore = defineStore('shell', () => {
   const agentDockCollapsed = ref(readStoredAgentDockCollapsed());
   const ideTerminalRevealToken = ref(0);
   const ideTerminalToggleToken = ref(0);
+  const workbenchTerminalPanelVisible = ref(false);
 
 
   const layoutModeLabel = computed(() =>
@@ -587,6 +589,9 @@ export const useShellStore = defineStore('shell', () => {
     agentStreamActive,
     operatorThreadMessages,
     threadMessages,
+    connectorsItems,
+    connectorsSummary,
+    connectorsLoadState,
   });
 
   const runHistoryRows = computed(() => buildRunHistoryRows(runHistorySnapshot.value));
@@ -1415,6 +1420,7 @@ export const useShellStore = defineStore('shell', () => {
     openIdeBriefingPanel,
     toggleSignalDetails,
     focusMissionControl,
+    focusWatchConnectors,
     setOperatorCenterView,
     afterRunLifecycleMutation,
     focusKairoBriefing,
@@ -1428,12 +1434,14 @@ export const useShellStore = defineStore('shell', () => {
     ideExplorerCollapsed,
     signalsSeamEmphasized,
     missionControlEmphasized,
+    connectorsEmphasized,
     briefingSeamEmphasized,
     operatorCenterView,
     dockHeroMode,
     setLeftSidebarMode,
     setDockHeroMode,
     restoreComposerDraft,
+    setLayoutMode,
   });
 
   const {
@@ -2124,6 +2132,7 @@ export const useShellStore = defineStore('shell', () => {
   const {
     revealIdeTerminalPanel,
     toggleIdeTerminalPanel,
+    focusIdeSidebarView,
     setIdeActivityView,
     toggleIdeExplorer,
     toggleAgentDock,
@@ -2136,6 +2145,10 @@ export const useShellStore = defineStore('shell', () => {
     ideAttentionPanelOpen,
     ideBriefingPanelOpen,
   });
+
+  function syncWorkbenchTerminalPanelVisible(visible: boolean): void {
+    workbenchTerminalPanelVisible.value = visible;
+  }
 
   const terminalSessionStore = createTerminalSessionStore({
     currentWorkspace,
@@ -3381,6 +3394,7 @@ export const useShellStore = defineStore('shell', () => {
     briefingLoadState,
     briefingSeamEmphasized,
     missionControlEmphasized,
+    connectorsEmphasized,
     signalsSeamEmphasized,
     highlightedSignalId,
     briefingSummaryLine,
@@ -3452,6 +3466,8 @@ export const useShellStore = defineStore('shell', () => {
     openIdeBriefingPanel,
     ideTerminalRevealToken,
     ideTerminalToggleToken,
+    workbenchTerminalPanelVisible,
+    syncWorkbenchTerminalPanelVisible,
     layoutMode,
     layoutModeLabel,
     leftSidebarAttentionBadgeCount,
@@ -3535,6 +3551,7 @@ export const useShellStore = defineStore('shell', () => {
     resumePrimaryRun,
     resumeIdeAgentRun,
     revealIdeTerminalPanel,
+    toggleIdeTerminalPanel,
     runs,
     runsError,
     runsLoadState,
@@ -3566,6 +3583,7 @@ export const useShellStore = defineStore('shell', () => {
     setActiveEditorDocument,
     setCurrentWorkspace,
     setDockHeroMode,
+    focusIdeSidebarView,
     setIdeActivityView,
     selectedComposerModel,
     selectedRuntimeTargetId,
@@ -3617,6 +3635,7 @@ export const useShellStore = defineStore('shell', () => {
     openIdeComposerWithDraft,
     focusAttentionSidebar,
     focusMissionControl,
+    focusWatchConnectors,
     focusKairoBriefing,
     deliverKairoSpokenAlert,
     speakOperatorBriefing,

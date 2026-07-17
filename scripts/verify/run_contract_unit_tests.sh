@@ -17,6 +17,7 @@ main_tests=(
   tests.test_runtime_summary_assembler
   tests.test_control_plane_runtime_summary
   tests.test_control_plane_operator_briefing
+  tests.test_operator_briefing_signals
   tests.test_control_plane_workspaces
   tests.test_workspace_project_bindings
   tests.test_control_plane_workspace_handoffs
@@ -36,6 +37,8 @@ main_tests=(
   tests.test_control_plane_chat
   tests.test_control_plane_chat_health
   tests.test_command_executor
+  tests.test_workspace_agent_scheduler
+  tests.test_workspace_worker_prompt
   tests.test_chat_orchestration
   tests.test_watch_bootstrap_signal
   tests.test_watch_summary_signal
@@ -43,6 +46,11 @@ main_tests=(
   tests.test_control_plane_inbox_projection
   tests.test_signal_consistency
   tests.test_run_state_transitions
+  tests.test_run_startup_reconcile
+  tests.test_run_stale_reconcile
+  tests.test_run_employee_retention
+  tests.test_run_review_ready_reconcile
+  tests.test_run_operator_facing_queries
   tests.test_control_plane_runs
   tests.test_runtime_summary_active_runs
   tests.test_service_health_endpoints
@@ -105,6 +113,28 @@ watch_vault_tests=(
 
 watch_signal_tests=(
   tests.test_email_signal
+  tests.test_connector_signal
+  tests.test_connector_inbox_integration
+  tests.test_actionable_inbox_signals
+  tests.test_watch_inbox_assembly
+)
+
+watch_connector_tests=(
+  tests.test_connector_probe_cache
+)
+
+watch_monitor_tests=(
+  tests.test_monitor_slice_registry
+  tests.test_dashpro_monitor_cache
+  tests.test_dashpro_monitor_slice
+  tests.test_dashpro_monitor_vault_action
+  tests.test_monitor_inbox_integration
+)
+
+watch_dashpro_api_tests=(
+  tests.test_dashpro_posthog
+  tests.test_dashpro_sentry
+  tests.test_dashpro_supabase_storage
 )
 
 watch_tunnel_tests=(
@@ -136,6 +166,12 @@ run_modules "axon-watch vault (isolated PYTHONPATH)" \
   "${repo_root}/services/axon-watch" "${watch_vault_tests[@]}"
 run_modules "axon-watch email signals (isolated PYTHONPATH)" \
   "${repo_root}/services/axon-watch" "${watch_signal_tests[@]}"
+run_modules "axon-watch connector probe cache (isolated PYTHONPATH)" \
+  "${repo_root}/services/axon-watch" "${watch_connector_tests[@]}"
+run_modules "axon-watch monitor probe cache (isolated PYTHONPATH)" \
+  "${repo_root}/services/axon-watch" "${watch_monitor_tests[@]}"
+run_modules "axon-watch DashPro monitor API resilience (isolated PYTHONPATH)" \
+  "${repo_root}/services/axon-watch" "${watch_dashpro_api_tests[@]}"
 run_modules "axon-watch native tunnel control (isolated PYTHONPATH)" \
   "${repo_root}/services/axon-watch" "${watch_tunnel_tests[@]}"
 

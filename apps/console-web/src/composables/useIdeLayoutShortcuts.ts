@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted } from 'vue';
 
+import { resolveIdeLayoutShortcut } from '../lib/ide-layout-shortcuts';
 import { useShellStore } from '../stores/shell';
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -20,25 +21,30 @@ export function useIdeLayoutShortcuts(): void {
   const shell = useShellStore();
 
   function onKeyDown(event: KeyboardEvent): void {
-    if (shell.layoutMode !== 'ide' || isEditableTarget(event.target)) {
+    const action = resolveIdeLayoutShortcut({
+      layoutMode: shell.layoutMode,
+      modKey: event.metaKey || event.ctrlKey,
+      key: event.key,
+      editableTarget: isEditableTarget(event.target),
+    });
+
+    if (!action) {
       return;
     }
 
-    const mod = event.metaKey || event.ctrlKey;
-    if (!mod) {
-      return;
-    }
+    event.preventDefault();
 
-    if (event.key.toLowerCase() === 'b') {
-      event.preventDefault();
+    if (action === 'toggle-explorer') {
       shell.toggleIdeExplorer();
       return;
     }
 
-    if (event.key === '\\') {
-      event.preventDefault();
+    if (action === 'toggle-agent-dock') {
       shell.toggleAgentDock();
+      return;
     }
+
+    shell.toggleIdeTerminalPanel();
   }
 
   onMounted(() => {

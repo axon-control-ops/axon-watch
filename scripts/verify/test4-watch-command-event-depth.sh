@@ -42,6 +42,14 @@ echo
 echo "[2/5] Watch command/event unit tests"
 python3 -m unittest tests.test_watch_commands_events -v
 python3 -m unittest tests.test_control_plane_watch_commands -v
+PYTHONPATH="${repo_root}/services/axon-watch" python3 -m unittest \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_connector_seeds_cold_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_tunnel_seeds_cold_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_connector_updates_warm_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_tunnel_updates_warm_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_refresh_summary_clears_connector_cache \
+  tests.test_dashpro_monitor_cache.DashProMonitorCacheTests.test_execute_refresh_summary_clears_monitor_cache \
+  -v
 echo
 
 echo "[3/5] Live watch command/event acceptance"

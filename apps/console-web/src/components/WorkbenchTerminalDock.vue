@@ -19,6 +19,10 @@ import {
   resolveMirrorVisibleTerminalSessionIds,
 } from '../lib/workbench-terminal-visible-panes';
 import { resolveAgentTerminalMirrorTranscript } from '../lib/workbench-terminal-mirror-transcript';
+import {
+  workbenchTerminalPanelAriaLabel,
+  workbenchTerminalPanelTitle,
+} from '../lib/workbench-terminal-panel-view';
 import { useShellStore } from '../stores/shell';
 
 const props = defineProps<{
@@ -76,6 +80,8 @@ const agentSessionId = computed(
 );
 
 const agentStreamActive = computed(() => shell.agentStreamActive);
+
+const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 
 function resolveMirrorTranscriptContent(): string {
   return resolveAgentTerminalMirrorTranscript({
@@ -400,8 +406,8 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="terminal-tabbar__action-button"
-            :title="hideOperatorEditor ? 'Hide terminal panel' : 'Close terminal panel (Ctrl/Cmd+J)'"
-            :aria-label="hideOperatorEditor ? 'Hide terminal panel' : 'Close terminal panel'"
+            :title="workbenchTerminalPanelTitle(true, terminalRunPhase)"
+            :aria-label="workbenchTerminalPanelAriaLabel(true, terminalRunPhase)"
             @click="requestHideTerminalPanel"
           >
             <WorkbenchIcon name="close" class="terminal-tabbar__action" :size="18" />

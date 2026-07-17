@@ -2,16 +2,30 @@ from __future__ import annotations
 
 import sys
 import unittest
-from pathlib import Path
+from typing import Any, Callable
 from unittest.mock import patch
 
-CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
-sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+from tests.support.control_plane_app_loader import prepare_control_plane_imports
 
-from app.operator_evidence import build_operator_evidence  # noqa: E402
+build_operator_evidence: Callable[[str], dict[str, Any]]
 
 
 class OperatorEvidenceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._saved_modules = prepare_control_plane_imports()
+        self.addCleanup(self._restore_control_plane_modules)
+
+        global build_operator_evidence
+        from app.operator_evidence import build_operator_evidence as _build_operator_evidence
+
+        build_operator_evidence = _build_operator_evidence
+
+    def _restore_control_plane_modules(self) -> None:
+        for name in list(sys.modules):
+            if name == "app" or name.startswith("app."):
+                del sys.modules[name]
+        sys.modules.update(self._saved_modules)
+
     def test_workspace_evidence_includes_open_ide_action(self) -> None:
         with patch(
             "app.operator_evidence.get_workspace_record",
@@ -24,7 +38,7 @@ class OperatorEvidenceTests(unittest.TestCase):
             "app.operator_evidence.build_inbox_response",
             return_value={"items": [], "count": 0},
         ), patch(
-            "app.operator_evidence.list_active_runs",
+            "app.operator_evidence.list_operator_facing_active_runs",
             return_value=[],
         ):
             payload = build_operator_evidence("ws_workspace_dashpro")

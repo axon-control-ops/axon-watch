@@ -18,16 +18,33 @@ import type {
 } from './types';
 import { countHighPrioritySignals, elapsedLabel, truncatePanelCopy } from './helpers';
 
+function requiredConnectorHeadline(count: number): string {
+  if (count === 1) {
+    return '1 required connector is down — restore the watch lane before more work.';
+  }
+  return `${count} required connectors are down — restore the watch lane before more work.`;
+}
+
+function requiredConnectorAdvise(count: number): string {
+  const noun = count === 1 ? 'connector' : 'connectors';
+  return `Open Mission Control → Connectors, reprobe the required ${noun}, then refresh summary.`;
+}
+
 export function operatorRadarTone(input: {
   runtimeSummary: RuntimeSummary | null;
   briefing: OperatorBriefing | null;
   pendingApprovals: number;
+  requiredConnectorsUnavailable?: number;
 }): OperatorRadarTone {
   if (input.briefing?.degraded.active || input.runtimeSummary?.degraded.active) {
     return 'degraded';
   }
 
-  if (input.pendingApprovals > 0 || countHighPrioritySignals(input.briefing) > 0) {
+  if (
+    (input.requiredConnectorsUnavailable ?? 0) > 0 ||
+    input.pendingApprovals > 0 ||
+    countHighPrioritySignals(input.briefing) > 0
+  ) {
     return 'attention';
   }
 
@@ -45,6 +62,7 @@ export function operatorStatusHeadline(input: {
   loadState: OperatorStatusLoadState;
   primaryActiveRun: RunRecord | null;
   workspaceReviewReadyCount?: number;
+  requiredConnectorsUnavailable?: number;
 }): string {
   if (input.loadState === 'loading') {
     return 'Loading operator status…';
@@ -71,6 +89,11 @@ export function operatorStatusHeadline(input: {
     return `${workspaceReviewReadyCount} ${noun} ready for your review in this workspace.`;
   }
 
+  const requiredConnectorsUnavailable = input.requiredConnectorsUnavailable ?? 0;
+  if (!input.primaryActiveRun && requiredConnectorsUnavailable > 0) {
+    return requiredConnectorHeadline(requiredConnectorsUnavailable);
+  }
+
   if (input.briefing?.notice) {
     return input.briefing.notice;
   }
@@ -89,6 +112,8 @@ export function operatorStatusHeadline(input: {
 export function operatorStatusAdvise(input: {
   briefing: OperatorBriefing | null;
   loadState: OperatorStatusLoadState;
+  primaryActiveRun?: RunRecord | null;
+  requiredConnectorsUnavailable?: number;
 }): string {
   if (input.loadState === 'loading') {
     return 'Standing by for briefing projection.';
@@ -96,6 +121,11 @@ export function operatorStatusAdvise(input: {
 
   if (input.loadState === 'error') {
     return 'Review connectivity before dispatching more work.';
+  }
+
+  const requiredConnectorsUnavailable = input.requiredConnectorsUnavailable ?? 0;
+  if (!input.primaryActiveRun && requiredConnectorsUnavailable > 0) {
+    return requiredConnectorAdvise(requiredConnectorsUnavailable);
   }
 
   return input.briefing?.advise ?? 'Describe the next action in Command.';

@@ -1,11 +1,15 @@
-import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 
 import {
   AGENT_DOCK_COLLAPSED_WIDTH_PX,
+  applyAgentDockResizeKeyAction,
   clampAgentDockWidth,
   defaultAgentDockWidth,
+  maxAgentDockWidth,
+  MIN_AGENT_DOCK_WIDTH,
   persistAgentDockWidth,
   readStoredAgentDockWidth,
+  resolveAgentDockResizeKey,
 } from '../lib/agent-dock-width';
 
 type UseRightDockResizeOptions = {
@@ -16,6 +20,10 @@ type UseRightDockResizeOptions = {
 export function useRightDockResize(options: UseRightDockResizeOptions) {
   const dockWidth = ref(readStoredAgentDockWidth() ?? defaultAgentDockWidth(window.innerWidth));
   const resizing = ref(false);
+  const viewportWidth = ref(window.innerWidth);
+
+  const ariaValueMin = MIN_AGENT_DOCK_WIDTH;
+  const ariaValueMax = computed(() => maxAgentDockWidth(viewportWidth.value));
 
   function shellRoot(): HTMLElement | null {
     return options.dockRef.value?.closest('.console-shell--mockup') as HTMLElement | null;
@@ -35,6 +43,7 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
   }
 
   function syncDockWidthToShell(): void {
+    viewportWidth.value = window.innerWidth;
     if (options.collapsed?.value) {
       applyCollapsedDockWidth();
       return;
@@ -75,6 +84,28 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
     persistAgentDockWidth(dockWidth.value);
   }
 
+  function onDockResizeKeydown(event: KeyboardEvent): void {
+    if (options.collapsed?.value) {
+      return;
+    }
+
+    const action = resolveAgentDockResizeKey(event.key, event.shiftKey);
+    if (!action) {
+      return;
+    }
+
+    event.preventDefault();
+    if (action.type === 'reset') {
+      resetDockWidth();
+      return;
+    }
+
+    applyDockWidth(
+      applyAgentDockResizeKeyAction(dockWidth.value, action, window.innerWidth),
+    );
+    persistAgentDockWidth(dockWidth.value);
+  }
+
   onMounted(() => {
     syncDockWidthToShell();
     window.addEventListener('resize', syncDockWidthToShell);
@@ -104,8 +135,11 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
   return {
     dockWidth,
     resizing,
+    ariaValueMin,
+    ariaValueMax,
     resetDockWidth,
     startDockResize,
+    onDockResizeKeydown,
     syncDockWidthToShell,
   };
 }

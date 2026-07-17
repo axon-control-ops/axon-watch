@@ -6,26 +6,73 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, Callable
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from tests.support.control_plane_app_loader import prepare_control_plane_imports
 from tests.support.control_plane_db import isolate_control_plane_db
 
-CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
-sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+app: Any
+run_store: Any
+build_company_roster: Callable[..., dict[str, object]]
+build_workspace_agent_record: Callable[..., dict[str, object]]
+load_workspace_agent_configs: Callable[..., tuple[Any, ...]]
+create_run: Callable[..., dict[str, Any]]
+derive_agent_status: Callable[[str], str]
+employee_status: Callable[..., str]
 
-from app.main import app  # noqa: E402
-from app.persistence import run_store  # noqa: E402
-from app.workspace_agents import (  # noqa: E402
-    build_company_roster,
-    build_workspace_agent_record,
-    load_workspace_agent_configs,
-)
-from app.workspace_agents.status import derive_agent_status, employee_status  # noqa: E402
+
+def _reload_control_plane_workspace_agent_modules() -> None:
+    global app, run_store, build_company_roster, build_workspace_agent_record
+    global load_workspace_agent_configs, create_run, derive_agent_status, employee_status
+
+    from app.main import app as _app
+    from app.persistence import run_store as _run_store
+    from app.runs.service import create_run as _create_run
+    from app.workspace_agents import (
+        build_company_roster as _build_company_roster,
+        build_workspace_agent_record as _build_workspace_agent_record,
+        load_workspace_agent_configs as _load_workspace_agent_configs,
+    )
+    from app.workspace_agents.status import (
+        derive_agent_status as _derive_agent_status,
+        employee_status as _employee_status,
+    )
+
+    app = _app
+    run_store = _run_store
+    build_company_roster = _build_company_roster
+    build_workspace_agent_record = _build_workspace_agent_record
+    load_workspace_agent_configs = _load_workspace_agent_configs
+    create_run = _create_run
+    derive_agent_status = _derive_agent_status
+    employee_status = _employee_status
 
 
 class WorkspaceAgentsModuleTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._saved_modules = prepare_control_plane_imports()
+        self.addCleanup(self._restore_control_plane_modules)
+        _reload_control_plane_workspace_agent_modules()
+        isolate_control_plane_db(self, run_store)
+
+    def _restore_control_plane_modules(self) -> None:
+        for name in list(sys.modules):
+            if name == "app" or name.startswith("app."):
+                del sys.modules[name]
+        sys.modules.update(self._saved_modules)
+
+    def test_derive_agent_status_ignores_background_employee_runs(self) -> None:
+        create_run(
+            workspace_id="workspace_demo",
+            mode="agent",
+            summary="Control Plane: continuous worker shift",
+            employee_role="backend",
+        )
+        self.assertEqual("idle", derive_agent_status("workspace_demo"))
+
     def test_review_ready_run_marks_agent_verifying(self) -> None:
         with patch(
             "app.workspace_agents.status.list_runs",
@@ -253,9 +300,18 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
 
 class ControlPlaneWorkspaceAgentsTests(unittest.TestCase):
     def setUp(self) -> None:
+        self._saved_modules = prepare_control_plane_imports()
+        self.addCleanup(self._restore_control_plane_modules)
+        _reload_control_plane_workspace_agent_modules()
         isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
+
+    def _restore_control_plane_modules(self) -> None:
+        for name in list(sys.modules):
+            if name == "app" or name.startswith("app."):
+                del sys.modules[name]
+        sys.modules.update(self._saved_modules)
 
     def test_agents_index_includes_bound_workspace_agent(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

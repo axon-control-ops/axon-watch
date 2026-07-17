@@ -113,6 +113,23 @@
   background: rgba(2, 10, 16, 0.48);
 }
 
+.operator-status-radar-panel__rail-item--action {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.operator-status-radar-panel__rail-item--action:hover {
+  border-color: rgba(0, 242, 255, 0.22);
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.operator-status-radar-panel__rail-item--action:focus-visible {
+  outline: 1px solid rgba(0, 242, 255, 0.55);
+  outline-offset: 1px;
+}
+
 .operator-status-radar-panel__rail-item span,
 .operator-status-radar-panel__rail-item strong {
   margin: 0;

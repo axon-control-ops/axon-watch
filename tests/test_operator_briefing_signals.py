@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import sys
 import unittest
+from pathlib import Path
 
-from app.operator_briefing_signals import (
+CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
+sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+
+from app.kairo_persona import build_persona_voice_line  # noqa: E402
+from app.operator_briefing_signals import (  # noqa: E402
     first_actionable_signal,
     is_bootstrap_signal,
     is_monitor_signal,
     summarize_actionable_inbox,
 )
-from app.kairo_persona import build_persona_voice_line
-from app.operator_presence import build_operator_presence
+from app.operator_presence import build_operator_presence  # noqa: E402
 
 
 class OperatorBriefingSignalsTests(unittest.TestCase):

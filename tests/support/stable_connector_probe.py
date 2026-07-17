@@ -38,6 +38,17 @@ STABLE_OK_CONNECTOR_RECORDS: list[dict[str, object]] = [
         "last_checked_at": "2026-07-05T08:00:00Z",
         "latency_ms": 1,
     },
+    {
+        "connector_id": "cloudflare_tunnel",
+        "display_name": "Cloudflare tunnel",
+        "health_url": "https://example.test/",
+        "required": True,
+        "workspace_id": "workspace_axon_watch",
+        "status": "ok",
+        "detail": "reachable",
+        "last_checked_at": "2026-07-05T08:00:00Z",
+        "latency_ms": 1,
+    },
 ]
 
 
@@ -50,8 +61,13 @@ def _empty_monitor_records() -> list[dict[str, object]]:
     return []
 
 
+def _empty_email_inbox_items() -> list[dict[str, object]]:
+    """Keep bootstrap inbox tests deterministic (no dev email stub noise)."""
+    return []
+
+
 class StableConnectorProbePatch:
-    """Patch connector + monitor probe sites used by watch inbox assembly."""
+    """Patch connector + monitor + email probe sites used by watch inbox assembly."""
 
     _CONNECTOR_TARGETS = (
         "app.connectors.summary.probe_all_connectors",
@@ -61,6 +77,10 @@ class StableConnectorProbePatch:
     _MONITOR_TARGETS = (
         "app.signals.store.probe_monitor_records",
         "app.monitors.dashpro_monitor.probe_monitor_records",
+    )
+    _EMAIL_TARGETS = (
+        "app.signals.store.email_inbox_items",
+        "app.signals.email_signal.email_inbox_items",
     )
 
     def __init__(self) -> None:
@@ -76,6 +96,10 @@ class StableConnectorProbePatch:
             patcher = patch(target, _empty_monitor_records)
             patcher.start()
             self._patches.append(patcher)
+        for target in self._EMAIL_TARGETS:
+            patcher = patch(target, _empty_email_inbox_items)
+            patcher.start()
+            self._patches.append(patcher)
 
     def stop(self) -> None:
         for item in reversed(self._patches):
@@ -89,6 +113,7 @@ def patch_stable_connector_probes() -> StableConnectorProbePatch:
 
 def reset_watch_ephemeral_stores() -> None:
     from app.commands import store as command_store  # noqa: WPS433
+    from app.connectors.summary import reset_connector_probe_cache  # noqa: WPS433
     from app.delivery import store as delivery_store  # noqa: WPS433
     from app.events import store as event_store  # noqa: WPS433
     from app.monitors.dashpro_monitor import reset_monitor_probe_cache  # noqa: WPS433
@@ -99,3 +124,4 @@ def reset_watch_ephemeral_stores() -> None:
     event_store.reset_store()
     suppression_store.reset_store()
     reset_monitor_probe_cache()
+    reset_connector_probe_cache()

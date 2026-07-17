@@ -77,8 +77,9 @@ Documented in `OPERATOR_MISSION_CONTROL_V1.md` § v1 Limitations:
 
 - Rich execution feed (tool args, stdout, diffs) from run-step events
 - Auto terminal peek when active run uses PTY
-- Operator keyboard shortcut for terminal toggle
 - Reduced duplication between status rail and HUD (optional slimming)
+
+Shipped after ADR acceptance: Operator **Ctrl/Cmd+J** terminal toggle (shared with IDE).
 
 ## Reevaluation Triggers
 

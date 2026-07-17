@@ -223,6 +223,7 @@
 }
 
 .ide-activity-bar__button {
+  position: relative;
   display: grid;
   place-items: center;
   width: 2rem;
@@ -232,6 +233,109 @@
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+}
+
+.ide-activity-bar__button--agent-alive {
+  color: rgba(150, 231, 255, 0.96);
+}
+
+.ide-activity-bar__button--agent-streaming {
+  box-shadow: inset 0 -2px 0 rgba(0, 245, 212, 0.45);
+}
+
+.ide-activity-bar__button--agent-approvals {
+  color: #ffca7e;
+  box-shadow: inset 0 -2px 0 rgba(255, 159, 0, 0.42);
+}
+
+.ide-activity-bar__button--agent-executing {
+  box-shadow: inset 0 -2px 0 rgba(0, 245, 212, 0.45);
+}
+
+.ide-activity-bar__button--agent-review-ready {
+  color: rgba(190, 230, 255, 0.98);
+  box-shadow: inset 0 -2px 0 rgba(120, 200, 255, 0.42);
+}
+
+.ide-activity-bar__button--terminal-alive {
+  color: rgba(150, 231, 255, 0.96);
+}
+
+.ide-activity-bar__button--terminal-executing {
+  box-shadow: inset 0 -2px 0 rgba(0, 245, 212, 0.45);
+}
+
+.ide-activity-bar__button--terminal-review-ready {
+  color: rgba(190, 230, 255, 0.98);
+  box-shadow: inset 0 -2px 0 rgba(120, 200, 255, 0.42);
+}
+
+.ide-activity-bar__button--run-attention {
+  color: rgba(170, 215, 255, 0.96);
+}
+
+.ide-activity-bar__button--run-warning {
+  color: #ffca7e;
+  box-shadow: inset 0 -2px 0 rgba(255, 159, 0, 0.42);
+}
+
+.ide-activity-bar__badge {
+  position: absolute;
+  top: 0.08rem;
+  right: 0.08rem;
+  min-width: 0.82rem;
+  padding: 0.04rem 0.16rem;
+  border: 1px solid rgba(255, 159, 0, 0.42);
+  border-radius: 999px;
+  background: rgba(255, 159, 0, 0.12);
+  color: #ffca7e;
+  font-family: var(--font-mono);
+  font-size: 0.44rem;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.ide-activity-bar__badge--warning {
+  border-color: rgba(255, 159, 0, 0.5);
+  background: rgba(255, 159, 0, 0.16);
+  color: #ffca7e;
+}
+
+.ide-activity-bar__pulse {
+  position: absolute;
+  top: 0.18rem;
+  right: 0.18rem;
+  width: 0.34rem;
+  height: 0.34rem;
+  border-radius: 999px;
+  background: rgba(0, 245, 212, 0.88);
+  box-shadow: 0 0 8px rgba(0, 245, 212, 0.45);
+  animation: ide-activity-bar-pulse 1.8s ease-in-out infinite;
+}
+
+.ide-activity-bar__pulse--glance {
+  background: rgba(120, 200, 255, 0.9);
+  box-shadow: 0 0 8px rgba(120, 200, 255, 0.45);
+}
+
+@keyframes ide-activity-bar-pulse {
+  0%,
+  100% {
+    opacity: 0.82;
+    box-shadow: 0 0 6px rgba(0, 245, 212, 0.35);
+  }
+
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(0, 245, 212, 0.68);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ide-activity-bar__pulse {
+    animation: none;
+  }
 }
 
 .ide-activity-bar__icon {
@@ -261,8 +365,68 @@
   overflow: auto;
 }
 
-.ide-explorer-panel__stub-copy {
+.ide-explorer-panel__stub-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
   padding: 0.65rem;
+}
+
+.ide-explorer-panel__run-notice {
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(120, 200, 255, 0.12);
+}
+
+.ide-explorer-panel__stub-copy {
+  margin: 0;
+  padding: 0;
+}
+
+.ide-explorer-panel__stub-action {
+  align-self: flex-start;
+  border: 1px solid rgba(148, 188, 204, 0.28);
+  border-radius: 999px;
+  background: rgba(148, 188, 204, 0.08);
+  color: rgba(210, 228, 238, 0.96);
+  padding: 0.32rem 0.72rem;
+  cursor: pointer;
+}
+
+.ide-explorer-panel__stub-action:hover {
+  border-color: rgba(0, 242, 255, 0.28);
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.ide-explorer-panel--stub-attention {
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 120, 0.22);
+}
+
+.ide-explorer-panel--stub-attention .ide-explorer-panel__stub-action {
+  border-color: rgba(255, 180, 120, 0.34);
+  background: rgba(255, 180, 120, 0.1);
+  color: #ffd8b8;
+}
+
+.ide-explorer-panel--stub-streaming {
+  animation: ide-explorer-stub-stream 2.2s ease-in-out infinite;
+}
+
+@keyframes ide-explorer-stub-stream {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.12);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ide-explorer-panel--stub-streaming {
+    animation: none;
+    box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.22);
+  }
 }
 
 
