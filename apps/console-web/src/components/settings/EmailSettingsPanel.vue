@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { useEmailSettingsMailbox } from './useEmailSettingsMailbox';
-
-const showImapPassword = ref(false);
-const showSmtpPassword = ref(false);
+import EmailSettingsPasswordField from './EmailSettingsPasswordField.vue';
 
 const {
   snapshot,
@@ -216,26 +213,11 @@ const {
           <input v-model="form.imap_ssl" type="checkbox" />
           <span>SSL</span>
         </label>
-        <label>
-          <span>IMAP password {{ vaultLocked ? '(needs Vault unlock)' : '' }}</span>
-          <div class="email-settings-panel__password-field">
-            <input
-              v-model="form.password_imap"
-              :type="showImapPassword ? 'text' : 'password'"
-              autocomplete="new-password"
-              :placeholder="vaultLocked ? 'Unlock Axon-X Vault first' : ''"
-            />
-            <button
-              type="button"
-              class="email-settings-panel__password-toggle"
-              :aria-pressed="showImapPassword"
-              :aria-label="showImapPassword ? 'Hide IMAP password' : 'Show IMAP password'"
-              @click="showImapPassword = !showImapPassword"
-            >
-              {{ showImapPassword ? 'Hide' : 'Show' }}
-            </button>
-          </div>
-        </label>
+        <EmailSettingsPasswordField
+          v-model="form.password_imap"
+          :label="`IMAP password ${vaultLocked ? '(needs Vault unlock)' : ''}`"
+          :placeholder="vaultLocked ? 'Unlock Axon-X Vault first' : ''"
+        />
 
         <h3>SMTP</h3>
         <label>
@@ -264,25 +246,10 @@ const {
           <input v-model="form.smtp_starttls" type="checkbox" :disabled="form.smtp_port === 465" />
           <span>STARTTLS (587)</span>
         </label>
-        <label>
-          <span>SMTP password (optional if same as IMAP)</span>
-          <div class="email-settings-panel__password-field">
-            <input
-              v-model="form.password_smtp"
-              :type="showSmtpPassword ? 'text' : 'password'"
-              autocomplete="new-password"
-            />
-            <button
-              type="button"
-              class="email-settings-panel__password-toggle"
-              :aria-pressed="showSmtpPassword"
-              :aria-label="showSmtpPassword ? 'Hide SMTP password' : 'Show SMTP password'"
-              @click="showSmtpPassword = !showSmtpPassword"
-            >
-              {{ showSmtpPassword ? 'Hide' : 'Show' }}
-            </button>
-          </div>
-        </label>
+        <EmailSettingsPasswordField
+          v-model="form.password_smtp"
+          label="SMTP password (optional if same as IMAP)"
+        />
 
         <h3>Monitor</h3>
         <label class="email-settings-panel__toggle">

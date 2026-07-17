@@ -93,7 +93,6 @@ import {
   writeOpenIdeThreadIdsForWorkspace,
 } from '../lib/ide-thread-tabs-prefs';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
-import { executeIdeRunRecovery } from '../lib/ide-run-auto-recovery';
 import {
   clearIdeRunRecovery,
   fetchControlPlaneBootId,
@@ -302,6 +301,7 @@ import { createOperatorBriefingSlice } from './shell/slices/create-operator-brie
 import { createOperatorFocusSlice } from './shell/slices/create-operator-focus-slice';
 import { createOperatorPresenceSettingsSlice } from './shell/slices/create-operator-presence-settings-slice';
 import { createOperatorProbesSlice } from './shell/slices/create-operator-probes-slice';
+import { createIdeRunAutoRecoverySlice } from './shell/slices/create-ide-run-auto-recovery-slice';
 import { createInboxSignalsSlice } from './shell/slices/create-inbox-signals-slice';
 import { createRuntimeProbesSlice } from './shell/slices/create-runtime-probes-slice';
 import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary-slice';
@@ -433,7 +433,7 @@ export const useShellStore = defineStore('shell', () => {
   const kairoVoicePaused = ref(false);
   const ideComposerQueueByWorkspaceId = ref<Record<string, IdeComposerQueuedMessage[]>>({});
   let flushingIdeComposerQueue = false;
-  let autoRunRecoveryInFlight = false;
+  const autoRunRecoveryInFlight = { value: false };
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
   const ideAgentRunId = ref<string | null>(null);
   const ideComposerActivity = ref<IdeComposerActivity | null>(null);
@@ -2936,79 +2936,24 @@ export const useShellStore = defineStore('shell', () => {
     await loadOperatorBriefing({ background: true, light: true });
   }
 
-  async function autoContinueInterruptedIdeRun(): Promise<void> {
-    const recovery = readIdeRunRecovery();
-    if (!recovery || autoRunRecoveryInFlight) {
-      return;
-    }
-
-    autoRunRecoveryInFlight = true;
-    try {
-      await executeIdeRunRecovery({
-        recovery,
-        loadRunPhase: async () => {
-          await loadRuns({ sync: false });
-          return runs.value.find((item) => item.run_id === recovery.runId)?.phase ?? null;
-        },
-        streamActive: () => agentStreamActive.value,
-        mutationBusy: () => commandMutationState.value === 'submitting',
-        currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
-        linkRun: (runId) => {
-          ideAgentRunId.value = runId;
-        },
-        reportError: (message) => {
-          commandMutationError.value = message;
-        },
-        reattach: async (record) => {
-          ideAgentRunId.value = record.runId;
-          setWorkspaceSurfaceThreadId(record.workspaceId, 'ide', record.threadId);
-          activeThreadId.value = record.threadId;
-          await loadWorkspaceThread(record.workspaceId, 'ide', record.threadId);
-          ideAgentRunId.value = record.runId;
-          const recoveredMessages =
-            workspaceIdeThreadMessagesById.value[record.workspaceId] ?? [];
-          const agentMessage = [...recoveredMessages]
-            .reverse()
-            .find(
-              (message) =>
-                message.role === 'agent' && message.run_id === record.runId,
-            );
-          if (agentMessage) {
-            const operatorMessage = [...recoveredMessages]
-              .reverse()
-              .find(
-                (message) =>
-                  message.role === 'operator' && message.run_id === record.runId,
-              );
-            ideComposerActivity.value = {
-              label: buildIdeComposerActivityLabel(
-                record.mode,
-                agentExecutionAccess.value,
-              ),
-              mode: record.mode,
-              executionAccess: agentExecutionAccess.value,
-              operatorPrompt: operatorMessage?.content ?? '',
-            };
-            attachChatStream(
-              record.workspaceId,
-              record.threadId,
-              agentMessage.message_id,
-            );
-          }
-        },
-        dispatchContinuation: (input) =>
-          dispatchIdeComposerMessage(input.mode, {
-            contentOverride: input.content,
-            linkedRunIdOverride: input.linkedRunId,
-            threadIdOverride: input.threadId,
-            recoveryCountOverride: input.recoveryCount,
-            clearDraftOnSuccess: false,
-          }),
-      });
-    } finally {
-      autoRunRecoveryInFlight = false;
-    }
-  }
+  const { autoContinueInterruptedIdeRun } = createIdeRunAutoRecoverySlice({
+    autoRunRecoveryInFlight,
+    runs,
+    agentStreamActive,
+    commandMutationState,
+    commandMutationError,
+    currentWorkspace,
+    ideAgentRunId,
+    ideComposerActivity,
+    agentExecutionAccess,
+    workspaceIdeThreadMessagesById,
+    activeThreadId,
+    loadRuns,
+    setWorkspaceSurfaceThreadId,
+    loadWorkspaceThread,
+    attachChatStream,
+    dispatchIdeComposerMessage,
+  });
 
   async function refreshRunSurfaces(options?: { light?: boolean; forceFull?: boolean }): Promise<void> {
     // During an active stream/run, full surface refresh (CLI status + briefing +

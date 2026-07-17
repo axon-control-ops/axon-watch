@@ -18,14 +18,9 @@ import { useKairoGalaxyOrbVoice } from './use-kairo-galaxy-orb-voice';
 import { createOrbTriggerGestureHandlers } from './orb-trigger-gestures';
 import { resolveVoiceOrbPlacementApi } from './resolve-voice-orb-placement-api';
 import { handleKairoGalaxyOrbInterrupt } from './kairo-galaxy-orb-interrupt';
+import { useKairoGalaxyOrbChromeFlags } from './use-kairo-galaxy-orb-chrome-flags';
+import { useKairoGalaxyOrbTtsBadge } from './use-kairo-galaxy-orb-tts-badge';
 import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_ORB_LABEL } from '../../lib/operator-persona-name';
-import {
-  kairoVoiceActiveEngine,
-  kairoVoiceActiveReason,
-  kairoVoiceEngineBadge,
-  kairoVoiceLastEngine,
-  kairoVoiceLastReason,
-} from '../../lib/kairo-voice-diagnostics';
 import {
   kairoConversationPhase,
   kairoConversationReply,
@@ -138,23 +133,11 @@ const orbStatusLabel = computed(() =>
     speechCapture.capturing.value,
   ),
 );
-const showInterrupt = computed(
-  () => shell.kairoSpeechActive || kairoConversationPhase.value === 'thinking',
-);
-const ttsBadge = computed(() => {
-  if (!speaking.value) {
-    return '';
-  }
-  // Touch reactive refs so the badge updates when the live engine changes.
-  void kairoVoiceActiveEngine.value;
-  void kairoVoiceActiveReason.value;
-  void kairoVoiceLastEngine.value;
-  void kairoVoiceLastReason.value;
-  return kairoVoiceEngineBadge();
+const { showInterrupt, showIdeClose } = useKairoGalaxyOrbChromeFlags({
+  shell,
+  placementMode: props.placementMode,
 });
-const showIdeClose = computed(
-  () => props.placementMode === 'viewport' && shell.layoutMode === 'ide',
-);
+const ttsBadge = useKairoGalaxyOrbTtsBadge(speaking);
 
 function handleInterrupt(): void {
   handleKairoGalaxyOrbInterrupt(shell);
