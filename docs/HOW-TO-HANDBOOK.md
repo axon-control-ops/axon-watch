@@ -17,6 +17,9 @@ Use it to:
 
 **Last verified:** 2026-07-06 — production operator at `:4173`, vault subscription auth + IDE composer catalog.
 
+**PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
+`./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
+
 **Production URL:** http://127.0.0.1:4173 — [`docs/PRODUCTION_OPERATOR_SURFACE.md`](PRODUCTION_OPERATOR_SURFACE.md)
 
 **Layered onboarding (shorter):** [`docs/AXON-X-STARTER-GUIDE.md`](AXON-X-STARTER-GUIDE.md)
@@ -29,6 +32,7 @@ Use it to:
 2. [Handbook map](#handbook-map) — who reads what
 3. [Operator manual](#operator-manual) — daily rituals
 3.5. [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools) — Pro vs API key, native vs Cursor
+3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, company roster
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
 6. [Source index](#source-index) — where truth lives
@@ -55,6 +59,7 @@ Use it to:
 | **Operator (daily use)** | [Quick Start](#quick-start) | [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [Operator manual](#operator-manual) |
 | **Teacher / reviewer** | [Teaching Axon-X](#teaching-axon-x-to-someone-else) | [Verification](#verification-commands), `docs/FINAL_PARITY_VERIFICATION.md` |
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
+| **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), GitHub Actions → Axon-X Fast Gate |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
 
@@ -930,7 +935,11 @@ If you need to understand the current implementation quickly, read these first:
 
 ## Verification Commands
 
-Use these from the repo root:
+Use these from the repo root.
+
+**CI, merge to `dev`, and employee agents:** see
+**[docs/how-to/ci-merge-and-worker-agents.md](how-to/ci-merge-and-worker-agents.md)**
+(Fast Gate workflow, PR workflow, roster/scheduler, how to tell if workers are live).
 
 ## Shared contract verification
 
