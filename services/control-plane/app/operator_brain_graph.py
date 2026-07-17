@@ -14,7 +14,7 @@ from app.adapters.watch_client import fetch_watch_connectors, fetch_watch_inbox
 from app.domain.run_state import is_terminal_phase
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.persistence import email_settings_store
-from app.runs.service import list_runs
+from app.runs.service import list_operator_facing_active_runs
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
 from app.operator_persona_name import OPERATOR_PERSONA_NAME
 from app.workspace_catalog import list_workspace_records
@@ -188,11 +188,7 @@ def build_operator_brain_graph(
         if isinstance(item, dict)
     ]
 
-    active_runs = [
-        record
-        for record in list_runs()
-        if not is_terminal_phase(str(record.get("phase", "")))
-    ]
+    active_runs = list_operator_facing_active_runs()
 
     workspace_records = list_workspace_records(
         inbox_fetcher=inbox_once,

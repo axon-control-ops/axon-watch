@@ -17,7 +17,7 @@ Supported `command_type` values (v1):
 | Type | Target | Action |
 |---|---|---|
 | `reprobe_connector` | `target_id` = connector id | Re-run HTTP probe for one connector |
-| `refresh_summary` | none | Rebuild watch summary snapshot |
+| `refresh_summary` | none | Rebuild watch summary snapshot (clears connector + monitor probe caches) |
 
 Request shape matches frozen planning (`command_id`, `command_type`, `target_type`,
 `target_id`, `requested_by`, `payload`, `requested_at`).
@@ -91,6 +91,14 @@ Shared DTOs: `packages/shared-types/src/watch.ts`
 
 ```bash
 python3 -m unittest tests.test_watch_commands_events tests.test_control_plane_watch_commands -v
+PYTHONPATH=services/axon-watch python3 -m unittest \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_connector_seeds_cold_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_tunnel_seeds_cold_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_connector_updates_warm_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_tunnel_updates_warm_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_refresh_summary_clears_connector_cache \
+  tests.test_dashpro_monitor_cache.DashProMonitorCacheTests.test_execute_refresh_summary_clears_monitor_cache \
+  -v
 ./scripts/verify/test4-watch-command-event-depth.sh
 npm run verify:test4
 ```

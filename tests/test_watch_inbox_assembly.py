@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from tests.support.watch_app_loader import load_watch_app, restore_app_modules
+from tests.support.watch_app_loader import prepare_watch_imports, restore_app_modules
 
 
 class InboxAssemblyTests(unittest.TestCase):
     def setUp(self) -> None:
-        self._watch_app, self._cached_modules = load_watch_app()
+        self._cached_modules = prepare_watch_imports()
         from app.signals.inbox_assembly import (  # noqa: WPS433
             connectors_trusted,
             include_summary_degraded_signal,

@@ -8,6 +8,23 @@ from pathlib import Path
 WATCH_ROOT = Path(__file__).resolve().parents[2] / "services" / "axon-watch"
 
 
+def prepare_watch_imports() -> dict[str, object]:
+    """Clear cached ``app`` modules and prioritize axon-watch on ``sys.path``."""
+    cached = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "app" or name.startswith("app.")
+    }
+    for name in cached:
+        del sys.modules[name]
+
+    watch_path = str(WATCH_ROOT)
+    while watch_path in sys.path:
+        sys.path.remove(watch_path)
+    sys.path.insert(0, watch_path)
+    return cached
+
+
 def load_watch_app():
     cached = {
         name: module

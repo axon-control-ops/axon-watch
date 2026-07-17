@@ -391,6 +391,29 @@ class ControlPlaneRunsTests(unittest.TestCase):
         self.assertEqual("Run resumed for follow-up work", resumed["current_step"])
         self.assertFalse(resumed["can_review"])
 
+    def test_resume_one_shot_review_ready_completes_instead_of_executing(self) -> None:
+        created = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "git status",
+            },
+        ).json()
+        review_ready = self.client.post(f"/api/runs/{created['run_id']}/review-ready").json()
+        self.assertEqual("review_ready", review_ready["phase"])
+
+        resume_response = self.client.post(f"/api/runs/{created['run_id']}/resume")
+        self.assertEqual(200, resume_response.status_code)
+        completed = resume_response.json()
+        self.assertEqual("completed", completed["phase"])
+        self.assertEqual("done", completed["status"])
+        self.assertFalse(completed["can_resume"])
+
+        history = run_store.list_history(str(completed["history_ref"]))
+        self.assertEqual("operator_complete", history[-1]["receipt"]["type"])
+        self.assertIn("One-shot", history[-1]["receipt"]["summary"])
+
     def test_complete_from_review_ready_transitions_to_completed(self) -> None:
         created = self.client.post(
             "/api/runs",

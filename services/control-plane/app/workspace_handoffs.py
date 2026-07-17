@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.persistence import handoff_store
-from app.runs.service import list_runs
+from app.runs.service import is_background_employee_run, list_operator_facing_runs
 from app.workspace_agents import get_workspace_agent_record
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
 
@@ -14,10 +14,11 @@ class WorkspaceHandoffError(ValueError):
 
 def build_target_workspace_summary(workspace_id: str) -> dict[str, object]:
     record = get_workspace_record(workspace_id)
+    normalized_workspace = workspace_id.strip()
     runs = [
         run
-        for run in list_runs()
-        if str(run.get("workspace_id", "")).strip() == workspace_id.strip()
+        for run in list_operator_facing_runs()
+        if str(run.get("workspace_id", "")).strip() == normalized_workspace
     ]
     active_runs = [
         {
@@ -28,6 +29,7 @@ def build_target_workspace_summary(workspace_id: str) -> dict[str, object]:
         }
         for run in runs
         if str(run.get("status", "")).strip() in {"running", "paused", "review_ready"}
+        and not is_background_employee_run(run)
     ]
 
     return {

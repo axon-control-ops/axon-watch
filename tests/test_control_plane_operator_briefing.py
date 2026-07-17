@@ -157,7 +157,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "updated_at": "2026-07-04T08:00:00Z",
             },
         ) as inbox_mock, patch(
-            "app.operator_briefing.list_active_runs",
+            "app.operator_briefing.list_operator_facing_active_runs",
             return_value=[],
         ):
             response = self.client.get("/api/briefing")
@@ -180,7 +180,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
             "app.operator_briefing.build_inbox_response",
             return_value={"items": [], "count": 0, "updated_at": ""},
         ), patch(
-            "app.operator_briefing.list_active_runs",
+            "app.operator_briefing.list_operator_facing_active_runs",
             return_value=[],
         ):
             response = self.client.get("/api/briefing")
@@ -234,6 +234,38 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
         self.assertEqual("fleet", fleet_payload["scope"]["mode"])
         self.assertIn("Approve the guarded run", fleet_payload["advise"])
         self.assertRegex(fleet_payload["advise"], r"(?i)dashpro")
+
+    def test_briefing_omits_background_employee_runs_from_active_projection(self) -> None:
+        self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "Control Plane: continuous worker shift",
+                "employee_role": "backend",
+            },
+        )
+
+        with patch(
+            "app.operator_briefing.assemble_runtime_summary",
+            return_value={
+                "generated_at": "2026-07-04T08:00:00Z",
+                "control_plane": {"ready": True},
+                "watch": {"connected": True},
+                "approvals": {"pending_count": 0},
+                "degraded": {"active": False, "reasons": []},
+            },
+        ), patch(
+            "app.operator_briefing.build_inbox_response",
+            return_value={"items": [], "count": 0, "updated_at": "2026-07-04T08:00:00Z"},
+        ):
+            response = self.client.get("/api/briefing")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+
+        self.assertEqual([], payload["active_runs"])
+        self.assertEqual("", payload["notice"])
 
 
 if __name__ == "__main__":

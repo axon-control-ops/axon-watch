@@ -7,16 +7,55 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from tests.support.control_plane_db import isolate_control_plane_db
+
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
+from app.persistence import run_store  # noqa: E402
+from app.runs.service import create_run  # noqa: E402
 
 
 class ControlPlaneDataTests(unittest.TestCase):
     def setUp(self) -> None:
+        isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
+
+    @patch("app.data.snapshot.fetch_watch_data_snapshot")
+    def test_data_snapshot_excludes_background_employee_runs(
+        self,
+        mock_watch_snapshot,
+    ) -> None:
+        create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Control Plane: continuous worker shift",
+            employee_role="backend",
+        )
+        create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Operator git status",
+        )
+        mock_watch_snapshot.return_value = {
+            "updated_at": "2026-07-06T05:02:00Z",
+            "tables": {
+                "commands": {"total": 0, "count": 0, "items": []},
+                "events": {"total": 0, "count": 0, "items": []},
+                "receipts": {"total": 0, "count": 0, "items": []},
+                "suppressions": {"total": 0, "count": 0, "items": []},
+            },
+        }
+
+        response = self.client.get("/api/data/snapshot")
+
+        self.assertEqual(200, response.status_code)
+        runs = response.json()["data"]["control_plane"]["runs"]
+        self.assertEqual(1, runs["total"])
+        self.assertEqual(1, runs["count"])
+        self.assertEqual("Operator git status", runs["items"][0]["summary"])
 
     @patch("app.data.snapshot.fetch_watch_data_snapshot")
     @patch("app.persistence.run_store.list_runs")

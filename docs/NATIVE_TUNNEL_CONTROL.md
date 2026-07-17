@@ -25,6 +25,16 @@ Axon-X writes a process ownership record and log under
 process recorded and validated as Axon-X-managed; it refuses to kill an
 unmanaged Cloudflare process.
 
+## Startup autostart
+
+On watch service startup (after vault auto-unlock), `attempt_tunnel_autostart`
+best-effort starts the configured tunnel when the slice is enabled. Failures are
+logged and never block service readiness — missing `cloudflared`, auth, or an
+already-running unmanaged process should not prevent the watch stack from booting.
+
+- Default: enabled (`AXON_WATCH_TUNNEL_AUTOSTART=1`)
+- Disable locally: set `AXON_WATCH_TUNNEL_AUTOSTART` to `0`, `false`, `no`, or `off`
+
 ## Migration note
 
 If an old tunnel is still owned by `axon-local`, stop that legacy process once
@@ -39,6 +49,7 @@ npm run verify:tunnel-remote-control
 
 The gate proves binary/auth diagnostics, native command construction, token
 redaction from arguments, control delegation, unmanaged-process protection,
+startup autostart (disable / slice-off / success / error swallowing),
 the control-plane proxy, and connector-inventory consistency.
 
 WhatsApp monitoring is a separate retirement item and remains explicitly
