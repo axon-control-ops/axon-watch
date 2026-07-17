@@ -10,6 +10,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run  # noqa: E402
+from app.chat.lane_b_plan_run import finalize_lane_b_plan_run  # noqa: E402
 from app.persistence import run_store  # noqa: E402
 from app.runs.service import approve_run, create_run, stop_run  # noqa: E402
 from tests.support.control_plane_db import isolate_control_plane_db  # noqa: E402
@@ -38,6 +39,39 @@ class LaneBRunDispatchTests(unittest.TestCase):
             execution_access="consultative",
         )
         self.assertEqual("executing", record["phase"])
+
+    def test_plan_run_is_linked_and_becomes_review_ready(self) -> None:
+        created = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="Plan the resume behavior",
+            linked_run_id=None,
+            execution_access="consultative",
+            composer_mode="plan",
+        )
+        self.assertEqual("plan", created["mode"])
+        self.assertEqual("executing", created["phase"])
+        self.assertFalse(created["can_approve"])
+
+        dispatched, reviewed = finalize_lane_b_plan_run(
+            run_id=str(created["run_id"]),
+            lane_b_result={
+                "dispatched": True,
+                "runtime_label": "Cursor CLI",
+            },
+        )
+        self.assertTrue(dispatched)
+        self.assertIsNotNone(reviewed)
+        self.assertEqual("review_ready", reviewed["phase"])
+
+        resumed = resolve_lane_b_agent_run(
+            workspace_id="workspace_alpha",
+            content="Revise the verification step",
+            linked_run_id=str(created["run_id"]),
+            execution_access="consultative",
+            composer_mode="plan",
+        )
+        self.assertEqual(str(created["run_id"]), str(resumed["run_id"]))
+        self.assertEqual("executing", resumed["phase"])
 
     def test_reuses_executing_run_for_follow_up_turn(self) -> None:
         created = resolve_lane_b_agent_run(

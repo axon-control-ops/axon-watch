@@ -3,6 +3,7 @@ defineProps<{
   personaName: string;
   orbStatusLabel: string;
   modeLabel: string;
+  ttsBadge?: string;
   showInterrupt: boolean;
   hint: string;
   modelLabel: string;
@@ -21,6 +22,7 @@ const emit = defineEmits<{
       <span class="kairo-galaxy-orb__status-label">{{ orbStatusLabel }}</span>
     </div>
     <p v-if="modeLabel" class="kairo-galaxy-orb__mode-pill">{{ modeLabel }}</p>
+    <p v-if="ttsBadge" class="kairo-galaxy-orb__tts-badge">{{ ttsBadge }}</p>
     <button
       v-if="showInterrupt"
       type="button"

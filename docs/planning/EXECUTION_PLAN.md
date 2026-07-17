@@ -109,15 +109,15 @@ Detail: `docs/planning/KAIRO_CONVERSATION_PLAN.md`
 | C5 | **OP-C5** | Session turn memory for follow-ups ("hand it off" after prior entity) | Contract tests for memory cap; manual follow-up without re-stating workspace | **Done** |
 | C6 | **V5+V9** | Narration plumbing cleanup + honest settings copy | vitest narration tests PASS; no speak API calls for filtered milestones | **Done** |
 | C6A | **Voice-A** | Remove generic briefing/response filler; stay quiet without a live fact/model reply | Focused backend/frontend voice tests + typecheck; no nominal copy beside live failure | **Done 2026-07-16** (`1c19f77`) |
-| C6B | **Voice-B / V10** | Ask/Plan answer-only narration without tool/run semantics | Answer-mode tests + shell extraction; Ask/Plan final answer speaks once | **Implemented 2026-07-16** |
+| C6B | **Voice-B / V10** | Ask/Plan answer-only narration without tool/run semantics | Answer-mode tests + shell extraction; Ask/Plan final answer speaks once | **Done 2026-07-16** |
 | C7 | **V1+V4+V6** | Honest mode labels, persona parity for thinking, error/fallback narration | Manual: minimal thinking uses Vaxon tone; agent error spoken | **Done** |
 | C8 | **M1+M2** | Unified session id + SQLite-backed turn/entity memory | pytest: follow-up survives CP restart | **Done** |
 | C9 | **M3+M5+M6** | Chat tail in context pack, 10 s DTO refresh, unified voice-log dedup | pytest context pack + TTL; manual: no repeated phrasing across channels | **Done** |
 | C10 | **M4** | Agent continuation — inject KAIRO memory into Lane B dispatch | Manual: IDE agent continues KAIRO topic after handoff | **Done** — IDE thread pack always in Lane B context + KAIRO appendix on continuation cues; write-through to session memory |
-| C11 | **V2+V3+V7+V8** | Throttled thinking, optional tool narration, stale-speak cancel, IDE voice hint | Optional depth — does not block Phase D |
-| C12 | **V11** | Prefer Azure/cloud TTS when configured; retain one browser fallback path | Provider-routing tests + no-double-speak manual proof | Planned after stable G6 voice baseline |
-| C13 | **V10** | Ask/Plan answer bookend narration without granting tool/run semantics | Ask/Plan final-answer speech test; Agent/Debug behavior unchanged |
-| C14 | **V12** | Replace the cloud-STT placeholder with real audio upload/transcription | STT API contract + browser fallback + privacy-mode tests |
+| C11 | **V2+V3+V7+V8** | Throttled thinking, optional tool narration, stale-speak cancel, IDE voice hint | Optional depth — does not block Phase D | **Done 2026-07-16** (Voice-C) |
+| C12 | **V11** | Prefer Azure/cloud TTS when configured; retain one browser fallback path | Provider-routing tests + no-double-speak manual proof | **Done 2026-07-16** (Voice-E: Azure-first + browser fallback receipts; queue serial/barge-in tests; live Azure REST synthesis) |
+| C13 | **V10** | Ask/Plan answer bookend narration without granting tool/run semantics | Ask/Plan final-answer speech test; Agent/Debug behavior unchanged | **Done 2026-07-16** (same work as C6B / Voice-B) |
+| C14 | **V12** | Replace the cloud-STT placeholder with real audio upload/transcription | STT API contract + browser fallback + privacy-mode tests | **Done 2026-07-16** (Voice-D: API contract + privacy/fallback tests; accent/noisy-room manual proof still deferred) |
 
 Detail: `docs/planning/KAIRO_VOICE_IMPROVEMENT_PLAN.md`
 
@@ -300,6 +300,18 @@ gate is clear. If debt returns, pause C/D and return to Phase B.
 - Debt gate enforced: 35 `review_ready` + 9 zombie `executing` block feature slices until B1 clears.
 - Next active slice: **Phase A** baseline, then **Phase B1** cleanup.
 - G5.4 operator acks remain human-only (Phase F1).
+
+### 2026-07-16 — SA-1 fleet-ranked Advise in progress
+
+- Control-plane Advise now ranks live fleet facts (approval → critical signal →
+  review-ready → degraded) and can redirect from a quiet focused workspace.
+- Gate: unit + briefing quiet-focus tests; handoff coaching still SA-2.
+
+### 2026-07-16 — Cross-workspace advice direction locked
+
+- Product choice: broader “super-agent” Advise that coaches across workspaces.
+- Published `VAXON_CROSS_WORKSPACE_ADVICE_PLAN.md` (SA-1…SA-4); first build = SA-1.
+- Voice upgrade “next slice” note updated; Phase D prove-source/handoff stays parallel.
 
 ### 2026-07-09 — KAIRO voice + context/memory plan added
 

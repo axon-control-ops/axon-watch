@@ -6,6 +6,7 @@ import {
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
 import type { NarrationMilestone, StreamingActivityView } from './kairo-agent-narration';
+import { toolMilestoneSpeakLine } from './kairo-tool-milestone';
 import { personaThreadPrefix } from './operator-persona-name';
 
 export type AgentStreamCounts = {
@@ -124,7 +125,11 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
       const index = toolCount;
       toolCount += 1;
       lastToolLabel = label;
-      milestones.push({ key: `tool:${index}`, message: label, toolLabel: label });
+      milestones.push({
+        key: `tool:${index}`,
+        message: toolMilestoneSpeakLine(label) || label,
+        toolLabel: label,
+      });
       inBlock = 'other';
       return milestones;
     }

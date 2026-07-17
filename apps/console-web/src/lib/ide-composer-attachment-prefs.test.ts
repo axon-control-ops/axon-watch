@@ -56,6 +56,37 @@ describe('ide composer attachment prefs', () => {
     expect(roundTrip.previewUrl.startsWith('data:image/png')).toBe(true);
   });
 
+  it('isolates attachments per conversation thread', () => {
+    persistComposerAttachments(
+      'workspace_a',
+      [
+        {
+          id: 'composer-image-1',
+          name: 'thread-one.png',
+          mimeType: 'image/png',
+          dataUrl: 'data:image/png;base64,cGl4ZWxz',
+        },
+      ],
+      'thread_1',
+    );
+    persistComposerAttachments(
+      'workspace_a',
+      [
+        {
+          id: 'composer-image-2',
+          name: 'thread-two.png',
+          mimeType: 'image/png',
+          dataUrl: 'data:image/png;base64,cGl4ZWxz',
+        },
+      ],
+      'thread_2',
+    );
+
+    expect(readStoredComposerAttachments('workspace_a', 'thread_1')[0]?.name).toBe('thread-one.png');
+    expect(readStoredComposerAttachments('workspace_a', 'thread_2')[0]?.name).toBe('thread-two.png');
+    expect(readStoredComposerAttachments('workspace_a', 'thread_3')).toEqual([]);
+  });
+
   it('clears stored attachments when list is empty', () => {
     persistComposerAttachments('workspace_a', [
       {

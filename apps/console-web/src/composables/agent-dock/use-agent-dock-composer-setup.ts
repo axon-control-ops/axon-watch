@@ -42,7 +42,11 @@ export function useAgentDockComposerSetup() {
   const defaultComposerMode =
     (shell.runtimeSummary?.runtime_identity.mode_default as ComposerMode) || 'agent';
   const composerMode = ref<ComposerMode>(
-    readWorkspaceComposerMode(shell.currentWorkspace?.workspace_id) ?? defaultComposerMode,
+    readWorkspaceComposerMode(
+      shell.currentWorkspace?.workspace_id,
+      sessionStorage,
+      shell.activeIdeThreadId,
+    ) ?? defaultComposerMode,
   );
 
   const menus = useComposerMenus(shell, { composerMode });
@@ -256,6 +260,7 @@ export function useAgentDockComposerSetup() {
     applyingHistoryDraft,
     composerHistoryIndex,
     composerHistoryScratch,
+    planSoftSwitchNotice,
     closeMenus,
     syncComposerHeight,
     syncContextFromDraft,

@@ -18,9 +18,15 @@ describe('resolveIdeAgentLinkedRunId', () => {
     expect(resolveIdeAgentLinkedRunId(null, [])).toBeNull();
   });
 
-  it('links only reusable agent phases', () => {
-    const runs = [run({ run_id: 'run_a', phase: 'review_ready' })];
+  it('links reusable run phases including in-progress Plan runs', () => {
+    const runs = [
+      run({ run_id: 'run_a', phase: 'review_ready' }),
+      run({ run_id: 'run_plan', phase: 'planning', mode: 'plan' }),
+    ];
     expect(resolveIdeAgentLinkedRunId('run_a', runs)).toBe('run_a');
+    expect(
+      resolveIdeAgentLinkedRunId('run_plan', runs, { expectedMode: 'plan' }),
+    ).toBe('run_plan');
     expect(resolveIdeAgentLinkedRunId('run_missing', runs)).toBeNull();
   });
 

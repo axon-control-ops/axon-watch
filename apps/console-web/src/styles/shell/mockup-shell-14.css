@@ -64,6 +64,20 @@
   text-align: center;
 }
 
+.kairo-galaxy-orb__tts-badge {
+  margin: 0;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 196, 92, 0.35);
+  background: rgba(255, 196, 92, 0.1);
+  color: rgba(255, 220, 150, 0.95);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
 .kairo-galaxy-orb--hands-free .kairo-galaxy-orb__mode-pill {
   border-color: rgba(92, 255, 180, 0.42);
   background: rgba(92, 255, 180, 0.12);

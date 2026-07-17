@@ -47,7 +47,8 @@ class KairoVoicePolicyTests(unittest.TestCase):
     def test_narration_allows_event_respects_levels(self) -> None:
         self.assertFalse(narration_allows_event("agent_start", "off"))
         self.assertTrue(narration_allows_event("agent_start", "minimal"))
-        self.assertFalse(narration_allows_event("tool", "conversational"))
+        self.assertTrue(narration_allows_event("tool", "conversational"))
+        self.assertTrue(narration_allows_event("edit", "conversational"))
         self.assertTrue(narration_allows_event("done", "conversational"))
         self.assertFalse(narration_allows_event("tool", "minimal"))
 
@@ -106,6 +107,20 @@ class KairoVoicePolicyTests(unittest.TestCase):
             )
         self.assertIn("scrollback", payload["line"].lower())
         self.assertNotIn("all set on my side", payload["line"].lower())
+
+    def test_tool_fallback_explains_read_action(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="tool",
+                context={
+                    "tool_label": "Read services/control-plane/app/research/availability.py",
+                },
+                session_id="tool-read-fallback",
+                narration="conversational",
+                use_runtime=False,
+            )
+        self.assertIn("availability.py", payload["line"])
+        self.assertEqual(payload["source"], "fallback")
 
     def test_failed_outcome_does_not_claim_all_set(self) -> None:
         with patch("app.kairo_voice._try_runtime_line", return_value=None):

@@ -7,6 +7,7 @@ import {
 } from './agent-live-line-view';
 import { personaThreadPrefix } from './operator-persona-name';
 import { cleanAgentReplyText } from './sanitize-spoken-reply';
+import { toolMilestoneSpeakLine } from './kairo-tool-milestone';
 
 const COMPLETION_SUMMARY_MAX = 280;
 
@@ -118,7 +119,11 @@ export function narrationMilestonesForDelta(
   const tools = matchAll(content, TOOL_RE);
   for (let index = previousTools; index < tools.length; index += 1) {
     const label = tools[index][1].trim();
-    milestones.push({ key: `tool:${index}`, message: label, toolLabel: label });
+    milestones.push({
+      key: `tool:${index}`,
+      message: toolMilestoneSpeakLine(label) || label,
+      toolLabel: label,
+    });
   }
 
   const previousEdits = matchAll(previousContent, EDIT_RE).length;

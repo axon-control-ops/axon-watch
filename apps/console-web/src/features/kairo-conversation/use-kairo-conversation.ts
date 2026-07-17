@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { postKairoConverse } from '../../lib/kairo-converse-client';
 import { parseChatUiAction } from '../../lib/chat-ui-action';
-import { normalizeKairoCopy, normalizeVoiceTranscript, canonicalWorkspaceLabel } from '../../lib/kairo-entity-labels';
+import { normalizeKairoCopy, normalizeVoiceTranscript } from '../../lib/kairo-entity-labels';
 import { recordOperatorArtifacts } from '../../lib/operator-artifact-view';
 import {
   formatConversationDisplayReply,
@@ -11,7 +11,11 @@ import {
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
 import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 import { useShellStore } from '../../stores/shell';
-import { resolveConversationNavigationIntent, workspaceGalaxyNodeId } from './conversation-intents';
+import { handleConversationModelSwitchIntent } from './conversation-model-switch-handler';
+import {
+  applyKairoConversationNavigationIntent,
+  resolveKairoConversationNavigationIntent,
+} from './conversation-navigation-handler';
 import { dispatchKairoConverseOutcome } from './kairo-conversation-dispatch';
 import {
   clearBriefingSurfaceOffer,
@@ -122,45 +126,37 @@ export function useKairoConversation() {
       scheduleRuntimeAssistantCue(content);
     }
 
-    const navIntent = resolveConversationNavigationIntent(
+    const modelHandled = await handleConversationModelSwitchIntent({
+      shell,
       content,
-      shell.workspaces.map((workspace) => ({
-        workspace_id: workspace.workspace_id,
-        display_name: canonicalWorkspaceLabel(
-          workspace.workspace_id,
-          workspace.display_name ?? workspace.workspace_id,
-        ),
-      })),
-    );
+      voiceCaptureMode: options?.voiceCaptureMode,
+      clearRuntimeAssistantCue,
+      deliverVoiceReply,
+      resetDraftState: () => {
+        draft.value = '';
+        pending.value = false;
+        thinkingLine.value = '';
+      },
+    });
+    if (modelHandled) {
+      return;
+    }
+
+    const navIntent = resolveKairoConversationNavigationIntent(content, shell);
 
     if (navIntent) {
       clearRuntimeAssistantCue();
-      if (navIntent.kind === 'focus_attention') {
-        shell.focusAttentionSidebar();
-      } else if (navIntent.kind === 'focus_briefing') {
-        clearBriefingSurfaceOffer();
-        shell.focusKairoBriefing();
-      } else if (navIntent.kind === 'focus_workspace' && navIntent.workspaceId) {
-        shell.setOperatorCenterView('graph');
-        shell.setCurrentWorkspace(navIntent.workspaceId);
-        const label = canonicalWorkspaceLabel(
-          navIntent.workspaceId,
-          shell.workspaces.find((workspace) => workspace.workspace_id === navIntent.workspaceId)
-            ?.display_name ?? navIntent.workspaceId,
-        );
-        setBrainGalaxyConversationFocus({
-          nodeId: workspaceGalaxyNodeId(navIntent.workspaceId),
-          workspaceId: navIntent.workspaceId,
-          signalId: null,
-          label,
-        });
-      } else if (navIntent.kind === 'switch_center_view' && navIntent.centerView) {
-        shell.setOperatorCenterView(navIntent.centerView);
-      }
-      draft.value = '';
-      pending.value = false;
-      thinkingLine.value = '';
-      await deliverVoiceReply(navIntent.reply, options?.voiceCaptureMode);
+      await applyKairoConversationNavigationIntent({
+        shell,
+        navIntent,
+        deliverVoiceReply,
+        voiceCaptureMode: options?.voiceCaptureMode,
+        resetDraftState: () => {
+          draft.value = '';
+          pending.value = false;
+          thinkingLine.value = '';
+        },
+      });
       return;
     }
 

@@ -67,12 +67,15 @@ describe('ide composer queue', () => {
     ).toBe('run_live');
   });
 
-  it('queues busy agent and debug submits', () => {
+  it('queues busy run-linked submits', () => {
     expect(
       shouldQueueIdeComposerSubmit({ agentBusy: true, composerMode: 'agent' }),
     ).toBe(true);
     expect(
       shouldQueueIdeComposerSubmit({ agentBusy: true, composerMode: 'debug' }),
+    ).toBe(true);
+    expect(
+      shouldQueueIdeComposerSubmit({ agentBusy: true, composerMode: 'plan' }),
     ).toBe(true);
     expect(
       shouldQueueIdeComposerSubmit({ agentBusy: true, composerMode: 'ask' }),

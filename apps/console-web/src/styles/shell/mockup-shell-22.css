@@ -349,4 +349,4 @@
   border-radius: 0.4rem;
 }
 
-@import './mockup-shell-plan-ask.css';
+@import '../shell/mockup-shell-plan-ask.css';

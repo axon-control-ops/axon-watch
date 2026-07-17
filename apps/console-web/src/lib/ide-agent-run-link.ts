@@ -2,14 +2,22 @@ import type { RunRecord } from '../contracts/canonical';
 
 import type { OperatorThreadEntry } from './operator-thread';
 
-const IDE_AGENT_LINK_PHASES = new Set(['awaiting_approval', 'executing', 'paused', 'review_ready']);
+const IDE_AGENT_LINK_PHASES = new Set([
+  'queued',
+  'starting',
+  'planning',
+  'awaiting_approval',
+  'executing',
+  'paused',
+  'review_ready',
+]);
 
 export type ResolveIdeAgentLinkedRunOptions = {
   /** When set, only link to a run whose mode matches (e.g. debug vs agent). */
   expectedMode?: string | null;
 };
 
-/** Run id to attach the next IDE Agent/Debug composer turn to (Lane B only). */
+/** Run id to attach the next IDE Agent/Debug/Plan composer turn to (Lane B only). */
 export function resolveIdeAgentLinkedRunId(
   storedRunId: string | null,
   runs: RunRecord[],

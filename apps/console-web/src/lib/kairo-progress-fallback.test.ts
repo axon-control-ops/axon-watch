@@ -69,6 +69,15 @@ describe('kairo-progress-fallback', () => {
 
     expect(
       agentMilestoneFallbackLine({
+        milestoneKey: 'tool:0',
+        context: {
+          tool_label: 'Read services/control-plane/app/research/availability.py',
+        },
+      }),
+    ).toContain('availability.py');
+
+    expect(
+      agentMilestoneFallbackLine({
         milestoneKey: 'failed',
         context: { failure_summary: 'runtime stream failed' },
       }),

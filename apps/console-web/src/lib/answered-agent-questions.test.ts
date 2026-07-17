@@ -31,4 +31,17 @@ describe('answered-agent-questions', () => {
       )?.id,
     ).toBe('2');
   });
+
+  it('matches free-text Other answers', () => {
+    const withOther = [
+      ...OPTIONS,
+      { id: 'other', label: 'Other' },
+    ];
+    expect(
+      matchQuestionAnswerFromUserText(
+        withOther,
+        'Selected option other: Use local docs only\n(answer to: Ready?)',
+      ),
+    ).toEqual({ id: 'other', label: 'Use local docs only' });
+  });
 });

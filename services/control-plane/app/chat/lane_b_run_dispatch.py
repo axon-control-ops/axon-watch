@@ -23,7 +23,11 @@ def lane_b_run_summary(content: str) -> str:
 
 def _run_mode_for_composer(composer_mode: str | None) -> str:
     normalized = str(composer_mode or "agent").strip().lower()
-    return "debug" if normalized == "debug" else "agent"
+    if normalized == "debug":
+        return "debug"
+    if normalized == "plan":
+        return "plan"
+    return "agent"
 
 
 def resolve_lane_b_agent_run(
@@ -64,6 +68,8 @@ def resolve_lane_b_agent_run(
     detail = (
         "Lane B debug-mode evidence loop"
         if run_mode == "debug"
+        else "Lane B plan-mode planning request"
+        if run_mode == "plan"
         else "Lane B agent-mode runtime request"
     )
     return create_run(
@@ -71,5 +77,7 @@ def resolve_lane_b_agent_run(
         mode=run_mode,
         summary=lane_b_run_summary(content),
         detail=detail,
-        requires_approval=lane_b_agent_requires_approval(execution_access),
+        requires_approval=(
+            False if run_mode == "plan" else lane_b_agent_requires_approval(execution_access)
+        ),
     )

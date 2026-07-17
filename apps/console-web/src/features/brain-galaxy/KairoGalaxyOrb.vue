@@ -18,6 +18,8 @@ import { useKairoGalaxyOrbVoice } from './use-kairo-galaxy-orb-voice';
 import { createOrbTriggerGestureHandlers } from './orb-trigger-gestures';
 import { resolveVoiceOrbPlacementApi } from './resolve-voice-orb-placement-api';
 import { handleKairoGalaxyOrbInterrupt } from './kairo-galaxy-orb-interrupt';
+import { useKairoGalaxyOrbChromeFlags } from './use-kairo-galaxy-orb-chrome-flags';
+import { useKairoGalaxyOrbTtsBadge } from './use-kairo-galaxy-orb-tts-badge';
 import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_ORB_LABEL } from '../../lib/operator-persona-name';
 import {
   kairoConversationPhase,
@@ -131,12 +133,11 @@ const orbStatusLabel = computed(() =>
     speechCapture.capturing.value,
   ),
 );
-const showInterrupt = computed(
-  () => shell.kairoSpeechActive || kairoConversationPhase.value === 'thinking',
-);
-const showIdeClose = computed(
-  () => props.placementMode === 'viewport' && shell.layoutMode === 'ide',
-);
+const { showInterrupt, showIdeClose } = useKairoGalaxyOrbChromeFlags({
+  shell,
+  placementMode: props.placementMode,
+});
+const ttsBadge = useKairoGalaxyOrbTtsBadge(speaking);
 
 function handleInterrupt(): void {
   handleKairoGalaxyOrbInterrupt(shell);
@@ -207,6 +208,7 @@ function handleInterrupt(): void {
         :persona-name="personaName"
         :orb-status-label="orbStatusLabel"
         :mode-label="modeLabel"
+        :tts-badge="ttsBadge"
         :show-interrupt="showInterrupt"
         :hint="hint"
         :model-label="modelLabel"

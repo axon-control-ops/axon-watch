@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3686,
+      "max_lines": 3672,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -98,7 +98,7 @@
       "note": "Auth probes extracted to auth_probes.py; identity to catalog_identity.py"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1436,
+      "max_lines": 1442,
       "soft_limit": 400,
       "hard_limit": 700,
       "target": "docs/how-to/* chapters"
@@ -116,7 +116,7 @@
       "target": "apps/console-web/src/features/settings/*"
     },
     "apps/console-web/src/features/brain-galaxy/KairoGalaxyOrb.vue": {
-      "max_lines": 218,
+      "max_lines": 220,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/brain-galaxy/*"
@@ -171,13 +171,13 @@
       "note": "FS-005 follow-up: model/runtime, menus/consent, and actions extracted under agent-dock/"
     },
     "apps/console-web/src/components/settings/EmailSettingsPanel.vue": {
-      "max_lines": 281,
+      "max_lines": 278,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/settings/useEmailSettingsMailbox.ts"
     },
     "apps/console-web/src/features/kairo-conversation/use-kairo-conversation.ts": {
-      "max_lines": 268,
+      "max_lines": 264,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/kairo-conversation/*"

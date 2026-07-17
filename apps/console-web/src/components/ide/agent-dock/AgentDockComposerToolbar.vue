@@ -190,8 +190,8 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
       <button
         type="button"
         class="agent-dock-composer__tool"
-        title="Turn the draft into concise Instructions markdown"
-        aria-label="Convert draft to Instructions markdown"
+        title="Structure the full draft as lossless Instructions markdown"
+        aria-label="Convert the full draft to Instructions markdown"
         :disabled="!canConvertInstructions"
         @click="emit('convert-to-instructions')"
       >

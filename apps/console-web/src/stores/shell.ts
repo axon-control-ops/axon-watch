@@ -95,12 +95,9 @@ import {
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
 import {
   clearIdeRunRecovery,
-  decideIdeRunRecovery,
   fetchControlPlaneBootId,
   persistIdeRunRecovery,
   readIdeRunRecovery,
-  SERVER_RESTART_CONTINUATION_PROMPT,
-  waitForStableControlPlaneBootId,
 } from '../lib/ide-run-recovery';
 import {
   appendBriefingVoiceTranscriptEntry,
@@ -161,7 +158,7 @@ import {
   type IdeComposerMode,
   type IdeComposerQueuedMessage,
 } from '../lib/ide-composer-queue';
-import { isToolCapableComposerMode } from '../lib/composer-tool-modes';
+import { isRunLinkedComposerMode, isToolCapableComposerMode } from '../lib/composer-tool-modes';
 import {
   persistIdeComposerDraft,
   readStoredIdeComposerDraft,
@@ -304,6 +301,7 @@ import { createOperatorBriefingSlice } from './shell/slices/create-operator-brie
 import { createOperatorFocusSlice } from './shell/slices/create-operator-focus-slice';
 import { createOperatorPresenceSettingsSlice } from './shell/slices/create-operator-presence-settings-slice';
 import { createOperatorProbesSlice } from './shell/slices/create-operator-probes-slice';
+import { createIdeRunAutoRecoverySlice } from './shell/slices/create-ide-run-auto-recovery-slice';
 import { createInboxSignalsSlice } from './shell/slices/create-inbox-signals-slice';
 import { createRuntimeProbesSlice } from './shell/slices/create-runtime-probes-slice';
 import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary-slice';
@@ -435,7 +433,7 @@ export const useShellStore = defineStore('shell', () => {
   const kairoVoicePaused = ref(false);
   const ideComposerQueueByWorkspaceId = ref<Record<string, IdeComposerQueuedMessage[]>>({});
   let flushingIdeComposerQueue = false;
-  let autoRunRecoveryInFlight = false;
+  const autoRunRecoveryInFlight = { value: false };
   const agentExecutionAccess = ref<AgentExecutionAccess>(resolveAgentExecutionAccess());
   const ideAgentRunId = ref<string | null>(null);
   const ideComposerActivity = ref<IdeComposerActivity | null>(null);
@@ -891,6 +889,9 @@ export const useShellStore = defineStore('shell', () => {
         commandMutationError.value = null;
       }
       await loadIdeThreads(workspaceId);
+      if (currentWorkspace.value?.workspace_id === workspaceId) {
+        syncIdeComposerDraftForWorkspace(workspaceId);
+      }
       return;
     }
 
@@ -902,6 +903,9 @@ export const useShellStore = defineStore('shell', () => {
       getWorkspaceSurfaceThreadId(workspaceId, 'ide'),
     );
     applyIdeThreadMessagesToView(workspaceId);
+    if (currentWorkspace.value?.workspace_id === workspaceId) {
+      syncIdeComposerDraftForWorkspace(workspaceId);
+    }
   }
 
   function resetThreadContext(): void {
@@ -1152,8 +1156,11 @@ export const useShellStore = defineStore('shell', () => {
           ),
         ]),
       };
-      ideComposerDraft.value = '';
+      // Flush outgoing thread draft before switching; new tab starts empty.
+      flushIdeComposerDraft();
       await selectIdeThread(created.thread_id);
+      ideComposerDraft.value = '';
+      persistIdeComposerDraft(workspaceId, '', created.thread_id);
       return created.thread_id;
     } catch (error) {
       commandMutationError.value =
@@ -1168,6 +1175,16 @@ export const useShellStore = defineStore('shell', () => {
       return;
     }
 
+    const previousThreadId = activeIdeThreadId.value;
+    if (previousThreadId === threadId) {
+      ensureIdeThreadTabOpen(threadId);
+      return;
+    }
+
+    if (previousThreadId) {
+      flushIdeComposerDraft();
+    }
+
     disconnectChatStreamSession(workspaceId);
     setWorkspaceStreamUi(workspaceId, {
       active: false,
@@ -1179,6 +1196,7 @@ export const useShellStore = defineStore('shell', () => {
     setWorkspaceSurfaceThreadId(workspaceId, 'ide', threadId);
     activeThreadId.value = threadId;
     ensureIdeThreadTabOpen(threadId);
+    syncIdeComposerDraftForThread(workspaceId, threadId);
 
     if (layoutMode.value === 'ide') {
       threadMessages.value = [];
@@ -1648,7 +1666,38 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {
-    ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId);
+    const threadId =
+      (workspaceId && getWorkspaceSurfaceThreadId(workspaceId, 'ide')) ||
+      activeIdeThreadId.value ||
+      null;
+    syncIdeComposerDraftForThread(workspaceId, threadId);
+  }
+
+  function syncIdeComposerDraftForThread(
+    workspaceId: string | null | undefined,
+    threadId: string | null | undefined,
+  ): void {
+    if (ideComposerDraftPersistTimer) {
+      clearTimeout(ideComposerDraftPersistTimer);
+      ideComposerDraftPersistTimer = null;
+    }
+    ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId, threadId);
+  }
+
+  function flushIdeComposerDraft(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (ideComposerDraftPersistTimer) {
+      clearTimeout(ideComposerDraftPersistTimer);
+      ideComposerDraftPersistTimer = null;
+    }
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    const threadId = activeIdeThreadId.value;
+    if (!workspaceId || !threadId) {
+      return;
+    }
+    persistIdeComposerDraft(workspaceId, ideComposerDraft.value, threadId);
   }
 
   function schedulePersistIdeComposerDraft(): void {
@@ -1660,10 +1709,12 @@ export const useShellStore = defineStore('shell', () => {
     }
     ideComposerDraftPersistTimer = setTimeout(() => {
       ideComposerDraftPersistTimer = null;
-      persistIdeComposerDraft(
-        currentWorkspace.value?.workspace_id ?? null,
-        ideComposerDraft.value,
-      );
+      const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+      const threadId = activeIdeThreadId.value;
+      if (!workspaceId || !threadId) {
+        return;
+      }
+      persistIdeComposerDraft(workspaceId, ideComposerDraft.value, threadId);
     }, 140);
   }
 
@@ -1713,7 +1764,7 @@ export const useShellStore = defineStore('shell', () => {
     };
 
     try {
-      const linkedRunId = isToolCapableComposerMode(composerMode)
+      const linkedRunId = isRunLinkedComposerMode(composerMode)
         ? options.linkedRunIdOverride
           ?? resolveIdeAgentLinkedRunId(ideAgentRunId.value, runs.value, {
             expectedMode: composerMode,
@@ -1738,7 +1789,7 @@ export const useShellStore = defineStore('shell', () => {
         attachmentIds.push(uploaded.attachment_id);
       }
       let controlPlaneBootId = '';
-      if (isToolCapableComposerMode(composerMode)) {
+      if (isRunLinkedComposerMode(composerMode)) {
         try {
           controlPlaneBootId = await fetchControlPlaneBootId();
         } catch {
@@ -1774,7 +1825,7 @@ export const useShellStore = defineStore('shell', () => {
       if (options.clearDraftOnSuccess !== false) {
         ideComposerDraft.value = '';
       }
-      if (isToolCapableComposerMode(composerMode) && response.run_id) {
+      if (isRunLinkedComposerMode(composerMode) && response.run_id) {
         ideAgentRunId.value = response.run_id;
       }
       const uiAction = parseChatUiAction(response.ui_action);
@@ -1803,13 +1854,13 @@ export const useShellStore = defineStore('shell', () => {
         if (
           response.run_id &&
           controlPlaneBootId &&
-          (composerMode === 'agent' || composerMode === 'debug')
+          isRunLinkedComposerMode(composerMode)
         ) {
           persistIdeRunRecovery({
             workspaceId,
             threadId: response.thread_id,
             runId: response.run_id,
-            mode: composerMode,
+            mode: composerMode === 'plan' ? 'plan' : composerMode === 'debug' ? 'debug' : 'agent',
             controlPlaneBootId,
             recoveryCount: options.recoveryCountOverride ?? 0,
           });
@@ -2484,6 +2535,8 @@ export const useShellStore = defineStore('shell', () => {
   function setCurrentWorkspace(workspaceId: string): void {
     const previousWorkspaceId = currentWorkspace.value?.workspace_id ?? null;
     if (previousWorkspaceId && previousWorkspaceId !== workspaceId) {
+      // Persist outgoing composer draft while currentWorkspace is still the old one.
+      flushIdeComposerDraft();
       // Persist outgoing workspace tabs before we wipe/replace the open set.
       persistOpenEditorTabs(previousWorkspaceId);
       stashWorkspaceIdeView(previousWorkspaceId);
@@ -2818,6 +2871,7 @@ export const useShellStore = defineStore('shell', () => {
 
   const {
     loadOperatorBriefing,
+    refreshOperatorPresence,
   } = createOperatorBriefingSlice({
     operatorBriefing,
     briefingLoadState,
@@ -2879,89 +2933,24 @@ export const useShellStore = defineStore('shell', () => {
     operatorBrainGraphError,
   });
 
-  async function refreshOperatorPresence(): Promise<void> {
-    await loadOperatorBriefing({ background: true, light: true });
-  }
-
-  async function autoContinueInterruptedIdeRun(): Promise<void> {
-    const recovery = readIdeRunRecovery();
-    if (!recovery || autoRunRecoveryInFlight) {
-      return;
-    }
-
-    autoRunRecoveryInFlight = true;
-    let currentBootId = '';
-    let dispatched = false;
-    try {
-      currentBootId =
-        (await waitForStableControlPlaneBootId({
-          previousBootId: recovery.controlPlaneBootId,
-        })) ?? '';
-      if (!currentBootId) {
-        // Same control-plane boot (or timeout): never leave a completed/failed
-        // recovery marker to re-check on every live refresh.
-        await loadRuns({ sync: false });
-        const run = runs.value.find((item) => item.run_id === recovery.runId) ?? null;
-        const phase = run?.phase ?? null;
-        if (
-          !run ||
-          phase === 'completed' ||
-          phase === 'failed' ||
-          phase === 'cancelled' ||
-          phase === 'review_ready'
-        ) {
-          clearIdeRunRecovery(recovery.runId);
-        }
-        return;
-      }
-      // Refresh runs so orphaned phases from startup reconcile are visible.
-      await loadRuns({ sync: false });
-      const run = runs.value.find((item) => item.run_id === recovery.runId) ?? null;
-      const decision = decideIdeRunRecovery({
-        recovery,
-        currentBootId,
-        runPhase: run?.phase ?? null,
-        streamActive: agentStreamActive.value,
-        mutationBusy: commandMutationState.value === 'submitting',
-        currentWorkspaceId: currentWorkspace.value?.workspace_id ?? null,
-      });
-
-      if (decision.action === 'clear') {
-        clearIdeRunRecovery(recovery.runId);
-        return;
-      }
-      if (decision.action === 'stop_retry') {
-        clearIdeRunRecovery(recovery.runId);
-        commandMutationError.value = decision.reason;
-        return;
-      }
-      if (decision.action !== 'continue') {
-        return;
-      }
-
-      if (decision.linkExistingRun) {
-        ideAgentRunId.value = recovery.runId;
-      }
-      // Clear the old marker before dispatch so a failed continue can persist a fresh one.
-      clearIdeRunRecovery(recovery.runId);
-      dispatched = await dispatchIdeComposerMessage(recovery.mode, {
-        contentOverride: SERVER_RESTART_CONTINUATION_PROMPT,
-        linkedRunIdOverride: decision.linkExistingRun ? recovery.runId : null,
-        threadIdOverride: recovery.threadId,
-        recoveryCountOverride: decision.nextRecoveryCount,
-        clearDraftOnSuccess: false,
-      });
-      if (!dispatched) {
-        // Restore so a later refresh can retry while attempts remain.
-        persistIdeRunRecovery({
-          ...recovery,
-          recoveryCount: decision.nextRecoveryCount - 1,
-        });
-      }
-    } finally {
-      autoRunRecoveryInFlight = false;
-    }
-  }
+  const { autoContinueInterruptedIdeRun } = createIdeRunAutoRecoverySlice({
+    autoRunRecoveryInFlight,
+    runs,
+    agentStreamActive,
+    commandMutationState,
+    commandMutationError,
+    currentWorkspace,
+    ideAgentRunId,
+    ideComposerActivity,
+    agentExecutionAccess,
+    workspaceIdeThreadMessagesById,
+    activeThreadId,
+    loadRuns,
+    setWorkspaceSurfaceThreadId,
+    loadWorkspaceThread,
+    attachChatStream,
+    dispatchIdeComposerMessage,
+  });
 
   async function refreshRunSurfaces(options?: { light?: boolean; forceFull?: boolean }): Promise<void> {
     // During an active stream/run, full surface refresh (CLI status + briefing +

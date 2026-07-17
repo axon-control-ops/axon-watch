@@ -1,6 +1,7 @@
 /**
  * Azure TTS chunk playback with N+1 prefetch.
  */
+import { markKairoVoicePlaybackActive } from './kairo-voice-diagnostics';
 import { postKairoTts, type KairoTtsResponse } from './kairo-tts-client';
 
 export type AzureChunkTuning = {
@@ -68,6 +69,13 @@ export async function speakAzureChunksWithPrefetch(
         voice: tuning.voice,
       }).then((payload) => ({ ...payload, prefetch: true }));
     }
+    const azureReason =
+      typeof response.first_byte_ms === 'number'
+        ? `first_byte_ms=${response.first_byte_ms}`
+        : lastPrefetchMs !== null
+          ? `first_byte_ms=${lastPrefetchMs}`
+          : null;
+    markKairoVoicePlaybackActive('azure', azureReason);
     const handle = handlers.createAudioHandle(response.audio_base64, response.content_type);
     handlers.registerAudio(handle.audio);
     try {

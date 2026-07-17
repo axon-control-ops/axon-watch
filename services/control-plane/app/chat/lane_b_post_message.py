@@ -10,14 +10,16 @@ from app.chat.lane_b_generated_image_actions import (
     maybe_generated_image_redisplay_reply,
 )
 from app.chat.lane_b_persona_fast_path import build_lane_b_persona_reply, post_lane_b_persona_message
+from app.chat.lane_b_plan_run import finalize_lane_b_plan_run
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
+from app.chat.lane_b_system_content import lane_b_system_content as _lane_b_system_content
 from app.chat.workspace_switch import (
     WorkspaceSwitchError,
     build_workspace_switch_reply,
     resolve_workspace_switch_intent,
     workspace_switch_ui_action,
 )
-from app.cli_runtime.approval_gate import is_tool_capable_composer_mode
+from app.cli_runtime.approval_gate import is_run_linked_composer_mode, is_tool_capable_composer_mode
 from app.persistence import chat_store
 from app.plans.service import maybe_attach_plan_artifact
 from app.terminal.session_registry import ensure_agent_session, serialize_session
@@ -48,7 +50,6 @@ def post_lane_b_message(
         _compose_lane_b_memory_appendix,
         _finalize_lane_b_agent_run,
         _lane_b_streaming_enabled,
-        _lane_b_system_content,
         _new_message_id,
         _remember_lane_b_turn,
         _resolve_chat_thread,
@@ -151,7 +152,7 @@ def post_lane_b_message(
     run_record = None
     agent_terminal_session = None
 
-    if is_tool_capable_composer_mode(composer_mode):
+    if is_run_linked_composer_mode(composer_mode):
         run_record = resolve_lane_b_agent_run(
             workspace_id=workspace_id,
             content=content,
@@ -160,10 +161,11 @@ def post_lane_b_message(
             composer_mode=composer_mode,
         )
         dispatch_run_id = str(run_record["run_id"])
-        agent_terminal_session = ensure_agent_session(
-            workspace_id=workspace_id,
-            run_id=dispatch_run_id,
-        )
+        if is_tool_capable_composer_mode(composer_mode):
+            agent_terminal_session = ensure_agent_session(
+                workspace_id=workspace_id,
+                run_id=dispatch_run_id,
+            )
 
     if _lane_b_streaming_enabled():
         thread, thread_id = _resolve_chat_thread(
@@ -281,7 +283,7 @@ def post_lane_b_message(
     )
     lane_b_result: dict[str, object]
 
-    if is_tool_capable_composer_mode(composer_mode) and run_record is not None:
+    if is_run_linked_composer_mode(composer_mode) and run_record is not None:
         lane_b_result = generate_lane_b_result(
             context=context,
             user_prompt=content,
@@ -305,6 +307,17 @@ def post_lane_b_message(
     if is_tool_capable_composer_mode(composer_mode) and run_record is not None:
         dispatched, run_record = _finalize_lane_b_agent_run(
             dispatch_run_id=dispatch_run_id,
+            lane_b_result=lane_b_result,
+        )
+        system_content = _lane_b_system_content(
+            composer_mode=composer_mode,
+            dispatch_run_id=dispatch_run_id,
+            dispatched=dispatched,
+            run_phase=str(run_record["phase"]) if run_record is not None else None,
+        )
+    elif composer_mode == "plan" and run_record is not None:
+        dispatched, run_record = finalize_lane_b_plan_run(
+            run_id=dispatch_run_id,
             lane_b_result=lane_b_result,
         )
         system_content = _lane_b_system_content(

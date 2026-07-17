@@ -20,6 +20,7 @@ import {
 export function useComposerImages() {
   const composerImages = ref<ComposerClipboardImage[]>([]);
   const composerImagesWorkspaceId = ref<string | null>(null);
+  const composerImagesThreadId = ref<string | null>(null);
   const composerImagesPersistTimer = ref<ReturnType<typeof setTimeout> | null>(null);
   const enlargedComposerImage = ref<ComposerClipboardImage | null>(null);
   const composerDragOver = ref(false);
@@ -47,32 +48,42 @@ export function useComposerImages() {
 
   async function persistCurrentComposerImages(): Promise<void> {
     const workspaceId = composerImagesWorkspaceId.value;
-    if (!workspaceId) {
+    const threadId = composerImagesThreadId.value;
+    if (!workspaceId || !threadId) {
       return;
     }
     if (!composerImages.value.length) {
-      persistComposerAttachments(workspaceId, []);
+      persistComposerAttachments(workspaceId, [], threadId);
       return;
     }
 
     const stored = await Promise.all(
       composerImages.value.map((image) => storedComposerImageFromClipboard(image)),
     );
-    persistComposerAttachments(workspaceId, stored);
+    persistComposerAttachments(workspaceId, stored, threadId);
   }
 
-  function loadComposerImagesForWorkspace(workspaceId: string | null | undefined): void {
+  function loadComposerImagesForWorkspace(
+    workspaceId: string | null | undefined,
+    threadId?: string | null,
+  ): void {
     const nextWorkspaceId = workspaceId?.trim() || null;
-    if (composerImagesWorkspaceId.value === nextWorkspaceId) {
+    const nextThreadId = threadId?.trim() || null;
+    if (
+      composerImagesWorkspaceId.value === nextWorkspaceId &&
+      composerImagesThreadId.value === nextThreadId
+    ) {
       return;
     }
 
     revokeComposerClipboardImages(composerImages.value);
     composerImagesWorkspaceId.value = nextWorkspaceId;
+    composerImagesThreadId.value = nextThreadId;
     enlargedComposerImage.value = null;
-    composerImages.value = nextWorkspaceId
-      ? readStoredComposerAttachments(nextWorkspaceId).map(composerImageFromStored)
-      : [];
+    composerImages.value =
+      nextWorkspaceId && nextThreadId
+        ? readStoredComposerAttachments(nextWorkspaceId, nextThreadId).map(composerImageFromStored)
+        : [];
   }
 
   function openComposerImage(image: ComposerClipboardImage): void {

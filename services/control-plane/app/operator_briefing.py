@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.chat.command_intent import humanize_run_summary, is_auto_complete_run_summary
 from app.operator_briefing_signals import filter_actionable_inbox_items, is_monitor_signal
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
+from app.operator_fleet_advice import build_fleet_advice_pack
 from app.runs.service import (
     list_active_runs,
     list_pending_approval_records,
@@ -15,6 +16,7 @@ from app.persistence.operator_memory_store import search_memories
 from app.operator_briefing_rhythm import build_operator_briefing_rhythm
 from app.operator_presence import build_operator_presence
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
+from app.workspace_project_bindings import load_workspace_project_bindings
 
 
 def _build_next_safe_actions(
@@ -174,12 +176,6 @@ def build_operator_briefing(
     if any(is_monitor_signal(item) for item in top_signals):
         top_signals = filter_actionable_inbox_items(top_signals)
     scoped_workspace_id = workspace_id.strip() if workspace_id else None
-    if scoped_workspace_id:
-        top_signals = [
-            item
-            for item in top_signals
-            if str(item.get("workspace_id", "")).strip() in {"", scoped_workspace_id}
-        ]
 
     def _signal_priority(item: dict[str, object]) -> tuple[int, str]:
         signal_id = str(item.get("signal_id", ""))
@@ -196,13 +192,28 @@ def build_operator_briefing(
         rank = 1 if severity in {"critical", "high"} else 2
         return (rank, signal_id)
 
-    top_signals = sorted(top_signals, key=_signal_priority)[:3]
-    active_run_records = list_active_runs()
-    pending_approval_records = list_pending_approval_records()
+    fleet_signals = sorted(top_signals, key=_signal_priority)
     if scoped_workspace_id:
-        active_run_records = _filter_records_by_workspace(active_run_records, scoped_workspace_id)
+        top_signals = [
+            item
+            for item in fleet_signals
+            if str(item.get("workspace_id", "")).strip() in {"", scoped_workspace_id}
+        ]
+    else:
+        top_signals = fleet_signals
+    top_signals = top_signals[:3]
+
+    fleet_active_run_records = list_active_runs()
+    fleet_pending_approval_records = list_pending_approval_records()
+    active_run_records = fleet_active_run_records
+    pending_approval_records = fleet_pending_approval_records
+    if scoped_workspace_id:
+        active_run_records = _filter_records_by_workspace(
+            fleet_active_run_records,
+            scoped_workspace_id,
+        )
         pending_approval_records = _filter_records_by_workspace(
-            pending_approval_records,
+            fleet_pending_approval_records,
             scoped_workspace_id,
         )
     active_runs = [
@@ -214,6 +225,22 @@ def build_operator_briefing(
         degraded_active=bool(runtime_summary["degraded"]["active"]),
     )
     pending_approvals_count = len(pending_approval_records)
+    display_names = {
+        workspace_key: str(binding.display_name).strip()
+        for workspace_key, binding in load_workspace_project_bindings().items()
+        if binding.display_name and str(binding.display_name).strip()
+    }
+    scope_mode = "workspace" if scoped_workspace_id else "fleet"
+    fleet_advice_pack = build_fleet_advice_pack(
+        active_run_records=fleet_active_run_records,
+        pending_approval_records=fleet_pending_approval_records,
+        fleet_signals=fleet_signals,
+        degraded=runtime_summary["degraded"],
+        watch_connected=watch_connected,
+        display_names=display_names,
+        focused_workspace_id=scoped_workspace_id,
+        scope_mode=scope_mode,
+    )
     rhythm = build_operator_briefing_rhythm(
         active_runs=active_runs,
         top_signals=top_signals,
@@ -222,6 +249,8 @@ def build_operator_briefing(
         watch_connected=watch_connected,
         next_safe_actions=next_safe_actions,
         cli_runtime=runtime_summary.get("cli_runtime"),
+        fleet_advice_pack=fleet_advice_pack,
+        display_names=display_names,
     )
 
     scope: dict[str, object] = (

@@ -14,6 +14,8 @@ ExecutionAccess = Literal["consultative", "full"]
 
 # Modes that create linked runs and may use tool-capable CLI execution.
 _TOOL_CAPABLE_COMPOSER_MODES = frozenset({"agent", "debug"})
+# Modes that create a linked run for stop / resume / recovery (includes Plan).
+_RUN_LINKED_COMPOSER_MODES = frozenset({"agent", "debug", "plan"})
 
 _BLOCKED_PHASES = frozenset(
     {
@@ -45,6 +47,11 @@ def normalize_execution_access(value: str | None) -> ExecutionAccess:
 def is_tool_capable_composer_mode(composer_mode: str | None) -> bool:
     """True for Agent and Debug — modes that may edit files / run tools after consent."""
     return str(composer_mode or "").strip().lower() in _TOOL_CAPABLE_COMPOSER_MODES
+
+
+def is_run_linked_composer_mode(composer_mode: str | None) -> bool:
+    """True for modes that create a linked run (Agent, Debug, and Plan)."""
+    return str(composer_mode or "").strip().lower() in _RUN_LINKED_COMPOSER_MODES
 
 
 def full_access_requested(execution_access: str | None) -> bool:

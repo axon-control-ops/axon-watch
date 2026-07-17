@@ -10,28 +10,55 @@ describe('plainTextToInstructionsMarkdown', () => {
     expect(plainTextToInstructionsMarkdown(existing)).toBe(existing);
   });
 
-  it('builds concise sections from a plain DashPro CI request', () => {
+  it('preserves the full source request and does not invent CI/agent steps', () => {
     const plain =
-      'Look at what Dashpro workspace said about the CI work and plan how the Agents we have built would handle that. I never said anything about committing. Also fix how you take instruction — turn plain text into Instructions markdown with concise precise steps.';
+      'Plan to address all this - we need Axon-X to really match Cursor Plan mode, keep auto-resume after refresh, and fix Instructions so plain text becomes a full super prompt without cutting details. I never said anything about committing.';
 
     const markdown = plainTextToInstructionsMarkdown(plain);
     expect(markdown).toContain('# Instructions');
-    expect(markdown).toContain('## Goal');
-    expect(markdown).toContain('## Out of scope');
+    expect(markdown).toContain('## Source request');
+    expect(markdown).toContain(plain);
     expect(markdown).toMatch(/Committing/i);
-    expect(markdown).toContain('## Steps');
-    expect(markdown).toMatch(/1\.\s+/);
-    expect(markdown.toLowerCase()).not.toMatch(/clear the local desk/);
+    expect(markdown.toLowerCase()).not.toMatch(/existing ci \/ build notes/);
+    expect(markdown.toLowerCase()).not.toMatch(/map detection, triage, fix/);
+    expect(markdown.toLowerCase()).not.toMatch(/staffed agents/);
+    expect(markdown.toLowerCase()).not.toMatch(/amend|desk-clearing|suggesting commits/);
 
     const sections = projectInstructionsSections(plain);
-    expect(sections.goal.toLowerCase()).toMatch(/ci|agents|plan|review/);
+    expect(sections.sourceRequest).toBe(plain);
+    expect(sections.goal.toLowerCase()).toContain('plan to address all this');
+    expect(sections.goal.toLowerCase()).not.toMatch(/^plan\s*$/);
     expect(sections.outOfScope.some((item) => /commit/i.test(item))).toBe(true);
-    expect(sections.constraints.some((item) => /not invent/i.test(item))).toBe(true);
+    expect(sections.steps.every((step) => !/ci \/ build|staffed agents/i.test(step))).toBe(
+      true,
+    );
+  });
+
+  it('uses explicit list lines as Steps and keeps multi-sentence scope', () => {
+    const plain = [
+      'Ship the Plan mode resume fix.',
+      '',
+      '- Create linked plan runs',
+      '- Persist recovery markers for plan',
+      '- Reattach after browser refresh',
+    ].join('\n');
+
+    const sections = projectInstructionsSections(plain);
+    expect(sections.steps).toEqual([
+      'Create linked plan runs',
+      'Persist recovery markers for plan',
+      'Reattach after browser refresh',
+    ]);
+    expect(sections.sourceRequest).toContain('Ship the Plan mode resume fix.');
+    expect(sections.inScope.some((item) => /Create linked plan runs/i.test(item))).toBe(
+      true,
+    );
   });
 
   it('returns a blank template for empty input', () => {
     const markdown = plainTextToInstructionsMarkdown('   ');
     expect(markdown).toContain('# Instructions');
     expect(markdown).toContain('Describe the outcome in one sentence.');
+    expect(markdown).toContain('## Source request');
   });
 });

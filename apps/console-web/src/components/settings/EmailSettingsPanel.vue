@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useEmailSettingsMailbox } from './useEmailSettingsMailbox';
+import EmailSettingsPasswordField from './EmailSettingsPasswordField.vue';
 
 const {
   snapshot,
@@ -212,15 +213,11 @@ const {
           <input v-model="form.imap_ssl" type="checkbox" />
           <span>SSL</span>
         </label>
-        <label>
-          <span>IMAP password {{ vaultLocked ? '(needs Vault unlock)' : '' }}</span>
-          <input
-            v-model="form.password_imap"
-            type="password"
-            autocomplete="new-password"
-            :placeholder="vaultLocked ? 'Unlock Axon-X Vault first' : ''"
-          />
-        </label>
+        <EmailSettingsPasswordField
+          v-model="form.password_imap"
+          :label="`IMAP password ${vaultLocked ? '(needs Vault unlock)' : ''}`"
+          :placeholder="vaultLocked ? 'Unlock Axon-X Vault first' : ''"
+        />
 
         <h3>SMTP</h3>
         <label>
@@ -249,10 +246,10 @@ const {
           <input v-model="form.smtp_starttls" type="checkbox" :disabled="form.smtp_port === 465" />
           <span>STARTTLS (587)</span>
         </label>
-        <label>
-          <span>SMTP password (optional if same as IMAP)</span>
-          <input v-model="form.password_smtp" type="password" autocomplete="new-password" />
-        </label>
+        <EmailSettingsPasswordField
+          v-model="form.password_smtp"
+          label="SMTP password (optional if same as IMAP)"
+        />
 
         <h3>Monitor</h3>
         <label class="email-settings-panel__toggle">

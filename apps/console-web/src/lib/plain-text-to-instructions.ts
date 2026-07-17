@@ -1,6 +1,6 @@
 /**
- * Turn plain-language requests into concise Instructions markdown
- * so agents follow stated intent and do not invent extra tasks.
+ * Turn plain-language requests into Instructions markdown without inventing
+ * work or dropping the operator's wording.
  */
 
 export type InstructionsSections = {
@@ -9,25 +9,11 @@ export type InstructionsSections = {
   outOfScope: string[];
   steps: string[];
   constraints: string[];
+  /** Full original request — never truncated away. */
+  sourceRequest: string;
 };
 
 const ALREADY_INSTRUCTIONS_RE = /^#\s*Instructions\b/im;
-
-const OUT_OF_SCOPE_HINTS: Array<{ pattern: RegExp; item: string }> = [
-  {
-    pattern: /\b(never|don'?t|do not|no)\b.{0,40}\bcommit(ting|s)?\b/i,
-    item: 'Committing, amending, or inventing commit chores',
-  },
-  {
-    pattern: /\b(never|don'?t|do not|no)\b.{0,40}\b(push|merge|release|deploy)\b/i,
-    item: 'Pushing, merging, releasing, or deploying unless later asked',
-  },
-  {
-    pattern: /\bi never said\b.{0,60}\bcommit/i,
-    item: 'Committing or suggesting commits',
-  },
-];
-
 const STEP_LINE_RE = /^\s*(?:[-*]|\d+[.)])\s+(.+)$/;
 
 function collapseWhitespace(text: string): string {
@@ -39,7 +25,9 @@ function splitSentences(text: string): string[] {
   if (!normalized) return [];
   return normalized
     .split(/(?<=[.!?])\s+|\n+/)
-    .map((part) => collapseWhitespace(part.replace(/^[-*]\s+/, '').replace(/^\d+[.)]\s+/, '')))
+    .map((part) =>
+      collapseWhitespace(part.replace(/^[-*]\s+/, '').replace(/^\d+[.)]\s+/, '')),
+    )
     .filter(Boolean);
 }
 
@@ -54,116 +42,107 @@ function extractExplicitSteps(plain: string): string[] {
   return steps;
 }
 
+function firstSentence(plain: string, sentences: string[]): string {
+  const fromSplit = sentences[0]?.trim();
+  if (fromSplit) {
+    return fromSplit;
+  }
+  const cut = plain.search(/[.!?]\s/);
+  if (cut > 0) {
+    return collapseWhitespace(plain.slice(0, cut + 1));
+  }
+  return collapseWhitespace(plain);
+}
+
 function inferOutOfScope(plain: string): string[] {
+  const items = splitSentences(plain).filter((sentence) =>
+    /\b(?:never|don'?t|do not|no|out of scope|exclude|without)\b/i.test(sentence),
+  );
+  items.push('Any task that was not asked for');
+  return [...new Set(items)];
+}
+
+/**
+ * Goal = first full sentence (or whole request if one line). Never cut at "and".
+ */
+function inferGoal(sentences: string[], plain: string): string {
+  const goal = firstSentence(plain, sentences);
+  return goal || 'Complete the stated request without inventing extra work.';
+}
+
+/**
+ * In scope = remaining request sentences (and non-list lines), verbatim.
+ * No domain hardcodes (CI / agents / etc.).
+ */
+function inferInScope(sentences: string[], plain: string, goal: string): string[] {
   const items: string[] = [];
   const seen = new Set<string>();
-  for (const hint of OUT_OF_SCOPE_HINTS) {
-    if (hint.pattern.test(plain) && !seen.has(hint.item)) {
-      seen.add(hint.item);
-      items.push(hint.item);
+  const add = (raw: string): void => {
+    const item = collapseWhitespace(raw);
+    if (!item || item === goal || seen.has(item.toLowerCase())) {
+      return;
+    }
+    // Skip pure negation lines — those belong in Out of scope / Constraints.
+    if (/^(?:i\s+)?(?:never|don'?t|do not|no)\b/i.test(item) && /commit|push|merge/i.test(item)) {
+      return;
+    }
+    seen.add(item.toLowerCase());
+    items.push(item);
+  };
+
+  for (const sentence of sentences) {
+    add(sentence);
+  }
+
+  // Preserve non-empty paragraph lines that sentence-split missed (short clauses).
+  for (const line of plain.split(/\r?\n/)) {
+    const trimmed = collapseWhitespace(line.replace(STEP_LINE_RE, '$1'));
+    if (trimmed.length >= 8 && !STEP_LINE_RE.test(line)) {
+      add(trimmed);
     }
   }
-  items.push('Any task that was not asked for');
-  return items;
+
+  // Goal is already listed under ## Goal — keep In scope as "what else matters".
+  const withoutGoal = items.filter((item) => item.toLowerCase() !== goal.toLowerCase());
+  if (withoutGoal.length > 0) {
+    return withoutGoal;
+  }
+  return items.length > 0 ? items : ['Do only what the request states'];
 }
 
-function inferGoal(sentences: string[], plain: string): string {
-  const lookMatch = plain.match(
-    /\b(?:look at|read|check|review)\b(.{0,120}?)(?:\band\b|\.|$)/i,
-  );
-  const planMatch = plain.match(
-    /\b(?:plan|figure out|map|decide)\b(.{0,120}?)(?:\band\b|\.|$)/i,
-  );
-  if (lookMatch && planMatch) {
-    return collapseWhitespace(
-      `Review${lookMatch[1]} and plan${planMatch[1]}`.replace(/\s+/g, ' '),
-    );
-  }
-  if (planMatch) {
-    return collapseWhitespace(`Plan${planMatch[1]}`);
-  }
-  if (lookMatch) {
-    return collapseWhitespace(`Review${lookMatch[1]}`);
-  }
-  return sentences[0] || 'Complete the stated request without inventing extra work.';
-}
-
-function inferInScope(sentences: string[], plain: string): string[] {
-  const items: string[] = [];
-  if (/\bci\b|build|pipeline|github|workflow/i.test(plain)) {
-    items.push('Use the existing CI / build notes as the source of truth');
-  }
-  if (/\bagents?\b|employees?\b|company\b|watchers?\b/i.test(plain)) {
-    items.push('Map work to the agents already staffed for this workspace');
-  }
-  if (/instruction|plain text|precise steps/i.test(plain)) {
-    items.push('Improve how plain requests become precise instruction steps');
-  }
-  for (const sentence of sentences.slice(0, 4)) {
-    if (/commit|push|merge/i.test(sentence) && /never|don'?t|do not|wrong/i.test(sentence)) {
-      continue;
-    }
-    if (sentence.length > 12 && sentence.length < 160 && !items.includes(sentence)) {
-      items.push(sentence);
-    }
-  }
-  if (items.length === 0) {
-    items.push('Do only what the request states');
-  }
-  return items.slice(0, 6);
-}
-
-function inferSteps(plain: string, sentences: string[], inScope: string[]): string[] {
+/**
+ * Steps = explicit bullets/numbers only. If none, one step: follow the request.
+ * Never invent CI/agent/workflow steps from keywords.
+ */
+function inferSteps(plain: string): string[] {
   const explicit = extractExplicitSteps(plain);
   if (explicit.length > 0) {
     return explicit;
   }
-  const steps: string[] = [];
-  if (/\bci\b|build|pipeline|deploy/i.test(plain)) {
-    steps.push('Read the latest CI / deploy triage notes for this workspace');
-  }
-  if (/\bagents?\b|employees?\b|company\b/i.test(plain)) {
-    steps.push('Map detection, triage, fix, and escalation to the staffed agents');
-  }
-  if (/without.{0,40}babysit|while.{0,40}server|always.?on|cloud agents?/i.test(plain)) {
-    steps.push('Plan how watchers and builders keep working without constant human prompting');
-  }
-  if (/instruction|plain text|precise steps/i.test(plain)) {
-    steps.push('Produce Instructions markdown with Goal, In scope, Out of scope, Steps, and Constraints');
-  }
-  if (steps.length === 0) {
-    for (const item of inScope.slice(0, 4)) {
-      steps.push(item);
-    }
-  }
-  if (steps.length === 0 && sentences[0]) {
-    steps.push(sentences[0]);
-  }
-  steps.push('Reply with a short summary of what changed — do not add unrequested chores');
-  return steps;
+  return [
+    'Follow the Goal and In scope exactly as written in the Source request',
+  ];
 }
 
-function inferConstraints(plain: string): string[] {
-  const constraints = [
-    'Follow only the steps listed above',
+function inferConstraints(): string[] {
+  return [
+    'Follow only the Goal, In scope, and Steps above',
     'Do not invent tasks that were not asked for',
+    'Preserve every requirement from the Source request',
   ];
-  if (/\bcommit/i.test(plain) && /\b(never|don'?t|do not|wrong|no)\b/i.test(plain)) {
-    constraints.push('Do not commit, suggest commits, or clear a “local desk” via git unless explicitly asked');
-  }
-  return constraints;
 }
 
 export function projectInstructionsSections(plainText: string): InstructionsSections {
   const plain = plainText.replace(/\r\n/g, '\n').trim();
   const sentences = splitSentences(plain);
-  const inScope = inferInScope(sentences, plain);
+  const goal = inferGoal(sentences, plain);
   return {
-    goal: inferGoal(sentences, plain),
-    inScope,
+    goal,
+    inScope: inferInScope(sentences, plain, goal),
     outOfScope: inferOutOfScope(plain),
-    steps: inferSteps(plain, sentences, inScope),
-    constraints: inferConstraints(plain),
+    steps: inferSteps(plain),
+    constraints: inferConstraints(),
+    sourceRequest: plain,
   };
 }
 
@@ -194,8 +173,11 @@ export function plainTextToInstructionsMarkdown(plainText: string): string {
       '1. …',
       '',
       '## Constraints',
-      '- Follow only the steps listed above',
+      '- Follow only the Goal, In scope, and Steps above',
       '- Do not invent tasks that were not asked for',
+      '',
+      '## Source request',
+      '(paste the original ask here)',
       '',
     ].join('\n');
   }
@@ -221,6 +203,9 @@ export function plainTextToInstructionsMarkdown(plainText: string): string {
     '',
     '## Constraints',
     renderList(sections.constraints),
+    '',
+    '## Source request',
+    sections.sourceRequest,
     '',
   ].join('\n');
 }

@@ -40,6 +40,73 @@ describe('kairo voice playback', () => {
     vi.unstubAllGlobals();
   });
 
+  it('prefers azure when synthesis is available', async () => {
+    vi.useFakeTimers();
+    const speech = stubBrowserSpeech();
+
+    class FakeAudio {
+      src = '';
+      preload = '';
+      currentTime = 0;
+      readyState = 3;
+      paused = true;
+      ended = false;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(src: string) {
+        this.src = src;
+      }
+
+      addEventListener(): void {}
+      removeEventListener(): void {}
+      load(): void {}
+      pause(): void {
+        this.paused = true;
+      }
+      play(): Promise<void> {
+        this.paused = false;
+        globalThis.setTimeout(() => {
+          this.ended = true;
+          this.paused = true;
+          this.onended?.();
+        }, 0);
+        return Promise.resolve();
+      }
+    }
+
+    vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio);
+    vi.stubGlobal('HTMLMediaElement', {
+      HAVE_CURRENT_DATA: 2,
+      HAVE_FUTURE_DATA: 3,
+      HAVE_ENOUGH_DATA: 4,
+      NETWORK_EMPTY: 0,
+    });
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:azure-voice'),
+      revokeObjectURL: vi.fn(),
+    });
+
+    vi.mocked(postKairoTts).mockResolvedValue({
+      available: true,
+      provider: 'azure',
+      audio_base64: 'YQ==',
+      content_type: 'audio/mpeg',
+      first_byte_ms: 42,
+    });
+
+    const promise = speakKairoLine('Azure path first.', { immediate: true });
+    await vi.advanceTimersByTimeAsync(500);
+    const result = await promise;
+
+    expect(result.engine).toBe('azure');
+    expect(result.reason).toBe('first_byte_ms=42');
+    expect(speech.speak).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
   it('falls back to browser speech when azure is unavailable', async () => {
     vi.useFakeTimers();
     const speech = stubBrowserSpeech();

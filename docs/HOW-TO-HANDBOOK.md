@@ -1135,6 +1135,12 @@ Use this order when something breaks:
 
 Symptom-specific fixes continue in the sections below.
 
+## Problem: online research falls back / Google search returns 403
+
+See **[docs/how-to/searxng-research.md](how-to/searxng-research.md)** for SearXNG
+setup, provider order (SearXNG → legacy Google → DuckDuckGo), and Google 403
+troubleshooting.
+
 ## Problem: `./scripts/dev/up.sh` fails or the frontend does not start
 
 Check:
