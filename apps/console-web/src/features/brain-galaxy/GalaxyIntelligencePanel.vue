@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
+import type { BriefingAction } from '../../contracts/canonical';
+import {
+  briefingActionCtaLabel,
+  executeBriefingAction,
+} from '../../lib/briefing-action-executor';
 import { projectGalaxyIntelligence } from './galaxy-intelligence-projector';
 import type { GalaxyPresencePhase } from './galaxy-presence-state';
 import { useShellStore } from '../../stores/shell';
@@ -11,6 +16,7 @@ const props = defineProps<{
 }>();
 
 const shell = useShellStore();
+const actionPendingId = ref<string | null>(null);
 
 const view = computed(() =>
   projectGalaxyIntelligence({
@@ -22,6 +28,18 @@ const view = computed(() =>
     routingReceipt: props.routingReceipt ?? null,
   }),
 );
+
+async function onActivateAction(action: BriefingAction): Promise<void> {
+  if (actionPendingId.value || shell.handoffMutationState === 'submitting') {
+    return;
+  }
+  actionPendingId.value = action.action_id;
+  try {
+    await executeBriefingAction(shell, shell.operatorBriefing, action);
+  } finally {
+    actionPendingId.value = null;
+  }
+}
 </script>
 
 <template>
@@ -81,12 +99,31 @@ const view = computed(() =>
     </section>
 
     <section v-if="view.safeActions.length" class="galaxy-intelligence-panel__section">
-      <p class="galaxy-intelligence-panel__section-label">
-        Suggested actions · guidance only
-      </p>
-      <ul>
-        <li v-for="action in view.safeActions" :key="`${action.kind}:${action.action_id}`">
-          {{ action.title }}
+      <p class="galaxy-intelligence-panel__section-label">Suggested actions</p>
+      <ul class="galaxy-intelligence-panel__action-list">
+        <li
+          v-for="action in view.safeActions"
+          :key="`${action.kind}:${action.action_id}`"
+          class="galaxy-intelligence-panel__action-item"
+        >
+          <button
+            type="button"
+            class="galaxy-intelligence-panel__action-button"
+            :disabled="
+              actionPendingId === action.action_id || shell.handoffMutationState === 'submitting'
+            "
+            @click="onActivateAction(action)"
+          >
+            <span class="galaxy-intelligence-panel__action-title">{{ action.title }}</span>
+            <span class="galaxy-intelligence-panel__action-detail">{{ action.detail }}</span>
+            <span class="galaxy-intelligence-panel__action-cta">
+              {{
+                actionPendingId === action.action_id || shell.handoffMutationState === 'submitting'
+                  ? 'Working…'
+                  : briefingActionCtaLabel(action)
+              }}
+            </span>
+          </button>
         </li>
       </ul>
     </section>
