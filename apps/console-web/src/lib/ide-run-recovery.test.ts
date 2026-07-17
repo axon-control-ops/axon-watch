@@ -50,6 +50,17 @@ describe('IDE run recovery record', () => {
     clearIdeRunRecovery('run_debug', storage);
     expect(readIdeRunRecovery(storage)).toBeNull();
   });
+
+  it('persists linked Plan runs', () => {
+    const storage = memoryStorage();
+    const record = baseRecovery({
+      threadId: 'thread_plan',
+      runId: 'run_plan',
+      mode: 'plan',
+    });
+    persistIdeRunRecovery(record, storage);
+    expect(readIdeRunRecovery(storage)).toEqual(record);
+  });
 });
 
 describe('decideIdeRunRecovery', () => {
@@ -85,7 +96,19 @@ describe('decideIdeRunRecovery', () => {
     });
   });
 
-  it('skips when boot id has not changed', () => {
+  it('reattaches a live Plan run after a same-boot refresh', () => {
+    const decision = decideIdeRunRecovery({
+      recovery: baseRecovery({ mode: 'plan' }),
+      currentBootId: 'boot-before-restart',
+      runPhase: 'executing',
+      streamActive: false,
+      mutationBusy: false,
+      currentWorkspaceId: 'workspace_axon_watch',
+    });
+    expect(decision).toEqual({ action: 'reattach' });
+  });
+
+  it('clears a terminal run after a same-boot refresh', () => {
     const decision = decideIdeRunRecovery({
       recovery: baseRecovery(),
       currentBootId: 'boot-before-restart',
@@ -94,7 +117,7 @@ describe('decideIdeRunRecovery', () => {
       mutationBusy: false,
       currentWorkspaceId: 'workspace_axon_watch',
     });
-    expect(decision).toEqual({ action: 'skip' });
+    expect(decision).toEqual({ action: 'clear' });
   });
 
   it('stops after repeated restart recovery attempts', () => {

@@ -1,5 +1,5 @@
 import type { RunRecord } from '../contracts/canonical';
-import { isToolCapableComposerMode } from './composer-tool-modes';
+import { isRunLinkedComposerMode } from './composer-tool-modes';
 
 const LIVE_STOP_PHASES = new Set(['queued', 'starting', 'planning', 'executing']);
 
@@ -59,7 +59,8 @@ export function shouldQueueIdeComposerSubmit(input: {
   agentBusy: boolean;
   composerMode: IdeComposerMode;
 }): boolean {
-  return input.agentBusy && isToolCapableComposerMode(input.composerMode);
+  // Queue Agent/Debug/Plan while a stream is live so follow-ups are not dropped.
+  return input.agentBusy && isRunLinkedComposerMode(input.composerMode);
 }
 
 export function appendIdeComposerQueueEntry(

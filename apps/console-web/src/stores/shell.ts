@@ -93,14 +93,12 @@ import {
   writeOpenIdeThreadIdsForWorkspace,
 } from '../lib/ide-thread-tabs-prefs';
 import { ideVoiceSpeechAllowed } from '../lib/ide-voice-strip';
+import { executeIdeRunRecovery } from '../lib/ide-run-auto-recovery';
 import {
   clearIdeRunRecovery,
-  decideIdeRunRecovery,
   fetchControlPlaneBootId,
   persistIdeRunRecovery,
   readIdeRunRecovery,
-  SERVER_RESTART_CONTINUATION_PROMPT,
-  waitForStableControlPlaneBootId,
 } from '../lib/ide-run-recovery';
 import {
   appendBriefingVoiceTranscriptEntry,
@@ -161,7 +159,7 @@ import {
   type IdeComposerMode,
   type IdeComposerQueuedMessage,
 } from '../lib/ide-composer-queue';
-import { isToolCapableComposerMode } from '../lib/composer-tool-modes';
+import { isRunLinkedComposerMode, isToolCapableComposerMode } from '../lib/composer-tool-modes';
 import {
   persistIdeComposerDraft,
   readStoredIdeComposerDraft,
@@ -1766,7 +1764,7 @@ export const useShellStore = defineStore('shell', () => {
     };
 
     try {
-      const linkedRunId = isToolCapableComposerMode(composerMode)
+      const linkedRunId = isRunLinkedComposerMode(composerMode)
         ? options.linkedRunIdOverride
           ?? resolveIdeAgentLinkedRunId(ideAgentRunId.value, runs.value, {
             expectedMode: composerMode,
@@ -1791,7 +1789,7 @@ export const useShellStore = defineStore('shell', () => {
         attachmentIds.push(uploaded.attachment_id);
       }
       let controlPlaneBootId = '';
-      if (isToolCapableComposerMode(composerMode)) {
+      if (isRunLinkedComposerMode(composerMode)) {
         try {
           controlPlaneBootId = await fetchControlPlaneBootId();
         } catch {
@@ -1827,7 +1825,7 @@ export const useShellStore = defineStore('shell', () => {
       if (options.clearDraftOnSuccess !== false) {
         ideComposerDraft.value = '';
       }
-      if (isToolCapableComposerMode(composerMode) && response.run_id) {
+      if (isRunLinkedComposerMode(composerMode) && response.run_id) {
         ideAgentRunId.value = response.run_id;
       }
       const uiAction = parseChatUiAction(response.ui_action);
@@ -1856,13 +1854,13 @@ export const useShellStore = defineStore('shell', () => {
         if (
           response.run_id &&
           controlPlaneBootId &&
-          (composerMode === 'agent' || composerMode === 'debug')
+          isRunLinkedComposerMode(composerMode)
         ) {
           persistIdeRunRecovery({
             workspaceId,
             threadId: response.thread_id,
             runId: response.run_id,
-            mode: composerMode,
+            mode: composerMode === 'plan' ? 'plan' : composerMode === 'debug' ? 'debug' : 'agent',
             controlPlaneBootId,
             recoveryCount: options.recoveryCountOverride ?? 0,
           });
@@ -2945,74 +2943,68 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     autoRunRecoveryInFlight = true;
-    let currentBootId = '';
-    let dispatched = false;
     try {
-      currentBootId =
-        (await waitForStableControlPlaneBootId({
-          previousBootId: recovery.controlPlaneBootId,
-        })) ?? '';
-      if (!currentBootId) {
-        // Same control-plane boot (or timeout): never leave a completed/failed
-        // recovery marker to re-check on every live refresh.
-        await loadRuns({ sync: false });
-        const run = runs.value.find((item) => item.run_id === recovery.runId) ?? null;
-        const phase = run?.phase ?? null;
-        if (
-          !run ||
-          phase === 'completed' ||
-          phase === 'failed' ||
-          phase === 'cancelled' ||
-          phase === 'review_ready'
-        ) {
-          clearIdeRunRecovery(recovery.runId);
-        }
-        return;
-      }
-      // Refresh runs so orphaned phases from startup reconcile are visible.
-      await loadRuns({ sync: false });
-      const run = runs.value.find((item) => item.run_id === recovery.runId) ?? null;
-      const decision = decideIdeRunRecovery({
+      await executeIdeRunRecovery({
         recovery,
-        currentBootId,
-        runPhase: run?.phase ?? null,
-        streamActive: agentStreamActive.value,
-        mutationBusy: commandMutationState.value === 'submitting',
-        currentWorkspaceId: currentWorkspace.value?.workspace_id ?? null,
+        loadRunPhase: async () => {
+          await loadRuns({ sync: false });
+          return runs.value.find((item) => item.run_id === recovery.runId)?.phase ?? null;
+        },
+        streamActive: () => agentStreamActive.value,
+        mutationBusy: () => commandMutationState.value === 'submitting',
+        currentWorkspaceId: () => currentWorkspace.value?.workspace_id ?? null,
+        linkRun: (runId) => {
+          ideAgentRunId.value = runId;
+        },
+        reportError: (message) => {
+          commandMutationError.value = message;
+        },
+        reattach: async (record) => {
+          ideAgentRunId.value = record.runId;
+          setWorkspaceSurfaceThreadId(record.workspaceId, 'ide', record.threadId);
+          activeThreadId.value = record.threadId;
+          await loadWorkspaceThread(record.workspaceId, 'ide', record.threadId);
+          ideAgentRunId.value = record.runId;
+          const recoveredMessages =
+            workspaceIdeThreadMessagesById.value[record.workspaceId] ?? [];
+          const agentMessage = [...recoveredMessages]
+            .reverse()
+            .find(
+              (message) =>
+                message.role === 'agent' && message.run_id === record.runId,
+            );
+          if (agentMessage) {
+            const operatorMessage = [...recoveredMessages]
+              .reverse()
+              .find(
+                (message) =>
+                  message.role === 'operator' && message.run_id === record.runId,
+              );
+            ideComposerActivity.value = {
+              label: buildIdeComposerActivityLabel(
+                record.mode,
+                agentExecutionAccess.value,
+              ),
+              mode: record.mode,
+              executionAccess: agentExecutionAccess.value,
+              operatorPrompt: operatorMessage?.content ?? '',
+            };
+            attachChatStream(
+              record.workspaceId,
+              record.threadId,
+              agentMessage.message_id,
+            );
+          }
+        },
+        dispatchContinuation: (input) =>
+          dispatchIdeComposerMessage(input.mode, {
+            contentOverride: input.content,
+            linkedRunIdOverride: input.linkedRunId,
+            threadIdOverride: input.threadId,
+            recoveryCountOverride: input.recoveryCount,
+            clearDraftOnSuccess: false,
+          }),
       });
-
-      if (decision.action === 'clear') {
-        clearIdeRunRecovery(recovery.runId);
-        return;
-      }
-      if (decision.action === 'stop_retry') {
-        clearIdeRunRecovery(recovery.runId);
-        commandMutationError.value = decision.reason;
-        return;
-      }
-      if (decision.action !== 'continue') {
-        return;
-      }
-
-      if (decision.linkExistingRun) {
-        ideAgentRunId.value = recovery.runId;
-      }
-      // Clear the old marker before dispatch so a failed continue can persist a fresh one.
-      clearIdeRunRecovery(recovery.runId);
-      dispatched = await dispatchIdeComposerMessage(recovery.mode, {
-        contentOverride: SERVER_RESTART_CONTINUATION_PROMPT,
-        linkedRunIdOverride: decision.linkExistingRun ? recovery.runId : null,
-        threadIdOverride: recovery.threadId,
-        recoveryCountOverride: decision.nextRecoveryCount,
-        clearDraftOnSuccess: false,
-      });
-      if (!dispatched) {
-        // Restore so a later refresh can retry while attempts remain.
-        persistIdeRunRecovery({
-          ...recovery,
-          recoveryCount: decision.nextRecoveryCount - 1,
-        });
-      }
     } finally {
       autoRunRecoveryInFlight = false;
     }

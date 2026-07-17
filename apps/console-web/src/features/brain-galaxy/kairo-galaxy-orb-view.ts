@@ -220,5 +220,5 @@ export function galaxyOrbHint(
   if (state === 'alerting') {
     return 'Tap for hands-free · hold to talk · long-press to move';
   }
-  return 'Tap for hands-free · hold to talk · long-press to move';
+  return 'Tap for hands-free · hold to talk · say "change brain to …" to switch models';
 }

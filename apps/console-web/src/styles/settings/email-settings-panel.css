@@ -37,6 +37,43 @@
   padding: 0.45rem 0.65rem;
 }
 
+.email-settings-panel__password-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.email-settings-panel__password-field input {
+  flex: 1;
+  min-width: 0;
+}
+
+.email-settings-panel__password-toggle {
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(180, 210, 230, 0.88);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  padding: 0.45rem 0.65rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.email-settings-panel__password-toggle:hover {
+  border-color: rgba(0, 242, 255, 0.35);
+  color: rgba(0, 242, 255, 0.92);
+}
+
+.email-settings-panel__password-toggle[aria-pressed='true'] {
+  border-color: rgba(0, 242, 255, 0.45);
+  background: rgba(0, 242, 255, 0.1);
+  color: rgba(0, 242, 255, 0.95);
+}
+
 .email-settings-panel__toggle {
   flex-direction: row !important;
   align-items: center;

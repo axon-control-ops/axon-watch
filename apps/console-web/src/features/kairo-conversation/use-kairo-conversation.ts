@@ -11,6 +11,8 @@ import {
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
 import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 import { useShellStore } from '../../stores/shell';
+import { applyBrainModelSwitch } from './apply-brain-model-switch';
+import { resolveConversationModelSwitchIntent } from './conversation-model-intents';
 import { resolveConversationNavigationIntent, workspaceGalaxyNodeId } from './conversation-intents';
 import { dispatchKairoConverseOutcome } from './kairo-conversation-dispatch';
 import {
@@ -120,6 +122,32 @@ export function useKairoConversation() {
     setKairoConversationPhase('thinking');
     if (answerTier === 'deep') {
       scheduleRuntimeAssistantCue(content);
+    }
+
+    const modelIntent = resolveConversationModelSwitchIntent(content, shell.cursorCatalogRows);
+    if (modelIntent) {
+      clearRuntimeAssistantCue();
+      draft.value = '';
+      pending.value = false;
+      thinkingLine.value = '';
+      if (!modelIntent.modelId) {
+        await deliverVoiceReply(modelIntent.reply, options?.voiceCaptureMode);
+        return;
+      }
+      if (
+        !applyBrainModelSwitch(shell, {
+          modelId: modelIntent.modelId,
+          rows: shell.cursorCatalogRows,
+        })
+      ) {
+        await deliverVoiceReply(
+          'Select a workspace first, then I can switch the brain model.',
+          options?.voiceCaptureMode,
+        );
+        return;
+      }
+      await deliverVoiceReply(modelIntent.reply, options?.voiceCaptureMode);
+      return;
     }
 
     const navIntent = resolveConversationNavigationIntent(

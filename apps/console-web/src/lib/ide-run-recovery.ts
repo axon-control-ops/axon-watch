@@ -4,7 +4,7 @@ export type IdeRunRecoveryRecord = {
   workspaceId: string;
   threadId: string;
   runId: string;
-  mode: 'agent' | 'debug';
+  mode: 'agent' | 'debug' | 'plan';
   controlPlaneBootId: string;
   recoveryCount: number;
 };
@@ -18,6 +18,10 @@ export type IdeRunRecoveryDecision =
       /** Link to the recovered run when it is still executing; otherwise start a fresh run. */
       linkExistingRun: boolean;
       nextRecoveryCount: number;
+    }
+  | {
+      /** Same control-plane boot after a browser refresh — restore the linked run without a new prompt. */
+      action: 'reattach';
     };
 
 const RECOVERY_KEY = 'axon-x:ide-run-recovery:v1';
@@ -114,8 +118,8 @@ export async function waitForStableControlPlaneBootId(options?: {
 }
 
 /**
- * Decide whether an IDE agent/debug run should auto-continue after a control-plane restart.
- * Recovery markers survive in sessionStorage; orphaned runs are usually marked failed on boot.
+ * Decide whether an IDE agent/debug/plan run should auto-continue after a
+ * control-plane restart, or reattach after a same-boot browser refresh.
  */
 export function decideIdeRunRecovery(input: {
   recovery: IdeRunRecoveryRecord | null;
@@ -135,9 +139,32 @@ export function decideIdeRunRecovery(input: {
   if (input.currentWorkspaceId !== recovery.workspaceId) {
     return { action: 'skip' };
   }
-  if (!input.currentBootId || input.currentBootId === recovery.controlPlaneBootId) {
+  if (!input.currentBootId) {
     return { action: 'skip' };
   }
+
+  // Same process as when the marker was written — browser refresh, not a restart.
+  if (input.currentBootId === recovery.controlPlaneBootId) {
+    if (
+      input.runPhase === 'executing' ||
+      input.runPhase === 'starting' ||
+      input.runPhase === 'planning' ||
+      input.runPhase === 'queued'
+    ) {
+      return { action: 'reattach' };
+    }
+    if (
+      !input.runPhase ||
+      input.runPhase === 'completed' ||
+      input.runPhase === 'failed' ||
+      input.runPhase === 'cancelled' ||
+      input.runPhase === 'review_ready'
+    ) {
+      return { action: 'clear' };
+    }
+    return { action: 'skip' };
+  }
+
   if (!input.runPhase) {
     return { action: 'clear' };
   }
@@ -175,13 +202,13 @@ export function decideIdeRunRecovery(input: {
 
 export function persistIdeRunRecovery(
   record: IdeRunRecoveryRecord,
-  storage: Pick<Storage, 'setItem'> = sessionStorage,
+  storage: Pick<Storage, 'setItem'> = localStorage,
 ): void {
   storage.setItem(RECOVERY_KEY, JSON.stringify(record));
 }
 
 export function readIdeRunRecovery(
-  storage: Pick<Storage, 'getItem'> = sessionStorage,
+  storage: Pick<Storage, 'getItem'> = localStorage,
 ): IdeRunRecoveryRecord | null {
   try {
     const parsed = JSON.parse(storage.getItem(RECOVERY_KEY) ?? 'null') as Partial<IdeRunRecoveryRecord> | null;
@@ -191,7 +218,7 @@ export function readIdeRunRecovery(
       !parsed.threadId ||
       !parsed.runId ||
       !parsed.controlPlaneBootId ||
-      (parsed.mode !== 'agent' && parsed.mode !== 'debug')
+      (parsed.mode !== 'agent' && parsed.mode !== 'debug' && parsed.mode !== 'plan')
     ) {
       return null;
     }
@@ -212,7 +239,7 @@ export function readIdeRunRecovery(
 
 export function clearIdeRunRecovery(
   runId?: string,
-  storage: Pick<Storage, 'getItem' | 'removeItem'> = sessionStorage,
+  storage: Pick<Storage, 'getItem' | 'removeItem'> = localStorage,
 ): void {
   const existing = readIdeRunRecovery(storage);
   if (!runId || existing?.runId === runId) {

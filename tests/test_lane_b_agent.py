@@ -67,7 +67,8 @@ class LaneBAgentTests(unittest.TestCase):
             plan,
         )
         self.assertIn("Online research", plan)
-        self.assertIn("discovery, implementation, verification", plan)
+        self.assertIn("Produce a complete durable plan", plan)
+        self.assertIn("## Verification checklist", plan)
         self.assertIn("Reply in first person", plan)
 
         debug = _build_prompt(

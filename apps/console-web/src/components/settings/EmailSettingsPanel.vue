@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useEmailSettingsMailbox } from './useEmailSettingsMailbox';
+
+const showImapPassword = ref(false);
+const showSmtpPassword = ref(false);
 
 const {
   snapshot,
@@ -214,12 +218,23 @@ const {
         </label>
         <label>
           <span>IMAP password {{ vaultLocked ? '(needs Vault unlock)' : '' }}</span>
-          <input
-            v-model="form.password_imap"
-            type="password"
-            autocomplete="new-password"
-            :placeholder="vaultLocked ? 'Unlock Axon-X Vault first' : ''"
-          />
+          <div class="email-settings-panel__password-field">
+            <input
+              v-model="form.password_imap"
+              :type="showImapPassword ? 'text' : 'password'"
+              autocomplete="new-password"
+              :placeholder="vaultLocked ? 'Unlock Axon-X Vault first' : ''"
+            />
+            <button
+              type="button"
+              class="email-settings-panel__password-toggle"
+              :aria-pressed="showImapPassword"
+              :aria-label="showImapPassword ? 'Hide IMAP password' : 'Show IMAP password'"
+              @click="showImapPassword = !showImapPassword"
+            >
+              {{ showImapPassword ? 'Hide' : 'Show' }}
+            </button>
+          </div>
         </label>
 
         <h3>SMTP</h3>
@@ -251,7 +266,22 @@ const {
         </label>
         <label>
           <span>SMTP password (optional if same as IMAP)</span>
-          <input v-model="form.password_smtp" type="password" autocomplete="new-password" />
+          <div class="email-settings-panel__password-field">
+            <input
+              v-model="form.password_smtp"
+              :type="showSmtpPassword ? 'text' : 'password'"
+              autocomplete="new-password"
+            />
+            <button
+              type="button"
+              class="email-settings-panel__password-toggle"
+              :aria-pressed="showSmtpPassword"
+              :aria-label="showSmtpPassword ? 'Hide SMTP password' : 'Show SMTP password'"
+              @click="showSmtpPassword = !showSmtpPassword"
+            >
+              {{ showSmtpPassword ? 'Hide' : 'Show' }}
+            </button>
+          </div>
         </label>
 
         <h3>Monitor</h3>
