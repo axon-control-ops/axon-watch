@@ -2871,6 +2871,7 @@ export const useShellStore = defineStore('shell', () => {
 
   const {
     loadOperatorBriefing,
+    refreshOperatorPresence,
   } = createOperatorBriefingSlice({
     operatorBriefing,
     briefingLoadState,
@@ -2931,10 +2932,6 @@ export const useShellStore = defineStore('shell', () => {
     operatorBrainGraphLoadState,
     operatorBrainGraphError,
   });
-
-  async function refreshOperatorPresence(): Promise<void> {
-    await loadOperatorBriefing({ background: true, light: true });
-  }
 
   const { autoContinueInterruptedIdeRun } = createIdeRunAutoRecoverySlice({
     autoRunRecoveryInFlight,

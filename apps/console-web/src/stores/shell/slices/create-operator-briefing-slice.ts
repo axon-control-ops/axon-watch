@@ -122,7 +122,12 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
     }
   }
 
+  async function refreshOperatorPresence(): Promise<void> {
+    await loadOperatorBriefing({ background: true, light: true });
+  }
+
   return {
     loadOperatorBriefing,
+    refreshOperatorPresence,
   };
 }
