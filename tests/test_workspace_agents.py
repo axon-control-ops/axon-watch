@@ -80,6 +80,38 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
             ),
         )
 
+    def test_employee_status_specialist_reflects_role_tagged_run(self) -> None:
+        self.assertEqual(
+            "executing",
+            employee_status(
+                role="frontend",
+                schedule="continuous",
+                workspace_status="idle",
+                primary=False,
+                role_run_status="executing",
+            ),
+        )
+        self.assertEqual(
+            "verifying",
+            employee_status(
+                role="backend",
+                schedule="continuous",
+                workspace_status="executing",
+                primary=False,
+                role_run_status="verifying",
+            ),
+        )
+        self.assertEqual(
+            "watching",
+            employee_status(
+                role="watcher",
+                schedule="always_on",
+                workspace_status="executing",
+                primary=False,
+                role_run_status="executing",
+            ),
+        )
+
     def test_loads_agent_overrides_from_config(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             agents_file = Path(tempdir) / "agents.json"

@@ -46,4 +46,6 @@ export interface RunRecord {
   can_review: boolean;
   current_step: string | null;
   history_ref: string;
+  /** Roster role that owns this run when started by the continuous worker scheduler. */
+  employee_role?: string | null;
 }

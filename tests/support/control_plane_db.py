@@ -13,7 +13,11 @@ def isolate_control_plane_db(testcase, run_store) -> str:
     db_path = str(Path(tempdir.name) / "control-plane.sqlite3")
     env_patch = patch.dict(
         os.environ,
-        {"AXON_WATCH_CONTROL_PLANE_DB": db_path},
+        {
+            "AXON_WATCH_CONTROL_PLANE_DB": db_path,
+            # Keep TestClient lifespan from starting continuous worker ticks.
+            "AXON_WATCH_WORKER_SCHEDULER": "0",
+        },
         clear=False,
     )
     env_patch.start()

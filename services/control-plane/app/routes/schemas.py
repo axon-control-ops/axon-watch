@@ -21,6 +21,7 @@ class CreateRunRequest(BaseModel):
     summary: str
     detail: str = ""
     requires_approval: bool = False
+    employee_role: str | None = None
 
 
 class EditorSelectionContextRequest(BaseModel):

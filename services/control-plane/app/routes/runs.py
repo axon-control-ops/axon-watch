@@ -39,6 +39,7 @@ def runs_create(body: CreateRunRequest) -> dict[str, Any]:
         summary=body.summary,
         detail=body.detail,
         requires_approval=body.requires_approval,
+        employee_role=body.employee_role,
     )
 
 
