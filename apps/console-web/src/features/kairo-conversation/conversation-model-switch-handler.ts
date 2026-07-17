@@ -1,3 +1,4 @@
+import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 import type { useShellStore } from '../../stores/shell';
 import { applyBrainModelSwitch } from './apply-brain-model-switch';
 import { resolveConversationModelSwitchIntent } from './conversation-model-intents';
@@ -7,9 +8,9 @@ type ShellStore = ReturnType<typeof useShellStore>;
 export async function handleConversationModelSwitchIntent(input: {
   shell: ShellStore;
   content: string;
-  voiceCaptureMode?: string;
+  voiceCaptureMode?: KairoVoiceCaptureMode;
   clearRuntimeAssistantCue: () => void;
-  deliverVoiceReply: (line: string, voiceCaptureMode?: string) => Promise<void>;
+  deliverVoiceReply: (line: string, voiceCaptureMode?: KairoVoiceCaptureMode) => Promise<void>;
   resetDraftState: () => void;
 }): Promise<boolean> {
   const modelIntent = resolveConversationModelSwitchIntent(

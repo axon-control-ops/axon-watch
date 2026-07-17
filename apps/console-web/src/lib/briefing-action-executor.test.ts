@@ -54,7 +54,7 @@ describe('briefing-action-executor', () => {
           source: 'watch',
           created_at: '2026-07-17T00:00:00Z',
           updated_at: '2026-07-17T00:00:00Z',
-          action_type: 'notify',
+          action_type: 'investigate',
         },
       ],
     });
@@ -114,7 +114,7 @@ describe('briefing-action-executor', () => {
           source: 'watch',
           created_at: '2026-07-17T00:00:00Z',
           updated_at: '2026-07-17T00:00:00Z',
-          action_type: 'notify',
+          action_type: 'investigate',
         },
       ],
     });

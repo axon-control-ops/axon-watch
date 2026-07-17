@@ -1,4 +1,5 @@
 import { canonicalWorkspaceLabel } from '../../lib/kairo-entity-labels';
+import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 import type { useShellStore } from '../../stores/shell';
 import { setBrainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
 import {
@@ -29,8 +30,8 @@ export function resolveKairoConversationNavigationIntent(
 export async function applyKairoConversationNavigationIntent(input: {
   shell: ShellStore;
   navIntent: ConversationNavigationIntent;
-  deliverVoiceReply: (line: string, voiceCaptureMode?: string) => Promise<void>;
-  voiceCaptureMode?: string;
+  deliverVoiceReply: (line: string, voiceCaptureMode?: KairoVoiceCaptureMode) => Promise<void>;
+  voiceCaptureMode?: KairoVoiceCaptureMode;
   resetDraftState: () => void;
 }): Promise<void> {
   if (input.navIntent.kind === 'focus_attention') {
