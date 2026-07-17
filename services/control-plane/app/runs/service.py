@@ -8,7 +8,7 @@ from typing import Any
 
 from app.domain.run_state import capability_flags, is_terminal_phase, status_for_phase
 from app.domain.run_transitions import can_transition
-from app.chat.command_intent import humanize_run_summary
+from app.chat.command_intent import humanize_run_summary, is_auto_complete_run_summary
 from app.persistence import run_store
 
 DEFAULT_LANE_ID = "control-plane"
@@ -300,6 +300,19 @@ def resume_run(run_id: str) -> dict[str, Any]:
         raise RunNotFoundError(f"run not found: {run_id}")
 
     phase = record["phase"]
+    # One-shot read-only commands must complete, not resume into a zombie executing phase.
+    if phase == "review_ready" and is_auto_complete_run_summary(str(record.get("summary") or "")):
+        return _transition_record(
+            record,
+            to_phase="completed",
+            current_step="Run completed",
+            actor="control-plane",
+            receipt_type="operator_complete",
+            receipt_summary=(
+                "One-shot command does not need resume; marked completed from review_ready"
+            ),
+        )
+
     transition = _RESUME_TARGETS.get(phase)
     if transition is None:
         raise RunLifecycleError(f"resume requires resumable phase, found {phase}")
@@ -373,6 +386,17 @@ def get_run_history(run_id: str) -> dict[str, Any]:
     }
 
 
+def touch_run_activity(run_id: str) -> dict[str, Any] | None:
+    """Refresh updated_at for in-flight runs (UI/API freshness only; stale reap uses history)."""
+    record = run_store.get_run(run_id)
+    if record is None:
+        return None
+    if is_terminal_phase(str(record.get("phase") or "")):
+        return None
+    record["updated_at"] = _utc_now_iso()
+    return run_store.save_run(record)
+
+
 def append_run_execution_receipt(
     run_id: str,
     *,
@@ -410,7 +434,10 @@ def append_run_execution_receipt(
 
 from app.runs.queries import (
     approval_summary,
+    is_background_employee_run,
     list_active_runs,
+    list_operator_facing_runs,
+    list_operator_facing_active_runs,
     list_pending_approval_records,
     list_pending_approval_runs,
     list_pending_review_runs,
@@ -418,3 +445,20 @@ from app.runs.queries import (
     to_runtime_summary_active_run,
 )
 from app.runs.restart_reconcile import reconcile_orphaned_runs_on_startup
+from app.runs.employee_retention import (
+    DEFAULT_KEEP_PER_ROLE,
+    drain_terminal_employee_runs,
+    employee_run_retention_per_role,
+    prune_terminal_employee_runs,
+)
+from app.runs.review_ready_reconcile import (
+    DEFAULT_REVIEW_READY_STALE_SECONDS,
+    reap_abandoned_review_ready_runs,
+    review_ready_stale_seconds,
+)
+from app.runs.stale_reconcile import (
+    BUSY_EMPLOYEE_PHASES,
+    DEFAULT_STALE_SECONDS,
+    employee_run_stale_seconds,
+    reap_stale_employee_runs,
+)
