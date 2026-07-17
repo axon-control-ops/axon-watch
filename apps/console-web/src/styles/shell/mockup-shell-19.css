@@ -223,13 +223,68 @@
 }
 
 .operator-status-radar-panel__guide-title {
-  margin: 0 0 0.35rem;
+  margin: 0;
   font-family: var(--font-mono);
   font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(150, 231, 255, 0.94);
+}
+
+.operator-status-radar-panel__guide-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.35rem;
+}
+
+.operator-status-radar-panel__guide-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.operator-status-radar-panel__guide-action {
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 2px;
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(233, 239, 245, 0.94);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
+  padding: 0.22rem 0.48rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.operator-status-radar-panel__guide-action:hover {
+  border-color: rgba(0, 242, 255, 0.42);
+  background: rgba(0, 242, 255, 0.14);
+}
+
+.operator-status-radar-panel__guide--attention {
+  border-color: rgba(251, 191, 36, 0.42);
+  background: rgba(251, 191, 36, 0.07);
+}
+
+.operator-status-radar-panel__guide--attention .operator-status-radar-panel__guide-title {
+  color: rgba(253, 224, 71, 0.96);
+}
+
+.operator-status-radar-panel__guide--attention .operator-status-radar-panel__guide-action {
+  border-color: rgba(251, 191, 36, 0.38);
+  background: rgba(251, 191, 36, 0.1);
+  color: rgba(255, 244, 214, 0.96);
+}
+
+.operator-status-radar-panel__guide--attention .operator-status-radar-panel__guide-action:hover {
+  border-color: rgba(251, 191, 36, 0.52);
+  background: rgba(251, 191, 36, 0.16);
 }
 
 .operator-status-radar-panel__guide-steps {
@@ -243,6 +298,19 @@
 
 .operator-status-radar-panel__guide-steps li + li {
   margin-top: 0.25rem;
+}
+
+.operator-status-radar-panel__guide--standalone {
+  margin-top: 0.35rem;
+}
+
+.operator-status-radar-panel__guide--terminal-hidden {
+  border-color: rgba(255, 184, 77, 0.34);
+  background: rgba(255, 184, 77, 0.06);
+}
+
+.operator-status-radar-panel__guide--terminal-hidden .operator-status-radar-panel__guide-title {
+  color: rgba(255, 214, 140, 0.96);
 }
 
 .operator-status-radar-panel__feed {

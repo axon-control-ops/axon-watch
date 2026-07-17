@@ -18,22 +18,23 @@ Side notes for future slices — not operator-facing. Keep concise and actionabl
 
 ### Polish later (priority order)
 
-1. **UI surface** — No connector panel in shell yet. `/api/connectors` is API-only.
-   Add Attention sidebar or Mission Control rail cell bound to live connector DTOs.
+1. **UI surface** — Shipped: Mission Control `ConnectorsRailPanel` with live probe rows,
+   status-bar required/legacy chips, IDE editor status chip, Run-sidebar notice, and
+   quick-guide Open connectors actions.
 
-2. **Inbox ranking for optional connectors** — Optional failures hidden from inbox by
-   design. Consider a lower-severity “glance” chip in status bar when `axon_local`
-   is down but Axon-X stack is healthy.
+2. **Inbox ranking for optional connectors** — Shipped: lower-severity status-bar glance
+   chip when optional `axon_local` is down and required connectors are healthy.
 
 3. **Replace bootstrap degraded signal** — `signal_runtime_summary_degraded` still
    emits with bootstrap copy. Once connector truth is trusted, narrow or remove this
    placeholder signal (coordinate with signal-consistency lane).
 
-4. **Probe caching / TTL** — Every summary/connectors/inbox hit re-probes all URLs.
-   Add short TTL cache in watch service to reduce dev-stack probe storms.
+4. **Probe caching / TTL** — Shipped: `probe_all_connectors` keeps a short TTL cache
+   (default 15s, `AXON_WATCH_CONNECTOR_CACHE_TTL_SECONDS`). Summary / connectors /
+   inbox reuse the warm snapshot instead of re-probing every request.
 
 5. **Reprobe command** — Shipped in TEST-4 via `POST /internal/watch/commands`
-   (`reprobe_connector`). UI trigger still missing.
+   (`reprobe_connector`). UI: per-row Reprobe + footer Refresh summary on Connectors rail.
 
 ---
 
@@ -53,8 +54,8 @@ Side notes for future slices — not operator-facing. Keep concise and actionabl
 1. **Persistent command/event store** — in-memory resets on watch restart; move to
    SQLite under `AXON_WATCH_STATE_DIR` for dedicated-server slice.
 
-2. **UI command triggers** — reprobe connector / refresh summary buttons in
-   Attention or Mission Control (API-only today).
+2. **UI command triggers** — Shipped on Mission Control Connectors rail
+   (per-connector Reprobe + Refresh summary).
 
 3. **Additional command types** — `acknowledge_signal`, `suppress_signal`,
    `rescan` per frozen watch-api.md (defer until signal depth + delivery receipts).
@@ -68,8 +69,10 @@ Side notes for future slices — not operator-facing. Keep concise and actionabl
 6. **Auth on watch internal routes** — loopback-trusted only; dedicated-server slice
    must add service-to-service auth.
 
-7. **Connector probe cache invalidation** — reprobe updates receipt but inbox/summary
-   still re-probe all connectors on next read; tie reprobe result into short TTL cache.
+7. **Probe cache invalidation** — Shipped with TTL cache: `reprobe_connector`
+   upserts the live connector record into the TTL snapshot (seeds a full snapshot
+   when cold); `refresh_summary` clears connector and monitor caches so the next
+   summary rebuild probes live.
 
 8. **Starter guide** — add “Watch commands” section with curl examples once UI exists.
 
@@ -128,7 +131,8 @@ Side notes for future slices — not operator-facing. Keep concise and actionabl
 ### Mission control (TEST-0)
 
 - Feed is receipt-depth only; no full agent transcript in center
-- Terminal Operator default hidden — polish reopen discoverability in onboarding
+- Terminal Operator default hidden — reopen discoverability shipped (header chip,
+  dock strip CTA, Ctrl/Cmd+J, quick-guide + auto-peek). Keep onboarding copy in sync.
 
 ---
 

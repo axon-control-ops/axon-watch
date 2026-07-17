@@ -53,6 +53,37 @@ describe('operator status radar view', () => {
     ).toBe('attention');
   });
 
+  it('prioritizes attention tone when required connectors are down', () => {
+    expect(
+      operatorRadarTone({
+        runtimeSummary,
+        briefing,
+        pendingApprovals: 0,
+        requiredConnectorsUnavailable: 2,
+      }),
+    ).toBe('attention');
+  });
+
+  it('surfaces required connector failures in the idle headline and advise', () => {
+    expect(
+      operatorStatusHeadline({
+        briefing,
+        loadState: 'loaded',
+        primaryActiveRun: null,
+        requiredConnectorsUnavailable: 1,
+      }),
+    ).toBe('1 required connector is down — restore the watch lane before more work.');
+
+    expect(
+      operatorStatusAdvise({
+        briefing,
+        loadState: 'loaded',
+        primaryActiveRun: null,
+        requiredConnectorsUnavailable: 2,
+      }),
+    ).toBe('Open Mission Control → Connectors, reprobe the required connectors, then refresh summary.');
+  });
+
   it('uses briefing notice as the status headline', () => {
     expect(
       operatorStatusHeadline({
@@ -222,12 +253,73 @@ describe('operator status radar view', () => {
       runtimeSummary,
       briefing,
       pendingApprovals: 1,
+      connectorsLoadState: 'loaded',
+      connectorsSummary: {
+        configured: 3,
+        ok: 3,
+        required_unavailable: 0,
+      },
     });
 
-    expect(rail).toHaveLength(5);
+    expect(rail).toHaveLength(6);
     expect(rail[0]?.value).toBe('online');
-    expect(rail[3]?.value).toBe('ready');
-    expect(rail[4]?.value).toBe('workspace_smoke');
+    expect(rail[1]).toMatchObject({ label: 'Connectors', value: '3/3 ok', tone: 'ok' });
+    expect(rail[4]?.value).toBe('ready');
+    expect(rail[5]?.value).toBe('workspace_smoke');
+  });
+
+  it('surfaces connector health in the status rail', () => {
+    expect(
+      operatorStatusRail({
+        workspaceId: 'workspace_smoke',
+        runtimeSummary,
+        briefing,
+        pendingApprovals: 0,
+        connectorsLoadState: 'loaded',
+        connectorsSummary: {
+          configured: 4,
+          ok: 2,
+          required_unavailable: 2,
+        },
+      })[1],
+    ).toMatchObject({
+      label: 'Connectors',
+      value: '2 req down',
+      tone: 'attention',
+      action: 'focus-connectors',
+    });
+
+    expect(
+      operatorStatusRail({
+        workspaceId: 'workspace_smoke',
+        runtimeSummary: { ...runtimeSummary, watch: { ...runtimeSummary.watch, connected: false } },
+        briefing: {
+          ...briefing,
+          connectivity: { ...briefing.connectivity, watch_connected: false },
+        },
+        pendingApprovals: 0,
+        connectorsLoadState: 'loaded',
+        connectorsSummary: {
+          configured: 2,
+          ok: 2,
+          required_unavailable: 0,
+        },
+      })[1]?.value,
+    ).toBe('watch offline');
+  });
+
+  it('elevates mission chip risk when required connectors are down', () => {
+    const chips = operatorMissionChips({
+      lastReceipt: null,
+      advise: 'Standing by',
+      runtimeSummary,
+      briefing,
+      pendingApprovals: 0,
+      requiredConnectorsUnavailable: 1,
+    });
+
+    expect(chips[2]?.value).toBe('Required connector down');
+    expect(chips[2]?.tone).toBe('attention');
   });
 
   it('reflects paused and executing phases in mission control projections', () => {

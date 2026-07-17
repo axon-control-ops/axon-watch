@@ -1,5 +1,6 @@
 import { computed, type ComputedRef, type Ref } from 'vue';
 
+import type { ConnectorProbeRecord } from '../../../api/control-plane';
 import type {
   InboxItem,
   OperatorBriefing,
@@ -7,6 +8,10 @@ import type {
   RuntimeSummary,
   WorkspaceRecord,
 } from '../../../contracts/canonical';
+import {
+  buildConnectorGlanceChip,
+  buildRequiredConnectorAlertChip,
+} from '../../../lib/connector-glance-view';
 import { shouldShowIdeAgentStop } from '../../../lib/ide-agent-run-active';
 import { resolveIdeStopRun } from '../../../lib/ide-composer-queue';
 import {
@@ -59,6 +64,9 @@ interface CreateShellDisplaySliceInput {
   agentStreamActive: Ref<boolean>;
   operatorThreadMessages: Ref<OperatorThreadEntry[]>;
   threadMessages: Ref<OperatorThreadEntry[]>;
+  connectorsItems: Ref<ConnectorProbeRecord[]>;
+  connectorsSummary: Ref<{ required_unavailable: number } | null>;
+  connectorsLoadState: Ref<'idle' | 'loading' | 'loaded' | 'error'>;
 }
 
 export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
@@ -139,8 +147,8 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     }),
   );
 
-  const statusBarZones = computed(() =>
-    buildStatusBarZones({
+  const statusBarZones = computed(() => {
+    const zones = buildStatusBarZones({
       runtimeSummary: input.runtimeSummary.value,
       runtimeSummaryLoadState: input.runtimeSummaryLoadState.value,
       primaryActiveRun: input.primaryActiveRun.value,
@@ -148,8 +156,27 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
       layoutMode: input.layoutMode.value,
       idePresenceProfile: input.getIdePresenceProfile(),
       activeSignalCount: activeOperatorSignalCount.value,
-    }),
-  );
+    });
+
+    const connectorChipInput = {
+      connectorsLoadState: input.connectorsLoadState.value,
+      items: input.connectorsItems.value,
+      summary: input.connectorsSummary.value,
+      watchConnected: input.runtimeSummary.value?.watch.connected ?? false,
+      layoutMode: input.layoutMode.value,
+    };
+    const requiredConnectorAlert = buildRequiredConnectorAlertChip(connectorChipInput);
+    if (requiredConnectorAlert) {
+      zones.center.push(requiredConnectorAlert);
+    } else {
+      const connectorGlance = buildConnectorGlanceChip(connectorChipInput);
+      if (connectorGlance) {
+        zones.center.push(connectorGlance);
+      }
+    }
+
+    return zones;
+  });
 
   const workspaceStatusCardRows = computed(() =>
     buildWorkspaceStatusCardRows({

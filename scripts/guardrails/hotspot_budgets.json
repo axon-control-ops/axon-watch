@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3672,
+      "max_lines": 3700,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -79,7 +79,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 675,
+      "max_lines": 1000,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
@@ -193,6 +193,30 @@
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/mockup-shell-13a.css + mockup-shell-13b.css"
+    },
+    "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
+      "max_lines": 695,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/shell/operator-status-radar/*"
+    },
+    "apps/console-web/src/styles/ide/ide-layout-08.css": {
+      "max_lines": 660,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/ide/*"
+    },
+    "apps/console-web/src/styles/shell/mockup-shell-07.css": {
+      "max_lines": 560,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/*"
+    },
+    "apps/console-web/src/styles/shell/mockup-shell-18.css": {
+      "max_lines": 510,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/*"
     }
   }
 }

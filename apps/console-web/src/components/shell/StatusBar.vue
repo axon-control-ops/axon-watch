@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import { useShellStore } from '../../stores/shell';
+import { isConnectorStatusBarChip } from '../../lib/connector-glance-view';
 import SupportedCommandsFooter from './SupportedCommandsFooter.vue';
 import PersonaTitle from '../PersonaTitle.vue';
 
@@ -11,6 +12,39 @@ const clockLabel = ref('00:00:00 UTC');
 function updateClock(): void {
   const now = new Date();
   clockLabel.value = `${now.toISOString().slice(11, 19)} UTC`;
+}
+
+function onCenterChipClick(id: string): void {
+  if (!isConnectorStatusBarChip(id)) {
+    return;
+  }
+
+  void shell.loadConnectors();
+  shell.focusWatchConnectors();
+}
+
+function connectorChipTitle(id: string): string | undefined {
+  if (!isConnectorStatusBarChip(id)) {
+    return undefined;
+  }
+
+  if (id === 'connector-required-alert') {
+    return shell.layoutMode === 'ide'
+      ? 'Required connector down — switch to Mission Control connectors'
+      : 'Required connector down — open Mission Control connectors';
+  }
+
+  return shell.layoutMode === 'ide'
+    ? 'Legacy connector offline — switch to Mission Control connectors'
+    : 'Open Mission Control connectors';
+}
+
+function connectorChipAriaLabel(id: string, label: string): string | undefined {
+  if (!isConnectorStatusBarChip(id)) {
+    return undefined;
+  }
+
+  return `${label}. ${connectorChipTitle(id)}.`;
 }
 
 let timer: number | undefined;
@@ -80,14 +114,22 @@ onUnmounted(() => {
 
         <span class="status-bar-mockup__rail" aria-hidden="true" />
 
-        <div
+        <component
+          :is="isConnectorStatusBarChip(item.id) ? 'button' : 'div'"
           v-for="item in centerZones"
           :key="item.id"
           class="status-bar-mockup__chip"
           :class="{
             'status-bar-mockup__chip--brand': item.tone === 'brand',
             'status-bar-mockup__chip--warning': item.tone === 'warning',
+            'status-bar-mockup__chip--connector-glance': item.id === 'connector-glance',
+            'status-bar-mockup__chip--connector-required-alert':
+              item.id === 'connector-required-alert',
           }"
+          :type="isConnectorStatusBarChip(item.id) ? 'button' : undefined"
+          :title="connectorChipTitle(item.id)"
+          :aria-label="connectorChipAriaLabel(item.id, item.label)"
+          @click="isConnectorStatusBarChip(item.id) ? onCenterChipClick(item.id) : undefined"
         >
           <span
             v-if="item.id === 'phase'"
@@ -99,8 +141,18 @@ onUnmounted(() => {
             class="status-bar-mockup__icon status-bar-mockup__icon--signals"
             aria-hidden="true"
           />
+          <span
+            v-else-if="item.id === 'connector-glance'"
+            class="status-bar-mockup__icon status-bar-mockup__icon--connector-glance"
+            aria-hidden="true"
+          />
+          <span
+            v-else-if="item.id === 'connector-required-alert'"
+            class="status-bar-mockup__icon status-bar-mockup__icon--connector-required-alert"
+            aria-hidden="true"
+          />
           <span class="status-bar-mockup__chip-label">{{ item.label }}</span>
-        </div>
+        </component>
 
         <span class="status-bar-mockup__rail" aria-hidden="true" />
 

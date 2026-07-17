@@ -68,10 +68,13 @@ export interface OperatorAgentSummaryItem {
   meta?: string;
 }
 
+export type OperatorStatusRailAction = 'focus-connectors';
+
 export interface OperatorStatusRailItem {
   label: string;
   value: string;
   tone: OperatorStatusMetricTone;
+  action?: OperatorStatusRailAction;
 }
 
 export type OperatorStatusLoadState = 'idle' | 'loading' | 'loaded' | 'error';
