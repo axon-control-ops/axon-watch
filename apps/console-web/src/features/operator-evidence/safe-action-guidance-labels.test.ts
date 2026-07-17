@@ -19,9 +19,11 @@ describe('safe action surface truth', () => {
     expect(source).toContain('Pending approvals · act in Mission Control');
   });
 
-  it('labels galaxy safe actions as guidance rather than buttons', () => {
+  it('wires galaxy safe actions to briefing action executor', () => {
     const source = readSource('features/brain-galaxy/GalaxyIntelligencePanel.vue');
 
-    expect(source).toContain('Suggested actions · guidance only');
+    expect(source).toContain('Suggested actions');
+    expect(source).toContain('executeBriefingAction');
+    expect(source).toContain('galaxy-intelligence-panel__action-button');
   });
 });

@@ -112,6 +112,61 @@
   line-height: 1.35;
 }
 
+.galaxy-intelligence-panel__action-list {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.galaxy-intelligence-panel__action-item {
+  margin: 0;
+}
+
+.galaxy-intelligence-panel__action-button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(72, 210, 255, 0.28);
+  background: rgba(0, 22, 34, 0.82);
+  color: rgba(210, 235, 248, 0.95);
+  text-align: left;
+  cursor: pointer;
+}
+
+.galaxy-intelligence-panel__action-button:hover:not(:disabled) {
+  border-color: rgba(100, 230, 255, 0.55);
+  background: rgba(0, 32, 48, 0.9);
+}
+
+.galaxy-intelligence-panel__action-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.galaxy-intelligence-panel__action-title {
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.galaxy-intelligence-panel__action-detail {
+  font-size: 0.56rem;
+  color: rgba(170, 205, 225, 0.88);
+  line-height: 1.35;
+}
+
+.galaxy-intelligence-panel__action-cta {
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(120, 220, 255, 0.95);
+}
+
 .galaxy-intelligence-panel__receipt {
   margin: 0;
   color: rgba(130, 180, 200, 0.85);
