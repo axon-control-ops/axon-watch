@@ -49,7 +49,8 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             can_approve INTEGER NOT NULL,
             can_review INTEGER NOT NULL,
             current_step TEXT,
-            history_ref TEXT NOT NULL
+            history_ref TEXT NOT NULL,
+            employee_role TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_runs_updated_at
@@ -149,7 +150,25 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         """
     )
     _ensure_chat_thread_kind_column(connection)
+    _ensure_runs_employee_role_column(connection)
     _ensure_chat_attachments_table(connection)
+
+
+def _ensure_runs_employee_role_column(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(runs)").fetchall()
+    }
+    if "employee_role" in columns:
+        return
+    connection.execute("ALTER TABLE runs ADD COLUMN employee_role TEXT")
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_runs_employee_role
+            ON runs(workspace_id, employee_role)
+        """
+    )
+    connection.commit()
 
 
 def _ensure_chat_attachments_table(connection: sqlite3.Connection) -> None:

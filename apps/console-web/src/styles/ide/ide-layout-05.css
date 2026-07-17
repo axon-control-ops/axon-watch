@@ -59,22 +59,31 @@
   gap: 0;
   min-width: 0;
   max-width: 100%;
-  overflow: visible;
+  overflow: hidden;
+  isolation: isolate;
   padding: 0.55rem 0.8rem 0.8rem;
   border-top: 1px solid rgba(138, 154, 173, 0.1);
   background: rgba(6, 10, 16, 0.72);
+}
+
+.agent-dock__composer > .agent-dock-composer {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .ide-agent-review-strip {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  width: 100%;
   margin-bottom: -1px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 0;
   border-radius: 10px 10px 0 0;
   background: rgba(18, 20, 26, 0.98);
   overflow: hidden;
+  position: relative;
+  z-index: 2;
 }
 
 .agent-dock__transcript .conversation-seam__item--thread-status {
@@ -106,9 +115,10 @@
 
 .ide-agent-review-strip__bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.55rem;
+  gap: 0.35rem 0.55rem;
   padding: 0.42rem 0.65rem;
 }
 
@@ -230,6 +240,9 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ide-agent-review-strip__btn {

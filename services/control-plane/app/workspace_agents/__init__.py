@@ -23,7 +23,11 @@ from app.workspace_agents.config_loader import (
     _schedule_label,
     _title_display_name,
 )
-from app.workspace_agents.status import derive_agent_status, employee_status
+from app.workspace_agents.status import (
+    active_role_run_status,
+    derive_agent_status,
+    employee_status,
+)
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record, list_workspace_records
 from app.workspace_project_bindings import load_workspace_project_bindings
 
@@ -98,6 +102,7 @@ def build_company_roster(
             schedule=schedule,
             workspace_status=workspace_status,
             primary=employee.primary,
+            role_run_status=active_role_run_status(normalized_id, role),
         )
         if employee.primary:
             primary_employee_id = emp_id

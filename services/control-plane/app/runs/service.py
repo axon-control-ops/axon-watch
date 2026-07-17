@@ -97,10 +97,12 @@ def _new_run_record(
     mode: str,
     summary: str,
     detail: str,
+    employee_role: str | None = None,
 ) -> dict[str, Any]:
     now = _utc_now_iso()
     run_id = f"run_{uuid.uuid4().hex[:12]}"
     history_ref = f"history/{run_id}"
+    cleaned_role = str(employee_role or "").strip() or None
     record = {
         "run_id": run_id,
         "workspace_id": workspace_id,
@@ -114,6 +116,7 @@ def _new_run_record(
         "ended_at": None,
         "current_step": "Run queued",
         "history_ref": history_ref,
+        "employee_role": cleaned_role,
     }
     return _apply_capabilities(record)
 
@@ -125,12 +128,14 @@ def create_run(
     summary: str,
     detail: str = "",
     requires_approval: bool = False,
+    employee_role: str | None = None,
 ) -> dict[str, Any]:
     record = _new_run_record(
         workspace_id=workspace_id,
         mode=mode,
         summary=summary,
         detail=detail,
+        employee_role=employee_role,
     )
     run_store.save_run(record)
     run_store.append_transition(

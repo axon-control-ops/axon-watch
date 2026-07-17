@@ -2,8 +2,40 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.domain.run_state import is_terminal_phase
 from app.runs.service import list_runs
+
+
+def status_from_run(run: dict[str, Any]) -> str:
+    """Map one run record to a roster status string."""
+    phase = str(run.get("phase", "")).strip()
+    status = str(run.get("status", "")).strip()
+
+    if phase == "awaiting_approval":
+        return "waiting_approval"
+    if phase == "planning" or str(run.get("mode", "")).strip() == "plan":
+        return "planning"
+    if status in {"review", "review_ready"} or phase == "review_ready":
+        return "verifying"
+    if status == "blocked" or phase in {"paused", "awaiting_input"}:
+        return "blocked"
+    if phase == "executing":
+        return "executing"
+    if phase in {"queued", "starting"} or status == "running":
+        return "executing"
+    return "watching"
+
+
+def _non_terminal_workspace_runs(workspace_id: str) -> list[dict[str, Any]]:
+    normalized = workspace_id.strip()
+    return [
+        run
+        for run in list_runs()
+        if str(run.get("workspace_id", "")).strip() == normalized
+        and not is_terminal_phase(str(run.get("phase", "")).strip())
+    ]
 
 
 def derive_agent_status(workspace_id: str) -> str:
@@ -12,39 +44,38 @@ def derive_agent_status(workspace_id: str) -> str:
     Align with list_active_runs(): ignore ended_at/status ghosts where phase is
     already completed/failed/cancelled but status stayed "running".
     """
-    runs = [
-        run
-        for run in list_runs()
-        if str(run.get("workspace_id", "")).strip() == workspace_id.strip()
-        and not is_terminal_phase(str(run.get("phase", "")).strip())
-    ]
+    runs = _non_terminal_workspace_runs(workspace_id)
     if not runs:
         return "idle"
 
     runs.sort(key=lambda run: str(run.get("updated_at") or run.get("started_at") or ""), reverse=True)
-    primary = runs[0]
-    phase = str(primary.get("phase", "")).strip()
-    status = str(primary.get("status", "")).strip()
-
-    if phase == "awaiting_approval":
-        derived = "waiting_approval"
-    elif phase == "planning" or str(primary.get("mode", "")).strip() == "plan":
-        derived = "planning"
-    elif status in {"review", "review_ready"} or phase == "review_ready":
-        derived = "verifying"
-    elif status == "blocked" or phase in {"paused", "awaiting_input"}:
-        derived = "blocked"
-    elif phase == "executing":
-        derived = "executing"
-    elif phase in {"queued", "starting"} or status == "running":
-        derived = "executing"
-    else:
-        derived = "watching"
-    return derived
+    return status_from_run(runs[0])
 
 
+def active_role_run_status(workspace_id: str, role: str) -> str | None:
+    """Return status for the newest non-terminal run tagged with this employee role."""
+    cleaned_role = str(role or "").strip().lower()
+    if not cleaned_role:
+        return None
+    tagged = [
+        run
+        for run in _non_terminal_workspace_runs(workspace_id)
+        if str(run.get("employee_role") or "").strip().lower() == cleaned_role
+    ]
+    if not tagged:
+        return None
+    tagged.sort(key=lambda run: str(run.get("updated_at") or run.get("started_at") or ""), reverse=True)
+    return status_from_run(tagged[0])
 
-def employee_status(*, role: str, schedule: str, workspace_status: str, primary: bool) -> str:
+
+def employee_status(
+    *,
+    role: str,
+    schedule: str,
+    workspace_status: str,
+    primary: bool,
+    role_run_status: str | None = None,
+) -> str:
     if primary or role in {"lead", "workspace_agent", "overview_agent"}:
         if workspace_status != "idle":
             return workspace_status
@@ -59,6 +90,10 @@ def employee_status(*, role: str, schedule: str, workspace_status: str, primary:
     # Always-on watchers stay on duty; they do not mirror active agent runs.
     if schedule == "always_on" or role == "watcher":
         return "watching"
+
+    # Role specialists reflect their own role-tagged run when present.
+    if role_run_status:
+        return role_run_status
 
     # Role specialists stay idle until role-tagged runs exist.
     return "idle"

@@ -53,7 +53,10 @@ class WorkspaceAgentConfig:
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    # config_loader.py lives at services/control-plane/app/workspace_agents/
+    # → parents[4] is the repo root. parents[3] incorrectly resolves to services/
+    # and makes default_agents_file miss config/workspace-agents.json.
+    return Path(__file__).resolve().parents[4]
 
 
 def default_agents_file() -> Path:
