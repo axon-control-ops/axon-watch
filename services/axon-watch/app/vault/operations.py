@@ -21,7 +21,6 @@ from app.vault.provider_aliases import (
     PROVIDER_VAULT_NAMES,
     PROVIDER_VAULT_URLS,
 )
-from app.vault.runtime_env import vault_runtime_env, vault_runtime_posture
 from app.vault.session import (
     VaultSession,
     auto_unlock_enabled,
@@ -384,3 +383,15 @@ def migrate_legacy_import_file() -> list[str]:
         vault_add_secret(key, str(name), "key", "", str(value), "", "Migrated from vault-import.json")
         migrated.append(str(name))
     return migrated
+
+
+def vault_runtime_env() -> dict[str, str]:
+    from app.vault import runtime_env as _runtime_env
+
+    return _runtime_env.vault_runtime_env()
+
+
+def vault_runtime_posture() -> dict[str, object]:
+    from app.vault import runtime_env as _runtime_env
+
+    return _runtime_env.vault_runtime_posture()

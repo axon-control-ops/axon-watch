@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-16",
-  "file_count": 41,
+  "generated_on": "2026-07-17",
+  "file_count": 42,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -50,8 +50,8 @@
       "bytes": 3278
     },
     "EXECUTION_PLAN.md": {
-      "sha256": "db6b8c2a31cd189d4ddadb1181194dda50a8cfd4b82ab4c390905b8f5933b9e0",
-      "bytes": 16610
+      "sha256": "0860d65041131e61bc56a4883a3070fce2a87ade21ecbed704adc19be70415ff",
+      "bytes": 17506
     },
     "FITNESS_FUNCTIONS.md": {
       "sha256": "f688b05666210bf2d4fb5870adbd6f0e91e39ecfd8c2a7b4552d25e275af5e2f",
@@ -82,8 +82,8 @@
       "bytes": 14770
     },
     "KAIRO_VOICE_UPGRADE_PLAN.md": {
-      "sha256": "99ca531b0d766aba05254b77a006bd80584d8cc619b6830282a82342f5dc264d",
-      "bytes": 7663
+      "sha256": "3bae920975f04985a9efe5f8c61ef9722f033352ddc20b76f5d8ae4ec69f3a9c",
+      "bytes": 10681
     },
     "OPERATOR_BRAIN_PIVOT.md": {
       "sha256": "5b789c0ee500d04a699686a8f9bffd641199df9e6af3d18546d894d65af7ad68",
@@ -102,8 +102,8 @@
       "bytes": 3178
     },
     "README.md": {
-      "sha256": "570af5a2b98222969cb7fed1346bf7a32c059be29d752ec2d179e51862bc165b",
-      "bytes": 3785
+      "sha256": "1dae8ad9150cee3f0ed7adadc84dfd712010a0bb9134a69de961f91fe96c7e6d",
+      "bytes": 3968
     },
     "REPO_BOOTSTRAP_SPEC.md": {
       "sha256": "b8617bb75e4b9224f5a6970dc4c43daed46701bd9f7417bfde6b5cfcac5050c9",
@@ -144,6 +144,10 @@
     "UI_VISUAL_DIRECTION.md": {
       "sha256": "c34035844ef68227f5c7f54828e233c2c39f03e6f0aaec3d2f9c1fbd1d31e4e4",
       "bytes": 7904
+    },
+    "VAXON_CROSS_WORKSPACE_ADVICE_PLAN.md": {
+      "sha256": "b96f3a893fb1d45be34fc30902c7151370ffad3ac59ab51996664888ae12d9d1",
+      "bytes": 11051
     },
     "agent-orchestration-contract.md": {
       "sha256": "5704453d7d53a94979b14738eba55625e53b92a2db604e34f36d44c82f9ed62f",
