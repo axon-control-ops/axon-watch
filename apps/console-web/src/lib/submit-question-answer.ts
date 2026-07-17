@@ -7,10 +7,14 @@ import type { IdeComposerMode } from './ide-composer-queue';
 export type SubmitQuestionAnswerShell = {
   openIdeComposerWithDraft: (content: string) => void;
   submitIdeComposer: (mode: IdeComposerMode) => Promise<void>;
+  activeIdeThreadId?: string | null;
 };
 
-function resolveSubmitMode(workspaceId: string | null | undefined): IdeComposerMode {
-  const stored = readWorkspaceComposerMode(workspaceId);
+function resolveSubmitMode(
+  workspaceId: string | null | undefined,
+  threadId?: string | null,
+): IdeComposerMode {
+  const stored = readWorkspaceComposerMode(workspaceId, sessionStorage, threadId);
   if (!stored || stored === 'kairo') {
     return stored === 'kairo' ? 'ask' : 'agent';
   }
@@ -24,13 +28,14 @@ export async function submitQuestionAnswer(
     option: AgentQuestionOption;
     prompt?: string;
     messageId?: string;
+    customText?: string;
   },
 ): Promise<void> {
-  const answer = formatQuestionAnswer(input.option, input.prompt).trim();
+  const answer = formatQuestionAnswer(input.option, input.prompt, input.customText).trim();
   if (!answer) {
     return;
   }
-  const mode = resolveSubmitMode(input.workspaceId);
+  const mode = resolveSubmitMode(input.workspaceId, shell.activeIdeThreadId);
   requestIdeComposerMode(mode);
   if (input.messageId && input.prompt) {
     markQuestionAnswered(input.messageId, input.prompt);

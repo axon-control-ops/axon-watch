@@ -43,10 +43,27 @@ describe('ide composer draft prefs', () => {
     expect(readStoredIdeComposerDraft('workspace_c')).toBe('');
   });
 
-  it('clears stored draft when content is empty', () => {
-    persistIdeComposerDraft('workspace_a', 'Temporary draft');
-    persistIdeComposerDraft('workspace_a', '   ');
+  it('isolates drafts per conversation thread', () => {
+    persistIdeComposerDraft('workspace_a', 'Sandbox plan draft', 'thread_1');
+    persistIdeComposerDraft('workspace_a', 'Worker roster draft', 'thread_2');
 
+    expect(readStoredIdeComposerDraft('workspace_a', 'thread_1')).toBe('Sandbox plan draft');
+    expect(readStoredIdeComposerDraft('workspace_a', 'thread_2')).toBe('Worker roster draft');
+    expect(readStoredIdeComposerDraft('workspace_a', 'thread_3')).toBe('');
+  });
+
+  it('migrates legacy workspace drafts into the first thread that reads them', () => {
+    persistIdeComposerDraft('workspace_a', 'Legacy shared draft');
+
+    expect(readStoredIdeComposerDraft('workspace_a', 'thread_1')).toBe('Legacy shared draft');
+    expect(readStoredIdeComposerDraft('workspace_a', 'thread_2')).toBe('');
     expect(readStoredIdeComposerDraft('workspace_a')).toBe('');
+  });
+
+  it('clears stored draft when content is empty', () => {
+    persistIdeComposerDraft('workspace_a', 'Temporary draft', 'thread_1');
+    persistIdeComposerDraft('workspace_a', '   ', 'thread_1');
+
+    expect(readStoredIdeComposerDraft('workspace_a', 'thread_1')).toBe('');
   });
 });
