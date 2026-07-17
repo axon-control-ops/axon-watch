@@ -21,6 +21,9 @@ resolve_python() {
 load_env() {
   repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
 
+  # Export every assignment from the env file so child processes (uvicorn, MCP)
+  # inherit optional secrets such as AXON_WATCH_GOOGLE_CSE_*.
+  set -a
   if [[ -f "${repo_root}/.env" ]]; then
     # shellcheck disable=SC1091
     source "${repo_root}/.env"
@@ -28,6 +31,7 @@ load_env() {
     # shellcheck disable=SC1091
     source "${repo_root}/.env.example"
   fi
+  set +a
 
   : "${AXON_WATCH_CONSOLE_WEB_PORT:=4173}"
   : "${AXON_WATCH_CONTROL_PLANE_PORT:=8787}"

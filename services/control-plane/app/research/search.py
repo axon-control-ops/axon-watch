@@ -7,8 +7,10 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from urllib.parse import urlparse
 
 
+from app.research.env_file import load_repo_env_file
 from app.research.policy import research_enabled, validate_url
 
 
@@ -20,25 +22,63 @@ def _env(*names: str) -> str:
     return ""
 
 
+_GOOGLE_CSE_API_KEY_NAMES = (
+    "AXON_WATCH_GOOGLE_CSE_API_KEY",
+    "GOOGLE_SEARCH_API_KEY",
+    "EXPO_PUBLIC_GOOGLE_CSE_API_KEY",
+    "google_cse_api_key",
+)
+_GOOGLE_CSE_CX_NAMES = (
+    "AXON_WATCH_GOOGLE_CSE_CX",
+    "GOOGLE_CSE_ID",
+    "EXPO_PUBLIC_GOOGLE_CSE_CX",
+    "google_cse_cx",
+)
+
+
+def _first_env_value(names: tuple[str, ...], env: dict[str, str]) -> str:
+    for name in names:
+        value = str(env.get(name, "")).strip()
+        if value:
+            return value
+    return ""
+
+
+def _vault_env() -> dict[str, str]:
+    try:
+        from app.cli_runtime.vault_keys import runtime_vault_env
+
+        return runtime_vault_env()
+    except Exception:
+        return {}
+
+
 def google_cse_credentials() -> tuple[str, str] | None:
     """Return (api_key, cx) when Google Custom Search is configured.
 
-    Accepts Axon-X names and DashPro-compatible aliases.
+    Accepts Axon-X names, DashPro-compatible aliases, unlocked /vault secrets,
+    and repo-root .env gaps.
     """
 
-    api_key = _env(
-        "AXON_WATCH_GOOGLE_CSE_API_KEY",
-        "GOOGLE_SEARCH_API_KEY",
-        "EXPO_PUBLIC_GOOGLE_CSE_API_KEY",
-    )
-    cx = _env(
-        "AXON_WATCH_GOOGLE_CSE_CX",
-        "GOOGLE_CSE_ID",
-        "EXPO_PUBLIC_GOOGLE_CSE_CX",
-    )
-    if api_key and cx:
-        return api_key, cx
-    return None
+    def _pair(env: dict[str, str]) -> tuple[str, str] | None:
+        api_key = _first_env_value(_GOOGLE_CSE_API_KEY_NAMES, env)
+        cx = _first_env_value(_GOOGLE_CSE_CX_NAMES, env)
+        if api_key and cx:
+            return api_key, cx
+        return None
+
+    process_env = {key: str(value) for key, value in os.environ.items() if str(value or "").strip()}
+    found = _pair(process_env)
+    if found is not None:
+        return found
+
+    found = _pair(_vault_env())
+    if found is not None:
+        return found
+
+    # Cursor MCP often starts with a minimal env; fill gaps from local .env.
+    load_repo_env_file()
+    return _pair({key: str(value) for key, value in os.environ.items() if str(value or "").strip()})
 
 
 def _google_cse_search(query: str) -> list[dict[str, str]] | None:
@@ -58,7 +98,13 @@ def _google_cse_search(query: str) -> list[dict[str, str]] | None:
     )
     url = f"https://www.googleapis.com/customsearch/v1?{params}"
     validate_url(url)
-    request = urllib.request.Request(url, headers={"User-Agent": "Axon-X-Research/1.0"})
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Axon-X-Research/1.0",
+            "Accept": "application/json",
+        },
+    )
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
@@ -81,14 +127,53 @@ def _google_cse_search(query: str) -> list[dict[str, str]] | None:
     return items
 
 
+def searxng_base_url() -> str:
+    """Resolve SearXNG base URL from process env, vault, then repo .env."""
+
+    def _from_env(env: dict[str, str]) -> str:
+        return str(env.get("AXON_WATCH_SEARXNG_URL", "")).strip().rstrip("/")
+
+    process_env = {key: str(value) for key, value in os.environ.items() if str(value or "").strip()}
+    found = _from_env(process_env)
+    if found:
+        return found
+
+    found = _from_env(_vault_env())
+    if found:
+        return found
+
+    load_repo_env_file()
+    return _from_env({key: str(value) for key, value in os.environ.items() if str(value or "").strip()})
+
+
+def _validate_searxng_request(url: str, base: str) -> None:
+    """Allow loopback only for the operator-configured SearXNG base URL."""
+    if not research_enabled():
+        raise ValueError("online research is disabled")
+    parsed = urlparse(url.strip())
+    base_parsed = urlparse(base.strip().rstrip("/"))
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("only http(s) URLs are allowed")
+    if not parsed.hostname or not base_parsed.hostname:
+        raise ValueError("URL hostname is required")
+    if parsed.netloc != base_parsed.netloc:
+        raise ValueError("searxng request must target configured AXON_WATCH_SEARXNG_URL")
+
+
 def _searxng_search(query: str) -> list[dict[str, str]] | None:
-    base = str(os.environ.get("AXON_WATCH_SEARXNG_URL", "")).strip().rstrip("/")
+    base = searxng_base_url()
     if not base:
         return None
     params = urllib.parse.urlencode({"q": query, "format": "json"})
     url = f"{base}/search?{params}"
-    validate_url(url)
-    request = urllib.request.Request(url, headers={"User-Agent": "Axon-X-Research/1.0"})
+    _validate_searxng_request(url, base)
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Axon-X-Research/1.0",
+            "Accept": "application/json",
+        },
+    )
     with urllib.request.urlopen(request, timeout=20) as response:
         payload = json.loads(response.read().decode("utf-8"))
     results = payload.get("results") if isinstance(payload, dict) else None
@@ -110,7 +195,13 @@ def _duckduckgo_instant_search(query: str) -> list[dict[str, str]]:
     params = urllib.parse.urlencode({"q": query, "format": "json", "no_redirect": "1"})
     url = f"https://api.duckduckgo.com/?{params}"
     validate_url(url)
-    request = urllib.request.Request(url, headers={"User-Agent": "Axon-X-Research/1.0"})
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Axon-X-Research/1.0",
+            "Accept": "application/json",
+        },
+    )
     with urllib.request.urlopen(request, timeout=20) as response:
         payload = json.loads(response.read().decode("utf-8"))
     items: list[dict[str, str]] = []
@@ -157,21 +248,21 @@ def search_web(query: str) -> dict[str, object]:
     items: list[dict[str, str]] | None = None
     errors: list[str] = []
 
-    if google_cse_credentials() is not None:
-        try:
-            items = _google_cse_search(cleaned)
-            provider = "google_cse"
-        except ValueError as exc:
-            errors.append(str(exc))
-            items = None
-
-    if items is None:
+    if searxng_base_url():
         try:
             items = _searxng_search(cleaned)
             if items is not None:
                 provider = "searxng"
         except (ValueError, OSError, urllib.error.URLError) as exc:
             errors.append(f"searxng: {exc}")
+            items = None
+
+    if items is None and google_cse_credentials() is not None:
+        try:
+            items = _google_cse_search(cleaned)
+            provider = "google_cse"
+        except ValueError as exc:
+            errors.append(str(exc))
             items = None
 
     if items is None:

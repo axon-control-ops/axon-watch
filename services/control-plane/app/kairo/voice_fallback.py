@@ -9,6 +9,7 @@ from typing import Any
 from app.kairo_participant_memory import apply_participant_address
 from app.kairo_persona import build_persona_voice_line
 from app.kairo_progress_voice import PROGRESS_FALLBACK_POOLS, contextual_progress_fallback
+from app.kairo.tool_milestone import contextual_tool_fallback
 from app.kairo_voice_text import normalize_spoken_line
 
 _FALLBACK_POOLS: dict[str, list[str]] = {
@@ -247,12 +248,16 @@ def fallback_for_event(
         return ""
 
     if event_type == "tool":
-        tool_label = str(context.get("tool_label") or "").strip().lower()
-        if tool_label.startswith("read"):
+        tool_label = str(context.get("tool_label") or "").strip()
+        contextual = contextual_tool_fallback(tool_label)
+        if contextual:
+            return apply_participant_address(contextual, guest_name)
+        lowered = tool_label.lower()
+        if lowered.startswith("read"):
             pool_key = "tool_read"
-        elif tool_label.startswith("edit"):
+        elif lowered.startswith("edit"):
             pool_key = "tool_edit"
-        elif tool_label.startswith("shell") or tool_label.startswith("run"):
+        elif lowered.startswith("shell") or lowered.startswith("run"):
             pool_key = "tool_shell"
         else:
             pool_key = "thinking"

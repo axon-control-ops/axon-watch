@@ -20,6 +20,13 @@ import { resolveVoiceOrbPlacementApi } from './resolve-voice-orb-placement-api';
 import { handleKairoGalaxyOrbInterrupt } from './kairo-galaxy-orb-interrupt';
 import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_ORB_LABEL } from '../../lib/operator-persona-name';
 import {
+  kairoVoiceActiveEngine,
+  kairoVoiceActiveReason,
+  kairoVoiceEngineBadge,
+  kairoVoiceLastEngine,
+  kairoVoiceLastReason,
+} from '../../lib/kairo-voice-diagnostics';
+import {
   kairoConversationPhase,
   kairoConversationReply,
 } from '../kairo-conversation/kairo-conversation-state';
@@ -134,6 +141,17 @@ const orbStatusLabel = computed(() =>
 const showInterrupt = computed(
   () => shell.kairoSpeechActive || kairoConversationPhase.value === 'thinking',
 );
+const ttsBadge = computed(() => {
+  if (!speaking.value) {
+    return '';
+  }
+  // Touch reactive refs so the badge updates when the live engine changes.
+  void kairoVoiceActiveEngine.value;
+  void kairoVoiceActiveReason.value;
+  void kairoVoiceLastEngine.value;
+  void kairoVoiceLastReason.value;
+  return kairoVoiceEngineBadge();
+});
 const showIdeClose = computed(
   () => props.placementMode === 'viewport' && shell.layoutMode === 'ide',
 );
@@ -207,6 +225,7 @@ function handleInterrupt(): void {
         :persona-name="personaName"
         :orb-status-label="orbStatusLabel"
         :mode-label="modeLabel"
+        :tts-badge="ttsBadge"
         :show-interrupt="showInterrupt"
         :hint="hint"
         :model-label="modelLabel"

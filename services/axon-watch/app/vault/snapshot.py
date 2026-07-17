@@ -54,6 +54,32 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         "optional_keys": ("AZURE_SPEECH_REGION", "azure_speech_key", "azure_speech_region"),
         "auth_note": "Store AZURE_SPEECH_KEY (or azure_speech_key) and optional region in /vault.",
     },
+    {
+        "id": "vaxon_research",
+        "label": "VAXON online research (Google CSE)",
+        "required_keys": ("AXON_WATCH_GOOGLE_CSE_API_KEY", "AXON_WATCH_GOOGLE_CSE_CX"),
+        "optional_keys": (
+            "GOOGLE_SEARCH_API_KEY",
+            "GOOGLE_CSE_ID",
+            "EXPO_PUBLIC_GOOGLE_CSE_API_KEY",
+            "EXPO_PUBLIC_GOOGLE_CSE_CX",
+            "google_cse_api_key",
+            "google_cse_cx",
+        ),
+        "auth_note": (
+            "Store AXON_WATCH_GOOGLE_CSE_API_KEY and AXON_WATCH_GOOGLE_CSE_CX in /vault "
+            "(password field holds the value). Unlock vault before research runs."
+        ),
+    },
+    {
+        "id": "vaxon_searxng",
+        "label": "VAXON online research (SearXNG)",
+        "required_keys": ("AXON_WATCH_SEARXNG_URL",),
+        "auth_note": (
+            "Store AXON_WATCH_SEARXNG_URL in /vault (password field), e.g. "
+            "http://127.0.0.1:8080. SearXNG is preferred over Google when set."
+        ),
+    },
 )
 
 

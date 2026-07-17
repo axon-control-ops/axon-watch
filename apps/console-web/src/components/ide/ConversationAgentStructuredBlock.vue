@@ -13,6 +13,7 @@ defineProps<{
   workspaceId: string | null;
   live?: boolean;
   messageId?: string;
+  segmentIndex?: number;
   answeredOption?: AgentQuestionOption | null;
 }>();
 </script>
@@ -30,6 +31,7 @@ defineProps<{
     :options="segment.options"
     :live="live"
     :message-id="messageId"
+    :segment-index="segmentIndex"
     :answered-option="answeredOption"
   />
   <AgentResearchBlock

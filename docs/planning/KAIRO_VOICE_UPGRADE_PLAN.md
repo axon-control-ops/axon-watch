@@ -93,7 +93,8 @@ Gate: policy/throttle tests and a long-run manual no-spam proof.
 
 ### Voice-D — Real cloud STT
 
-**Status:** merged to `dev` at `1fb6340`; optional manual accent/noisy-room proof remains.
+**Status:** merged to `dev` at `1fb6340`; implementation complete. Optional
+manual accent/noisy-room proof remains and does not block the API contract gate.
 
 Work:
 
@@ -106,6 +107,8 @@ Work:
 Gate: API contract, upload/fallback tests, and an accent/noisy-room comparison.
 
 ### Voice-E — Azure / cloud TTS routing
+
+**Status:** implementation complete; verification recorded below.
 
 Work:
 
@@ -178,8 +181,54 @@ barge-in, and no-double-speak proofs.
 - Focused frontend: `kairo-cloud-stt.test.ts` + `cloud-audio-capture.test.ts`.
 - `tests.test_kairo_stt` wired into `verify:contracts`.
 - Cloud upload accepts **ogg/wav only**; WebM stays on browser STT fallback.
-- Manual accent/noisy-room comparison: **deferred** (operator proof when Azure keys live).
+- Manual accent/noisy-room comparison: **deferred** (operator proof when Azure
+  keys live); does not block C14. Prior “merge to `dev` in this close-out”
+  note cleared — Voice-D is recorded complete here and in `EXECUTION_PLAN.md`.
+
+### 2026-07-16 — Voice-E
+
+- Azure-first TTS routing confirmed in `kairo-voice-playback.ts` with serialized
+  queue (`kairo-voice-queue.ts`) — no concurrent playback; barge-in flushes queue.
+- Provider receipts: `kairo-voice-diagnostics.ts` records engine/reason; galaxy orb
+  shows `Azure voice` / `Browser voice · <reason>` badge while speaking.
+- Tool milestone narration: contextual lines from `tool_milestone.py` /
+  `kairo-tool-milestone.ts` — explains read/edit/shell/research instead of raw
+  `:::tool` headers; speak API allows `tool`/`edit` for conversational narration.
+- Focused backend: `tests.test_kairo_voice` + `tests.test_kairo_tool_milestone` —
+  **25/25 PASS**.
+- Focused frontend: `kairo-voice-playback`, `kairo-voice-diagnostics`,
+  `kairo-voice-queue` (serial play + barge-in flush + no overlap),
+  `kairo-tool-milestone`, `kairo-progress-fallback` — **19/19 PASS**.
+- Live Azure REST synthesis (subscription key + regional SSML endpoint):
+  success returned `audio/mpeg` (~73 KiB); forced bad key returned no audio
+  (client browser fallback path with explicit reason).
+- Fallback reasons exercised in playback tests / code paths: `azure_unavailable`,
+  `audio_playback_failed`, `fetch_error`, plus diagnostics badge
+  `Browser voice · <reason>`.
+- Research alignment (supporting): handbook + `.env.example` +
+  `config/deployment.env.example` document SearXNG → Google CSE (legacy) →
+  DuckDuckGo Instant; live `axon_research_search` receipt `provider: searxng`
+  with `AXON_WATCH_SEARXNG_URL` set. No new Google CSE project/key for Axon-X.
+- C12 gate: **green** (see `EXECUTION_PLAN.md`).
+
+### 2026-07-16 — Close-out sync (Voice-D / Voice-E + research path)
+
+- Re-ran focused gates: backend `tests.test_kairo_voice` +
+  `tests.test_kairo_tool_milestone` + `tests.test_kairo_stt` — **35/35 PASS**;
+  frontend voice playback/diagnostics/queue/tool-milestone/progress-fallback +
+  cloud STT / audio capture — **26/26 PASS**.
+- `EXECUTION_PLAN.md` Phase C table synced: C6B/C11/C12/C13/C14 marked done to
+  match this log (C13 duplicates C6B / Voice-B).
+- Research path unchanged: prefer local SearXNG; Google Custom Search stays
+  legacy-only if already configured — **do not** create a new Google search
+  project or API key for Axon-X. Live `axon_research_search` receipt
+  `provider: searxng` (e.g. [SearXNG Search API](https://docs.searxng.org/dev/search_api.html)).
 
 ## Next slice
 
-Voice-E: Azure / cloud TTS routing (provider receipts, no double-speak).
+**Locked 2026-07-16:** cross-workspace coaching (broader “super-agent” advice).
+
+Design: [`VAXON_CROSS_WORKSPACE_ADVICE_PLAN.md`](VAXON_CROSS_WORKSPACE_ADVICE_PLAN.md)
+— **SA-1** (fleet-ranked grounded Advise) implementation started. Phase D (brain
+polish + handoff) remains the parallel product roadmap; this advice plan feeds
+the same fleet/handoff facts and does not replace D1–D4.

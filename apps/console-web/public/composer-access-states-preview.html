@@ -201,30 +201,30 @@
       .send {
         display: inline-flex;
         align-items: center;
-        gap: 0.28rem;
-        padding: 0.32rem 0.55rem;
-        border-radius: 8px;
-        border: 1px solid transparent;
-        font-family: var(--font-mono);
-        font-size: 0.56rem;
+        justify-content: center;
+        width: 1.85rem;
+        height: 1.85rem;
+        border-radius: 999px;
+        border: none;
+        font-size: 0.9rem;
         font-weight: 700;
-        letter-spacing: 0.03em;
+        line-height: 1;
         cursor: default;
       }
       .send--full {
-        border-color: rgba(244, 63, 94, 0.55);
-        background: rgba(76, 5, 25, 0.72);
+        background: rgba(76, 5, 25, 0.92);
         color: rgba(255, 205, 214, 0.98);
+        box-shadow: 0 0 18px rgba(244, 63, 94, 0.22);
       }
       .send--sandbox {
-        border-color: rgba(45, 212, 191, 0.55);
-        background: rgba(6, 78, 72, 0.72);
+        background: rgba(6, 78, 72, 0.92);
         color: rgba(167, 243, 208, 0.98);
+        box-shadow: 0 0 18px rgba(45, 212, 191, 0.22);
       }
       .send--sandbox-full {
-        border-color: rgba(251, 191, 36, 0.55);
-        background: linear-gradient(120deg, rgba(6, 78, 72, 0.72), rgba(88, 28, 38, 0.7));
+        background: linear-gradient(120deg, rgba(6, 78, 72, 0.92), rgba(88, 28, 38, 0.9));
         color: rgba(254, 243, 199, 0.98);
+        box-shadow: 0 0 18px rgba(251, 191, 36, 0.2);
       }
     </style>
   </head>
@@ -244,7 +244,7 @@
             <div class="icons">📎  ⚙</div>
           </div>
           <div class="field">Describe what you want to build or change…</div>
-          <div class="actions"><div class="send send--full">Send command ↗</div></div>
+          <div class="actions"><div class="send send--full" title="Send command">↑</div></div>
         </div>
       </section>
       <section>
@@ -268,7 +268,7 @@
             <div class="icons">📎  ⚙</div>
           </div>
           <div class="field">Describe Sandbox changes — edits stay in the disposable session…</div>
-          <div class="actions"><div class="send send--sandbox">Send in Sandbox ↗</div></div>
+          <div class="actions"><div class="send send--sandbox" title="Send in Sandbox">↑</div></div>
         </div>
       </section>
       <section>
@@ -293,7 +293,7 @@
             <div class="icons">📎  ⚙</div>
           </div>
           <div class="field">Describe Sandbox changes — edits stay in the disposable session…</div>
-          <div class="actions"><div class="send send--sandbox-full">Send in Sandbox ↗</div></div>
+          <div class="actions"><div class="send send--sandbox-full" title="Send in Sandbox">↑</div></div>
         </div>
       </section>
     </div>

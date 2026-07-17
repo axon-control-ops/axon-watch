@@ -1,0 +1,13 @@
+# Local Axon-X research SearXNG settings (JSON API + no limiter for 127.0.0.1).
+use_default_settings: true
+
+server:
+  secret_key: "axon-watch-local-searxng"
+  limiter: false
+  image_proxy: false
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json

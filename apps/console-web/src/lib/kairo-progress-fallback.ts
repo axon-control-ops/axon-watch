@@ -1,3 +1,5 @@
+import { toolMilestoneSpeakLine } from './kairo-tool-milestone';
+
 export interface ProgressFallbackInput {
   eventType: string;
   context?: Record<string, unknown>;
@@ -80,6 +82,14 @@ export function agentMilestoneFallbackLine(input: {
   context?: Record<string, unknown>;
 }): string {
   const context = input.context ?? {};
+  if (input.milestoneKey.startsWith('tool:')) {
+    const toolLabel = String(context.tool_label ?? '').trim();
+    return toolLabel ? toolMilestoneSpeakLine(toolLabel) : '';
+  }
+  if (input.milestoneKey.startsWith('edit:')) {
+    const fileName = String(context.file_name ?? context.edit_path ?? '').trim();
+    return fileName ? `I'm updating ${fileName}.` : '';
+  }
   const eventType =
     input.milestoneKey === 'start'
       ? 'run_started'

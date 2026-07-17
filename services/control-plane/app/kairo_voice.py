@@ -214,6 +214,9 @@ def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:
             "chat_summary",
             "briefing",
             "conversation_reply",
+            "tool",
+            "edit",
+            "thinking",
             *PROGRESS_EVENT_TYPES,
         }
     return event_type in {

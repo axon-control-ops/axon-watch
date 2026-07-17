@@ -339,6 +339,7 @@ const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(convers
               :workspace-id="shell.currentWorkspace?.workspace_id ?? null"
               :live="segment.kind !== 'plan' && segment.open && isStreamingMessage(item.message.message_id)"
               :message-id="item.message.message_id"
+              :segment-index="segmentIndex"
               :answered-option="
                 segment.kind === 'question'
                   ? answeredOptionForQuestion(

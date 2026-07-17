@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-import os
-
 from app.research.policy import research_enabled
-from app.research.search import google_cse_credentials
+from app.research.search import google_cse_credentials, searxng_base_url
 
 
 def research_capability_snapshot() -> dict[str, object]:
     enabled = research_enabled()
     if not enabled:
         provider = "none"
+    elif searxng_base_url():
+        provider = "searxng"
     elif google_cse_credentials() is not None:
         provider = "google_cse"
-    elif bool(str(os.environ.get("AXON_WATCH_SEARXNG_URL", "")).strip()):
-        provider = "searxng"
     else:
         provider = "duckduckgo_instant"
     return {

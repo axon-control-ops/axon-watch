@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 
 import {
   AGENT_QUESTION_OTHER_ID,
@@ -15,11 +15,14 @@ const props = defineProps<{
   options: AgentQuestionOption[];
   live?: boolean;
   messageId?: string;
+  /** Stable per-segment id so multiple asks in one message stay isolated. */
+  segmentIndex?: number;
   /** When set, render Cursor-like collapsed answered card. */
   answeredOption?: AgentQuestionOption | null;
 }>();
 
 const shell = useShellStore();
+const instanceId = useId();
 const displayOptions = computed(() => withOtherQuestionOption(props.options));
 const selectedId = ref(props.answeredOption?.id || displayOptions.value[0]?.id || '');
 const otherText = ref(
@@ -49,8 +52,8 @@ const canContinue = computed(() => {
   return true;
 });
 
-const radioGroupName = computed(
-  () => `axon-agent-question-${props.prompt.slice(0, 40).replace(/\W+/g, '-').toLowerCase()}`,
+const groupLabelId = computed(
+  () => `axon-agent-question-label-${instanceId}-${props.messageId || 'local'}-${props.segmentIndex ?? 0}`,
 );
 
 watch(
@@ -61,6 +64,22 @@ watch(
     }
   },
 );
+
+watch(
+  () => props.answeredOption?.id,
+  (answeredId) => {
+    if (answeredId && !locallyAnswered.value) {
+      selectedId.value = answeredId;
+    }
+  },
+);
+
+function selectOption(optionId: string): void {
+  if (props.live || submitting.value || isAnswered.value) {
+    return;
+  }
+  selectedId.value = optionId;
+}
 
 async function continueWithSelection(): Promise<void> {
   const option =
@@ -100,11 +119,16 @@ async function continueWithSelection(): Promise<void> {
     class="agent-block agent-block--question"
     :class="{ 'agent-block--question-answered': isAnswered }"
     role="group"
-    :aria-label="prompt"
+    :aria-labelledby="groupLabelId"
   >
     <template v-if="isAnswered && resolvedAnswer">
       <p class="agent-block__question-kicker">Answered</p>
-      <p class="agent-block__question-prompt">{{ prompt }}</p>
+      <p
+        :id="groupLabelId"
+        class="agent-block__question-prompt"
+      >
+        {{ prompt }}
+      </p>
       <p class="agent-block__question-answered-choice">
         <span class="agent-block__question-id">{{ resolvedAnswer.id }}</span>
         <span class="agent-block__question-label">{{ resolvedAnswer.label }}</span>
@@ -112,39 +136,48 @@ async function continueWithSelection(): Promise<void> {
     </template>
     <template v-else>
       <p class="agent-block__question-kicker">Question</p>
-      <p class="agent-block__question-prompt">{{ prompt }}</p>
+      <p
+        :id="groupLabelId"
+        class="agent-block__question-prompt"
+      >
+        {{ prompt }}
+      </p>
       <div
         class="agent-block__question-options"
         role="radiogroup"
-        :aria-label="prompt"
+        :aria-labelledby="groupLabelId"
       >
-        <label
+        <button
           v-for="option in displayOptions"
-          :key="option.id"
+          :key="`${instanceId}-${option.id}`"
+          type="button"
           class="agent-block__question-option"
           :class="{ 'agent-block__question-option--selected': selectedId === option.id }"
+          role="radio"
+          :aria-checked="selectedId === option.id"
+          :disabled="live || submitting"
+          @click="selectOption(option.id)"
         >
-          <input
-            v-model="selectedId"
+          <span
             class="agent-block__question-radio"
-            type="radio"
-            :name="radioGroupName"
-            :value="option.id"
-            :disabled="live || submitting"
-          >
+            aria-hidden="true"
+          />
           <span class="agent-block__question-id">{{ option.id }}</span>
           <span class="agent-block__question-label">{{ option.label }}</span>
-        </label>
+        </button>
       </div>
       <div
         v-if="otherSelected"
         class="agent-block__question-other"
       >
-        <label class="agent-block__question-other-label" :for="`${radioGroupName}-other`">
+        <label
+          class="agent-block__question-other-label"
+          :for="`${instanceId}-other`"
+        >
           Your answer
         </label>
         <textarea
-          :id="`${radioGroupName}-other`"
+          :id="`${instanceId}-other`"
           v-model="otherText"
           class="agent-block__question-other-input"
           rows="3"

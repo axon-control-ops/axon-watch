@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 import sys
 
+from app.research.env_file import load_repo_env_file
 from app.research.service import fetch_url, search_web
+
+load_repo_env_file()
 
 
 def _send(payload: dict[str, object]) -> None:

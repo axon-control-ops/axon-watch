@@ -42,11 +42,60 @@ class ResearchServiceTests(unittest.TestCase):
         self.assertEqual(1, payload.get("count"))
 
 
+class RepoEnvFileTests(unittest.TestCase):
+    def test_loads_missing_keys_from_env_file(self) -> None:
+        from app.research import env_file as env_file_mod
+
+        with patch.object(env_file_mod, "_LOADED", False), patch.dict(
+            os.environ, {"AXON_WATCH_GOOGLE_CSE_API_KEY": "", "AXON_WATCH_GOOGLE_CSE_CX": ""}, clear=False
+        ):
+            os.environ.pop("AXON_WATCH_GOOGLE_CSE_API_KEY", None)
+            os.environ.pop("AXON_WATCH_GOOGLE_CSE_CX", None)
+            tmp = Path(self.id().replace(".", "_") + "_env")
+            # Use a temp file via patched repo root
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as td:
+                root = Path(td)
+                (root / ".env").write_text(
+                    "AXON_WATCH_GOOGLE_CSE_API_KEY=from-file-key\n"
+                    "AXON_WATCH_GOOGLE_CSE_CX=from-file-cx\n",
+                    encoding="utf-8",
+                )
+                with patch.object(env_file_mod, "_repo_root", return_value=root):
+                    env_file_mod.load_repo_env_file(force=True)
+                self.assertEqual("from-file-key", os.environ.get("AXON_WATCH_GOOGLE_CSE_API_KEY"))
+                self.assertEqual("from-file-cx", os.environ.get("AXON_WATCH_GOOGLE_CSE_CX"))
+
+    def test_does_not_override_existing_env(self) -> None:
+        from app.research import env_file as env_file_mod
+
+        import tempfile
+
+        with patch.object(env_file_mod, "_LOADED", False), patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_GOOGLE_CSE_API_KEY": "already",
+                "AXON_WATCH_GOOGLE_CSE_CX": "set",
+            },
+            clear=False,
+        ), tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / ".env").write_text(
+                "AXON_WATCH_GOOGLE_CSE_API_KEY=from-file\nAXON_WATCH_GOOGLE_CSE_CX=from-file\n",
+                encoding="utf-8",
+            )
+            with patch.object(env_file_mod, "_repo_root", return_value=root):
+                env_file_mod.load_repo_env_file(force=True)
+            self.assertEqual("already", os.environ.get("AXON_WATCH_GOOGLE_CSE_API_KEY"))
+            self.assertEqual("set", os.environ.get("AXON_WATCH_GOOGLE_CSE_CX"))
+
+
 class GoogleCseProviderTests(unittest.TestCase):
     def test_prefers_google_cse_when_configured(self) -> None:
         from app.research import search as search_mod
 
-        with patch.dict(
+        with patch.object(search_mod, "searxng_base_url", return_value=""), patch.dict(
             os.environ,
             {
                 "AXON_WATCH_GOOGLE_CSE_API_KEY": "test-key",
@@ -89,15 +138,53 @@ class GoogleCseProviderTests(unittest.TestCase):
         ):
             self.assertEqual(("dash-key", "dash-cx"), google_cse_credentials())
 
-    def test_falls_back_when_google_cse_errors(self) -> None:
+    def test_reads_google_cse_from_unlocked_vault(self) -> None:
+        from app.research.search import google_cse_credentials
+
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "app.research.search._vault_env",
+            return_value={
+                "AXON_WATCH_GOOGLE_CSE_API_KEY": "vault-key",
+                "AXON_WATCH_GOOGLE_CSE_CX": "vault-cx",
+            },
+        ):
+            self.assertEqual(("vault-key", "vault-cx"), google_cse_credentials())
+
+    def test_prefers_searxng_when_configured(self) -> None:
         from app.research import search as search_mod
 
         with patch.dict(
             os.environ,
             {
+                "AXON_WATCH_SEARXNG_URL": "http://127.0.0.1:8080",
                 "AXON_WATCH_GOOGLE_CSE_API_KEY": "test-key",
                 "AXON_WATCH_GOOGLE_CSE_CX": "test-cx",
-                "AXON_WATCH_SEARXNG_URL": "",
+            },
+            clear=False,
+        ), patch.object(
+            search_mod,
+            "_searxng_search",
+            return_value=[
+                {"title": "FastAPI", "url": "https://fastapi.tiangolo.com/", "snippet": "docs"},
+            ],
+        ) as mock_searx, patch.object(
+            search_mod,
+            "_google_cse_search",
+            side_effect=AssertionError("google should not run when searxng succeeds"),
+        ):
+            payload = search_mod.search_web("fastapi")
+        self.assertEqual("searxng", payload["provider"])
+        self.assertEqual(1, payload["count"])
+        mock_searx.assert_called_once_with("fastapi")
+
+    def test_falls_back_when_google_cse_errors(self) -> None:
+        from app.research import search as search_mod
+
+        with patch.object(search_mod, "searxng_base_url", return_value=""), patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_GOOGLE_CSE_API_KEY": "test-key",
+                "AXON_WATCH_GOOGLE_CSE_CX": "test-cx",
             },
             clear=False,
         ), patch.object(

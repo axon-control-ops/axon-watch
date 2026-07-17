@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
+from app.operator_fleet_advice import resolve_fleet_briefing_advise
+
 EXECUTIVE_RHYTHM_KEYS = ("notice", "advise", "decide", "execute", "verify", "report")
 
 
@@ -77,7 +81,16 @@ def build_briefing_advise(
     *,
     next_safe_actions: list[dict[str, object]],
     active_runs: list[dict[str, object]],
+    fleet_advice_pack: dict[str, object] | None = None,
+    display_names: Mapping[str, str] | None = None,
 ) -> str:
+    coach = resolve_fleet_briefing_advise(
+        pack=fleet_advice_pack,
+        display_names=display_names,
+    )
+    if coach:
+        return coach
+
     if next_safe_actions:
         action = next_safe_actions[0]
         detail = str(action.get("detail", "")).strip()
@@ -214,6 +227,8 @@ def build_operator_briefing_rhythm(
     watch_connected: bool,
     next_safe_actions: list[dict[str, object]],
     cli_runtime: dict[str, object] | None = None,
+    fleet_advice_pack: dict[str, object] | None = None,
+    display_names: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     notice = build_briefing_notice(
         active_runs=active_runs,
@@ -226,6 +241,8 @@ def build_operator_briefing_rhythm(
     advise = build_briefing_advise(
         next_safe_actions=next_safe_actions,
         active_runs=active_runs,
+        fleet_advice_pack=fleet_advice_pack,
+        display_names=display_names,
     )
     return {
         "notice": notice,

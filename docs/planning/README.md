@@ -49,6 +49,8 @@ python3 scripts/ops/sync_planning_mirror_to_axon_local.py
 - `DELIVERY_PLAN.md` — reviewable slice sequencing
 - `EXECUTION_PLAN.md` — **locked follow-to-the-letter checklist** (Phase A–F, 2026-07-09+)
 - `KAIRO_VOICE_IMPROVEMENT_PLAN.md` — voice narration gaps + context/memory/continuation slices
+- `KAIRO_VOICE_UPGRADE_PLAN.md` — Voice-A…E close-out (truthful fallbacks, STT, Azure TTS)
+- `VAXON_CROSS_WORKSPACE_ADVICE_PLAN.md` — locked cross-workspace coaching for Advise
 - `TEST_STRATEGY.md` — contract/UI/service/E2E test layers
 - `SERVER_DEPLOYMENT_SPEC.md` — dedicated-server topology
 

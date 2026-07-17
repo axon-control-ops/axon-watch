@@ -1,5 +1,9 @@
 import { logKairoVoice } from './kairo-voice-debug';
-import { recordKairoVoicePlayback } from './kairo-voice-diagnostics';
+import {
+  clearKairoVoicePlaybackActive,
+  markKairoVoicePlaybackActive,
+  recordKairoVoicePlayback,
+} from './kairo-voice-diagnostics';
 import { postKairoTts, type KairoTtsResponse } from './kairo-tts-client';
 import { speakAzureChunksWithPrefetch } from './kairo-voice-azure-prefetch';
 import { sanitizeSpokenReply, splitSpokenReplyChunks } from './sanitize-spoken-reply';
@@ -208,6 +212,7 @@ export function stopKairoPlayback(): void {
   notifyKairoVoiceUtterance(null);
   notifySpeaking(false);
   notifyIdle();
+  clearKairoVoicePlaybackActive();
 }
 
 export { pauseKairoPlayback, resumeKairoPlayback };
@@ -356,6 +361,7 @@ async function speakWithBrowser(
   stopSharedPlayback();
   notifyKairoVoiceUtterance(trimmed);
   notifySpeaking(true);
+  markKairoVoicePlaybackActive('browser', reason);
   await delay(AUDIO_PREROLL_MS);
   for (const chunk of browserChunks) {
     enqueueSpeech(chunk, port, {
@@ -403,6 +409,7 @@ export async function playKairoUtteranceNow(
 
   notifyKairoVoiceUtterance(trimmed);
   notifySpeaking(true);
+  markKairoVoicePlaybackActive('azure', null);
   const chunks = splitSpokenReplyChunks(trimmed);
 
   try {
@@ -413,6 +420,11 @@ export async function playKairoUtteranceNow(
         voice: tuning.voice,
       });
       if (response.available && response.audio_base64) {
+        const azureReason =
+          typeof response.first_byte_ms === 'number'
+            ? `first_byte_ms=${response.first_byte_ms}`
+            : null;
+        markKairoVoicePlaybackActive('azure', azureReason);
         const handle = createAzureAudioHandle(response.audio_base64, response.content_type);
         registerKairoAudioElement(handle.audio);
         try {
@@ -420,16 +432,7 @@ export async function playKairoUtteranceNow(
           await playAzureAudio(handle.audio);
           notifySpeaking(false);
           notifyIdle();
-          return finishPlayback(
-            {
-              engine: 'azure',
-              reason:
-                typeof response.first_byte_ms === 'number'
-                  ? `first_byte_ms=${response.first_byte_ms}`
-                  : null,
-            },
-            trimmed,
-          );
+          return finishPlayback({ engine: 'azure', reason: azureReason }, trimmed);
         } catch {
           registerKairoAudioElement(null);
           return speakWithBrowser(trimmed, 'audio_playback_failed', tuning);
