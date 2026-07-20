@@ -42,18 +42,15 @@ watch(
 );
 
 function rowCommand(row: ComposerTypeaheadRow): string {
-  return 'command' in row ? row.command : `@file:${row.path}`;
+  return row.kind === 'file' ? `@file:${row.path}` : row.command;
 }
 
 function rowLabel(row: ComposerTypeaheadRow): string {
-  return 'label' in row ? row.label : row.path;
+  return row.label;
 }
 
 function rowDetail(row: ComposerTypeaheadRow): string {
-  if ('detail' in row) {
-    return row.detail;
-  }
-  return 'Workspace file';
+  return row.kind === 'file' ? 'Workspace file' : row.detail;
 }
 </script>
 
