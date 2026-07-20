@@ -57,4 +57,6 @@ Env brakes remain: `AXON_WATCH_WORKER_SCHEDULER`, `AXON_WATCH_WORKER_SCHEDULER_D
 
 ## Gate 1 baseline
 
-Recorded after clause commit + Fast Gate (see commit message / Actions).
+- **SHA:** `c9782dd` (tip of `feat/autonomous` after Critical Review Clause + CI fixes)
+- **Evidence:** Fast Gate success — https://github.com/axon-control-ops/axon-watch/actions/runs/29763367538
+- Dirty WIP disposition remains **hold** (option 3); not part of this baseline.
