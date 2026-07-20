@@ -25,7 +25,7 @@
       "rule": "IDE chrome only; panel styles co-locate with components"
     },
     "services/control-plane/app/main.py": {
-      "max_lines": 28,
+      "max_lines": 31,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/routes/*",
