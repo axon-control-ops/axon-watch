@@ -209,11 +209,11 @@
       "note": "Mission control panel; extract quick-guide rail when shrinking"
     },
     "apps/console-web/src/styles/ide/ide-layout-01.css": {
-      "max_lines": 535,
+      "max_lines": 534,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
-      "note": "Ratcheted after status-bar/connector polish; split further when shrinking"
+      "note": "Ratcheted after status-bar/connector polish; panel-shared hoisted in ide-layout.css"
     },
     "apps/console-web/src/styles/ide/ide-layout-08.css": {
       "max_lines": 660,
