@@ -1456,6 +1456,7 @@ evidence yet.</p>
 <li><strong>Stack health</strong> — <code>axonhealth</code> (or <code>./scripts/dev/check-health.sh</code>).</li>
 <li><strong>Empty shell / Runtime unavailable</strong> — <code>axonrevive</code>, then hard-refresh <code>:4173</code>. Do <strong>not</strong> rely on <code>./scripts/dev/down.sh</code> when systemd owns the ports.</li>
 <li><strong>Soft refresh</strong> — <code>axonrestart</code> after backend route changes (if the API still answers).</li>
+<li><strong>Stale UI on <code>:4173</code></strong> — rebuild console-web (<code>npm run build -w @axon-watch/console-web</code>), <code>systemctl --user restart console-web.service</code>, then hard-refresh. Source-only / <code>:5173</code> Vite edits do <strong>not</strong> update the systemd bundle.</li>
 <li><strong>Browser cache</strong> — hard refresh <code>:4173</code> (<code>Ctrl+Shift+R</code>) after console-web bundle changes.</li>
 <li><strong>Connectors truth</strong> — Mission Control → <strong>Connectors</strong> rail or <code>GET /api/connectors</code>.</li>
 <li><strong>Gate scripts</strong> — <code>npm run verify:production-operator</code>, then the slice gate (<code>verify:testN</code> / <code>verify:shell-commands</code>).</li>
@@ -1655,6 +1656,17 @@ axonrevive
 ./scripts/ops/axonrevive.sh
 </code></pre>
 <p>Open console after revive: <strong>http://127.0.0.1:4173</strong> (hard-refresh).</p>
+<h3>Console-web rebuild (always-on <code>:4173</code>)</h3>
+<p><code>:4173</code> serves the <strong>built</strong> <code>apps/console-web/dist</code> via systemd <code>console-web.service</code>. Source edits (including Vite <code>:5173</code>) are <strong>not</strong> live on <code>:4173</code> until:</p>
+<pre><code class="language-bash">npm run build -w @axon-watch/console-web
+systemctl --user restart console-web.service
+# then hard-refresh http://127.0.0.1:4173
+</code></pre>
+<h3>Local verify loop</h3>
+<pre><code class="language-bash">./scripts/ops/change-verify-loop.sh              # dirty working tree
+./scripts/ops/change-verify-loop.sh --head-only  # committed HEAD only
+./scripts/ops/change-verify-loop.sh --watch
+</code></pre>
 <h3>Dev bootstrap (when systemd is not owning ports)</h3>
 <pre><code class="language-bash">./scripts/dev/up.sh
 ./scripts/dev/down.sh
