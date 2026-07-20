@@ -7,6 +7,7 @@ import {
   agentDockActivityBarAriaLabel,
   agentDockActivityBarTitle,
   agentDockReopenAlive,
+  agentDockReopenEmployeeFailure,
 } from '../../lib/agent-dock-reopen-view';
 import {
   type IdeSidebarActivityView,
@@ -59,9 +60,14 @@ const agentDockState = computed(() => ({
   streaming: shell.agentStreamActive,
   pendingApprovals: shell.pendingApprovalsCount,
   runPhase: shell.primaryActiveRun?.phase ?? null,
+  employeeFailureLine: shell.activeIdeEmployeeFailureLine,
 }));
 
 const agentDockAlive = computed(() => agentDockReopenAlive(agentDockState.value));
+
+const agentDockEmployeeFailure = computed(() =>
+  agentDockReopenEmployeeFailure(agentDockState.value),
+);
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 
@@ -199,6 +205,8 @@ function selectView(view: IdeActivityView): void {
         'ide-activity-bar__button--active': isActive(item),
         'ide-activity-bar__button--agent-alive':
           item.id === 'agent' && agentDockAlive && shell.agentDockCollapsed,
+        'ide-activity-bar__button--agent-failure':
+          item.id === 'agent' && agentDockEmployeeFailure && shell.agentDockCollapsed,
         'ide-activity-bar__button--agent-streaming':
           item.id === 'agent' && shell.agentStreamActive && shell.agentDockCollapsed,
         'ide-activity-bar__button--agent-approvals':
@@ -249,6 +257,11 @@ function selectView(view: IdeActivityView): void {
       <span
         v-else-if="item.id === 'run' && runNeedsAttention"
         class="ide-activity-bar__pulse ide-activity-bar__pulse--glance"
+        aria-hidden="true"
+      />
+      <span
+        v-else-if="item.id === 'agent' && agentDockEmployeeFailure && shell.agentDockCollapsed"
+        class="ide-activity-bar__pulse ide-activity-bar__pulse--failure"
         aria-hidden="true"
       />
       <span

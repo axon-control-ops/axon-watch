@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   shouldAutoPeekAgentDock,
+  shouldAutoPeekAgentDockForEmployeeFailure,
   shouldAutoPeekAgentDockForRun,
   shouldAutoPeekAgentDockForStreaming,
 } from './agent-dock-auto-peek';
@@ -172,6 +173,69 @@ describe('shouldAutoPeekAgentDockForRun', () => {
       shouldAutoPeekAgentDockForRun({
         ...base,
         runId: null,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('shouldAutoPeekAgentDockForEmployeeFailure', () => {
+  const base = {
+    layoutMode: 'ide' as const,
+    agentDockCollapsed: true,
+    employeeFailureLine: 'Last shift failed: vitest assertion failed',
+    employeeFailurePeekKey: 'e1:run_abc',
+    agentStreamActive: false,
+    alreadyPeekedFailureKeys: new Set<string>(),
+  };
+
+  it('opens the dock once per failed shift in IDE mode', () => {
+    expect(shouldAutoPeekAgentDockForEmployeeFailure(base)).toBe(true);
+    expect(
+      shouldAutoPeekAgentDockForEmployeeFailure({
+        ...base,
+        alreadyPeekedFailureKeys: new Set(['e1:run_abc']),
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoPeekAgentDockForEmployeeFailure({
+        ...base,
+        employeeFailurePeekKey: 'e1:run_def',
+      }),
+    ).toBe(true);
+  });
+
+  it('waits until the agent stream finishes before peeking', () => {
+    expect(
+      shouldAutoPeekAgentDockForEmployeeFailure({
+        ...base,
+        agentStreamActive: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('ignores operator layout, expanded dock, and missing failure state', () => {
+    expect(
+      shouldAutoPeekAgentDockForEmployeeFailure({
+        ...base,
+        layoutMode: 'operator',
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoPeekAgentDockForEmployeeFailure({
+        ...base,
+        agentDockCollapsed: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoPeekAgentDockForEmployeeFailure({
+        ...base,
+        employeeFailureLine: null,
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoPeekAgentDockForEmployeeFailure({
+        ...base,
+        employeeFailurePeekKey: null,
       }),
     ).toBe(false);
   });

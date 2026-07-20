@@ -2,6 +2,7 @@ export type AgentDockReopenState = {
   streaming: boolean;
   pendingApprovals: number;
   runPhase: string | null;
+  employeeFailureLine?: string | null;
 };
 
 function approvalPhrase(count: number): string {
@@ -43,6 +44,22 @@ function runPhaseAriaHintParts(runPhase: string | null): string[] {
   return [];
 }
 
+function employeeFailureHintParts(state: AgentDockReopenState): string[] {
+  const line = (state.employeeFailureLine ?? '').trim();
+  if (!line) {
+    return [];
+  }
+  return ['Last shift failed'];
+}
+
+function employeeFailureAriaHintParts(state: AgentDockReopenState): string[] {
+  const line = (state.employeeFailureLine ?? '').trim();
+  if (!line) {
+    return [];
+  }
+  return ['last shift failed'];
+}
+
 function activityHintParts(state: AgentDockReopenState): string[] {
   const parts: string[] = [];
   if (state.streaming) {
@@ -53,6 +70,9 @@ function activityHintParts(state: AgentDockReopenState): string[] {
   }
   if (!state.streaming && state.pendingApprovals <= 0) {
     parts.push(...runPhaseHintParts(state.runPhase));
+  }
+  if (!state.streaming && state.pendingApprovals <= 0 && parts.length === 0) {
+    parts.push(...employeeFailureHintParts(state));
   }
   return parts;
 }
@@ -67,6 +87,9 @@ function activityAriaHintParts(state: AgentDockReopenState): string[] {
   }
   if (!state.streaming && state.pendingApprovals <= 0) {
     parts.push(...runPhaseAriaHintParts(state.runPhase));
+  }
+  if (!state.streaming && state.pendingApprovals <= 0 && parts.length === 0) {
+    parts.push(...employeeFailureAriaHintParts(state));
   }
   return parts;
 }
@@ -103,5 +126,23 @@ export function agentDockReopenAlive(state: AgentDockReopenState): boolean {
   }
 
   const phase = state.runPhase ?? '';
-  return phase === 'executing' || phase === 'review_ready';
+  if (phase === 'executing' || phase === 'review_ready') {
+    return true;
+  }
+
+  return Boolean((state.employeeFailureLine ?? '').trim());
+}
+
+/** Coral failure treatment when a teammate shift failed and nothing else is live. */
+export function agentDockReopenEmployeeFailure(state: AgentDockReopenState): boolean {
+  if (state.streaming || state.pendingApprovals > 0) {
+    return false;
+  }
+
+  const phase = state.runPhase ?? '';
+  if (phase === 'executing' || phase === 'review_ready') {
+    return false;
+  }
+
+  return Boolean((state.employeeFailureLine ?? '').trim());
 }

@@ -61,9 +61,11 @@ import {
 import { shouldAutoPeekWorkbenchTerminal } from '../../lib/workbench-terminal-auto-peek';
 import {
   shouldAutoPeekAgentDock,
+  shouldAutoPeekAgentDockForEmployeeFailure,
   shouldAutoPeekAgentDockForRun,
   shouldAutoPeekAgentDockForStreaming,
 } from '../../lib/agent-dock-auto-peek';
+import { employeeFailurePeekKey } from '../../features/workspace-agents/company-roster-view';
 import { useEditorPlanBuild } from '../../composables/use-editor-plan-build';
 
 const shell = useShellStore();
@@ -78,11 +80,13 @@ const autoPeekedTerminalRunIds = ref(new Set<string>());
 const autoPeekedAgentApprovalCount = ref(0);
 const autoPeekedAgentStreamMessageIds = ref(new Set<string>());
 const autoPeekedAgentRunIds = ref(new Set<string>());
+const autoPeekedAgentFailureKeys = ref(new Set<string>());
 const showTerminalDock = computed(() => terminalPanelVisible.value);
 const agentDockReopenState = computed(() => ({
   streaming: shell.agentStreamActive,
   pendingApprovals: shell.pendingApprovalsCount,
   runPhase: shell.primaryActiveRun?.phase ?? null,
+  employeeFailureLine: shell.activeIdeEmployeeFailureLine,
 }));
 const terminalReopenRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 const terminalReopenAlive = computed(
@@ -124,6 +128,7 @@ const ideQuickGuide = computed(() =>
     pendingApprovals: shell.pendingApprovalsCount,
     streaming: shell.agentStreamActive,
     runPhase: shell.primaryActiveRun?.phase ?? null,
+    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
     requiredConnectorsUnavailable: shell.connectorsSummary?.required_unavailable ?? 0,
     legacyConnectorGlanceVisible: isLegacyConnectorGlanceVisible({
       connectorsLoadState: shell.connectorsLoadState,
@@ -453,6 +458,10 @@ watch(
       shell.agentStreamMessageId,
       shell.primaryActiveRun?.run_id ?? null,
       shell.primaryActiveRun?.phase ?? null,
+      shell.activeIdeEmployeeFailureLine,
+      shell.activeIdeEmployeeRecord?.employee_id ?? null,
+      shell.activeIdeEmployeeRecord?.last_run_id ?? null,
+      shell.activeIdeEmployeeRecord?.last_outcome_detail ?? null,
     ] as const,
   ([
     layoutMode,
@@ -462,6 +471,10 @@ watch(
     streamMessageId,
     runId,
     runPhase,
+    employeeFailureLine,
+    _employeeId,
+    _lastRunId,
+    _lastOutcomeDetail,
   ]) => {
     if (pendingApprovals === 0) {
       autoPeekedAgentApprovalCount.value = 0;
@@ -492,6 +505,28 @@ watch(
       autoPeekedAgentStreamMessageIds.value = new Set([
         ...autoPeekedAgentStreamMessageIds.value,
         streamMessageId ?? '',
+      ]);
+      showAgentDock();
+      return;
+    }
+
+    const failurePeekKey = shell.activeIdeEmployeeRecord
+      ? employeeFailurePeekKey(shell.activeIdeEmployeeRecord)
+      : null;
+
+    if (
+      shouldAutoPeekAgentDockForEmployeeFailure({
+        layoutMode,
+        agentDockCollapsed,
+        employeeFailureLine,
+        employeeFailurePeekKey: failurePeekKey,
+        agentStreamActive: streaming,
+        alreadyPeekedFailureKeys: autoPeekedAgentFailureKeys.value,
+      })
+    ) {
+      autoPeekedAgentFailureKeys.value = new Set([
+        ...autoPeekedAgentFailureKeys.value,
+        failurePeekKey ?? '',
       ]);
       showAgentDock();
       return;

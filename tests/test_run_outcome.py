@@ -58,6 +58,26 @@ class RunOutcomeTests(unittest.TestCase):
         self.assertEqual("failed", outcome["outcome"])
         self.assertIn("out of usage", outcome["detail"])
 
+    def test_latest_role_outcome_normalizes_lane_b_fallback_wrapper(self) -> None:
+        created = create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Control Plane: continuous worker shift",
+            employee_role="backend",
+        )
+        fail_run(
+            created["run_id"],
+            receipt_summary=(
+                "Lane B agent fallback reply generated "
+                "(ActionRequiredError: Increase limits for faster responses You're out of usage.)"
+            ),
+        )
+        outcome = latest_role_run_outcome("workspace_axon_watch", "backend")
+        assert outcome is not None
+        self.assertEqual("failed", outcome["outcome"])
+        self.assertNotIn("Lane B agent fallback", outcome["detail"])
+        self.assertIn("out of usage", outcome["detail"])
+
     def test_latest_role_outcome_prefers_terminal_failure_over_paused_shift(self) -> None:
         failed = create_run(
             workspace_id="workspace_axon_watch",

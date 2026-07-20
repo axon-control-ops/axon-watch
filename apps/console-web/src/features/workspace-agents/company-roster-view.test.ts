@@ -14,6 +14,7 @@ import {
   employeeDockReceiptRunLabel,
   employeeFailureLine,
   employeeFailureDetailTooltip,
+  employeeFailurePeekKey,
   employeeFailureBannerCopy,
   employeeFailureBannerAriaLabel,
   employeeFailureBeatAriaLabel,
@@ -588,6 +589,29 @@ describe('company-roster-view', () => {
         }),
       ]),
     ).toBeNull();
+  });
+
+  it('builds stable peek keys for auto-expanding the agent dock after a failed shift', () => {
+    expect(
+      employeeFailurePeekKey(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'timeout',
+          last_run_id: 'run_abc',
+        }),
+      ),
+    ).toBe('e1:run_abc');
+    expect(
+      employeeFailurePeekKey(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'timeout',
+        }),
+      ),
+    ).toBe('e1:timeout');
+    expect(employeeFailurePeekKey(employee({ status: 'idle' }))).toBeNull();
   });
 
   it('maps working status, glow tone, and talk lines', () => {

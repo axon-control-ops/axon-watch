@@ -207,6 +207,10 @@
   border-color: rgba(255, 120, 100, 0.35);
 }
 
+.agent-persona-dock--interrupted {
+  border-color: rgba(255, 180, 90, 0.34);
+}
+
 .agent-persona-dock[data-presence='working'] {
   border-color: rgba(80, 220, 180, 0.32);
   box-shadow: 0 0 18px rgba(60, 200, 160, 0.08);
@@ -316,6 +320,11 @@
   background: rgba(140, 40, 35, 0.45);
 }
 
+.agent-persona-dock__status[data-status='interrupted'] {
+  color: rgba(255, 230, 195, 0.96);
+  background: rgba(100, 65, 18, 0.48);
+}
+
 .agent-persona-dock__status[data-status='executing'],
 .agent-persona-dock__status[data-status='watching'] {
   color: rgba(180, 255, 220, 0.95);
@@ -342,6 +351,26 @@
   background: rgba(90, 28, 24, 0.4);
   border-color: rgba(255, 120, 100, 0.28);
   overflow-wrap: anywhere;
+}
+
+.agent-persona-dock__beat--interrupted {
+  color: rgba(255, 230, 195, 0.96);
+  background: rgba(80, 52, 18, 0.42);
+  border-color: rgba(255, 180, 90, 0.34);
+  overflow-wrap: anywhere;
+}
+
+.agent-persona-dock--interrupted .company-roster__action--retry {
+  color: rgba(255, 240, 210, 0.98);
+  border-color: rgba(255, 180, 90, 0.42);
+  background: rgba(100, 65, 18, 0.55);
+}
+
+.agent-persona-dock--interrupted .company-roster__action--retry:hover,
+.agent-persona-dock--interrupted .company-roster__action--retry:focus-visible {
+  border-color: rgba(255, 200, 110, 0.58);
+  background: rgba(120, 78, 22, 0.72);
+  box-shadow: 0 0 8px rgba(200, 140, 40, 0.2);
 }
 
 .agent-persona-dock__receipt {

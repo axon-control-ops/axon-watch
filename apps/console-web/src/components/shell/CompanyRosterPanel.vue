@@ -9,6 +9,7 @@ import {
   companyHeadline,
   companyFailedEmployees,
   companyFailedEmployeesHint,
+  companyFailedEmployeesHintTooltip,
   companyHasFailedEmployees,
   COMPANY_ROSTER_DOCK_ID,
   employeeFailureLine,
@@ -142,6 +143,10 @@ const hasFailedEmployees = computed(() => companyHasFailedEmployees(employees.va
 const failedEmployeeCount = computed(() => companyFailedEmployees(employees.value).length);
 
 const failedEmployeesHint = computed(() => companyFailedEmployeesHint(employees.value));
+
+const failedEmployeesHintTooltip = computed(() =>
+  companyFailedEmployeesHintTooltip(employees.value),
+);
 
 const selectedEmployee = computed(
   () => employees.value.find((row) => row.employee_id === selectedEmployeeId.value) ?? null,
@@ -327,6 +332,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
         v-if="hasFailedEmployees && failedEmployeesHint"
         type="button"
         class="company-roster__hint company-roster__hint--alert company-roster__hint--action"
+        :title="failedEmployeesHintTooltip ?? undefined"
         @click="focusFailedEmployee"
       >
         {{ failedEmployeesHint }}

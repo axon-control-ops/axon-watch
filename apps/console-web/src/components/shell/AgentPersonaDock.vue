@@ -12,10 +12,12 @@ import {
   employeeDockReceiptDetail,
   employeeDockReceiptRunId,
   employeeDockReceiptRunLabel,
+  employeeFailureBeatAriaLabel,
   employeeFailureDetailTooltip,
   employeeFailureLine,
   employeeMetaLine,
   employeeRoleBadge,
+  employeeShiftNeedsContinuation,
   employeeStatusLabel,
   employeeTalkLine,
 } from '../../features/workspace-agents/company-roster-view';
@@ -33,7 +35,9 @@ const emit = defineEmits<{
 
 const avatar = computed(() => buildEmployeeAvatar(props.employee));
 const failure = computed(() => employeeFailureLine(props.employee));
+const interruptedShift = computed(() => employeeShiftNeedsContinuation(props.employee));
 const failureDetailTooltip = computed(() => employeeFailureDetailTooltip(props.employee));
+const failureBeatAriaLabel = computed(() => employeeFailureBeatAriaLabel(props.employee));
 const liveBeat = computed(() => {
   if (failure.value) {
     return failure.value;
@@ -57,6 +61,7 @@ const displayActions = computed(() =>
 <template>
   <article
     class="agent-persona-dock"
+    :class="{ 'agent-persona-dock--interrupted': interruptedShift }"
     :data-presence="avatar.presence"
     :data-role="employee.role"
     :aria-label="`${employee.name} agent dock`"
@@ -108,8 +113,12 @@ const displayActions = computed(() =>
 
     <p
       class="agent-persona-dock__beat"
-      :class="{ 'agent-persona-dock__beat--failed': !!failure }"
+      :class="{
+        'agent-persona-dock__beat--failed': !!failure && !interruptedShift,
+        'agent-persona-dock__beat--interrupted': !!failure && interruptedShift,
+      }"
       :title="failureDetailTooltip"
+      :aria-label="failureBeatAriaLabel ?? undefined"
       :aria-live="failure ? 'polite' : undefined"
       role="status"
     >

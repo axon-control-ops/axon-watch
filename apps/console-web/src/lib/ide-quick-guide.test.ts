@@ -51,6 +51,35 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.actions).toEqual([{ id: 'expand-agent-dock', label: 'Expand agent dock' }]);
   });
 
+  it('prioritizes failed teammate shift guidance when the dock is collapsed', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      employeeFailureLine: 'Last shift failed: vitest assertion failed',
+    });
+
+    expect(guide?.title).toContain('Last shift failed');
+    expect(guide?.tone).toBe('attention');
+    expect(guide?.steps.join(' ')).toContain('Retry shift');
+    expect(guide?.actions).toEqual([{ id: 'expand-agent-dock', label: 'Expand agent dock' }]);
+  });
+
+  it('keeps failed-shift guidance below approvals and streaming', () => {
+    expect(
+      buildIdeQuickGuide({
+        ...base,
+        pendingApprovals: 1,
+        employeeFailureLine: 'Last shift failed: timeout',
+      })?.title,
+    ).toContain('Approval waiting');
+    expect(
+      buildIdeQuickGuide({
+        ...base,
+        streaming: true,
+        employeeFailureLine: 'Last shift failed: timeout',
+      })?.title,
+    ).toContain('responding');
+  });
+
   it('lists layout shortcuts when agent dock and terminal are both hidden', () => {
     const guide = buildIdeQuickGuide(base);
 

@@ -176,6 +176,22 @@ export function employeeFailureLine(employee: CompanyEmployeeRecord): string | n
   return 'Last shift failed — open the run for receipts.';
 }
 
+/** Stable dedupe key for auto-peeking the agent dock after a failed shift. */
+export function employeeFailurePeekKey(employee: CompanyEmployeeRecord): string | null {
+  if (!employeeFailureLine(employee)) {
+    return null;
+  }
+  const runId = employee.last_run_id?.trim();
+  if (runId) {
+    return `${employee.employee_id}:${runId}`;
+  }
+  const detail = employeeResolvedFailureDetail(employee);
+  if (detail) {
+    return `${employee.employee_id}:${detail}`;
+  }
+  return `${employee.employee_id}:failed`;
+}
+
 /** Full last-shift detail for title/tooltip when the compact failure line is truncated. */
 export function employeeFailureDetailTooltip(
   employee: CompanyEmployeeRecord,

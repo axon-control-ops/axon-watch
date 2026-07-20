@@ -6,6 +6,7 @@ import {
   agentDockCollapseTitle,
   agentDockReopenAlive,
   agentDockReopenAriaLabel,
+  agentDockReopenEmployeeFailure,
   agentDockReopenTitle,
 } from './agent-dock-reopen-view';
 
@@ -54,6 +55,42 @@ describe('agent dock reopen view', () => {
     expect(agentDockReopenAlive({ ...idle, runPhase: 'executing' })).toBe(true);
     expect(agentDockReopenAlive({ ...idle, runPhase: 'review_ready' })).toBe(true);
     expect(agentDockReopenAlive({ ...idle, runPhase: 'paused' })).toBe(false);
+  });
+
+  it('surfaces failed teammate shifts while the dock is collapsed', () => {
+    expect(
+      agentDockReopenTitle({
+        ...idle,
+        employeeFailureLine: 'Last shift failed: timeout',
+      }),
+    ).toBe('Expand agent dock (Ctrl/Cmd+\\) · Last shift failed');
+    expect(
+      agentDockReopenAriaLabel({
+        ...idle,
+        employeeFailureLine: 'Last shift failed: timeout',
+      }),
+    ).toBe('Expand agent dock, last shift failed');
+    expect(
+      agentDockReopenAlive({
+        ...idle,
+        employeeFailureLine: 'Last shift failed: timeout',
+      }),
+    ).toBe(true);
+    expect(
+      agentDockReopenEmployeeFailure({
+        ...idle,
+        employeeFailureLine: 'Last shift failed: timeout',
+      }),
+    ).toBe(true);
+  });
+
+  it('defers failure chrome while streaming, approvals, or active runs take priority', () => {
+    const failed = { ...idle, employeeFailureLine: 'Last shift failed: timeout' };
+    expect(agentDockReopenEmployeeFailure({ ...failed, streaming: true })).toBe(false);
+    expect(agentDockReopenEmployeeFailure({ ...failed, pendingApprovals: 1 })).toBe(false);
+    expect(agentDockReopenEmployeeFailure({ ...failed, runPhase: 'executing' })).toBe(false);
+    expect(agentDockReopenEmployeeFailure({ ...failed, runPhase: 'review_ready' })).toBe(false);
+    expect(agentDockReopenAlive({ ...failed, streaming: true })).toBe(true);
   });
 
   it('names the activity-bar agent button with expand or collapse intent', () => {

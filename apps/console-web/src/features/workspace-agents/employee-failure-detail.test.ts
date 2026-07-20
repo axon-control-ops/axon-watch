@@ -38,6 +38,11 @@ describe('employee-failure-detail', () => {
     expect(
       normalizeOperatorFailureDetail('continuous worker dispatch failed: cursor agent unavailable'),
     ).toBe('cursor agent unavailable');
+    const authWrapped =
+      'Lane B agent fallback reply generated (Cursor rejected CURSOR_API_KEY. Remove or fix the key in /vault, clear it from the control-plane shell env, or run `cursor agent login` to use your subscription.; Cursor Cloud Agent unavailable)';
+    expect(normalizeOperatorFailureDetail(authWrapped)).toBe(
+      'Cursor rejected CURSOR_API_KEY. Remove or fix the key in /vault, clear it from the control-plane shell env, or run `cursor agent login` to use your subscription.',
+    );
   });
 
   it('detects restart and SIGTERM continuation failures', () => {

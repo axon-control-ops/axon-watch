@@ -7,6 +7,7 @@ from typing import Any
 from app.domain.run_state import is_terminal_phase
 from app.persistence import run_store
 from app.runs.service import list_runs
+from app.workspace_agents.failure_detail import normalize_operator_failure_detail
 
 _MAX_DETAIL = 180
 _RESTART_INTERRUPT_MARKERS = (
@@ -104,6 +105,9 @@ def latest_role_run_outcome(workspace_id: str, role: str) -> dict[str, str] | No
             detail = "Shift failed — open run history for receipts."
     elif not detail:
         detail = str(run.get("summary") or "").strip()
+
+    if detail:
+        detail = normalize_operator_failure_detail(detail)
 
     return {
         "run_id": str(run.get("run_id") or ""),

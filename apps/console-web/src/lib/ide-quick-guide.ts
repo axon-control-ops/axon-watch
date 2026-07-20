@@ -21,6 +21,7 @@ export function buildIdeQuickGuide(input: {
   pendingApprovals: number;
   streaming: boolean;
   runPhase: string | null;
+  employeeFailureLine?: string | null;
   requiredConnectorsUnavailable?: number;
   legacyConnectorGlanceVisible?: boolean;
 }): IdeQuickGuide | null {
@@ -52,6 +53,19 @@ export function buildIdeQuickGuide(input: {
       actions: [{ id: 'expand-agent-dock', label: 'Expand agent dock' }],
       steps: [
         'Ctrl/Cmd+\\ toggles the agent dock.',
+        'Click AGENT in the editor status bar or the right-edge reopen strip.',
+      ],
+    };
+  }
+
+  if (input.agentDockCollapsed && (input.employeeFailureLine ?? '').trim()) {
+    return {
+      title: 'Last shift failed — expand the agent dock to retry',
+      tone: 'attention',
+      actions: [{ id: 'expand-agent-dock', label: 'Expand agent dock' }],
+      steps: [
+        'Ctrl/Cmd+\\ toggles the agent dock.',
+        'Use Retry shift in the failure banner, or open Team to talk it through.',
         'Click AGENT in the editor status bar or the right-edge reopen strip.',
       ],
     };

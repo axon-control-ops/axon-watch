@@ -7,6 +7,7 @@ import {
   agentDockCollapseTitle,
   agentDockReopenAlive,
   agentDockReopenAriaLabel,
+  agentDockReopenEmployeeFailure,
   agentDockReopenTitle,
 } from '../../lib/agent-dock-reopen-view';
 import AgentDockComposer from './AgentDockComposer.vue';
@@ -23,6 +24,16 @@ const dockAlive = computed(() =>
     streaming: shell.agentStreamActive,
     pendingApprovals: shell.pendingApprovalsCount,
     runPhase: shell.primaryActiveRun?.phase ?? null,
+    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+  }),
+);
+
+const dockEmployeeFailure = computed(() =>
+  agentDockReopenEmployeeFailure({
+    streaming: shell.agentStreamActive,
+    pendingApprovals: shell.pendingApprovalsCount,
+    runPhase: shell.primaryActiveRun?.phase ?? null,
+    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
   }),
 );
 
@@ -30,6 +41,7 @@ const reopenState = computed(() => ({
   streaming: shell.agentStreamActive,
   pendingApprovals: shell.pendingApprovalsCount,
   runPhase: shell.primaryActiveRun?.phase ?? null,
+  employeeFailureLine: shell.activeIdeEmployeeFailureLine,
 }));
 
 const reopenTitle = computed(() => agentDockReopenTitle(reopenState.value));
@@ -150,6 +162,7 @@ onMounted(() => {
       'agent-dock-reopen--approvals': shell.pendingApprovalsCount > 0,
       'agent-dock-reopen--executing': shell.primaryActiveRun?.phase === 'executing',
       'agent-dock-reopen--review-ready': shell.primaryActiveRun?.phase === 'review_ready',
+      'agent-dock-reopen--failure': dockEmployeeFailure,
     }"
     :aria-label="reopenAriaLabel"
     :title="reopenTitle"
@@ -163,6 +176,11 @@ onMounted(() => {
     >
       {{ shell.pendingApprovalsCount }}
     </span>
+    <span
+      v-else-if="dockEmployeeFailure"
+      class="agent-dock-reopen__pulse agent-dock-reopen__pulse--failure"
+      aria-hidden="true"
+    />
     <span
       v-else-if="dockAlive"
       class="agent-dock-reopen__pulse"
