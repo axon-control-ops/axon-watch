@@ -172,6 +172,11 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     expect(agentDockCollapsed.value).toBe(true);
     expect(ideTerminalRevealToken.value).toBe(0);
 
+    slice.focusIdeSidebarView('terminal');
+    expect(ideActivityView.value).toBe('terminal');
+    expect(ideTerminalRevealToken.value).toBe(0);
+  });
+
   it('revealTeamRosterForActiveEmployee opens team view and bumps the reveal token', () => {
     const ideActivityView = ref<'explorer' | 'team'>('explorer');
     const ideExplorerCollapsed = ref(true);

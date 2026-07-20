@@ -34,15 +34,15 @@ export function buildTopbarChips(input: {
   runtimeSummaryLoadState: RuntimeSummaryLoadState;
   primaryActiveRun: RunRecord | null;
 }): RuntimeStripChip[] {
-  if (input.runtimeSummaryLoadState === 'loading') {
-    return [{ id: 'loading', label: 'Loading runtime…', tone: 'muted' }];
-  }
-
-  if (input.runtimeSummaryLoadState === 'error') {
-    return [{ id: 'unavailable', label: 'Runtime unavailable', tone: 'warning' }];
-  }
-
   if (!input.runtimeSummary) {
+    if (input.runtimeSummaryLoadState === 'loading') {
+      return [{ id: 'loading', label: 'Loading runtime…', tone: 'muted' }];
+    }
+
+    if (input.runtimeSummaryLoadState === 'error') {
+      return [{ id: 'unavailable', label: 'Runtime unavailable', tone: 'warning' }];
+    }
+
     return [{ id: 'loading', label: 'Awaiting runtime…', tone: 'muted' }];
   }
 

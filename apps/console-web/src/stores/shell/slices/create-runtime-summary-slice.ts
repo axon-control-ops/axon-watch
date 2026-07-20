@@ -11,25 +11,39 @@ interface CreateRuntimeSummarySliceInput {
 }
 
 export function createRuntimeSummarySlice(input: CreateRuntimeSummarySliceInput) {
+  let inflightSummary: Promise<void> | null = null;
+
   async function loadRuntimeSummary(options?: { background?: boolean }): Promise<void> {
-    const background =
-      options?.background === true && input.runtimeSummaryLoadState.value === 'loaded';
+    const hasCached = Boolean(input.runtimeSummary.value);
+    const background = options?.background === true || hasCached;
+
+    if (inflightSummary) {
+      return inflightSummary;
+    }
+
     if (!background) {
       input.runtimeSummaryLoadState.value = 'loading';
       input.runtimeSummaryError.value = null;
     }
 
-    try {
-      const summary = await fetchRuntimeSummary();
-      input.runtimeSummary.value = summary;
-      input.runtimeSummaryLoadState.value = 'loaded';
-    } catch (error) {
-      if (!background) {
-        input.runtimeSummaryLoadState.value = 'error';
-        input.runtimeSummaryError.value =
-          error instanceof Error ? error.message : 'runtime summary request failed';
+    inflightSummary = (async () => {
+      try {
+        const summary = await fetchRuntimeSummary();
+        input.runtimeSummary.value = summary;
+        input.runtimeSummaryLoadState.value = 'loaded';
+        input.runtimeSummaryError.value = null;
+      } catch (error) {
+        if (!hasCached) {
+          input.runtimeSummaryLoadState.value = 'error';
+          input.runtimeSummaryError.value =
+            error instanceof Error ? error.message : 'runtime summary request failed';
+        }
+      } finally {
+        inflightSummary = null;
       }
-    }
+    })();
+
+    return inflightSummary;
   }
 
   return {

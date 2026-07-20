@@ -60,7 +60,9 @@ onMounted(() => {
     void shell.loadCursorCatalog();
   }
   const workspaceId = shell.currentWorkspace?.workspace_id;
-  if (workspaceId) {
+  // Bootstrap already hydrates IDE chat; only retry here when the dock mounts before
+  // bootstrap finished and the conversation is still empty.
+  if (workspaceId && shell.layoutMode === 'ide' && shell.threadMessages.length === 0) {
     void shell.hydrateWorkspaceIdeChat(workspaceId);
   }
 });

@@ -745,7 +745,7 @@ export const useShellStore = defineStore('shell', () => {
       criticalSignals: summary?.signals.critical_count ?? 0,
       highSignals: summary?.signals.high_count ?? 0,
       watchConnected: Boolean(summary?.watch.connected),
-      runtimeLoaded: runtimeSummaryLoadState.value === 'loaded' && Boolean(summary),
+      runtimeLoaded: Boolean(summary),
     });
   });
 
@@ -1069,6 +1069,7 @@ export const useShellStore = defineStore('shell', () => {
 
   const workspaceThreadLoadQueue = createWorkspaceThreadLoadQueue();
   const ideThreadsLoadPromises = new Map<string, Promise<void>>();
+  const ideChatHydratePromises = new Map<string, Promise<void>>();
 
   function bootstrapIdeActiveThreadId(workspaceId: string): string | null {
     const resolved = resolveBootstrapIdeThreadId({
@@ -1159,12 +1160,37 @@ export const useShellStore = defineStore('shell', () => {
     return promise;
   }
 
-  async function hydrateWorkspaceIdeChat(workspaceId: string): Promise<void> {
+  async function hydrateWorkspaceIdeChatImpl(workspaceId: string): Promise<void> {
+    // Restore cached transcript immediately so the dock does not flash empty while
+    // thread list + history requests are in flight.
+    applyIdeThreadMessagesToView(workspaceId);
     await loadIdeThreads(workspaceId);
     bootstrapIdeActiveThreadId(workspaceId);
+    applyIdeThreadMessagesToView(workspaceId);
     const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    if (!threadId) {
+      return;
+    }
     await loadWorkspaceThread(workspaceId, 'ide', threadId);
     applyIdeThreadMessagesToView(workspaceId);
+  }
+
+  async function hydrateWorkspaceIdeChat(workspaceId: string): Promise<void> {
+    const cleaned = workspaceId.trim();
+    if (!cleaned) {
+      return;
+    }
+
+    const inflight = ideChatHydratePromises.get(cleaned);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = hydrateWorkspaceIdeChatImpl(cleaned).finally(() => {
+      ideChatHydratePromises.delete(cleaned);
+    });
+    ideChatHydratePromises.set(cleaned, promise);
+    return promise;
   }
 
   async function createIdeThread(): Promise<string | null> {
@@ -3095,7 +3121,7 @@ export const useShellStore = defineStore('shell', () => {
       loadRuntimeStatus(),
       loadRuntimeSummary({ background: runtimeBackground }),
       loadInbox({ background: inboxBackground }),
-      loadConnectors(),
+      loadConnectors({ background: connectorsLoadState.value === 'loaded' }),
       loadOperatorBriefing({ background: briefingBackground }),
       loadOperatorFleetHealth({ background: operatorFleetHealthLoadState.value === 'loaded' }),
       operatorBrainGraphLoadState.value === 'loaded'

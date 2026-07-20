@@ -32,7 +32,7 @@
 }
 
 .agent-dock-composer__image-card:hover .agent-dock-composer__image-remove,
-.agent-dock-composer__image-card:focus-visible .agent-dock-composer__image-remove {
+.agent-dock-composer__image-card:focus-within .agent-dock-composer__image-remove {
   opacity: 1;
 }
 
@@ -104,6 +104,7 @@
 
 .agent-dock-composer__input-row {
   position: relative;
+  z-index: 2;
   display: flex;
   align-items: flex-start;
   padding: 0.45rem 0.65rem 0.35rem;
@@ -114,7 +115,7 @@
   bottom: calc(100% + 0.35rem);
   left: 0.65rem;
   right: 0.65rem;
-  z-index: 90;
+  z-index: var(--agent-dock-composer-overlay-z, 120);
   max-height: min(18rem, 45vh);
   overflow-x: hidden;
   overflow-y: auto;
@@ -295,7 +296,7 @@
   position: absolute;
   bottom: calc(100% + 0.45rem);
   left: 0;
-  z-index: 80;
+  z-index: var(--agent-dock-composer-overlay-z, 120);
   width: 15rem;
   padding: 0.45rem;
   border: 1px solid rgba(138, 154, 173, 0.16);

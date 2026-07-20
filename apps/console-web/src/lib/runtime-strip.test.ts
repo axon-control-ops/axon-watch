@@ -46,6 +46,16 @@ describe('runtime strip helpers', () => {
     ).toBe(false);
   });
 
+  it('keeps cached topbar chips while runtime summary refreshes', () => {
+    expect(
+      buildTopbarChips({
+        runtimeSummary,
+        runtimeSummaryLoadState: 'loading',
+        primaryActiveRun: null,
+      }),
+    ).toEqual([{ id: 'watch', label: 'watch connected', tone: 'success' }]);
+  });
+
   it('limits topbar chips to run, watch, and degraded', () => {
     expect(
       buildTopbarChips({

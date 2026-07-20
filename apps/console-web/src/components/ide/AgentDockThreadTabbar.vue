@@ -135,6 +135,12 @@ function scrollActiveTabIntoView(): void {
   window.setTimeout(updateScrollState, 180);
 }
 
+function handleDocumentKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && historyOpen.value) {
+    historyOpen.value = false;
+  }
+}
+
 watch(activeThreadId, async () => {
   await nextTick();
   scrollActiveTabIntoView();
@@ -152,13 +158,11 @@ watch(
 
 onMounted(() => {
   document.addEventListener('click', handleDocumentClick);
+  document.addEventListener('keydown', handleDocumentKeydown);
   const scroller = tabsRef.value;
   scroller?.addEventListener('scroll', updateScrollState, { passive: true });
   window.addEventListener('resize', updateScrollState);
-  const workspaceId = shell.currentWorkspace?.workspace_id;
-  if (workspaceId) {
-    void shell.hydrateWorkspaceIdeChat(workspaceId);
-  }
+  // Bootstrap already hydrates IDE chat; avoid a second hydrate flash here.
   void nextTick(() => {
     updateScrollState();
     scrollActiveTabIntoView();
@@ -167,6 +171,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick);
+  document.removeEventListener('keydown', handleDocumentKeydown);
   tabsRef.value?.removeEventListener('scroll', updateScrollState);
   window.removeEventListener('resize', updateScrollState);
 });

@@ -56,6 +56,9 @@ done
 if [[ -x "${repo_root}/scripts/ops/disable-legacy-7734-autostart.sh" ]]; then
   "${repo_root}/scripts/ops/disable-legacy-7734-autostart.sh"
 fi
+if [[ -x "${repo_root}/scripts/ops/install-bin-wrappers.sh" ]]; then
+  "${repo_root}/scripts/ops/install-bin-wrappers.sh"
+fi
 
 systemctl --user daemon-reload
 systemctl --user enable axon-watch.service control-plane.service console-web.service
@@ -66,6 +69,7 @@ port_busy() {
 }
 
 if [[ "${takeover}" -eq 1 ]]; then
+  # Stop known bare listeners for these ports, then start units.
   for port in 8788 8787 4173; do
     pids="$(ss -ltnp "sport = :${port}" 2>/dev/null | rg -o 'pid=[0-9]+' | cut -d= -f2 | sort -u || true)"
     for pid in ${pids}; do
@@ -83,7 +87,7 @@ if [[ "${takeover}" -eq 1 ]]; then
   systemctl --user restart control-plane.service
   systemctl --user restart console-web.service
   systemctl --user --no-pager --full status axon-watch.service control-plane.service console-web.service || true
-  echo "Takeover complete."
+  echo "Takeover complete. Check: axonhealth"
   echo "  curl -sS http://127.0.0.1:8787/api/health"
   echo "  curl -sS http://127.0.0.1:4173/api/health"
   exit 0

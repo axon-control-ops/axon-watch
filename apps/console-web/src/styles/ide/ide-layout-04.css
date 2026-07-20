@@ -37,6 +37,8 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .agent-dock__section-header {
@@ -336,7 +338,7 @@
 .agent-dock-composer__menu--runtime {
   right: 0;
   left: auto;
-  z-index: 90;
+  z-index: var(--agent-dock-composer-overlay-z, 120);
   width: 18rem;
   max-height: min(28rem, 72vh);
   padding: 0.32rem;

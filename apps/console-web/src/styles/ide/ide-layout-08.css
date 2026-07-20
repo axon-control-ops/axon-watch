@@ -111,6 +111,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+  justify-self: end;
 }
 
 .agent-dock-composer__resume {
@@ -755,5 +756,16 @@
   cursor: pointer;
   border-color: rgba(150, 231, 255, 0.28);
   color: rgba(180, 235, 255, 0.95);
+}
+
+.agent-dock-composer__activity-chip--terminal:hover {
+  border-color: rgba(125, 211, 252, 0.48);
+  background: rgba(14, 165, 233, 0.12);
+  color: rgba(224, 242, 254, 0.98);
+}
+
+.agent-dock-composer__activity-chip--terminal:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.55);
+  outline-offset: 2px;
 }
 

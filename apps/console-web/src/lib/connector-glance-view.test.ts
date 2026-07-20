@@ -50,6 +50,15 @@ describe('connector glance view', () => {
     expect(isLegacyConnectorGlanceVisible(input)).toBe(true);
   });
 
+  it('keeps required connector alert visible while connectors refresh', () => {
+    const chip = buildRequiredConnectorAlertChip({
+      ...baseInput,
+      connectorsLoadState: 'loading',
+      summary: { required_unavailable: 1 },
+    });
+    expect(chip?.label).toBe('1 REQUIRED CONNECTOR DOWN');
+  });
+
   it('hides the legacy glance when required connectors are already alerting', () => {
     const input = {
       ...baseInput,
