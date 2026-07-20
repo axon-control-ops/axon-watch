@@ -7,6 +7,8 @@
     "packages/*"
   ],
   "scripts": {
+    "run:5173": "./scripts/ops/run-5173.sh",
+    "run-5173": "./scripts/ops/run-5173.sh",
     "dev": "./scripts/dev/up.sh",
     "down": "./scripts/dev/down.sh",
     "health": "./scripts/dev/check-health.sh",
