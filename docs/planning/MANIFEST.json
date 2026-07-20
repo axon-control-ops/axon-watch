@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-17",
-  "file_count": 42,
+  "generated_on": "2026-07-20",
+  "file_count": 43,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -56,6 +56,10 @@
     "FITNESS_FUNCTIONS.md": {
       "sha256": "f688b05666210bf2d4fb5870adbd6f0e91e39ecfd8c2a7b4552d25e275af5e2f",
       "bytes": 5594
+    },
+    "GATE0-DIRTY-INVENTORY.md": {
+      "sha256": "ec9e1af836bc986207cee8f929acaf332eb2afa58862e24c6db6981b21fd5545",
+      "bytes": 2276
     },
     "IMPLEMENTATION_ROADMAP.md": {
       "sha256": "04aa1e038da5cbde9cfaa0db19b146284b5bc6086a56a55de6fe2a20ff88567e",

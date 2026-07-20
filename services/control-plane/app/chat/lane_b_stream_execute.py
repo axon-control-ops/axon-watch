@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext
+from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext, generate_lane_b_result
 from app.chat.lane_b_generated_image_actions import (
     bind_agent_generated_images,
     lane_b_open_file_ui_action,
@@ -210,10 +210,8 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             updated_at=_utc_now(),
         )
 
-    from app.chat import service as chat_service
-
     try:
-        lane_b_result = chat_service.generate_lane_b_result(
+        lane_b_result = generate_lane_b_result(
             context=context,
             user_prompt=job.content,
             run_id=job.dispatch_run_id,
