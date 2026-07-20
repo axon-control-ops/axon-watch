@@ -70,9 +70,23 @@ def vault_setup_route(body: VaultSetupRequest) -> dict[str, object]:
 
 @router.post("/api/vault/unlock")
 def vault_unlock_route(body: VaultUnlockRequest) -> dict[str, object]:
+    from app.auth import append_auth_audit, get_request_identity
+
     try:
-        return vault_unlock(body.master_password, body.totp_code, remember_me=body.remember_me)
+        result = vault_unlock(body.master_password, body.totp_code, remember_me=body.remember_me)
+        append_auth_audit(
+            event_type="vault_unlock",
+            summary=f"Vault unlock succeeded for identity {get_request_identity()}",
+            success=True,
+            extra={"remember_me": bool(body.remember_me)},
+        )
+        return result
     except RuntimeError as exc:
+        append_auth_audit(
+            event_type="vault_unlock",
+            summary=f"Vault unlock failed for identity {get_request_identity()}: {exc}",
+            success=False,
+        )
         raise _vault_http_error(exc) from exc
 
 
@@ -94,8 +108,32 @@ def vault_auto_unlock_status_route() -> dict[str, object]:
 
 @router.post("/api/vault/auto-unlock/enable")
 def vault_auto_unlock_enable_route() -> dict[str, object]:
+    from app.auth import append_auth_audit, get_request_identity, is_remotely_reachable
+
+    if is_remotely_reachable():
+        append_auth_audit(
+            event_type="vault_auto_unlock_enable",
+            summary=(
+                f"Refused vault auto-unlock enable for identity {get_request_identity()} "
+                "(deployment marked remotely reachable)"
+            ),
+            success=False,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Vault auto-unlock is disabled when AXON_WATCH_PUBLIC_BASE_URL is "
+                "non-loopback or AXON_WATCH_REMOTELY_REACHABLE=1"
+            ),
+        )
     try:
-        return vault_auto_unlock_enable()
+        result = vault_auto_unlock_enable()
+        append_auth_audit(
+            event_type="vault_auto_unlock_enable",
+            summary=f"Vault auto-unlock enabled by identity {get_request_identity()}",
+            success=True,
+        )
+        return result
     except RuntimeError as exc:
         raise _vault_http_error(exc) from exc
 

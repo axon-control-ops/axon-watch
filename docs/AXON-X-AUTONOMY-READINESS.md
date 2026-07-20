@@ -481,6 +481,15 @@ Source:
 Those flags may be useful for a trusted local operator session. Scheduled
 workers need a narrower policy before internet-exposed autonomy is considered.
 
+**Gate 2 progress (20 July 2026, `feat/autonomous`):** mutating control-plane
+routes now run through `MutatingAuthMiddleware` (`AXON_WATCH_AUTH_MODE=local_token`
+requires a bearer operator token; loopback bypass is configurable). Continuous
+workers dispatch Cursor with `trust_policy=worker` (keeps `--trust`, omits
+`--force` / `--approve-mcps`). Vault auto-unlock enable/startup is refused when
+the deployment is marked remotely reachable. Remaining Gate 2 debt: watch-service
+mTLS/service identity, CSRF/rate limits, and step-up Full Access keyed to a real
+login session (not only a shared operator token).
+
 ---
 
 ## Strict ordered plan

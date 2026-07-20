@@ -120,6 +120,7 @@ def dispatch_continuous_worker_run(
             run_id=run_id,
             execution_access="full",
             on_chunk=_throttled_worker_stream_progress(run_id),
+            cursor_trust_policy="worker",
         )
         dispatched, finalized = finalize_lane_b_agent_run(
             dispatch_run_id=run_id,

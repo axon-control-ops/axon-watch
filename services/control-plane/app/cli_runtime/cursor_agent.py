@@ -38,6 +38,49 @@ def _cursor_mode_flag(composer_mode: str, execution_tier: str) -> str:
     return "plan"
 
 
+def build_cursor_agent_command(
+    *,
+    binary: str,
+    prompt: str,
+    workspace_root: Path | None,
+    composer_mode: str,
+    execution_tier: str = "consultative",
+    model: str = "",
+    trust_policy: str = "operator",
+    research_available: bool | None = None,
+) -> list[str]:
+    """Build the Cursor CLI argv for operator vs continuous-worker trust policies."""
+    command = [
+        binary,
+        "agent",
+        "--print",
+        "--trust",
+        "--output-format",
+        "stream-json",
+        "--stream-partial-output",
+    ]
+    policy = str(trust_policy or "operator").strip().lower() or "operator"
+    if research_available is None:
+        research_available = bool(research_capability_snapshot().get("available"))
+    if research_available and workspace_root:
+        ensure_workspace_research_mcp(workspace_root)
+    if policy != "worker" and research_available:
+        # Cursor CLI rejects audited MCP tools unless --force is set alongside
+        # --approve-mcps in headless dispatch (verified against cursor 3.10.x).
+        command.extend(["--force", "--approve-mcps"])
+    mode_flag = _cursor_mode_flag(composer_mode, execution_tier)
+    if mode_flag:
+        command.extend(["--mode", mode_flag])
+    if workspace_root:
+        # Safe-improvement evaluation must pass the disposable isolation root
+        # (proposal_service.sandbox_agent_workspace), never the live bound project.
+        command.extend(["--workspace", str(workspace_root.resolve())])
+    if model:
+        command.extend(["--model", model])
+    command.append(prompt)
+    return command
+
+
 def run_cursor_local(
     *,
     binary: str,
@@ -50,34 +93,19 @@ def run_cursor_local(
     subprocess_env: dict[str, str] | None = None,
     run_id: str = "",
     on_chunk: Callable[[str, str], None] | None = None,
+    trust_policy: str = "operator",
 ) -> CursorAgentReply:
     # stream-json is the only print format that reliably carries assistant text;
     # `--output-format text` returns an empty body for plan/tool-heavy replies.
-    command = [
-        binary,
-        "agent",
-        "--print",
-        "--trust",
-        "--output-format",
-        "stream-json",
-        "--stream-partial-output",
-    ]
-    if research_capability_snapshot().get("available"):
-        # Cursor CLI rejects audited MCP tools unless --force is set alongside
-        # --approve-mcps in headless dispatch (verified against cursor 3.10.x).
-        command.extend(["--force", "--approve-mcps"])
-        if workspace_root:
-            ensure_workspace_research_mcp(workspace_root)
-    mode_flag = _cursor_mode_flag(composer_mode, execution_tier)
-    if mode_flag:
-        command.extend(["--mode", mode_flag])
-    if workspace_root:
-        # Safe-improvement evaluation must pass the disposable isolation root
-        # (proposal_service.sandbox_agent_workspace), never the live bound project.
-        command.extend(["--workspace", str(workspace_root.resolve())])
-    if model:
-        command.extend(["--model", model])
-    command.append(prompt)
+    command = build_cursor_agent_command(
+        binary=binary,
+        prompt=prompt,
+        workspace_root=workspace_root,
+        composer_mode=composer_mode,
+        execution_tier=execution_tier,
+        model=model,
+        trust_policy=trust_policy,
+    )
 
     assembler = CursorStreamAssembler(
         workspace_root=str(workspace_root.resolve() if workspace_root else ""),

@@ -110,6 +110,8 @@ main_tests=(
   tests.test_conversation_transcript
   tests.test_voice_transcript_store
   tests.test_debug_session_log_endpoint
+  tests.test_critical_review_clause
+  tests.test_gate2_auth_containment
   tests.test_safe_improvement
   tests.test_safe_improvement_gate
 )

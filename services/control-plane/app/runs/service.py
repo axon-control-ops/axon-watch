@@ -6,10 +6,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from app.auth.identity import get_request_identity
 from app.domain.run_state import capability_flags, is_terminal_phase, status_for_phase
 from app.domain.run_transitions import can_transition
 from app.chat.command_intent import humanize_run_summary, is_auto_complete_run_summary
 from app.persistence import run_store
+
+
+def _actor_or_operator() -> str:
+    identity = get_request_identity()
+    return identity if identity and identity != "anonymous" else "operator"
 
 DEFAULT_LANE_ID = "control-plane"
 _PAUSE_ON_STOP_PHASES = {"queued", "starting", "planning", "executing", "waiting_external"}
@@ -281,7 +287,7 @@ def stop_run(run_id: str) -> dict[str, Any]:
             record,
             to_phase="paused",
             current_step="Run paused by operator stop",
-            actor="operator",
+            actor=_actor_or_operator(),
             receipt_type="operator_stop",
             receipt_summary="Operator stopped the run; execution paused",
         )
@@ -291,7 +297,7 @@ def stop_run(run_id: str) -> dict[str, Any]:
             record,
             to_phase="cancelled",
             current_step="Run cancelled by operator stop",
-            actor="operator",
+            actor=_actor_or_operator(),
             receipt_type="operator_stop",
             receipt_summary="Operator stopped the run; execution cancelled",
         )
@@ -327,7 +333,7 @@ def resume_run(run_id: str) -> dict[str, Any]:
         record,
         to_phase=to_phase,
         current_step=current_step,
-        actor="operator",
+        actor=_actor_or_operator(),
         receipt_type="operator_resume",
         receipt_summary=f"Operator resumed the run from {phase}",
     )
@@ -347,7 +353,7 @@ def approve_run(run_id: str) -> dict[str, Any]:
         record,
         to_phase="executing",
         current_step="Run approved by operator",
-        actor="operator",
+        actor=_actor_or_operator(),
         receipt_type="operator_approve",
         receipt_summary="Operator approved the run to continue execution",
     )
@@ -367,7 +373,7 @@ def reject_run(run_id: str) -> dict[str, Any]:
         record,
         to_phase="cancelled",
         current_step="Run rejected by operator",
-        actor="operator",
+        actor=_actor_or_operator(),
         receipt_type="operator_reject",
         receipt_summary="Operator rejected the run at the approval boundary",
     )

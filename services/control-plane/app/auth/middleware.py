@@ -1,0 +1,89 @@
+"""Mutating-route auth middleware for Gate 2."""
+
+from __future__ import annotations
+
+import secrets
+from collections.abc import Callable
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+
+from app.auth.identity import bind_request_identity, reset_identity_token
+from app.auth.settings import (
+    allow_loopback_bypass,
+    auth_mode,
+    client_is_loopback,
+    operator_token,
+)
+
+_MUTATING = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+_EXEMPT_PREFIXES = (
+    "/api/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+)
+
+
+def _is_exempt(path: str) -> bool:
+    return any(path == prefix or path.startswith(prefix + "/") for prefix in _EXEMPT_PREFIXES)
+
+
+def _extract_bearer(request: Request) -> str:
+    header = request.headers.get("authorization") or request.headers.get("Authorization") or ""
+    parts = header.split(None, 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1].strip()
+    # Same-origin console can also send a dedicated header once wired.
+    return (request.headers.get("x-axon-operator-token") or "").strip()
+
+
+def resolve_mutating_identity(request: Request) -> tuple[str | None, str | None]:
+    """Return (identity, error_detail). identity None means reject."""
+    mode = auth_mode()
+    if mode == "off":
+        return "anonymous", None
+
+    token = operator_token()
+    presented = _extract_bearer(request)
+    if token and presented and secrets.compare_digest(presented, token):
+        return "operator", None
+
+    client_host = request.client.host if request.client else None
+    if allow_loopback_bypass() and client_is_loopback(client_host):
+        return "loopback", None
+
+    if mode == "local_token":
+        if not token:
+            return None, "AXON_WATCH_OPERATOR_TOKEN is not configured"
+        return None, "mutating API requires Authorization: Bearer <operator token>"
+
+    return "anonymous", None
+
+
+class MutatingAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        method = request.method.upper()
+        path = request.url.path
+        identity = "anonymous"
+        token = None
+        try:
+            if method in _MUTATING and not _is_exempt(path):
+                resolved, error = resolve_mutating_identity(request)
+                if resolved is None:
+                    return JSONResponse(
+                        status_code=401,
+                        content={
+                            "detail": error or "unauthorized",
+                            "auth_required": True,
+                        },
+                    )
+                identity = resolved
+            token = bind_request_identity(identity)
+            return await call_next(request)
+        finally:
+            if token is not None:
+                reset_identity_token(token)
+            else:
+                bind_request_identity("anonymous")

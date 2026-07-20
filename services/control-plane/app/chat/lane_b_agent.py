@@ -111,6 +111,7 @@ def generate_lane_b_result(
     runtime_model: str | None = None,
     execution_access: str | None = None,
     on_chunk: Callable[[str, str], None] | None = None,
+    cursor_trust_policy: str = "operator",
 ) -> dict[str, object]:
     trimmed = user_prompt.strip()
     if not trimmed:
@@ -144,6 +145,7 @@ def generate_lane_b_result(
                 runtime_model=runtime_model,
                 execution_access=execution_access,
                 on_chunk=on_chunk,
+                cursor_trust_policy=cursor_trust_policy,
             )
         except RuntimeError as exc:
             return {
@@ -183,6 +185,7 @@ def generate_lane_b_result(
             runtime_model=runtime_model,
             execution_access=execution_access,
             on_chunk=on_chunk,
+            cursor_trust_policy=cursor_trust_policy,
         )
     except RuntimeError as exc:
         return {

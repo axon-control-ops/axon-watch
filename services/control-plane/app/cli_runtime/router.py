@@ -250,6 +250,7 @@ def dispatch_ide_composer(
     runtime_model: str | None = None,
     execution_access: str | None = None,
     on_chunk: Callable[[str, str], None] | None = None,
+    cursor_trust_policy: str = "operator",
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
@@ -325,6 +326,7 @@ def dispatch_ide_composer(
                     subprocess_env=dispatch_env,
                     run_id=run_id,
                     on_chunk=on_chunk,
+                    trust_policy=cursor_trust_policy,
                 )
                 content = _cursor_reply_content(cursor_reply, approval_notice)
                 return _finish({
@@ -389,6 +391,7 @@ def dispatch_ide_composer(
                                 subprocess_env=retry_env,
                                 run_id=run_id,
                                 on_chunk=on_chunk,
+                                trust_policy=cursor_trust_policy,
                             )
                             content = _cursor_reply_content(cursor_reply, approval_notice)
                         else:
