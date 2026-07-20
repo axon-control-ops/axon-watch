@@ -4,12 +4,13 @@ from __future__ import annotations
 
 CONNECTOR_SIGNAL_ID = "signal_connector_console_web_unavailable"
 CONNECTOR_WORKSPACE_ID = "workspace_axon_watch"
+CONNECTOR_PROBE_DETAIL = "status=503"
 
 CONNECTOR_INBOX_ITEM = {
     "signal_id": CONNECTOR_SIGNAL_ID,
     "workspace_id": CONNECTOR_WORKSPACE_ID,
     "title": "Console web connector unavailable",
-    "summary": "status=503",
+    "summary": CONNECTOR_PROBE_DETAIL,
     "severity": "critical",
     "status": "open",
     "source": "connector",
