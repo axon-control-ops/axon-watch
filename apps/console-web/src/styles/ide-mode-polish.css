@@ -151,6 +151,18 @@
   box-shadow: 0 0 10px rgba(220, 70, 60, 0.65);
 }
 
+.console-shell--ide .kairo-chip--employee-interrupted {
+  border-color: rgba(255, 180, 90, 0.55);
+  box-shadow: 0 0 16px rgba(255, 160, 60, 0.22);
+}
+
+.console-shell--ide .kairo-chip--employee-interrupted .kairo-chip__pulse {
+  animation: kairo-pulse 1.8s ease-in-out infinite;
+  opacity: 1;
+  background: rgba(255, 180, 90, 0.95);
+  box-shadow: 0 0 10px rgba(255, 160, 60, 0.65);
+}
+
 .console-shell--ide .kairo-sidebar-panel--employee-failed.kairo-sidebar-panel--alerting {
   border-color: rgba(255, 110, 90, 0.42);
 }
@@ -183,6 +195,47 @@
   box-shadow: 0 0 10px rgba(220, 70, 60, 0.55);
 }
 
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted.kairo-sidebar-panel--alerting {
+  border-color: rgba(255, 180, 90, 0.42);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__ring {
+  border-color: rgba(255, 180, 90, 0.38);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__ring--inner {
+  background: rgba(100, 62, 18, 0.14);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(255, 180, 90, 0.45),
+    transparent 35%
+  );
+}
+
+.console-shell--ide .kairo-sidebar-panel--employee-interrupted .kairo-sidebar-panel__compact-dot {
+  background: rgba(255, 180, 90, 0.95);
+  box-shadow: 0 0 10px rgba(255, 160, 60, 0.55);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted
+  .kairo-sidebar-panel__employee-failure {
+  color: rgba(255, 230, 195, 0.94);
+  background: rgba(80, 52, 18, 0.38);
+  border-color: rgba(255, 180, 90, 0.28);
+}
+
 .console-shell--ide .kairo-sidebar-panel__employee-failure {
   margin: 0.2rem 0 0;
   padding: 0.35rem 0.45rem;
@@ -201,6 +254,20 @@
 
 .console-shell--ide .ide-kairo-footer__interrupt--employee-failed .ide-kairo-footer__interrupt-state {
   color: rgba(255, 190, 175, 0.96);
+}
+
+.console-shell--ide .ide-kairo-footer__interrupt--employee-interrupted {
+  border-color: rgba(255, 180, 90, 0.42);
+}
+
+.console-shell--ide .ide-kairo-footer__interrupt--employee-interrupted .ide-kairo-footer__interrupt-state {
+  color: rgba(255, 220, 170, 0.96);
+}
+
+.console-shell--ide .ide-kairo-footer__interrupt--employee-interrupted .ide-kairo-footer__employee-failure {
+  color: rgba(255, 230, 195, 0.94);
+  background: rgba(80, 52, 18, 0.38);
+  border-color: rgba(255, 180, 90, 0.28);
 }
 
 .console-shell--ide .ide-kairo-footer__employee-failure {

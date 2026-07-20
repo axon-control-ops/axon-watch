@@ -10,4 +10,5 @@ export type AgentDockComposerAttachmentChip = {
   key: string;
   label: string;
   kind: string;
+  title?: string;
 };

@@ -312,6 +312,69 @@ class RunOutcomeRosterApiTests(unittest.TestCase):
         self.assertEqual("executing", backend["status"])
         self.assertEqual(created["run_id"], backend.get("active_run_id"))
 
+    def test_company_roster_omits_active_run_id_for_paused_shift(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            project_root = Path(tempdir) / "bound-project"
+            project_root.mkdir()
+            bindings_file = Path(tempdir) / "bindings.json"
+            agents_file = Path(tempdir) / "agents.json"
+            bindings_file.write_text(
+                json.dumps(
+                    {
+                        "bindings": {
+                            "workspace_bound_demo": {
+                                "project_root": str(project_root),
+                                "display_name": "Bound demo",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_bound_demo": {
+                                "company_name": "Bound Co",
+                                "employees": [
+                                    {
+                                        "name": "Bound Backend",
+                                        "role": "backend",
+                                        "schedule": "continuous",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_BINDINGS_FILE": str(bindings_file),
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_PROJECT_ROOT_ALLOWLIST": str(tempdir),
+                },
+                clear=False,
+            ):
+                created = create_run(
+                    workspace_id="workspace_bound_demo",
+                    mode="agent",
+                    summary="Backend: paused worker shift",
+                    employee_role="backend",
+                )
+                stop_run(created["run_id"])
+                response = self.client.get("/api/workspaces/workspace_bound_demo/company")
+
+        self.assertEqual(200, response.status_code)
+        backend = response.json()["company"]["employees"][0]
+        self.assertEqual("backend", backend["role"])
+        self.assertEqual("idle", backend["status"])
+        self.assertNotIn("active_run_id", backend)
+
 
 if __name__ == "__main__":
     unittest.main()

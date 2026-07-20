@@ -8,6 +8,7 @@ import {
   agentDockActivityBarTitle,
   agentDockReopenAlive,
   agentDockReopenEmployeeFailure,
+  agentDockReopenEmployeeInterrupted,
 } from '../../lib/agent-dock-reopen-view';
 import {
   type IdeSidebarActivityView,
@@ -61,12 +62,17 @@ const agentDockState = computed(() => ({
   pendingApprovals: shell.pendingApprovalsCount,
   runPhase: shell.primaryActiveRun?.phase ?? null,
   employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+  employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
 }));
 
 const agentDockAlive = computed(() => agentDockReopenAlive(agentDockState.value));
 
 const agentDockEmployeeFailure = computed(() =>
   agentDockReopenEmployeeFailure(agentDockState.value),
+);
+
+const agentDockEmployeeInterrupted = computed(() =>
+  agentDockReopenEmployeeInterrupted(agentDockState.value),
 );
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
@@ -204,9 +210,15 @@ function selectView(view: IdeActivityView): void {
       :class="{
         'ide-activity-bar__button--active': isActive(item),
         'ide-activity-bar__button--agent-alive':
-          item.id === 'agent' && agentDockAlive && shell.agentDockCollapsed,
+          item.id === 'agent' &&
+          agentDockAlive &&
+          shell.agentDockCollapsed &&
+          !agentDockEmployeeFailure &&
+          !agentDockEmployeeInterrupted,
         'ide-activity-bar__button--agent-failure':
           item.id === 'agent' && agentDockEmployeeFailure && shell.agentDockCollapsed,
+        'ide-activity-bar__button--agent-interrupted':
+          item.id === 'agent' && agentDockEmployeeInterrupted && shell.agentDockCollapsed,
         'ide-activity-bar__button--agent-streaming':
           item.id === 'agent' && shell.agentStreamActive && shell.agentDockCollapsed,
         'ide-activity-bar__button--agent-approvals':
@@ -257,6 +269,11 @@ function selectView(view: IdeActivityView): void {
       <span
         v-else-if="item.id === 'run' && runNeedsAttention"
         class="ide-activity-bar__pulse ide-activity-bar__pulse--glance"
+        aria-hidden="true"
+      />
+      <span
+        v-else-if="item.id === 'agent' && agentDockEmployeeInterrupted && shell.agentDockCollapsed"
+        class="ide-activity-bar__pulse ide-activity-bar__pulse--interrupted"
         aria-hidden="true"
       />
       <span

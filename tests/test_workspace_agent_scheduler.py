@@ -14,10 +14,10 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.persistence import run_store, worker_scheduler_settings_store  # noqa: E402
-from app.runs.service import create_run, fail_run, get_run  # noqa: E402
+from app.runs.service import create_run, fail_run, get_run, stop_run  # noqa: E402
 from app.workspace_agents import build_company_roster  # noqa: E402
 from app.workspace_agents.scheduler import run_continuous_worker_tick  # noqa: E402
-from app.workspace_agents.status import active_role_run_status  # noqa: E402
+from app.workspace_agents.status import active_role_run_id, active_role_run_status  # noqa: E402
 
 
 class WorkspaceAgentSchedulerTests(unittest.TestCase):
@@ -53,6 +53,19 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         assert stored is not None
         self.assertEqual("frontend", stored.get("employee_role"))
         self.assertEqual("executing", active_role_run_status("workspace_role_tag", "frontend"))
+
+    def test_active_role_run_helpers_ignore_paused_shift(self) -> None:
+        created = create_run(
+            workspace_id="workspace_role_paused",
+            mode="agent",
+            summary="Backend continuous shift",
+            employee_role="backend",
+        )
+        run_id = str(created["run_id"])
+        stop_run(run_id)
+        self.assertEqual("paused", get_run(run_id)["phase"])
+        self.assertIsNone(active_role_run_status("workspace_role_paused", "backend"))
+        self.assertIsNone(active_role_run_id("workspace_role_paused", "backend"))
 
     def test_company_roster_specialist_reflects_role_tagged_run(self) -> None:
         create_run(

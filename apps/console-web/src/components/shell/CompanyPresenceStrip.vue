@@ -9,6 +9,7 @@ import {
   employeeFailureLine,
   employeePresenceSelectAriaLabel,
   employeePresenceStripHoverTitle,
+  employeeShiftNeedsContinuation,
   presenceStripOptionId,
   selectedPresenceStripEmployee,
   sortEmployeesForPresenceStrip,
@@ -26,13 +27,17 @@ const emit = defineEmits<{
 const stripRef = ref<HTMLElement | null>(null);
 
 const items = computed(() =>
-  sortEmployeesForPresenceStrip(props.employees).map((employee) => ({
-    employee,
-    avatar: buildEmployeeAvatar(employee),
-    failed: Boolean(employeeFailureLine(employee)),
-    paused: !employee.enabled && !employeeFailureLine(employee),
-    optionId: presenceStripOptionId(employee.employee_id),
-  })),
+  sortEmployeesForPresenceStrip(props.employees).map((employee) => {
+    const failed = Boolean(employeeFailureLine(employee));
+    return {
+      employee,
+      avatar: buildEmployeeAvatar(employee),
+      failed,
+      interrupted: failed && employeeShiftNeedsContinuation(employee),
+      paused: !employee.enabled && !failed,
+      optionId: presenceStripOptionId(employee.employee_id),
+    };
+  }),
 );
 
 const activeOptionId = computed(() => presenceStripOptionId(props.selectedEmployeeId));
@@ -175,7 +180,15 @@ function onKeydown(event: KeyboardEvent): void {
         >
           {{ item.avatar.initials }}
           <span
-            v-if="item.failed"
+            v-if="item.interrupted"
+            class="company-presence-strip__interrupt-mark"
+            aria-hidden="true"
+            title="Shift interrupted — retry to continue"
+          >
+            ↻
+          </span>
+          <span
+            v-else-if="item.failed"
             class="company-presence-strip__fail-mark"
             aria-hidden="true"
             title="Last shift failed"

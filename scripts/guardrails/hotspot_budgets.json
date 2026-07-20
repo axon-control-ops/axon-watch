@@ -215,7 +215,7 @@
       "target": "apps/console-web/src/styles/ide/*"
     },
     "apps/console-web/src/styles/shell/mockup-shell-07.css": {
-      "max_lines": 560,
+      "max_lines": 298,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"

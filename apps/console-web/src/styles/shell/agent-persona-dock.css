@@ -79,6 +79,7 @@
 }
 
 .company-presence-strip__fail-mark,
+.company-presence-strip__interrupt-mark,
 .company-presence-strip__pause-mark {
   position: absolute;
   right: -0.08rem;
@@ -99,6 +100,12 @@
   background: rgba(180, 45, 35, 0.95);
 }
 
+.company-presence-strip__interrupt-mark {
+  font-size: 0.56rem;
+  color: rgba(255, 240, 210, 0.98);
+  background: rgba(180, 110, 30, 0.95);
+}
+
 .company-presence-strip__pause-mark {
   font-size: 0.44rem;
   color: rgba(255, 230, 190, 0.96);
@@ -114,6 +121,11 @@
 .company-presence-strip__avatar[data-presence='failed'] {
   box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 110, 90, 0.85),
     0 0 12px rgba(220, 70, 60, 0.35);
+}
+
+.company-presence-strip__avatar[data-presence='interrupted'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 180, 90, 0.88),
+    0 0 12px rgba(255, 160, 60, 0.35);
 }
 
 .company-presence-strip__avatar[data-presence='paused'] {
@@ -162,6 +174,11 @@
     0 0 14px rgba(220, 70, 60, 0.42), 0 0 0 4px rgba(0, 242, 255, 0.55);
 }
 
+.company-presence-strip__btn--selected .company-presence-strip__avatar[data-presence='interrupted'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 180, 90, 0.92),
+    0 0 14px rgba(255, 160, 60, 0.42), 0 0 0 4px rgba(0, 242, 255, 0.55);
+}
+
 .company-presence-strip__btn--selected .company-presence-strip__avatar[data-presence='working'] {
   box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(80, 220, 180, 0.82),
     0 0 14px rgba(60, 200, 160, 0.38), 0 0 0 4px rgba(0, 242, 255, 0.55);
@@ -207,6 +224,7 @@
   border-color: rgba(255, 120, 100, 0.35);
 }
 
+.agent-persona-dock[data-presence='interrupted'],
 .agent-persona-dock--interrupted {
   border-color: rgba(255, 180, 90, 0.34);
 }
@@ -256,6 +274,11 @@
 .agent-persona-dock__avatar[data-presence='failed'] {
   box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(255, 110, 90, 0.9),
     0 0 16px rgba(220, 70, 60, 0.4);
+}
+
+.agent-persona-dock__avatar[data-presence='interrupted'] {
+  box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(255, 180, 90, 0.9),
+    0 0 16px rgba(255, 160, 60, 0.4);
 }
 
 .agent-persona-dock__avatar[data-presence='paused'] {

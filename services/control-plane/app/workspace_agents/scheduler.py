@@ -178,10 +178,7 @@ def _dispatch_worker_run(
 
 
 def run_continuous_worker_tick() -> list[dict[str, Any]]:
-    """Start at most one bounded role-tagged run per continuous/always_on employee."""
-    if not scheduler_enabled():
-        return []
-
+    """Reconcile hung shifts, then start bounded role-tagged runs when enabled."""
     reaped = reap_stale_employee_runs()
     if reaped:
         logger.info("continuous worker tick reaped %s stale run(s)", len(reaped))
@@ -196,6 +193,9 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
     pruned = prune_terminal_employee_runs()
     if pruned:
         logger.info("continuous worker tick pruned %s terminal employee run(s)", len(pruned))
+
+    if not scheduler_enabled():
+        return []
 
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
     active_bound = max_active_executing()
@@ -281,7 +281,8 @@ async def start_continuous_worker_scheduler() -> asyncio.Task[None] | None:
     """Start the periodic tick; cancel via stop_continuous_worker_scheduler.
 
     The loop always runs so Settings can enable workers without a process restart.
-    Each tick no-ops when scheduler_enabled() is false (env brake and/or UI off).
+    Each tick always reconciles stale/abandoned/pruned runs; new starts only when
+    scheduler_enabled() is true (env brake and/or UI off).
     """
     global _scheduler_task
     if _scheduler_task is not None and not _scheduler_task.done():

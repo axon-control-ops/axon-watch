@@ -47,6 +47,15 @@ describe('employee-avatar', () => {
         }),
       ),
     ).toBe('failed');
+    expect(
+      employeePresenceTone(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'Run interrupted by control-plane restart',
+        }),
+      ),
+    ).toBe('interrupted');
     expect(employeePresenceTone(employee({ enabled: false }))).toBe('paused');
     expect(
       employeePresenceTone(

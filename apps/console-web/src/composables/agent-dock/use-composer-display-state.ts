@@ -34,6 +34,7 @@ type UseComposerDisplayStateOptions = {
   kairoPending: Ref<boolean>;
   dismissedDebugReproduceMessageId: Ref<string | null>;
   syncComposerHeight: () => void;
+  skillAttachmentCount?: Ref<number>;
 };
 
 export function useComposerDisplayState(options: UseComposerDisplayStateOptions) {
@@ -48,6 +49,7 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     kairoPending,
     dismissedDebugReproduceMessageId,
     syncComposerHeight,
+    skillAttachmentCount,
   } = options;
 
   const composerAgentBusy = computed(() => shell.composerAgentBusy);
@@ -199,7 +201,14 @@ export function useComposerDisplayState(options: UseComposerDisplayStateOptions)
     if (composerMode.value === 'kairo') {
       return kairoCanSubmit.value && Boolean(shell.currentWorkspace);
     }
-    return shell.canSubmitIdeComposer;
+    if (shell.canSubmitIdeComposer) {
+      return true;
+    }
+    return (
+      shell.commandMutationState !== 'submitting' &&
+      Boolean(shell.currentWorkspace?.workspace_id) &&
+      (skillAttachmentCount?.value ?? 0) > 0
+    );
   });
 
   const composerSubmitLabel = computed(() => {

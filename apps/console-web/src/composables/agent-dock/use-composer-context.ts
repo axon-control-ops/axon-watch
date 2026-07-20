@@ -6,9 +6,23 @@ import {
   SELECTION_CONTEXT_TOKEN,
   TERMINAL_CONTEXT_TOKEN,
 } from '../../lib/ide-composer-context-tokens';
+import {
+  composerSkillSlugFromPath,
+  isComposerSkillFilePath,
+  listComposerSkillFileTokens,
+  prependComposerSkillFileTokens,
+  stripComposerSkillFileTokens,
+  type ComposerSkillFileToken,
+} from '../../lib/composer-slash-skills-view';
 import { useShellStore } from '../../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
+
+export type ComposerSkillAttachment = {
+  path: string;
+  slug: string;
+  label: string;
+};
 
 export function useComposerContext(shell: ShellStore) {
   const contextWorkspace = ref(false);
@@ -17,6 +31,7 @@ export function useComposerContext(shell: ShellStore) {
   const contextTerminal = ref(false);
   const contextIde = ref(false);
   const contextPinned = ref(false);
+  const skillAttachments = ref<ComposerSkillAttachment[]>([]);
 
   const activeFileToken = computed(() =>
     shell.activeWorkspaceFilePath ? `@file:${shell.activeWorkspaceFilePath}` : null,
@@ -43,8 +58,64 @@ export function useComposerContext(shell: ShellStore) {
     }
     return `L${selection.startLine}-${selection.endLine}`;
   });
+
+  function toSkillAttachment(token: ComposerSkillFileToken | ComposerSkillAttachment): ComposerSkillAttachment {
+    return {
+      path: token.path,
+      slug: token.slug,
+      label: token.label || token.slug,
+    };
+  }
+
+  function upsertSkillAttachment(path: string, label?: string): void {
+    const cleaned = path.trim();
+    if (!cleaned || !isComposerSkillFilePath(cleaned)) {
+      return;
+    }
+    const slug = composerSkillSlugFromPath(cleaned);
+    const next: ComposerSkillAttachment = {
+      path: cleaned,
+      slug,
+      label: (label ?? slug).trim() || slug,
+    };
+    if (skillAttachments.value.some((row) => row.path === cleaned)) {
+      return;
+    }
+    skillAttachments.value = [...skillAttachments.value, next];
+  }
+
+  function clearSkillAttachments(): void {
+    skillAttachments.value = [];
+  }
+
+  function promoteSkillTokensFromDraft(): void {
+    const tokens = listComposerSkillFileTokens(shell.ideComposerDraft);
+    if (!tokens.length) {
+      return;
+    }
+    for (const token of tokens) {
+      upsertSkillAttachment(token.path, token.label);
+    }
+    shell.ideComposerDraft = stripComposerSkillFileTokens(shell.ideComposerDraft);
+  }
+
+  function withSkillTokensForSubmit(draft: string): string {
+    return prependComposerSkillFileTokens(
+      draft,
+      skillAttachments.value.map((row) => row.path),
+    );
+  }
+
   const attachmentChips = computed(() => {
-    const chips: Array<{ key: string; label: string; kind: string }> = [];
+    const chips: Array<{ key: string; label: string; kind: string; title?: string }> = [];
+    for (const skill of skillAttachments.value) {
+      chips.push({
+        key: `skill:${skill.path}`,
+        kind: 'skill',
+        label: skill.label,
+        title: skill.path,
+      });
+    }
     if (contextWorkspace.value && shell.currentWorkspace?.workspace_id) {
       chips.push({
         key: 'workspace',
@@ -133,6 +204,11 @@ export function useComposerContext(shell: ShellStore) {
   }
 
   function removeChip(key: string): void {
+    if (key.startsWith('skill:')) {
+      const path = key.slice('skill:'.length);
+      skillAttachments.value = skillAttachments.value.filter((row) => row.path !== path);
+      return;
+    }
     if (key === 'workspace') {
       contextWorkspace.value = false;
       setTokenEnabled(workspaceToken.value, false);
@@ -163,6 +239,7 @@ export function useComposerContext(shell: ShellStore) {
   }
 
   function syncContextFromDraft(): void {
+    promoteSkillTokensFromDraft();
     const draft = shell.ideComposerDraft;
     if (workspaceToken.value) {
       contextWorkspace.value = composerDraftIncludesToken(draft, workspaceToken.value);
@@ -183,6 +260,7 @@ export function useComposerContext(shell: ShellStore) {
     contextTerminal,
     contextIde,
     contextPinned,
+    skillAttachments,
     activeFileToken,
     workspaceToken,
     ideToken,
@@ -197,5 +275,10 @@ export function useComposerContext(shell: ShellStore) {
     toggleContext,
     removeChip,
     syncContextFromDraft,
+    upsertSkillAttachment,
+    clearSkillAttachments,
+    promoteSkillTokensFromDraft,
+    withSkillTokensForSubmit,
+    toSkillAttachment,
   };
 }

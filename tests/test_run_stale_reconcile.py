@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from tests.support.control_plane_app_loader import prepare_control_plane_imports
 from tests.support.control_plane_db import isolate_control_plane_db
@@ -322,6 +323,29 @@ class RunStaleReconcileTests(unittest.TestCase):
         self.assertEqual(started, [])
         self.assertEqual("failed", get_run(run_id)["phase"])
 
+    def test_scheduler_tick_reaps_when_env_scheduler_disabled(self) -> None:
+        stale = create_run(
+            workspace_id="workspace_sched_env_off",
+            mode="agent",
+            summary="Sched API: continuous worker shift",
+            employee_role="backend",
+        )
+        run_id = str(stale["run_id"])
+        _age_run(run_id, seconds=900)
+
+        with patch(
+            "app.workspace_agents.scheduler.load_workspace_agent_configs",
+            return_value=({}, {}, {}, []),
+        ), patch.dict(
+            "os.environ",
+            {"AXON_WATCH_WORKER_SCHEDULER": "0"},
+            clear=False,
+        ):
+            started = run_continuous_worker_tick()
+
+        self.assertEqual(started, [])
+        self.assertEqual("failed", get_run(run_id)["phase"])
+
     def test_dispatch_heartbeat_receipts_refresh_stale_ttl(self) -> None:
         from app.workspace_agents.config_loader import EmployeeConfig
         from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
@@ -429,6 +453,41 @@ class RunStaleReconcileTests(unittest.TestCase):
 
         self.assertEqual(reaped, [])
         self.assertIn("worker_progress", receipt_types)
+
+    def test_bootstrap_reaps_stale_employee_runs_when_scheduler_disabled(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from tests.support.control_plane_app_loader import load_control_plane_app
+
+        record = create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Control Plane: startup stale shift",
+            employee_role="backend",
+        )
+        run_id = str(record["run_id"])
+        _age_run(run_id, seconds=900)
+
+        app = load_control_plane_app()
+        with patch.dict(
+            os.environ,
+            {"AXON_WATCH_WORKER_SCHEDULER": "0"},
+            clear=False,
+        ), patch(
+            "app.bootstrap.reconcile_orphaned_runs_on_startup",
+            return_value=[],
+        ), patch(
+            "app.bootstrap.start_continuous_worker_scheduler",
+            new=AsyncMock(return_value=None),
+        ), patch(
+            "app.bootstrap.stop_continuous_worker_scheduler",
+            new=AsyncMock(),
+        ):
+            with TestClient(app) as client:
+                response = client.get("/api/health")
+                self.assertEqual(200, response.status_code)
+
+        self.assertEqual("failed", get_run(run_id)["phase"])
 
     def test_reconcile_stale_api_returns_reaped_run_ids(self) -> None:
         from fastapi.testclient import TestClient

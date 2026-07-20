@@ -3,6 +3,8 @@ import type { ConnectorProbeRecord } from '../api/control-plane';
 import {
   agentDockReopenAlive,
   agentDockReopenAriaLabel,
+  agentDockReopenEmployeeFailure,
+  agentDockReopenEmployeeInterrupted,
   agentDockReopenTitle,
   type AgentDockReopenState,
 } from './agent-dock-reopen-view';
@@ -128,6 +130,8 @@ export type IdeEditorStatusAgentChip = {
   approvals: boolean;
   executing: boolean;
   reviewReady: boolean;
+  failure: boolean;
+  interrupted: boolean;
 };
 
 /** Agent reopen chip for the IDE editor status bar when the dock is collapsed. */
@@ -143,6 +147,8 @@ export function buildIdeEditorStatusAgentChip(input: {
   const pendingApprovals = state.pendingApprovals;
   const runPhase = state.runPhase ?? null;
   const alive = agentDockReopenAlive(state);
+  const failure = agentDockReopenEmployeeFailure(state);
+  const interrupted = agentDockReopenEmployeeInterrupted(state);
 
   return {
     label: 'AGENT',
@@ -155,5 +161,7 @@ export function buildIdeEditorStatusAgentChip(input: {
     approvals: pendingApprovals > 0,
     executing: runPhase === 'executing',
     reviewReady: runPhase === 'review_ready',
+    failure,
+    interrupted,
   };
 }

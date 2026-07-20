@@ -3,6 +3,8 @@ export type AgentDockReopenState = {
   pendingApprovals: number;
   runPhase: string | null;
   employeeFailureLine?: string | null;
+  /** Restart or session cut — retry continues the shift rather than a hard failure. */
+  employeeShiftInterrupted?: boolean;
 };
 
 function approvalPhrase(count: number): string {
@@ -49,7 +51,7 @@ function employeeFailureHintParts(state: AgentDockReopenState): string[] {
   if (!line) {
     return [];
   }
-  return ['Last shift failed'];
+  return state.employeeShiftInterrupted ? ['Shift interrupted'] : ['Last shift failed'];
 }
 
 function employeeFailureAriaHintParts(state: AgentDockReopenState): string[] {
@@ -57,7 +59,7 @@ function employeeFailureAriaHintParts(state: AgentDockReopenState): string[] {
   if (!line) {
     return [];
   }
-  return ['last shift failed'];
+  return state.employeeShiftInterrupted ? ['shift interrupted'] : ['last shift failed'];
 }
 
 function activityHintParts(state: AgentDockReopenState): string[] {
@@ -133,8 +135,7 @@ export function agentDockReopenAlive(state: AgentDockReopenState): boolean {
   return Boolean((state.employeeFailureLine ?? '').trim());
 }
 
-/** Coral failure treatment when a teammate shift failed and nothing else is live. */
-export function agentDockReopenEmployeeFailure(state: AgentDockReopenState): boolean {
+function employeeFailureAttentionActive(state: AgentDockReopenState): boolean {
   if (state.streaming || state.pendingApprovals > 0) {
     return false;
   }
@@ -145,4 +146,14 @@ export function agentDockReopenEmployeeFailure(state: AgentDockReopenState): boo
   }
 
   return Boolean((state.employeeFailureLine ?? '').trim());
+}
+
+/** Coral failure treatment when a teammate shift hard-failed and nothing else is live. */
+export function agentDockReopenEmployeeFailure(state: AgentDockReopenState): boolean {
+  return employeeFailureAttentionActive(state) && !state.employeeShiftInterrupted;
+}
+
+/** Amber interrupted treatment when a shift was cut short and retry should continue. */
+export function agentDockReopenEmployeeInterrupted(state: AgentDockReopenState): boolean {
+  return employeeFailureAttentionActive(state) && Boolean(state.employeeShiftInterrupted);
 }

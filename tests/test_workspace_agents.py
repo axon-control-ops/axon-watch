@@ -91,6 +91,17 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
                 role_run_status="executing",
             ),
         )
+        # Single-employee rosters auto-mark primary; specialists still mirror their shift.
+        self.assertEqual(
+            "executing",
+            employee_status(
+                role="backend",
+                schedule="continuous",
+                workspace_status="idle",
+                primary=True,
+                role_run_status="executing",
+            ),
+        )
         self.assertEqual(
             "verifying",
             employee_status(

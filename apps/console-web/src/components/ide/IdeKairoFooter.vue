@@ -47,9 +47,12 @@ const surfaceEmployeeFailure = computed(() =>
   }),
 );
 const chipEmployeeFailed = computed(() => surfaceEmployeeFailure.value);
-const chipPresenceHint = computed(() =>
-  chipEmployeeFailed.value ? 'last shift failed' : null,
-);
+const chipPresenceHint = computed(() => {
+  if (!chipEmployeeFailed.value) {
+    return null;
+  }
+  return shell.activeIdeEmployeeShiftInterrupted ? 'shift interrupted' : 'last shift failed';
+});
 const chipTitle = computed(() => {
   const row = shell.activeIdeEmployeeRecord;
   if (!row || !chipEmployeeFailed.value) {
@@ -101,6 +104,7 @@ const signalBadge = computed(
       :persona-name="shell.activeIdeEmployee ? activePersonaName : null"
       :presence-hint="chipPresenceHint"
       :employee-failed="chipEmployeeFailed"
+      :employee-interrupted="chipEmployeeFailed && shell.activeIdeEmployeeShiftInterrupted"
       :chip-title="chipTitle"
       :open-hint="chipOpenHint"
       @open-briefing="handleKairoPresenceOpen"
@@ -115,7 +119,9 @@ const signalBadge = computed(
         `ide-kairo-footer__interrupt--${shell.kairoPresenceState}`,
         {
           'ide-kairo-footer__interrupt--emphasized': shell.briefingSeamEmphasized,
-          'ide-kairo-footer__interrupt--employee-failed': chipEmployeeFailed,
+          'ide-kairo-footer__interrupt--employee-failed': chipEmployeeFailed && !shell.activeIdeEmployeeShiftInterrupted,
+          'ide-kairo-footer__interrupt--employee-interrupted':
+            chipEmployeeFailed && shell.activeIdeEmployeeShiftInterrupted,
         },
       ]"
       :aria-label="`${activePersonaName}. ${shell.briefingSummaryLine}`"

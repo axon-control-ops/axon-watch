@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 import { resizeCommandComposer } from '../../lib/command-composer-autosize';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
@@ -97,9 +97,13 @@ export function useAgentDockComposerSetup() {
     hasTerminalSnippet,
     selectionChipLabel,
     attachmentChips,
+    skillAttachments,
     toggleContext,
     removeChip,
     syncContextFromDraft,
+    upsertSkillAttachment,
+    clearSkillAttachments,
+    withSkillTokensForSubmit,
   } = useComposerContext(shell);
 
   const images = useComposerImages();
@@ -198,6 +202,7 @@ export function useAgentDockComposerSetup() {
       shell.ideComposerDraft = value;
     },
     closeToolbarMenus: closeMenus,
+    attachSkill: upsertSkillAttachment,
   });
 
   const {
@@ -254,6 +259,8 @@ export function useAgentDockComposerSetup() {
     stopVoiceCapture,
     planSoftSwitchNotice,
     handleTypeaheadKeydown,
+    withSkillTokensForSubmit,
+    clearSkillAttachments,
     onDebugReproduceProceed: (messageId) => {
       dismissedDebugReproduceMessageId.value = messageId;
     },
@@ -290,6 +297,7 @@ export function useAgentDockComposerSetup() {
     kairoPending,
     dismissedDebugReproduceMessageId,
     syncComposerHeight,
+    skillAttachmentCount: computed(() => skillAttachments.value.length),
   });
 
   function updateComposerDraft(value: string): void {

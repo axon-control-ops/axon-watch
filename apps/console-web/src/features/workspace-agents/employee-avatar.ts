@@ -4,10 +4,11 @@ import {
   employeeFailureLine,
   employeeGlowTone,
   employeeIsWorking,
+  employeeShiftNeedsContinuation,
   type EmployeeGlowTone,
 } from './company-roster-view';
 
-export type EmployeePresenceTone = 'idle' | 'working' | 'failed' | 'paused';
+export type EmployeePresenceTone = 'idle' | 'working' | 'failed' | 'interrupted' | 'paused';
 
 export type EmployeeAvatarModel = {
   initials: string;
@@ -66,7 +67,7 @@ export function employeeInitials(name: string | null | undefined): string {
 
 export function employeePresenceTone(employee: CompanyEmployeeRecord): EmployeePresenceTone {
   if (employeeFailureLine(employee)) {
-    return 'failed';
+    return employeeShiftNeedsContinuation(employee) ? 'interrupted' : 'failed';
   }
   if (!employee.enabled) {
     return 'paused';

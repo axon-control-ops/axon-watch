@@ -16,6 +16,8 @@ const props = defineProps<{
   presenceHint?: string | null;
   /** Warm red accent when alerting reflects a failed teammate shift. */
   employeeFailed?: boolean;
+  /** Amber accent when alerting reflects an interrupted shift that can continue. */
+  employeeInterrupted?: boolean;
   /** Overrides default briefing title when set (e.g. full failure detail on hover). */
   chipTitle?: string | null;
   /** Tooltip when the chip opens something other than briefing (e.g. team roster). */
@@ -50,7 +52,7 @@ const showWaveform = computed(
     props.state === 'alerting',
 );
 const accessibilityLabel = computed(() => {
-  const detail = props.chipTitle?.trim();
+  const detail = props.chipTitle?.trim() || props.openHint?.trim();
   if (props.employeeFailed && detail) {
     return `${titleLabel.value}. ${detail}`;
   }
@@ -64,7 +66,12 @@ const accessibilityLabel = computed(() => {
     class="kairo-chip"
     :class="[
       `kairo-chip--${state}`,
-      { 'kairo-chip--employee-failed': employeeFailed && state === 'alerting' },
+      {
+        'kairo-chip--employee-failed':
+          employeeFailed && !employeeInterrupted && state === 'alerting',
+        'kairo-chip--employee-interrupted':
+          employeeFailed && employeeInterrupted && state === 'alerting',
+      },
     ]"
     :aria-label="accessibilityLabel"
     :title="chipTitle?.trim() || openHint?.trim() || 'Open operator briefing'"

@@ -15,6 +15,7 @@ type AttachmentChip = {
   key: string;
   label: string;
   kind: string;
+  title?: string;
 };
 
 type ActivityChip = {
@@ -103,10 +104,19 @@ const typeaheadActiveDescendantId = computed(() =>
       :key="chip.key"
       type="button"
       class="agent-dock-composer__chip"
-      :title="chip.label"
+      :class="{ 'agent-dock-composer__chip--skill': chip.kind === 'skill' }"
+      :title="chip.title || chip.label"
       @click="emit('remove-chip', chip.key)"
     >
-      <span class="agent-dock-composer__chip-kind">{{ chip.kind }}</span>
+      <span
+        v-if="chip.kind === 'skill'"
+        class="agent-dock-composer__chip-icon"
+        aria-hidden="true"
+      >✦</span>
+      <span
+        v-else
+        class="agent-dock-composer__chip-kind"
+      >{{ chip.kind }}</span>
       <span class="agent-dock-composer__chip-label">{{ chip.label }}</span>
       <span class="agent-dock-composer__chip-remove" aria-hidden="true">×</span>
     </button>

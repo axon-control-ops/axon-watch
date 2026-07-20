@@ -10,6 +10,7 @@ import {
   applySlashSkillToDraft,
   buildSlashPaletteCatalog,
   filterSlashPaletteRows,
+  isComposerSkillFilePath,
   slashHelpText,
   type SlashPaletteRow,
 } from '../../lib/composer-slash-skills-view';
@@ -32,6 +33,8 @@ type UseComposerTypeaheadOptions = {
   getDraft: () => string;
   setDraft: (value: string) => void;
   closeToolbarMenus: () => void;
+  /** Attach a skill as a Cursor-style chip instead of raw `@file:` text. */
+  attachSkill?: (path: string, label?: string) => void;
 };
 
 export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
@@ -42,6 +45,7 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
     getDraft,
     setDraft,
     closeToolbarMenus,
+    attachSkill,
   } = options;
 
   const open = ref(false);
@@ -174,6 +178,14 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
     }
 
     if (token.kind === 'mention' && 'path' in row) {
+      if (attachSkill && isComposerSkillFilePath(row.path)) {
+        attachSkill(row.path, row.label);
+        const result = replaceComposerToken(getDraft(), token, '');
+        setDraft(result.next.trimStart());
+        closeTypeahead();
+        restoreCaret(Math.min(result.caret, getDraft().length));
+        return;
+      }
       const insertion = mentionInsertionForPath(row.path);
       const result = replaceComposerToken(getDraft(), token, insertion);
       setDraft(result.next);
@@ -209,6 +221,7 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
     if (row.kind === 'skill' && row.skillPath) {
       const result = applySlashSkillToDraft(getDraft(), token, row.skillPath);
       setDraft(result.next);
+      attachSkill?.(row.skillPath, row.label || row.skillSlug);
       if (composerMode.value === 'kairo' || composerMode.value === 'ask') {
         composerMode.value = 'agent';
       }

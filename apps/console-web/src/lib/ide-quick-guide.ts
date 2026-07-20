@@ -1,4 +1,9 @@
-export type IdeQuickGuideTone = 'neutral' | 'attention' | 'streaming';
+export type IdeQuickGuideTone =
+  | 'neutral'
+  | 'attention'
+  | 'streaming'
+  | 'failure'
+  | 'interrupted';
 
 export type IdeQuickGuideActionId = 'expand-agent-dock' | 'show-terminal' | 'open-connectors';
 
@@ -14,6 +19,14 @@ export type IdeQuickGuide = {
   actions: IdeQuickGuideAction[];
 };
 
+function withEmployeeFailureDetail(
+  line: string | null | undefined,
+  steps: string[],
+): string[] {
+  const detail = (line ?? '').trim();
+  return detail ? [detail, ...steps] : steps;
+}
+
 export function buildIdeQuickGuide(input: {
   layoutMode: 'operator' | 'ide';
   agentDockCollapsed: boolean;
@@ -22,6 +35,7 @@ export function buildIdeQuickGuide(input: {
   streaming: boolean;
   runPhase: string | null;
   employeeFailureLine?: string | null;
+  employeeShiftInterrupted?: boolean;
   requiredConnectorsUnavailable?: number;
   legacyConnectorGlanceVisible?: boolean;
 }): IdeQuickGuide | null {
@@ -59,15 +73,49 @@ export function buildIdeQuickGuide(input: {
   }
 
   if (input.agentDockCollapsed && (input.employeeFailureLine ?? '').trim()) {
+    const interrupted = Boolean(input.employeeShiftInterrupted);
     return {
-      title: 'Last shift failed — expand the agent dock to retry',
-      tone: 'attention',
+      title: interrupted
+        ? 'Shift interrupted — expand the agent dock to continue'
+        : 'Last shift failed — expand the agent dock to retry',
+      tone: interrupted ? 'interrupted' : 'failure',
       actions: [{ id: 'expand-agent-dock', label: 'Expand agent dock' }],
-      steps: [
+      steps: withEmployeeFailureDetail(input.employeeFailureLine, [
         'Ctrl/Cmd+\\ toggles the agent dock.',
-        'Use Retry shift in the failure banner, or open Team to talk it through.',
+        interrupted
+          ? 'Use Retry shift in the failure banner to continue, or open Team to talk it through.'
+          : 'Use Retry shift in the failure banner, or open Team to talk it through.',
         'Click AGENT in the editor status bar or the right-edge reopen strip.',
-      ],
+      ]),
+    };
+  }
+
+  if (
+    !input.agentDockCollapsed &&
+    (input.employeeFailureLine ?? '').trim() &&
+    idleRun &&
+    !input.streaming &&
+    input.pendingApprovals <= 0
+  ) {
+    const interrupted = Boolean(input.employeeShiftInterrupted);
+    const actions: IdeQuickGuideAction[] = [];
+    if (!input.terminalVisible) {
+      actions.push({ id: 'show-terminal', label: 'Show terminal' });
+    }
+
+    return {
+      title: interrupted
+        ? 'Shift interrupted — retry from the agent dock banner'
+        : 'Last shift failed — retry from the agent dock banner',
+      tone: interrupted ? 'interrupted' : 'failure',
+      actions,
+      steps: withEmployeeFailureDetail(input.employeeFailureLine, [
+        'Use Retry shift in the failure banner at the top of the agent dock composer.',
+        'Open Team in the left sidebar to review receipts or talk it through.',
+        ...(input.terminalVisible
+          ? []
+          : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
+      ]),
     };
   }
 
@@ -189,8 +237,8 @@ export function buildIdeQuickGuide(input: {
       title: 'Panels closed — keyboard shortcuts',
       tone: 'neutral',
       actions: [
-        { id: 'expand-agent-dock', label: 'Agent dock' },
-        { id: 'show-terminal', label: 'Terminal' },
+        { id: 'expand-agent-dock', label: 'Expand agent dock' },
+        { id: 'show-terminal', label: 'Show terminal' },
       ],
       steps: [
         'Ctrl/Cmd+\\ — agent dock (conversation + composer)',

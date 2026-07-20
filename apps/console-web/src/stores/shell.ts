@@ -981,6 +981,7 @@ export const useShellStore = defineStore('shell', () => {
     activeIdeEmployee,
     activeIdeEmployeeRecord,
     activeIdeEmployeeFailureLine,
+    activeIdeEmployeeShiftInterrupted,
     companyEmployeesForCurrentWorkspace,
     loadCompanyEmployees,
   } = createCompanyRosterSlice({
@@ -3548,6 +3549,7 @@ export const useShellStore = defineStore('shell', () => {
     activeIdeEmployee,
     activeIdeEmployeeRecord,
     activeIdeEmployeeFailureLine,
+    activeIdeEmployeeShiftInterrupted,
     companyEmployeesForCurrentWorkspace,
     loadCompanyEmployees,
     ideThreadsForCurrentWorkspace,

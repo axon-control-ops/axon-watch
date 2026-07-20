@@ -7,6 +7,7 @@ import {
   agentDockReopenAlive,
   agentDockReopenAriaLabel,
   agentDockReopenEmployeeFailure,
+  agentDockReopenEmployeeInterrupted,
   agentDockReopenTitle,
 } from './agent-dock-reopen-view';
 
@@ -82,6 +83,32 @@ describe('agent dock reopen view', () => {
         employeeFailureLine: 'Last shift failed: timeout',
       }),
     ).toBe(true);
+    expect(
+      agentDockReopenEmployeeInterrupted({
+        ...idle,
+        employeeFailureLine: 'Last shift failed: timeout',
+      }),
+    ).toBe(false);
+  });
+
+  it('surfaces interrupted teammate shifts with amber copy while the dock is collapsed', () => {
+    const interrupted = {
+      ...idle,
+      employeeFailureLine:
+        'Last shift interrupted before it could finish — use Retry shift to continue.',
+      employeeShiftInterrupted: true,
+    };
+    expect(agentDockReopenTitle(interrupted)).toBe(
+      'Expand agent dock (Ctrl/Cmd+\\) · Shift interrupted',
+    );
+    expect(agentDockReopenAriaLabel(interrupted)).toBe(
+      'Expand agent dock, shift interrupted',
+    );
+    expect(agentDockReopenEmployeeFailure(interrupted)).toBe(false);
+    expect(agentDockReopenEmployeeInterrupted(interrupted)).toBe(true);
+    expect(
+      agentDockActivityBarTitle(interrupted, false),
+    ).toBe('Agent dock (Ctrl/Cmd+\\) · Shift interrupted');
   });
 
   it('defers failure chrome while streaming, approvals, or active runs take priority', () => {

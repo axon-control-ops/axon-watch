@@ -46,7 +46,10 @@ const employeeFailureTooltip = computed(() => {
 });
 const presenceLabel = computed(() => {
   if (!debugModeActive.value && surfaceEmployeeFailure.value) {
-    return `${activePersonaName.value} · last shift failed`;
+    const hint = shell.activeIdeEmployeeShiftInterrupted
+      ? 'shift interrupted'
+      : 'last shift failed';
+    return `${activePersonaName.value} · ${hint}`;
   }
   if (!debugModeActive.value) {
     return kairoPresenceLabel(shell.kairoPresenceState, activePersonaName.value);
@@ -107,7 +110,10 @@ function handleStopSpeech(event: Event): void {
       {
         'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized,
         'kairo-sidebar-panel--debug-mode': debugModeActive,
-        'kairo-sidebar-panel--employee-failed': surfaceEmployeeFailure,
+        'kairo-sidebar-panel--employee-failed':
+          surfaceEmployeeFailure && !shell.activeIdeEmployeeShiftInterrupted,
+        'kairo-sidebar-panel--employee-interrupted':
+          surfaceEmployeeFailure && shell.activeIdeEmployeeShiftInterrupted,
       },
     ]"
     :aria-label="presenceLabel"
@@ -128,7 +134,10 @@ function handleStopSpeech(event: Event): void {
       {
         'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized,
         'kairo-sidebar-panel--debug-mode': debugModeActive,
-        'kairo-sidebar-panel--employee-failed': surfaceEmployeeFailure,
+        'kairo-sidebar-panel--employee-failed':
+          surfaceEmployeeFailure && !shell.activeIdeEmployeeShiftInterrupted,
+        'kairo-sidebar-panel--employee-interrupted':
+          surfaceEmployeeFailure && shell.activeIdeEmployeeShiftInterrupted,
         'kairo-sidebar-panel--alerting': chipState === 'alerting',
       },
     ]"

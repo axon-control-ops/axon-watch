@@ -9,6 +9,7 @@ import {
   resolveIdeThreadEmployeeFailure,
   type ActiveIdeEmployeeView,
 } from '../../../features/workspace-agents/active-ide-employee';
+import { employeeShiftNeedsContinuation } from '../../../features/workspace-agents/company-roster-view';
 import { COMPANY_REFRESH_MS } from '../../../features/workspace-agents/use-workspace-company';
 
 interface CreateCompanyRosterSliceInput {
@@ -93,6 +94,11 @@ export function createCompanyRosterSlice(input: CreateCompanyRosterSliceInput) {
     }),
   );
 
+  const activeIdeEmployeeShiftInterrupted = computed(() => {
+    const row = activeIdeEmployeeRecord.value;
+    return row ? employeeShiftNeedsContinuation(row) : false;
+  });
+
   watch(
     () => input.currentWorkspace.value?.workspace_id ?? null,
     (workspaceId) => {
@@ -125,6 +131,7 @@ export function createCompanyRosterSlice(input: CreateCompanyRosterSliceInput) {
     activeIdeEmployee,
     activeIdeEmployeeRecord,
     activeIdeEmployeeFailureLine,
+    activeIdeEmployeeShiftInterrupted,
     loadCompanyEmployees,
   };
 }

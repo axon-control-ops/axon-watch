@@ -8,6 +8,7 @@ import {
   agentDockReopenAlive,
   agentDockReopenAriaLabel,
   agentDockReopenEmployeeFailure,
+  agentDockReopenEmployeeInterrupted,
   agentDockReopenTitle,
 } from '../../lib/agent-dock-reopen-view';
 import AgentDockComposer from './AgentDockComposer.vue';
@@ -25,6 +26,7 @@ const dockAlive = computed(() =>
     pendingApprovals: shell.pendingApprovalsCount,
     runPhase: shell.primaryActiveRun?.phase ?? null,
     employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
   }),
 );
 
@@ -34,6 +36,17 @@ const dockEmployeeFailure = computed(() =>
     pendingApprovals: shell.pendingApprovalsCount,
     runPhase: shell.primaryActiveRun?.phase ?? null,
     employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
+  }),
+);
+
+const dockEmployeeInterrupted = computed(() =>
+  agentDockReopenEmployeeInterrupted({
+    streaming: shell.agentStreamActive,
+    pendingApprovals: shell.pendingApprovalsCount,
+    runPhase: shell.primaryActiveRun?.phase ?? null,
+    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
   }),
 );
 
@@ -42,6 +55,7 @@ const reopenState = computed(() => ({
   pendingApprovals: shell.pendingApprovalsCount,
   runPhase: shell.primaryActiveRun?.phase ?? null,
   employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+  employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
 }));
 
 const reopenTitle = computed(() => agentDockReopenTitle(reopenState.value));
@@ -157,12 +171,14 @@ onMounted(() => {
     type="button"
     class="region region-right-dock agent-dock-reopen"
     :class="{
-      'agent-dock-reopen--alive': dockAlive,
+      'agent-dock-reopen--alive':
+        dockAlive && !dockEmployeeFailure && !dockEmployeeInterrupted,
       'agent-dock-reopen--streaming': shell.agentStreamActive,
       'agent-dock-reopen--approvals': shell.pendingApprovalsCount > 0,
       'agent-dock-reopen--executing': shell.primaryActiveRun?.phase === 'executing',
       'agent-dock-reopen--review-ready': shell.primaryActiveRun?.phase === 'review_ready',
       'agent-dock-reopen--failure': dockEmployeeFailure,
+      'agent-dock-reopen--interrupted': dockEmployeeInterrupted,
     }"
     :aria-label="reopenAriaLabel"
     :title="reopenTitle"
@@ -176,6 +192,11 @@ onMounted(() => {
     >
       {{ shell.pendingApprovalsCount }}
     </span>
+    <span
+      v-else-if="dockEmployeeInterrupted"
+      class="agent-dock-reopen__pulse agent-dock-reopen__pulse--interrupted"
+      aria-hidden="true"
+    />
     <span
       v-else-if="dockEmployeeFailure"
       class="agent-dock-reopen__pulse agent-dock-reopen__pulse--failure"

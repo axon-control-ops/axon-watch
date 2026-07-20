@@ -18,7 +18,7 @@ from tests.support.stable_connector_probe import (
     patch_stable_connector_probes,
     reset_watch_ephemeral_stores,
 )
-from tests.support.watch_app_loader import load_watch_app, restore_app_modules
+from tests.support.watch_app_loader import load_control_plane_watch_pair, restore_app_modules
 from tests.support.watch_db import isolate_watch_db
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
@@ -32,12 +32,17 @@ from app import runtime_summary_assembler  # noqa: E402
 class ControlPlaneWatchIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_watch_db(self)
-        watch_app, self._watch_modules = load_watch_app()
-        reset_watch_ephemeral_stores()
         self._connector_patch = patch_stable_connector_probes()
-        self._connector_patch.start()
+
+        def _prepare_watch() -> None:
+            reset_watch_ephemeral_stores()
+            self._connector_patch.start()
+
+        watch_asgi, self._control_plane_modules = load_control_plane_watch_pair(
+            on_watch_loaded=_prepare_watch,
+        )
         self.addCleanup(self._connector_patch.stop)
-        self._watch_server = EphemeralUvicorn(watch_app)
+        self._watch_server = EphemeralUvicorn(watch_asgi)
         self._watch_server.start("/internal/watch/health")
 
         isolate_control_plane_db(self, run_store)
@@ -73,7 +78,7 @@ class ControlPlaneWatchIntegrationTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self._watch_server.stop()
-        restore_app_modules(self._watch_modules)
+        restore_app_modules(self._control_plane_modules)
 
     def test_inbox_endpoint_fetches_live_watch_inbox(self) -> None:
         response = self.client.get("/api/inbox")
