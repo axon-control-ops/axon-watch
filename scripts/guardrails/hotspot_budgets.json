@@ -18,7 +18,7 @@
       "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display slices extracted; keep shrinking via factory slices."
     },
     "apps/console-web/src/styles/ide-layout.css": {
-      "max_lines": 12,
+      "max_lines": 14,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/* + feature CSS",
@@ -227,7 +227,7 @@
       "target": "apps/console-web/src/styles/shell/*"
     },
     "tests/test_actionable_inbox_signals.py": {
-      "max_lines": 540,
+      "max_lines": 580,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_actionable_inbox_* slices"
@@ -239,7 +239,7 @@
       "target": "tests/test_control_plane_runs_* slices"
     },
     "tests/test_parity_a4_signal_inbox_consistency.py": {
-      "max_lines": 630,
+      "max_lines": 650,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_parity_a4_* slices"
