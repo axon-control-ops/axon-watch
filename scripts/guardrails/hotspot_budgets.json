@@ -217,6 +217,13 @@
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_signal_consistency_* slices"
+    },
+    "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
+      "max_lines": 520,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/shell/operator-status-radar/*",
+      "note": "Mission control panel; extract quick-guide rail when shrinking"
     }
   }
 }
