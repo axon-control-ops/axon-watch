@@ -105,6 +105,12 @@
   box-shadow: 0 0 12px rgba(190, 140, 40, 0.2);
 }
 
+.company-roster__talk--failed {
+  color: rgba(255, 170, 150, 0.96);
+  border-color: rgba(190, 80, 60, 0.45);
+  background: rgba(90, 28, 22, 0.55);
+}
+
 .company-roster__talk--integrations {
   border-color: rgba(255, 150, 130, 0.42);
   box-shadow: 0 0 12px rgba(200, 90, 70, 0.2);

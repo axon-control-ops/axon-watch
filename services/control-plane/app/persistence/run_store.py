@@ -145,6 +145,28 @@ def list_runs() -> list[dict[str, Any]]:
     return [_row_to_record(row) for row in rows]
 
 
+def delete_run(run_id: str) -> bool:
+    """Remove one run and its history. Returns False when the run does not exist."""
+    cleaned = str(run_id or "").strip()
+    if not cleaned:
+        return False
+    with _managed_connection() as connection:
+        row = connection.execute(
+            "SELECT history_ref FROM runs WHERE run_id = ?",
+            (cleaned,),
+        ).fetchone()
+        if row is None:
+            return False
+        history_ref = row["history_ref"]
+        connection.execute(
+            "DELETE FROM run_history WHERE history_ref = ?",
+            (history_ref,),
+        )
+        connection.execute("DELETE FROM runs WHERE run_id = ?", (cleaned,))
+        connection.commit()
+    return True
+
+
 def append_transition(history_ref: str, transition: dict[str, Any]) -> None:
     payload = deepcopy(transition)
     encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
@@ -175,3 +197,57 @@ def list_history(history_ref: str) -> list[dict[str, Any]]:
             (history_ref,),
         ).fetchall()
     return [json.loads(row["transition_json"]) for row in rows]
+
+
+def last_transition_timestamp(history_ref: str) -> str | None:
+    """Return the timestamp on the newest history entry, if any."""
+    with _managed_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT transition_json
+            FROM run_history
+            WHERE history_ref = ?
+            ORDER BY sequence DESC
+            LIMIT 1
+            """,
+            (history_ref,),
+        ).fetchone()
+    if row is None:
+        return None
+    timestamp = str(json.loads(row["transition_json"]).get("timestamp") or "").strip()
+    return timestamp or None
+
+
+def backdate_last_transition(history_ref: str, timestamp: str) -> None:
+    """Rewrite the newest history entry timestamp (test fixtures only)."""
+    cleaned = str(timestamp or "").strip()
+    if not cleaned:
+        return
+    with _managed_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT sequence, transition_json
+            FROM run_history
+            WHERE history_ref = ?
+            ORDER BY sequence DESC
+            LIMIT 1
+            """,
+            (history_ref,),
+        ).fetchone()
+        if row is None:
+            return
+        payload = json.loads(row["transition_json"])
+        payload["timestamp"] = cleaned
+        connection.execute(
+            """
+            UPDATE run_history
+            SET transition_json = ?
+            WHERE history_ref = ? AND sequence = ?
+            """,
+            (
+                json.dumps(payload, separators=(",", ":"), sort_keys=True),
+                history_ref,
+                row["sequence"],
+            ),
+        )
+        connection.commit()

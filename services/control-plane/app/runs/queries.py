@@ -21,8 +21,27 @@ def list_runs() -> list[dict[str, Any]]:
     return run_store.list_runs()
 
 
+def is_background_employee_run(record: dict[str, Any]) -> bool:
+    """True for scheduled role-tagged worker shifts (not operator-initiated runs)."""
+    return bool(str(record.get("employee_role") or "").strip())
+
+
 def list_active_runs() -> list[dict[str, Any]]:
     return [record for record in run_store.list_runs() if not is_terminal_phase(record["phase"])]
+
+
+def list_operator_facing_runs() -> list[dict[str, Any]]:
+    """Persisted runs the operator should see (excludes role-tagged worker shifts)."""
+    return [
+        record for record in run_store.list_runs() if not is_background_employee_run(record)
+    ]
+
+
+def list_operator_facing_active_runs() -> list[dict[str, Any]]:
+    """Active runs the operator should see in briefing, summary, and fleet health."""
+    return [
+        record for record in list_active_runs() if not is_background_employee_run(record)
+    ]
 
 
 def list_pending_approval_runs() -> list[dict[str, Any]]:
@@ -63,7 +82,10 @@ def to_runtime_summary_active_run(record: dict[str, Any]) -> dict[str, Any]:
 
 __all__ = [
     "approval_summary",
+    "is_background_employee_run",
     "list_active_runs",
+    "list_operator_facing_runs",
+    "list_operator_facing_active_runs",
     "list_pending_approval_records",
     "list_pending_approval_runs",
     "list_pending_review_runs",

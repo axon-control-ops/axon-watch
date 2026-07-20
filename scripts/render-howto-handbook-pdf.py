@@ -11,7 +11,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from markdown_it import MarkdownIt
+import markdown
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = REPO_ROOT / "docs"
@@ -19,12 +19,43 @@ SOURCE_MD = DOCS_DIR / "HOW-TO-HANDBOOK.md"
 PRINT_CSS = DOCS_DIR / "how-to-handbook-print.css"
 DEFAULT_HTML = DOCS_DIR / "HOW-TO-HANDBOOK.html"
 DEFAULT_PDF = DOCS_DIR / "HOW-TO-HANDBOOK.pdf"
+DEFAULT_DESKTOP_PDF = Path.home() / "Desktop" / "Axon-X-How-To-Handbook.pdf"
+
+HOWTO_LINK_RE = re.compile(r"\]\((?:docs/)?how-to/([^)]+\.md)\)")
 
 HEADING_RE = re.compile(r"^(#{2,3})\s+(.+)$")
 VERIFIED_RE = re.compile(r"\*\*Last verified:\*\*\s*(.+?)(?:\n\n|\Z)", re.S)
 NUMBERED_SECTION_RE = re.compile(r"^\d+\.\s")
 PROBLEM_SECTION_RE = re.compile(r"^Problem:\s", re.I)
 TIP_SECTION_RE = re.compile(r"^Tip\s+\d+:", re.I)
+
+
+def demote_headings(text: str, levels: int = 1) -> str:
+    out: list[str] = []
+    for line in text.splitlines():
+        match = re.match(r"^(#+)\s", line)
+        if match:
+            hashes = "#" * (len(match.group(1)) + levels)
+            line = f"{hashes}{line[len(match.group(1)):]}"
+        out.append(line)
+    return "\n".join(out)
+
+
+def bundle_howto_chapters(markdown_text: str) -> str:
+    """Inline linked docs/how-to/*.md chapters so the PDF is self-contained."""
+    seen: set[str] = set()
+    appendices: list[str] = []
+    for match in HOWTO_LINK_RE.finditer(markdown_text):
+        rel = f"how-to/{match.group(1)}"
+        if rel in seen:
+            continue
+        path = DOCS_DIR / rel
+        if not path.is_file():
+            continue
+        seen.add(rel)
+        body = demote_headings(path.read_text(encoding="utf-8").strip(), levels=1)
+        appendices.append(f"\n\n---\n\n{body}\n")
+    return markdown_text + "".join(appendices)
 
 
 def chrome_binary() -> str | None:
@@ -146,8 +177,11 @@ def intro_panel_html() -> str:
 
 
 def markdown_to_html(text: str) -> str:
-    md = MarkdownIt("commonmark", {"breaks": True}).enable("table")
-    return md.render(text)
+    return markdown.markdown(
+        text,
+        extensions=["tables", "fenced_code", "sane_lists"],
+        output_format="html5",
+    )
 
 
 def cover_html(verified: str | None) -> str:
@@ -261,7 +295,12 @@ def render_pdf(html_path: Path, pdf_path: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", default=str(DEFAULT_PDF), help="PDF output path")
+    parser.add_argument("--output", default=str(DEFAULT_PDF), help="Repo PDF output path")
+    parser.add_argument(
+        "--desktop",
+        default=str(DEFAULT_DESKTOP_PDF),
+        help="Desktop PDF copy (pass empty string to skip)",
+    )
     parser.add_argument("--html", default=str(DEFAULT_HTML), help="HTML preview path")
     args = parser.parse_args()
 
@@ -270,7 +309,7 @@ def main() -> int:
     if not PRINT_CSS.is_file():
         raise SystemExit(f"Missing print CSS: {PRINT_CSS}")
 
-    markdown_text = SOURCE_MD.read_text(encoding="utf-8")
+    markdown_text = bundle_howto_chapters(SOURCE_MD.read_text(encoding="utf-8"))
     html_text = build_html(markdown_text)
 
     html_path = Path(args.html).expanduser().resolve()
@@ -284,6 +323,14 @@ def main() -> int:
 
     print(f"HTML: {html_path}")
     print(f"PDF:  {pdf_path} ({pdf_path.stat().st_size:,} bytes)")
+
+    desktop_arg = str(args.desktop).strip()
+    if desktop_arg:
+        desktop_pdf = Path(desktop_arg).expanduser().resolve()
+        desktop_pdf.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(pdf_path, desktop_pdf)
+        print(f"Desktop: {desktop_pdf} ({desktop_pdf.stat().st_size:,} bytes)")
+
     return 0
 
 

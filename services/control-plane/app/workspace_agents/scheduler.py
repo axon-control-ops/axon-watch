@@ -9,7 +9,14 @@ import threading
 from typing import Any
 
 from app.domain.run_state import is_terminal_phase
-from app.runs.service import create_run, list_runs
+from app.runs.service import (
+    create_run,
+    list_runs,
+    prune_terminal_employee_runs,
+    reap_abandoned_review_ready_runs,
+    reap_stale_employee_runs,
+)
+from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
 
@@ -43,12 +50,14 @@ def tick_interval_seconds() -> float:
 
 
 def _active_role_run_exists(workspace_id: str, role: str) -> bool:
+    """True when a role already has in-flight work (not paused/review leftovers)."""
     cleaned_role = role.strip().lower()
     normalized_workspace = workspace_id.strip()
     for run in list_runs():
         if str(run.get("workspace_id", "")).strip() != normalized_workspace:
             continue
-        if is_terminal_phase(str(run.get("phase", "")).strip()):
+        phase = str(run.get("phase", "")).strip()
+        if is_terminal_phase(phase) or phase not in BUSY_EMPLOYEE_PHASES:
             continue
         if str(run.get("employee_role") or "").strip().lower() == cleaned_role:
             return True
@@ -88,6 +97,21 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
     """Start at most one bounded role-tagged run per continuous/always_on employee."""
     if not scheduler_enabled():
         return []
+
+    reaped = reap_stale_employee_runs()
+    if reaped:
+        logger.info("continuous worker tick reaped %s stale run(s)", len(reaped))
+
+    abandoned = reap_abandoned_review_ready_runs()
+    if abandoned:
+        logger.info(
+            "continuous worker tick completed %s abandoned review_ready run(s)",
+            len(abandoned),
+        )
+
+    pruned = prune_terminal_employee_runs()
+    if pruned:
+        logger.info("continuous worker tick pruned %s terminal employee run(s)", len(pruned))
 
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
     if _executing_run_count() >= MAX_ACTIVE_EXECUTING:
