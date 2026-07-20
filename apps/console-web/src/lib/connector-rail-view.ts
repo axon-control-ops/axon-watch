@@ -3,6 +3,12 @@ import { LEGACY_AXON_LOCAL_FALLBACK_URL } from '../api/connectors-api';
 
 import { effectiveRequiredConnectorsUnavailable } from './connector-glance-view';
 
+export type ConnectorRailSummary = {
+  configured: number;
+  ok: number;
+  required_unavailable: number;
+};
+
 export type ConnectorRailTone = 'ok' | 'degraded' | 'unavailable' | 'unknown';
 
 export interface ConnectorRailRow {
@@ -34,37 +40,18 @@ export function connectorRailTone(status: string): ConnectorRailTone {
   return 'unknown';
 }
 
-type ConnectorsRailSummary = {
-  configured: number;
-  ok: number;
-  required_unavailable: number;
-};
-
-/** Body copy when the watch lane is offline — suppresses stale probe rows. */
-export function buildConnectorsRailWatchOfflineBody(): string {
-  return 'Watch offline — connector probes paused until the watch reconnects. Use Refresh summary when the stack is back up.';
-}
-
-export function connectorsRailProbeListVisible(input: {
+/** Header summary for the Mission Control connectors rail. */
+export function buildConnectorRailSummaryLabel(input: {
   loading: boolean;
+  summary: ConnectorRailSummary | null;
   watchConnected: boolean;
-  hasError: boolean;
-}): boolean {
-  return !input.loading && !input.hasError && input.watchConnected;
-}
-
-/** Header summary for Mission Control connectors rail — suppresses stale counts when watch is offline. */
-export function buildConnectorsRailSummaryLabel(input: {
-  loading: boolean;
-  watchConnected: boolean;
-  summary: ConnectorsRailSummary | null;
 }): string {
   if (input.loading) {
     return 'Loading…';
   }
 
   if (!input.watchConnected) {
-    return 'Watch offline';
+    return 'Watch offline — probe counts paused';
   }
 
   const summary = input.summary;
@@ -76,13 +63,12 @@ export function buildConnectorsRailSummaryLabel(input: {
   return `${summary.ok}/${summary.configured} ok · ${requiredDown} required down`;
 }
 
-export function connectorsRailEmphasized(input: {
+/** Whether the connectors rail should show required-down emphasis styling. */
+export function connectorRailNeedsEmphasis(input: {
+  summary: ConnectorRailSummary | null;
   watchConnected: boolean;
-  summary: ConnectorsRailSummary | null;
 }): boolean {
-  return (
-    effectiveRequiredConnectorsUnavailable(input.summary, input.watchConnected) > 0
-  );
+  return effectiveRequiredConnectorsUnavailable(input.summary, input.watchConnected) > 0;
 }
 
 export function buildConnectorRailRows(items: ConnectorProbeRecord[]): ConnectorRailRow[] {

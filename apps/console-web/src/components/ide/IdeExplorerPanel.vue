@@ -39,6 +39,8 @@ const agentSidebarStub = computed(() =>
     streaming: shell.agentStreamActive,
     pendingApprovals: shell.pendingApprovalsCount,
     runPhase: shell.primaryActiveRun?.phase ?? null,
+    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
   }),
 );
 
@@ -51,7 +53,6 @@ const terminalSidebarStub = computed(() =>
 
 const runConnectorNotice = computed(() =>
   buildIdeRunPanelConnectorNotice({
-    watchConnected: shell.runtimeSummary?.watch.connected ?? false,
     requiredConnectorsUnavailable: effectiveRequiredConnectorsUnavailable(
       shell.connectorsSummary,
       shell.runtimeSummary?.watch.connected ?? false,
@@ -332,26 +333,26 @@ function handleCreateFolder(path: string): void {
         ‹
       </button>
     </div>
-    <div class="ide-panel-search">
-      <div
-        v-if="runConnectorNotice"
-        class="ide-explorer-panel__stub-body ide-explorer-panel__run-notice"
+    <div
+      v-if="runConnectorNotice"
+      class="ide-explorer-panel__stub-body ide-explorer-panel__run-notice"
+    >
+      <p
+        v-for="(line, index) in runConnectorNotice.lines"
+        :key="index"
+        class="region-copy ide-explorer-panel__stub-copy"
       >
-        <p
-          v-for="(line, index) in runConnectorNotice.lines"
-          :key="index"
-          class="region-copy ide-explorer-panel__stub-copy"
-        >
-          {{ line }}
-        </p>
-        <button
-          type="button"
-          class="ide-explorer-panel__stub-action"
-          @click="openWatchConnectors"
-        >
-          {{ runConnectorNotice.actionLabel }}
-        </button>
-      </div>
+        {{ line }}
+      </p>
+      <button
+        type="button"
+        class="ide-explorer-panel__stub-action"
+        @click="openWatchConnectors"
+      >
+        {{ runConnectorNotice.actionLabel }}
+      </button>
+    </div>
+    <div class="ide-panel-search">
       <p class="region-copy ide-panel-caption">
         {{ shell.primaryActiveRun ? `${shell.primaryActiveRun.run_id} · ${shell.primaryActiveRun.phase}` : 'No active run' }}
       </p>

@@ -84,9 +84,14 @@ summary, connectors, and inbox reads do not re-hit every health URL on each requ
 
 - Source: `connector`
 - Emitted for **required** connectors with status `degraded` or `unavailable`
-- Also emitted for optional **Cloudflare tunnel** probes when remote ingress
-  still targets a legacy origin (`ingress_matches_axon: false`)
-- Other optional connector failures remain visible in `/api/connectors` only (v1)
+- Also emitted for optional connectors when tunnel ingress still targets a
+  legacy origin (`ingress_matches_axon: false`) and status is `degraded` or
+  `unavailable` — for example legacy `axon_local` on `:7734`
+- **Not** emitted when status is `ok`, including Cloudflare tunnel soft cutover
+  (`soft_origin_cutover: true`) where public health passes on Axon-X while
+  remote ingress still points at legacy `:7734`
+- Other optional connector failures (no ingress mismatch) remain visible in
+  `/api/connectors` only (v1)
 
 ## Verification
 

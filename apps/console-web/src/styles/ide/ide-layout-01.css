@@ -443,9 +443,12 @@
 }
 
 .ide-explorer-panel__run-notice {
-  padding-bottom: 0.75rem;
-  margin-bottom: 0.25rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid rgba(120, 200, 255, 0.12);
+}
+
+.ide-explorer-panel--stub-neutral .ide-explorer-panel__run-notice {
+  border-bottom-color: rgba(148, 188, 204, 0.14);
 }
 
 .ide-explorer-panel__stub-copy {
@@ -478,6 +481,38 @@
   color: #ffd8b8;
 }
 
+.ide-explorer-panel--stub-failure {
+  box-shadow: inset 0 0 0 1px rgba(255, 110, 90, 0.28);
+}
+
+.ide-explorer-panel--stub-failure .ide-explorer-panel__stub-action {
+  border-color: rgba(255, 110, 90, 0.38);
+  background: rgba(120, 40, 32, 0.42);
+  color: rgba(255, 230, 220, 0.96);
+}
+
+.ide-explorer-panel--stub-failure .ide-explorer-panel__stub-action:hover,
+.ide-explorer-panel--stub-failure .ide-explorer-panel__stub-action:focus-visible {
+  border-color: rgba(220, 110, 90, 0.52);
+  background: rgba(110, 36, 28, 0.55);
+}
+
+.ide-explorer-panel--stub-interrupted {
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 90, 0.28);
+}
+
+.ide-explorer-panel--stub-interrupted .ide-explorer-panel__stub-action {
+  border-color: rgba(255, 180, 90, 0.38);
+  background: rgba(100, 65, 18, 0.42);
+  color: rgba(255, 240, 210, 0.96);
+}
+
+.ide-explorer-panel--stub-interrupted .ide-explorer-panel__stub-action:hover,
+.ide-explorer-panel--stub-interrupted .ide-explorer-panel__stub-action:focus-visible {
+  border-color: rgba(255, 200, 110, 0.52);
+  background: rgba(110, 72, 20, 0.55);
+}
+
 .ide-explorer-panel--stub-streaming {
   animation: ide-explorer-stub-stream 2.2s ease-in-out infinite;
 }
@@ -497,3 +532,4 @@
     box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.22);
   }
 }
+@import './ide-panel-shared.css';

@@ -9,9 +9,7 @@ export type IdeQuickGuideActionId =
   | 'expand-agent-dock'
   | 'show-terminal'
   | 'open-connectors'
-  | 'retry-employee-shift'
-  | 'view-employee-receipts'
-  | 'open-team-roster';
+  | 'retry-employee-shift';
 
 export type IdeQuickGuideAction = {
   id: IdeQuickGuideActionId;
@@ -45,72 +43,6 @@ function employeeFailureComposerBannerStep(interrupted: boolean): string {
   return `Use ${action} in the failure banner at the top of the agent dock composer.`;
 }
 
-function employeeFailureCollapsedDockSteps(input: {
-  interrupted: boolean;
-  employeeRetryActionLabel?: string | null;
-  employeeHasReceipts?: boolean;
-}): string[] {
-  const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
-  if (retryLabel) {
-    const steps = [
-      `Click ${retryLabel} above to open the agent dock with a prefilled composer.`,
-    ];
-    if (input.employeeHasReceipts) {
-      steps.push('View receipts above to inspect the last run output.');
-    }
-    steps.push(
-      'Open Team to review the roster or talk it through.',
-      'Ctrl/Cmd+\\ also toggles the agent dock; the failure banner appears at the top of the composer.',
-    );
-    return steps;
-  }
-
-  return [
-    'Ctrl/Cmd+\\ toggles the agent dock.',
-    employeeFailureBannerStep(input.interrupted),
-    'Click AGENT in the editor status bar or the right-edge reopen strip.',
-  ];
-}
-
-function employeeFailureOpenDockStep(input: {
-  interrupted: boolean;
-  employeeRetryActionLabel?: string | null;
-}): string {
-  const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
-  if (retryLabel) {
-    return `Click ${retryLabel} above, or use the failure banner at the top of the agent dock composer.`;
-  }
-
-  return employeeFailureComposerBannerStep(input.interrupted);
-}
-
-function employeeFailureQuickGuideActions(input: {
-  agentDockCollapsed: boolean;
-  terminalVisible: boolean;
-  employeeRetryActionLabel?: string | null;
-  employeeHasReceipts?: boolean;
-}): IdeQuickGuideAction[] {
-  const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
-  const actions: IdeQuickGuideAction[] = [];
-
-  if (retryLabel) {
-    actions.push({ id: 'retry-employee-shift', label: retryLabel });
-    if (input.employeeHasReceipts) {
-      actions.push({ id: 'view-employee-receipts', label: 'View receipts' });
-    }
-  } else if (input.agentDockCollapsed) {
-    actions.push({ id: 'expand-agent-dock', label: 'Expand agent dock' });
-  }
-
-  actions.push({ id: 'open-team-roster', label: 'Open team' });
-
-  if (!input.terminalVisible) {
-    actions.push({ id: 'show-terminal', label: 'Show terminal' });
-  }
-
-  return actions;
-}
-
 export function buildIdeQuickGuide(input: {
   layoutMode: 'operator' | 'ide';
   agentDockCollapsed: boolean;
@@ -120,11 +52,10 @@ export function buildIdeQuickGuide(input: {
   runPhase: string | null;
   employeeFailureLine?: string | null;
   employeeShiftInterrupted?: boolean;
+  /** Continue shift / Retry shift — omitted when no active teammate record. */
   employeeRetryActionLabel?: string | null;
-  employeeHasReceipts?: boolean;
   requiredConnectorsUnavailable?: number;
   legacyConnectorGlanceVisible?: boolean;
-  watchConnected?: boolean;
 }): IdeQuickGuide | null {
   if (input.layoutMode !== 'ide') {
     return null;
@@ -132,7 +63,6 @@ export function buildIdeQuickGuide(input: {
 
   const requiredConnectorsUnavailable = input.requiredConnectorsUnavailable ?? 0;
   const legacyConnectorGlanceVisible = input.legacyConnectorGlanceVisible ?? false;
-  const watchConnected = input.watchConnected ?? true;
   const idleRun = input.runPhase !== 'executing' && input.runPhase !== 'review_ready';
 
   if (input.pendingApprovals > 0 && input.agentDockCollapsed) {
@@ -164,28 +94,19 @@ export function buildIdeQuickGuide(input: {
     const interrupted = Boolean(input.employeeShiftInterrupted);
     const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
     return {
-      title: retryLabel
-        ? interrupted
-          ? 'Shift interrupted — continue from the quick guide'
-          : 'Last shift failed — retry from the quick guide'
-        : interrupted
-          ? 'Shift interrupted — expand the agent dock to continue'
-          : 'Last shift failed — expand the agent dock to retry',
+      title: interrupted
+        ? 'Shift interrupted — expand the agent dock to continue'
+        : 'Last shift failed — expand the agent dock to retry',
       tone: interrupted ? 'interrupted' : 'failure',
-      actions: employeeFailureQuickGuideActions({
-        agentDockCollapsed: true,
-        terminalVisible: input.terminalVisible,
-        employeeRetryActionLabel: input.employeeRetryActionLabel,
-        employeeHasReceipts: input.employeeHasReceipts,
-      }),
-      steps: withEmployeeFailureDetail(
-        input.employeeFailureLine,
-        employeeFailureCollapsedDockSteps({
-          interrupted,
-          employeeRetryActionLabel: input.employeeRetryActionLabel,
-          employeeHasReceipts: input.employeeHasReceipts,
-        }),
-      ),
+      actions: [
+        { id: 'expand-agent-dock', label: 'Expand agent dock' },
+        ...(retryLabel ? [{ id: 'retry-employee-shift' as const, label: retryLabel }] : []),
+      ],
+      steps: withEmployeeFailureDetail(input.employeeFailureLine, [
+        'Ctrl/Cmd+\\ toggles the agent dock.',
+        employeeFailureBannerStep(interrupted),
+        'Click AGENT in the editor status bar or the right-edge reopen strip.',
+      ]),
     };
   }
 
@@ -197,49 +118,28 @@ export function buildIdeQuickGuide(input: {
     input.pendingApprovals <= 0
   ) {
     const interrupted = Boolean(input.employeeShiftInterrupted);
+    const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
+    const actions: IdeQuickGuideAction[] = [];
+    if (retryLabel) {
+      actions.push({ id: 'retry-employee-shift', label: retryLabel });
+    }
+    if (!input.terminalVisible) {
+      actions.push({ id: 'show-terminal', label: 'Show terminal' });
+    }
 
     return {
       title: interrupted
         ? 'Shift interrupted — retry from the agent dock banner'
         : 'Last shift failed — retry from the agent dock banner',
       tone: interrupted ? 'interrupted' : 'failure',
-      actions: employeeFailureQuickGuideActions({
-        agentDockCollapsed: false,
-        terminalVisible: input.terminalVisible,
-        employeeRetryActionLabel: input.employeeRetryActionLabel,
-        employeeHasReceipts: input.employeeHasReceipts,
-      }),
+      actions,
       steps: withEmployeeFailureDetail(input.employeeFailureLine, [
-        employeeFailureOpenDockStep({
-          interrupted,
-          employeeRetryActionLabel: input.employeeRetryActionLabel,
-        }),
+        employeeFailureComposerBannerStep(interrupted),
         'Open Team in the left sidebar to review receipts or talk it through.',
         ...(input.terminalVisible
           ? []
           : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
       ]),
-    };
-  }
-
-  if (idleRun && !watchConnected) {
-    const actions: IdeQuickGuideAction[] = [{ id: 'open-connectors', label: 'Open connectors' }];
-    if (!input.terminalVisible) {
-      actions.push({ id: 'show-terminal', label: 'Show terminal' });
-    }
-
-    return {
-      title: 'Watch offline — connector probes paused',
-      tone: 'attention',
-      actions,
-      steps: [
-        'Runtime probes pause until the watch reconnects.',
-        'Mission Control → Connectors shows live status once the stack is back up.',
-        'Refresh summary after the dev stack is healthy again.',
-        ...(input.terminalVisible
-          ? []
-          : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
-      ],
     };
   }
 

@@ -40,7 +40,6 @@ const requiredConnectorsUnavailable = computed(() =>
 );
 
 const runConnectorAttention = computed(() => ({
-  watchConnected: watchConnected.value,
   requiredConnectorsUnavailable: requiredConnectorsUnavailable.value,
   legacyConnectorGlanceVisible: isLegacyConnectorGlanceVisible({
     connectorsLoadState: shell.connectorsLoadState,
@@ -254,8 +253,7 @@ function selectView(view: IdeActivityView): void {
         'ide-activity-bar__button--run-attention':
           item.id === 'run' && runNeedsAttention,
         'ide-activity-bar__button--run-warning':
-          item.id === 'run' &&
-          (!watchConnected || requiredConnectorsUnavailable > 0),
+          item.id === 'run' && requiredConnectorsUnavailable > 0,
       }"
       :aria-label="itemAriaLabel(item)"
       :title="itemTitle(item)"
@@ -276,11 +274,6 @@ function selectView(view: IdeActivityView): void {
       >
         {{ requiredConnectorsUnavailable }}
       </span>
-      <span
-        v-else-if="item.id === 'run' && !watchConnected"
-        class="ide-activity-bar__pulse ide-activity-bar__pulse--warning"
-        aria-hidden="true"
-      />
       <span
         v-else-if="item.id === 'run' && runNeedsAttention"
         class="ide-activity-bar__pulse ide-activity-bar__pulse--glance"

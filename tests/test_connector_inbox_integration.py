@@ -86,6 +86,41 @@ class ConnectorInboxIntegrationTests(unittest.TestCase):
     @patch("app.signals.store.is_signal_acknowledged", return_value=False)
     @patch("app.signals.store.email_inbox_items", return_value=[])
     @patch("app.signals.store.probe_monitor_records", return_value=[])
+    def test_soft_cutover_tunnel_stays_out_of_inbox(
+        self, _monitors, _email, _acked
+    ) -> None:
+        payload = self.get_inbox_snapshot(
+            connector_records=[
+                {
+                    "connector_id": "control_plane",
+                    "display_name": "Control plane",
+                    "status": "ok",
+                    "required": True,
+                },
+                {
+                    "connector_id": "cloudflare_tunnel",
+                    "display_name": "Cloudflare tunnel",
+                    "status": "degraded",
+                    "required": False,
+                    "detail": "active soft cutover (public=axon-x control-plane)",
+                    "tunnel": {
+                        "ingress_matches_axon": False,
+                        "soft_origin_cutover": True,
+                        "remote_ingress_service": "http://localhost:7734",
+                    },
+                },
+            ]
+        )
+        signal_ids = [
+            str(item.get("signal_id"))
+            for item in payload.get("items", [])
+            if isinstance(item, dict)
+        ]
+        self.assertFalse(any(signal_id.startswith("signal_connector_") for signal_id in signal_ids))
+
+    @patch("app.signals.store.is_signal_acknowledged", return_value=False)
+    @patch("app.signals.store.email_inbox_items", return_value=[])
+    @patch("app.signals.store.probe_monitor_records", return_value=[])
     def test_optional_connector_failure_stays_out_of_inbox(
         self, _monitors, _email, _acked
     ) -> None:
@@ -119,45 +154,6 @@ class ConnectorInboxIntegrationTests(unittest.TestCase):
         ]
         self.assertFalse(any(signal_id.startswith("signal_connector_") for signal_id in signal_ids))
         self.assertNotIn(self.summary_degraded_signal_id, signal_ids)
-
-    @patch("app.signals.store.is_signal_acknowledged", return_value=False)
-    @patch("app.signals.store.email_inbox_items", return_value=[])
-    @patch("app.signals.store.probe_monitor_records", return_value=[])
-    def test_optional_tunnel_legacy_ingress_appears_in_inbox(
-        self, _monitors, _email, _acked
-    ) -> None:
-        payload = self.get_inbox_snapshot(
-            connector_records=[
-                {
-                    "connector_id": "control_plane",
-                    "display_name": "Control plane",
-                    "status": "ok",
-                    "required": True,
-                },
-                {
-                    "connector_id": "cloudflare_tunnel",
-                    "display_name": "Cloudflare tunnel",
-                    "status": "degraded",
-                    "required": False,
-                    "detail": "ingress still targets legacy Axon Local",
-                    "tunnel": {"ingress_matches_axon": False},
-                },
-            ]
-        )
-        signal_ids = [
-            str(item.get("signal_id"))
-            for item in payload.get("items", [])
-            if isinstance(item, dict)
-        ]
-        self.assertIn("signal_connector_cloudflare_tunnel_degraded", signal_ids)
-        connector_items = [
-            item
-            for item in payload["items"]
-            if str(item.get("source")) == "connector"
-        ]
-        self.assertEqual(1, len(connector_items))
-        self.assertEqual("high", connector_items[0]["severity"])
-        self.assertEqual("investigate", connector_items[0]["action_type"])
 
     @patch("app.signals.store.is_signal_acknowledged", return_value=False)
     @patch("app.signals.store.email_inbox_items", return_value=[])

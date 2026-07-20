@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computed, ref } from 'vue';
 
-import {
-  handleIdeQuickGuideAction,
-  openWatchConnectors,
-  useIdeEditorStatusBar,
-} from './useIdeEditorStatusBar';
-
 vi.mock('../lib/agent-dock-composer-focus', () => ({
   focusAgentDockComposerInput: vi.fn(),
 }));
+
+import {
+  handleIdeQuickGuideAction,
+  openEmployeeShiftRetry,
+  openWatchConnectors,
+  useIdeEditorStatusBar,
+} from './useIdeEditorStatusBar';
 
 function mockShell(overrides: Record<string, unknown> = {}) {
   return {
@@ -17,9 +18,9 @@ function mockShell(overrides: Record<string, unknown> = {}) {
     pendingApprovalsCount: 0,
     agentStreamActive: false,
     primaryActiveRun: null,
-    activeIdeEmployeeRecord: null,
     activeIdeEmployeeFailureLine: null,
     activeIdeEmployeeShiftInterrupted: false,
+    activeIdeEmployeeRecord: null,
     connectorsLoadState: 'loaded',
     connectorsItems: [],
     connectorsSummary: { required_unavailable: 0 },
@@ -28,7 +29,6 @@ function mockShell(overrides: Record<string, unknown> = {}) {
     focusWatchConnectors: vi.fn(),
     openIdeComposerWithDraft: vi.fn(),
     openIdeComposer: vi.fn(),
-    revealTeamRosterForActiveEmployee: vi.fn(),
     ...overrides,
   };
 }
@@ -64,32 +64,6 @@ describe('useIdeEditorStatusBar', () => {
     expect(ideQuickGuide.value?.title).toContain('Approval waiting');
   });
 
-  it('suppresses stale required-connector quick guide when watch is offline', () => {
-    const shell = mockShell({
-      agentDockCollapsed: false,
-      connectorsSummary: { required_unavailable: 2 },
-      runtimeSummary: { watch: { connected: false } },
-    });
-    const { ideEditorStatusConnectorChip, ideQuickGuide } = useIdeEditorStatusBar({
-      shell: shell as never,
-      workbenchLayoutMode: computed(() => 'ide'),
-      terminalPanelVisible: ref(false),
-      terminalReopenRunPhase: computed(() => null),
-      agentDockReopenState: computed(() => ({
-        streaming: false,
-        pendingApprovals: 0,
-        runPhase: null,
-      })),
-    });
-
-    expect(ideEditorStatusConnectorChip.value).toMatchObject({
-      id: 'watch-offline',
-      label: 'WATCH OFFLINE',
-    });
-    expect(ideQuickGuide.value?.title).toContain('Watch offline');
-    expect(ideQuickGuide.value?.title).not.toContain('connector down');
-  });
-
   it('hides terminal chip when the panel is already visible', () => {
     const { ideEditorStatusTerminalChip } = useIdeEditorStatusBar({
       shell: mockShell() as never,
@@ -106,22 +80,49 @@ describe('useIdeEditorStatusBar', () => {
     expect(ideEditorStatusTerminalChip.value).toBeNull();
   });
 
-  it('surfaces interrupted teammate guidance through the quick guide', () => {
+  it('suppresses stale connector-down guidance when watch is disconnected', () => {
     const shell = mockShell({
-      activeIdeEmployeeRecord: {
-        employee_id: 'jules',
-        name: 'Jules',
-        role: 'frontend',
-        role_label: 'Frontend',
-        owns: 'console UI',
-        enabled: true,
-        status: 'idle',
-        last_outcome: 'failed',
-        last_outcome_detail: 'Run interrupted by control-plane restart',
-      },
+      connectorsSummary: { required_unavailable: 2 },
+      runtimeSummary: { watch: { connected: false } },
+    });
+    const { ideEditorStatusConnectorChip, ideQuickGuide } = useIdeEditorStatusBar({
+      shell: shell as never,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
+    });
+
+    expect(ideEditorStatusConnectorChip.value).toBeNull();
+    expect(ideQuickGuide.value?.title).toContain('Panels closed');
+    expect(ideQuickGuide.value?.title).not.toContain('connectors down');
+  });
+
+  it('surfaces interrupted teammate guidance through the quick guide', () => {
+    const employee = {
+      employee_id: 'e1',
+      workspace_id: 'workspace_demo',
+      name: 'Jules',
+      role: 'frontend',
+      role_label: 'UI/UX',
+      schedule: 'continuous',
+      schedule_label: 'Continuous',
+      status: 'idle',
+      owns: 'console UI/UX',
+      enabled: true,
+      primary: false,
+      last_outcome: 'failed',
+      last_outcome_detail: 'Agent exited with status 143 (SIGTERM)',
+    };
+    const shell = mockShell({
       activeIdeEmployeeFailureLine:
         'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
       activeIdeEmployeeShiftInterrupted: true,
+      activeIdeEmployeeRecord: employee,
     });
     const { ideQuickGuide } = useIdeEditorStatusBar({
       shell: shell as never,
@@ -138,7 +139,11 @@ describe('useIdeEditorStatusBar', () => {
     });
 
     expect(ideQuickGuide.value?.tone).toBe('interrupted');
-    expect(ideQuickGuide.value?.title).toContain('continue from the quick guide');
+    expect(ideQuickGuide.value?.title).toContain('Shift interrupted');
+    expect(ideQuickGuide.value?.actions).toContainEqual({
+      id: 'retry-employee-shift',
+      label: 'Continue shift',
+    });
   });
 });
 
@@ -150,6 +155,36 @@ describe('openWatchConnectors', () => {
 
     expect(shell.loadConnectors).toHaveBeenCalledOnce();
     expect(shell.focusWatchConnectors).toHaveBeenCalledOnce();
+  });
+});
+
+describe('openEmployeeShiftRetry', () => {
+  it('opens the agent dock and seeds the composer with a retry draft', () => {
+    const employee = {
+      employee_id: 'e1',
+      workspace_id: 'workspace_demo',
+      name: 'Jules',
+      role: 'frontend',
+      role_label: 'UI/UX',
+      schedule: 'continuous',
+      schedule_label: 'Continuous',
+      status: 'idle',
+      owns: 'console UI/UX',
+      enabled: true,
+      primary: false,
+      last_outcome: 'failed',
+      last_outcome_detail: 'vitest assertion failed',
+    };
+    const shell = mockShell({ activeIdeEmployeeRecord: employee });
+    const showAgentDock = vi.fn();
+
+    openEmployeeShiftRetry({ shell: shell as never, showAgentDock });
+
+    expect(showAgentDock).toHaveBeenCalledOnce();
+    expect(shell.openIdeComposerWithDraft).toHaveBeenCalledOnce();
+    const draft = vi.mocked(shell.openIdeComposerWithDraft).mock.calls[0]?.[0] ?? '';
+    expect(draft).toContain('Jules');
+    expect(draft).toContain('vitest assertion failed');
   });
 });
 
@@ -198,18 +233,23 @@ describe('handleIdeQuickGuideAction', () => {
     expect(showAgentDock).not.toHaveBeenCalled();
   });
 
-  it('opens a retry draft for the active teammate', () => {
-    const shell = mockShell({
-      activeIdeEmployeeRecord: {
-        employee_id: 'jules',
-        name: 'Jules',
-        role: 'frontend',
-        role_label: 'Frontend',
-        owns: 'console UI',
-        enabled: true,
-        last_outcome_detail: 'vitest assertion failed',
-      },
-    });
+  it('retries the active teammate shift from the quick guide', () => {
+    const employee = {
+      employee_id: 'e1',
+      workspace_id: 'workspace_demo',
+      name: 'Jules',
+      role: 'frontend',
+      role_label: 'UI/UX',
+      schedule: 'continuous',
+      schedule_label: 'Continuous',
+      status: 'idle',
+      owns: 'console UI/UX',
+      enabled: true,
+      primary: false,
+      last_outcome: 'failed',
+      last_outcome_detail: 'timeout',
+    };
+    const shell = mockShell({ activeIdeEmployeeRecord: employee });
     const showAgentDock = vi.fn();
     const showTerminalPanel = vi.fn();
 
@@ -221,49 +261,6 @@ describe('handleIdeQuickGuideAction', () => {
 
     expect(showAgentDock).toHaveBeenCalledOnce();
     expect(shell.openIdeComposerWithDraft).toHaveBeenCalledOnce();
-    expect(String(shell.openIdeComposerWithDraft.mock.calls[0]?.[0])).toContain('Jules');
     expect(showTerminalPanel).not.toHaveBeenCalled();
-  });
-
-  it('opens receipts in ask mode when view receipts is chosen', () => {
-    const shell = mockShell({
-      activeIdeEmployeeRecord: {
-        employee_id: 'jules',
-        name: 'Jules',
-        role: 'frontend',
-        role_label: 'Frontend',
-        owns: 'console UI',
-        enabled: true,
-        last_run_id: 'run-123',
-        last_outcome_detail: 'vitest assertion failed',
-      },
-    });
-    const showAgentDock = vi.fn();
-    const showTerminalPanel = vi.fn();
-
-    handleIdeQuickGuideAction('view-employee-receipts', {
-      shell: shell as never,
-      showAgentDock,
-      showTerminalPanel,
-    });
-
-    expect(showAgentDock).toHaveBeenCalledOnce();
-    expect(shell.openIdeComposerWithDraft).toHaveBeenCalledOnce();
-    expect(String(shell.openIdeComposerWithDraft.mock.calls[0]?.[0])).toContain('run-123');
-  });
-
-  it('opens the team roster for the active teammate', () => {
-    const shell = mockShell();
-    const showAgentDock = vi.fn();
-    const showTerminalPanel = vi.fn();
-
-    handleIdeQuickGuideAction('open-team-roster', {
-      shell: shell as never,
-      showAgentDock,
-      showTerminalPanel,
-    });
-
-    expect(shell.revealTeamRosterForActiveEmployee).toHaveBeenCalledOnce();
-    expect(showAgentDock).not.toHaveBeenCalled();
   });
 });

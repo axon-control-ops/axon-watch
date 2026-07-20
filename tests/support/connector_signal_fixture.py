@@ -4,6 +4,7 @@ from __future__ import annotations
 
 CONNECTOR_SIGNAL_ID = "signal_connector_console_web_unavailable"
 CONNECTOR_WORKSPACE_ID = "workspace_axon_watch"
+
 CONNECTOR_PROBE_DETAIL = "status=503"
 
 CONNECTOR_INBOX_ITEM = {

@@ -3,10 +3,8 @@ import { computed, onMounted, ref } from 'vue';
 
 import {
   buildConnectorRailRows,
-  buildConnectorsRailSummaryLabel,
-  buildConnectorsRailWatchOfflineBody,
-  connectorsRailEmphasized,
-  connectorsRailProbeListVisible,
+  buildConnectorRailSummaryLabel,
+  connectorRailNeedsEmphasis,
 } from '../../lib/connector-rail-view';
 import { useShellStore } from '../../stores/shell';
 
@@ -16,30 +14,19 @@ const reprobingConnectorId = ref<string | null>(null);
 const rows = computed(() => buildConnectorRailRows(shell.connectorsItems));
 const loading = computed(() => shell.connectorsLoadState === 'loading');
 const watchConnected = computed(() => shell.runtimeSummary?.watch.connected ?? false);
-
 const emphasized = computed(() =>
-  connectorsRailEmphasized({
-    watchConnected: watchConnected.value,
+  connectorRailNeedsEmphasis({
     summary: shell.connectorsSummary,
+    watchConnected: watchConnected.value,
   }),
 );
 const summaryLabel = computed(() =>
-  buildConnectorsRailSummaryLabel({
+  buildConnectorRailSummaryLabel({
     loading: loading.value,
-    watchConnected: watchConnected.value,
     summary: shell.connectorsSummary,
-  }),
-);
-
-const probeListVisible = computed(() =>
-  connectorsRailProbeListVisible({
-    loading: loading.value,
     watchConnected: watchConnected.value,
-    hasError: Boolean(shell.connectorsError),
   }),
 );
-
-const watchOfflineBody = buildConnectorsRailWatchOfflineBody();
 
 function openLegacyFallback(url: string): void {
   window.open(url, '_blank', 'noopener,noreferrer');
@@ -80,11 +67,7 @@ onMounted(() => {
   <section
     id="watch-connectors-rail"
     class="connectors-rail-panel"
-    :class="{
-      'connectors-rail-panel--emphasized': emphasized,
-      'connectors-rail-panel--watch-offline':
-        !watchConnected && !loading && !shell.connectorsError,
-    }"
+    :class="{ 'connectors-rail-panel--emphasized': emphasized }"
     aria-label="Watch connectors"
   >
     <header class="connectors-rail-panel__header">
@@ -101,15 +84,7 @@ onMounted(() => {
 
     <p v-else-if="loading" class="connectors-rail-panel__status">Loading connectors…</p>
 
-    <p
-      v-else-if="!watchConnected"
-      class="connectors-rail-panel__status connectors-rail-panel__status--offline"
-      role="status"
-    >
-      {{ watchOfflineBody }}
-    </p>
-
-    <ul v-else-if="probeListVisible && rows.length" class="connectors-rail-panel__list">
+    <ul v-else-if="rows.length" class="connectors-rail-panel__list">
       <li
         v-for="row in rows"
         :key="row.connectorId"

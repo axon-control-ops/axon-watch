@@ -60,24 +60,64 @@ describe('buildIdeAgentSidebarStub', () => {
     expect(executing.lines[0]).toContain('Run in progress');
     expect(reviewReady.lines[0]).toContain('Review ready');
   });
+
+  it('surfaces failed teammate shift guidance when the dock is collapsed', () => {
+    const failureLine = 'Last shift failed: vitest assertion failed';
+    const panel = buildIdeAgentSidebarStub({
+      agentDockCollapsed: true,
+      streaming: false,
+      pendingApprovals: 0,
+      runPhase: null,
+      employeeFailureLine: failureLine,
+    });
+
+    expect(panel.tone).toBe('failure');
+    expect(panel.lines[0]).toBe(failureLine);
+    expect(panel.lines.join(' ')).toContain('Retry shift');
+    expect(panel.actionLabel).toBe('Expand agent dock');
+  });
+
+  it('surfaces interrupted teammate shift guidance when the dock is collapsed', () => {
+    const panel = buildIdeAgentSidebarStub({
+      agentDockCollapsed: true,
+      streaming: false,
+      pendingApprovals: 0,
+      runPhase: null,
+      employeeFailureLine:
+        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+      employeeShiftInterrupted: true,
+    });
+
+    expect(panel.tone).toBe('interrupted');
+    expect(panel.lines.join(' ')).toContain('Continue shift');
+    expect(panel.lines.join(' ')).not.toContain('Retry shift in the failure banner');
+  });
+
+  it('keeps failure guidance below approvals and streaming', () => {
+    expect(
+      buildIdeAgentSidebarStub({
+        agentDockCollapsed: true,
+        streaming: false,
+        pendingApprovals: 1,
+        runPhase: null,
+        employeeFailureLine: 'Last shift failed: timeout',
+      }).lines[0],
+    ).toContain('approval');
+    expect(
+      buildIdeAgentSidebarStub({
+        agentDockCollapsed: true,
+        streaming: true,
+        pendingApprovals: 0,
+        runPhase: null,
+        employeeFailureLine: 'Last shift failed: timeout',
+      }).lines[0],
+    ).toContain('responding');
+  });
 });
 
 describe('buildIdeRunPanelConnectorNotice', () => {
-  it('surfaces watch offline guidance before stale connector counts', () => {
-    const notice = buildIdeRunPanelConnectorNotice({
-      watchConnected: false,
-      requiredConnectorsUnavailable: 2,
-      legacyConnectorGlanceVisible: true,
-    });
-
-    expect(notice?.tone).toBe('attention');
-    expect(notice?.lines[0]).toContain('Watch offline');
-    expect(notice?.actionLabel).toBe('Open connectors');
-  });
-
   it('surfaces required connector attention in the Run panel', () => {
     const notice = buildIdeRunPanelConnectorNotice({
-      watchConnected: true,
       requiredConnectorsUnavailable: 2,
       legacyConnectorGlanceVisible: false,
     });
@@ -89,7 +129,6 @@ describe('buildIdeRunPanelConnectorNotice', () => {
 
   it('surfaces legacy connector guidance when optional Axon Local is offline', () => {
     const notice = buildIdeRunPanelConnectorNotice({
-      watchConnected: true,
       requiredConnectorsUnavailable: 0,
       legacyConnectorGlanceVisible: true,
     });
@@ -102,7 +141,6 @@ describe('buildIdeRunPanelConnectorNotice', () => {
   it('returns null when connectors are healthy', () => {
     expect(
       buildIdeRunPanelConnectorNotice({
-        watchConnected: true,
         requiredConnectorsUnavailable: 0,
         legacyConnectorGlanceVisible: false,
       }),

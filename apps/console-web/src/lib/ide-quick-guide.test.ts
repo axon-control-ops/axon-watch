@@ -59,32 +59,13 @@ describe('buildIdeQuickGuide', () => {
       employeeRetryActionLabel: 'Retry shift',
     });
 
-    expect(guide?.title).toContain('retry from the quick guide');
+    expect(guide?.title).toContain('Last shift failed');
     expect(guide?.tone).toBe('failure');
     expect(guide?.steps[0]).toBe(failureLine);
-    expect(guide?.steps.join(' ')).toContain('Click Retry shift above');
-    expect(guide?.steps.join(' ')).not.toContain('Use Retry shift in the failure banner');
-    expect(guide?.actions.map((action) => action.id)).toEqual([
-      'retry-employee-shift',
-      'open-team-roster',
-      'show-terminal',
-    ]);
-    expect(guide?.actions[0]?.label).toBe('Retry shift');
-  });
-
-  it('keeps expand-dock copy when a failed shift has no inline retry action', () => {
-    const failureLine = 'Last shift failed: vitest assertion failed';
-    const guide = buildIdeQuickGuide({
-      ...base,
-      employeeFailureLine: failureLine,
-    });
-
-    expect(guide?.title).toContain('expand the agent dock');
-    expect(guide?.steps.join(' ')).toContain('failure banner');
-    expect(guide?.actions.map((action) => action.id)).toEqual([
-      'expand-agent-dock',
-      'open-team-roster',
-      'show-terminal',
+    expect(guide?.steps.join(' ')).toContain('Retry shift');
+    expect(guide?.actions).toEqual([
+      { id: 'expand-agent-dock', label: 'Expand agent dock' },
+      { id: 'retry-employee-shift', label: 'Retry shift' },
     ]);
   });
 
@@ -97,9 +78,12 @@ describe('buildIdeQuickGuide', () => {
       employeeRetryActionLabel: 'Continue shift',
     });
 
-    expect(guide?.title).toContain('continue from the quick guide');
-    expect(guide?.steps.join(' ')).toContain('Click Continue shift above');
-    expect(guide?.steps.join(' ')).not.toContain('Use Continue shift in the failure banner');
+    expect(guide?.steps.join(' ')).toContain('Continue shift');
+    expect(guide?.steps.join(' ')).not.toContain('Retry shift in the failure banner');
+    expect(guide?.actions).toContainEqual({
+      id: 'retry-employee-shift',
+      label: 'Continue shift',
+    });
   });
 
   it('guides interrupted teammate shifts to continue rather than retry', () => {
@@ -128,12 +112,9 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.title).toContain('Last shift failed');
     expect(guide?.tone).toBe('failure');
     expect(guide?.steps[0]).toBe(failureLine);
-    expect(guide?.steps.join(' ')).toContain('Click Retry shift above');
+    expect(guide?.steps.join(' ')).toContain('Retry shift');
     expect(guide?.steps.join(' ')).toContain('agent dock composer');
-    expect(guide?.actions.map((action) => action.id)).toEqual([
-      'retry-employee-shift',
-      'open-team-roster',
-    ]);
+    expect(guide?.actions).toEqual([{ id: 'retry-employee-shift', label: 'Retry shift' }]);
   });
 
   it('offers terminal reopen when the dock is open and a shift was interrupted', () => {
@@ -149,28 +130,9 @@ describe('buildIdeQuickGuide', () => {
 
     expect(guide?.title).toContain('Shift interrupted');
     expect(guide?.tone).toBe('interrupted');
-    expect(guide?.actions.map((action) => action.id)).toEqual([
-      'retry-employee-shift',
-      'open-team-roster',
-      'show-terminal',
-    ]);
-    expect(guide?.actions[0]?.label).toBe('Continue shift');
-  });
-
-  it('offers view receipts when the failed teammate has a dock receipt run', () => {
-    const guide = buildIdeQuickGuide({
-      ...base,
-      employeeFailureLine: 'Last shift failed: timeout',
-      employeeRetryActionLabel: 'Retry shift',
-      employeeHasReceipts: true,
-    });
-
-    expect(guide?.steps.join(' ')).toContain('View receipts above');
-    expect(guide?.actions.map((action) => action.id)).toEqual([
-      'retry-employee-shift',
-      'view-employee-receipts',
-      'open-team-roster',
-      'show-terminal',
+    expect(guide?.actions).toEqual([
+      { id: 'retry-employee-shift', label: 'Continue shift' },
+      { id: 'show-terminal', label: 'Show terminal' },
     ]);
   });
 
@@ -309,39 +271,6 @@ describe('buildIdeQuickGuide', () => {
       'open-connectors',
       'show-terminal',
     ]);
-  });
-
-  it('surfaces watch offline guidance instead of stale connector counts', () => {
-    const guide = buildIdeQuickGuide({
-      ...base,
-      watchConnected: false,
-      requiredConnectorsUnavailable: 2,
-    });
-
-    expect(guide?.tone).toBe('attention');
-    expect(guide?.title).toContain('Watch offline');
-    expect(guide?.steps.join(' ')).toContain('Runtime probes pause');
-    expect(guide?.actions.map((action) => action.id)).toEqual([
-      'open-connectors',
-      'show-terminal',
-    ]);
-  });
-
-  it('keeps watch offline guidance below approvals and streaming', () => {
-    expect(
-      buildIdeQuickGuide({
-        ...base,
-        watchConnected: false,
-        pendingApprovals: 1,
-      })?.title,
-    ).toContain('Approval waiting');
-    expect(
-      buildIdeQuickGuide({
-        ...base,
-        watchConnected: false,
-        streaming: true,
-      })?.title,
-    ).toContain('responding');
   });
 
   it('surfaces legacy connector guidance when optional Axon Local is offline', () => {

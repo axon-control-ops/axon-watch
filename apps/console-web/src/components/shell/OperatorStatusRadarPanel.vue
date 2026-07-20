@@ -227,7 +227,6 @@ const quickGuide = computed(() =>
     terminalVisible: props.terminalVisible,
     legacyConnectorGlanceVisible: legacyConnectorGlanceVisible.value,
     requiredConnectorsUnavailable: requiredConnectorsUnavailable.value,
-    watchConnected: watchConnected.value,
   }),
 );
 

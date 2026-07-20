@@ -1,4 +1,9 @@
-export type IdeSidebarStubTone = 'neutral' | 'attention' | 'streaming';
+export type IdeSidebarStubTone =
+  | 'neutral'
+  | 'attention'
+  | 'streaming'
+  | 'failure'
+  | 'interrupted';
 
 export type IdeSidebarStubPanel = {
   lines: string[];
@@ -10,12 +15,21 @@ function approvalPhrase(count: number): string {
   return `${count} approval${count === 1 ? '' : 's'} waiting`;
 }
 
+function employeeFailureSidebarStep(interrupted: boolean): string {
+  const action = interrupted ? 'Continue shift' : 'Retry shift';
+  return interrupted
+    ? `Expand the dock and use ${action} in the failure banner to pick up where you left off.`
+    : `Expand the dock and use ${action} in the failure banner, or open Team to talk it through.`;
+}
+
 /** Copy and CTA for the IDE left-rail agent stub when the dock lives on the right. */
 export function buildIdeAgentSidebarStub(input: {
   agentDockCollapsed: boolean;
   streaming: boolean;
   pendingApprovals: number;
   runPhase: string | null;
+  employeeFailureLine?: string | null;
+  employeeShiftInterrupted?: boolean;
 }): IdeSidebarStubPanel {
   if (!input.agentDockCollapsed) {
     return {
@@ -46,6 +60,21 @@ export function buildIdeAgentSidebarStub(input: {
       lines: [
         'Agent is responding — expand the dock to follow the conversation.',
         'Ctrl/Cmd+\\ · editor status bar · right-edge reopen strip.',
+      ],
+      actionLabel: 'Expand agent dock',
+    };
+  }
+
+  const failureLine = (input.employeeFailureLine ?? '').trim();
+  const idleRun = input.runPhase !== 'executing' && input.runPhase !== 'review_ready';
+  if (failureLine && idleRun) {
+    const interrupted = Boolean(input.employeeShiftInterrupted);
+    return {
+      tone: interrupted ? 'interrupted' : 'failure',
+      lines: [
+        failureLine,
+        employeeFailureSidebarStep(interrupted),
+        'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
       ],
       actionLabel: 'Expand agent dock',
     };
@@ -91,22 +120,9 @@ export type IdeRunPanelConnectorNotice = {
 
 /** Watch-lane connector notice for the IDE Run sidebar when probes need attention. */
 export function buildIdeRunPanelConnectorNotice(input: {
-  watchConnected: boolean;
   requiredConnectorsUnavailable: number;
   legacyConnectorGlanceVisible: boolean;
 }): IdeRunPanelConnectorNotice | null {
-  if (!input.watchConnected) {
-    return {
-      tone: 'attention',
-      lines: [
-        'Watch offline — runtime probes paused until the watch reconnects.',
-        'Mission Control → Connectors shows live status once the stack is back up.',
-        'Refresh summary after the dev stack is healthy again.',
-      ],
-      actionLabel: 'Open connectors',
-    };
-  }
-
   const required = input.requiredConnectorsUnavailable;
   if (required > 0) {
     return {

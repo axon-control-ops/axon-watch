@@ -3,7 +3,7 @@
 **Purpose:** Turn the readiness assessment into a strict, ordered build plan.  
 **Source of truth:** `docs/AXON-X-AUTONOMY-READINESS.md`  
 **Created:** 20 July 2026  
-**Target:** Bounded autonomy for DashPro app work, then a secure Axon-X mobile control plane
+**Target:** Bounded autonomy so any bound workspace can work in its own project/app, proven first on DashPro, then a secure Axon-X mobile control plane
 
 ---
 
@@ -11,11 +11,11 @@
 
 Build a system where:
 
-1. DashPro can work on the DashPro app without a human babysitting every step.
+1. Workspaces can work on/in their own projects and apps without a human babysitting every step.
 2. Axon-X can build and operate its own mobile control plane under the same safety rules.
 3. Dangerous actions stay blocked unless a human explicitly approves them.
 
-This is **bounded autonomy**, not unlimited power.
+This is **bounded autonomy**, not unlimited power. DashPro is the first proving ground for the multi-workspace rule; the same controls must apply to every bound workspace (including `workspace_axon_watch`).
 
 ---
 

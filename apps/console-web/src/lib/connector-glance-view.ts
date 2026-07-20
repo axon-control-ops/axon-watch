@@ -1,9 +1,6 @@
 import type { ConnectorProbeRecord } from '../api/control-plane';
 
-export type ConnectorStatusBarChipId =
-  | 'connector-glance'
-  | 'connector-required-alert'
-  | 'watch-offline';
+export type ConnectorStatusBarChipId = 'connector-glance' | 'connector-required-alert';
 
 export type ConnectorStatusBarChip = {
   id: ConnectorStatusBarChipId;
@@ -43,11 +40,7 @@ export function isLegacyConnectorGlanceVisible(input: ConnectorStatusBarChipInpu
 }
 
 export function isConnectorStatusBarChip(id: string): id is ConnectorStatusBarChipId {
-  return (
-    id === 'connector-glance' ||
-    id === 'connector-required-alert' ||
-    id === 'watch-offline'
-  );
+  return id === 'connector-glance' || id === 'connector-required-alert';
 }
 
 function requiredConnectorAlertLabel(count: number): string {

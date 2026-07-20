@@ -1,23 +1,20 @@
 import { computed, type ComputedRef, type Ref } from 'vue';
 
 import { employeeComposerOpenPayload } from '../features/workspace-agents/company-roster-actions';
-import {
-  employeeDockReceiptRunId,
-  employeeFailureRetryActionLabel,
-} from '../features/workspace-agents/company-roster-view';
-import { buildIdeQuickGuide, type IdeQuickGuideActionId } from '../lib/ide-quick-guide';
+import { employeeFailureRetryActionLabel } from '../features/workspace-agents/company-roster-view';
+import { focusAgentDockComposerInput } from '../lib/agent-dock-composer-focus';
+import type { AgentDockReopenState } from '../lib/agent-dock-reopen-view';
 import {
   effectiveRequiredConnectorsUnavailable,
   isLegacyConnectorGlanceVisible,
 } from '../lib/connector-glance-view';
+import { requestIdeComposerMode } from '../lib/ide-composer-restore-request';
+import { buildIdeQuickGuide, type IdeQuickGuideActionId } from '../lib/ide-quick-guide';
 import {
   buildIdeEditorStatusAgentChip,
   buildIdeEditorStatusConnectorChip,
   buildIdeEditorStatusTerminalChip,
 } from '../lib/ide-editor-status-view';
-import type { AgentDockReopenState } from '../lib/agent-dock-reopen-view';
-import { focusAgentDockComposerInput } from '../lib/agent-dock-composer-focus';
-import { requestIdeComposerMode } from '../lib/ide-composer-restore-request';
 import { useShellStore } from '../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -63,6 +60,7 @@ export function useIdeEditorStatusBar(input: {
   const ideQuickGuide = computed(() => {
     const watchConnected = shell.runtimeSummary?.watch.connected ?? false;
     const employee = shell.activeIdeEmployeeRecord;
+    const employeeFailureLine = shell.activeIdeEmployeeFailureLine;
     return buildIdeQuickGuide({
       layoutMode: workbenchLayoutMode.value,
       agentDockCollapsed: shell.agentDockCollapsed,
@@ -70,10 +68,12 @@ export function useIdeEditorStatusBar(input: {
       pendingApprovals: shell.pendingApprovalsCount,
       streaming: shell.agentStreamActive,
       runPhase: shell.primaryActiveRun?.phase ?? null,
-      employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+      employeeFailureLine,
       employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-      employeeRetryActionLabel: employee ? employeeFailureRetryActionLabel(employee) : null,
-      employeeHasReceipts: employee ? Boolean(employeeDockReceiptRunId(employee)) : false,
+      employeeRetryActionLabel:
+        employee && (employeeFailureLine ?? '').trim()
+          ? employeeFailureRetryActionLabel(employee)
+          : null,
       requiredConnectorsUnavailable: effectiveRequiredConnectorsUnavailable(
         shell.connectorsSummary,
         watchConnected,
@@ -82,10 +82,9 @@ export function useIdeEditorStatusBar(input: {
         connectorsLoadState: shell.connectorsLoadState,
         items: shell.connectorsItems,
         summary: shell.connectorsSummary,
-        watchConnected,
+        watchConnected: shell.runtimeSummary?.watch.connected ?? false,
         layoutMode: workbenchLayoutMode.value,
       }),
-      watchConnected,
     });
   });
 
@@ -102,23 +101,22 @@ export function openWatchConnectors(shell: ShellStore): void {
   shell.focusWatchConnectors();
 }
 
-function openEmployeeComposerAction(
-  shell: ShellStore,
-  showAgentDock: () => void,
-  kind: 'retry' | 'receipts',
-): void {
-  const row = shell.activeIdeEmployeeRecord;
-  if (!row) {
+export function openEmployeeShiftRetry(input: {
+  shell: ShellStore;
+  showAgentDock: () => void;
+}): void {
+  const employee = input.shell.activeIdeEmployeeRecord;
+  if (!employee) {
     return;
   }
 
-  showAgentDock();
-  const { mode, draft } = employeeComposerOpenPayload(row, kind);
+  input.showAgentDock();
+  const { mode, draft } = employeeComposerOpenPayload(employee, 'retry');
   requestIdeComposerMode(mode);
   if (draft) {
-    shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
+    input.shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
   } else {
-    shell.openIdeComposer({ keepActivityView: true });
+    input.shell.openIdeComposer({ keepActivityView: true });
   }
   focusAgentDockComposerInput();
 }
@@ -131,21 +129,6 @@ export function handleIdeQuickGuideAction(
     showTerminalPanel: () => void;
   },
 ): void {
-  if (actionId === 'retry-employee-shift') {
-    openEmployeeComposerAction(input.shell, input.showAgentDock, 'retry');
-    return;
-  }
-
-  if (actionId === 'view-employee-receipts') {
-    openEmployeeComposerAction(input.shell, input.showAgentDock, 'receipts');
-    return;
-  }
-
-  if (actionId === 'open-team-roster') {
-    input.shell.revealTeamRosterForActiveEmployee();
-    return;
-  }
-
   if (actionId === 'expand-agent-dock') {
     input.showAgentDock();
     return;
@@ -153,6 +136,11 @@ export function handleIdeQuickGuideAction(
 
   if (actionId === 'open-connectors') {
     openWatchConnectors(input.shell);
+    return;
+  }
+
+  if (actionId === 'retry-employee-shift') {
+    openEmployeeShiftRetry(input);
     return;
   }
 

@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildConnectorRailRows,
-  buildConnectorsRailSummaryLabel,
-  buildConnectorsRailWatchOfflineBody,
-  connectorsRailEmphasized,
-  connectorsRailProbeListVisible,
+  buildConnectorRailSummaryLabel,
+  connectorRailNeedsEmphasis,
 } from './connector-rail-view';
 
 describe('buildConnectorRailRows', () => {
@@ -29,47 +27,6 @@ describe('buildConnectorRailRows', () => {
     expect(row.tunnelStartAllowed).toBe(false);
   });
 
-  it('hides probe rows when the watch is offline', () => {
-    expect(buildConnectorsRailWatchOfflineBody()).toContain('Watch offline');
-    expect(
-      connectorsRailProbeListVisible({
-        loading: false,
-        watchConnected: false,
-        hasError: false,
-      }),
-    ).toBe(false);
-    expect(
-      connectorsRailProbeListVisible({
-        loading: false,
-        watchConnected: true,
-        hasError: false,
-      }),
-    ).toBe(true);
-    expect(
-      connectorsRailProbeListVisible({
-        loading: true,
-        watchConnected: true,
-        hasError: false,
-      }),
-    ).toBe(false);
-  });
-
-  it('shows watch offline instead of stale required-down counts', () => {
-    expect(
-      buildConnectorsRailSummaryLabel({
-        loading: false,
-        watchConnected: false,
-        summary: { configured: 3, ok: 1, required_unavailable: 2 },
-      }),
-    ).toBe('Watch offline');
-    expect(
-      connectorsRailEmphasized({
-        watchConnected: false,
-        summary: { configured: 3, ok: 1, required_unavailable: 2 },
-      }),
-    ).toBe(false);
-  });
-
   it('passes through probe failure detail for operator visibility', () => {
     const [row] = buildConnectorRailRows([
       {
@@ -84,5 +41,47 @@ describe('buildConnectorRailRows', () => {
     expect(row.detail).toBe('Connection refused on http://127.0.0.1:4173/api/health');
     expect(row.tone).toBe('unavailable');
     expect(row.required).toBe(true);
+  });
+});
+
+describe('buildConnectorRailSummaryLabel', () => {
+  const summary = { configured: 3, ok: 2, required_unavailable: 1 };
+
+  it('shows loading copy while probes refresh', () => {
+    expect(
+      buildConnectorRailSummaryLabel({ loading: true, summary, watchConnected: true }),
+    ).toBe('Loading…');
+  });
+
+  it('pauses counts when watch is offline', () => {
+    expect(
+      buildConnectorRailSummaryLabel({ loading: false, summary, watchConnected: false }),
+    ).toBe('Watch offline — probe counts paused');
+  });
+
+  it('uses effective required-down counts when watch is connected', () => {
+    expect(
+      buildConnectorRailSummaryLabel({ loading: false, summary, watchConnected: true }),
+    ).toBe('2/3 ok · 1 required down');
+  });
+});
+
+describe('connectorRailNeedsEmphasis', () => {
+  it('suppresses emphasis when watch is offline', () => {
+    expect(
+      connectorRailNeedsEmphasis({
+        summary: { configured: 3, ok: 1, required_unavailable: 2 },
+        watchConnected: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('emphasizes when required connectors are down', () => {
+    expect(
+      connectorRailNeedsEmphasis({
+        summary: { configured: 3, ok: 1, required_unavailable: 2 },
+        watchConnected: true,
+      }),
+    ).toBe(true);
   });
 });
