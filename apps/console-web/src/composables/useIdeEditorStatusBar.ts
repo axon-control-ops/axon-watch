@@ -1,13 +1,23 @@
 import { computed, type ComputedRef, type Ref } from 'vue';
 
+import { employeeComposerOpenPayload } from '../features/workspace-agents/company-roster-actions';
+import {
+  employeeDockReceiptRunId,
+  employeeFailureRetryActionLabel,
+} from '../features/workspace-agents/company-roster-view';
 import { buildIdeQuickGuide, type IdeQuickGuideActionId } from '../lib/ide-quick-guide';
-import { isLegacyConnectorGlanceVisible } from '../lib/connector-glance-view';
+import {
+  effectiveRequiredConnectorsUnavailable,
+  isLegacyConnectorGlanceVisible,
+} from '../lib/connector-glance-view';
 import {
   buildIdeEditorStatusAgentChip,
   buildIdeEditorStatusConnectorChip,
   buildIdeEditorStatusTerminalChip,
 } from '../lib/ide-editor-status-view';
 import type { AgentDockReopenState } from '../lib/agent-dock-reopen-view';
+import { focusAgentDockComposerInput } from '../lib/agent-dock-composer-focus';
+import { requestIdeComposerMode } from '../lib/ide-composer-restore-request';
 import { useShellStore } from '../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -50,8 +60,10 @@ export function useIdeEditorStatusBar(input: {
     }),
   );
 
-  const ideQuickGuide = computed(() =>
-    buildIdeQuickGuide({
+  const ideQuickGuide = computed(() => {
+    const watchConnected = shell.runtimeSummary?.watch.connected ?? false;
+    const employee = shell.activeIdeEmployeeRecord;
+    return buildIdeQuickGuide({
       layoutMode: workbenchLayoutMode.value,
       agentDockCollapsed: shell.agentDockCollapsed,
       terminalVisible: terminalPanelVisible.value,
@@ -60,16 +72,22 @@ export function useIdeEditorStatusBar(input: {
       runPhase: shell.primaryActiveRun?.phase ?? null,
       employeeFailureLine: shell.activeIdeEmployeeFailureLine,
       employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-      requiredConnectorsUnavailable: shell.connectorsSummary?.required_unavailable ?? 0,
+      employeeRetryActionLabel: employee ? employeeFailureRetryActionLabel(employee) : null,
+      employeeHasReceipts: employee ? Boolean(employeeDockReceiptRunId(employee)) : false,
+      requiredConnectorsUnavailable: effectiveRequiredConnectorsUnavailable(
+        shell.connectorsSummary,
+        watchConnected,
+      ),
       legacyConnectorGlanceVisible: isLegacyConnectorGlanceVisible({
         connectorsLoadState: shell.connectorsLoadState,
         items: shell.connectorsItems,
         summary: shell.connectorsSummary,
-        watchConnected: shell.runtimeSummary?.watch.connected ?? false,
+        watchConnected,
         layoutMode: workbenchLayoutMode.value,
       }),
-    }),
-  );
+      watchConnected,
+    });
+  });
 
   return {
     ideEditorStatusTerminalChip,
@@ -84,6 +102,27 @@ export function openWatchConnectors(shell: ShellStore): void {
   shell.focusWatchConnectors();
 }
 
+function openEmployeeComposerAction(
+  shell: ShellStore,
+  showAgentDock: () => void,
+  kind: 'retry' | 'receipts',
+): void {
+  const row = shell.activeIdeEmployeeRecord;
+  if (!row) {
+    return;
+  }
+
+  showAgentDock();
+  const { mode, draft } = employeeComposerOpenPayload(row, kind);
+  requestIdeComposerMode(mode);
+  if (draft) {
+    shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
+  } else {
+    shell.openIdeComposer({ keepActivityView: true });
+  }
+  focusAgentDockComposerInput();
+}
+
 export function handleIdeQuickGuideAction(
   actionId: IdeQuickGuideActionId,
   input: {
@@ -92,6 +131,21 @@ export function handleIdeQuickGuideAction(
     showTerminalPanel: () => void;
   },
 ): void {
+  if (actionId === 'retry-employee-shift') {
+    openEmployeeComposerAction(input.shell, input.showAgentDock, 'retry');
+    return;
+  }
+
+  if (actionId === 'view-employee-receipts') {
+    openEmployeeComposerAction(input.shell, input.showAgentDock, 'receipts');
+    return;
+  }
+
+  if (actionId === 'open-team-roster') {
+    input.shell.revealTeamRosterForActiveEmployee();
+    return;
+  }
+
   if (actionId === 'expand-agent-dock') {
     input.showAgentDock();
     return;

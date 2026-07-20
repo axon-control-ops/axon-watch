@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildConnectorGlanceChip,
   buildRequiredConnectorAlertChip,
+  effectiveRequiredConnectorsUnavailable,
   isConnectorStatusBarChip,
   isLegacyConnectorGlanceVisible,
 } from './connector-glance-view';
@@ -19,6 +20,7 @@ describe('connector glance view', () => {
   it('identifies status-bar connector chips', () => {
     expect(isConnectorStatusBarChip('connector-glance')).toBe(true);
     expect(isConnectorStatusBarChip('connector-required-alert')).toBe(true);
+    expect(isConnectorStatusBarChip('watch-offline')).toBe(true);
     expect(isConnectorStatusBarChip('phase')).toBe(false);
   });
 
@@ -57,6 +59,35 @@ describe('connector glance view', () => {
       summary: { required_unavailable: 1 },
     });
     expect(chip?.label).toBe('1 REQUIRED CONNECTOR DOWN');
+  });
+
+  it('suppresses required-unavailable counts when watch is offline', () => {
+    expect(
+      effectiveRequiredConnectorsUnavailable({ required_unavailable: 2 }, false),
+    ).toBe(0);
+    expect(
+      effectiveRequiredConnectorsUnavailable({ required_unavailable: 2 }, true),
+    ).toBe(2);
+  });
+
+  it('hides connector status-bar chips when the watch is offline', () => {
+    const offlineInput = {
+      ...baseInput,
+      watchConnected: false,
+      summary: { required_unavailable: 2 },
+      items: [
+        {
+          connector_id: 'axon_local',
+          display_name: 'Legacy Axon Local',
+          required: false,
+          status: 'unavailable',
+        },
+      ],
+    };
+
+    expect(buildRequiredConnectorAlertChip(offlineInput)).toBeNull();
+    expect(buildConnectorGlanceChip(offlineInput)).toBeNull();
+    expect(isLegacyConnectorGlanceVisible(offlineInput)).toBe(false);
   });
 
   it('hides the legacy glance when required connectors are already alerting', () => {

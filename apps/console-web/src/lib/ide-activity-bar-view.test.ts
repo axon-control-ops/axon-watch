@@ -27,8 +27,22 @@ describe('ide activity bar view', () => {
     expect(ideActivityBarSidebarAriaLabel('team', true)).toBe('Collapse workspace team sidebar');
   });
 
+  it('surfaces watch offline on the Run activity button before stale counts', () => {
+    const offline = {
+      watchConnected: false,
+      requiredConnectorsUnavailable: 0,
+      legacyConnectorGlanceVisible: false,
+    };
+    expect(ideActivityBarRunNeedsAttention(offline)).toBe(true);
+    expect(ideActivityBarRunTitle(false, offline)).toBe('Run · Watch offline');
+    expect(ideActivityBarRunAriaLabel(false, offline)).toBe(
+      'Expand run sidebar, watch offline',
+    );
+  });
+
   it('surfaces connector attention on the Run activity button', () => {
     const required = {
+      watchConnected: true,
       requiredConnectorsUnavailable: 2,
       legacyConnectorGlanceVisible: false,
     };
@@ -41,6 +55,7 @@ describe('ide activity bar view', () => {
     );
 
     const legacy = {
+      watchConnected: true,
       requiredConnectorsUnavailable: 0,
       legacyConnectorGlanceVisible: true,
     };
@@ -48,6 +63,7 @@ describe('ide activity bar view', () => {
     expect(ideActivityBarRunTitle(false, legacy)).toContain('Legacy Axon Local offline');
 
     const healthy = {
+      watchConnected: true,
       requiredConnectorsUnavailable: 0,
       legacyConnectorGlanceVisible: false,
     };

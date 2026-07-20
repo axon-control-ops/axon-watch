@@ -293,24 +293,3 @@
   letter-spacing: 0.08em;
 }
 
-.connectors-rail-panel__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.connectors-rail-panel__eyebrow {
-  margin: 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.connectors-rail-panel__title {
-  margin: 0.1rem 0 0;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-

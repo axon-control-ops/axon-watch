@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import io
 import os
+import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.persistence import attachment_store, chat_store
-from app.terminal.session_registry import ensure_agent_session, list_sessions, reset_registry
+CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
+sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+
+from app.main import app  # noqa: E402
+from app.persistence import attachment_store, chat_store  # noqa: E402
+from app.terminal.session_registry import ensure_agent_session, list_sessions, reset_registry  # noqa: E402
 
 
 class ChatParitySliceTests(unittest.TestCase):
@@ -91,6 +96,51 @@ class ChatParitySliceTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual("image/png", response.headers.get("content-type"))
         self.assertIn("inline", response.headers.get("content-disposition", "").lower())
+
+    def test_upload_pdf_and_csv_attachments(self) -> None:
+        pdf_upload = self.client.post(
+            "/api/chat/attachments",
+            data={"workspace_id": "workspace_alpha"},
+            files={"file": ("brief.pdf", io.BytesIO(b"%PDF-1.4 sample"), "application/pdf")},
+        )
+        self.assertEqual(200, pdf_upload.status_code)
+        self.assertEqual("application/pdf", pdf_upload.json()["mime_type"])
+
+        csv_upload = self.client.post(
+            "/api/chat/attachments",
+            data={"workspace_id": "workspace_alpha"},
+            files={"file": ("report.csv", io.BytesIO(b"a,b\n1,2\n"), "text/csv")},
+        )
+        self.assertEqual(200, csv_upload.status_code)
+        self.assertEqual("text/csv", csv_upload.json()["mime_type"])
+
+        # Browsers often send CSV as octet-stream — infer from filename.
+        inferred = self.client.post(
+            "/api/chat/attachments",
+            data={"workspace_id": "workspace_alpha"},
+            files={
+                "file": (
+                    "ledger.csv",
+                    io.BytesIO(b"sku,qty\nA,3\n"),
+                    "application/octet-stream",
+                )
+            },
+        )
+        self.assertEqual(200, inferred.status_code)
+        self.assertEqual("text/csv", inferred.json()["mime_type"])
+
+        rejected = self.client.post(
+            "/api/chat/attachments",
+            data={"workspace_id": "workspace_alpha"},
+            files={"file": ("payload.exe", io.BytesIO(b"MZ"), "application/x-msdownload")},
+        )
+        self.assertEqual(400, rejected.status_code)
+
+        pdf_id = pdf_upload.json()["attachment_id"]
+        response = self.client.get(f"/api/chat/attachments/{pdf_id}")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("application/pdf", response.headers.get("content-type"))
+        self.assertIn("attachment", response.headers.get("content-disposition", "").lower())
 
     def test_list_and_create_workspace_chat_threads(self) -> None:
         with patch(

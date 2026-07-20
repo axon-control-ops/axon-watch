@@ -1,4 +1,4 @@
-"""Persisted chat image attachments for Lane B composer uploads."""
+"""Persisted chat attachments for Lane B composer uploads (images + documents)."""
 
 from __future__ import annotations
 
@@ -25,6 +25,34 @@ _ATTACHMENT_COLUMNS = (
 
 _MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
 _ALLOWED_MIME_PREFIXES = ("image/",)
+_ALLOWED_MIME_TYPES = frozenset(
+    {
+        "application/pdf",
+        "application/csv",
+        "application/json",
+        "application/vnd.ms-excel",
+        "text/csv",
+        "text/tab-separated-values",
+        "text/plain",
+        "text/markdown",
+    }
+)
+_GENERIC_UPLOAD_MIME_TYPES = frozenset(
+    {
+        "",
+        "application/octet-stream",
+        "binary/octet-stream",
+    }
+)
+_EXTENSION_MIME_TYPES = {
+    ".csv": "text/csv",
+    ".tsv": "text/tab-separated-values",
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".markdown": "text/markdown",
+    ".json": "application/json",
+}
 
 
 class AttachmentNotFoundError(LookupError):
@@ -79,13 +107,33 @@ def _row_to_record(row: Any) -> dict[str, Any]:
     }
 
 
+def _guess_mime_from_filename(filename: str) -> str:
+    suffix = Path(str(filename or "").strip()).suffix.lower()
+    if suffix in _EXTENSION_MIME_TYPES:
+        return _EXTENSION_MIME_TYPES[suffix]
+    guessed, _ = mimetypes.guess_type(str(filename or ""))
+    return str(guessed or "").strip().lower()
+
+
+def _resolve_mime_type(filename: str, mime_type: str) -> str:
+    clean = str(mime_type or "").strip().lower()
+    if clean not in _GENERIC_UPLOAD_MIME_TYPES:
+        return clean
+    guessed = _guess_mime_from_filename(filename)
+    return guessed or clean
+
+
 def _validate_mime_type(mime_type: str) -> str:
     clean = str(mime_type or "").strip().lower()
     if not clean:
         raise AttachmentValidationError("attachment mime_type is required")
-    if not any(clean.startswith(prefix) for prefix in _ALLOWED_MIME_PREFIXES):
-        raise AttachmentValidationError("only image attachments are supported")
-    return clean
+    if clean in _ALLOWED_MIME_TYPES:
+        return clean
+    if any(clean.startswith(prefix) for prefix in _ALLOWED_MIME_PREFIXES):
+        return clean
+    raise AttachmentValidationError(
+        "unsupported attachment type (images, PDF, CSV, and text files are allowed)"
+    )
 
 
 def _safe_filename(filename: str, mime_type: str) -> str:
@@ -134,7 +182,7 @@ def save_upload(
     if len(data) > _MAX_ATTACHMENT_BYTES:
         raise AttachmentValidationError("attachment exceeds 8MB limit")
 
-    clean_mime = _validate_mime_type(mime_type)
+    clean_mime = _validate_mime_type(_resolve_mime_type(filename, mime_type))
     safe_name = _safe_filename(filename, clean_mime)
     attachment_id = f"attachment_{uuid4().hex}"
     workspace_dir = _attachments_root() / clean_workspace_id

@@ -91,6 +91,35 @@ describe('buildIdeEditorStatusConnectorChip', () => {
       }),
     ).toBeNull();
   });
+
+  it('shows watch offline instead of stale connector counts', () => {
+    expect(
+      buildIdeEditorStatusConnectorChip({
+        ...base,
+        watchConnected: false,
+        summary: { required_unavailable: 2 },
+      }),
+    ).toMatchObject({
+      id: 'watch-offline',
+      label: 'WATCH OFFLINE',
+      tone: 'warning',
+    });
+    expect(
+      buildIdeEditorStatusConnectorChip({
+        ...base,
+        watchConnected: false,
+        summary: { required_unavailable: 0 },
+        items: [
+          {
+            connector_id: 'axon_local',
+            display_name: 'Axon Local',
+            status: 'unavailable',
+            required: false,
+          },
+        ],
+      })?.id,
+    ).toBe('watch-offline');
+  });
 });
 
 describe('buildIdeEditorStatusTerminalChip', () => {

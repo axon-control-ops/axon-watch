@@ -90,9 +90,11 @@ export function buildOperatorQuickGuide(input: {
   terminalVisible: boolean;
   legacyConnectorGlanceVisible?: boolean;
   requiredConnectorsUnavailable?: number;
+  watchConnected?: boolean;
 }): OperatorQuickGuide | null {
   const legacyConnectorGlanceVisible = input.legacyConnectorGlanceVisible ?? false;
   const requiredConnectorsUnavailable = input.requiredConnectorsUnavailable ?? 0;
+  const watchConnected = input.watchConnected ?? true;
   if (input.layoutMode !== 'operator') {
     return null;
   }
@@ -110,6 +112,25 @@ export function buildOperatorQuickGuide(input: {
         'Center Mission Control → APPROVE RUN or REJECT RUN.',
         'Left sidebar → Attention to read why approval was requested.',
         'Right dock → KAIRO Briefing for the short summary.',
+        ...(input.terminalVisible ? [] : terminalReopenSteps()),
+      ],
+    };
+  }
+
+  if (!watchConnected && !input.hasActiveRun) {
+    const actions: OperatorQuickGuideAction[] = [openConnectorsAction()];
+    if (!input.terminalVisible) {
+      actions.push(showTerminalAction());
+    }
+    actions.push({ id: 'switch-to-ide', label: 'Switch to IDE' });
+    return {
+      title: 'Watch offline — connector probes paused',
+      tone: 'attention',
+      actions,
+      steps: [
+        'Watch offline — connector probes paused until the watch reconnects.',
+        'Mission Control → Connectors shows live status once the stack is back up.',
+        'Refresh summary after ./scripts/dev/up.sh is healthy again.',
         ...(input.terminalVisible ? [] : terminalReopenSteps()),
       ],
     };

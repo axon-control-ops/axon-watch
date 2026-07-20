@@ -66,6 +66,18 @@ function connectorChipAriaLabel(id: ConnectorStatusBarChipId, label: string): st
 export function buildIdeEditorStatusConnectorChip(
   input: IdeEditorStatusConnectorChipInput,
 ): IdeEditorStatusConnectorChip | null {
+  if (!input.watchConnected) {
+    const title =
+      'Watch offline — connector probes paused until the watch reconnects';
+    return {
+      id: 'watch-offline',
+      label: 'WATCH OFFLINE',
+      tone: 'warning',
+      title,
+      ariaLabel: `WATCH OFFLINE. ${title}.`,
+    };
+  }
+
   const chipInput = {
     ...input,
     layoutMode: 'ide' as const,

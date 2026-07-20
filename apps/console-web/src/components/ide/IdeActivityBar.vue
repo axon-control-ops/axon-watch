@@ -18,7 +18,10 @@ import {
   ideActivityBarSidebarAriaLabel,
   ideActivityBarSidebarTitle,
 } from '../../lib/ide-activity-bar-view';
-import { isLegacyConnectorGlanceVisible } from '../../lib/connector-glance-view';
+import {
+  effectiveRequiredConnectorsUnavailable,
+  isLegacyConnectorGlanceVisible,
+} from '../../lib/connector-glance-view';
 import {
   ideActivityBarTerminalAriaLabel,
   ideActivityBarTerminalTitle,
@@ -30,8 +33,15 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 
+const watchConnected = computed(() => shell.runtimeSummary?.watch.connected ?? false);
+
+const requiredConnectorsUnavailable = computed(() =>
+  effectiveRequiredConnectorsUnavailable(shell.connectorsSummary, watchConnected.value),
+);
+
 const runConnectorAttention = computed(() => ({
-  requiredConnectorsUnavailable: shell.connectorsSummary?.required_unavailable ?? 0,
+  watchConnected: watchConnected.value,
+  requiredConnectorsUnavailable: requiredConnectorsUnavailable.value,
   legacyConnectorGlanceVisible: isLegacyConnectorGlanceVisible({
     connectorsLoadState: shell.connectorsLoadState,
     items: shell.connectorsItems,
@@ -245,7 +255,7 @@ function selectView(view: IdeActivityView): void {
           item.id === 'run' && runNeedsAttention,
         'ide-activity-bar__button--run-warning':
           item.id === 'run' &&
-          (shell.connectorsSummary?.required_unavailable ?? 0) > 0,
+          (!watchConnected || requiredConnectorsUnavailable > 0),
       }"
       :aria-label="itemAriaLabel(item)"
       :title="itemTitle(item)"
@@ -260,12 +270,17 @@ function selectView(view: IdeActivityView): void {
         {{ shell.pendingApprovalsCount }}
       </span>
       <span
-        v-else-if="item.id === 'run' && (shell.connectorsSummary?.required_unavailable ?? 0) > 0"
+        v-else-if="item.id === 'run' && requiredConnectorsUnavailable > 0"
         class="ide-activity-bar__badge ide-activity-bar__badge--warning"
         aria-hidden="true"
       >
-        {{ shell.connectorsSummary?.required_unavailable }}
+        {{ requiredConnectorsUnavailable }}
       </span>
+      <span
+        v-else-if="item.id === 'run' && !watchConnected"
+        class="ide-activity-bar__pulse ide-activity-bar__pulse--warning"
+        aria-hidden="true"
+      />
       <span
         v-else-if="item.id === 'run' && runNeedsAttention"
         class="ide-activity-bar__pulse ide-activity-bar__pulse--glance"

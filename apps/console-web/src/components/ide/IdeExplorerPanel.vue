@@ -3,7 +3,10 @@ import { computed, ref } from 'vue';
 
 import WorkspaceFileTree from '../WorkspaceFileTree.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
-import { isLegacyConnectorGlanceVisible } from '../../lib/connector-glance-view';
+import {
+  effectiveRequiredConnectorsUnavailable,
+  isLegacyConnectorGlanceVisible,
+} from '../../lib/connector-glance-view';
 import {
   buildIdeAgentSidebarStub,
   buildIdeRunPanelConnectorNotice,
@@ -48,7 +51,11 @@ const terminalSidebarStub = computed(() =>
 
 const runConnectorNotice = computed(() =>
   buildIdeRunPanelConnectorNotice({
-    requiredConnectorsUnavailable: shell.connectorsSummary?.required_unavailable ?? 0,
+    watchConnected: shell.runtimeSummary?.watch.connected ?? false,
+    requiredConnectorsUnavailable: effectiveRequiredConnectorsUnavailable(
+      shell.connectorsSummary,
+      shell.runtimeSummary?.watch.connected ?? false,
+    ),
     legacyConnectorGlanceVisible: isLegacyConnectorGlanceVisible({
       connectorsLoadState: shell.connectorsLoadState,
       items: shell.connectorsItems,

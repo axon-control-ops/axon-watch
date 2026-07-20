@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  composerAttachmentExtensionLabel,
   readClipboardImages,
+  readComposerImageFiles,
   readDroppedImages,
   shouldAcceptComposerFileDrop,
   shouldInterceptComposerImagePaste,
@@ -29,7 +31,7 @@ describe('composer clipboard paste', () => {
     expect(shouldInterceptComposerImagePaste(images)).toBe(true);
   });
 
-  it('ignores non-image clipboard items', () => {
+  it('ignores non-file clipboard items', () => {
     const event = {
       clipboardData: {
         items: [
@@ -62,5 +64,25 @@ describe('composer clipboard paste', () => {
     expect(
       shouldAcceptComposerFileDrop({ dataTransfer: { types: ['Files'] } } as unknown as DragEvent),
     ).toBe(true);
+  });
+
+  it('accepts csv and pdf files from the attachment picker path', () => {
+    const csv = new File(['a,b\n1,2'], 'report.csv', { type: 'text/csv' });
+    const pdf = new File(['%PDF-1.4'], 'brief.pdf', { type: 'application/pdf' });
+    const rejected = new File(['MZ'], 'tool.exe', { type: 'application/x-msdownload' });
+
+    const attachments = readComposerImageFiles([csv, pdf, rejected]);
+    expect(attachments.map((item) => item.name)).toEqual(['report.csv', 'brief.pdf']);
+    expect(attachments[0]?.mimeType).toBe('text/csv');
+    expect(attachments[1]?.mimeType).toBe('application/pdf');
+    expect(composerAttachmentExtensionLabel('report.csv', 'text/csv')).toBe('CSV');
+    expect(composerAttachmentExtensionLabel('brief.pdf', 'application/pdf')).toBe('PDF');
+  });
+
+  it('infers csv mime type from filename when browser omits type', () => {
+    const csv = new File(['name,value\nx,1'], 'vault.csv', { type: '' });
+    const attachments = readComposerImageFiles([csv]);
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]?.mimeType).toBe('text/csv');
   });
 });

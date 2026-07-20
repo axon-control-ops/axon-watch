@@ -21,9 +21,10 @@
     "dev:axon-watch": "cd services/axon-watch && ../../scripts/dev/python.sh -m uvicorn app.main:app --host 127.0.0.1 --port ${AXON_WATCH_WATCH_SERVICE_PORT:-8788}",
     "verify:shared-types": "npm run verify -w @contracts/shared-types",
     "verify:file-sizes": "./scripts/dev/python.sh scripts/guardrails/check_file_sizes.py",
+    "verify:css-imports": "./scripts/dev/python.sh scripts/guardrails/check_css_import_order.py",
     "verify:hotspot-changes": "./scripts/dev/python.sh scripts/guardrails/check_hotspot_changes.py",
-    "verify:preflight": "./scripts/dev/python.sh scripts/verify/check_dependency_directions.py --strict-pending && ./scripts/dev/python.sh scripts/verify/check_dto_sizes.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json --strict-pending && npm run verify:file-sizes",
-    "verify:contracts": "npm run verify:shared-types && npm run verify:file-sizes && ./scripts/verify/run_contract_unit_tests.sh",
+    "verify:preflight": "./scripts/dev/python.sh scripts/verify/check_dependency_directions.py --strict-pending && ./scripts/dev/python.sh scripts/verify/check_dto_sizes.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json --strict-pending && npm run verify:file-sizes && npm run verify:css-imports",
+    "verify:contracts": "npm run verify:shared-types && npm run verify:file-sizes && npm run verify:css-imports && ./scripts/verify/run_contract_unit_tests.sh",
     "verify:test0": "./scripts/verify/test0-workspace-smoke.sh",
     "verify:test1": "./scripts/verify/test1-workspace-project-connection.sh",
     "verify:test2": "./scripts/verify/test2-workspace-handoff.sh",
@@ -75,7 +76,7 @@
     "verify:parity-d6": "./scripts/verify/parity-d6-dock-and-startup.sh",
     "verify:phase-d": "./scripts/verify/phase-d-platform-retirement.sh",
     "verify:production-operator": "./scripts/verify/production-operator-smoke.sh",
-    "verify:console-web": "npm run typecheck -w @axon-watch/console-web && npm run test -w @axon-watch/console-web && npm run build -w @axon-watch/console-web",
+    "verify:console-web": "npm run verify:css-imports && npm run typecheck -w @axon-watch/console-web && npm run test -w @axon-watch/console-web && npm run build -w @axon-watch/console-web",
     "docs:handbook-pdf": "./scripts/docs/build-howto-handbook-pdf.sh",
     "verify": "npm run verify:contracts && npm run verify:console-web && ./scripts/dev/python.sh scripts/verify/all.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json --shell-boot-report scripts/verify/fixtures/shell-boot-report.dev.json --runtime-latency-samples scripts/verify/fixtures/runtime-summary-latency.ci.json --watch-latency-samples scripts/verify/fixtures/watch-summary-latency.ci.json"
   }

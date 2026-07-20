@@ -1,6 +1,9 @@
 import type { ConnectorProbeRecord } from '../api/control-plane';
 
-export type ConnectorStatusBarChipId = 'connector-glance' | 'connector-required-alert';
+export type ConnectorStatusBarChipId =
+  | 'connector-glance'
+  | 'connector-required-alert'
+  | 'watch-offline';
 
 export type ConnectorStatusBarChip = {
   id: ConnectorStatusBarChipId;
@@ -14,6 +17,17 @@ export type ConnectorGlanceChip = ConnectorStatusBarChip & { id: 'connector-glan
 type ConnectorsSummary = {
   required_unavailable: number;
 };
+
+/** Required-unavailable counts are stale when watch is offline — suppress misleading UI. */
+export function effectiveRequiredConnectorsUnavailable(
+  summary: ConnectorsSummary | null,
+  watchConnected: boolean,
+): number {
+  if (!watchConnected) {
+    return 0;
+  }
+  return summary?.required_unavailable ?? 0;
+}
 
 export type ConnectorStatusBarChipInput = {
   connectorsLoadState: 'idle' | 'loading' | 'loaded' | 'error';
@@ -29,7 +43,11 @@ export function isLegacyConnectorGlanceVisible(input: ConnectorStatusBarChipInpu
 }
 
 export function isConnectorStatusBarChip(id: string): id is ConnectorStatusBarChipId {
-  return id === 'connector-glance' || id === 'connector-required-alert';
+  return (
+    id === 'connector-glance' ||
+    id === 'connector-required-alert' ||
+    id === 'watch-offline'
+  );
 }
 
 function requiredConnectorAlertLabel(count: number): string {

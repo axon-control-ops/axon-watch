@@ -75,7 +75,7 @@ def build_lane_b_context_block(context: LaneBContext) -> str:
         lines.append(context.terminal_snippet.strip())
 
     if context.image_paths:
-        lines.append("Attached images (absolute paths):")
+        lines.append("Attached files (absolute paths):")
         for image_path in context.image_paths:
             lines.append(image_path)
 

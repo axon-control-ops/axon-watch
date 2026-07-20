@@ -45,6 +45,7 @@ export function ideActivityBarExplorerAriaLabel(expanded: boolean): string {
 }
 
 export type IdeActivityBarRunAttentionInput = {
+  watchConnected: boolean;
   requiredConnectorsUnavailable: number;
   legacyConnectorGlanceVisible: boolean;
 };
@@ -53,6 +54,10 @@ export type IdeActivityBarRunAttentionInput = {
 export function ideActivityBarRunNeedsAttention(
   input: IdeActivityBarRunAttentionInput,
 ): boolean {
+  if (!input.watchConnected) {
+    return true;
+  }
+
   return (
     input.requiredConnectorsUnavailable > 0 || input.legacyConnectorGlanceVisible
   );
@@ -62,6 +67,10 @@ export function ideActivityBarRunNeedsAttention(
 export function ideActivityBarRunAttentionHint(
   input: IdeActivityBarRunAttentionInput,
 ): string | null {
+  if (!input.watchConnected) {
+    return 'Watch offline';
+  }
+
   if (input.requiredConnectorsUnavailable > 0) {
     const count = input.requiredConnectorsUnavailable;
     return count === 1

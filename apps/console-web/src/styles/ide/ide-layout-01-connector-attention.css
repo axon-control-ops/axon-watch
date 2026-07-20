@@ -1,0 +1,26 @@
+/* Run activity-bar connector attention pulse — extracted from ide-layout-01.css */
+
+.ide-activity-bar__pulse--warning {
+  background: rgba(255, 190, 110, 0.92);
+  box-shadow: 0 0 8px rgba(255, 159, 0, 0.45);
+  animation: ide-activity-bar-pulse-warning 1.8s ease-in-out infinite;
+}
+
+@keyframes ide-activity-bar-pulse-warning {
+  0%,
+  100% {
+    opacity: 0.82;
+    box-shadow: 0 0 6px rgba(255, 159, 0, 0.35);
+  }
+
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(255, 190, 110, 0.68);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ide-activity-bar__pulse--warning {
+    animation: none;
+  }
+}

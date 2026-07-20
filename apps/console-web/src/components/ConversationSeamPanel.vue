@@ -11,7 +11,6 @@ import {
   systemMessagePreview,
 } from '../lib/thread-message-view';
 import { thinkingPreview } from '../lib/agent-transcript-blocks';
-import { resolveChatAttachmentUrl } from '../api/control-plane';
 import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from './ide/AgentFileReadBlock.vue';
 import ConversationAgentStructuredBlock from './ide/ConversationAgentStructuredBlock.vue';
@@ -22,6 +21,7 @@ import IdeAgentThreadStatusStrip from './ide/IdeAgentThreadStatusStrip.vue';
 import ConversationSeamTerminalBlock from './conversation/ConversationSeamTerminalBlock.vue';
 import OperatorMessageActions from './conversation/OperatorMessageActions.vue';
 import ConversationSeamAttachmentLightbox from './conversation/ConversationSeamAttachmentLightbox.vue';
+import ConversationSeamMessageAttachments from './conversation/ConversationSeamMessageAttachments.vue';
 import { createConversationSeamAnswerBridge } from '../lib/conversation-seam-question-answers';
 import { useConversationSeamPanel } from './conversation/useConversationSeamPanel';
 
@@ -62,7 +62,7 @@ const {
   displayItemKey,
   attachmentUrlForImagePath,
   applyArtifactAction,
-  messageImageAttachments,
+  messageAttachments,
   enlargedAttachment,
   openAttachmentPreview,
   closeAttachmentLightbox,
@@ -224,27 +224,10 @@ const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(convers
           </time>
         </div>
 
-        <div
-          v-if="messageImageAttachments(item.message).length"
-          class="conversation-seam__attachments conversation-seam__attachments--thread"
-          aria-label="Message attachments"
-        >
-          <button
-            v-for="attachment in messageImageAttachments(item.message)"
-            :key="attachment.attachment_id"
-            type="button"
-            class="conversation-seam__attachment-card conversation-seam__attachment-card--thread"
-            :title="`Preview ${attachment.filename}`"
-            @click="openAttachmentPreview(attachment)"
-          >
-            <img
-              class="conversation-seam__attachment-preview"
-              :src="resolveChatAttachmentUrl(attachment.url)"
-              :alt="attachment.filename"
-              loading="lazy"
-            >
-          </button>
-        </div>
+        <ConversationSeamMessageAttachments
+          :attachments="messageAttachments(item.message)"
+          @preview="openAttachmentPreview"
+        />
 
         <p
           v-if="item.message.role === 'system' && shouldCollapseSystemMessage(item.message.content) && !isSystemExpanded(item.message.message_id)"

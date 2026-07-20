@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildConnectorRailRows } from './connector-rail-view';
+import {
+  buildConnectorRailRows,
+  buildConnectorsRailSummaryLabel,
+  buildConnectorsRailWatchOfflineBody,
+  connectorsRailEmphasized,
+  connectorsRailProbeListVisible,
+} from './connector-rail-view';
 
 describe('buildConnectorRailRows', () => {
   it('only marks an Axon-X-owned tunnel as managed', () => {
@@ -21,6 +27,47 @@ describe('buildConnectorRailRows', () => {
     expect(row.tunnelRunning).toBe(true);
     expect(row.tunnelManaged).toBe(false);
     expect(row.tunnelStartAllowed).toBe(false);
+  });
+
+  it('hides probe rows when the watch is offline', () => {
+    expect(buildConnectorsRailWatchOfflineBody()).toContain('Watch offline');
+    expect(
+      connectorsRailProbeListVisible({
+        loading: false,
+        watchConnected: false,
+        hasError: false,
+      }),
+    ).toBe(false);
+    expect(
+      connectorsRailProbeListVisible({
+        loading: false,
+        watchConnected: true,
+        hasError: false,
+      }),
+    ).toBe(true);
+    expect(
+      connectorsRailProbeListVisible({
+        loading: true,
+        watchConnected: true,
+        hasError: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('shows watch offline instead of stale required-down counts', () => {
+    expect(
+      buildConnectorsRailSummaryLabel({
+        loading: false,
+        watchConnected: false,
+        summary: { configured: 3, ok: 1, required_unavailable: 2 },
+      }),
+    ).toBe('Watch offline');
+    expect(
+      connectorsRailEmphasized({
+        watchConnected: false,
+        summary: { configured: 3, ok: 1, required_unavailable: 2 },
+      }),
+    ).toBe(false);
   });
 
   it('passes through probe failure detail for operator visibility', () => {

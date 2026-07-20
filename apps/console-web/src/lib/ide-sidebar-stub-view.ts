@@ -91,9 +91,22 @@ export type IdeRunPanelConnectorNotice = {
 
 /** Watch-lane connector notice for the IDE Run sidebar when probes need attention. */
 export function buildIdeRunPanelConnectorNotice(input: {
+  watchConnected: boolean;
   requiredConnectorsUnavailable: number;
   legacyConnectorGlanceVisible: boolean;
 }): IdeRunPanelConnectorNotice | null {
+  if (!input.watchConnected) {
+    return {
+      tone: 'attention',
+      lines: [
+        'Watch offline — runtime probes paused until the watch reconnects.',
+        'Mission Control → Connectors shows live status once the stack is back up.',
+        'Refresh summary after the dev stack is healthy again.',
+      ],
+      actionLabel: 'Open connectors',
+    };
+  }
+
   const required = input.requiredConnectorsUnavailable;
   if (required > 0) {
     return {

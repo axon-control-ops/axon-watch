@@ -2,7 +2,9 @@ import { ref } from 'vue';
 
 import {
   type ComposerClipboardImage,
+  COMPOSER_ATTACHMENT_ACCEPT,
   composerImageFromStored,
+  isComposerImageMime,
   readClipboardImages,
   readComposerImageFiles,
   readDroppedImages,
@@ -87,6 +89,12 @@ export function useComposerImages() {
   }
 
   function openComposerImage(image: ComposerClipboardImage): void {
+    if (!isComposerImageMime(image.mimeType)) {
+      if (typeof window !== 'undefined') {
+        window.open(image.previewUrl, '_blank', 'noopener,noreferrer');
+      }
+      return;
+    }
     enlargedComposerImage.value = image;
   }
 
@@ -114,7 +122,7 @@ export function useComposerImages() {
     }
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = COMPOSER_ATTACHMENT_ACCEPT;
     input.multiple = true;
     input.addEventListener('change', () => {
       addComposerImages(readComposerImageFiles(input.files));

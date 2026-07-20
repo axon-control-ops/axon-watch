@@ -13,36 +13,105 @@ export type StoredComposerAttachment = {
   dataUrl: string;
 };
 
-function imageTypeFromFilename(name: string): string {
+/** File picker accept list for composer attachments (images + common documents).
+ * Document extensions are listed first so Linux/GTK dialogs don't default to "Image Files".
+ */
+export const COMPOSER_ATTACHMENT_ACCEPT =
+  '.pdf,.csv,.tsv,.txt,.md,.markdown,.json,application/pdf,text/csv,text/tab-separated-values,text/plain,text/markdown,application/json,image/*';
+
+const EXTENSION_MIME_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  bmp: 'image/bmp',
+  avif: 'image/avif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  pdf: 'application/pdf',
+  csv: 'text/csv',
+  tsv: 'text/tab-separated-values',
+  txt: 'text/plain',
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  json: 'application/json',
+};
+
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/csv',
+  'application/json',
+  'application/vnd.ms-excel',
+  'text/csv',
+  'text/tab-separated-values',
+  'text/plain',
+  'text/markdown',
+]);
+
+function mimeTypeFromFilename(name: string): string {
   const ext = name.trim().toLowerCase().split('.').pop();
-  const types: Record<string, string> = {
-    png: 'image/png',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    webp: 'image/webp',
-    gif: 'image/gif',
-    bmp: 'image/bmp',
-    avif: 'image/avif',
-    heic: 'image/heic',
-    heif: 'image/heif',
-  };
-  return types[ext ?? ''] ?? '';
+  return EXTENSION_MIME_TYPES[ext ?? ''] ?? '';
 }
 
-function fileLooksLikeComposerImage(file: File): boolean {
-  const mimeType = file.type.trim() || imageTypeFromFilename(file.name);
-  return mimeType.startsWith('image/');
+function resolveComposerAttachmentMime(file: File): string {
+  const fromFile = file.type.trim().toLowerCase();
+  if (fromFile && fromFile !== 'application/octet-stream') {
+    return fromFile;
+  }
+  return mimeTypeFromFilename(file.name) || fromFile;
+}
+
+export function isComposerImageMime(mimeType: string): boolean {
+  return mimeType.trim().toLowerCase().startsWith('image/');
+}
+
+function fileLooksLikeComposerAttachment(file: File): boolean {
+  const mimeType = resolveComposerAttachmentMime(file);
+  if (isComposerImageMime(mimeType)) {
+    return true;
+  }
+  return ALLOWED_DOCUMENT_MIME_TYPES.has(mimeType);
 }
 
 function buildComposerClipboardImage(file: File, index: number): ComposerClipboardImage {
-  const mimeType = file.type.trim() || imageTypeFromFilename(file.name);
+  const mimeType = resolveComposerAttachmentMime(file);
   return {
-    id: `composer-image-${Date.now()}-${index}`,
-    name: file.name?.trim() || 'attached-image',
+    id: `composer-attachment-${Date.now()}-${index}`,
+    name: file.name?.trim() || (isComposerImageMime(mimeType) ? 'attached-image' : 'attached-file'),
     previewUrl: URL.createObjectURL(file),
     mimeType,
     file,
   };
+}
+
+export function composerAttachmentExtensionLabel(name: string, mimeType: string): string {
+  const fromName = name.trim().toLowerCase().split('.').pop()?.trim();
+  if (fromName && fromName !== name.trim().toLowerCase() && fromName.length <= 8) {
+    return fromName.toUpperCase();
+  }
+  if (isComposerImageMime(mimeType)) {
+    return 'IMG';
+  }
+  if (mimeType.includes('pdf')) {
+    return 'PDF';
+  }
+  if (mimeType.includes('csv') || mimeType.includes('excel')) {
+    return 'CSV';
+  }
+  if (mimeType.includes('tab-separated')) {
+    return 'TSV';
+  }
+  if (mimeType.includes('json')) {
+    return 'JSON';
+  }
+  if (mimeType.includes('markdown')) {
+    return 'MD';
+  }
+  if (mimeType.startsWith('text/')) {
+    return 'TXT';
+  }
+  return 'FILE';
 }
 
 export function readComposerImageFiles(files: FileList | File[] | null | undefined): ComposerClipboardImage[] {
@@ -53,7 +122,7 @@ export function readComposerImageFiles(files: FileList | File[] | null | undefin
   const images: ComposerClipboardImage[] = [];
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
-    if (!file || !fileLooksLikeComposerImage(file)) {
+    if (!file || !fileLooksLikeComposerAttachment(file)) {
       continue;
     }
     images.push(buildComposerClipboardImage(file, index));
@@ -75,7 +144,7 @@ export function readClipboardImages(event: ClipboardEvent): ComposerClipboardIma
     }
 
     const file = item.getAsFile();
-    if (!file || !fileLooksLikeComposerImage(file)) {
+    if (!file || !fileLooksLikeComposerAttachment(file)) {
       continue;
     }
 
@@ -150,9 +219,9 @@ function readFileAsDataUrl(file: File): Promise<string> {
         resolve(reader.result);
         return;
       }
-      reject(new Error('Unable to read image attachment'));
+      reject(new Error('Unable to read attachment'));
     };
-    reader.onerror = () => reject(reader.error ?? new Error('Unable to read image attachment'));
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read attachment'));
     reader.readAsDataURL(file);
   });
 }

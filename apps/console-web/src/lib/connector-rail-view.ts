@@ -1,6 +1,8 @@
 import type { ConnectorProbeRecord } from '../api/control-plane';
 import { LEGACY_AXON_LOCAL_FALLBACK_URL } from '../api/connectors-api';
 
+import { effectiveRequiredConnectorsUnavailable } from './connector-glance-view';
+
 export type ConnectorRailTone = 'ok' | 'degraded' | 'unavailable' | 'unknown';
 
 export interface ConnectorRailRow {
@@ -30,6 +32,57 @@ export function connectorRailTone(status: string): ConnectorRailTone {
     return 'unavailable';
   }
   return 'unknown';
+}
+
+type ConnectorsRailSummary = {
+  configured: number;
+  ok: number;
+  required_unavailable: number;
+};
+
+/** Body copy when the watch lane is offline — suppresses stale probe rows. */
+export function buildConnectorsRailWatchOfflineBody(): string {
+  return 'Watch offline — connector probes paused until the watch reconnects. Use Refresh summary when the stack is back up.';
+}
+
+export function connectorsRailProbeListVisible(input: {
+  loading: boolean;
+  watchConnected: boolean;
+  hasError: boolean;
+}): boolean {
+  return !input.loading && !input.hasError && input.watchConnected;
+}
+
+/** Header summary for Mission Control connectors rail — suppresses stale counts when watch is offline. */
+export function buildConnectorsRailSummaryLabel(input: {
+  loading: boolean;
+  watchConnected: boolean;
+  summary: ConnectorsRailSummary | null;
+}): string {
+  if (input.loading) {
+    return 'Loading…';
+  }
+
+  if (!input.watchConnected) {
+    return 'Watch offline';
+  }
+
+  const summary = input.summary;
+  if (!summary) {
+    return 'Connectors unavailable';
+  }
+
+  const requiredDown = effectiveRequiredConnectorsUnavailable(summary, true);
+  return `${summary.ok}/${summary.configured} ok · ${requiredDown} required down`;
+}
+
+export function connectorsRailEmphasized(input: {
+  watchConnected: boolean;
+  summary: ConnectorsRailSummary | null;
+}): boolean {
+  return (
+    effectiveRequiredConnectorsUnavailable(input.summary, input.watchConnected) > 0
+  );
 }
 
 export function buildConnectorRailRows(items: ConnectorProbeRecord[]): ConnectorRailRow[] {

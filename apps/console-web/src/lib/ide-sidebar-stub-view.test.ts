@@ -63,8 +63,21 @@ describe('buildIdeAgentSidebarStub', () => {
 });
 
 describe('buildIdeRunPanelConnectorNotice', () => {
+  it('surfaces watch offline guidance before stale connector counts', () => {
+    const notice = buildIdeRunPanelConnectorNotice({
+      watchConnected: false,
+      requiredConnectorsUnavailable: 2,
+      legacyConnectorGlanceVisible: true,
+    });
+
+    expect(notice?.tone).toBe('attention');
+    expect(notice?.lines[0]).toContain('Watch offline');
+    expect(notice?.actionLabel).toBe('Open connectors');
+  });
+
   it('surfaces required connector attention in the Run panel', () => {
     const notice = buildIdeRunPanelConnectorNotice({
+      watchConnected: true,
       requiredConnectorsUnavailable: 2,
       legacyConnectorGlanceVisible: false,
     });
@@ -76,6 +89,7 @@ describe('buildIdeRunPanelConnectorNotice', () => {
 
   it('surfaces legacy connector guidance when optional Axon Local is offline', () => {
     const notice = buildIdeRunPanelConnectorNotice({
+      watchConnected: true,
       requiredConnectorsUnavailable: 0,
       legacyConnectorGlanceVisible: true,
     });
@@ -88,6 +102,7 @@ describe('buildIdeRunPanelConnectorNotice', () => {
   it('returns null when connectors are healthy', () => {
     expect(
       buildIdeRunPanelConnectorNotice({
+        watchConnected: true,
         requiredConnectorsUnavailable: 0,
         legacyConnectorGlanceVisible: false,
       }),

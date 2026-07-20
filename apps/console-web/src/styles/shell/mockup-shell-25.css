@@ -1,3 +1,5 @@
+@import './conversation-seam-attachments.css';
+
 .conversation-seam__content--markdown {
   white-space: normal;
   font-family: var(--font-sans, system-ui, sans-serif);
@@ -158,24 +160,6 @@
   flex-shrink: 0;
 }
 
-.conversation-seam__attachments--thread {
-  margin-top: 0.35rem;
-}
-
-.conversation-seam__attachment-card--thread {
-  width: min(100%, 18rem);
-  height: auto;
-  max-height: 14rem;
-  border-radius: 12px;
-}
-
-.conversation-seam__attachment-card--thread .conversation-seam__attachment-preview {
-  width: 100%;
-  height: auto;
-  max-height: 14rem;
-  object-fit: contain;
-}
-
 .conversation-seam__inline-image {
   margin: 0.45rem 0;
 }
@@ -259,36 +243,6 @@
   object-fit: contain;
   border-radius: 12px;
   border: 1px solid rgba(138, 154, 173, 0.18);
-}
-
-.conversation-seam__attachments {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 0 0 0.45rem;
-}
-
-.conversation-seam__attachment-card {
-  display: block;
-  width: 4.5rem;
-  height: 4.5rem;
-  padding: 0;
-  border: 1px solid rgba(138, 154, 173, 0.18);
-  border-radius: 10px;
-  background: rgba(8, 12, 18, 0.92);
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.conversation-seam__attachment-card:hover {
-  border-color: rgba(0, 242, 255, 0.28);
-}
-
-.conversation-seam__attachment-preview {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .conversation-seam__content {

@@ -35,6 +35,8 @@ main_tests=(
   tests.test_control_plane_workspace_files
   tests.test_control_plane_terminal
   tests.test_control_plane_chat
+  tests.test_attachment_store
+  tests.test_chat_parity_slices
   tests.test_control_plane_chat_health
   tests.test_employee_chat_thread
   tests.test_employee_persona_prompt

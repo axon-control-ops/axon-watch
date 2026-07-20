@@ -197,10 +197,16 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     applyChatUiAction(shell as unknown as Parameters<typeof applyChatUiAction>[0], action.uiAction);
   }
 
+  function messageAttachments(message: OperatorThreadEntry): ThreadMessageAttachment[] {
+    return message.attachments ?? [];
+  }
+
+  function isImageAttachment(attachment: ThreadMessageAttachment): boolean {
+    return attachment.mime_type.startsWith('image/');
+  }
+
   function messageImageAttachments(message: OperatorThreadEntry): ThreadMessageAttachment[] {
-    return (message.attachments ?? []).filter((attachment) =>
-      attachment.mime_type.startsWith('image/'),
-    );
+    return messageAttachments(message).filter(isImageAttachment);
   }
 
   interface EnlargedAttachmentPreview {
@@ -211,8 +217,15 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   const enlargedAttachment = ref<EnlargedAttachmentPreview | null>(null);
 
   function openAttachmentPreview(attachment: ThreadMessageAttachment): void {
+    const url = resolveChatAttachmentUrl(attachment.url);
+    if (!isImageAttachment(attachment)) {
+      if (typeof window !== 'undefined') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+      return;
+    }
     enlargedAttachment.value = {
-      url: resolveChatAttachmentUrl(attachment.url),
+      url,
       filename: attachment.filename,
     };
   }
@@ -276,6 +289,8 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     displayItemKey,
     attachmentUrlForImagePath,
     applyArtifactAction,
+    messageAttachments,
+    isImageAttachment,
     messageImageAttachments,
     enlargedAttachment,
     openAttachmentPreview,

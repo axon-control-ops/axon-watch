@@ -34,6 +34,10 @@ function connectorChipTitle(id: string): string | undefined {
       : 'Required connector down — open Mission Control connectors';
   }
 
+  if (id === 'watch-offline') {
+    return 'Watch offline — connector probes paused until the watch reconnects';
+  }
+
   return shell.layoutMode === 'ide'
     ? 'Legacy connector offline — switch to Mission Control connectors'
     : 'Open Mission Control connectors';

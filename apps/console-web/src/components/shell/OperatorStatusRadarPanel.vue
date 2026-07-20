@@ -2,7 +2,10 @@
 import { computed } from 'vue';
 
 import { buildOperatorQuickGuide, type OperatorQuickGuideActionId } from '../../lib/operator-quick-guide';
-import { isLegacyConnectorGlanceVisible } from '../../lib/connector-glance-view';
+import {
+  effectiveRequiredConnectorsUnavailable,
+  isLegacyConnectorGlanceVisible,
+} from '../../lib/connector-glance-view';
 import {
   type OperatorCenterView,
 } from '../../lib/operator-brain-graph-view';
@@ -72,8 +75,10 @@ const pendingApprovals = computed(
     0,
 );
 
-const requiredConnectorsUnavailable = computed(
-  () => shell.connectorsSummary?.required_unavailable ?? 0,
+const watchConnected = computed(() => shell.runtimeSummary?.watch.connected ?? false);
+
+const requiredConnectorsUnavailable = computed(() =>
+  effectiveRequiredConnectorsUnavailable(shell.connectorsSummary, watchConnected.value),
 );
 
 const radarTone = computed(() =>
@@ -221,7 +226,8 @@ const quickGuide = computed(() =>
     layoutMode: shell.layoutMode,
     terminalVisible: props.terminalVisible,
     legacyConnectorGlanceVisible: legacyConnectorGlanceVisible.value,
-    requiredConnectorsUnavailable: shell.connectorsSummary?.required_unavailable ?? 0,
+    requiredConnectorsUnavailable: requiredConnectorsUnavailable.value,
+    watchConnected: watchConnected.value,
   }),
 );
 

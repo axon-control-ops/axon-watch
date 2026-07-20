@@ -3,7 +3,11 @@ import { computed } from 'vue';
 
 import type { ComposerMode } from '../../../composables/useAgentDockComposer';
 import type { ComposerTypeaheadRow } from '../../../composables/agent-dock/use-composer-typeahead';
-import type { ComposerClipboardImage } from '../../../lib/composer-clipboard-paste';
+import {
+  type ComposerClipboardImage,
+  composerAttachmentExtensionLabel,
+  isComposerImageMime,
+} from '../../../lib/composer-clipboard-paste';
 import type { ComposerAccessTone } from '../../../lib/sandbox-session-view';
 import {
   COMPOSER_TYPEAHEAD_LISTBOX_ID,
@@ -91,32 +95,31 @@ const typeaheadActiveDescendantId = computed(() =>
     props.typeaheadSelectedIndex ?? 0,
   ),
 );
+
+const skillChips = computed(() =>
+  props.attachmentChips.filter((chip) => chip.kind === 'skill'),
+);
+
+const contextChips = computed(() =>
+  props.attachmentChips.filter((chip) => chip.kind !== 'skill'),
+);
 </script>
 
 <template>
   <div
-    v-if="attachmentChips.length"
+    v-if="contextChips.length"
     class="agent-dock-composer__chips"
     aria-label="Composer context"
   >
     <button
-      v-for="chip in attachmentChips"
+      v-for="chip in contextChips"
       :key="chip.key"
       type="button"
       class="agent-dock-composer__chip"
-      :class="{ 'agent-dock-composer__chip--skill': chip.kind === 'skill' }"
       :title="chip.title || chip.label"
       @click="emit('remove-chip', chip.key)"
     >
-      <span
-        v-if="chip.kind === 'skill'"
-        class="agent-dock-composer__chip-icon"
-        aria-hidden="true"
-      >✦</span>
-      <span
-        v-else
-        class="agent-dock-composer__chip-kind"
-      >{{ chip.kind }}</span>
+      <span class="agent-dock-composer__chip-kind">{{ chip.kind }}</span>
       <span class="agent-dock-composer__chip-label">{{ chip.label }}</span>
       <span class="agent-dock-composer__chip-remove" aria-hidden="true">×</span>
     </button>
@@ -125,12 +128,13 @@ const typeaheadActiveDescendantId = computed(() =>
   <div
     v-if="composerImages.length"
     class="agent-dock-composer__image-strip"
-    aria-label="Attached images"
+    aria-label="Attached files"
   >
     <div
       v-for="image in composerImages"
       :key="image.id"
       class="agent-dock-composer__image-card"
+      :class="{ 'agent-dock-composer__image-card--file': !isComposerImageMime(image.mimeType) }"
     >
       <button
         type="button"
@@ -139,10 +143,20 @@ const typeaheadActiveDescendantId = computed(() =>
         @click="emit('open-image', image)"
       >
         <img
+          v-if="isComposerImageMime(image.mimeType)"
           class="agent-dock-composer__image-preview"
           :src="image.previewUrl"
           :alt="image.name"
         >
+        <span
+          v-else
+          class="agent-dock-composer__file-preview"
+        >
+          <span class="agent-dock-composer__file-ext">
+            {{ composerAttachmentExtensionLabel(image.name, image.mimeType) }}
+          </span>
+          <span class="agent-dock-composer__file-name">{{ image.name }}</span>
+        </span>
       </button>
       <button
         type="button"
@@ -213,27 +227,50 @@ const typeaheadActiveDescendantId = computed(() =>
       @select="emit('typeahead-select', $event)"
       @hover="emit('typeahead-hover', $event)"
     />
-    <textarea
-      id="agent-dock-composer-input"
-      :ref="(element) => { props.setInputRef?.(element as HTMLTextAreaElement | null) }"
-      :value="draft"
-      class="agent-dock-composer__input"
-      rows="1"
-      :aria-label="composerMode === 'kairo' ? `${operatorPersonaName} composer` : 'Agent composer'"
-      :placeholder="placeholder"
-      :disabled="!workspaceSelected"
-      autocomplete="off"
-      spellcheck="true"
-      :aria-expanded="Boolean(typeaheadOpen)"
-      :aria-controls="typeaheadOpen ? COMPOSER_TYPEAHEAD_LISTBOX_ID : undefined"
-      :aria-activedescendant="typeaheadActiveDescendantId"
-      aria-autocomplete="list"
-      @input="emit('update:draft', ($event.target as HTMLTextAreaElement).value); emit('sync-height')"
-      @keydown="emit('keydown', $event)"
-      @keyup="emit('sync-typeahead')"
-      @click="emit('sync-typeahead')"
-      @paste="emit('paste', $event)"
-    />
+    <div class="agent-dock-composer__field">
+      <div
+        v-if="skillChips.length"
+        class="agent-dock-composer__inline-chips"
+        aria-label="Attached skills"
+      >
+        <button
+          v-for="chip in skillChips"
+          :key="chip.key"
+          type="button"
+          class="agent-dock-composer__chip agent-dock-composer__chip--skill"
+          :title="chip.title || chip.label"
+          @click="emit('remove-chip', chip.key)"
+        >
+          <span
+            class="agent-dock-composer__chip-icon"
+            aria-hidden="true"
+          >✦</span>
+          <span class="agent-dock-composer__chip-label">{{ chip.label }}</span>
+          <span class="agent-dock-composer__chip-remove" aria-hidden="true">×</span>
+        </button>
+      </div>
+      <textarea
+        id="agent-dock-composer-input"
+        :ref="(element) => { props.setInputRef?.(element as HTMLTextAreaElement | null) }"
+        :value="draft"
+        class="agent-dock-composer__input"
+        rows="1"
+        :aria-label="composerMode === 'kairo' ? `${operatorPersonaName} composer` : 'Agent composer'"
+        :placeholder="placeholder"
+        :disabled="!workspaceSelected"
+        autocomplete="off"
+        spellcheck="true"
+        :aria-expanded="Boolean(typeaheadOpen)"
+        :aria-controls="typeaheadOpen ? COMPOSER_TYPEAHEAD_LISTBOX_ID : undefined"
+        :aria-activedescendant="typeaheadActiveDescendantId"
+        aria-autocomplete="list"
+        @input="emit('update:draft', ($event.target as HTMLTextAreaElement).value); emit('sync-height')"
+        @keydown="emit('keydown', $event)"
+        @keyup="emit('sync-typeahead')"
+        @click="emit('sync-typeahead')"
+        @paste="emit('paste', $event)"
+      />
+    </div>
   </div>
 
   <div class="agent-dock-composer__footer">

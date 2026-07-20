@@ -141,7 +141,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
             {{
               composerImageCount
                 ? `${composerImageCount} attached — add more`
-                : 'Attach images from your device'
+                : 'Attach images, PDF, CSV, and text files'
             }}
           </small>
         </button>

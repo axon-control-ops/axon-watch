@@ -60,6 +60,35 @@ class ConnectorSignalTests(unittest.TestCase):
         )
         self.assertIsNone(item)
 
+    def test_optional_tunnel_with_legacy_ingress_emits_investigate_signal(self) -> None:
+        item = self.connector_signal.connector_inbox_item(
+            {
+                "connector_id": "cloudflare_tunnel",
+                "display_name": "Cloudflare tunnel",
+                "status": "degraded",
+                "required": False,
+                "detail": "ingress still targets legacy Axon Local",
+                "tunnel": {"ingress_matches_axon": False},
+            }
+        )
+        self.assertIsNotNone(item)
+        assert item is not None
+        self.assertEqual("signal_connector_cloudflare_tunnel_degraded", item["signal_id"])
+        self.assertEqual("high", item["severity"])
+        self.assertEqual("investigate", item["action_type"])
+
+    def test_optional_tunnel_with_axon_ingress_stays_out_of_inbox(self) -> None:
+        item = self.connector_signal.connector_inbox_item(
+            {
+                "connector_id": "cloudflare_tunnel",
+                "display_name": "Cloudflare tunnel",
+                "status": "degraded",
+                "required": False,
+                "tunnel": {"ingress_matches_axon": True},
+            }
+        )
+        self.assertIsNone(item)
+
     def test_required_degraded_emits_high_investigate_signal(self) -> None:
         item = self.connector_signal.connector_inbox_item(
             {

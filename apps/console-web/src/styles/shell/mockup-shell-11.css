@@ -204,16 +204,6 @@
   }
 }
 
-.connectors-rail-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid rgba(0, 242, 255, 0.16);
-  border-radius: 0.45rem;
-  background: rgba(0, 12, 20, 0.55);
-}
-
 .operator-fleet-grid {
   display: flex;
   flex-direction: column;

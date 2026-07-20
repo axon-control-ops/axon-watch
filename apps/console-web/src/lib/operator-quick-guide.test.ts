@@ -71,6 +71,23 @@ describe('buildOperatorQuickGuide', () => {
     expect(guide?.actions[0]).toEqual({ id: 'open-connectors', label: 'Open connectors' });
   });
 
+  it('surfaces watch offline guidance instead of stale connector counts', () => {
+    const guide = buildOperatorQuickGuide({
+      runPhase: null,
+      hasActiveRun: false,
+      pendingApprovals: 0,
+      layoutMode: 'operator',
+      terminalVisible: true,
+      watchConnected: false,
+      requiredConnectorsUnavailable: 2,
+    });
+
+    expect(guide?.tone).toBe('attention');
+    expect(guide?.title).toContain('Watch offline');
+    expect(guide?.steps.join(' ')).toContain('connector probes paused');
+    expect(guide?.actions[0]).toEqual({ id: 'open-connectors', label: 'Open connectors' });
+  });
+
   it('surfaces terminal reopen paths when the panel is hidden', () => {
     const idle = buildOperatorQuickGuide({
       runPhase: null,
