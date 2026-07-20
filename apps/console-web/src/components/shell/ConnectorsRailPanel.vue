@@ -9,6 +9,9 @@ const reprobingConnectorId = ref<string | null>(null);
 
 const rows = computed(() => buildConnectorRailRows(shell.connectorsItems));
 const loading = computed(() => shell.connectorsLoadState === 'loading');
+const emphasized = computed(
+  () => (shell.connectorsSummary?.required_unavailable ?? 0) > 0,
+);
 const summaryLabel = computed(() => {
   if (loading.value) {
     return 'Loading…';
@@ -59,7 +62,7 @@ onMounted(() => {
   <section
     id="watch-connectors-rail"
     class="connectors-rail-panel"
-    :class="{ 'connectors-rail-panel--emphasized': shell.connectorsEmphasized }"
+    :class="{ 'connectors-rail-panel--emphasized': emphasized }"
     aria-label="Watch connectors"
   >
     <header class="connectors-rail-panel__header">

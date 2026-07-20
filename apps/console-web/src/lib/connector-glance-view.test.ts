@@ -40,6 +40,7 @@ describe('connector glance view', () => {
       items: [
         {
           connector_id: 'axon_local',
+          display_name: 'Legacy Axon Local',
           required: false,
           status: 'unavailable',
         },
@@ -56,6 +57,7 @@ describe('connector glance view', () => {
       items: [
         {
           connector_id: 'axon_local',
+          display_name: 'Legacy Axon Local',
           required: false,
           status: 'unavailable',
         },

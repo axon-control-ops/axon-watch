@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { isLegacyConnectorGlanceVisible } from '../../lib/connector-glance-view';
 import { buildOperatorQuickGuide } from '../../lib/operator-quick-guide';
 import {
   type OperatorCenterView,
@@ -180,12 +181,25 @@ const showRunActions = computed(
       shell.pendingApprovalsCount > 0),
 );
 
+const legacyConnectorGlanceVisible = computed(() =>
+  isLegacyConnectorGlanceVisible({
+    connectorsLoadState: shell.connectorsLoadState,
+    items: shell.connectorsItems,
+    summary: shell.connectorsSummary,
+    watchConnected: shell.runtimeSummary?.watch.connected ?? false,
+    layoutMode: shell.layoutMode,
+  }),
+);
+
 const quickGuide = computed(() =>
   buildOperatorQuickGuide({
     runPhase: shell.primaryActiveRun?.phase ?? null,
     hasActiveRun: executionStage.value.hasActiveRun,
     pendingApprovals: pendingApprovals.value,
     layoutMode: shell.layoutMode,
+    terminalVisible: props.terminalVisible,
+    legacyConnectorGlanceVisible: legacyConnectorGlanceVisible.value,
+    requiredConnectorsUnavailable: shell.connectorsSummary?.required_unavailable ?? 0,
   }),
 );
 
