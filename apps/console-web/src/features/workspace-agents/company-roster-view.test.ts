@@ -13,6 +13,7 @@ import {
   employeeDockReceiptRunId,
   employeeDockReceiptRunLabel,
   employeeFailureLine,
+  employeeFailureRetryActionLabel,
   employeeFailureDetailTooltip,
   employeeFailurePeekKey,
   employeeFailureBannerCopy,
@@ -533,7 +534,7 @@ describe('company-roster-view', () => {
         }),
       ]),
     ).toBe(
-      'Jules — Last shift interrupted by server restart — use Retry shift to continue.',
+      'Jules — Last shift interrupted by server restart — use Continue shift to pick up where you left off.',
     );
     expect(
       companyFailedEmployeesHint([
@@ -546,7 +547,7 @@ describe('company-roster-view', () => {
         }),
       ]),
     ).toBe(
-      'Jules — Last shift interrupted before it could finish — use Retry shift to continue.',
+      'Jules — Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
     );
     expect(
       companyFailedEmployeesHint([
