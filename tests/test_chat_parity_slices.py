@@ -154,7 +154,7 @@ class ChatParitySliceTests(unittest.TestCase):
         self.assertIn("agent_terminal_session", payload)
         session = payload["agent_terminal_session"]
         self.assertEqual("agent", session["role"])
-        self.assertTrue(session["session_id"].startswith("terminal-agent-"))
+        self.assertEqual("terminal-agent", session["session_id"])
 
         sessions = self.client.get("/api/workspaces/workspace_alpha/terminal/sessions")
         self.assertEqual(200, sessions.status_code)
@@ -166,6 +166,10 @@ class ChatParitySliceTests(unittest.TestCase):
         self.assertTrue(any(item.session_id == "terminal-operator" for item in sessions))
         agent = ensure_agent_session(workspace_id="workspace_alpha", run_id="run_deadbeef")
         self.assertEqual("agent", agent.role)
+        self.assertEqual("terminal-agent", agent.session_id)
+        again = ensure_agent_session(workspace_id="workspace_alpha", run_id="run_cafebabe")
+        self.assertEqual(agent.session_id, again.session_id)
+        self.assertEqual("run_cafebabe", again.run_id)
 
 
 if __name__ == "__main__":
