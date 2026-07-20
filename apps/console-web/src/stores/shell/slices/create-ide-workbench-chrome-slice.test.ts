@@ -84,6 +84,7 @@ describe('createIdeWorkbenchChromeSlice terminal reveal', () => {
     const slice = createIdeWorkbenchChromeSlice({
       ideTerminalRevealToken,
       ideTerminalToggleToken: ref(0),
+      teamRosterRevealToken: ref(0),
       ideActivityView: ref('explorer'),
       ideExplorerCollapsed: ref(false),
       agentDockCollapsed: ref(false),
@@ -109,6 +110,7 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     return createIdeWorkbenchChromeSlice({
       ideTerminalRevealToken: ref(0),
       ideTerminalToggleToken: ref(0),
+      teamRosterRevealToken: ref(0),
       ideActivityView: ref('explorer'),
       ideExplorerCollapsed: ref(true),
       agentDockCollapsed: ref(true),
@@ -170,8 +172,20 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     expect(agentDockCollapsed.value).toBe(true);
     expect(ideTerminalRevealToken.value).toBe(0);
 
-    slice.focusIdeSidebarView('terminal');
-    expect(ideActivityView.value).toBe('terminal');
-    expect(ideTerminalRevealToken.value).toBe(0);
+  it('revealTeamRosterForActiveEmployee opens team view and bumps the reveal token', () => {
+    const ideActivityView = ref<'explorer' | 'team'>('explorer');
+    const ideExplorerCollapsed = ref(true);
+    const teamRosterRevealToken = ref(0);
+    const slice = createSlice({
+      ideActivityView,
+      ideExplorerCollapsed,
+      teamRosterRevealToken,
+    });
+
+    slice.revealTeamRosterForActiveEmployee();
+
+    expect(ideActivityView.value).toBe('team');
+    expect(ideExplorerCollapsed.value).toBe(false);
+    expect(teamRosterRevealToken.value).toBe(1);
   });
 });

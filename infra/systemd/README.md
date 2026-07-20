@@ -31,6 +31,11 @@ system units:
 ```
 
 Units live under `infra/systemd/user/` and install to `~/.config/systemd/user/`.
-This keeps watch + control-plane restarting on failure; it does not invent
-cloud agent execution. Remote phone access still needs a working Cloudflare
-tunnel token.
+This keeps **watch + control-plane + console-web (:4173)** restarting on failure.
+Legacy axon-local **:7734** is not started — run
+`./scripts/ops/disable-legacy-7734-autostart.sh` (also invoked by the installer).
+
+Memory caps (user units) stop one runaway service from freezing the desktop:
+control-plane MemoryMax=5G, console-web 1G, axon-watch 800M.
+
+Remote phone access still needs a working Cloudflare tunnel token.

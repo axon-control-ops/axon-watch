@@ -41,4 +41,18 @@ describe('workspace-thread-load', () => {
       }),
     ).toBe('thread_list');
   });
+
+  it('skips empty New chat selection when titled history exists', () => {
+    expect(
+      resolveBootstrapIdeThreadId({
+        selectedThreadId: 'thread_empty',
+        openTabIds: ['thread_empty', 'thread_history'],
+        threadListIds: ['thread_empty', 'thread_history'],
+        threadPreviewById: {
+          thread_empty: 'New chat',
+          thread_history: 'Quinn · Integrations',
+        },
+      }),
+    ).toBe('thread_history');
+  });
 });

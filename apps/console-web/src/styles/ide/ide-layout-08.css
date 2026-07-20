@@ -208,13 +208,93 @@
 }
 
 .agent-dock-composer__approval-banner,
-.agent-dock-composer__debug-reproduce-banner {
+.agent-dock-composer__debug-reproduce-banner,
+.agent-dock-composer__employee-failure-banner {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
   margin-bottom: 0.45rem;
   padding: 0.55rem 0.65rem;
   border-radius: 0.45rem;
+}
+
+.agent-dock-composer__employee-failure-banner {
+  border: 1px solid rgba(255, 120, 100, 0.38);
+  background: rgba(90, 28, 24, 0.42);
+}
+
+.agent-dock-composer__employee-failure-copy {
+  margin: 0;
+  font-size: 0.62rem;
+  line-height: 1.45;
+  color: rgba(255, 210, 200, 0.96);
+  overflow-wrap: anywhere;
+}
+
+.agent-dock-composer__employee-failure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.agent-dock-composer__employee-failure-btn {
+  flex: 1 1 auto;
+  min-width: 5.5rem;
+  padding: 0.38rem 0.7rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 140, 120, 0.45);
+  background: rgba(120, 40, 32, 0.55);
+  color: rgba(255, 230, 220, 0.98);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.agent-dock-composer__employee-failure-btn--retry:hover:not(:disabled),
+.agent-dock-composer__employee-failure-btn--retry:focus-visible:not(:disabled) {
+  border-color: rgba(220, 110, 90, 0.62);
+  background: rgba(110, 36, 28, 0.72);
+}
+
+.agent-dock-composer__employee-failure-btn--receipts {
+  border-color: rgba(140, 190, 230, 0.42);
+  background: rgba(20, 40, 58, 0.72);
+  color: rgba(200, 230, 255, 0.95);
+}
+
+.agent-dock-composer__employee-failure-btn--receipts:hover:not(:disabled),
+.agent-dock-composer__employee-failure-btn--receipts:focus-visible:not(:disabled) {
+  border-color: rgba(120, 200, 255, 0.52);
+  background: rgba(24, 52, 78, 0.82);
+}
+
+.agent-dock-composer__employee-failure-btn--team {
+  border-color: rgba(0, 242, 255, 0.28);
+  background: rgba(8, 24, 36, 0.72);
+  color: rgba(160, 245, 255, 0.94);
+}
+
+.agent-dock-composer__employee-failure-btn--team:hover,
+.agent-dock-composer__employee-failure-btn--team:focus-visible {
+  border-color: rgba(0, 242, 255, 0.48);
+  background: rgba(12, 36, 52, 0.88);
+}
+
+.agent-dock-composer__employee-failure-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.agent-dock-composer__employee-failure-btn:focus-visible {
+  filter: brightness(1.08);
+  outline: 2px solid rgba(0, 242, 255, 0.55);
+  outline-offset: 2px;
+}
+
+.agent-dock-composer__employee-failure-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
 }
 
 .agent-dock-composer__approval-banner {

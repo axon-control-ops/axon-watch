@@ -10,6 +10,11 @@ WorkingDirectory=%h
 ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/run-service.sh axon-watch
 Restart=on-failure
 RestartSec=3
+MemoryAccounting=yes
+MemoryHigh=400M
+MemoryMax=800M
+OOMPolicy=stop
 
 [Install]
 WantedBy=default.target
+

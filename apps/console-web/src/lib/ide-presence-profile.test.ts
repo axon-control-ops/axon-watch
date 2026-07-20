@@ -5,7 +5,9 @@ import {
   ideShowKairoSidebarExpanded,
   ideShowWatchInStatusBar,
   ideUseKairoChip,
+  resolveIdeKairoChipState,
   resolveIdePresenceProfile,
+  shouldSurfaceIdeEmployeeFailure,
 } from './ide-presence-profile';
 
 describe('ide presence profile', () => {
@@ -82,5 +84,64 @@ describe('ide presence profile', () => {
   it('keeps sidebar expanded only on interrupt or voice', () => {
     expect(ideShowKairoSidebarExpanded('quiet')).toBe(false);
     expect(ideShowKairoSidebarExpanded('interrupt')).toBe(true);
+  });
+
+  it('promotes idle chip to alerting when the active teammate thread failed', () => {
+    expect(
+      resolveIdeKairoChipState({
+        profileState: 'idle',
+        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        agentStreamActive: false,
+        kairoSpeechActive: false,
+      }),
+    ).toBe('alerting');
+  });
+
+  it('keeps chip idle while agent stream or speech is active', () => {
+    expect(
+      resolveIdeKairoChipState({
+        profileState: 'idle',
+        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        agentStreamActive: true,
+        kairoSpeechActive: false,
+      }),
+    ).toBe('idle');
+
+    expect(
+      resolveIdeKairoChipState({
+        profileState: 'idle',
+        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        agentStreamActive: false,
+        kairoSpeechActive: true,
+      }),
+    ).toBe('idle');
+  });
+
+  it('gates composer failure chrome on the same alerting rules as the Kairo chip', () => {
+    const failureInput = {
+      profileState: 'idle' as const,
+      employeeFailureLine: 'Last shift failed: npm test exited 1',
+      agentStreamActive: false,
+      kairoSpeechActive: false,
+    };
+    expect(shouldSurfaceIdeEmployeeFailure(failureInput)).toBe(true);
+    expect(
+      shouldSurfaceIdeEmployeeFailure({
+        ...failureInput,
+        agentStreamActive: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSurfaceIdeEmployeeFailure({
+        ...failureInput,
+        employeeFailureLine: null,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSurfaceIdeEmployeeFailure({
+        ...failureInput,
+        profileState: 'thinking',
+      }),
+    ).toBe(false);
   });
 });

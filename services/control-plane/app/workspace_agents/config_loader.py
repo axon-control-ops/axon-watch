@@ -14,6 +14,7 @@ from app.workspace_agents.catalog import (
     ROLE_CATALOG,
     _BRAND_CASE,
     _DEFAULT_OWNS,
+    _DEFAULT_ROLE_NAMES,
     _ROLE_BY_ID,
     _SCHEDULE_LABELS,
 )
@@ -32,6 +33,7 @@ class EmployeeConfig:
     enabled: bool = True
     primary: bool = False
     employee_id: str | None = None
+    azure_voice_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +152,9 @@ def _parse_employee_config(raw: Any, *, default_primary: bool = False) -> Employ
     primary_raw = raw.get("primary")
     primary = default_primary if primary_raw is None else bool(primary_raw)
     employee_id = _clean_text(raw.get("employee_id") or raw.get("id")) or None
+    azure_voice_id = _clean_text(
+        raw.get("azure_voice_id") or raw.get("azureVoiceId") or raw.get("voice_id")
+    ) or None
     return EmployeeConfig(
         name=name,
         role=role,
@@ -158,6 +163,7 @@ def _parse_employee_config(raw: Any, *, default_primary: bool = False) -> Employ
         enabled=enabled_value,
         primary=primary,
         employee_id=employee_id,
+        azure_voice_id=azure_voice_id,
     )
 
 
@@ -293,18 +299,12 @@ def _default_company_name(display_name: str, *, company_name_template: str) -> s
 
 
 def _default_employee_name(display_name: str, role: str) -> str:
-    company = _title_display_name(display_name)
-    if role == "lead":
-        return f"{company} Lead"
-    if role == "watcher":
-        return f"{company} Night Watch"
-    if role == "frontend":
-        return f"{company} Frontend"
-    if role == "backend":
-        return f"{company} Backend"
-    if role == "integrations":
-        return f"{company} Integrations"
-    return f"{company} {_role_label(role)}"
+    del display_name  # Names are personal; company prefix is no longer used.
+    cleaned_role = (role or "").strip().lower()
+    if cleaned_role in _DEFAULT_ROLE_NAMES:
+        return _DEFAULT_ROLE_NAMES[cleaned_role]
+    # Last resort: short personal name, never "{Company} {Role Title}".
+    return "Alex"
 
 
 def _resolve_employees(
@@ -328,6 +328,7 @@ def _resolve_employees(
                 enabled=first.enabled,
                 primary=True,
                 employee_id=first.employee_id,
+                azure_voice_id=first.azure_voice_id,
             )
         return employees
 
@@ -367,6 +368,7 @@ def _resolve_employees(
             enabled=first.enabled,
             primary=True,
             employee_id=first.employee_id,
+            azure_voice_id=first.azure_voice_id,
         )
     # Ensure only one primary.
     primary_seen = False
@@ -384,6 +386,7 @@ def _resolve_employees(
                 enabled=employee.enabled,
                 primary=is_primary,
                 employee_id=employee.employee_id,
+                azure_voice_id=employee.azure_voice_id,
             )
         )
     return normalized

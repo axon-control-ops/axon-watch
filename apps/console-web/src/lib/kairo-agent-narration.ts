@@ -52,18 +52,30 @@ export type StreamingActivityView = {
 };
 
 /** Status-strip label while the agent transcript streams. */
-export function streamingActivityLabel(content: string, fullAccess = false): string {
-  return resolveStreamingActivity(content, fullAccess).label;
+export function streamingActivityLabel(
+  content: string,
+  fullAccess = false,
+  personaName?: string | null,
+): string {
+  return resolveStreamingActivity(content, fullAccess, personaName).label;
 }
 
-export function resolveStreamingActivity(content: string, fullAccess = false): StreamingActivityView {
+export function resolveStreamingActivity(
+  content: string,
+  fullAccess = false,
+  personaName?: string | null,
+): StreamingActivityView {
+  const prefix = (body: string) =>
+    personaName?.trim()
+      ? personaThreadPrefix(body, personaName.trim())
+      : personaThreadPrefix(body);
   const thinking = liveThinkingText(content);
   if (thinking) {
     const sanitized = sanitizeAgentThinkingForOperator(thinking);
     if (sanitized) {
       const displayBody = truncateAgentLiveLineForDisplay(sanitized, AGENT_LIVE_LINE_DISPLAY_MAX);
       return {
-        label: personaThreadPrefix(displayBody),
+        label: prefix(displayBody),
         liveBodyFull: sanitized,
         liveBodySpoken: firstSpeakableAgentLiveBlock(sanitized),
         liveBodyTruncated: isAgentLiveLineTruncated(sanitized, displayBody),
@@ -72,7 +84,7 @@ export function resolveStreamingActivity(content: string, fullAccess = false): S
     // Meta-only thinking ("The user is asking…") — do not surface as VAXON copy.
     const fallback = fullAccess ? 'Full Access agent running…' : 'Agent running…';
     return {
-      label: personaThreadPrefix(fallback),
+      label: prefix(fallback),
       liveBodyFull: null,
       liveBodySpoken: null,
       liveBodyTruncated: false,
@@ -83,7 +95,7 @@ export function resolveStreamingActivity(content: string, fullAccess = false): S
   if (tools.length > 0) {
     const toolLabel = tools[tools.length - 1][1].trim();
     return {
-      label: personaThreadPrefix(toolLabel),
+      label: prefix(toolLabel),
       liveBodyFull: toolLabel,
       liveBodySpoken: firstSpeakableAgentLiveBlock(toolLabel),
       liveBodyTruncated: false,
@@ -92,7 +104,7 @@ export function resolveStreamingActivity(content: string, fullAccess = false): S
 
   const fallback = fullAccess ? 'Full Access agent running…' : 'Agent running…';
   return {
-    label: personaThreadPrefix(fallback),
+    label: prefix(fallback),
     liveBodyFull: null,
     liveBodySpoken: null,
     liveBodyTruncated: false,
@@ -216,6 +228,12 @@ function fileBaseName(path: string): string {
 }
 
 /** Short status-strip label for the most recent milestone. */
-export function narrationActivityLabel(milestone: NarrationMilestone): string {
-  return personaThreadPrefix(milestone.message.replace(/\.$/, ''));
+export function narrationActivityLabel(
+  milestone: NarrationMilestone,
+  personaName?: string | null,
+): string {
+  const body = milestone.message.replace(/\.$/, '');
+  return personaName?.trim()
+    ? personaThreadPrefix(body, personaName.trim())
+    : personaThreadPrefix(body);
 }

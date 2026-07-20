@@ -7,7 +7,8 @@ import {
   briefingPanelHeadline,
 } from '../../lib/briefing-panel-view';
 import { kairoPresenceLabel } from '../../lib/kairo-presence';
-import { ideShowKairoSidebarExpanded } from '../../lib/ide-presence-profile';
+import { ideShowKairoSidebarExpanded, resolveIdeKairoChipState, shouldSurfaceIdeEmployeeFailure } from '../../lib/ide-presence-profile';
+import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
 import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
 import AgentLiveLineHeadline from './AgentLiveLineHeadline.vue';
@@ -16,13 +17,43 @@ import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/Bri
 
 const shell = useShellStore();
 const debugModeActive = computed(() => shell.ideDebugModeSelected);
+const activePersonaName = computed(
+  () => shell.activeIdeEmployee?.name?.trim() || OPERATOR_PERSONA_NAME,
+);
+const activePersonaMark = computed(() => shell.activeIdeEmployee?.initials ?? null);
+const chipState = computed(() =>
+  resolveIdeKairoChipState({
+    profileState: shell.ideDisplayKairoPresenceState,
+    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+    agentStreamActive: shell.agentStreamActive,
+    kairoSpeechActive: shell.kairoSpeechActive,
+  }),
+);
+const surfaceEmployeeFailure = computed(() =>
+  shouldSurfaceIdeEmployeeFailure({
+    profileState: shell.ideDisplayKairoPresenceState,
+    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+    agentStreamActive: shell.agentStreamActive,
+    kairoSpeechActive: shell.kairoSpeechActive,
+  }),
+);
+const employeeFailureTooltip = computed(() => {
+  const row = shell.activeIdeEmployeeRecord;
+  if (!row) {
+    return undefined;
+  }
+  return employeeFailureDetailTooltip(row) ?? shell.activeIdeEmployeeFailureLine ?? undefined;
+});
 const presenceLabel = computed(() => {
+  if (!debugModeActive.value && surfaceEmployeeFailure.value) {
+    return `${activePersonaName.value} · last shift failed`;
+  }
   if (!debugModeActive.value) {
-    return kairoPresenceLabel(shell.kairoPresenceState);
+    return kairoPresenceLabel(shell.kairoPresenceState, activePersonaName.value);
   }
   const access = shell.agentExecutionAccess === 'full' ? ' FULL' : '';
   const activity = shell.agentStreamActive ? ' · RUNNING' : '';
-  return `${OPERATOR_PERSONA_NAME} · DEBUG${access}${activity}`;
+  return `${activePersonaName.value} · DEBUG${access}${activity}`;
 });
 
 const showExpandedPanel = computed(() =>
@@ -52,6 +83,10 @@ function handleExpand(): void {
     shell.stopKairoSpeech();
     return;
   }
+  if (surfaceEmployeeFailure.value) {
+    shell.revealTeamRosterForActiveEmployee();
+    return;
+  }
   shell.focusKairoBriefing();
 }
 
@@ -68,10 +103,11 @@ function handleStopSpeech(event: Event): void {
     type="button"
     class="kairo-sidebar-panel kairo-sidebar-panel--compact"
     :class="[
-      `kairo-sidebar-panel--${shell.ideDisplayKairoPresenceState}`,
+      `kairo-sidebar-panel--${chipState}`,
       {
         'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized,
         'kairo-sidebar-panel--debug-mode': debugModeActive,
+        'kairo-sidebar-panel--employee-failed': surfaceEmployeeFailure,
       },
     ]"
     :aria-label="presenceLabel"
@@ -92,13 +128,15 @@ function handleStopSpeech(event: Event): void {
       {
         'kairo-sidebar-panel--emphasized': shell.briefingSeamEmphasized,
         'kairo-sidebar-panel--debug-mode': debugModeActive,
+        'kairo-sidebar-panel--employee-failed': surfaceEmployeeFailure,
+        'kairo-sidebar-panel--alerting': chipState === 'alerting',
       },
     ]"
-    :aria-label="`${OPERATOR_PERSONA_NAME}. ${shell.briefingSummaryLine}`"
+    :aria-label="`${activePersonaName}. ${shell.briefingSummaryLine}`"
     @click="handleExpand"
   >
     <p class="kairo-sidebar-panel__title">
-      <OperatorPersonaMark size="sm" />
+      <OperatorPersonaMark size="sm" :mark="activePersonaMark" />
     </p>
     <div class="kairo-sidebar-panel__body">
       <div class="kairo-sidebar-panel__radar" aria-hidden="true">
@@ -109,6 +147,13 @@ function handleStopSpeech(event: Event): void {
       </div>
       <div class="kairo-sidebar-panel__copy">
         <p class="kairo-sidebar-panel__state">{{ presenceLabel }}</p>
+        <p
+          v-if="surfaceEmployeeFailure && !debugModeActive"
+          class="kairo-sidebar-panel__employee-failure"
+          :title="employeeFailureTooltip"
+        >
+          {{ shell.activeIdeEmployeeFailureLine }}
+        </p>
         <AgentLiveLineHeadline
           class="kairo-sidebar-panel__headline"
           :activity="shell.ideComposerActivity"

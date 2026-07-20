@@ -77,6 +77,23 @@ def active_role_run_status(workspace_id: str, role: str) -> str | None:
     return status_from_run(tagged[0])
 
 
+def active_role_run_id(workspace_id: str, role: str) -> str | None:
+    """Return run_id for the newest non-terminal run tagged with this employee role."""
+    cleaned_role = str(role or "").strip().lower()
+    if not cleaned_role:
+        return None
+    tagged = [
+        run
+        for run in _non_terminal_workspace_runs(workspace_id)
+        if str(run.get("employee_role") or "").strip().lower() == cleaned_role
+    ]
+    if not tagged:
+        return None
+    tagged.sort(key=lambda run: str(run.get("updated_at") or run.get("started_at") or ""), reverse=True)
+    run_id = str(tagged[0].get("run_id") or "").strip()
+    return run_id or None
+
+
 def employee_status(
     *,
     role: str,

@@ -1,15 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  companyFailedEmployees,
+  companyFailedEmployeesHint,
+  companyHasFailedEmployees,
   companyHasWorkingEmployees,
   companyHeadline,
+  employeeDisplayStatus,
+  employeeDockReceiptDetail,
+  employeeDockReceiptRunId,
+  employeeDockReceiptRunLabel,
   employeeFailureLine,
+  employeeFailureDetailTooltip,
+  employeeFailureBannerCopy,
+  employeeFailureBannerAriaLabel,
   employeeGlowTone,
   employeeIsWorking,
   employeeMetaLine,
+  adjacentPresenceStripEmployee,
+  employeePresenceContextPhrase,
+  employeePresenceSelectAriaLabel,
+  employeePresenceSelectLabel,
+  employeePresenceStripHoverTitle,
+  employeePresenceStripTitle,
+  firstFailedRosterEmployee,
+  pickDefaultRosterEmployee,
+  presenceStripOptionId,
+  selectedPresenceStripEmployee,
   employeeStatusLabel,
   employeeTalkLine,
   employeeSpeakLine,
+  sortEmployeesForPresenceStrip,
 } from './company-roster-view';
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 
@@ -36,9 +57,9 @@ describe('company-roster-view', () => {
       employeeMetaLine({
         employee_id: 'e1',
         workspace_id: 'workspace_demo',
-        name: 'Night Watch',
+        name: 'Rowan',
         role: 'watcher',
-        role_label: 'Night Watch',
+        role_label: 'Watcher',
         schedule: 'always_on',
         schedule_label: 'Always on (24/7)',
         status: 'watching',
@@ -46,8 +67,9 @@ describe('company-roster-view', () => {
         enabled: true,
         primary: false,
       }),
-    ).toBe('Night Watch · Always on (24/7)');
+    ).toBe('Always on (24/7)');
     expect(employeeStatusLabel('waiting_approval')).toBe('waiting approval');
+    expect(employeeStatusLabel('failed')).toBe('last shift failed');
   });
 
   it('builds company headline with employee count', () => {
@@ -66,6 +88,26 @@ describe('company-roster-view', () => {
       ),
     ).toContain('out of usage');
     expect(
+      employeeFailureBannerCopy(
+        employee({
+          name: 'Jules',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toBe('Jules — Last shift failed: ActionRequiredError: out of usage');
+    expect(
+      employeeFailureBannerAriaLabel(
+        employee({
+          name: 'Jules',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toContain('Jules — Last shift failed: ActionRequiredError: out of usage');
+    expect(
       employeeTalkLine(
         employee({
           status: 'idle',
@@ -75,6 +117,16 @@ describe('company-roster-view', () => {
       ),
     ).toContain('Last shift failed');
     expect(
+      employeeDisplayStatus(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toBe('failed');
+    expect(employeeStatusLabel(employeeDisplayStatus(employee({ status: 'idle' })))).toBe('idle');
+    expect(
       employeeFailureLine(
         employee({
           status: 'executing',
@@ -83,6 +135,337 @@ describe('company-roster-view', () => {
         }),
       ),
     ).toBeNull();
+    expect(
+      employeeDisplayStatus(
+        employee({
+          status: 'executing',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toBe('executing');
+  });
+
+  it('maps restart-interrupted failures to operator-friendly copy', () => {
+    const interrupted = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'Run interrupted by control-plane restart',
+      last_run_id: 'run_5c0253a7808a',
+    });
+    expect(employeeFailureLine(interrupted)).toBe(
+      'Last shift interrupted by server restart — use Retry shift to continue.',
+    );
+    expect(employeeSpeakLine(interrupted, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(
+      /server restarted and cut the shift short/i,
+    );
+    expect(employeeSpeakLine(interrupted, 'talk', { talkMode: 'callback', entropy: '1' })).not.toMatch(
+      /control-plane restart/i,
+    );
+  });
+
+  it('maps agent runtime fallback failures to operator-friendly copy', () => {
+    const detail =
+      'Lane B agent fallback reply generated (Cursor CLI exited with status 143.; Cursor Cloud Agent unavailable; Codex CLI (local) unavailable; Codex Cloud Task unavailable)';
+    const failed = employee({
+      name: 'Jules',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: detail,
+      last_run_id: 'run_95ec3ce2d508',
+    });
+    expect(employeeFailureLine(failed)).toBe(
+      'Last shift stopped — agent runtime unavailable. Use Retry shift.',
+    );
+    expect(employeeFailureBannerCopy(failed)).toBe(
+      'Jules — Last shift stopped — agent runtime unavailable. Use Retry shift.',
+    );
+    expect(employeeFailureDetailTooltip(failed)).toBe(detail);
+    expect(employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(
+      /agent session was interrupted/i,
+    );
+    expect(employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' })).not.toMatch(
+      /Codex CLI/i,
+    );
+  });
+
+  it('dedupes dock receipt detail when the failure beat already carries it', () => {
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'vitest: assertion failed',
+      last_run_id: 'run_failed_1',
+    });
+    expect(employeeDockReceiptDetail(failed)).toBeNull();
+    expect(employeeDockReceiptRunId(failed)).toBe('run_failed_1');
+    expect(employeeDockReceiptRunLabel('run_failed_1')).toBe('#failed');
+
+    const ok = employee({
+      status: 'idle',
+      last_outcome: 'completed',
+      last_outcome_detail: 'Shipped dock polish with receipts.',
+      last_run_id: 'run_ok_1',
+    });
+    expect(employeeDockReceiptDetail(ok)).toBe('Shipped dock polish with receipts.');
+    expect(employeeDockReceiptRunId(ok)).toBe('run_ok_1');
+    expect(employeeDockReceiptRunLabel('run_ok_1')).toBe('#ok_1');
+  });
+
+  it('steps presence strip selection with keyboard moves', () => {
+    const rows = [
+      employee({ employee_id: 'e_idle', name: 'Zara', status: 'idle' }),
+      employee({
+        employee_id: 'e_failed',
+        name: 'Mira',
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: 'timeout',
+      }),
+      employee({ employee_id: 'e_work', name: 'Alex', status: 'executing' }),
+    ];
+    const sorted = sortEmployeesForPresenceStrip(rows);
+    expect(adjacentPresenceStripEmployee(rows, null, 'first')?.employee_id).toBe(
+      sorted[0].employee_id,
+    );
+    expect(adjacentPresenceStripEmployee(rows, sorted[0].employee_id, 'next')?.employee_id).toBe(
+      sorted[1].employee_id,
+    );
+    expect(adjacentPresenceStripEmployee(rows, sorted[0].employee_id, 'prev')?.employee_id).toBe(
+      sorted[sorted.length - 1].employee_id,
+    );
+    expect(adjacentPresenceStripEmployee(rows, sorted[1].employee_id, 'last')?.employee_id).toBe(
+      sorted[sorted.length - 1].employee_id,
+    );
+  });
+
+  it('picks default roster selection with failed teammates first in strip order', () => {
+    const rows = [
+      employee({ employee_id: 'e_idle', name: 'Zara', status: 'idle' }),
+      employee({
+        employee_id: 'e_failed_b',
+        name: 'Bravo',
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: 'build failed',
+      }),
+      employee({
+        employee_id: 'e_failed_a',
+        name: 'Alpha',
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: 'timeout',
+      }),
+      employee({ employee_id: 'e_lead', name: 'Lead', role: 'lead', primary: true, status: 'idle' }),
+    ];
+    expect(firstFailedRosterEmployee(rows)?.employee_id).toBe('e_failed_a');
+    expect(pickDefaultRosterEmployee(rows)?.employee_id).toBe('e_failed_a');
+    expect(pickDefaultRosterEmployee([rows[0], rows[3]])?.employee_id).toBe('e_lead');
+    expect(pickDefaultRosterEmployee([rows[0]])?.employee_id).toBe('e_idle');
+  });
+
+  it('sorts presence strip with failed teammates first', () => {
+    const rows = [
+      employee({ employee_id: 'e_idle', name: 'Zara', status: 'idle' }),
+      employee({
+        employee_id: 'e_failed',
+        name: 'Mira',
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: 'timeout',
+      }),
+      employee({ employee_id: 'e_work', name: 'Alex', status: 'executing' }),
+      employee({ employee_id: 'e_lead', name: 'Lead', role: 'lead', primary: true, status: 'idle' }),
+    ];
+    expect(
+      sortEmployeesForPresenceStrip(rows).map((row) => row.employee_id),
+    ).toEqual(['e_failed', 'e_work', 'e_lead', 'e_idle']);
+  });
+
+  it('builds stable presence strip option ids', () => {
+    expect(presenceStripOptionId('e_failed')).toBe('company-presence-option-e_failed');
+    expect(presenceStripOptionId('')).toBe('');
+    expect(presenceStripOptionId(null)).toBe('');
+  });
+
+  it('builds presence strip aria labels and titles for failure, pause, and live shifts', () => {
+    const failed = employee({
+      name: 'Jules',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'timeout',
+    });
+    expect(employeePresenceContextPhrase(failed)).toBe('Last shift failed: timeout');
+    expect(employeePresenceSelectLabel(failed)).toBe(
+      'Select Jules, Last shift failed: timeout',
+    );
+    expect(employeePresenceStripTitle(failed)).toBe('Jules — Last shift failed: timeout');
+    expect(employeePresenceSelectLabel(employee({ name: 'Jules', enabled: false }))).toBe(
+      'Select Jules, paused',
+    );
+    expect(employeePresenceStripTitle(employee({ name: 'Jules', enabled: false }))).toBe(
+      'Jules — Paused',
+    );
+    const working = employee({ name: 'Alex', status: 'executing' });
+    expect(employeePresenceContextPhrase(working)).toBe('executing');
+    expect(employeePresenceSelectLabel(working)).toBe('Select Alex, executing');
+    expect(employeePresenceStripTitle(working)).toBe('Alex — executing');
+    expect(employeePresenceSelectLabel(employee({ name: 'Jules' }))).toBe('Select Jules');
+    expect(employeePresenceStripTitle(employee({ name: 'Jules' }))).toBe('Jules');
+  });
+
+  it('resolves the selected presence strip employee for keyboard confirm', () => {
+    const rows = [
+      employee({ employee_id: 'e_idle', name: 'Zara' }),
+      employee({ employee_id: 'e_failed', name: 'Mira', last_outcome: 'failed' }),
+    ];
+    expect(selectedPresenceStripEmployee(rows, 'e_failed')?.name).toBe('Mira');
+    expect(selectedPresenceStripEmployee(rows, 'missing')).toBeNull();
+    expect(selectedPresenceStripEmployee(rows, null)).toBeNull();
+  });
+
+  it('truncates very long failure detail in the talk banner', () => {
+    const longDetail = `${'ActionRequiredError: '.repeat(20)}out of usage`;
+    const line = employeeFailureLine(
+      employee({
+        status: 'idle',
+        last_outcome: 'failed',
+        last_outcome_detail: longDetail,
+      }),
+    );
+    expect(line).toContain('Last shift failed:');
+    expect(line!.length).toBeLessThan(longDetail.length + 24);
+    expect(line).toMatch(/…$/);
+  });
+
+  it('exposes full failure detail for tooltips when the banner line is truncated', () => {
+    const longDetail = `${'ActionRequiredError: '.repeat(20)}out of usage`;
+    const row = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: longDetail,
+    });
+    expect(employeeFailureDetailTooltip(row)).toBe(longDetail);
+    expect(employeeFailureDetailTooltip(employee({ status: 'executing', last_outcome: 'failed' }))).toBeUndefined();
+    expect(employeeFailureBannerAriaLabel(row)).toContain('Full detail:');
+    expect(employeeFailureBannerAriaLabel(row)).toContain(longDetail);
+    expect(employeePresenceStripHoverTitle(row)).toBe(longDetail);
+    expect(employeePresenceSelectAriaLabel(row)).toContain('Full detail:');
+    expect(employeePresenceSelectAriaLabel(row)).toContain(longDetail);
+  });
+
+  it('keeps short failure labels compact for hover and screen readers', () => {
+    const row = employee({
+      name: 'Jules',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'timeout',
+    });
+    expect(employeePresenceStripHoverTitle(row)).toBe('Jules — Last shift failed: timeout');
+    expect(employeePresenceSelectAriaLabel(row)).toBe('Select Jules, Last shift failed: timeout');
+  });
+
+  it('uses failure-aware callback speak when idle after a failed shift', () => {
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'vitest: assertion failed',
+    });
+    const line = employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' });
+    expect(line).toMatch(/failed|retry/i);
+    expect(line).toContain('vitest: assertion failed');
+    expect(line).not.toMatch(/Present\.|Yes\?/);
+  });
+
+  it('speaks a real role briefing instead of Present stubs', () => {
+    const bridge = employee({
+      name: 'Bridge',
+      role: 'integrations',
+      role_label: 'Integrations Engineer',
+      owns: 'connectors, watch service, and cross-repo wiring',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'cursor agent unavailable',
+    });
+    const talk = employeeSpeakLine(bridge, 'talk', { talkMode: 'intro' });
+    expect(talk).toContain('Bridge');
+    expect(talk).toContain('connectors');
+    expect(talk).toContain('cursor agent unavailable');
+    expect(talk).not.toMatch(/Present\.|On deck\.|Ready to help/);
+
+    const status = employeeSpeakLine(bridge, 'status');
+    expect(status).toContain('reporting in');
+    expect(status).toContain('cursor agent unavailable');
+    expect(status).toMatch(/retry|receipts/i);
+  });
+
+  it('detects failed teammates for roster alerts', () => {
+    expect(
+      companyHasFailedEmployees([
+        employee({ status: 'idle' }),
+        employee({
+          employee_id: 'e2',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'timeout',
+        }),
+      ]),
+    ).toBe(true);
+    expect(
+      companyHasFailedEmployees([
+        employee({ status: 'executing', last_outcome: 'failed', last_outcome_detail: 'timeout' }),
+      ]),
+    ).toBe(false);
+    expect(
+      companyFailedEmployees([
+        employee({ status: 'idle' }),
+        employee({
+          employee_id: 'e2',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'timeout',
+        }),
+        employee({
+          employee_id: 'e3',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'build failed',
+        }),
+      ]),
+    ).toHaveLength(2);
+  });
+
+  it('builds failure hints with teammate names and counts', () => {
+    expect(companyFailedEmployeesHint([])).toBeNull();
+    expect(
+      companyFailedEmployeesHint([
+        employee({
+          name: 'Shell Craft',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'vitest',
+        }),
+      ]),
+    ).toContain("Shell Craft's last shift failed");
+    expect(
+      companyFailedEmployeesHint([
+        employee({
+          employee_id: 'e2',
+          name: 'Night Watch',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'timeout',
+        }),
+        employee({
+          employee_id: 'e3',
+          name: 'Backend Smith',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'build failed',
+        }),
+      ]),
+    ).toBe(
+      "2 teammates' last shifts failed — select one for Retry shift, or click to talk it through.",
+    );
   });
 
   it('maps working status, glow tone, and talk lines', () => {
@@ -91,20 +474,21 @@ describe('company-roster-view', () => {
     expect(employeeGlowTone(employee({ role: 'backend' }))).toBe('backend');
     expect(employeeGlowTone(employee({ role: 'lead', primary: true }))).toBe('lead');
     expect(employeeTalkLine(employee({ status: 'idle' }))).toBeNull();
-    expect(employeeTalkLine(employee({ status: 'executing' }))).toContain('Working on');
-    expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk')).toContain('Ready to help');
+    expect(employeeTalkLine(employee({ status: 'executing' }))).toContain('In progress');
+    expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk')).toContain('Shell');
+    expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk')).toContain('What do you need');
     expect(employeeSpeakLine(employee({ status: 'executing' }), 'talk', { talkMode: 'intro' })).toContain(
-      'Shell Craft here',
+      'Shell',
     );
-    expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk', { talkMode: 'callback' })).not.toContain(
-      'Ready to help',
+    expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk', { talkMode: 'callback' })).toMatch(
+      /Shell|checking in|you called/i,
     );
     expect(
       employeeSpeakLine(employee({ status: 'executing' }), 'talk', {
         talkMode: 'callback',
         entropy: '1',
       }),
-    ).toMatch(/Yep|You need me|Here —|Listening|Yes boss|On it already/);
+    ).toMatch(/still mid-|in flight|live on|listening/i);
     expect(
       companyHasWorkingEmployees([
         employee({ status: 'idle' }),

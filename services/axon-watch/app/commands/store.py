@@ -89,6 +89,35 @@ def list_commands(*, limit: int = 50) -> dict[str, object]:
     }
 
 
+def _observation_detail_from_command(record: dict[str, object]) -> str:
+    """Surface receipt detail so observation never stops at bare failed/completed."""
+    status = str(record.get("status", "")).strip()
+    receipt = record.get("receipt")
+    if not isinstance(receipt, dict):
+        return ""
+
+    if status == "failed":
+        return str(receipt.get("error", "")).strip()
+
+    result = receipt.get("result")
+    if not isinstance(result, dict):
+        return ""
+
+    detail = str(result.get("detail", "")).strip()
+    if detail:
+        return detail
+
+    connector_status = str(result.get("connector_status", "")).strip()
+    if connector_status and connector_status not in {"ok", "completed"}:
+        return connector_status
+
+    summary_status = str(result.get("summary_status", "")).strip()
+    if summary_status and summary_status != "ok":
+        return summary_status
+
+    return ""
+
+
 def latest_command_snapshot() -> dict[str, object]:
     with _managed_connection() as connection:
         row = connection.execute(
@@ -105,6 +134,7 @@ def latest_command_snapshot() -> dict[str, object]:
             "last_command_id": "",
             "last_command_status": "",
             "last_command_at": "",
+            "last_command_detail": "",
         }
 
     latest = json.loads(str(row["record_json"]))
@@ -112,4 +142,5 @@ def latest_command_snapshot() -> dict[str, object]:
         "last_command_id": str(latest.get("command_id", "")),
         "last_command_status": str(latest.get("status", "")),
         "last_command_at": str(latest.get("updated_at", "")),
+        "last_command_detail": _observation_detail_from_command(latest),
     }

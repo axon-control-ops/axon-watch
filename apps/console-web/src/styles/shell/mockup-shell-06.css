@@ -289,7 +289,6 @@
   font-family: var(--font-ui);
   font-size: 0.54rem;
   line-height: 1.2;
-  scrollbar-width: thin;
 }
 
 .editor-breadcrumb__segment {

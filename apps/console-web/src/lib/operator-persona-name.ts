@@ -20,16 +20,21 @@ export const OPERATOR_PERSONA_MARK = 'V';
 export const OPERATOR_PERSONA_WAKE_WORD_RE =
   /\b(vaxon|naxon|axon[\s-]?vaxon|x|kairo|cairo|kyro|kairos|ex)\b/i;
 
-export function personaStatusLabel(mode: string): string {
-  return `${OPERATOR_PERSONA_NAME} · ${mode}`;
+export function personaStatusLabel(mode: string, personaName: string = OPERATOR_PERSONA_NAME): string {
+  const name = personaName.trim() || OPERATOR_PERSONA_NAME;
+  return `${name} · ${mode}`;
 }
 
-export function personaThreadPrefix(body: string): string {
+export function personaThreadPrefix(
+  body: string,
+  personaName: string = OPERATOR_PERSONA_NAME,
+): string {
+  const name = personaName.trim() || OPERATOR_PERSONA_NAME;
   const trimmed = body.trim();
   if (!trimmed) {
-    return `${OPERATOR_PERSONA_NAME} — Agent is working…`;
+    return `${name} — Agent is working…`;
   }
-  return `${OPERATOR_PERSONA_NAME} — ${trimmed}`;
+  return `${name} — ${trimmed}`;
 }
 
 export function stripPersonaWakeWordPrefix(text: string): string {

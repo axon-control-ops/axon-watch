@@ -295,13 +295,22 @@
   position: absolute;
   bottom: calc(100% + 0.45rem);
   left: 0;
-  z-index: 20;
+  z-index: 80;
   width: 15rem;
   padding: 0.45rem;
   border: 1px solid rgba(138, 154, 173, 0.16);
   border-radius: 10px;
   background: rgba(10, 14, 20, 0.98);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.agent-dock-composer__tool-group:has(.agent-dock-composer__tool--mode) .agent-dock-composer__menu {
+  right: 0;
+  left: auto;
+  width: 16.5rem;
+  max-height: min(24rem, 60vh);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .agent-dock-composer__menu--context {

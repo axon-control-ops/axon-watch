@@ -336,14 +336,13 @@
 .agent-dock-composer__menu--runtime {
   right: 0;
   left: auto;
-  z-index: 60;
+  z-index: 90;
   width: 18rem;
   max-height: min(28rem, 72vh);
   padding: 0.32rem;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .agent-dock-composer__menu--runtime .agent-dock-composer__menu-caption {

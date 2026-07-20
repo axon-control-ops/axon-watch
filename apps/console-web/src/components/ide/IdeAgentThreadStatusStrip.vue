@@ -11,10 +11,16 @@ import {
   resolveThreadStatusStripTone,
   threadStatusStripClassNames,
 } from '../../lib/thread-status-strip-tone';
+import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const expanded = ref(false);
+
+const personaName = computed(
+  () => shell.activeIdeEmployee?.name?.trim() || OPERATOR_PERSONA_NAME,
+);
+const personaMark = computed(() => shell.activeIdeEmployee?.initials ?? null);
 
 const showStatusStrip = computed(() =>
   shouldShowIdeAgentThreadStatusStrip({
@@ -27,10 +33,13 @@ const showStatusStrip = computed(() =>
 const statusLabel = computed(() =>
   buildIdeAgentThreadStatusLabel({
     activityLabel: shell.ideComposerActivity?.label,
+    personaName: personaName.value,
   }),
 );
 
-const statusBody = computed(() => parseIdeAgentThreadStatusLabel(statusLabel.value).body);
+const statusBody = computed(
+  () => parseIdeAgentThreadStatusLabel(statusLabel.value, personaName.value).body,
+);
 const canExpand = computed(() => Boolean(shell.ideComposerActivity?.liveBodyTruncated));
 const visibleBody = computed(() =>
   expanded.value && shell.ideComposerActivity?.liveBodyFull
@@ -79,7 +88,7 @@ function toggleExpanded(event: Event): void {
       :class="{ 'conversation-seam__thread-status-label--expanded': expanded }"
     >
       <span class="persona-title">
-        <OperatorPersonaMark size="xs" />
+        <OperatorPersonaMark size="xs" :mark="personaMark" />
         <span class="conversation-seam__thread-status-body">— {{ visibleBody }}</span>
       </span>
       <button

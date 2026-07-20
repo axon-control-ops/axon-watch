@@ -3,7 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
 import { fetchWorkspaceCompany } from '../../api/workspace-api';
 import type { CompanyEmployeeRecord, CompanyRosterRecord } from '../../contracts/canonical';
 
-const COMPANY_REFRESH_MS = 12_000;
+/** Shared poll interval for workspace company roster snapshots. */
+export const COMPANY_REFRESH_MS = 12_000;
 
 export function useWorkspaceCompany(currentWorkspaceId: Ref<string | null | undefined>) {
   const company = ref<CompanyRosterRecord | null>(null);

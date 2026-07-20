@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
+import {
+  buildIdeThreadFailureDetailTooltipMap,
+  buildIdeThreadFailureHintMap,
+} from '../../features/workspace-agents/active-ide-employee';
 import {
   ideThreadMenuLabel,
   ideThreadMenuMeta,
@@ -14,13 +18,33 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const historyOpen = ref(false);
 const menuRef = ref<HTMLElement | null>(null);
+const tabsRef = ref<HTMLElement | null>(null);
+const canScrollLeft = ref(false);
+const canScrollRight = ref(false);
 
 const openTabs = computed(() => shell.openIdeThreadTabsForCurrentWorkspace);
 const allThreads = computed(() =>
   sortIdeThreadsNewestFirst(shell.ideThreadsForCurrentWorkspace),
 );
+const threadFailureHintById = computed(() =>
+  buildIdeThreadFailureHintMap({
+    threads: allThreads.value,
+    employees: shell.companyEmployeesForCurrentWorkspace,
+  }),
+);
+const threadFailureDetailById = computed(() =>
+  buildIdeThreadFailureDetailTooltipMap({
+    threads: allThreads.value,
+    employees: shell.companyEmployeesForCurrentWorkspace,
+  }),
+);
+
+function threadFailureHoverTitle(threadId: string, fallbackTitle: string): string {
+  return threadFailureDetailById.value.get(threadId) ?? fallbackTitle;
+}
 const activeThreadId = computed(() => shell.activeIdeThreadId);
 const canCloseTab = computed(() => openTabs.value.length > 1);
+const showScrollControls = computed(() => canScrollLeft.value || canScrollRight.value);
 
 function selectThread(threadId: string): void {
   void shell.selectIdeThread(threadId);
@@ -50,16 +74,101 @@ function handleDocumentClick(event: MouseEvent): void {
   historyOpen.value = false;
 }
 
+function updateScrollState(): void {
+  const scroller = tabsRef.value;
+  if (!scroller) {
+    canScrollLeft.value = false;
+    canScrollRight.value = false;
+    return;
+  }
+  const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+  canScrollLeft.value = scroller.scrollLeft > 1;
+  canScrollRight.value = maxScroll > 1 && scroller.scrollLeft < maxScroll - 1;
+}
+
+/** Vertical wheel / trackpad → horizontal tab scroll when the strip overflows. */
+function handleTabsWheel(event: WheelEvent): void {
+  const scroller = tabsRef.value;
+  if (!scroller) {
+    return;
+  }
+  if (scroller.scrollWidth <= scroller.clientWidth + 1) {
+    return;
+  }
+  const delta =
+    Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  if (!delta) {
+    return;
+  }
+  event.preventDefault();
+  scroller.scrollLeft += delta;
+  updateScrollState();
+}
+
+function tabScrollBehavior(): ScrollBehavior {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
+
+function scrollTabsBy(direction: -1 | 1): void {
+  const scroller = tabsRef.value;
+  if (!scroller) {
+    return;
+  }
+  const step = Math.max(140, Math.floor(scroller.clientWidth * 0.7));
+  scroller.scrollBy({ left: direction * step, behavior: tabScrollBehavior() });
+  window.setTimeout(updateScrollState, 180);
+}
+
+function scrollActiveTabIntoView(): void {
+  const scroller = tabsRef.value;
+  if (!scroller || !activeThreadId.value) {
+    return;
+  }
+  const active = scroller.querySelector<HTMLElement>(
+    `[data-thread-id="${CSS.escape(activeThreadId.value)}"]`,
+  );
+  active?.scrollIntoView({
+    behavior: tabScrollBehavior(),
+    inline: 'nearest',
+    block: 'nearest',
+  });
+  window.setTimeout(updateScrollState, 180);
+}
+
+watch(activeThreadId, async () => {
+  await nextTick();
+  scrollActiveTabIntoView();
+});
+
+watch(
+  openTabs,
+  async () => {
+    await nextTick();
+    updateScrollState();
+    scrollActiveTabIntoView();
+  },
+  { deep: true },
+);
+
 onMounted(() => {
   document.addEventListener('click', handleDocumentClick);
+  const scroller = tabsRef.value;
+  scroller?.addEventListener('scroll', updateScrollState, { passive: true });
+  window.addEventListener('resize', updateScrollState);
   const workspaceId = shell.currentWorkspace?.workspace_id;
   if (workspaceId) {
     void shell.hydrateWorkspaceIdeChat(workspaceId);
   }
+  void nextTick(() => {
+    updateScrollState();
+    scrollActiveTabIntoView();
+  });
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick);
+  tabsRef.value?.removeEventListener('scroll', updateScrollState);
+  window.removeEventListener('resize', updateScrollState);
 });
 </script>
 
@@ -68,7 +177,26 @@ onUnmounted(() => {
     ref="menuRef"
     class="agent-dock-thread-tabbar editor-tabbar editor-tabbar--mockup"
   >
-    <div class="editor-tabbar__tabs agent-dock-thread-tabbar__tabs" role="tablist" aria-label="Open agent chats">
+    <button
+      v-if="showScrollControls"
+      type="button"
+      class="agent-dock-thread-tabbar__scroll"
+      :disabled="!canScrollLeft"
+      aria-label="Scroll tabs left"
+      title="Scroll tabs left"
+      @click="scrollTabsBy(-1)"
+    >
+      ‹
+    </button>
+
+    <div
+      ref="tabsRef"
+      class="editor-tabbar__tabs agent-dock-thread-tabbar__tabs"
+      role="tablist"
+      aria-label="Open agent chats"
+      @wheel="handleTabsWheel"
+      @scroll="updateScrollState"
+    >
       <button
         v-for="thread in openTabs"
         :key="thread.thread_id"
@@ -78,12 +206,32 @@ onUnmounted(() => {
         :class="{
           'editor-tabbar__tab--active hud-active-chip--active agent-dock-thread-tabbar__tab--active':
             activeThreadId === thread.thread_id,
+          'agent-dock-thread-tabbar__tab--failed': threadFailureHintById.has(thread.thread_id),
         }"
+        :data-thread-id="thread.thread_id"
         :aria-selected="activeThreadId === thread.thread_id"
-        :title="ideThreadTabTitle(thread.preview_label)"
+        :aria-label="
+          threadFailureHintById.get(thread.thread_id)
+            ? `Last shift failed — ${ideThreadTabTitle(thread.preview_label)}`
+            : ideThreadTabTitle(thread.preview_label)
+        "
+        :title="
+          threadFailureHoverTitle(
+            thread.thread_id,
+            ideThreadTabTitle(thread.preview_label),
+          )
+        "
         @click="selectThread(thread.thread_id)"
       >
         <WorkspaceIcon class="agent-dock-thread-tabbar__tab-icon" kind="chat" :size="12" />
+        <span
+          v-if="threadFailureHintById.has(thread.thread_id)"
+          class="agent-dock-thread-tabbar__tab-fail-mark"
+          aria-hidden="true"
+          title="Last shift failed"
+        >
+          !
+        </span>
         <span class="editor-tabbar__label agent-dock-thread-tabbar__tab-label">
           {{ ideThreadTabTitle(thread.preview_label) }}
         </span>
@@ -99,6 +247,18 @@ onUnmounted(() => {
         </span>
       </button>
     </div>
+
+    <button
+      v-if="showScrollControls"
+      type="button"
+      class="agent-dock-thread-tabbar__scroll"
+      :disabled="!canScrollRight"
+      aria-label="Scroll tabs right"
+      title="Scroll tabs right"
+      @click="scrollTabsBy(1)"
+    >
+      ›
+    </button>
 
     <div class="editor-tabbar__tools agent-dock-thread-tabbar__tools">
       <div class="agent-dock-thread-tabbar__history">
@@ -137,13 +297,32 @@ onUnmounted(() => {
             :class="{
               'agent-dock-thread-tabbar__history-item--active':
                 activeThreadId === thread.thread_id,
+              'agent-dock-thread-tabbar__history-item--failed':
+                threadFailureHintById.has(thread.thread_id),
             }"
             :aria-selected="activeThreadId === thread.thread_id"
+            :aria-label="
+              threadFailureHintById.get(thread.thread_id)
+                ? `Last shift failed — ${ideThreadMenuLabel(thread)}`
+                : ideThreadMenuLabel(thread)
+            "
+            :title="
+              threadFailureHoverTitle(thread.thread_id, ideThreadMenuLabel(thread))
+            "
             @click="selectThread(thread.thread_id)"
           >
             <span class="agent-dock-thread-tabbar__history-copy">
-              <span class="agent-dock-thread-tabbar__history-label">
-                {{ ideThreadMenuLabel(thread) }}
+              <span class="agent-dock-thread-tabbar__history-label-row">
+                <span
+                  v-if="threadFailureHintById.has(thread.thread_id)"
+                  class="agent-dock-thread-tabbar__history-fail-mark"
+                  aria-hidden="true"
+                >
+                  !
+                </span>
+                <span class="agent-dock-thread-tabbar__history-label">
+                  {{ ideThreadMenuLabel(thread) }}
+                </span>
               </span>
               <span class="agent-dock-thread-tabbar__history-meta">
                 {{ ideThreadMenuMeta(thread) }}

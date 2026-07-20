@@ -9,8 +9,11 @@ import threading
 from typing import Any
 
 from app.domain.run_state import is_terminal_phase
+from app.persistence import worker_scheduler_settings_store
 from app.runs.service import (
+    RunLifecycleError,
     create_run,
+    fail_run,
     list_runs,
     prune_terminal_employee_runs,
     reap_abandoned_review_ready_runs,
@@ -26,16 +29,30 @@ CONTINUOUS_SCHEDULES = frozenset({"always_on", "continuous"})
 SKIP_ROLES = frozenset({"lead", "overview_agent"})
 DEFAULT_TICK_SECONDS = 45.0
 # Cap new starts per tick so one restart cannot flood approvals / executing debt.
-MAX_STARTS_PER_TICK = 6
+# Keep these low: each cursor-agent is ~300MB+ and often spawns jest workers.
+DEFAULT_MAX_STARTS_PER_TICK = 2
 # Skip new starts when non-terminal executing runs already exceed this bound.
-MAX_ACTIVE_EXECUTING = 24
+# 24 concurrent agents (~7GB+) will thrash past MemoryHigh=3G and trip systemd-oomd.
+DEFAULT_MAX_ACTIVE_EXECUTING = 4
 
 _scheduler_task: asyncio.Task[None] | None = None
 
 
-def scheduler_enabled() -> bool:
+def env_scheduler_allowed() -> bool:
+    """Hard emergency brake from process env (deployment.env / systemd)."""
     raw = os.environ.get("AXON_WATCH_WORKER_SCHEDULER", "1").strip().lower()
     return raw not in {"0", "false", "off", "no"}
+
+
+def scheduler_enabled() -> bool:
+    """Effective enable: env hard-brake AND SQLite UI overlay."""
+    if not env_scheduler_allowed():
+        return False
+    return bool(worker_scheduler_settings_store.load_settings().get("scheduler_enabled"))
+
+
+def worker_dispatch_enabled_for_status() -> bool:
+    return worker_dispatch_enabled()
 
 
 def tick_interval_seconds() -> float:
@@ -47,6 +64,45 @@ def tick_interval_seconds() -> float:
     except ValueError:
         return DEFAULT_TICK_SECONDS
     return max(5.0, value)
+
+
+def _env_positive_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(1, value)
+
+
+def max_starts_per_tick() -> int:
+    settings = worker_scheduler_settings_store.load_settings()
+    store_value = settings.get("max_starts_per_tick")
+    if store_value is not None:
+        try:
+            return max(1, int(store_value))
+        except (TypeError, ValueError):
+            pass
+    return _env_positive_int(
+        "AXON_WATCH_WORKER_SCHEDULER_MAX_STARTS_PER_TICK",
+        DEFAULT_MAX_STARTS_PER_TICK,
+    )
+
+
+def max_active_executing() -> int:
+    settings = worker_scheduler_settings_store.load_settings()
+    store_value = settings.get("max_active")
+    if store_value is not None:
+        try:
+            return max(1, int(store_value))
+        except (TypeError, ValueError):
+            pass
+    return _env_positive_int(
+        "AXON_WATCH_WORKER_SCHEDULER_MAX_ACTIVE",
+        DEFAULT_MAX_ACTIVE_EXECUTING,
+    )
 
 
 def _active_role_run_exists(workspace_id: str, role: str) -> bool:
@@ -65,12 +121,22 @@ def _active_role_run_exists(workspace_id: str, role: str) -> bool:
 
 
 def _executing_run_count() -> int:
+    """Count executing employee shifts only — operator runs must not block worker starts."""
     return sum(
         1
         for run in list_runs()
         if str(run.get("phase", "")).strip() == "executing"
         and not is_terminal_phase(str(run.get("phase", "")).strip())
+        and str(run.get("employee_role") or "").strip()
     )
+
+
+def _dispatch_failure_summary(exc: BaseException) -> str:
+    message = " ".join(str(exc or "").split()).strip()
+    role_hint = "Continuous worker dispatch failed"
+    if message:
+        return f"{role_hint}: {message}"
+    return f"{role_hint} — open run history for receipts."
 
 
 def _dispatch_worker_run(
@@ -79,18 +145,25 @@ def _dispatch_worker_run(
     employee: EmployeeConfig,
     run_record: dict[str, Any],
 ) -> None:
+    run_id = str(run_record.get("run_id") or "").strip()
     try:
         dispatch_continuous_worker_run(
             workspace_id=workspace_id,
             employee=employee,
             run_record=run_record,
         )
-    except Exception:  # noqa: BLE001 — keep scheduler loop alive
+    except Exception as exc:  # noqa: BLE001 — keep scheduler loop alive
         logger.exception(
             "continuous worker dispatch failed for %s role=%s",
-            run_record.get("run_id"),
+            run_id,
             employee.role,
         )
+        if not run_id:
+            return
+        try:
+            fail_run(run_id, receipt_summary=_dispatch_failure_summary(exc))
+        except RunLifecycleError:
+            logger.exception("could not mark worker run failed: %s", run_id)
 
 
 def run_continuous_worker_tick() -> list[dict[str, Any]]:
@@ -114,18 +187,27 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
         logger.info("continuous worker tick pruned %s terminal employee run(s)", len(pruned))
 
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
-    if _executing_run_count() >= MAX_ACTIVE_EXECUTING:
-        logger.info("continuous worker tick skipped: executing debt bound reached")
+    active_bound = max_active_executing()
+    if _executing_run_count() >= active_bound:
+        logger.info(
+            "continuous worker tick skipped: executing debt bound reached (%s)",
+            active_bound,
+        )
         return []
 
+    starts_bound = max_starts_per_tick()
     started: list[dict[str, Any]] = []
     for workspace_id, company in companies.items():
         for employee in company.employees:
-            if len(started) >= MAX_STARTS_PER_TICK:
+            if len(started) >= starts_bound:
                 return started
-            if not employee.enabled:
-                continue
             role = str(employee.role or "").strip().lower()
+            if not worker_scheduler_settings_store.is_employee_enabled(
+                workspace_id,
+                role,
+                file_enabled=bool(employee.enabled),
+            ):
+                continue
             schedule = str(employee.schedule or "").strip().lower()
             if not role or role in SKIP_ROLES:
                 continue
@@ -178,10 +260,12 @@ async def _scheduler_loop() -> None:
 
 
 async def start_continuous_worker_scheduler() -> asyncio.Task[None] | None:
-    """Start the periodic tick; cancel via stop_continuous_worker_scheduler."""
+    """Start the periodic tick; cancel via stop_continuous_worker_scheduler.
+
+    The loop always runs so Settings can enable workers without a process restart.
+    Each tick no-ops when scheduler_enabled() is false (env brake and/or UI off).
+    """
     global _scheduler_task
-    if not scheduler_enabled():
-        return None
     if _scheduler_task is not None and not _scheduler_task.done():
         return _scheduler_task
     _scheduler_task = asyncio.create_task(

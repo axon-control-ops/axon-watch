@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,10 +36,42 @@ def default_connectors_file() -> Path:
     return (_repo_root() / "config" / "watch-connectors.json").resolve()
 
 
+_UNRESOLVED_ENV_PATTERN = re.compile(r"\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _bootstrap_connector_env() -> None:
+    """Mirror run-service.sh localhost defaults so connector probes work without deployment.env."""
+    os.environ.setdefault("AXON_WATCH_CONSOLE_WEB_PORT", "4173")
+    os.environ.setdefault("AXON_WATCH_CONTROL_PLANE_PORT", "8787")
+    os.environ.setdefault("AXON_WATCH_WATCH_SERVICE_PORT", "8788")
+
+    console_port = os.environ["AXON_WATCH_CONSOLE_WEB_PORT"]
+    control_plane_port = os.environ["AXON_WATCH_CONTROL_PLANE_PORT"]
+    watch_port = os.environ["AXON_WATCH_WATCH_SERVICE_PORT"]
+
+    os.environ.setdefault(
+        "AXON_WATCH_PUBLIC_BASE_URL",
+        f"http://127.0.0.1:{console_port}",
+    )
+    os.environ.setdefault(
+        "AXON_WATCH_CONTROL_PLANE_BASE_URL",
+        f"http://127.0.0.1:{control_plane_port}",
+    )
+    os.environ.setdefault(
+        "AXON_WATCH_WATCH_SERVICE_BASE_URL",
+        f"http://127.0.0.1:{watch_port}",
+    )
+
+
 def _resolve_health_url(raw_url: str) -> str:
+    _bootstrap_connector_env()
     text = os.path.expandvars(raw_url.strip())
     if not text:
         raise ConnectorConfigError("health_url is required")
+    if _UNRESOLVED_ENV_PATTERN.search(text):
+        raise ConnectorConfigError(
+            f"health_url has unresolved environment placeholders: {text}"
+        )
     return text
 
 

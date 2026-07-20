@@ -176,6 +176,51 @@
   color: rgba(255, 224, 170, 0.92);
 }
 
+.settings-feedback-banner--warn {
+  border-color: rgba(255, 180, 70, 0.4);
+  background: rgba(255, 160, 40, 0.1);
+  color: rgba(255, 220, 160, 0.95);
+}
+
+.settings-surface__button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.75rem;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.settings-surface__button:hover:not(:disabled),
+.settings-surface__button:focus-visible:not(:disabled) {
+  border-color: rgba(0, 242, 255, 0.35);
+  background: rgba(0, 242, 255, 0.06);
+  outline: none;
+}
+
+.settings-surface__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.settings-surface__primary {
+  border-color: rgba(0, 242, 255, 0.45);
+  background: rgba(0, 242, 255, 0.16);
+}
+
+.settings-surface__primary:hover:not(:disabled),
+.settings-surface__primary:focus-visible:not(:disabled) {
+  border-color: rgba(0, 242, 255, 0.62);
+  background: rgba(0, 242, 255, 0.22);
+}
+
 .settings-surface__status {
   margin: 0;
   font-size: 0.75rem;

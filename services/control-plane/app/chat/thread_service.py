@@ -63,6 +63,13 @@ def get_chat_thread_history(thread_id: str) -> dict[str, object]:
     }
 
 
+def _thread_preview_label(thread: dict[str, object]) -> str:
+    title = str(thread.get("title") or "").strip()
+    if title:
+        return title
+    return chat_store.first_operator_message_preview(str(thread["thread_id"]))
+
+
 def list_workspace_chat_threads(
     workspace_id: str,
     *,
@@ -79,7 +86,7 @@ def list_workspace_chat_threads(
     items = [
         {
             **thread,
-            "preview_label": chat_store.first_operator_message_preview(str(thread["thread_id"])),
+            "preview_label": _thread_preview_label(thread),
         }
         for thread in threads
     ]
@@ -96,19 +103,55 @@ def create_workspace_chat_thread(
     *,
     thread_kind: str = "ide",
     run_id: str | None = None,
+    title: str | None = None,
+    employee_id: str | None = None,
+    employee_role: str | None = None,
 ) -> dict[str, object]:
     get_workspace_record(workspace_id)
     kind = _normalize_thread_kind(thread_kind)
+    cleaned_employee = str(employee_id or "").strip()
+    if cleaned_employee:
+        existing = chat_store.find_thread_for_employee(
+            workspace_id,
+            employee_id=cleaned_employee,
+            thread_kind=kind,
+        )
+        if existing is not None:
+            return {
+                **existing,
+                "preview_label": _thread_preview_label(existing),
+            }
     created = chat_store.create_thread(
         workspace_id=workspace_id,
         run_id=run_id,
         created_at=_utc_now(),
         thread_kind=kind,
+        title=title,
+        employee_id=employee_id,
+        employee_role=employee_role,
     )
     return {
         **created,
-        "preview_label": "New chat",
+        "preview_label": _thread_preview_label(created) if created.get("title") else "New chat",
     }
+
+
+def open_or_create_employee_chat_thread(
+    workspace_id: str,
+    *,
+    employee_id: str,
+    employee_role: str | None = None,
+    title: str | None = None,
+    thread_kind: str = "ide",
+) -> dict[str, object]:
+    """Find an existing IDE thread for this employee, or create a titled one."""
+    return create_workspace_chat_thread(
+        workspace_id,
+        thread_kind=thread_kind,
+        title=title,
+        employee_id=employee_id,
+        employee_role=employee_role,
+    )
 
 
 def get_workspace_chat_thread(

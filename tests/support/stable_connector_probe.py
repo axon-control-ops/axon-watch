@@ -19,7 +19,7 @@ STABLE_OK_CONNECTOR_RECORDS: list[dict[str, object]] = [
     {
         "connector_id": "console_web",
         "display_name": "Console web",
-        "health_url": "http://127.0.0.1:4173/",
+        "health_url": "http://127.0.0.1:4173/api/health",
         "required": True,
         "workspace_id": "workspace_axon_watch",
         "status": "ok",

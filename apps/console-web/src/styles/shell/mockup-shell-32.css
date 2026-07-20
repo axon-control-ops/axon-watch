@@ -1,3 +1,5 @@
+@import './agent-persona-dock.css';
+
 /* Company roster — workspace-as-company employee staffing */
 
 .company-roster {
@@ -9,6 +11,48 @@
 
 .company-roster__header {
   margin-bottom: 0.55rem;
+}
+
+.company-roster--persona-dock .company-roster__dock-host {
+  flex: 1 1 auto;
+  min-height: 6rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  container-type: inline-size;
+  container-name: roster-dock;
+}
+
+.company-roster__header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.company-roster__fleet-link {
+  flex-shrink: 0;
+  margin: 0.15rem 0 0;
+  padding: 0.22rem 0.48rem;
+  border: 1px solid rgba(110, 160, 200, 0.22);
+  border-radius: 0.28rem;
+  background: rgba(12, 26, 38, 0.75);
+  color: rgba(190, 220, 240, 0.9);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.company-roster__fleet-link:hover,
+.company-roster__fleet-link:focus-visible {
+  border-color: rgba(0, 242, 255, 0.42);
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(210, 245, 255, 0.96);
+  outline: none;
 }
 
 .company-roster__eyebrow {
@@ -24,6 +68,37 @@
   font-size: 0.82rem;
   font-weight: 600;
   color: rgba(230, 242, 255, 0.94);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.company-roster__alert-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0.06rem 0.38rem;
+  border: 1px solid rgba(190, 80, 60, 0.42);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 170, 150, 0.96);
+  background: rgba(90, 28, 22, 0.55);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.company-roster__alert-badge:hover,
+.company-roster__alert-badge:focus-visible {
+  border-color: rgba(220, 110, 90, 0.62);
+  background: rgba(110, 36, 28, 0.72);
+  box-shadow: 0 0 10px rgba(160, 60, 40, 0.22);
+  outline: none;
 }
 
 .company-roster__hint {
@@ -31,6 +106,32 @@
   font-size: 0.68rem;
   line-height: 1.35;
   color: rgba(160, 190, 215, 0.68);
+}
+
+.company-roster__hint--alert {
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(190, 80, 60, 0.32);
+  border-radius: 0.35rem;
+  background: rgba(70, 22, 16, 0.42);
+  color: rgba(255, 170, 150, 0.92);
+}
+
+.company-roster__hint--action {
+  display: block;
+  width: 100%;
+  margin: 0.4rem 0 0;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.company-roster__hint--action:hover,
+.company-roster__hint--action:focus-visible {
+  border-color: rgba(220, 110, 90, 0.52);
+  background: rgba(90, 28, 22, 0.55);
+  box-shadow: 0 0 10px rgba(160, 60, 40, 0.18);
+  outline: none;
 }
 
 .company-roster__empty {
@@ -59,6 +160,10 @@
 }
 
 .company-roster__item--working {
+  gap: 0.18rem;
+}
+
+.company-roster__item--failed {
   gap: 0.18rem;
 }
 
@@ -109,6 +214,12 @@
   color: rgba(255, 170, 150, 0.96);
   border-color: rgba(190, 80, 60, 0.45);
   background: rgba(90, 28, 22, 0.55);
+  box-shadow: 0 0 10px rgba(160, 60, 40, 0.18);
+  overflow-wrap: anywhere;
+}
+
+.company-roster__talk--failed::after {
+  border-color: rgba(190, 80, 60, 0.45) transparent transparent transparent;
 }
 
 .company-roster__talk--integrations {
@@ -179,6 +290,17 @@
   outline: none;
 }
 
+.company-roster__action:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.company-roster__action:disabled:hover,
+.company-roster__action:disabled:focus-visible {
+  border-color: rgba(110, 160, 200, 0.22);
+  background: rgba(12, 26, 38, 0.75);
+}
+
 .company-roster__action--surface {
   border-color: rgba(120, 180, 140, 0.28);
   color: rgba(190, 235, 210, 0.95);
@@ -208,6 +330,44 @@
   border-radius: 0.2rem;
   color: rgba(150, 220, 255, 0.95);
   background: rgba(40, 120, 180, 0.28);
+}
+
+.company-roster__badge--role[data-role='lead'] {
+  color: rgba(210, 230, 255, 0.98);
+  background: rgba(70, 120, 200, 0.38);
+}
+
+.company-roster__badge--role[data-role='watcher'] {
+  color: rgba(160, 255, 210, 0.95);
+  background: rgba(30, 120, 80, 0.35);
+}
+
+.company-roster__badge--role[data-role='frontend'] {
+  color: rgba(180, 230, 255, 0.95);
+  background: rgba(40, 110, 170, 0.35);
+}
+
+.company-roster__badge--role[data-role='backend'] {
+  color: rgba(200, 190, 255, 0.95);
+  background: rgba(90, 70, 160, 0.35);
+}
+
+.company-roster__badge--role[data-role='integrations'] {
+  color: rgba(255, 220, 160, 0.95);
+  background: rgba(140, 90, 30, 0.35);
+}
+
+.company-roster__badge--paused {
+  color: rgba(255, 210, 160, 0.95);
+  background: rgba(120, 80, 20, 0.35);
+}
+
+.company-roster__row--paused {
+  opacity: 0.72;
+}
+
+.company-roster__action--control {
+  border-color: rgba(0, 242, 255, 0.28);
 }
 
 .company-roster__meta,
@@ -245,6 +405,57 @@
 .company-roster__status[data-status='waiting_approval'] {
   color: rgba(255, 190, 140, 0.95);
   background: rgba(140, 80, 30, 0.3);
+}
+
+.company-roster__status[data-status='failed'] {
+  color: rgba(255, 170, 150, 0.96);
+  background: rgba(120, 40, 30, 0.38);
+}
+
+.company-roster__row--failed {
+  border-color: rgba(190, 80, 60, 0.42);
+  background: rgba(36, 14, 12, 0.62);
+}
+
+.company-roster__row--selected.company-roster__row--failed {
+  border-color: rgba(220, 100, 80, 0.58);
+  background: rgba(48, 18, 14, 0.78);
+  box-shadow:
+    inset 0 0 0 1px rgba(190, 80, 60, 0.28),
+    0 0 10px rgba(160, 60, 40, 0.18);
+}
+
+.company-roster__row--failed:hover,
+.company-roster__row--failed:focus-visible {
+  border-color: rgba(220, 110, 90, 0.55);
+  box-shadow: 0 0 10px rgba(160, 60, 40, 0.22);
+}
+
+.company-roster__action--retry {
+  color: rgba(255, 190, 170, 0.96);
+  border-color: rgba(190, 80, 60, 0.45);
+  background: rgba(90, 28, 22, 0.45);
+}
+
+.company-roster__action--retry:hover,
+.company-roster__action--retry:focus-visible {
+  border-color: rgba(220, 110, 90, 0.62);
+  background: rgba(110, 36, 28, 0.72);
+  box-shadow: 0 0 8px rgba(160, 60, 40, 0.22);
+  outline: none;
+}
+
+.company-roster__action--receipts {
+  color: rgba(190, 225, 255, 0.95);
+  border-color: rgba(90, 160, 220, 0.38);
+  background: rgba(18, 40, 62, 0.55);
+}
+
+.company-roster__action--receipts:hover,
+.company-roster__action--receipts:focus-visible {
+  border-color: rgba(120, 200, 255, 0.52);
+  background: rgba(24, 52, 78, 0.82);
+  outline: none;
 }
 
 .company-roster__row--working {
@@ -320,6 +531,12 @@
   min-height: 0;
 }
 
+.company-roster--ide .company-roster__header,
+.company-roster--ide .company-presence-strip,
+.company-roster--ide .company-roster__empty {
+  flex-shrink: 0;
+}
+
 .company-roster--ide .company-roster__list {
   max-height: none;
   flex: 1 1 auto;
@@ -335,7 +552,9 @@
 .ide-team-panel__body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes company-roster-glow-pulse {

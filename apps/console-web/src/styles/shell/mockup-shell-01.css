@@ -12,8 +12,6 @@
     "leftSidebar centerWorkbench rightDock"
     "statusBar statusBar statusBar";
   grid-template-rows: var(--topbar-height) minmax(0, 1fr) var(--statusbar-height);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 
 .console-shell--mockup.console-shell--mobile-compact {
@@ -27,47 +25,98 @@
   font-size: 0.56rem;
 }
 
-.console-shell--mockup * {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.32) transparent;
+/*
+ * Cursor / VS Code overlay scrollbar:
+ * - no arrow buttons
+ * - transparent track (floats over content)
+ * - thin rounded thumb (~4px visual inside a 10px gutter)
+ *
+ * Important: Chrome ignores ::-webkit-scrollbar* when scrollbar-width /
+ * scrollbar-color are set — those must stay unset for WebKit.
+ */
+@supports selector(::-webkit-scrollbar) {
+  .console-shell--mockup,
+  .console-shell--mockup * {
+    scrollbar-width: auto;
+    scrollbar-color: unset;
+  }
+
+  .console-shell--mockup *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+
+  .console-shell--mockup *::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent;
+  }
+
+  .console-shell--mockup *::-webkit-scrollbar-track,
+  .console-shell--mockup *::-webkit-scrollbar-track-piece {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .console-shell--mockup *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .console-shell--mockup *::-webkit-scrollbar-thumb {
+    background-color: rgba(121, 121, 121, 0.4);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    min-height: 24px;
+  }
+
+  .console-shell--mockup *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(191, 191, 191, 0.55);
+  }
+
+  .console-shell--mockup *::-webkit-scrollbar-thumb:active {
+    background-color: rgba(191, 191, 191, 0.7);
+  }
 }
 
-.console-shell--mockup *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Firefox: thin platform bar, transparent track (no webkit hooks). */
+@supports not selector(::-webkit-scrollbar) {
+  .console-shell--mockup,
+  .console-shell--mockup * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(121, 121, 121, 0.45) transparent;
+  }
 }
 
-.console-shell--mockup *::-webkit-scrollbar-track {
-  background: transparent;
+/* Monaco uses its own DOM scrollbars (same visual language as Cursor). */
+.console-shell--mockup .monaco-scrollable-element > .scrollbar {
+  width: 10px !important;
+  background: transparent !important;
 }
 
-.console-shell--mockup *::-webkit-scrollbar-thumb {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background-clip: padding-box;
-  background-color: rgba(148, 163, 184, 0.28);
-}
-
-.console-shell--mockup *::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(148, 163, 184, 0.48);
-}
-
-.console-shell--mockup *::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/* Cursor-thin scrollbars in editor / explorer / markdown surfaces */
-.console-shell--mockup .center-workbench__editor *::-webkit-scrollbar,
-.console-shell--mockup .ide-explorer-panel *::-webkit-scrollbar,
-.console-shell--mockup .editor-markdown-preview::-webkit-scrollbar,
-.console-shell--mockup .agent-edit-review-viewer::-webkit-scrollbar,
-.console-shell--mockup .editor-tabbar__tabs::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+.console-shell--mockup .monaco-scrollable-element > .scrollbar.horizontal {
+  height: 10px !important;
 }
 
 .console-shell--mockup .monaco-scrollable-element > .scrollbar > .slider {
   border-radius: 999px !important;
+  background: rgba(121, 121, 121, 0.4) !important;
+  left: 3px !important;
+  width: 4px !important;
+}
+
+.console-shell--mockup .monaco-scrollable-element > .scrollbar.horizontal > .slider {
+  top: 3px !important;
+  height: 4px !important;
+  width: auto !important;
+  left: auto !important;
+}
+
+.console-shell--mockup .monaco-scrollable-element > .scrollbar > .slider:hover {
+  background: rgba(191, 191, 191, 0.55) !important;
 }
 
 .console-shell--mockup[data-layout-mode='operator'] {

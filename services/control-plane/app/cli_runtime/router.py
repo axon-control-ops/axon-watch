@@ -124,13 +124,26 @@ def _build_prompt(
     execution_tier: str = "consultative",
     research_snapshot: dict[str, object] | None = None,
 ) -> str:
+    from app.workspace_agents.employee_persona_prompt import (
+        adapt_lane_b_system_prompt_for_employee,
+        split_employee_persona_from_context,
+    )
+
     snapshot = research_snapshot or research_capability_snapshot()
     workbook_policy = assignment_workbook_policy_appendix(user_prompt, context_block)
     policy_block = f"\n\n{workbook_policy}" if workbook_policy else ""
+    system = adapt_lane_b_system_prompt_for_employee(
+        _system_prompt(composer_mode, execution_tier, research_snapshot=snapshot),
+        context_block,
+    )
+    persona_block, remainder_context = split_employee_persona_from_context(context_block)
+    persona_section = f"\n\n{persona_block}" if persona_block else ""
+    workspace_body = remainder_context if persona_block else context_block
     return (
-        f"{_system_prompt(composer_mode, execution_tier, research_snapshot=snapshot)}"
-        f"{policy_block}\n\n"
-        f"Workspace context:\n{context_block}\n\n"
+        f"{system}"
+        f"{policy_block}"
+        f"{persona_section}\n\n"
+        f"Workspace context:\n{workspace_body}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
 

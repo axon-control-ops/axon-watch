@@ -7,6 +7,7 @@ import {
   pruneOpenIdeThreadTabs,
   resolveIdeThreadTabAfterClose,
   resolveOpenIdeThreadTabItems,
+  seedOpenIdeTabsFromHistory,
 } from './ide-thread-tabs-view';
 
 describe('ide thread tabs view', () => {
@@ -50,5 +51,36 @@ describe('ide thread tabs view', () => {
         workspaceId: 'workspace_dashpro',
       }).map((thread) => thread.thread_id),
     ).toEqual(['thread_live']);
+  });
+
+  it('reseeds open tabs from titled history when only New chat slots remain', () => {
+    expect(
+      seedOpenIdeTabsFromHistory({
+        openIds: ['thread_new_a', 'thread_new_b'],
+        activeThreadId: 'thread_new_a',
+        threads: [
+          {
+            thread_id: 'thread_new_a',
+            preview_label: 'New chat',
+            updated_at: '2026-07-18T10:00:00Z',
+          },
+          {
+            thread_id: 'thread_new_b',
+            preview_label: 'New chat',
+            updated_at: '2026-07-18T10:01:00Z',
+          },
+          {
+            thread_id: 'thread_quinn',
+            preview_label: 'Quinn · Integrations',
+            updated_at: '2026-07-18T09:00:00Z',
+          },
+          {
+            thread_id: 'thread_worker',
+            preview_label: 'Look at the Worker/Employee Agents',
+            updated_at: '2026-07-18T08:00:00Z',
+          },
+        ],
+      }),
+    ).toEqual(['thread_new_a', 'thread_quinn', 'thread_worker']);
   });
 });

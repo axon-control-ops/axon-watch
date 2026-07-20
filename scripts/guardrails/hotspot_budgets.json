@@ -91,11 +91,18 @@
       "target": "services/control-plane/app/kairo/replies/*"
     },
     "services/control-plane/app/cli_runtime/catalog.py": {
-      "max_lines": 294,
+      "max_lines": 82,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
-      "note": "Auth probes extracted to auth_probes.py; identity to catalog_identity.py"
+      "note": "CLI discovery only; snapshot cache in catalog_snapshot.py"
+    },
+    "services/control-plane/app/cli_runtime/catalog_snapshot.py": {
+      "max_lines": 270,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/cli_runtime/catalog/*",
+      "note": "Runtime status snapshot cache and probe assembly"
     },
     "docs/HOW-TO-HANDBOOK.md": {
       "max_lines": 1455,

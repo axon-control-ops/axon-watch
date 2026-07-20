@@ -21,16 +21,58 @@ export function shouldApplyWorkspaceThreadLoad(
   return selected === loadedThreadId.trim();
 }
 
-/** Prefer selected → open tab → thread list when bootstrapping IDE chat. */
+/** Empty untitled IDE threads created by "+" — not real conversation history. */
+export function isPlaceholderIdeThreadLabel(label: string | null | undefined): boolean {
+  const trimmed = String(label || '').trim().toLowerCase();
+  return !trimmed || trimmed === 'new chat';
+}
+
+function firstSubstantialThreadId(
+  ids: readonly string[],
+  previewById: Record<string, string>,
+): string | null {
+  for (const raw of ids) {
+    const id = raw?.trim();
+    if (!id) {
+      continue;
+    }
+    if (!isPlaceholderIdeThreadLabel(previewById[id])) {
+      return id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Prefer selected → open tab → thread list when bootstrapping IDE chat.
+ * If the selected/open tab is an empty "New chat", jump to a titled history thread.
+ */
 export function resolveBootstrapIdeThreadId(input: {
   selectedThreadId: string | null | undefined;
   openTabIds: readonly string[];
   threadListIds: readonly string[];
+  /** Map of thread_id → preview_label for preferring real history. */
+  threadPreviewById?: Record<string, string>;
 }): string | null {
-  const selected = input.selectedThreadId?.trim();
+  const previewById = input.threadPreviewById ?? {};
+  const selected = input.selectedThreadId?.trim() || null;
+
+  if (selected && !isPlaceholderIdeThreadLabel(previewById[selected])) {
+    return selected;
+  }
+
+  const preferred =
+    firstSubstantialThreadId(input.openTabIds, previewById) ||
+    firstSubstantialThreadId(input.threadListIds, previewById);
+
+  if (preferred) {
+    return preferred;
+  }
+
   if (selected) {
     return selected;
   }
+
   const fromTabs = input.openTabIds[0]?.trim();
   if (fromTabs) {
     return fromTabs;

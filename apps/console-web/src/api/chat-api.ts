@@ -72,6 +72,9 @@ export interface WorkspaceChatThreadListItem {
   workspace_id: string;
   run_id: string | null;
   thread_kind: string;
+  title?: string | null;
+  employee_id?: string | null;
+  employee_role?: string | null;
   created_at: string;
   updated_at: string;
   preview_label: string;
@@ -193,7 +196,13 @@ export async function fetchWorkspaceChatThreads(
 
 export async function createWorkspaceChatThread(
   workspaceId: string,
-  options: { surface?: 'operator' | 'ide'; runId?: string | null } = {},
+  options: {
+    surface?: 'operator' | 'ide';
+    runId?: string | null;
+    title?: string | null;
+    employeeId?: string | null;
+    employeeRole?: string | null;
+  } = {},
 ): Promise<WorkspaceChatThreadListItem> {
   const encodedWorkspaceId = encodeURIComponent(workspaceId);
   return fetchJson<WorkspaceChatThreadListItem>(
@@ -204,6 +213,9 @@ export async function createWorkspaceChatThread(
       body: JSON.stringify({
         surface: options.surface ?? 'ide',
         run_id: options.runId ?? null,
+        title: options.title ?? null,
+        employee_id: options.employeeId ?? null,
+        employee_role: options.employeeRole ?? null,
       }),
     },
     'workspace chat thread create failed',

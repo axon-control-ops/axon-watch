@@ -59,7 +59,10 @@
   gap: 0;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  /* Menus open upward over the transcript — must not clip or sit under threads. */
+  overflow: visible;
+  position: relative;
+  z-index: 40;
   isolation: isolate;
   padding: 0.55rem 0.8rem 0.8rem;
   border-top: 1px solid rgba(138, 154, 173, 0.1);

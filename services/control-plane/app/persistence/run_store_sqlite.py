@@ -120,6 +120,12 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS worker_scheduler_settings (
+            settings_key TEXT PRIMARY KEY,
+            settings_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS operator_memories (
             memory_id TEXT PRIMARY KEY,
             workspace_id TEXT NOT NULL,
@@ -150,6 +156,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         """
     )
     _ensure_chat_thread_kind_column(connection)
+    _ensure_chat_thread_persona_columns(connection)
     _ensure_runs_employee_role_column(connection)
     _ensure_chat_attachments_table(connection)
 
@@ -218,3 +225,29 @@ def _ensure_chat_thread_kind_column(connection: sqlite3.Connection) -> None:
         """
     )
     connection.commit()
+
+
+def _ensure_chat_thread_persona_columns(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(chat_threads)").fetchall()
+    }
+    changed = False
+    if "title" not in columns:
+        connection.execute("ALTER TABLE chat_threads ADD COLUMN title TEXT")
+        changed = True
+    if "employee_id" not in columns:
+        connection.execute("ALTER TABLE chat_threads ADD COLUMN employee_id TEXT")
+        changed = True
+    if "employee_role" not in columns:
+        connection.execute("ALTER TABLE chat_threads ADD COLUMN employee_role TEXT")
+        changed = True
+    if changed or "employee_id" in columns:
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_threads_employee
+                ON chat_threads(workspace_id, thread_kind, employee_id)
+            """
+        )
+    if changed:
+        connection.commit()

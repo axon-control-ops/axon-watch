@@ -9,6 +9,7 @@ import {
 interface CreateIdeWorkbenchChromeSliceInput {
   ideTerminalRevealToken: Ref<number>;
   ideTerminalToggleToken: Ref<number>;
+  teamRosterRevealToken: Ref<number>;
   ideActivityView: Ref<IdeActivityView>;
   ideExplorerCollapsed: Ref<boolean>;
   agentDockCollapsed: Ref<boolean>;
@@ -59,6 +60,12 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
     persistAgentDockCollapsed(input.agentDockCollapsed.value);
   }
 
+  /** Open Team sidebar and nudge roster chrome to scroll the active teammate into view. */
+  function revealTeamRosterForActiveEmployee(): void {
+    setIdeActivityView('team');
+    input.teamRosterRevealToken.value += 1;
+  }
+
   return {
     revealIdeTerminalPanel,
     toggleIdeTerminalPanel,
@@ -66,5 +73,6 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
     setIdeActivityView,
     toggleIdeExplorer,
     toggleAgentDock,
+    revealTeamRosterForActiveEmployee,
   };
 }

@@ -23,6 +23,7 @@ from app.cli_runtime.approval_gate import is_run_linked_composer_mode, is_tool_c
 from app.persistence import chat_store
 from app.plans.service import maybe_attach_plan_artifact
 from app.terminal.session_registry import ensure_agent_session, serialize_session
+from app.workspace_agents.employee_persona_prompt import build_employee_persona_appendix
 
 
 def post_lane_b_message(
@@ -106,6 +107,20 @@ def post_lane_b_message(
         kairo_session_id=kairo_session_id,
         composer_mode=composer_mode,
     )
+    thread_employee_id = str(early_thread.get("employee_id") or "").strip()
+    employee_persona = build_employee_persona_appendix(
+        workspace_id=workspace_id,
+        employee_id=thread_employee_id or None,
+        employee_role=(
+            str(early_thread.get("employee_role") or "").strip() or None
+        ),
+    )
+    if employee_persona:
+        memory_appendix = "\n\n".join(
+            part
+            for part in (employee_persona, memory_appendix)
+            if part and str(part).strip()
+        )
     recent_turns = [
         {
             "role": str(item.get("role") or ""),
@@ -113,13 +128,14 @@ def post_lane_b_message(
         }
         for item in chat_store.list_thread_messages(thread_id)
     ]
+    # VAXON smalltalk fast-path stays on generic threads only — employee 1:1s dispatch.
     persona_reply = (
         build_lane_b_persona_reply(
             content=content,
             recent_turns=recent_turns,
             session_id=f"ide-thread:{thread_id}",
         )
-        if composer_mode == "agent"
+        if composer_mode == "agent" and not thread_employee_id
         else None
     )
     if persona_reply:

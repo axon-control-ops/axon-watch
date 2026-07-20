@@ -118,7 +118,11 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
 
   async function speakKairoConversationLine(
     line: string,
-    options?: { operatorPrompt?: string; skipSpeakApi?: boolean },
+    options?: {
+      operatorPrompt?: string;
+      skipSpeakApi?: boolean;
+      azureVoiceId?: string | null;
+    },
   ): Promise<void> {
     const trimmed = line.trim();
     const configuredNarration = input.operatorPresenceSettings.value.kairo_narration ?? 'minimal';
@@ -171,6 +175,7 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       priority: 'conversation',
       speechRate: input.operatorPresenceSettings.value.speech_rate,
       speechPitch: input.operatorPresenceSettings.value.speech_pitch,
+      azureVoiceId: options?.azureVoiceId?.trim() || undefined,
     });
   }
 

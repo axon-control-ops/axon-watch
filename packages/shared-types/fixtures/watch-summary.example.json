@@ -40,6 +40,7 @@
     "last_command_id": "",
     "last_command_status": "",
     "last_command_at": "",
+    "last_command_detail": "",
     "receipts_count": 2,
     "last_receipt_at": "2026-07-05T08:00:01Z",
     "last_receipt_result": "succeeded"
