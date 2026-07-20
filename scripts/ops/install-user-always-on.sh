@@ -83,5 +83,16 @@ else
   systemctl --user --no-pager --full status axon-watch.service control-plane.service || true
 fi
 
+echo "==> Soft public cutover (:7734 -> :4173) + managed tunnel"
+if [[ -x "${repo_root}/scripts/ops/soft-public-cutover.sh" ]]; then
+  "${repo_root}/scripts/ops/soft-public-cutover.sh" || \
+    echo "WARN: soft-public-cutover failed; public hostname may stay degraded." >&2
+fi
+curl -sS --max-time 10 -X POST \
+  "${AXON_WATCH_CONTROL_PLANE_BASE_URL:-http://127.0.0.1:8787}/api/tunnel/start" \
+  | python3 -m json.tool 2>/dev/null || \
+  echo "WARN: managed tunnel start failed; check /api/tunnel/status." >&2
+
 echo "User linger should stay yes so services survive logout: loginctl enable-linger \$USER"
-echo "Remote access still needs a Cloudflare tunnel token (connectors rail shows it missing today)."
+echo "Operator surface: http://127.0.0.1:4173  (legacy soft-rollback on :7735 via soft cutover)"
+echo "Hard CF ingress cutover (optional): CF_API_TOKEN=... ./scripts/ops/set-tunnel-ingress-4173.sh"
