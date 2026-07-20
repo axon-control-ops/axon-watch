@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import type { IdeActivityView } from '../../lib/ide-layout-prefs';
+import { resolveIdeActivityBarSelectAction } from '../../lib/ide-activity-bar-select';
 import {
   agentDockActivityBarAriaLabel,
   agentDockActivityBarTitle,
@@ -157,34 +158,32 @@ function isActive(item: (typeof items)[number]): boolean {
 }
 
 function selectView(view: IdeActivityView): void {
-  if (view === 'agent') {
-    if (agentDockExpanded.value) {
-      shell.toggleAgentDock();
-      shell.focusIdeSidebarView('agent');
-      return;
-    }
-    shell.setIdeActivityView('agent');
+  const action = resolveIdeActivityBarSelectAction({
+    view,
+    currentView: shell.ideActivityView,
+    explorerCollapsed: shell.ideExplorerCollapsed,
+    agentDockCollapsed: shell.agentDockCollapsed,
+    terminalPanelVisible: shell.workbenchTerminalPanelVisible,
+    sidebarViews,
+  });
+
+  if (action === 'toggle-agent') {
+    shell.toggleAgentDock();
+    shell.focusIdeSidebarView('agent');
     return;
   }
 
-  if (view === 'terminal') {
-    if (shell.workbenchTerminalPanelVisible) {
-      shell.toggleIdeTerminalPanel();
-      shell.focusIdeSidebarView('terminal');
-      return;
-    }
-    shell.setIdeActivityView('terminal');
+  if (action === 'toggle-terminal') {
+    shell.toggleIdeTerminalPanel();
+    shell.focusIdeSidebarView('terminal');
     return;
   }
 
-  if (
-    sidebarViews.has(view as IdeSidebarActivityView) &&
-    shell.ideActivityView === view &&
-    !shell.ideExplorerCollapsed
-  ) {
+  if (action === 'toggle-explorer') {
     shell.toggleIdeExplorer();
     return;
   }
+
   shell.setIdeActivityView(view);
 }
 </script>

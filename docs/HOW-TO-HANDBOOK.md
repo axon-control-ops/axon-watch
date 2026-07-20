@@ -1158,10 +1158,11 @@ Use this order when something breaks:
 1. **Stack health** — `axonhealth` (or `./scripts/dev/check-health.sh`).
 2. **Empty shell / Runtime unavailable** — `axonrevive`, then hard-refresh `:4173`. Do **not** rely on `./scripts/dev/down.sh` when systemd owns the ports.
 3. **Soft refresh** — `axonrestart` after backend route changes (if the API still answers).
-4. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
-5. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
-6. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
-7. **Logs** — `journalctl --user -u control-plane.service -n 80` (always-on) or `.local/logs/` (dev bootstrap).
+4. **Stale UI on `:4173`** — rebuild console-web (`npm run build -w @axon-watch/console-web`), `systemctl --user restart console-web.service`, then hard-refresh. Source-only / `:5173` Vite edits do **not** update the systemd bundle.
+5. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
+6. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
+7. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
+8. **Logs** — `journalctl --user -u control-plane.service -n 80` (always-on) or `.local/logs/` (dev bootstrap).
 
 Symptom-specific fixes continue in the sections below.
 
@@ -1375,6 +1376,24 @@ Repo scripts (same behavior without PATH):
 ```
 
 Open console after revive: **http://127.0.0.1:4173** (hard-refresh).
+
+### Console-web rebuild (always-on `:4173`)
+
+`:4173` serves the **built** `apps/console-web/dist` via systemd `console-web.service`. Source edits (including Vite `:5173`) are **not** live on `:4173` until:
+
+```bash
+npm run build -w @axon-watch/console-web
+systemctl --user restart console-web.service
+# then hard-refresh http://127.0.0.1:4173
+```
+
+### Local verify loop
+
+```bash
+./scripts/ops/change-verify-loop.sh              # dirty working tree
+./scripts/ops/change-verify-loop.sh --head-only  # committed HEAD only
+./scripts/ops/change-verify-loop.sh --watch
+```
 
 ### Dev bootstrap (when systemd is not owning ports)
 
