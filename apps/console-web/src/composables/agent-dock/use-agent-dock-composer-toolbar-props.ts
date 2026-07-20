@@ -1,5 +1,4 @@
-import type { ComputedRef, MaybeRef, Ref } from 'vue';
-import { computed, toValue } from 'vue';
+import { computed, toValue, type MaybeRef } from 'vue';
 
 import { MODE_OPTIONS, type ComposerMode } from './use-composer-menus';
 import type { AgentDockComposerAttachmentChip } from '../../components/ide/agent-dock/agent-dock-composer-toolbar-types';
@@ -9,7 +8,8 @@ import type { AgentDockComposerRuntimeTarget } from '../../components/ide/agent-
 
 type ModeOption = (typeof MODE_OPTIONS)[number];
 
-type ToolbarPropsInput = {
+/** Fields the composer API must expose for the toolbar binding. */
+export type AgentDockComposerToolbarSource = {
   showContextMenu: MaybeRef<boolean>;
   showToolsMenu: MaybeRef<boolean>;
   showModelMenu: MaybeRef<boolean>;
@@ -24,7 +24,7 @@ type ToolbarPropsInput = {
   composerImages: MaybeRef<unknown[]>;
   mcpToolsForMode: MaybeRef<ComposerMcpTool[]>;
   composerMode: MaybeRef<ComposerMode>;
-  modeOptions: ModeOption[];
+  MODE_OPTIONS: ModeOption[];
   modeButtonLabel: MaybeRef<string>;
   modeButtonTitle: MaybeRef<string>;
   activeMode: MaybeRef<ModeOption>;
@@ -63,61 +63,62 @@ type ToolbarPropsInput = {
   canConvertInstructions: MaybeRef<boolean>;
 };
 
+/** Bind composer setup refs into toolbar prop values (keeps AgentDockComposer.vue thin). */
 export function useAgentDockComposerToolbarProps(
-  input: ToolbarPropsInput,
+  composer: AgentDockComposerToolbarSource,
 ) {
   return computed(() => ({
-    showContextMenu: toValue(input.showContextMenu),
-    showToolsMenu: toValue(input.showToolsMenu),
-    showModelMenu: toValue(input.showModelMenu),
-    showModeMenu: toValue(input.showModeMenu),
-    showAddModelsPanel: toValue(input.showAddModelsPanel),
-    showRuntimeTargetsPanel: toValue(input.showRuntimeTargetsPanel),
-    showAddModelsEntry: toValue(input.showAddModelsEntry),
-    showExtraPinnedRows: toValue(input.showExtraPinnedRows),
-    showCursorCatalog: toValue(input.showCursorCatalog),
-    showVaultAction: toValue(input.showVaultAction),
-    attachmentChips: toValue(input.attachmentChips),
-    composerImageCount: toValue(input.composerImages).length,
-    mcpToolsForMode: toValue(input.mcpToolsForMode),
-    composerMode: toValue(input.composerMode),
-    modeOptions: input.modeOptions,
-    modeButtonLabel: toValue(input.modeButtonLabel),
-    modeButtonTitle: toValue(input.modeButtonTitle),
-    activeMode: toValue(input.activeMode),
-    isFullAccessAgent: toValue(input.isFullAccessAgent),
-    executionAccessHint: toValue(input.executionAccessHint),
-    sandboxSessionEnabled: toValue(input.sandboxSessionEnabled),
-    sandboxEnvForced: toValue(input.sandboxEnvForced),
-    sandboxHint: toValue(input.sandboxHint),
-    sandboxLabel: toValue(input.sandboxLabel),
-    sandboxSessionPending: toValue(input.sandboxSessionPending),
-    contextWorkspace: toValue(input.contextWorkspace),
-    contextSelection: toValue(input.contextSelection),
-    contextTerminal: toValue(input.contextTerminal),
-    contextIde: toValue(input.contextIde),
-    contextPinned: toValue(input.contextPinned),
-    hasTerminalSnippet: toValue(input.hasTerminalSnippet),
-    selectionChipLabel: toValue(input.selectionChipLabel),
-    runtimeDetail: toValue(input.runtimeDetail),
-    runtimeLabel: toValue(input.runtimeLabel),
-    selectedRuntimeSummary: toValue(input.selectedRuntimeSummary),
-    runtimeTargets: toValue(input.runtimeTargets),
-    selectedModelId: toValue(input.selectedModelId),
-    selectedModelLabel: toValue(input.selectedModelLabel),
-    autoModelRow: toValue(input.autoModelRow),
-    autoToggleChecked: toValue(input.autoToggleChecked),
-    composerPickerRows: toValue(input.composerPickerRows),
-    extraPinnedRows: toValue(input.extraPinnedRows),
-    cursorCatalogTotal: toValue(input.cursorCatalogTotal),
-    cursorCatalogStatus: toValue(input.cursorCatalogStatus),
-    cursorAuthLine: toValue(input.cursorAuthLine),
-    cursorStaleWarning: toValue(input.cursorStaleWarning) ?? '',
-    cursorManageRows: toValue(input.cursorManageRows),
-    cursorCatalogCount: toValue(input.cursorCatalogCount),
-    modelSearchQuery: toValue(input.modelSearchQuery),
-    runtimeHint: toValue(input.runtimeHint),
-    canConvertInstructions: toValue(input.canConvertInstructions),
+    showContextMenu: toValue(composer.showContextMenu),
+    showToolsMenu: toValue(composer.showToolsMenu),
+    showModelMenu: toValue(composer.showModelMenu),
+    showModeMenu: toValue(composer.showModeMenu),
+    showAddModelsPanel: toValue(composer.showAddModelsPanel),
+    showRuntimeTargetsPanel: toValue(composer.showRuntimeTargetsPanel),
+    showAddModelsEntry: toValue(composer.showAddModelsEntry),
+    showExtraPinnedRows: toValue(composer.showExtraPinnedRows),
+    showCursorCatalog: toValue(composer.showCursorCatalog),
+    showVaultAction: toValue(composer.showVaultAction),
+    attachmentChips: toValue(composer.attachmentChips),
+    composerImageCount: toValue(composer.composerImages).length,
+    mcpToolsForMode: toValue(composer.mcpToolsForMode),
+    composerMode: toValue(composer.composerMode),
+    modeOptions: composer.MODE_OPTIONS,
+    modeButtonLabel: toValue(composer.modeButtonLabel),
+    modeButtonTitle: toValue(composer.modeButtonTitle),
+    activeMode: toValue(composer.activeMode),
+    isFullAccessAgent: toValue(composer.isFullAccessAgent),
+    executionAccessHint: toValue(composer.executionAccessHint),
+    sandboxSessionEnabled: toValue(composer.sandboxSessionEnabled),
+    sandboxEnvForced: toValue(composer.sandboxEnvForced),
+    sandboxHint: toValue(composer.sandboxHint),
+    sandboxLabel: toValue(composer.sandboxLabel),
+    sandboxSessionPending: toValue(composer.sandboxSessionPending),
+    contextWorkspace: toValue(composer.contextWorkspace),
+    contextSelection: toValue(composer.contextSelection),
+    contextTerminal: toValue(composer.contextTerminal),
+    contextIde: toValue(composer.contextIde),
+    contextPinned: toValue(composer.contextPinned),
+    hasTerminalSnippet: toValue(composer.hasTerminalSnippet),
+    selectionChipLabel: toValue(composer.selectionChipLabel),
+    runtimeDetail: toValue(composer.runtimeDetail),
+    runtimeLabel: toValue(composer.runtimeLabel),
+    selectedRuntimeSummary: toValue(composer.selectedRuntimeSummary),
+    runtimeTargets: toValue(composer.runtimeTargets),
+    selectedModelId: toValue(composer.selectedModelId),
+    selectedModelLabel: toValue(composer.selectedModelLabel),
+    autoModelRow: toValue(composer.autoModelRow),
+    autoToggleChecked: toValue(composer.autoToggleChecked),
+    composerPickerRows: toValue(composer.composerPickerRows),
+    extraPinnedRows: toValue(composer.extraPinnedRows),
+    cursorCatalogTotal: toValue(composer.cursorCatalogTotal),
+    cursorCatalogStatus: toValue(composer.cursorCatalogStatus),
+    cursorAuthLine: toValue(composer.cursorAuthLine),
+    cursorStaleWarning: toValue(composer.cursorStaleWarning) ?? '',
+    cursorManageRows: toValue(composer.cursorManageRows),
+    cursorCatalogCount: toValue(composer.cursorCatalogCount),
+    modelSearchQuery: toValue(composer.modelSearchQuery),
+    runtimeHint: toValue(composer.runtimeHint),
+    canConvertInstructions: toValue(composer.canConvertInstructions),
   }));
 }
 

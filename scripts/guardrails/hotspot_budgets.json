@@ -41,11 +41,11 @@
   },
   "ratcheted_oversize_files": {
     "apps/console-web/src/components/ide/AgentDockComposer.vue": {
-      "max_lines": 190,
+      "max_lines": 146,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/ide/agent-dock/*",
-      "note": "FS-005: thin orchestrator; logic lives in useAgentDockComposer.ts + agent-dock/*"
+      "note": "FS-005: thin orchestrator; toolbar binding in use-agent-dock-composer-toolbar-props.ts"
     },
     "apps/console-web/src/api/control-plane.ts": {
       "max_lines": 12,
