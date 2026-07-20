@@ -80,7 +80,7 @@ describe('useIdeEditorStatusBar', () => {
     expect(ideEditorStatusTerminalChip.value).toBeNull();
   });
 
-  it('suppresses stale connector-down guidance when watch is disconnected', () => {
+  it('shows watch-offline chip and suppresses stale connector-down guidance when watch is disconnected', () => {
     const shell = mockShell({
       connectorsSummary: { required_unavailable: 2 },
       runtimeSummary: { watch: { connected: false } },
@@ -97,7 +97,11 @@ describe('useIdeEditorStatusBar', () => {
       })),
     });
 
-    expect(ideEditorStatusConnectorChip.value).toBeNull();
+    expect(ideEditorStatusConnectorChip.value).toMatchObject({
+      id: 'watch-offline',
+      label: 'WATCH OFFLINE',
+      tone: 'warning',
+    });
     expect(ideQuickGuide.value?.title).toContain('Panels closed');
     expect(ideQuickGuide.value?.title).not.toContain('connectors down');
   });

@@ -92,6 +92,39 @@
   opacity: 0.95;
 }
 
+.status-bar-mockup__chip--watch-offline {
+  border-color: rgba(255, 176, 96, 0.38);
+  background: rgba(32, 18, 8, 0.92);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.status-bar-mockup__chip--watch-offline:hover {
+  border-color: rgba(255, 176, 96, 0.55);
+  background: rgba(40, 22, 10, 0.96);
+}
+
+.status-bar-mockup__chip--watch-offline:focus-visible {
+  outline: 2px solid rgba(255, 176, 96, 0.72);
+  outline-offset: 2px;
+}
+
+.status-bar-mockup__chip--watch-offline .status-bar-mockup__chip-label {
+  color: rgba(255, 196, 128, 0.96);
+  text-shadow: none;
+}
+
+.status-bar-mockup__icon--watch-offline {
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 1px dashed rgba(255, 176, 96, 0.72);
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 0 6px rgba(255, 176, 96, 0.22);
+  opacity: 0.95;
+}
+
 .status-bar-mockup__icon--operator {
   position: relative;
   width: 0.48rem;

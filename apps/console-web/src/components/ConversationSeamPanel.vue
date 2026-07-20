@@ -66,7 +66,6 @@ const {
   enlargedAttachment,
   openAttachmentPreview,
   closeAttachmentLightbox,
-  handleAttachmentLightboxKeydown,
   compactCommandSummary,
   isEmptyStreamingAgent,
   transcriptSegments,

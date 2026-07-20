@@ -24,6 +24,7 @@ import {
 import { armAgentShellMirror, agentShellMirrorActive } from '../../lib/agent-shell-mirror-state';
 import { resolveChatAttachmentUrl } from '../../api/control-plane';
 import { threadAttachmentUrlForImagePath } from '../../lib/thread-image-url';
+import { isThreadImageAttachment } from '../../lib/thread-message-attachment-view';
 import { useShellStore } from '../../stores/shell';
 
 export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listRef: Ref<HTMLElement | null>, handleContentChange: () => void) {
@@ -201,14 +202,6 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     return message.attachments ?? [];
   }
 
-  function isImageAttachment(attachment: ThreadMessageAttachment): boolean {
-    return attachment.mime_type.startsWith('image/');
-  }
-
-  function messageImageAttachments(message: OperatorThreadEntry): ThreadMessageAttachment[] {
-    return messageAttachments(message).filter(isImageAttachment);
-  }
-
   interface EnlargedAttachmentPreview {
     url: string;
     filename: string;
@@ -218,7 +211,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
 
   function openAttachmentPreview(attachment: ThreadMessageAttachment): void {
     const url = resolveChatAttachmentUrl(attachment.url);
-    if (!isImageAttachment(attachment)) {
+    if (!isThreadImageAttachment(attachment)) {
       if (typeof window !== 'undefined') {
         window.open(url, '_blank', 'noopener,noreferrer');
       }
@@ -232,12 +225,6 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
 
   function closeAttachmentLightbox(): void {
     enlargedAttachment.value = null;
-  }
-
-  function handleAttachmentLightboxKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      closeAttachmentLightbox();
-    }
   }
 
   function compactCommandSummary(output: string): string {
@@ -290,12 +277,9 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     attachmentUrlForImagePath,
     applyArtifactAction,
     messageAttachments,
-    isImageAttachment,
-    messageImageAttachments,
     enlargedAttachment,
     openAttachmentPreview,
     closeAttachmentLightbox,
-    handleAttachmentLightboxKeydown,
     compactCommandSummary,
     isEmptyStreamingAgent,
     transcriptSegments,

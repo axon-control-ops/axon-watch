@@ -6,6 +6,7 @@ import {
   resolveThreadImageUrl,
 } from '../../lib/thread-image-url';
 import { useShellStore } from '../../stores/shell';
+import ImagePreviewLightbox from './ImagePreviewLightbox.vue';
 
 const props = defineProps<{
   path: string;
@@ -38,11 +39,15 @@ function closeLightbox(): void {
   enlarged.value = false;
 }
 
-function handleLightboxKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    closeLightbox();
+const enlargedPreview = computed(() => {
+  if (!enlarged.value || !imageUrl.value) {
+    return null;
   }
-}
+  return {
+    url: imageUrl.value,
+    filename: fileName.value,
+  };
+});
 
 function openInCanvas(): void {
   void shell.openWorkspaceFile(resolvedPath.value);
@@ -73,35 +78,8 @@ function openInCanvas(): void {
     </figcaption>
   </figure>
 
-  <Teleport to="body">
-    <div
-      v-if="enlarged"
-      class="agent-dock-composer__image-lightbox"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="`Preview ${fileName}`"
-      tabindex="-1"
-      @click.self="closeLightbox"
-      @keydown="handleLightboxKeydown"
-    >
-      <figure class="agent-dock-composer__image-lightbox-body">
-        <img
-          class="agent-dock-composer__image-lightbox-img"
-          :src="imageUrl"
-          :alt="fileName"
-        >
-        <figcaption class="agent-dock-composer__image-lightbox-caption">
-          {{ fileName }}
-        </figcaption>
-      </figure>
-      <button
-        type="button"
-        class="agent-dock-composer__image-lightbox-close"
-        aria-label="Close image preview"
-        @click="closeLightbox"
-      >
-        ×
-      </button>
-    </div>
-  </Teleport>
+  <ImagePreviewLightbox
+    :preview="enlargedPreview"
+    @close="closeLightbox"
+  />
 </template>

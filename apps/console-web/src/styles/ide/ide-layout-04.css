@@ -174,6 +174,25 @@
   margin-left: auto;
 }
 
+.agent-dock__transcript .conversation-seam__attachments--thread {
+  margin-top: 0.28rem;
+  max-width: 100%;
+}
+
+.agent-dock__transcript .conversation-seam__attachment-card--thread {
+  width: min(100%, 14rem);
+  max-height: 11rem;
+}
+
+.agent-dock__transcript .conversation-seam__attachment-card--thread .conversation-seam__attachment-preview {
+  max-height: 11rem;
+}
+
+.agent-dock__transcript .conversation-seam__attachment-card--thread.conversation-seam__attachment-card--file {
+  max-width: 8.5rem;
+  height: 4rem;
+}
+
 .conversation-seam__inline-image {
   margin: 0.45rem 0;
 }

@@ -76,6 +76,39 @@ class AttachmentStoreTests(unittest.TestCase):
                 created_at="2026-07-20T14:00:04Z",
             )
 
+    def test_bind_and_list_attachments_for_message(self) -> None:
+        record = attachment_store.save_upload(
+            workspace_id="workspace_alpha",
+            filename="notes.txt",
+            mime_type="text/plain",
+            data=b"hello",
+            created_at="2026-07-20T14:00:05Z",
+        )
+        bound = attachment_store.bind_attachments_to_message(
+            attachment_ids=[record["attachment_id"]],
+            workspace_id="workspace_alpha",
+            message_id="message_operator_abc",
+            thread_id="thread_ide_abc",
+        )
+        self.assertEqual(1, len(bound))
+        self.assertEqual("message_operator_abc", bound[0]["message_id"])
+        self.assertEqual("thread_ide_abc", bound[0]["thread_id"])
+
+        grouped = attachment_store.list_attachments_for_messages(["message_operator_abc"])
+        self.assertIn("message_operator_abc", grouped)
+        self.assertEqual(record["attachment_id"], grouped["message_operator_abc"][0]["attachment_id"])
+
+        serialized = attachment_store.serialize_attachment(bound[0])
+        self.assertEqual(f"/api/chat/attachments/{record['attachment_id']}", serialized["url"])
+
+        with self.assertRaises(attachment_store.AttachmentValidationError):
+            attachment_store.bind_attachments_to_message(
+                attachment_ids=[record["attachment_id"]],
+                workspace_id="workspace_alpha",
+                message_id="message_operator_def",
+                thread_id="thread_ide_def",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { resolveChatAttachmentUrl } from '../../api/control-plane';
-import { composerAttachmentExtensionLabel } from '../../lib/composer-clipboard-paste';
 import type { ThreadMessageAttachment } from '../../lib/operator-thread';
+import {
+  isThreadImageAttachment,
+  threadAttachmentExtensionLabel,
+  threadAttachmentPreviewTitle,
+} from '../../lib/thread-message-attachment-view';
 
 defineProps<{
   attachments: ThreadMessageAttachment[];
@@ -11,9 +15,6 @@ const emit = defineEmits<{
   preview: [attachment: ThreadMessageAttachment];
 }>();
 
-function isImageAttachment(attachment: ThreadMessageAttachment): boolean {
-  return attachment.mime_type.startsWith('image/');
-}
 </script>
 
 <template>
@@ -28,13 +29,14 @@ function isImageAttachment(attachment: ThreadMessageAttachment): boolean {
       type="button"
       class="conversation-seam__attachment-card conversation-seam__attachment-card--thread"
       :class="{
-        'conversation-seam__attachment-card--file': !isImageAttachment(attachment),
+        'conversation-seam__attachment-card--file': !isThreadImageAttachment(attachment),
       }"
-      :title="isImageAttachment(attachment) ? `Preview ${attachment.filename}` : `Open ${attachment.filename}`"
+      :title="threadAttachmentPreviewTitle(attachment)"
+      :aria-label="threadAttachmentPreviewTitle(attachment)"
       @click="emit('preview', attachment)"
     >
       <img
-        v-if="isImageAttachment(attachment)"
+        v-if="isThreadImageAttachment(attachment)"
         class="conversation-seam__attachment-preview"
         :src="resolveChatAttachmentUrl(attachment.url)"
         :alt="attachment.filename"
@@ -45,7 +47,7 @@ function isImageAttachment(attachment: ThreadMessageAttachment): boolean {
         class="conversation-seam__attachment-file"
       >
         <span class="conversation-seam__attachment-file-ext">
-          {{ composerAttachmentExtensionLabel(attachment.filename, attachment.mime_type) }}
+          {{ threadAttachmentExtensionLabel(attachment) }}
         </span>
         <span class="conversation-seam__attachment-file-label">{{ attachment.filename }}</span>
       </span>

@@ -55,6 +55,10 @@ function connectorChipTitle(id: ConnectorStatusBarChipId): string {
     return 'Required connector down — switch to Mission Control connectors';
   }
 
+  if (id === 'watch-offline') {
+    return 'Watch offline — connector probes paused until the watch reconnects';
+  }
+
   return 'Legacy connector offline — switch to Mission Control connectors';
 }
 

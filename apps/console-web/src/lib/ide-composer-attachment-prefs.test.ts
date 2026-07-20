@@ -56,6 +56,31 @@ describe('ide composer attachment prefs', () => {
     expect(roundTrip.previewUrl.startsWith('data:image/png')).toBe(true);
   });
 
+  it('persists and restores document attachments per workspace', () => {
+    persistComposerAttachments('workspace_a', [
+      {
+        id: 'composer-file-1',
+        name: 'report.csv',
+        mimeType: 'text/csv',
+        dataUrl: 'data:text/csv;base64,YSxCCjEsMg==',
+      },
+      {
+        id: 'composer-file-2',
+        name: 'brief.pdf',
+        mimeType: 'application/pdf',
+        dataUrl: 'data:application/pdf;base64,JVBERi0xLjQ=',
+      },
+    ]);
+
+    const restored = readStoredComposerAttachments('workspace_a');
+    expect(restored.map((item) => item.name)).toEqual(['report.csv', 'brief.pdf']);
+
+    const csv = composerImageFromStored(restored[0]!);
+    expect(csv.mimeType).toBe('text/csv');
+    expect(csv.file.type).toBe('text/csv');
+    expect(csv.previewUrl.startsWith('data:text/csv')).toBe(true);
+  });
+
   it('isolates attachments per conversation thread', () => {
     persistComposerAttachments(
       'workspace_a',

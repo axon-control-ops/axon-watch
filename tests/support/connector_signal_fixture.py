@@ -48,3 +48,28 @@ CONNECTOR_DEGRADED_WATCH_INBOX = {
     "count": 1,
     "updated_at": "2026-07-17T06:00:00Z",
 }
+
+OPTIONAL_TUNNEL_LEGACY_INGRESS_SIGNAL_ID = "signal_connector_cloudflare_tunnel_degraded"
+OPTIONAL_TUNNEL_LEGACY_INGRESS_DETAIL = (
+    "ingress still targets legacy Axon Local; expected http://127.0.0.1:4173"
+)
+
+OPTIONAL_TUNNEL_LEGACY_INGRESS_INBOX_ITEM = {
+    "signal_id": OPTIONAL_TUNNEL_LEGACY_INGRESS_SIGNAL_ID,
+    "workspace_id": CONNECTOR_WORKSPACE_ID,
+    "title": "Cloudflare tunnel connector degraded",
+    "summary": OPTIONAL_TUNNEL_LEGACY_INGRESS_DETAIL,
+    "severity": "high",
+    "status": "open",
+    "source": "connector",
+    "created_at": "2026-07-18T08:00:00Z",
+    "updated_at": "2026-07-18T08:00:00Z",
+    "action_type": "investigate",
+    "delivery_state": "pending",
+}
+
+OPTIONAL_TUNNEL_LEGACY_INGRESS_WATCH_INBOX = {
+    "items": [OPTIONAL_TUNNEL_LEGACY_INGRESS_INBOX_ITEM],
+    "count": 1,
+    "updated_at": "2026-07-18T08:00:00Z",
+}

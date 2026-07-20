@@ -76,6 +76,16 @@ describe('IDE editor surface layout contract', () => {
     expect(offlineStatus).toMatch(/color:\s*rgba\(251,\s*191,\s*36,\s*0\.88\)/);
   });
 
+  it('styles the watch-offline status-bar chip as a warning affordance', () => {
+    const shell28 = readCss('shell/mockup-shell-28.css');
+    const chip = ruleBlock(shell28, '.status-bar-mockup__chip--watch-offline');
+    expect(chip).toMatch(/cursor:\s*pointer/);
+    expect(chip).toMatch(/border-color:\s*rgba\(255,\s*176,\s*96/);
+
+    const icon = ruleBlock(shell28, '.status-bar-mockup__icon--watch-offline');
+    expect(icon).toMatch(/border:\s*1px dashed rgba\(255,\s*176,\s*96/);
+  });
+
   it('loads connector attention pulse styles from the ide-layout aggregator', () => {
     const aggregator = readCss('ide-layout.css');
     expect(aggregator).toMatch(
@@ -113,5 +123,38 @@ describe('IDE editor surface layout contract', () => {
 
     const threadCard = ruleBlock(attachments, '.conversation-seam__attachment-card--thread');
     expect(threadCard).toMatch(/max-height:\s*14rem/);
+  });
+
+  it('tightens thread attachment cards inside the IDE agent dock transcript', () => {
+    const ide04 = readCss('ide/ide-layout-04.css');
+    const transcriptCard = ruleBlock(
+      ide04,
+      '.agent-dock__transcript .conversation-seam__attachment-card--thread',
+    );
+    expect(transcriptCard).toMatch(/width:\s*min\(100%,\s*14rem\)/);
+    expect(transcriptCard).toMatch(/max-height:\s*11rem/);
+
+    const transcriptFileCard = ruleBlock(
+      ide04,
+      '.agent-dock__transcript .conversation-seam__attachment-card--thread.conversation-seam__attachment-card--file',
+    );
+    expect(transcriptFileCard).toMatch(/max-width:\s*8\.5rem/);
+  });
+
+  it('loads composer file attachment styles from the ide-layout aggregator', () => {
+    const aggregator = readCss('ide-layout.css');
+    expect(aggregator).toMatch(/@import\s+['"]\.\/ide\/ide-layout-07\.css['"]/);
+
+    const layout06 = readCss('ide/ide-layout-06.css');
+    const layout07 = readCss('ide/ide-layout-07.css');
+    expect(layout06).toMatch(/\.agent-dock-composer__image-card\s*\{/);
+    expect(layout07).not.toMatch(/\.agent-dock-composer__image-card\s*\{/);
+    expect(layout07).toMatch(/\.agent-dock-composer__image-card--file/);
+
+    const fileExt = ruleBlock(layout07, '.agent-dock-composer__file-ext');
+    expect(fileExt).toMatch(/font-weight:\s*700/);
+
+    const fileName = ruleBlock(layout07, '.agent-dock-composer__file-name');
+    expect(fileName).toMatch(/-webkit-line-clamp:\s*2/);
   });
 });

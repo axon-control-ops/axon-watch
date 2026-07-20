@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   composerAttachmentExtensionLabel,
+  composerAttachmentPreviewTitle,
   readClipboardImages,
   readComposerImageFiles,
   readDroppedImages,
@@ -77,6 +78,13 @@ describe('composer clipboard paste', () => {
     expect(attachments[1]?.mimeType).toBe('application/pdf');
     expect(composerAttachmentExtensionLabel('report.csv', 'text/csv')).toBe('CSV');
     expect(composerAttachmentExtensionLabel('brief.pdf', 'application/pdf')).toBe('PDF');
+  });
+
+  it('builds preview titles for images and documents', () => {
+    expect(composerAttachmentPreviewTitle('screenshot.png', 'image/png')).toBe(
+      'Preview screenshot.png',
+    );
+    expect(composerAttachmentPreviewTitle('report.csv', 'text/csv')).toBe('Open report.csv');
   });
 
   it('infers csv mime type from filename when browser omits type', () => {

@@ -6,6 +6,7 @@ import type { ComposerTypeaheadRow } from '../../../composables/agent-dock/use-c
 import {
   type ComposerClipboardImage,
   composerAttachmentExtensionLabel,
+  composerAttachmentPreviewTitle,
   isComposerImageMime,
 } from '../../../lib/composer-clipboard-paste';
 import type { ComposerAccessTone } from '../../../lib/sandbox-session-view';
@@ -139,7 +140,8 @@ const contextChips = computed(() =>
       <button
         type="button"
         class="agent-dock-composer__image-open"
-        :title="`Open ${image.name}`"
+        :title="composerAttachmentPreviewTitle(image.name, image.mimeType)"
+        :aria-label="composerAttachmentPreviewTitle(image.name, image.mimeType)"
         @click="emit('open-image', image)"
       >
         <img
@@ -147,6 +149,7 @@ const contextChips = computed(() =>
           class="agent-dock-composer__image-preview"
           :src="image.previewUrl"
           :alt="image.name"
+          loading="lazy"
         >
         <span
           v-else

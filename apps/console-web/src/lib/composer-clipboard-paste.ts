@@ -66,6 +66,11 @@ export function isComposerImageMime(mimeType: string): boolean {
   return mimeType.trim().toLowerCase().startsWith('image/');
 }
 
+/** Tooltip for a composer attachment preview/open button. */
+export function composerAttachmentPreviewTitle(name: string, mimeType: string): string {
+  return isComposerImageMime(mimeType) ? `Preview ${name}` : `Open ${name}`;
+}
+
 function fileLooksLikeComposerAttachment(file: File): boolean {
   const mimeType = resolveComposerAttachmentMime(file);
   if (isComposerImageMime(mimeType)) {

@@ -23,17 +23,29 @@ from app.terminal.session_registry import ensure_agent_session, list_sessions, r
 class ChatParitySliceTests(unittest.TestCase):
     def setUp(self) -> None:
         self._tmpdir = tempfile.TemporaryDirectory()
-        os.environ["AXON_WATCH_CONTROL_PLANE_DB"] = os.path.join(
-            self._tmpdir.name,
-            "control-plane.sqlite3",
+        self.addCleanup(self._tmpdir.cleanup)
+        self._env = patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_CONTROL_PLANE_DB": os.path.join(
+                    self._tmpdir.name,
+                    "control-plane.sqlite3",
+                ),
+                "AXON_WATCH_STATE_DIR": os.path.join(self._tmpdir.name, "state"),
+                # Keep lane B chat tests on the synchronous path so mocks apply.
+                "AXON_WATCH_LANE_B_STREAMING": "0",
+                "AXON_WATCH_WORKER_SCHEDULER": "0",
+            },
+            clear=False,
         )
-        os.environ["AXON_WATCH_STATE_DIR"] = os.path.join(self._tmpdir.name, "state")
+        self._env.start()
+        self.addCleanup(self._env.stop)
         chat_store.reset_store()
         reset_registry()
         self.client = TestClient(app)
+        self.addCleanup(self.client.close)
 
     def tearDown(self) -> None:
-        self._tmpdir.cleanup()
         reset_registry()
 
     def test_upload_attachment_and_send_with_message(self) -> None:
@@ -52,7 +64,7 @@ class ChatParitySliceTests(unittest.TestCase):
         attachment_id = upload.json()["attachment_id"]
 
         with patch(
-            "app.chat.service.generate_lane_b_result",
+            "app.chat.lane_b_post_message.generate_lane_b_result",
             return_value={
                 "content": "I see the diagram.",
                 "dispatched": True,
@@ -144,7 +156,7 @@ class ChatParitySliceTests(unittest.TestCase):
 
     def test_list_and_create_workspace_chat_threads(self) -> None:
         with patch(
-            "app.chat.service.generate_lane_b_result",
+            "app.chat.lane_b_post_message.generate_lane_b_result",
             return_value={
                 "content": "First thread",
                 "dispatched": False,
@@ -181,7 +193,7 @@ class ChatParitySliceTests(unittest.TestCase):
             "app.chat.service._lane_b_streaming_enabled",
             return_value=False,
         ), patch(
-            "app.chat.service.generate_lane_b_result",
+            "app.chat.lane_b_post_message.generate_lane_b_result",
             return_value={
                 "content": "Agent done",
                 "dispatched": True,

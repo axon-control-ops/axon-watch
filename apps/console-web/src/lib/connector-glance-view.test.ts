@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildConnectorGlanceChip,
   buildRequiredConnectorAlertChip,
+  buildStatusBarConnectorChip,
+  buildWatchOfflineChip,
   effectiveRequiredConnectorsUnavailable,
   isConnectorStatusBarChip,
   isLegacyConnectorGlanceVisible,
@@ -20,7 +22,17 @@ describe('connector glance view', () => {
   it('identifies status-bar connector chips', () => {
     expect(isConnectorStatusBarChip('connector-glance')).toBe(true);
     expect(isConnectorStatusBarChip('connector-required-alert')).toBe(true);
+    expect(isConnectorStatusBarChip('watch-offline')).toBe(true);
     expect(isConnectorStatusBarChip('phase')).toBe(false);
+  });
+
+  it('builds a watch-offline chip when the watch lane is disconnected', () => {
+    expect(buildWatchOfflineChip(false)).toEqual({
+      id: 'watch-offline',
+      label: 'WATCH OFFLINE',
+      tone: 'warning',
+    });
+    expect(buildWatchOfflineChip(true)).toBeNull();
   });
 
   it('builds a required connector alert when required probes are down', () => {
@@ -67,6 +79,45 @@ describe('connector glance view', () => {
     expect(
       effectiveRequiredConnectorsUnavailable({ required_unavailable: 2 }, true),
     ).toBe(2);
+  });
+
+  it('prefers watch-offline over stale connector counts in the status bar', () => {
+    expect(
+      buildStatusBarConnectorChip({
+        ...baseInput,
+        watchConnected: false,
+        summary: { required_unavailable: 2 },
+        items: [
+          {
+            connector_id: 'axon_local',
+            display_name: 'Legacy Axon Local',
+            required: false,
+            status: 'unavailable',
+          },
+        ],
+      }),
+    ).toEqual({
+      id: 'watch-offline',
+      label: 'WATCH OFFLINE',
+      tone: 'warning',
+    });
+  });
+
+  it('prefers required-down over legacy glance in the status bar', () => {
+    expect(
+      buildStatusBarConnectorChip({
+        ...baseInput,
+        summary: { required_unavailable: 1 },
+        items: [
+          {
+            connector_id: 'axon_local',
+            display_name: 'Legacy Axon Local',
+            required: false,
+            status: 'unavailable',
+          },
+        ],
+      })?.id,
+    ).toBe('connector-required-alert');
   });
 
   it('hides the legacy glance when required connectors are already alerting', () => {

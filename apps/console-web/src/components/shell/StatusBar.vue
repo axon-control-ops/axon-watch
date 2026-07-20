@@ -129,6 +129,7 @@ onUnmounted(() => {
             'status-bar-mockup__chip--connector-glance': item.id === 'connector-glance',
             'status-bar-mockup__chip--connector-required-alert':
               item.id === 'connector-required-alert',
+            'status-bar-mockup__chip--watch-offline': item.id === 'watch-offline',
           }"
           :type="isConnectorStatusBarChip(item.id) ? 'button' : undefined"
           :title="connectorChipTitle(item.id)"
@@ -153,6 +154,11 @@ onUnmounted(() => {
           <span
             v-else-if="item.id === 'connector-required-alert'"
             class="status-bar-mockup__icon status-bar-mockup__icon--connector-required-alert"
+            aria-hidden="true"
+          />
+          <span
+            v-else-if="item.id === 'watch-offline'"
+            class="status-bar-mockup__icon status-bar-mockup__icon--watch-offline"
             aria-hidden="true"
           />
           <span class="status-bar-mockup__chip-label">{{ item.label }}</span>

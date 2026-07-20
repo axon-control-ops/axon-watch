@@ -17,6 +17,8 @@ from tests.support.connector_signal_fixture import (
     CONNECTOR_DEGRADED_WATCH_INBOX,
     CONNECTOR_INBOX_ITEM,
     CONNECTOR_WATCH_INBOX,
+    OPTIONAL_TUNNEL_LEGACY_INGRESS_INBOX_ITEM,
+    OPTIONAL_TUNNEL_LEGACY_INGRESS_WATCH_INBOX,
 )
 from tests.support.email_signal_fixture import EMAIL_INBOX_ITEM, EMAIL_WATCH_INBOX
 from tests.support.control_plane_app_loader import load_control_plane_app, prepare_control_plane_imports
@@ -232,6 +234,25 @@ class ParityA4SignalInboxConsistencyTests(unittest.TestCase):
         self.assertEqual(expected, consistency_tuple(inbox_item))
         self.assertEqual(expected, consistency_tuple(summary["top_items"][0]))
         self.assertEqual(expected, consistency_tuple(briefing_item))
+        self.assertEqual(1, summary["open_count"])
+        self.assertEqual(0, summary["critical_count"])
+        self.assertEqual(1, summary["high_count"])
+
+    def test_optional_tunnel_legacy_ingress_signal_consistent_across_surfaces(
+        self,
+    ) -> None:
+        self._patch_watch_inbox(OPTIONAL_TUNNEL_LEGACY_INGRESS_WATCH_INBOX)
+
+        inbox_item = self.client.get("/api/inbox").json()["items"][0]
+        summary = self.client.get("/api/runtime/summary").json()["signals"]
+        briefing_item = self.client.get("/api/briefing").json()["top_signals"][0]
+
+        expected = consistency_tuple(OPTIONAL_TUNNEL_LEGACY_INGRESS_INBOX_ITEM)
+        self.assertEqual(expected, consistency_tuple(inbox_item))
+        self.assertEqual(expected, consistency_tuple(summary["top_items"][0]))
+        self.assertEqual(expected, consistency_tuple(briefing_item))
+        self.assertEqual("high", inbox_item["severity"])
+        self.assertEqual("investigate", inbox_item["action_type"])
         self.assertEqual(1, summary["open_count"])
         self.assertEqual(0, summary["critical_count"])
         self.assertEqual(1, summary["high_count"])

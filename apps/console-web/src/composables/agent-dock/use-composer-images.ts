@@ -102,12 +102,6 @@ export function useComposerImages() {
     enlargedComposerImage.value = null;
   }
 
-  function handleComposerImageLightboxKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      closeComposerImageLightbox();
-    }
-  }
-
   function addComposerImages(images: ComposerClipboardImage[]): void {
     if (!images.length) {
       return;
@@ -204,7 +198,6 @@ export function useComposerImages() {
     loadComposerImagesForWorkspace,
     openComposerImage,
     closeComposerImageLightbox,
-    handleComposerImageLightboxKeydown,
     addComposerImages,
     openComposerAttachmentPicker,
     handleComposerPaste,

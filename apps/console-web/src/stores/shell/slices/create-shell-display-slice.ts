@@ -8,10 +8,7 @@ import type {
   RuntimeSummary,
   WorkspaceRecord,
 } from '../../../contracts/canonical';
-import {
-  buildConnectorGlanceChip,
-  buildRequiredConnectorAlertChip,
-} from '../../../lib/connector-glance-view';
+import { buildStatusBarConnectorChip } from '../../../lib/connector-glance-view';
 import { shouldShowIdeAgentStop } from '../../../lib/ide-agent-run-active';
 import { resolveIdeStopRun } from '../../../lib/ide-composer-queue';
 import {
@@ -158,21 +155,17 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
       activeSignalCount: activeOperatorSignalCount.value,
     });
 
+    const watchConnected = input.runtimeSummary.value?.watch.connected ?? false;
     const connectorChipInput = {
       connectorsLoadState: input.connectorsLoadState.value,
       items: input.connectorsItems.value,
       summary: input.connectorsSummary.value,
-      watchConnected: input.runtimeSummary.value?.watch.connected ?? false,
+      watchConnected,
       layoutMode: input.layoutMode.value,
     };
-    const requiredConnectorAlert = buildRequiredConnectorAlertChip(connectorChipInput);
-    if (requiredConnectorAlert) {
-      zones.center.push(requiredConnectorAlert);
-    } else {
-      const connectorGlance = buildConnectorGlanceChip(connectorChipInput);
-      if (connectorGlance) {
-        zones.center.push(connectorGlance);
-      }
+    const connectorChip = buildStatusBarConnectorChip(connectorChipInput);
+    if (connectorChip) {
+      zones.center.push(connectorChip);
     }
 
     return zones;
