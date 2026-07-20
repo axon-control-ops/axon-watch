@@ -29,6 +29,12 @@ import {
   type BrainGraphNode,
 } from '../../lib/operator-brain-graph-view';
 import { useShellStore } from '../../stores/shell';
+import {
+  operatorTerminalChipLabel,
+  workbenchTerminalPanelAlive,
+  workbenchTerminalPanelAriaLabel,
+  workbenchTerminalPanelTitle,
+} from '../../lib/workbench-terminal-panel-view';
 
 const props = defineProps<{
   terminalVisible: boolean;
@@ -126,6 +132,20 @@ const speechCapturing = kairoCaptureCapturing;
 const kairoSpeechActive = computed(() => shell.kairoSpeechActive);
 const agentStreamActive = computed(() => shell.agentStreamActive);
 const streamWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
+
+const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
+
+const terminalDockAlive = computed(
+  () => !props.terminalVisible && workbenchTerminalPanelAlive(terminalRunPhase.value),
+);
+
+const terminalPanelTitle = computed(() =>
+  workbenchTerminalPanelTitle(props.terminalVisible, terminalRunPhase.value),
+);
+
+const terminalPanelAriaLabel = computed(() =>
+  workbenchTerminalPanelAriaLabel(props.terminalVisible, terminalRunPhase.value),
+);
 
 const {
   webglReady,
@@ -435,16 +455,29 @@ function handleEvidenceHandoff(signal: {
         <button
           type="button"
           class="status-bar-mockup__chip status-bar-mockup__chip--galaxy"
-          :class="{ 'status-bar-mockup__chip--galaxy-accent': !props.terminalVisible }"
-          :title="props.terminalVisible ? 'Hide terminal' : 'Show terminal'"
+          :class="{
+            'status-bar-mockup__chip--galaxy-accent': !props.terminalVisible,
+            'status-bar-mockup__chip--galaxy-alive': terminalDockAlive,
+            'status-bar-mockup__chip--galaxy-executing':
+              !props.terminalVisible && terminalRunPhase === 'executing',
+            'status-bar-mockup__chip--galaxy-review-ready':
+              !props.terminalVisible && terminalRunPhase === 'review_ready',
+          }"
+          :title="terminalPanelTitle"
+          :aria-label="terminalPanelAriaLabel"
           @click="emit('toggleTerminal')"
         >
           <span
             class="status-bar-mockup__dot"
-            :class="{ 'status-bar-mockup__dot--warn': !props.terminalVisible }"
+            :class="{
+              'status-bar-mockup__dot--warn': !props.terminalVisible && !terminalDockAlive,
+              'status-bar-mockup__dot--alive': terminalDockAlive,
+            }"
             aria-hidden="true"
           />
-          <span class="status-bar-mockup__chip-label">Terminal</span>
+          <span class="status-bar-mockup__chip-label">{{
+            operatorTerminalChipLabel(props.terminalVisible)
+          }}</span>
         </button>
       </div>
     </Teleport>

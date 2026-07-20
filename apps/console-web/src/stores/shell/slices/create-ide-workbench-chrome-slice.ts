@@ -5,7 +5,6 @@ import {
   persistAgentDockCollapsed,
   persistIdeExplorerCollapsed,
 } from '../../../lib/ide-layout-prefs';
-import { persistWorkbenchTerminalPanelVisible } from '../../../lib/workbench-terminal-split';
 
 interface CreateIdeWorkbenchChromeSliceInput {
   ideTerminalRevealToken: Ref<number>;
@@ -18,8 +17,8 @@ interface CreateIdeWorkbenchChromeSliceInput {
 }
 
 export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSliceInput) {
+  /** Bump reveal token only — CenterWorkbench persists visibility for the active layout mode. */
   function revealIdeTerminalPanel(): void {
-    persistWorkbenchTerminalPanelVisible('ide', true);
     input.ideTerminalRevealToken.value += 1;
   }
 
@@ -27,15 +26,16 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
     input.ideTerminalToggleToken.value += 1;
   }
 
-  function setIdeActivityView(view: IdeActivityView): void {
+  function focusIdeSidebarView(view: IdeActivityView): void {
     input.ideAttentionPanelOpen.value = false;
     input.ideBriefingPanelOpen.value = false;
     input.ideActivityView.value = view;
-    if (view === 'explorer') {
-      input.ideExplorerCollapsed.value = false;
-      persistIdeExplorerCollapsed(false);
-      return;
-    }
+    input.ideExplorerCollapsed.value = false;
+    persistIdeExplorerCollapsed(false);
+  }
+
+  function setIdeActivityView(view: IdeActivityView): void {
+    focusIdeSidebarView(view);
     if (view === 'terminal') {
       revealIdeTerminalPanel();
       return;
@@ -43,10 +43,7 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
     if (view === 'agent') {
       input.agentDockCollapsed.value = false;
       persistAgentDockCollapsed(false);
-      return;
     }
-    input.ideExplorerCollapsed.value = false;
-    persistIdeExplorerCollapsed(false);
   }
 
   function toggleIdeExplorer(): void {
@@ -65,6 +62,7 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
   return {
     revealIdeTerminalPanel,
     toggleIdeTerminalPanel,
+    focusIdeSidebarView,
     setIdeActivityView,
     toggleIdeExplorer,
     toggleAgentDock,

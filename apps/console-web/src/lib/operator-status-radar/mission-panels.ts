@@ -71,6 +71,7 @@ export function operatorExecutionStage(input: {
   loadState: OperatorStatusLoadState;
   primaryActiveRun: RunRecord | null;
   workspaceReviewReadyCount?: number;
+  requiredConnectorsUnavailable?: number;
 }): OperatorExecutionStage {
   const mission = operatorMissionSummary({
     workspaceId: input.workspaceId,
@@ -94,10 +95,13 @@ export function operatorExecutionStage(input: {
       loadState: input.loadState,
       primaryActiveRun: run,
       workspaceReviewReadyCount: input.workspaceReviewReadyCount,
+      requiredConnectorsUnavailable: input.requiredConnectorsUnavailable,
     }),
     advise: operatorStatusAdvise({
       briefing: input.briefing,
       loadState: input.loadState,
+      primaryActiveRun: run,
+      requiredConnectorsUnavailable: input.requiredConnectorsUnavailable,
     }),
     decide:
       input.briefing?.executive_rhythm?.decide ??
@@ -216,11 +220,69 @@ export function operatorAgentSummary(input: {
   return items.slice(0, 4);
 }
 
+type ConnectorsRailSummary = {
+  configured: number;
+  ok: number;
+  required_unavailable: number;
+};
+
+type ConnectorsRailLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+
+function operatorConnectorsRailItem(input: {
+  watchConnected: boolean;
+  connectorsLoadState: ConnectorsRailLoadState;
+  connectorsSummary: ConnectorsRailSummary | null;
+}): OperatorStatusRailItem {
+  if (!input.watchConnected) {
+    return {
+      label: 'Connectors',
+      value: 'watch offline',
+      tone: 'warn',
+    };
+  }
+
+  if (input.connectorsLoadState === 'loading' || input.connectorsLoadState === 'idle') {
+    return {
+      label: 'Connectors',
+      value: 'loading…',
+      tone: 'default',
+    };
+  }
+
+  if (input.connectorsLoadState === 'error' || !input.connectorsSummary) {
+    return {
+      label: 'Connectors',
+      value: 'unavailable',
+      tone: 'warn',
+      action: 'focus-connectors',
+    };
+  }
+
+  const { configured, ok, required_unavailable: requiredDown } = input.connectorsSummary;
+  if (requiredDown > 0) {
+    return {
+      label: 'Connectors',
+      value: requiredDown === 1 ? '1 req down' : `${requiredDown} req down`,
+      tone: 'attention',
+      action: 'focus-connectors',
+    };
+  }
+
+  return {
+    label: 'Connectors',
+    value: `${ok}/${configured} ok`,
+    tone: 'ok',
+    action: 'focus-connectors',
+  };
+}
+
 export function operatorStatusRail(input: {
   workspaceId: string | null;
   runtimeSummary: RuntimeSummary | null;
   briefing: OperatorBriefing | null;
   pendingApprovals: number;
+  connectorsLoadState?: ConnectorsRailLoadState;
+  connectorsSummary?: ConnectorsRailSummary | null;
 }): OperatorStatusRailItem[] {
   const watchConnected =
     input.briefing?.connectivity.watch_connected ?? input.runtimeSummary?.watch.connected ?? false;
@@ -237,6 +299,11 @@ export function operatorStatusRail(input: {
       value: watchConnected ? 'online' : 'offline',
       tone: watchConnected ? 'ok' : 'warn',
     },
+    operatorConnectorsRailItem({
+      watchConnected,
+      connectorsLoadState: input.connectorsLoadState ?? 'idle',
+      connectorsSummary: input.connectorsSummary ?? null,
+    }),
     {
       label: 'Signals',
       value: String(openSignals),
@@ -266,17 +333,21 @@ export function operatorMissionChips(input: {
   runtimeSummary: RuntimeSummary | null;
   briefing: OperatorBriefing | null;
   pendingApprovals: number;
+  requiredConnectorsUnavailable?: number;
 }): OperatorMissionChip[] {
   const openSignals =
     input.briefing?.top_signals.length ?? input.runtimeSummary?.signals.open_count ?? 0;
+  const requiredConnectorsUnavailable = input.requiredConnectorsUnavailable ?? 0;
   const risk =
     input.briefing?.degraded.active || input.runtimeSummary?.degraded.active
       ? 'Runtime degraded'
-      : input.pendingApprovals > 0
-        ? 'Approval boundary open'
-        : openSignals > 0
-          ? 'Open signal requires review'
-          : 'Nominal';
+      : requiredConnectorsUnavailable > 0
+        ? 'Required connector down'
+        : input.pendingApprovals > 0
+          ? 'Approval boundary open'
+          : openSignals > 0
+            ? 'Open signal requires review'
+            : 'Nominal';
 
   return [
     {

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { buildOperatorQuickGuide, type OperatorQuickGuideActionId } from '../../lib/operator-quick-guide';
 import { isLegacyConnectorGlanceVisible } from '../../lib/connector-glance-view';
-import { buildOperatorQuickGuide } from '../../lib/operator-quick-guide';
 import {
   type OperatorCenterView,
 } from '../../lib/operator-brain-graph-view';
@@ -23,6 +23,13 @@ import {
 } from '../../lib/run-display';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
+import {
+  operatorTerminalChipLabel,
+  operatorTerminalDockActionLabel,
+  workbenchTerminalPanelAlive,
+  workbenchTerminalPanelAriaLabel,
+  workbenchTerminalPanelTitle,
+} from '../../lib/workbench-terminal-panel-view';
 import ConnectorsRailPanel from './ConnectorsRailPanel.vue';
 import OperatorBrainGraphPanel from './OperatorBrainGraphPanel.vue';
 import OperatorFleetHealthGrid from './OperatorFleetHealthGrid.vue';
@@ -65,11 +72,16 @@ const pendingApprovals = computed(
     0,
 );
 
+const requiredConnectorsUnavailable = computed(
+  () => shell.connectorsSummary?.required_unavailable ?? 0,
+);
+
 const radarTone = computed(() =>
   operatorRadarTone({
     runtimeSummary: shell.runtimeSummary,
     briefing: shell.operatorBriefing,
     pendingApprovals: pendingApprovals.value,
+    requiredConnectorsUnavailable: requiredConnectorsUnavailable.value,
   }),
 );
 
@@ -89,6 +101,7 @@ const executionStage = computed(() =>
     loadState: shell.briefingLoadState,
     primaryActiveRun: shell.primaryActiveRun,
     workspaceReviewReadyCount: reviewReadyRuns.value.length,
+    requiredConnectorsUnavailable: requiredConnectorsUnavailable.value,
   }),
 );
 
@@ -116,8 +129,17 @@ const statusRail = computed(() =>
     runtimeSummary: shell.runtimeSummary,
     briefing: shell.operatorBriefing,
     pendingApprovals: pendingApprovals.value,
+    connectorsLoadState: shell.connectorsLoadState,
+    connectorsSummary: shell.connectorsSummary,
   }),
 );
+
+function handleStatusRailAction(action: 'focus-connectors'): void {
+  if (action === 'focus-connectors') {
+    void shell.loadConnectors();
+    shell.focusWatchConnectors();
+  }
+}
 
 const attentionBadgeCount = computed(() =>
   leftSidebarAttentionBadgeCount({
@@ -203,18 +225,73 @@ const quickGuide = computed(() =>
   }),
 );
 
+const showStandaloneQuickGuide = computed(
+  () => !showMissionStage.value && Boolean(quickGuide.value),
+);
+
+const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
+
+const terminalDockAlive = computed(
+  () => !props.terminalVisible && workbenchTerminalPanelAlive(terminalRunPhase.value),
+);
+
+const terminalPanelTitle = computed(() =>
+  workbenchTerminalPanelTitle(props.terminalVisible, terminalRunPhase.value),
+);
+
+const terminalPanelAriaLabel = computed(() =>
+  workbenchTerminalPanelAriaLabel(props.terminalVisible, terminalRunPhase.value),
+);
+
 const workspaceTerminalLabel = computed(() => {
   if (!workspaceId.value) {
     return 'No workspace selected';
   }
 
-  return shell.runtimeSummary?.watch.connected
+  const workspacePart = shell.runtimeSummary?.watch.connected
     ? `Connected · ${workspaceId.value}`
     : `Workspace · ${workspaceId.value}`;
+
+  if (!props.terminalVisible && terminalRunPhase.value === 'executing') {
+    return `Run in progress · ${workspacePart}`;
+  }
+
+  if (!props.terminalVisible && terminalRunPhase.value === 'review_ready') {
+    return `Review ready · ${workspacePart}`;
+  }
+
+  return workspacePart;
 });
 
 function toggleTerminal(): void {
   emit('toggleTerminal');
+}
+
+function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): void {
+  if (actionId === 'show-terminal') {
+    toggleTerminal();
+    return;
+  }
+
+  if (actionId === 'open-attention') {
+    shell.focusAttentionSidebar();
+    return;
+  }
+
+  if (actionId === 'open-briefing') {
+    shell.focusKairoBriefing();
+    return;
+  }
+
+  if (actionId === 'open-connectors') {
+    void shell.loadConnectors();
+    shell.focusWatchConnectors();
+    return;
+  }
+
+  if (actionId === 'switch-to-ide') {
+    shell.setLayoutMode('ide');
+  }
 }
 </script>
 
@@ -256,10 +333,24 @@ function toggleTerminal(): void {
           <button
             type="button"
             class="operator-status-radar-panel__terminal-chip"
-            :class="{ 'operator-status-radar-panel__terminal-chip--collapsed': !props.terminalVisible }"
+            :class="{
+              'operator-status-radar-panel__terminal-chip--collapsed': !props.terminalVisible,
+              'operator-status-radar-panel__terminal-chip--alive': terminalDockAlive,
+              'operator-status-radar-panel__terminal-chip--executing':
+                !props.terminalVisible && terminalRunPhase === 'executing',
+              'operator-status-radar-panel__terminal-chip--review-ready':
+                !props.terminalVisible && terminalRunPhase === 'review_ready',
+            }"
+            :title="terminalPanelTitle"
+            :aria-label="terminalPanelAriaLabel"
             @click="toggleTerminal"
           >
-            {{ props.terminalVisible ? 'Terminal open' : 'Open terminal' }}
+            {{ operatorTerminalChipLabel(props.terminalVisible) }}
+            <span
+              v-if="terminalDockAlive"
+              class="operator-status-radar-panel__terminal-chip-pulse"
+              aria-hidden="true"
+            />
           </button>
           <div class="operator-status-radar-panel__presence">
             <span
@@ -301,6 +392,39 @@ function toggleTerminal(): void {
       <OperatorIncidentFeedPanel />
 
       <OperatorRunStripPanel />
+
+      <section
+        v-if="showStandaloneQuickGuide && quickGuide"
+        class="operator-status-radar-panel__guide operator-status-radar-panel__guide--standalone"
+        :class="{
+          'operator-status-radar-panel__guide--terminal-hidden': !props.terminalVisible,
+          'operator-status-radar-panel__guide--attention': quickGuide.tone === 'attention',
+        }"
+        aria-label="What to do next"
+      >
+        <div class="operator-status-radar-panel__guide-head">
+          <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
+          <div
+            v-if="quickGuide.actions.length"
+            class="operator-status-radar-panel__guide-actions"
+            role="group"
+            aria-label="Quick actions"
+          >
+            <button
+              v-for="action in quickGuide.actions"
+              :key="action.id"
+              type="button"
+              class="operator-status-radar-panel__guide-action"
+              @click="handleOperatorQuickGuideAction(action.id)"
+            >
+              {{ action.label }}
+            </button>
+          </div>
+        </div>
+        <ol class="operator-status-radar-panel__guide-steps">
+          <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
+        </ol>
+      </section>
 
       <section
         v-if="showMissionStage"
@@ -349,9 +473,31 @@ function toggleTerminal(): void {
         <section
           v-if="quickGuide"
           class="operator-status-radar-panel__guide"
+          :class="{
+            'operator-status-radar-panel__guide--terminal-hidden': !props.terminalVisible,
+            'operator-status-radar-panel__guide--attention': quickGuide.tone === 'attention',
+          }"
           aria-label="What to do next"
         >
-          <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
+          <div class="operator-status-radar-panel__guide-head">
+            <p class="operator-status-radar-panel__guide-title">{{ quickGuide.title }}</p>
+            <div
+              v-if="quickGuide.actions.length"
+              class="operator-status-radar-panel__guide-actions"
+              role="group"
+              aria-label="Quick actions"
+            >
+              <button
+                v-for="action in quickGuide.actions"
+                :key="action.id"
+                type="button"
+                class="operator-status-radar-panel__guide-action"
+                @click="handleOperatorQuickGuideAction(action.id)"
+              >
+                {{ action.label }}
+              </button>
+            </div>
+          </div>
           <ol class="operator-status-radar-panel__guide-steps">
             <li v-for="(step, index) in quickGuide.steps" :key="index">{{ step }}</li>
           </ol>
@@ -487,26 +633,56 @@ function toggleTerminal(): void {
       </div>
 
       <footer class="operator-status-radar-panel__rail" aria-label="Runtime status">
-        <div
+        <component
+          :is="item.action ? 'button' : 'div'"
           v-for="item in statusRail"
           :key="item.label"
           class="operator-status-radar-panel__rail-item"
-          :class="`operator-status-radar-panel__rail-item--${item.tone}`"
+          :class="[
+            `operator-status-radar-panel__rail-item--${item.tone}`,
+            { 'operator-status-radar-panel__rail-item--action': item.action },
+          ]"
+          :type="item.action ? 'button' : undefined"
+          :title="item.action === 'focus-connectors' ? 'Open Mission Control connectors' : undefined"
+          :aria-label="
+            item.action === 'focus-connectors'
+              ? `${item.label} ${item.value}. Open Mission Control connectors.`
+              : undefined
+          "
+          @click="item.action ? handleStatusRailAction(item.action) : undefined"
         >
           <span>{{ item.label }}</span>
           <strong>{{ item.value }}</strong>
-        </div>
+        </component>
       </footer>
 
       <button
         v-if="!props.terminalVisible"
         type="button"
         class="operator-status-radar-panel__terminal-dock"
+        :class="{
+          'operator-status-radar-panel__terminal-dock--alive': terminalDockAlive,
+          'operator-status-radar-panel__terminal-dock--executing':
+            terminalRunPhase === 'executing',
+          'operator-status-radar-panel__terminal-dock--review-ready':
+            terminalRunPhase === 'review_ready',
+        }"
+        :title="terminalPanelTitle"
+        :aria-label="terminalPanelAriaLabel"
         @click="toggleTerminal"
       >
-        <span class="operator-status-radar-panel__terminal-dock-label">Terminal dock</span>
+        <span class="operator-status-radar-panel__terminal-dock-label">
+          Terminal dock
+          <span
+            v-if="terminalDockAlive"
+            class="operator-status-radar-panel__terminal-dock-pulse"
+            aria-hidden="true"
+          />
+        </span>
         <span class="operator-status-radar-panel__terminal-dock-copy">{{ workspaceTerminalLabel }}</span>
-        <span class="operator-status-radar-panel__terminal-dock-action">Show</span>
+        <span class="operator-status-radar-panel__terminal-dock-action">
+          {{ operatorTerminalDockActionLabel(false) }}
+        </span>
       </button>
     </template>
   </section>

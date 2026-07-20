@@ -45,7 +45,25 @@ import {
   readEditorMinimapEnabled,
 } from '../../lib/editor-surface-prefs';
 import { isAgentEditReviewDocumentId } from '../../lib/ide-agent-edit-review';
+import { buildIdeQuickGuide, type IdeQuickGuideActionId } from '../../lib/ide-quick-guide';
+import { isLegacyConnectorGlanceVisible } from '../../lib/connector-glance-view';
+import {
+  buildIdeEditorStatusAgentChip,
+  buildIdeEditorStatusConnectorChip,
+  buildIdeEditorStatusTerminalChip,
+} from '../../lib/ide-editor-status-view';
 import { buildWorkbenchProblemItems } from '../../lib/workbench-problem-items';
+import {
+  workbenchTerminalPanelAlive,
+  workbenchTerminalReopenAriaLabel,
+  workbenchTerminalReopenTitle,
+} from '../../lib/workbench-terminal-panel-view';
+import { shouldAutoPeekWorkbenchTerminal } from '../../lib/workbench-terminal-auto-peek';
+import {
+  shouldAutoPeekAgentDock,
+  shouldAutoPeekAgentDockForRun,
+  shouldAutoPeekAgentDockForStreaming,
+} from '../../lib/agent-dock-auto-peek';
 import { useEditorPlanBuild } from '../../composables/use-editor-plan-build';
 
 const shell = useShellStore();
@@ -56,7 +74,66 @@ const workbenchLayoutMode = computed((): 'operator' | 'ide' =>
   hideOperatorEditor.value ? 'operator' : 'ide',
 );
 const terminalPanelVisible = ref(false);
+const autoPeekedTerminalRunIds = ref(new Set<string>());
+const autoPeekedAgentApprovalCount = ref(0);
+const autoPeekedAgentStreamMessageIds = ref(new Set<string>());
+const autoPeekedAgentRunIds = ref(new Set<string>());
 const showTerminalDock = computed(() => terminalPanelVisible.value);
+const agentDockReopenState = computed(() => ({
+  streaming: shell.agentStreamActive,
+  pendingApprovals: shell.pendingApprovalsCount,
+  runPhase: shell.primaryActiveRun?.phase ?? null,
+}));
+const terminalReopenRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
+const terminalReopenAlive = computed(
+  () =>
+    !terminalPanelVisible.value &&
+    workbenchTerminalPanelAlive(terminalReopenRunPhase.value),
+);
+const terminalReopenTitle = computed(() =>
+  workbenchTerminalReopenTitle({ runPhase: terminalReopenRunPhase.value }),
+);
+const terminalReopenAriaLabel = computed(() =>
+  workbenchTerminalReopenAriaLabel({ runPhase: terminalReopenRunPhase.value }),
+);
+const ideEditorStatusTerminalChip = computed(() =>
+  buildIdeEditorStatusTerminalChip({
+    terminalVisible: terminalPanelVisible.value,
+    runPhase: terminalReopenRunPhase.value,
+  }),
+);
+const ideEditorStatusAgentChip = computed(() =>
+  buildIdeEditorStatusAgentChip({
+    agentDockCollapsed: shell.agentDockCollapsed,
+    state: agentDockReopenState.value,
+  }),
+);
+const ideEditorStatusConnectorChip = computed(() =>
+  buildIdeEditorStatusConnectorChip({
+    connectorsLoadState: shell.connectorsLoadState,
+    items: shell.connectorsItems,
+    summary: shell.connectorsSummary,
+    watchConnected: shell.runtimeSummary?.watch.connected ?? false,
+  }),
+);
+const ideQuickGuide = computed(() =>
+  buildIdeQuickGuide({
+    layoutMode: workbenchLayoutMode.value,
+    agentDockCollapsed: shell.agentDockCollapsed,
+    terminalVisible: terminalPanelVisible.value,
+    pendingApprovals: shell.pendingApprovalsCount,
+    streaming: shell.agentStreamActive,
+    runPhase: shell.primaryActiveRun?.phase ?? null,
+    requiredConnectorsUnavailable: shell.connectorsSummary?.required_unavailable ?? 0,
+    legacyConnectorGlanceVisible: isLegacyConnectorGlanceVisible({
+      connectorsLoadState: shell.connectorsLoadState,
+      items: shell.connectorsItems,
+      summary: shell.connectorsSummary,
+      watchConnected: shell.runtimeSummary?.watch.connected ?? false,
+      layoutMode: workbenchLayoutMode.value,
+    }),
+  }),
+);
 const workbenchRef = ref<HTMLElement | null>(null);
 const terminalHeight = ref(240);
 const resizing = ref(false);
@@ -305,6 +382,7 @@ function persistTerminalHeight(): void {
 
 function persistTerminalPanelVisible(visible: boolean): void {
   persistWorkbenchTerminalPanelVisible(workbenchLayoutMode.value, visible);
+  shell.syncWorkbenchTerminalPanelVisible(visible);
 }
 
 function hideTerminalPanel(): void {
@@ -327,15 +405,114 @@ watch(
 watch(
   () => shell.ideTerminalToggleToken,
   () => {
-    if (!isIdeMode.value) {
-      return;
-    }
     if (terminalPanelVisible.value) {
       hideTerminalPanel();
     } else {
       showTerminalPanel();
     }
   },
+);
+
+watch(
+  () =>
+    [
+      workbenchLayoutMode.value,
+      terminalPanelVisible.value,
+      shell.primaryActiveRun?.run_id ?? null,
+      shell.primaryActiveRun?.phase ?? null,
+    ] as const,
+  ([layoutMode, terminalVisible, runId, runPhase]) => {
+    if (
+      !shouldAutoPeekWorkbenchTerminal({
+        layoutMode,
+        terminalVisible,
+        runId,
+        runPhase,
+        alreadyPeekedRunIds: autoPeekedTerminalRunIds.value,
+      })
+    ) {
+      return;
+    }
+
+    autoPeekedTerminalRunIds.value = new Set([
+      ...autoPeekedTerminalRunIds.value,
+      runId ?? '',
+    ]);
+    showTerminalPanel();
+  },
+  { immediate: true },
+);
+
+watch(
+  () =>
+    [
+      workbenchLayoutMode.value,
+      shell.agentDockCollapsed,
+      shell.pendingApprovalsCount,
+      shell.agentStreamActive,
+      shell.agentStreamMessageId,
+      shell.primaryActiveRun?.run_id ?? null,
+      shell.primaryActiveRun?.phase ?? null,
+    ] as const,
+  ([
+    layoutMode,
+    agentDockCollapsed,
+    pendingApprovals,
+    streaming,
+    streamMessageId,
+    runId,
+    runPhase,
+  ]) => {
+    if (pendingApprovals === 0) {
+      autoPeekedAgentApprovalCount.value = 0;
+    }
+
+    if (
+      shouldAutoPeekAgentDock({
+        layoutMode,
+        agentDockCollapsed,
+        pendingApprovals,
+        lastPeekedApprovalCount: autoPeekedAgentApprovalCount.value,
+      })
+    ) {
+      autoPeekedAgentApprovalCount.value = pendingApprovals;
+      showAgentDock();
+      return;
+    }
+
+    if (
+      shouldAutoPeekAgentDockForStreaming({
+        layoutMode,
+        agentDockCollapsed,
+        streaming,
+        streamMessageId,
+        alreadyPeekedStreamMessageIds: autoPeekedAgentStreamMessageIds.value,
+      })
+    ) {
+      autoPeekedAgentStreamMessageIds.value = new Set([
+        ...autoPeekedAgentStreamMessageIds.value,
+        streamMessageId ?? '',
+      ]);
+      showAgentDock();
+      return;
+    }
+
+    if (
+      !shouldAutoPeekAgentDockForRun({
+        layoutMode,
+        agentDockCollapsed,
+        runId,
+        runPhase,
+        alreadyPeekedRunIds: autoPeekedAgentRunIds.value,
+      })
+    ) {
+      return;
+    }
+
+    autoPeekedAgentRunIds.value = new Set([...autoPeekedAgentRunIds.value, runId ?? '']);
+    showAgentDock();
+  },
+  { immediate: true },
 );
 
 function showTerminalPanel(): void {
@@ -347,6 +524,33 @@ function showTerminalPanel(): void {
   persistTerminalPanelVisible(true);
   syncTerminalHeightToContainer();
   requestAnimationFrame(() => runLayoutSync('resize'));
+}
+
+function showAgentDock(): void {
+  if (!shell.agentDockCollapsed) {
+    return;
+  }
+
+  shell.setIdeActivityView('agent');
+}
+
+function openWatchConnectors(): void {
+  void shell.loadConnectors();
+  shell.focusWatchConnectors();
+}
+
+function handleIdeQuickGuideAction(actionId: IdeQuickGuideActionId): void {
+  if (actionId === 'expand-agent-dock') {
+    showAgentDock();
+    return;
+  }
+
+  if (actionId === 'open-connectors') {
+    openWatchConnectors();
+    return;
+  }
+
+  showTerminalPanel();
 }
 
 function toggleTerminalPanel(): void {
@@ -462,6 +666,7 @@ onMounted(() => {
   }
 
   terminalPanelVisible.value = readStoredWorkbenchTerminalPanelVisible(workbenchLayoutMode.value);
+  shell.syncWorkbenchTerminalPanelVisible(terminalPanelVisible.value);
 
   syncTerminalHeightToContainer();
   runLayoutSync('mount');
@@ -487,6 +692,7 @@ watch(
   () => shell.layoutMode,
   () => {
     terminalPanelVisible.value = readStoredWorkbenchTerminalPanelVisible(workbenchLayoutMode.value);
+    shell.syncWorkbenchTerminalPanelVisible(terminalPanelVisible.value);
     syncTerminalHeightToContainer();
     runLayoutSync('resize');
   },
@@ -593,6 +799,38 @@ watch(
       </header>
 
       <section class="center-workbench__editor" :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }">
+        <section
+          v-if="ideQuickGuide"
+          class="center-workbench__ide-guide"
+          :class="{
+            'center-workbench__ide-guide--with-editor': Boolean(shell.activeEditorDocument),
+            [`center-workbench__ide-guide--${ideQuickGuide.tone}`]: true,
+          }"
+          aria-label="IDE tips"
+        >
+          <div class="center-workbench__ide-guide-head">
+            <p class="center-workbench__ide-guide-title">{{ ideQuickGuide.title }}</p>
+            <div
+              v-if="ideQuickGuide.actions.length"
+              class="center-workbench__ide-guide-actions"
+              role="group"
+              aria-label="Quick panel actions"
+            >
+              <button
+                v-for="action in ideQuickGuide.actions"
+                :key="action.id"
+                type="button"
+                class="center-workbench__ide-guide-action"
+                @click="handleIdeQuickGuideAction(action.id)"
+              >
+                {{ action.label }}
+              </button>
+            </div>
+          </div>
+          <ol class="center-workbench__ide-guide-steps">
+            <li v-for="(step, index) in ideQuickGuide.steps" :key="index">{{ step }}</li>
+          </ol>
+        </section>
         <EditorMarkdownToolbar
           v-if="isMarkdownEditorDocument && shell.activeEditorDocument"
           :preview-enabled="editorPreviewEnabled"
@@ -635,16 +873,80 @@ watch(
           @click="handleEditorPreviewClick"
         />
         <div class="editor-statusbar editor-statusbar--mockup">
-          <button
-            v-if="isIdeMode && !terminalPanelVisible"
-            type="button"
-            class="editor-statusbar__panel-toggle"
-            title="Show terminal panel (Ctrl/Cmd+J)"
-            aria-label="Show terminal panel"
-            @click="showTerminalPanel"
-          >
-            TERMINAL
-          </button>
+          <div v-if="isIdeMode" class="editor-statusbar__panel-toggles">
+            <button
+              v-if="ideEditorStatusTerminalChip"
+              type="button"
+              class="editor-statusbar__panel-toggle editor-statusbar__panel-toggle--terminal"
+              :class="{
+                'editor-statusbar__panel-toggle--terminal-alive':
+                  ideEditorStatusTerminalChip.showPulse,
+                'editor-statusbar__panel-toggle--terminal-executing':
+                  ideEditorStatusTerminalChip.executing,
+                'editor-statusbar__panel-toggle--terminal-review-ready':
+                  ideEditorStatusTerminalChip.reviewReady,
+              }"
+              :title="ideEditorStatusTerminalChip.title"
+              :aria-label="ideEditorStatusTerminalChip.ariaLabel"
+              @click="showTerminalPanel"
+            >
+              {{ ideEditorStatusTerminalChip.label }}
+              <span
+                v-if="ideEditorStatusTerminalChip.showPulse"
+                class="editor-statusbar__panel-pulse"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              v-if="ideEditorStatusConnectorChip"
+              type="button"
+              class="editor-statusbar__panel-toggle editor-statusbar__panel-toggle--connector"
+              :class="{
+                'editor-statusbar__panel-toggle--connector-warning':
+                  ideEditorStatusConnectorChip.tone === 'warning',
+                'editor-statusbar__panel-toggle--connector-glance':
+                  ideEditorStatusConnectorChip.id === 'connector-glance',
+              }"
+              :title="ideEditorStatusConnectorChip.title"
+              :aria-label="ideEditorStatusConnectorChip.ariaLabel"
+              @click="openWatchConnectors"
+            >
+              {{ ideEditorStatusConnectorChip.label }}
+            </button>
+            <button
+              v-if="ideEditorStatusAgentChip"
+              type="button"
+              class="editor-statusbar__panel-toggle editor-statusbar__panel-toggle--agent"
+              :class="{
+                'editor-statusbar__panel-toggle--agent-alive': ideEditorStatusAgentChip.alive,
+                'editor-statusbar__panel-toggle--agent-streaming':
+                  ideEditorStatusAgentChip.streaming,
+                'editor-statusbar__panel-toggle--agent-approvals':
+                  ideEditorStatusAgentChip.approvals,
+                'editor-statusbar__panel-toggle--agent-executing':
+                  ideEditorStatusAgentChip.executing,
+                'editor-statusbar__panel-toggle--agent-review-ready':
+                  ideEditorStatusAgentChip.reviewReady,
+              }"
+              :title="ideEditorStatusAgentChip.title"
+              :aria-label="ideEditorStatusAgentChip.ariaLabel"
+              @click="showAgentDock"
+            >
+              {{ ideEditorStatusAgentChip.label }}
+              <span
+                v-if="ideEditorStatusAgentChip.showBadge !== null"
+                class="editor-statusbar__panel-badge"
+                aria-hidden="true"
+              >
+                {{ ideEditorStatusAgentChip.showBadge }}
+              </span>
+              <span
+                v-else-if="ideEditorStatusAgentChip.showPulse"
+                class="editor-statusbar__panel-pulse"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
           <div class="editor-statusbar__meta">
             <button
               v-if="!showAgentDiffReviewViewer"
@@ -666,6 +968,26 @@ watch(
             <span class="editor-statusbar__state">{{ editorAccessLabel }}</span>
           </div>
         </div>
+        <button
+          v-if="isIdeMode && !terminalPanelVisible"
+          type="button"
+          class="workbench-terminal-reopen"
+          :class="{
+            'workbench-terminal-reopen--alive': terminalReopenAlive,
+            'workbench-terminal-reopen--executing': shell.primaryActiveRun?.phase === 'executing',
+            'workbench-terminal-reopen--review-ready': shell.primaryActiveRun?.phase === 'review_ready',
+          }"
+          :title="terminalReopenTitle"
+          :aria-label="terminalReopenAriaLabel"
+          @click="showTerminalPanel"
+        >
+          <span class="workbench-terminal-reopen__label">TERMINAL</span>
+          <span
+            v-if="terminalReopenAlive"
+            class="workbench-terminal-reopen__pulse"
+            aria-hidden="true"
+          />
+        </button>
       </section>
     </section>
 

@@ -379,9 +379,27 @@
 }
 
 .agent-dock__resize-handle:hover .agent-dock__resize-grip,
+.agent-dock__resize-handle:focus-visible .agent-dock__resize-grip,
 .agent-dock--resizing .agent-dock__resize-grip {
   height: 3rem;
   background: rgba(0, 245, 212, 0.72);
+}
+
+.agent-dock__resize-handle:focus-visible {
+  outline: none;
+}
+
+.agent-dock__resize-handle:focus-visible::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.55rem;
+  height: 3.4rem;
+  border: 1px solid rgba(0, 245, 212, 0.55);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .agent-dock__header {

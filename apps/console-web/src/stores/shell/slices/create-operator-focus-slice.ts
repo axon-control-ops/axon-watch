@@ -21,12 +21,14 @@ interface CreateOperatorFocusSliceInput {
   ideExplorerCollapsed: Ref<boolean>;
   signalsSeamEmphasized: Ref<boolean>;
   missionControlEmphasized: Ref<boolean>;
+  connectorsEmphasized: Ref<boolean>;
   briefingSeamEmphasized: Ref<boolean>;
   operatorCenterView: Ref<OperatorCenterView>;
   dockHeroMode: Ref<DockHeroMode>;
   setLeftSidebarMode: (mode: LeftSidebarMode) => void;
   setDockHeroMode: (mode: DockHeroMode) => void;
   restoreComposerDraft: (content: string) => void;
+  setLayoutMode: (mode: LayoutMode) => void;
 }
 
 export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
@@ -94,6 +96,35 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     }
   }
 
+  function focusWatchConnectors(): void {
+    if (input.layoutMode.value === 'ide') {
+      input.setLayoutMode('operator');
+    }
+
+    if (input.operatorCenterView.value === 'graph') {
+      setOperatorCenterView('grid');
+    }
+
+    input.connectorsEmphasized.value = true;
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        document.getElementById('operator-mission-control')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+        window.requestAnimationFrame(() => {
+          document.getElementById('watch-connectors-rail')?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+          });
+          window.setTimeout(() => {
+            input.connectorsEmphasized.value = false;
+          }, 1200);
+        });
+      });
+    }
+  }
+
   function setOperatorCenterView(view: OperatorCenterView): void {
     input.operatorCenterView.value = view;
     persistOperatorCenterView(view);
@@ -153,6 +184,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     openIdeBriefingPanel,
     toggleSignalDetails,
     focusMissionControl,
+    focusWatchConnectors,
     setOperatorCenterView,
     afterRunLifecycleMutation,
     focusKairoBriefing,

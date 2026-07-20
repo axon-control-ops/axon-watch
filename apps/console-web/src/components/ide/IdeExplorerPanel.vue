@@ -3,6 +3,12 @@ import { computed, ref } from 'vue';
 
 import WorkspaceFileTree from '../WorkspaceFileTree.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
+import { isLegacyConnectorGlanceVisible } from '../../lib/connector-glance-view';
+import {
+  buildIdeAgentSidebarStub,
+  buildIdeRunPanelConnectorNotice,
+  buildIdeTerminalSidebarStub,
+} from '../../lib/ide-sidebar-stub-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -23,6 +29,48 @@ const searchResults = computed(() => {
 const dirtyDocuments = computed(() =>
   shell.editorDocuments.filter((document) => document.source === 'file' && document.dirty),
 );
+
+const agentSidebarStub = computed(() =>
+  buildIdeAgentSidebarStub({
+    agentDockCollapsed: shell.agentDockCollapsed,
+    streaming: shell.agentStreamActive,
+    pendingApprovals: shell.pendingApprovalsCount,
+    runPhase: shell.primaryActiveRun?.phase ?? null,
+  }),
+);
+
+const terminalSidebarStub = computed(() =>
+  buildIdeTerminalSidebarStub({
+    terminalVisible: shell.workbenchTerminalPanelVisible,
+    runPhase: shell.primaryActiveRun?.phase ?? null,
+  }),
+);
+
+const runConnectorNotice = computed(() =>
+  buildIdeRunPanelConnectorNotice({
+    requiredConnectorsUnavailable: shell.connectorsSummary?.required_unavailable ?? 0,
+    legacyConnectorGlanceVisible: isLegacyConnectorGlanceVisible({
+      connectorsLoadState: shell.connectorsLoadState,
+      items: shell.connectorsItems,
+      summary: shell.connectorsSummary,
+      watchConnected: shell.runtimeSummary?.watch.connected ?? false,
+      layoutMode: 'ide',
+    }),
+  }),
+);
+
+function toggleAgentDockFromStub(): void {
+  shell.toggleAgentDock();
+}
+
+function toggleTerminalFromStub(): void {
+  shell.toggleIdeTerminalPanel();
+}
+
+function openWatchConnectors(): void {
+  void shell.loadConnectors();
+  shell.focusWatchConnectors();
+}
 
 function openSearchResult(path: string): void {
   void shell.openWorkspaceFile(path);
@@ -264,6 +312,7 @@ function handleCreateFolder(path: string): void {
   <section
     v-else-if="!shell.ideExplorerCollapsed && shell.ideActivityView === 'run'"
     class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
+    :class="runConnectorNotice ? `ide-explorer-panel--stub-${runConnectorNotice.tone}` : undefined"
   >
     <div class="panel-heading ide-explorer-panel__heading">
       <p class="panel-heading__title">RUN</p>
@@ -277,6 +326,25 @@ function handleCreateFolder(path: string): void {
       </button>
     </div>
     <div class="ide-panel-search">
+      <div
+        v-if="runConnectorNotice"
+        class="ide-explorer-panel__stub-body ide-explorer-panel__run-notice"
+      >
+        <p
+          v-for="(line, index) in runConnectorNotice.lines"
+          :key="index"
+          class="region-copy ide-explorer-panel__stub-copy"
+        >
+          {{ line }}
+        </p>
+        <button
+          type="button"
+          class="ide-explorer-panel__stub-action"
+          @click="openWatchConnectors"
+        >
+          {{ runConnectorNotice.actionLabel }}
+        </button>
+      </div>
       <p class="region-copy ide-panel-caption">
         {{ shell.primaryActiveRun ? `${shell.primaryActiveRun.run_id} · ${shell.primaryActiveRun.phase}` : 'No active run' }}
       </p>
@@ -298,6 +366,7 @@ function handleCreateFolder(path: string): void {
   <section
     v-else-if="!shell.ideExplorerCollapsed && shell.ideActivityView === 'agent'"
     class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
+    :class="`ide-explorer-panel--stub-${agentSidebarStub.tone}`"
   >
     <div class="panel-heading ide-explorer-panel__heading">
       <p class="panel-heading__title">AGENT</p>
@@ -310,14 +379,29 @@ function handleCreateFolder(path: string): void {
         ‹
       </button>
     </div>
-    <p class="region-copy ide-explorer-panel__stub-copy">
-      Agent dock stays pinned on the right. Use Ctrl/Cmd+\ to collapse or expand it.
-    </p>
+    <div class="ide-explorer-panel__stub-body">
+      <p
+        v-for="(line, index) in agentSidebarStub.lines"
+        :key="index"
+        class="region-copy ide-explorer-panel__stub-copy"
+      >
+        {{ line }}
+      </p>
+      <button
+        v-if="agentSidebarStub.actionLabel"
+        type="button"
+        class="ide-explorer-panel__stub-action"
+        @click="toggleAgentDockFromStub"
+      >
+        {{ agentSidebarStub.actionLabel }}
+      </button>
+    </div>
   </section>
 
   <section
-    v-else-if="!shell.ideExplorerCollapsed"
+    v-else-if="!shell.ideExplorerCollapsed && shell.ideActivityView === 'terminal'"
     class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
+    :class="`ide-explorer-panel--stub-${terminalSidebarStub.tone}`"
   >
     <div class="panel-heading ide-explorer-panel__heading">
       <p class="panel-heading__title">TERMINAL</p>
@@ -330,8 +414,22 @@ function handleCreateFolder(path: string): void {
         ‹
       </button>
     </div>
-    <p class="region-copy ide-explorer-panel__stub-copy">
-      Terminal lives in the center bottom panel. Use Ctrl/Cmd+J to show or hide it.
-    </p>
+    <div class="ide-explorer-panel__stub-body">
+      <p
+        v-for="(line, index) in terminalSidebarStub.lines"
+        :key="index"
+        class="region-copy ide-explorer-panel__stub-copy"
+      >
+        {{ line }}
+      </p>
+      <button
+        v-if="terminalSidebarStub.actionLabel"
+        type="button"
+        class="ide-explorer-panel__stub-action"
+        @click="toggleTerminalFromStub"
+      >
+        {{ terminalSidebarStub.actionLabel }}
+      </button>
+    </div>
   </section>
 </template>

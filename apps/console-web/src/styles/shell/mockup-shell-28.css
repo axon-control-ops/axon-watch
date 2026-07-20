@@ -27,6 +27,71 @@
   filter: drop-shadow(0 0 4px rgba(0, 242, 255, 0.35));
 }
 
+.status-bar-mockup__chip--connector-glance {
+  border-color: rgba(148, 188, 204, 0.28);
+  background: rgba(8, 16, 24, 0.88);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.status-bar-mockup__chip--connector-glance:hover {
+  border-color: rgba(148, 188, 204, 0.42);
+  background: rgba(12, 22, 32, 0.94);
+}
+
+.status-bar-mockup__chip--connector-glance:focus-visible {
+  outline: 2px solid rgba(148, 188, 204, 0.72);
+  outline-offset: 2px;
+}
+
+.status-bar-mockup__chip--connector-glance .status-bar-mockup__chip-label {
+  color: rgba(148, 188, 204, 0.92);
+  text-shadow: none;
+}
+
+.status-bar-mockup__icon--connector-glance {
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 1px solid rgba(148, 188, 204, 0.65);
+  border-radius: 50%;
+  box-shadow: none;
+  opacity: 0.85;
+}
+
+.status-bar-mockup__chip--connector-required-alert {
+  border-color: rgba(255, 176, 96, 0.38);
+  background: rgba(32, 18, 8, 0.92);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.status-bar-mockup__chip--connector-required-alert:hover {
+  border-color: rgba(255, 176, 96, 0.55);
+  background: rgba(40, 22, 10, 0.96);
+}
+
+.status-bar-mockup__chip--connector-required-alert:focus-visible {
+  outline: 2px solid rgba(255, 176, 96, 0.72);
+  outline-offset: 2px;
+}
+
+.status-bar-mockup__chip--connector-required-alert .status-bar-mockup__chip-label {
+  color: rgba(255, 196, 128, 0.96);
+  text-shadow: none;
+}
+
+.status-bar-mockup__icon--connector-required-alert {
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 1px solid rgba(255, 176, 96, 0.72);
+  border-radius: 50%;
+  background: rgba(255, 176, 96, 0.28);
+  box-shadow: 0 0 8px rgba(255, 176, 96, 0.35);
+  opacity: 0.95;
+}
+
 .status-bar-mockup__icon--operator {
   position: relative;
   width: 0.48rem;
@@ -125,6 +190,32 @@
 .status-bar-mockup__chip--galaxy .status-bar-mockup__dot--warn {
   background: rgba(255, 196, 72, 0.95);
   box-shadow: 0 0 6px rgba(255, 180, 40, 0.45);
+}
+
+.status-bar-mockup__chip--galaxy-alive {
+  box-shadow: inset 0 -2px 0 rgba(0, 245, 212, 0.42);
+}
+
+.status-bar-mockup__chip--galaxy-executing {
+  border-color: rgba(0, 245, 212, 0.42);
+  animation: operator-terminal-chip-stream 1.8s ease-in-out infinite;
+}
+
+.status-bar-mockup__chip--galaxy-review-ready {
+  border-color: rgba(120, 200, 255, 0.42);
+}
+
+.status-bar-mockup__chip--galaxy .status-bar-mockup__dot--alive {
+  background: rgba(0, 245, 212, 0.88);
+  box-shadow: 0 0 8px rgba(0, 245, 212, 0.45);
+  animation: operator-terminal-chip-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-bar-mockup__chip--galaxy-executing,
+  .status-bar-mockup__chip--galaxy .status-bar-mockup__dot--alive {
+    animation: none;
+  }
 }
 
 .status-bar-mockup__chip--commands:hover {

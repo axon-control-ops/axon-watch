@@ -11,7 +11,15 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
 
-const { resizing, resetDockWidth, startDockResize } = useRightDockResize({ dockRef });
+const {
+  dockWidth,
+  resizing,
+  ariaValueMin,
+  ariaValueMax,
+  resetDockWidth,
+  startDockResize,
+  onDockResizeKeydown,
+} = useRightDockResize({ dockRef });
 </script>
 
 <template>
@@ -25,12 +33,19 @@ const { resizing, resetDockWidth, startDockResize } = useRightDockResize({ dockR
   >
     <div
       class="right-dock__resize-handle"
-      title="Drag to resize the right dock. Double-click to reset."
-      aria-hidden="true"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize right dock"
+      title="Drag or use arrow keys to resize. Enter or double-click to reset."
+      tabindex="0"
+      :aria-valuemin="ariaValueMin"
+      :aria-valuemax="ariaValueMax"
+      :aria-valuenow="dockWidth"
       @mousedown="startDockResize"
+      @keydown="onDockResizeKeydown"
       @dblclick="resetDockWidth"
     >
-      <span class="right-dock__resize-grip" />
+      <span class="right-dock__resize-grip" aria-hidden="true" />
     </div>
 
     <div class="dock-stack__upper dock-stack__upper--conversation">

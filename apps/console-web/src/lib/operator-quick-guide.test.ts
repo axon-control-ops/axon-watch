@@ -71,6 +71,29 @@ describe('buildOperatorQuickGuide', () => {
     expect(guide?.actions[0]).toEqual({ id: 'open-connectors', label: 'Open connectors' });
   });
 
+  it('surfaces terminal reopen paths when the panel is hidden', () => {
+    const idle = buildOperatorQuickGuide({
+      runPhase: null,
+      hasActiveRun: false,
+      pendingApprovals: 0,
+      layoutMode: 'operator',
+      terminalVisible: false,
+    });
+    expect(idle?.title).toContain('Terminal hidden');
+    expect(idle?.steps.join(' ')).toContain('Ctrl/Cmd+J');
+    expect(idle?.steps.join(' ')).toContain('Open terminal');
+
+    const executing = buildOperatorQuickGuide({
+      runPhase: 'executing',
+      hasActiveRun: true,
+      pendingApprovals: 0,
+      layoutMode: 'operator',
+      terminalVisible: false,
+    });
+    expect(executing?.title).toContain('open the terminal');
+    expect(executing?.steps[0]).toContain('Ctrl/Cmd+J');
+  });
+
   it('returns null in IDE mode', () => {
     expect(
       buildOperatorQuickGuide({

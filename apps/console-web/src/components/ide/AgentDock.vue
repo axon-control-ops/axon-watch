@@ -3,6 +3,12 @@ import { computed, onMounted, ref } from 'vue';
 
 import ConversationSeamPanel from '../ConversationSeamPanel.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
+import {
+  agentDockCollapseTitle,
+  agentDockReopenAlive,
+  agentDockReopenAriaLabel,
+  agentDockReopenTitle,
+} from '../../lib/agent-dock-reopen-view';
 import AgentDockComposer from './AgentDockComposer.vue';
 import AgentDockThreadTabbar from './AgentDockThreadTabbar.vue';
 import AgentDockWorkspaceMenu from './AgentDockWorkspaceMenu.vue';
@@ -12,11 +18,32 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
 
-const dockAlive = computed(
-  () => shell.agentStreamActive || shell.pendingApprovalsCount > 0,
+const dockAlive = computed(() =>
+  agentDockReopenAlive({
+    streaming: shell.agentStreamActive,
+    pendingApprovals: shell.pendingApprovalsCount,
+    runPhase: shell.primaryActiveRun?.phase ?? null,
+  }),
 );
 
-const { resizing, resetDockWidth, startDockResize } = useRightDockResize({
+const reopenState = computed(() => ({
+  streaming: shell.agentStreamActive,
+  pendingApprovals: shell.pendingApprovalsCount,
+  runPhase: shell.primaryActiveRun?.phase ?? null,
+}));
+
+const reopenTitle = computed(() => agentDockReopenTitle(reopenState.value));
+const reopenAriaLabel = computed(() => agentDockReopenAriaLabel(reopenState.value));
+
+const {
+  dockWidth,
+  resizing,
+  ariaValueMin,
+  ariaValueMax,
+  resetDockWidth,
+  startDockResize,
+  onDockResizeKeydown,
+} = useRightDockResize({
   dockRef,
   collapsed: computed(() => shell.agentDockCollapsed),
 });
@@ -52,12 +79,19 @@ onMounted(() => {
   >
     <div
       class="agent-dock__resize-handle"
-      title="Drag to resize the agent dock. Double-click to reset."
-      aria-hidden="true"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize agent dock"
+      title="Drag or use arrow keys to resize. Enter or double-click to reset."
+      tabindex="0"
+      :aria-valuemin="ariaValueMin"
+      :aria-valuemax="ariaValueMax"
+      :aria-valuenow="dockWidth"
       @mousedown="startDockResize"
+      @keydown="onDockResizeKeydown"
       @dblclick="resetDockWidth"
     >
-      <span class="agent-dock__resize-grip" />
+      <span class="agent-dock__resize-grip" aria-hidden="true" />
     </div>
 
     <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide">
@@ -74,6 +108,7 @@ onMounted(() => {
           type="button"
           class="agent-dock__collapse"
           aria-label="Collapse agent dock"
+          :title="agentDockCollapseTitle()"
           @click="collapseDock"
         >
           ×
@@ -107,9 +142,29 @@ onMounted(() => {
     ref="dockRef"
     type="button"
     class="region region-right-dock agent-dock-reopen"
-    aria-label="Expand agent dock"
+    :class="{
+      'agent-dock-reopen--alive': dockAlive,
+      'agent-dock-reopen--streaming': shell.agentStreamActive,
+      'agent-dock-reopen--approvals': shell.pendingApprovalsCount > 0,
+      'agent-dock-reopen--executing': shell.primaryActiveRun?.phase === 'executing',
+      'agent-dock-reopen--review-ready': shell.primaryActiveRun?.phase === 'review_ready',
+    }"
+    :aria-label="reopenAriaLabel"
+    :title="reopenTitle"
     @click="shell.toggleAgentDock()"
   >
-    AGENT
+    <span class="agent-dock-reopen__label">AGENT</span>
+    <span
+      v-if="shell.pendingApprovalsCount > 0"
+      class="agent-dock-reopen__badge"
+      aria-hidden="true"
+    >
+      {{ shell.pendingApprovalsCount }}
+    </span>
+    <span
+      v-else-if="dockAlive"
+      class="agent-dock-reopen__pulse"
+      aria-hidden="true"
+    />
   </button>
 </template>
