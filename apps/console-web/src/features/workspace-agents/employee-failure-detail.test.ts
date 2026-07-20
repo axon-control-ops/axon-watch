@@ -52,6 +52,11 @@ describe('employee-failure-detail', () => {
       "Lane B agent fallback reply generated (ActionRequiredError: You're out of usage.)";
     expect(isUsageLimitFailure(wrapped)).toBe(true);
     expect(isUsageLimitFailure('ActionRequiredError: out of usage')).toBe(true);
+    expect(
+      isUsageLimitFailure(
+        'Lane B agent fallback reply generated (ActionRequiredError: Increase limits for faster responses.)',
+      ),
+    ).toBe(true);
     expect(isUsageLimitFailure('vitest: assertion failed')).toBe(false);
     expect(agentRuntimeFallbackSpeakDetail(wrapped)).toMatch(/usage limits blocked/i);
   });

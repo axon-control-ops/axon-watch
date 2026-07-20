@@ -68,7 +68,11 @@ export function isUsageLimitFailure(detail: string | null | undefined): boolean 
   if (!normalized) {
     return false;
   }
-  return /out of usage/i.test(normalized);
+  return (
+    /out of usage/i.test(normalized) ||
+    /increase limits/i.test(normalized) ||
+    /ActionRequiredError/i.test(normalized)
+  );
 }
 
 /** Matches Lane B runtime fallback receipts where no CLI/cloud agent could run the shift. */

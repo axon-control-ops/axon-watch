@@ -223,7 +223,7 @@ async function onControlAction(
     controlError.value = null;
     try {
       await patchWorkspaceEmployeeEnabled(workspaceId, employee.employee_id, !employee.enabled);
-      await loadCompany({ reason: 'employee-enabled' });
+      await loadCompany();
     } catch (error) {
       controlError.value =
         error instanceof Error ? error.message : 'Could not update agent enabled state';
@@ -241,7 +241,7 @@ async function onControlAction(
     controlError.value = null;
     try {
       await stopRun(runId);
-      await loadCompany({ reason: 'employee-stop' });
+      await loadCompany();
     } catch (error) {
       controlError.value = error instanceof Error ? error.message : 'Could not stop shift';
     } finally {
