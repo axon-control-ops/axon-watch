@@ -1,11 +1,34 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
+// Stability is the safe default: source edits must not reload an operator's
+// active console. Developers can opt into HMR with AXON_WATCH_VITE_HMR=1.
+const hmrEnabled = process.env.AXON_WATCH_VITE_HMR === '1';
+
+function injectOperatorAuth(proxyReq: { setHeader: (name: string, value: string) => void }) {
+  // Always-on Gate 2: console :4173 → vite /api proxy → CP appears as loopback.
+  // With AUTH_ALLOW_LOOPBACK=0 the browser must not rely on loopback bypass;
+  // inject the deployment operator token on proxied mutating calls.
+  const token = (process.env.AXON_WATCH_OPERATOR_TOKEN || '').trim();
+  if (!token || token === 'replace-me') {
+    return;
+  }
+  proxyReq.setHeader('Authorization', `Bearer ${token}`);
+  proxyReq.setHeader('x-axon-operator-token', token);
+}
+
 const controlPlaneProxy = {
   '/api': {
     target: process.env.VITE_CONTROL_PLANE_BASE_URL ?? 'http://127.0.0.1:8787',
     changeOrigin: true,
     ws: true,
+    configure: (proxy: {
+      on: (event: string, listener: (...args: unknown[]) => void) => void;
+    }) => {
+      proxy.on('proxyReq', (proxyReq: unknown) => {
+        injectOperatorAuth(proxyReq as { setHeader: (name: string, value: string) => void });
+      });
+    },
   },
 };
 
@@ -16,6 +39,7 @@ export default defineConfig({
   },
   server: {
     strictPort: true,
+    hmr: hmrEnabled,
     proxy: controlPlaneProxy,
   },
   preview: {

@@ -251,6 +251,7 @@ def dispatch_ide_composer(
     execution_access: str | None = None,
     on_chunk: Callable[[str, str], None] | None = None,
     cursor_trust_policy: str = "operator",
+    workspace_root: Path | None = None,
 ) -> dict[str, object]:
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
@@ -259,8 +260,8 @@ def dispatch_ide_composer(
     snapshot = runtime_status_snapshot(
         force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")),
     )
-    workspace_root = _resolve_workspace_root(workspace_id)
-    if workspace_root is None:
+    resolved_root = workspace_root if workspace_root is not None else _resolve_workspace_root(workspace_id)
+    if resolved_root is None:
         return _finish({
             "content": _fallback_reply(
                 composer_mode=composer_mode,
@@ -273,6 +274,7 @@ def dispatch_ide_composer(
             "runtime_label": "",
             "reason": "workspace root unavailable",
         })
+    workspace_root = resolved_root
 
     run_phase = _run_phase(run_id)
     execution_tier = resolve_runtime_execution_tier(

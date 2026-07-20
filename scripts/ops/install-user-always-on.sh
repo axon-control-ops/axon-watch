@@ -21,6 +21,42 @@ fi
 
 mkdir -p "${unit_dst}" "${HOME}/.config/axon-watch"
 
+ensure_gate2_auth_env() {
+  local env_file="$1"
+  local mode token allow_loop
+  mode="$(rg -N '^AXON_WATCH_AUTH_MODE=' "${env_file}" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
+  token="$(rg -N '^AXON_WATCH_OPERATOR_TOKEN=' "${env_file}" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
+  allow_loop="$(rg -N '^AXON_WATCH_AUTH_ALLOW_LOOPBACK=' "${env_file}" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
+
+  if [[ -z "${mode}" || "${mode}" == "placeholder" || "${mode}" == "off" ]]; then
+    if rg -q '^AXON_WATCH_AUTH_MODE=' "${env_file}" 2>/dev/null; then
+      sed -i 's/^AXON_WATCH_AUTH_MODE=.*/AXON_WATCH_AUTH_MODE=local_token/' "${env_file}"
+    else
+      printf '\n# Gate 2 — mutating API auth (always-on hardened)\nAXON_WATCH_AUTH_MODE=local_token\n' >>"${env_file}"
+    fi
+  fi
+
+  if [[ -z "${token}" || "${token}" == "replace-me" ]]; then
+    token="$(openssl rand -hex 32 2>/dev/null || python3 -c 'import secrets; print(secrets.token_hex(32))')"
+    if rg -q '^AXON_WATCH_OPERATOR_TOKEN=' "${env_file}" 2>/dev/null; then
+      sed -i "s/^AXON_WATCH_OPERATOR_TOKEN=.*/AXON_WATCH_OPERATOR_TOKEN=${token}/" "${env_file}"
+    else
+      printf 'AXON_WATCH_OPERATOR_TOKEN=%s\n' "${token}" >>"${env_file}"
+    fi
+    echo "Generated AXON_WATCH_OPERATOR_TOKEN in ${env_file}"
+  fi
+
+  if [[ -z "${allow_loop}" || "${allow_loop}" == "1" ]]; then
+    # Console :4173 proxies as 127.0.0.1; without token injection loopback bypass
+    # would let anonymous browser mutations through. Always-on requires the token.
+    if rg -q '^AXON_WATCH_AUTH_ALLOW_LOOPBACK=' "${env_file}" 2>/dev/null; then
+      sed -i 's/^AXON_WATCH_AUTH_ALLOW_LOOPBACK=.*/AXON_WATCH_AUTH_ALLOW_LOOPBACK=0/' "${env_file}"
+    else
+      printf 'AXON_WATCH_AUTH_ALLOW_LOOPBACK=0\n' >>"${env_file}"
+    fi
+  fi
+}
+
 if [[ ! -f "${env_dst}" ]]; then
   cat >"${env_dst}" <<EOF
 # Local always-on host (machine stays powered; you may be away).
@@ -38,11 +74,16 @@ AXON_WATCH_STATE_DIR=${repo_root}/.local/state
 AXON_WATCH_CONTROL_PLANE_DB=${repo_root}/.local/state/control-plane.sqlite3
 AXON_WATCH_WATCH_SERVICE_DB=${repo_root}/.local/state/axon-watch.sqlite3
 AXON_WATCH_DEPLOYMENT_ENV=${env_dst}
+# Gate 2 — mutating API auth (always-on hardened)
+AXON_WATCH_AUTH_MODE=local_token
+AXON_WATCH_AUTH_ALLOW_LOOPBACK=0
+AXON_WATCH_OPERATOR_TOKEN=
 EOF
   echo "Wrote ${env_dst}"
 else
   echo "Keeping existing ${env_dst}"
 fi
+ensure_gate2_auth_env "${env_dst}"
 
 # Rewrite ExecStart paths in installed units to this checkout.
 for name in axon-watch control-plane console-web; do

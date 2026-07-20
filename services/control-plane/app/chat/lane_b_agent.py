@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from app.cli_runtime.router import dispatch_ide_composer
 from app.chat.lane_b_git_dispatch import try_lane_b_git_commit_dispatch
@@ -112,6 +113,7 @@ def generate_lane_b_result(
     execution_access: str | None = None,
     on_chunk: Callable[[str, str], None] | None = None,
     cursor_trust_policy: str = "operator",
+    workspace_root: Path | None = None,
 ) -> dict[str, object]:
     trimmed = user_prompt.strip()
     if not trimmed:
@@ -146,6 +148,7 @@ def generate_lane_b_result(
                 execution_access=execution_access,
                 on_chunk=on_chunk,
                 cursor_trust_policy=cursor_trust_policy,
+                workspace_root=workspace_root,
             )
         except RuntimeError as exc:
             return {
@@ -186,6 +189,7 @@ def generate_lane_b_result(
             execution_access=execution_access,
             on_chunk=on_chunk,
             cursor_trust_policy=cursor_trust_policy,
+            workspace_root=workspace_root,
         )
     except RuntimeError as exc:
         return {

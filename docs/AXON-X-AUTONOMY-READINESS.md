@@ -486,9 +486,16 @@ routes now run through `MutatingAuthMiddleware` (`AXON_WATCH_AUTH_MODE=local_tok
 requires a bearer operator token; loopback bypass is configurable). Continuous
 workers dispatch Cursor with `trust_policy=worker` (keeps `--trust`, omits
 `--force` / `--approve-mcps`). Vault auto-unlock enable/startup is refused when
-the deployment is marked remotely reachable. Remaining Gate 2 debt: watch-service
-mTLS/service identity, CSRF/rate limits, and step-up Full Access keyed to a real
-login session (not only a shared operator token).
+the deployment is marked remotely reachable. Always-on install now forces
+`local_token` + `AUTH_ALLOW_LOOPBACK=0` and mints `AXON_WATCH_OPERATOR_TOKEN`;
+console vite `/api` proxy injects the bearer so the SPA keeps working.
+Remaining Gate 2 debt: watch-service mTLS/service identity, CSRF/rate limits,
+and step-up Full Access keyed to a real login session (not only a shared
+operator token).
+
+**Gate 3 progress:** continuous workers create a disposable git worktree/clone
+via `safe_improvement.isolated_executor` before Lane B dispatch, pass that path
+as `workspace_root` (never the live binding), and clean up with receipts.
 
 ---
 

@@ -20,6 +20,13 @@ from app.runs.service import (
 )
 from app.terminal.session_registry import ensure_agent_session
 from app.workspace_agents.config_loader import EmployeeConfig
+from app.workspace_agents.worker_isolation import (
+    IsolationError,
+    cleanup_worker_isolation,
+    create_worker_isolation,
+    isolation_receipt_summary,
+    worker_agent_workspace,
+)
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
 
 logger = logging.getLogger(__name__)
@@ -102,6 +109,8 @@ def dispatch_continuous_worker_run(
         daemon=True,
         name=f"worker-heartbeat-{run_id}",
     )
+    isolation_root = None
+    lane_b_result: dict[str, Any] = {}
     try:
         touch_run_activity(run_id)
         append_run_execution_receipt(
@@ -111,6 +120,16 @@ def dispatch_continuous_worker_run(
             actor="workspace_scheduler",
         )
         heartbeat.start()
+        isolation_root = create_worker_isolation(workspace_id=workspace_id, run_id=run_id)
+        agent_root = worker_agent_workspace(isolation_root)
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="worker_isolation_created",
+            receipt_summary=isolation_receipt_summary(isolation_root),
+            actor="workspace_scheduler",
+            success=True,
+            intent="worker_isolation",
+        )
         prompt = build_continuous_worker_prompt(workspace_id=workspace_id, employee=employee)
         ensure_agent_session(workspace_id=workspace_id, run_id=run_id)
         context = LaneBContext(workspace_id=workspace_id, composer_mode="agent")
@@ -121,12 +140,24 @@ def dispatch_continuous_worker_run(
             execution_access="full",
             on_chunk=_throttled_worker_stream_progress(run_id),
             cursor_trust_policy="worker",
+            workspace_root=agent_root,
         )
         dispatched, finalized = finalize_lane_b_agent_run(
             dispatch_run_id=run_id,
             lane_b_result=lane_b_result,
             reply_text=str(lane_b_result.get("content") or ""),
         )
+    except IsolationError as exc:
+        logger.exception(
+            "continuous worker isolation failed for %s role=%s",
+            run_id,
+            employee.role,
+        )
+        failed = _fail_worker_run(
+            run_id,
+            receipt_summary=f"Continuous worker isolation failed: {exc}",
+        )
+        return False, failed
     except Exception as exc:  # noqa: BLE001 — never leave role-tagged runs stuck executing
         logger.exception(
             "continuous worker dispatch crashed for %s role=%s",
@@ -141,6 +172,22 @@ def dispatch_continuous_worker_run(
     finally:
         stop_heartbeat.set()
         heartbeat.join(timeout=2.0)
+        if isolation_root is not None:
+            cleanup = cleanup_worker_isolation(isolation_root)
+            try:
+                append_run_execution_receipt(
+                    run_id,
+                    receipt_type="worker_isolation_cleanup",
+                    receipt_summary=(
+                        f"worker isolation cleanup removed={cleanup.get('removed')} "
+                        f"cleaned={cleanup.get('cleaned')}"
+                    ),
+                    actor="workspace_scheduler",
+                    success=bool(cleanup.get("cleaned")),
+                    intent="worker_isolation",
+                )
+            except (RunLifecycleError, RunNotFoundError):
+                logger.exception("worker isolation cleanup receipt failed for %s", run_id)
 
     if not dispatched:
         logger.warning(
