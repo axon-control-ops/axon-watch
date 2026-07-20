@@ -9,59 +9,7 @@ import AgentDockComposerToolbar from './agent-dock/AgentDockComposerToolbar.vue'
 import AgentDockKairoComposerFooter from './agent-dock/AgentDockKairoComposerFooter.vue';
 
 const composer = useAgentDockComposer();
-const toolbarProps = useAgentDockComposerToolbarProps({
-  showContextMenu: composer.showContextMenu,
-  showToolsMenu: composer.showToolsMenu,
-  showModelMenu: composer.showModelMenu,
-  showModeMenu: composer.showModeMenu,
-  showAddModelsPanel: composer.showAddModelsPanel,
-  showRuntimeTargetsPanel: composer.showRuntimeTargetsPanel,
-  showAddModelsEntry: composer.showAddModelsEntry,
-  showExtraPinnedRows: composer.showExtraPinnedRows,
-  showCursorCatalog: composer.showCursorCatalog,
-  showVaultAction: composer.showVaultAction,
-  attachmentChips: composer.attachmentChips,
-  composerImages: composer.composerImages,
-  mcpToolsForMode: composer.mcpToolsForMode,
-  composerMode: composer.composerMode,
-  modeOptions: composer.MODE_OPTIONS,
-  modeButtonLabel: composer.modeButtonLabel,
-  modeButtonTitle: composer.modeButtonTitle,
-  activeMode: composer.activeMode,
-  isFullAccessAgent: composer.isFullAccessAgent,
-  executionAccessHint: composer.executionAccessHint,
-  sandboxSessionEnabled: composer.sandboxSessionEnabled,
-  sandboxEnvForced: composer.sandboxEnvForced,
-  sandboxHint: composer.sandboxHint,
-  sandboxLabel: composer.sandboxLabel,
-  sandboxSessionPending: composer.sandboxSessionPending,
-  contextWorkspace: composer.contextWorkspace,
-  contextSelection: composer.contextSelection,
-  contextTerminal: composer.contextTerminal,
-  contextIde: composer.contextIde,
-  contextPinned: composer.contextPinned,
-  hasTerminalSnippet: composer.hasTerminalSnippet,
-  selectionChipLabel: composer.selectionChipLabel,
-  runtimeDetail: composer.runtimeDetail,
-  runtimeLabel: composer.runtimeLabel,
-  selectedRuntimeSummary: composer.selectedRuntimeSummary,
-  runtimeTargets: composer.runtimeTargets,
-  selectedModelId: composer.selectedModelId,
-  selectedModelLabel: composer.selectedModelLabel,
-  autoModelRow: composer.autoModelRow,
-  autoToggleChecked: composer.autoToggleChecked,
-  composerPickerRows: composer.composerPickerRows,
-  extraPinnedRows: composer.extraPinnedRows,
-  cursorCatalogTotal: composer.cursorCatalogTotal,
-  cursorCatalogStatus: composer.cursorCatalogStatus,
-  cursorAuthLine: composer.cursorAuthLine,
-  cursorStaleWarning: composer.cursorStaleWarning,
-  cursorManageRows: composer.cursorManageRows,
-  cursorCatalogCount: composer.cursorCatalogCount,
-  modelSearchQuery: composer.modelSearchQuery,
-  runtimeHint: composer.runtimeHint,
-  canConvertInstructions: composer.canConvertInstructions,
-});
+const toolbarProps = useAgentDockComposerToolbarProps(composer);
 </script>
 
 <template>
@@ -135,7 +83,12 @@ const toolbarProps = useAgentDockComposerToolbarProps({
           :speech-capture-supported="composer.speechCapture.supported"
           :speech-capturing="composer.speechCapture.capturing.value"
           :privacy-mode="composer.shell.operatorPresenceSettings.privacy_mode"
-          @update:draft="composer.composerDraftModel.value = $event"
+          :typeahead-open="composer.typeaheadOpen.value"
+          :typeahead-caption="composer.typeaheadCaption.value"
+          :typeahead-loading="composer.typeaheadLoading.value"
+          :typeahead-rows="composer.typeaheadRows.value"
+          :typeahead-selected-index="composer.typeaheadSelectedIndex.value"
+          @update:draft="composer.updateComposerDraft"
           @remove-chip="composer.removeChip"
           @open-image="composer.openComposerImage"
           @remove-image="composer.removeComposerImage"
@@ -143,6 +96,9 @@ const toolbarProps = useAgentDockComposerToolbarProps({
           @remove-queued="composer.removeQueuedMessage"
           @steer-queued="composer.handleSteerQueuedMessage"
           @sync-height="composer.syncComposerHeight"
+          @sync-typeahead="composer.syncTypeaheadFromComposer()"
+          @typeahead-select="composer.applyTypeaheadRow"
+          @typeahead-hover="composer.selectTypeaheadIndex"
           @keydown="composer.handleComposerKeydown"
           @paste="composer.handleComposerPaste"
           @reveal-terminal="composer.revealComposerTerminalPanel"
