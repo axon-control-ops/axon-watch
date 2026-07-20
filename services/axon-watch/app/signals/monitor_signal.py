@@ -4,6 +4,19 @@ from __future__ import annotations
 
 from app.signals.iso_time import utc_now_iso
 
+_TRANSPORT_FAILURE_MARKER = " API query failed:"
+
+
+def _severity_for_monitor(status: str, detail: str) -> str:
+    if status == "critical":
+        return "critical"
+    if status == "warning":
+        # Transient PostHog/Sentry/Supabase network blips stay inbox-only (medium urgency).
+        if _TRANSPORT_FAILURE_MARKER in detail:
+            return "warning"
+        return "high"
+    return "info"
+
 
 def monitor_inbox_item(record: dict[str, object]) -> dict[str, object] | None:
     status = str(record.get("status", "")).strip()
@@ -18,7 +31,7 @@ def monitor_inbox_item(record: dict[str, object]) -> dict[str, object] | None:
     detail = str(record.get("detail", "")).strip()
     workspace_id = str(record.get("workspace_id", "workspace_dashpro")).strip()
     workspace_label = str(record.get("workspace_label") or workspace_id).strip()
-    severity = "high" if status == "warning" else "critical"
+    severity = _severity_for_monitor(status, detail)
     now = utc_now_iso()
     sentry_issues = record.get("issues") if isinstance(record.get("issues"), list) else []
     meta: dict[str, object] = {
