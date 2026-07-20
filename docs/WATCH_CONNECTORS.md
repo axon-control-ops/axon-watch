@@ -62,6 +62,15 @@ Default connectors:
 
 Runtime summary marks `degraded.active` when `required_unavailable > 0`.
 
+## Probe caching
+
+Watch connector probes use a short in-process TTL cache (default **15 seconds**) so
+summary, connectors, and inbox reads do not re-hit every health URL on each request.
+
+- Override: `AXON_WATCH_CONNECTOR_CACHE_TTL_SECONDS` (set `0` to disable)
+- `refresh_summary` clears the cache so the next summary rebuild probes live
+- `reprobe_connector` upserts the live result into the TTL cache (seeds a full snapshot first when cold)
+
 ## Signal behavior
 
 - Source: `connector`
@@ -72,6 +81,23 @@ Runtime summary marks `degraded.active` when `required_unavailable > 0`.
 
 ```bash
 python3 -m unittest tests.test_watch_connectors tests.test_control_plane_connectors -v
+PYTHONPATH=services/axon-watch python3 -m unittest \
+  tests.test_connector_probe_cache \
+  tests.test_connector_signal \
+  tests.test_connector_inbox_integration \
+  tests.test_actionable_inbox_signals \
+  tests.test_watch_inbox_assembly \
+  -v
+python3 -m unittest \
+  tests.test_parity_a4_signal_inbox_consistency \
+  tests.test_signal_consistency \
+  -v
+PYTHONPATH=services/axon-watch python3 -m unittest \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_connector_seeds_cold_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_tunnel_seeds_cold_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_connector_updates_warm_cache \
+  tests.test_connector_probe_cache.ConnectorProbeCacheTests.test_execute_reprobe_tunnel_updates_warm_cache \
+  -v
 ./scripts/verify/test3-watch-connectors.sh
 npm run verify:test3
 ```

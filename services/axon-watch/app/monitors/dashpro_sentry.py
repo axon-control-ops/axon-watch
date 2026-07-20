@@ -60,7 +60,9 @@ def check_sentry_recent_issues(
         status = int(exc.code)
         body = exc.read().decode("utf-8", errors="replace")
     except (TimeoutError, URLError, OSError) as exc:
-        return "critical", f"Sentry API query failed: {exc}", empty
+        # Transient network blips stay warning (not critical) so inbox severity
+        # can keep them below Attention thresholds via the shared marker.
+        return "warning", f"Sentry API query failed: {exc}", empty
 
     if status == 401:
         return "critical", "Sentry API rejected the auth token", empty

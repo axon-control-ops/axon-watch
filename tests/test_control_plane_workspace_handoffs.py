@@ -13,6 +13,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.main import app  # noqa: E402
 from app.persistence import handoff_store, run_store  # noqa: E402
+from app.runs.service import create_run  # noqa: E402
 
 
 class ControlPlaneWorkspaceHandoffsTests(unittest.TestCase):
@@ -47,6 +48,33 @@ class ControlPlaneWorkspaceHandoffsTests(unittest.TestCase):
         self.assertIn("run_count", summary)
         self.assertIn("active_run_count", summary)
         self.assertIn("active_runs", summary)
+
+    def test_handoff_summary_excludes_background_employee_runs_from_counts(self) -> None:
+        create_run(
+            workspace_id="workspace_alpha",
+            mode="agent",
+            summary="Control Plane: continuous worker shift",
+            employee_role="backend",
+        )
+        create_run(
+            workspace_id="workspace_alpha",
+            mode="agent",
+            summary="Operator git status",
+        )
+
+        response = self.client.post(
+            "/api/workspaces/workspace_smoke/handoffs",
+            json={
+                "target_workspace_id": "workspace_alpha",
+                "task": "Review bootstrap follow-up",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        summary = response.json()["target_workspace_summary"]
+        self.assertEqual(1, summary["run_count"])
+        self.assertEqual(1, summary["active_run_count"])
+        self.assertEqual("Operator git status", summary["active_runs"][0]["summary"])
 
     def test_list_handoffs_returns_recorded_handoff(self) -> None:
         create_response = self.client.post(

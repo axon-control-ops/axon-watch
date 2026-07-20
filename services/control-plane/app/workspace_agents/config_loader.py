@@ -307,50 +307,6 @@ def _default_employee_name(display_name: str, role: str) -> str:
     return f"{company} {_role_label(role)}"
 
 
-def _derive_agent_status(workspace_id: str) -> str:
-    active_statuses = {
-        "running",
-        "waiting",
-        "blocked",
-        "review",
-        # Legacy values retained for older persisted runs.
-        "paused",
-        "review_ready",
-    }
-    workspace_runs = [
-        run
-        for run in list_runs()
-        if str(run.get("workspace_id", "")).strip() == workspace_id.strip()
-        and not run.get("ended_at")
-    ]
-    runs = [
-        run
-        for run in workspace_runs
-        if str(run.get("status", "")).strip() in active_statuses
-    ]
-    if not runs:
-        return "idle"
-
-    runs.sort(key=lambda run: str(run.get("updated_at") or run.get("started_at") or ""), reverse=True)
-    primary = runs[0]
-    phase = str(primary.get("phase", "")).strip()
-    status = str(primary.get("status", "")).strip()
-
-    if phase == "awaiting_approval":
-        derived = "waiting_approval"
-    elif phase == "planning" or str(primary.get("mode", "")).strip() == "plan":
-        derived = "planning"
-    elif status in {"review", "review_ready"} or phase == "review_ready":
-        derived = "verifying"
-    elif status == "blocked" or phase in {"paused", "awaiting_input"}:
-        derived = "blocked"
-    elif phase == "executing" or status == "running":
-        derived = "executing"
-    else:
-        derived = "watching"
-    return derived
-
-
 def _resolve_employees(
     workspace_id: str,
     *,

@@ -13,12 +13,19 @@ from app.runs.service import (
     approve_run,
     complete_run,
     create_run,
+    drain_terminal_employee_runs,
+    employee_run_retention_per_role,
+    employee_run_stale_seconds,
     get_run,
     get_run_history,
+    list_operator_facing_runs,
     list_runs,
     mark_review_ready,
+    reap_abandoned_review_ready_runs,
+    reap_stale_employee_runs,
     reject_run,
     resume_run,
+    review_ready_stale_seconds,
     stop_run,
 )
 
@@ -26,8 +33,8 @@ router = APIRouter()
 
 
 @router.get("/api/runs")
-def runs_index() -> dict[str, Any]:
-    items = list_runs()
+def runs_index(operator_facing: bool = False) -> dict[str, Any]:
+    items = list_operator_facing_runs() if operator_facing else list_runs()
     return {"items": items, "count": len(items)}
 
 
@@ -41,6 +48,39 @@ def runs_create(body: CreateRunRequest) -> dict[str, Any]:
         requires_approval=body.requires_approval,
         employee_role=body.employee_role,
     )
+
+
+@router.post("/api/runs/reconcile-stale")
+def runs_reconcile_stale() -> dict[str, Any]:
+    """Fail/cancel idle role-tagged worker runs beyond the stale TTL."""
+    reaped = reap_stale_employee_runs()
+    return {
+        "reaped_run_ids": reaped,
+        "count": len(reaped),
+        "stale_seconds": employee_run_stale_seconds(),
+    }
+
+
+@router.post("/api/runs/prune-employee-history")
+def runs_prune_employee_history() -> dict[str, Any]:
+    """Drain terminal role-tagged runs beyond the per-role retention window."""
+    pruned = drain_terminal_employee_runs()
+    return {
+        "pruned_run_ids": pruned,
+        "count": len(pruned),
+        "keep_per_role": employee_run_retention_per_role(),
+    }
+
+
+@router.post("/api/runs/reconcile-review-ready")
+def runs_reconcile_review_ready() -> dict[str, Any]:
+    """Complete abandoned untagged review_ready checkpoints beyond the idle TTL."""
+    completed = reap_abandoned_review_ready_runs()
+    return {
+        "completed_run_ids": completed,
+        "count": len(completed),
+        "stale_seconds": review_ready_stale_seconds(),
+    }
 
 
 @router.get("/api/runs/{run_id}")

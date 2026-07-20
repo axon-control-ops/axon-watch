@@ -54,7 +54,9 @@ def check_posthog_recent_events(
         status = int(exc.code)
         body = exc.read().decode("utf-8", errors="replace")
     except (TimeoutError, URLError, OSError) as exc:
-        return "critical", f"PostHog API query failed: {exc}"
+        # Transient network blips stay warning (not critical) so inbox severity
+        # can keep them below Attention thresholds via the shared marker.
+        return "warning", f"PostHog API query failed: {exc}"
 
     if status == 401:
         return "critical", "PostHog API rejected the personal API key"

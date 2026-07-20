@@ -47,6 +47,16 @@ def summarize_actionable_inbox(items: list[dict[str, object]]) -> dict[str, obje
     }
 
 
-def should_emit_bootstrap_signal(monitor_items: list[dict[str, object]]) -> bool:
-    """Bootstrap is dev-only context — omit once a live child-project monitor fires."""
-    return len(monitor_items) == 0
+def should_emit_bootstrap_signal(
+    monitor_items: list[dict[str, object]],
+    connector_items: list[dict[str, object]] | None = None,
+    email_items: list[dict[str, object]] | None = None,
+) -> bool:
+    """Bootstrap is dev-only context — omit once live actionable signals fire."""
+    if monitor_items:
+        return False
+    if connector_items:
+        return False
+    if email_items:
+        return False
+    return True

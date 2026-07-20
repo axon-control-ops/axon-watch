@@ -171,14 +171,14 @@ Implementation: `readStoredWorkbenchTerminalPanelVisible(layoutMode)` and
 Height and visibility persist in `sessionStorage`. Custom height key:
 `axon-x-workbench-terminal-height-v3` (shared across modes).
 
-### IDE-only parity
+### Terminal reopen parity
 
-IDE restores terminal via editor status-bar **TERMINAL** chip (`revealIdeTerminalPanel()`).
-Operator has no status-bar terminal chip in v1.
+- **Operator:** Mission Control header chip + bottom dock strip; **Ctrl/Cmd+J** toggles the panel.
+- **IDE:** Activity bar Terminal button + editor status-bar **TERMINAL** chip; **Ctrl/Cmd+J** toggles the panel.
+- Reveal requests bump a shared token; CenterWorkbench persists visibility for the **active** layout mode (Operator and IDE keys stay separate).
 
 ### Not in v1
 
-- Keyboard shortcut parity (IDE Ctrl/Cmd+J) in Operator mode
 - Auto-reveal terminal when run phase is `executing` with PTY activity
 - Inline tool output / diff preview in the live feed (requires richer run-step events from control-plane)
 

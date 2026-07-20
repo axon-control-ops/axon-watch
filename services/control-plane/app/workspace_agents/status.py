@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.domain.run_state import is_terminal_phase
+from app.runs.queries import is_background_employee_run
 from app.runs.service import list_runs
 
 
@@ -28,14 +29,22 @@ def status_from_run(run: dict[str, Any]) -> str:
     return "watching"
 
 
-def _non_terminal_workspace_runs(workspace_id: str) -> list[dict[str, Any]]:
+def _non_terminal_workspace_runs(
+    workspace_id: str,
+    *,
+    operator_facing: bool = False,
+) -> list[dict[str, Any]]:
     normalized = workspace_id.strip()
-    return [
-        run
-        for run in list_runs()
-        if str(run.get("workspace_id", "")).strip() == normalized
-        and not is_terminal_phase(str(run.get("phase", "")).strip())
-    ]
+    runs: list[dict[str, Any]] = []
+    for run in list_runs():
+        if str(run.get("workspace_id", "")).strip() != normalized:
+            continue
+        if is_terminal_phase(str(run.get("phase", "")).strip()):
+            continue
+        if operator_facing and is_background_employee_run(run):
+            continue
+        runs.append(run)
+    return runs
 
 
 def derive_agent_status(workspace_id: str) -> str:
@@ -44,7 +53,7 @@ def derive_agent_status(workspace_id: str) -> str:
     Align with list_active_runs(): ignore ended_at/status ghosts where phase is
     already completed/failed/cancelled but status stayed "running".
     """
-    runs = _non_terminal_workspace_runs(workspace_id)
+    runs = _non_terminal_workspace_runs(workspace_id, operator_facing=True)
     if not runs:
         return "idle"
 

@@ -7,7 +7,7 @@ from app.operator_briefing_signals import filter_actionable_inbox_items, is_moni
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.operator_fleet_advice import build_fleet_advice_pack
 from app.runs.service import (
-    list_active_runs,
+    list_operator_facing_active_runs,
     list_pending_approval_records,
     to_runtime_summary_active_run,
 )
@@ -203,7 +203,7 @@ def build_operator_briefing(
         top_signals = fleet_signals
     top_signals = top_signals[:3]
 
-    fleet_active_run_records = list_active_runs()
+    fleet_active_run_records = list_operator_facing_active_runs()
     fleet_pending_approval_records = list_pending_approval_records()
     active_run_records = fleet_active_run_records
     pending_approval_records = fleet_pending_approval_records

@@ -7,6 +7,8 @@
     "packages/*"
   ],
   "scripts": {
+    "run:5173": "./scripts/ops/run-5173.sh",
+    "run-5173": "./scripts/ops/run-5173.sh",
     "dev": "./scripts/dev/up.sh",
     "down": "./scripts/dev/down.sh",
     "health": "./scripts/dev/check-health.sh",
@@ -74,6 +76,7 @@
     "verify:phase-d": "./scripts/verify/phase-d-platform-retirement.sh",
     "verify:production-operator": "./scripts/verify/production-operator-smoke.sh",
     "verify:console-web": "npm run typecheck -w @axon-watch/console-web && npm run test -w @axon-watch/console-web && npm run build -w @axon-watch/console-web",
+    "docs:handbook-pdf": "./scripts/docs/build-howto-handbook-pdf.sh",
     "verify": "npm run verify:contracts && npm run verify:console-web && ./scripts/dev/python.sh scripts/verify/all.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json --shell-boot-report scripts/verify/fixtures/shell-boot-report.dev.json --runtime-latency-samples scripts/verify/fixtures/runtime-summary-latency.ci.json --watch-latency-samples scripts/verify/fixtures/watch-summary-latency.ci.json"
   }
 }

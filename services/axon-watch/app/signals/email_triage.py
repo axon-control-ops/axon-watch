@@ -15,22 +15,62 @@ _ACTION_PATTERNS = (
         re.I,
     ),
 )
-_RISK_PATTERNS = (
+_HARD_RISK_PATTERNS = (
     re.compile(
-        r"\b(urgent|asap|blocked|can't|cannot|failure|failing|deadline|overdue|escalat)\w*\b",
+        r"\b(urgent|asap|blocked|can't|cannot|failure|failing|overdue|escalat)\w*\b",
         re.I,
     ),
+)
+# Soft risk words often appear in marketing copy ("deadline", contest cutoffs).
+_SOFT_RISK_PATTERNS = (
+    re.compile(r"\bdeadline\w*\b", re.I),
 )
 _COMMITMENT_PATTERNS = (
     re.compile(r"\b(i will|we will|i'll|we'll|committed to|promised to)\b", re.I),
 )
+# Avoid bare "may" — it matches the English modal verb more often than the month.
 _DUE_PATTERNS = re.compile(
     r"\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
-    r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|"
+    r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|june?|jul(?:y)?|"
     r"aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|"
     r"\d{4}-\d{2}-\d{2})\b",
     re.I,
 )
+_DUE_MAY_MONTH = re.compile(r"\bMay\b")
+_PROMO_PATTERNS = (
+    re.compile(
+        r"\b(unsubscribe|view in browser|pre-?register|devpost|hackathon|"
+        r"in prizes?|prize categor(?:y|ies)|weeks to build|newsletter|"
+        r"limited[- ]time offer|promo(?:tion)?|utm_|shipaton)\b",
+        re.I,
+    ),
+    re.compile(r"customer\.io|mailchimp\.com|sendgrid\.net|list-manage\.com", re.I),
+)
+_PROMO_PRIORITY_CAP = 40
+_AUTOMATED_SENDER_PATTERNS = (
+    re.compile(r"noreply|no-reply|do-not-reply|donotreply|billing-noreply", re.I),
+)
+_BILLING_NOTICE_PATTERNS = (
+    re.compile(
+        r"\b(invoice\s+\S+\s+is\s+ready|your\s+\w*\s*invoice|your\s+statement\s+is\s+ready|"
+        r"payment\s+receipt|billing\s+statement|amount\s+due|disregard\s+this\s+email)\b",
+        re.I,
+    ),
+)
+_LOW_ATTENTION_PRIORITY_CAP = 40
+
+
+def _is_promotional_email(*, subject: str, sender: str, snippet: str) -> bool:
+    combined = f"{subject}\n{sender}\n{snippet}"
+    return any(pattern.search(combined) for pattern in _PROMO_PATTERNS)
+
+
+def _is_automated_billing_notice(*, subject: str, sender: str, snippet: str) -> bool:
+    """Detect vendor noreply invoice/billing mail that should not page the inbox."""
+    combined = f"{subject}\n{sender}\n{snippet}"
+    has_automated_sender = any(pattern.search(sender) for pattern in _AUTOMATED_SENDER_PATTERNS)
+    has_billing_copy = any(pattern.search(combined) for pattern in _BILLING_NOTICE_PATTERNS)
+    return has_automated_sender and has_billing_copy
 
 
 def _sentence_candidates(text: str) -> list[str]:
@@ -53,6 +93,15 @@ def analyze_email_message(
     combined = f"{subject}\n{snippet}".strip()
     sentences = _sentence_candidates(combined)
 
+    promotional = _is_promotional_email(subject=subject, sender=sender, snippet=snippet)
+    automated_billing = _is_automated_billing_notice(
+        subject=subject,
+        sender=sender,
+        snippet=snippet,
+    )
+    low_attention = promotional or automated_billing
+    risk_patterns = _HARD_RISK_PATTERNS if low_attention else (_HARD_RISK_PATTERNS + _SOFT_RISK_PATTERNS)
+
     actions = [
         sentence
         for sentence in sentences
@@ -61,7 +110,7 @@ def analyze_email_message(
     risks = [
         sentence
         for sentence in sentences
-        if any(pattern.search(sentence) for pattern in _RISK_PATTERNS)
+        if any(pattern.search(sentence) for pattern in risk_patterns)
     ]
     commitments = [
         sentence
@@ -69,6 +118,11 @@ def analyze_email_message(
         if any(pattern.search(sentence) for pattern in _COMMITMENT_PATTERNS)
     ]
     due_markers = sorted({match.group(0) for match in _DUE_PATTERNS.finditer(combined)})
+    for match in _DUE_MAY_MONTH.finditer(combined):
+        token = match.group(0)
+        if token not in due_markers:
+            due_markers.append(token)
+    due_markers = sorted(due_markers, key=str.lower)
 
     matched_workspaces: list[str] = []
     for workspace_name in workspace_names or []:
@@ -85,6 +139,17 @@ def analyze_email_message(
         priority += 15
     if due_markers:
         priority += 15
+    if promotional:
+        # Marketing / contest mail should not drown out real blockers.
+        priority = min(priority, _LOW_ATTENTION_PRIORITY_CAP)
+        risks = []
+        commitments = []
+    elif automated_billing:
+        # Vendor noreply invoices use "review" boilerplate — not a human follow-up.
+        priority = min(priority, _LOW_ATTENTION_PRIORITY_CAP)
+        risks = []
+        commitments = []
+        actions = []
     priority = max(5, min(priority, 100))
 
     risk_level = "low"
@@ -93,7 +158,17 @@ def analyze_email_message(
     elif priority >= 50:
         risk_level = "medium"
 
-    if risks:
+    if promotional:
+        recommended_action = "monitor_email"
+        recommended_detail = (
+            "Promotional or contest email — keep for awareness, not as an urgent blocker."
+        )
+    elif automated_billing:
+        recommended_action = "monitor_email"
+        recommended_detail = (
+            "Automated billing or invoice notice — check your vendor portal; no reply expected."
+        )
+    elif risks:
         recommended_action = "reply_or_investigate"
         recommended_detail = (
             "Respond to the blocker or investigate the issue mentioned in the email."
@@ -123,6 +198,8 @@ def analyze_email_message(
         "snippet": snippet[:280],
         "priority": priority,
         "risk_level": risk_level,
+        "promotional": promotional,
+        "automated_billing": automated_billing,
         "action_requests": actions[:5],
         "risks": risks[:5],
         "commitments": commitments[:5],

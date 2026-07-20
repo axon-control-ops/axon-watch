@@ -64,7 +64,22 @@ def _format_storage_bytes(value: int) -> str:
     return f"{megabytes:.0f} MB"
 
 
-def _probe_storage_api_restricted(headers: dict[str, str], *, timeout: float) -> str | None:
+def _transport_failure_detail(exc: Exception) -> str:
+    # Keep the shared " API query failed:" marker so inbox severity stays warning
+    # (same ladder as PostHog/Sentry transport blips).
+    return f"Supabase Storage API query failed: {exc}"
+
+
+def _probe_storage_api_restricted(
+    headers: dict[str, str], *, timeout: float
+) -> tuple[str, str] | None:
+    """Early Storage API probe for terminal outcomes.
+
+    Returns:
+      ("critical", detail) for HTTP 402 quota restriction
+      ("warning", detail) for transient network failures
+      None when unrestricted, or for non-402 HTTP so usage fetch can continue
+    """
     base_url = headers["_base_url"].rstrip("/")
     req = Request(
         f"{base_url}/storage/v1/bucket",
@@ -78,14 +93,21 @@ def _probe_storage_api_restricted(headers: dict[str, str], *, timeout: float) ->
         with urlopen(req, timeout=timeout) as response:
             if int(response.status) == 402:
                 body = response.read().decode("utf-8", errors="replace")
-                return f"Supabase Storage API restricted (402): {body[:200]}"
+                return (
+                    "critical",
+                    f"Supabase Storage API restricted (402): {body[:200]}",
+                )
     except HTTPError as exc:
         if int(exc.code) == 402:
             body = exc.read().decode("utf-8", errors="replace")
-            return f"Supabase Storage API restricted (402): {body[:200]}"
-        return f"Supabase Storage API probe failed: HTTP {exc.code}"
+            return (
+                "critical",
+                f"Supabase Storage API restricted (402): {body[:200]}",
+            )
+        # Non-402 HTTP: let the usage fetch path decide / fall back.
+        return None
     except (TimeoutError, URLError, OSError) as exc:
-        return f"Supabase Storage API probe failed: {exc}"
+        return "warning", _transport_failure_detail(exc)
     return None
 
 
@@ -153,7 +175,7 @@ def _fetch_storage_bucket_totals_via_storage_api(
         if status == 402:
             return {}, "402 exceed_storage_size_quota"
     except (TimeoutError, URLError, OSError) as exc:
-        return {}, f"storage bucket list failed: {exc}"
+        return {}, _transport_failure_detail(exc)
 
     if status == 402:
         return {}, "402 exceed_storage_size_quota"
@@ -208,7 +230,7 @@ def _fetch_storage_bucket_totals_via_storage_api(
                     if status == 402:
                         return {}, "402 exceed_storage_size_quota"
                 except (TimeoutError, URLError, OSError) as exc:
-                    return totals, f"storage object list failed: {exc}"
+                    return totals, _transport_failure_detail(exc)
 
                 if status == 402:
                     return {}, "402 exceed_storage_size_quota"
@@ -265,7 +287,7 @@ def _fetch_storage_bucket_totals(
         status = int(exc.code)
         body = exc.read().decode("utf-8", errors="replace")
     except (TimeoutError, URLError, OSError) as exc:
-        return {}, f"storage usage RPC failed: {exc}"
+        return {}, _transport_failure_detail(exc)
 
     if status == 402:
         return {}, "402 exceed_storage_size_quota"
@@ -301,7 +323,7 @@ def _fetch_storage_bucket_totals(
             if status == 402:
                 return {}, "402 exceed_storage_size_quota"
         except (TimeoutError, URLError, OSError) as exc:
-            return totals, f"storage.objects query failed: {exc}"
+            return totals, _transport_failure_detail(exc)
 
         if status == 402:
             return {}, "402 exceed_storage_size_quota"
@@ -366,9 +388,9 @@ def check_supabase_storage_quota(
             "Storage quota check skipped until Supabase URL and service-role key are available",
         )
 
-    restriction = _probe_storage_api_restricted(headers, timeout=timeout_seconds)
-    if restriction:
-        return "critical", restriction
+    early = _probe_storage_api_restricted(headers, timeout=timeout_seconds)
+    if early is not None:
+        return early
 
     totals, fetch_error = _fetch_storage_bucket_totals(
         headers,
@@ -382,6 +404,9 @@ def check_supabase_storage_quota(
             "Purge regeneratable buckets (tts-audio first) or upgrade the plan.",
         )
     if fetch_error and not totals:
+        # Transient network blips warn; auth/schema/quota failures stay critical.
+        if " API query failed:" in fetch_error:
+            return "warning", fetch_error
         return "critical", fetch_error
 
     total_bytes = sum(bucket["bytes"] for bucket in totals.values())

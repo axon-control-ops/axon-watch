@@ -16,6 +16,7 @@ import {
   type ComposerMode,
 } from './use-composer-menus';
 import { useComposerModelRuntime } from './use-composer-model-runtime';
+import { useComposerTypeahead } from './use-composer-typeahead';
 import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
 import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
@@ -183,6 +184,44 @@ export function useAgentDockComposerSetup() {
     closeMenus,
   });
 
+  const typeahead = useComposerTypeahead({
+    shell,
+    composerMode,
+    inputRef,
+    getDraft: () =>
+      composerMode.value === 'kairo' ? kairoDraft.value : shell.ideComposerDraft,
+    setDraft: (value) => {
+      if (composerMode.value === 'kairo') {
+        kairoDraft.value = value;
+        return;
+      }
+      shell.ideComposerDraft = value;
+    },
+    closeToolbarMenus: closeMenus,
+  });
+
+  const {
+    typeaheadOpen,
+    typeaheadKind,
+    typeaheadRows,
+    typeaheadCaption,
+    typeaheadSelectedIndex,
+    typeaheadLoading,
+    closeTypeahead,
+    syncTypeaheadFromComposer,
+    handleTypeaheadKeydown,
+    applyTypeaheadRow,
+    selectTypeaheadIndex,
+  } = typeahead;
+
+  const baseToggleSection = toggleSection;
+  function toggleSectionWithTypeahead(
+    section: 'context' | 'tools' | 'model' | 'mode',
+  ): void {
+    closeTypeahead();
+    baseToggleSection(section);
+  }
+
   const {
     dismissPlanSoftSwitch,
     handleApproveRun,
@@ -214,6 +253,7 @@ export function useAgentDockComposerSetup() {
     startVoiceCapture,
     stopVoiceCapture,
     planSoftSwitchNotice,
+    handleTypeaheadKeydown,
     onDebugReproduceProceed: (messageId) => {
       dismissedDebugReproduceMessageId.value = messageId;
     },
@@ -252,6 +292,11 @@ export function useAgentDockComposerSetup() {
     syncComposerHeight,
   });
 
+  function updateComposerDraft(value: string): void {
+    composerDraftModel.value = value;
+    void syncTypeaheadFromComposer();
+  }
+
   useComposerWorkspaceSync({
     shell,
     composerMode,
@@ -261,7 +306,10 @@ export function useAgentDockComposerSetup() {
     composerHistoryIndex,
     composerHistoryScratch,
     planSoftSwitchNotice,
-    closeMenus,
+    closeMenus: () => {
+      closeMenus();
+      closeTypeahead();
+    },
     syncComposerHeight,
     syncContextFromDraft,
     loadComposerHistoryForWorkspace,
@@ -273,6 +321,7 @@ export function useAgentDockComposerSetup() {
 
   return buildAgentDockComposerApi({
     activeMode,
+    applyTypeaheadRow,
     attachmentChips,
     autoModelRow,
     autoToggleChecked,
@@ -388,12 +437,21 @@ export function useAgentDockComposerSetup() {
     showVaultAction,
     speechCapture,
     switchToConsultativeAccess,
+    selectTypeaheadIndex,
     syncComposerHeight,
+    syncTypeaheadFromComposer,
     toggleContext,
     toggleRuntimeTargetsPanel,
-    toggleSection,
+    toggleSection: toggleSectionWithTypeahead,
     toggleVoiceCapture,
+    typeaheadCaption,
+    typeaheadKind,
+    typeaheadLoading,
+    typeaheadOpen,
+    typeaheadRows,
+    typeaheadSelectedIndex,
     undoPlanSoftSwitch,
+    updateComposerDraft,
     cancelFullAccessConsent,
   });
 }

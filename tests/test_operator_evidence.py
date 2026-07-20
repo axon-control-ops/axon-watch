@@ -9,6 +9,9 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.operator_evidence import build_operator_evidence  # noqa: E402
+from app.persistence import run_store  # noqa: E402
+from app.runs.service import create_run  # noqa: E402
+from tests.support.control_plane_db import isolate_control_plane_db  # noqa: E402
 
 
 class OperatorEvidenceTests(unittest.TestCase):
@@ -24,7 +27,7 @@ class OperatorEvidenceTests(unittest.TestCase):
             "app.operator_evidence.build_inbox_response",
             return_value={"items": [], "count": 0},
         ), patch(
-            "app.operator_evidence.list_active_runs",
+            "app.operator_evidence.list_operator_facing_active_runs",
             return_value=[],
         ):
             payload = build_operator_evidence("ws_workspace_dashpro")
@@ -34,6 +37,42 @@ class OperatorEvidenceTests(unittest.TestCase):
         self.assertTrue(
             any(action.get("target") == "workspace" for action in payload["actions"])
         )
+
+    def test_workspace_evidence_excludes_role_tagged_worker_shifts(self) -> None:
+        isolate_control_plane_db(self, run_store)
+        create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Control Plane: continuous worker shift",
+            employee_role="backend",
+        )
+        create_run(
+            workspace_id="workspace_dashpro",
+            mode="agent",
+            summary="Operator git status",
+        )
+
+        with patch(
+            "app.operator_evidence.get_workspace_record",
+            return_value={
+                "workspace_id": "workspace_dashpro",
+                "display_name": "DashPro",
+                "connection_kind": "child_project",
+            },
+        ), patch(
+            "app.operator_evidence.build_inbox_response",
+            return_value={"items": [], "count": 0},
+        ):
+            payload = build_operator_evidence("ws_workspace_dashpro")
+
+        self.assertEqual("1 active run(s) · 0 open signal(s)", payload["summary"])
+        run_titles = [
+            item["title"]
+            for section in payload["sections"]
+            if section.get("title") == "Runs"
+            for item in section.get("items", [])
+        ]
+        self.assertEqual(["Operator git status"], run_titles)
 
     def test_signal_evidence_surfaces_sentry_sample_and_handoff(self) -> None:
         with patch(

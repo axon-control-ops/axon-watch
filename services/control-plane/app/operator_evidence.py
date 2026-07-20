@@ -7,7 +7,7 @@ from typing import Any
 from app.adapters.watch_client import fetch_watch_connectors
 from app.inbox_projection import build_inbox_response
 from app.persistence import email_settings_store
-from app.runs.service import get_run, get_run_history, list_active_runs
+from app.runs.service import get_run, get_run_history, list_operator_facing_active_runs
 from app.workspace_catalog import get_workspace_record, list_workspace_records
 
 
@@ -35,7 +35,7 @@ def _workspace_evidence(workspace_id: str) -> dict[str, Any]:
     ][:5]
     runs = [
         run
-        for run in list_active_runs()
+        for run in list_operator_facing_active_runs()
         if str(run.get("workspace_id", "")).strip() == workspace_id
     ][:5]
     return {
@@ -319,7 +319,7 @@ def _connector_evidence(connector_id: str) -> dict[str, Any]:
 
 def _core_evidence() -> dict[str, Any]:
     workspaces = list_workspace_records(operator_surface=True)
-    active_runs = list_active_runs()
+    active_runs = list_operator_facing_active_runs()
     primary_workspace_id = ""
     preferred_ids = (
         "workspace_axon_watch",
