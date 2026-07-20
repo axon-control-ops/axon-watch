@@ -4,15 +4,25 @@ from __future__ import annotations
 
 from app.signals.iso_time import utc_now_iso
 
+# Shared marker from monitor probes (PostHog / Sentry / Supabase Storage).
 _TRANSPORT_FAILURE_MARKER = " API query failed:"
 
 
 def _severity_for_monitor(status: str, detail: str) -> str:
-    if status == "critical":
+    """Map monitor status to inbox severity.
+
+    Volume thresholds (unresolved issues, zero events, storage quota warning)
+    stay high. Transient transport blips and token-scope gaps stay warning so
+    they do not page as Attention-critical noise.
+    """
+    normalized = status.strip().lower()
+    if normalized == "critical":
         return "critical"
-    if status == "warning":
-        # Transient PostHog/Sentry/Supabase network blips stay inbox-only (medium urgency).
+    if normalized == "warning":
+        detail_l = detail.lower()
         if _TRANSPORT_FAILURE_MARKER in detail:
+            return "warning"
+        if "lacks issue read scope" in detail_l:
             return "warning"
         return "high"
     return "info"

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from app.domain.run_state import is_terminal_phase
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.operator_briefing_signals import filter_actionable_inbox_items
-from app.runs.service import list_runs
+from app.runs.service import list_operator_facing_active_runs
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
 from app.workspace_catalog import list_workspace_records
 
@@ -44,11 +43,7 @@ def build_operator_fleet_health(
         item for item in inbox_snapshot.get("items", []) if isinstance(item, dict)
     ]
 
-    active_runs = [
-        record
-        for record in list_runs()
-        if not is_terminal_phase(str(record.get("phase", "")))
-    ]
+    active_runs = list_operator_facing_active_runs()
 
     workspace_records = list_workspace_records(
         inbox_fetcher=inbox_fetcher,

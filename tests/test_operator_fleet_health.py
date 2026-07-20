@@ -26,7 +26,7 @@ class OperatorFleetHealthTests(unittest.TestCase):
         created = self.client.post(
             "/api/runs",
             json={
-                "workspace_id": "workspace_alpha",
+                "workspace_id": "workspace_axon_watch",
                 "mode": "agent",
                 "summary": "git status",
             },
@@ -57,11 +57,93 @@ class OperatorFleetHealthTests(unittest.TestCase):
         payload = response.json()
         self.assertIn("items", payload)
         self.assertGreater(payload["count"], 0)
-        alpha = next(
-            item for item in payload["items"] if item["workspace_id"] == "workspace_alpha"
+        axon_watch = next(
+            item
+            for item in payload["items"]
+            if item["workspace_id"] == "workspace_axon_watch"
         )
-        self.assertEqual(1, alpha["review_ready_count"])
-        self.assertEqual("attention", alpha["health"])
+        self.assertEqual(1, axon_watch["review_ready_count"])
+        self.assertEqual("attention", axon_watch["health"])
+
+    def test_fleet_health_ignores_background_employee_executing_runs(self) -> None:
+        self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_axon_watch",
+                "mode": "agent",
+                "summary": "Control Plane: continuous worker shift",
+                "employee_role": "backend",
+            },
+        )
+
+        with patch(
+            "app.operator_fleet_health.assemble_runtime_summary",
+            return_value={
+                "generated_at": "2026-07-07T20:00:00Z",
+                "watch": {"connected": True},
+                "connectors": {
+                    "configured": 2,
+                    "ok": 2,
+                    "degraded": 0,
+                    "unavailable": 0,
+                    "required_unavailable": 0,
+                },
+                "degraded": {"active": False, "reasons": []},
+            },
+        ), patch(
+            "app.operator_fleet_health.build_inbox_response",
+            return_value={"items": [], "count": 0, "updated_at": "2026-07-07T20:00:00Z"},
+        ):
+            response = self.client.get("/api/operator/fleet-health")
+
+        self.assertEqual(200, response.status_code)
+        axon_watch = next(
+            item
+            for item in response.json()["items"]
+            if item["workspace_id"] == "workspace_axon_watch"
+        )
+        self.assertEqual(0, axon_watch["executing_count"])
+        self.assertEqual(0, axon_watch["active_runs"])
+        self.assertEqual("nominal", axon_watch["health"])
+
+    def test_fleet_health_hides_demo_isolated_workspaces(self) -> None:
+        created = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "acceptance fixture run",
+            },
+        ).json()
+        self.client.post(f"/api/runs/{created['run_id']}/review-ready")
+
+        with patch(
+            "app.operator_fleet_health.assemble_runtime_summary",
+            return_value={
+                "generated_at": "2026-07-07T20:00:00Z",
+                "watch": {"connected": True},
+                "connectors": {
+                    "configured": 2,
+                    "ok": 2,
+                    "degraded": 0,
+                    "unavailable": 0,
+                    "required_unavailable": 0,
+                },
+                "degraded": {"active": False, "reasons": []},
+            },
+        ), patch(
+            "app.operator_fleet_health.build_inbox_response",
+            return_value={"items": [], "count": 0, "updated_at": "2026-07-07T20:00:00Z"},
+        ):
+            response = self.client.get("/api/operator/fleet-health")
+
+        self.assertEqual(200, response.status_code)
+        workspace_ids = {
+            str(item.get("workspace_id", ""))
+            for item in response.json().get("items", [])
+            if isinstance(item, dict)
+        }
+        self.assertNotIn("workspace_alpha", workspace_ids)
 
     def test_briefing_workspace_scope_limits_review_ready_notice(self) -> None:
         alpha = self.client.post(

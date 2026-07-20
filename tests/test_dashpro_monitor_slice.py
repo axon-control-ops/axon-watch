@@ -7,18 +7,39 @@ import unittest
 from pathlib import Path
 
 WATCH_SERVICE_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
-for module_name in list(sys.modules):
-    if module_name == "app" or module_name.startswith("app."):
-        sys.modules.pop(module_name, None)
-sys.path.insert(0, str(WATCH_SERVICE_ROOT))
-
-from app.signals.monitor_signal import monitor_inbox_item, monitor_inbox_items  # noqa: E402
+_WATCH_PATH = str(WATCH_SERVICE_ROOT)
 
 
 class DashProMonitorSignalTests(unittest.TestCase):
+    monitor_signal: object
+    _saved_modules: dict[str, object]
+
+    def setUp(self) -> None:
+        self._saved_modules = {
+            name: module
+            for name, module in sys.modules.items()
+            if name == "app" or name.startswith("app.")
+        }
+        for name in self._saved_modules:
+            del sys.modules[name]
+        while _WATCH_PATH in sys.path:
+            sys.path.remove(_WATCH_PATH)
+        sys.path.insert(0, _WATCH_PATH)
+        import app.signals.monitor_signal as monitor_signal  # noqa: WPS433
+
+        self.monitor_signal = monitor_signal
+
+    def tearDown(self) -> None:
+        for name in list(sys.modules):
+            if name == "app" or name.startswith("app."):
+                del sys.modules[name]
+        while _WATCH_PATH in sys.path:
+            sys.path.remove(_WATCH_PATH)
+        sys.modules.update(self._saved_modules)
+
     def test_monitor_inbox_item_skips_ok_and_skipped(self) -> None:
         self.assertIsNone(
-            monitor_inbox_item(
+            self.monitor_signal.monitor_inbox_item(
                 {
                     "check_id": "dashpro_sentry_recent_issues",
                     "status": "ok",
@@ -27,7 +48,7 @@ class DashProMonitorSignalTests(unittest.TestCase):
             )
         )
         self.assertIsNone(
-            monitor_inbox_item(
+            self.monitor_signal.monitor_inbox_item(
                 {
                     "check_id": "dashpro_posthog_recent_events",
                     "status": "skipped",
@@ -37,7 +58,7 @@ class DashProMonitorSignalTests(unittest.TestCase):
         )
 
     def test_monitor_inbox_item_emits_warning_signal(self) -> None:
-        item = monitor_inbox_item(
+        item = self.monitor_signal.monitor_inbox_item(
             {
                 "check_id": "dashpro_sentry_recent_issues",
                 "check_type": "sentry_recent_issues",
@@ -53,6 +74,21 @@ class DashProMonitorSignalTests(unittest.TestCase):
         self.assertEqual("high", item["severity"])
         self.assertEqual("child_project_monitor", item["meta"]["signal_family"])
 
+    def test_monitor_inbox_item_downranks_transport_warning(self) -> None:
+        item = self.monitor_signal.monitor_inbox_item(
+            {
+                "check_id": "dashpro_posthog_recent_events",
+                "check_type": "posthog_recent_events",
+                "service": "PostHog",
+                "workspace_id": "workspace_dashpro",
+                "status": "warning",
+                "detail": "PostHog API query failed: The read operation timed out",
+            }
+        )
+        self.assertIsNotNone(item)
+        assert item is not None
+        self.assertEqual("warning", item["severity"])
+
     def test_monitor_inbox_item_attaches_sentry_issues(self) -> None:
         issues = [
             {
@@ -65,7 +101,7 @@ class DashProMonitorSignalTests(unittest.TestCase):
                 "culprit": "app.js",
             }
         ]
-        item = monitor_inbox_item(
+        item = self.monitor_signal.monitor_inbox_item(
             {
                 "check_id": "dashpro_sentry_recent_issues",
                 "check_type": "sentry_recent_issues",
@@ -82,7 +118,7 @@ class DashProMonitorSignalTests(unittest.TestCase):
         self.assertEqual(1, item["meta"]["sentry_issue_count"])
 
     def test_monitor_inbox_items_filters_ok(self) -> None:
-        items = monitor_inbox_items(
+        items = self.monitor_signal.monitor_inbox_items(
             [
                 {"check_id": "a", "status": "ok", "detail": "fine"},
                 {

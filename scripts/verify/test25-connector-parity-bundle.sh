@@ -44,6 +44,17 @@ echo
 echo "[3/6] Watch connector slices (TEST-3 steps 2-4)"
 "${python_bin}" -m unittest tests.test_watch_connectors -v
 "${python_bin}" -m unittest tests.test_control_plane_connectors -v
+PYTHONPATH="${repo_root}/services/axon-watch" "${python_bin}" -m unittest \
+  tests.test_connector_probe_cache \
+  tests.test_connector_signal \
+  tests.test_connector_inbox_integration \
+  tests.test_actionable_inbox_signals \
+  tests.test_watch_inbox_assembly \
+  -v
+"${python_bin}" -m unittest \
+  tests.test_parity_a4_signal_inbox_consistency \
+  tests.test_signal_consistency \
+  -v
 "${python_bin}" -m unittest tests.test_test3_watch_connectors_acceptance -v
 "${python_bin}" -m unittest tests.test_control_plane_watch_integration -v
 echo

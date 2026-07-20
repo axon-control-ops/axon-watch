@@ -193,6 +193,37 @@
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/mockup-shell-13a.css + mockup-shell-13b.css"
+    },
+    "tests/test_actionable_inbox_signals.py": {
+      "max_lines": 540,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_actionable_inbox_* slices"
+    },
+    "tests/test_control_plane_runs.py": {
+      "max_lines": 510,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_control_plane_runs_* slices"
+    },
+    "tests/test_parity_a4_signal_inbox_consistency.py": {
+      "max_lines": 630,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_parity_a4_* slices"
+    },
+    "tests/test_signal_consistency.py": {
+      "max_lines": 515,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_signal_consistency_* slices"
+    },
+    "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
+      "max_lines": 520,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/shell/operator-status-radar/*",
+      "note": "Mission control panel; extract quick-guide rail when shrinking"
     }
   }
 }

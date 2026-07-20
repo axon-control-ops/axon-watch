@@ -40,8 +40,18 @@ echo "[1/5] Dev stack health"
 echo
 
 echo "[2/5] Watch connector unit tests"
-python3 -m unittest tests.test_watch_connectors -v
-python3 -m unittest tests.test_control_plane_connectors -v
+python3 -m unittest tests.test_watch_connectors tests.test_control_plane_connectors -v
+PYTHONPATH="${repo_root}/services/axon-watch" python3 -m unittest \
+  tests.test_connector_probe_cache \
+  tests.test_connector_signal \
+  tests.test_connector_inbox_integration \
+  tests.test_actionable_inbox_signals \
+  tests.test_watch_inbox_assembly \
+  -v
+python3 -m unittest \
+  tests.test_parity_a4_signal_inbox_consistency \
+  tests.test_signal_consistency \
+  -v
 echo
 
 echo "[3/5] Live watch connector acceptance"

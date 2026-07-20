@@ -6,6 +6,7 @@ from typing import Any
 
 from app.data.watch_adapter import fetch_watch_data_snapshot
 from app.persistence import chat_store, handoff_store, run_store
+from app.runs.queries import is_background_employee_run
 
 _RUN_SUMMARY_FIELDS = (
     "run_id",
@@ -57,7 +58,11 @@ def _summarize_message(record: dict[str, Any]) -> dict[str, Any]:
 
 def _control_plane_tables(*, limit: int) -> dict[str, object]:
     max_limit = max(1, min(100, int(limit or 50)))
-    all_runs = run_store.list_runs()
+    all_runs = [
+        record
+        for record in run_store.list_runs()
+        if not is_background_employee_run(record)
+    ]
     recent_runs = list(reversed(all_runs))[:max_limit]
     run_items = [_summarize_run(record) for record in recent_runs]
     thread_items = chat_store.list_threads(limit=max_limit)

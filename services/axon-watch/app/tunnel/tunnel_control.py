@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import os
+
 from app.tunnel.native_process import (
     managed_process_snapshot,
     start_managed_process,
@@ -11,9 +14,18 @@ from app.tunnel.slice_registry import load_tunnel_slice
 from app.tunnel.tunnel_credentials import load_tunnel_vault_secrets, resolve_cloudflare_tunnel_token_state
 from app.tunnel.tunnel_probe import build_tunnel_diagnostics
 
+logger = logging.getLogger(__name__)
+
 
 class TunnelControlError(ValueError):
     pass
+
+
+def tunnel_autostart_enabled() -> bool:
+    """Return whether watch startup should ensure the named tunnel is running."""
+
+    raw = os.environ.get("AXON_WATCH_TUNNEL_AUTOSTART", "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
 
 
 def _resolved_tunnel_token() -> str:
@@ -96,3 +108,35 @@ def tunnel_stop(config: dict[str, object] | None = None) -> dict[str, object]:
     snapshot = tunnel_status(config)
     snapshot["msg"] = "Tunnel stopped"
     return snapshot
+
+
+def attempt_tunnel_autostart() -> dict[str, object]:
+    """Best-effort tunnel ensure for watch startup.
+
+    Skips when autostart is disabled, the tunnel slice is off, or start fails.
+    Never raises — startup must stay healthy even when auth/binary is missing.
+    """
+
+    if not tunnel_autostart_enabled():
+        return {"attempted": False, "reason": "disabled"}
+    config = load_tunnel_slice()
+    if config is None:
+        return {"attempted": False, "reason": "slice_disabled"}
+    try:
+        snapshot = tunnel_start(config)
+    except TunnelControlError as exc:
+        logger.warning("tunnel autostart skipped: %s", exc)
+        return {"attempted": True, "ok": False, "reason": str(exc)}
+    except Exception:
+        logger.exception("tunnel autostart failed")
+        return {"attempted": True, "ok": False, "reason": "unexpected_error"}
+    running = bool(snapshot.get("running"))
+    return {
+        "attempted": True,
+        "ok": running,
+        "running": running,
+        "managed": bool(snapshot.get("managed")),
+        "msg": str(snapshot.get("msg") or ""),
+        "status": str(snapshot.get("status") or ""),
+        "detail": str(snapshot.get("detail") or ""),
+    }

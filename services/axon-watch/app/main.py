@@ -17,7 +17,13 @@ from app.events.store import list_events
 from app.events.stream import watch_events_stream_response
 from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.signals.store import get_inbox_snapshot
-from app.tunnel.tunnel_control import TunnelControlError, tunnel_start, tunnel_status, tunnel_stop
+from app.tunnel.tunnel_control import (
+    TunnelControlError,
+    attempt_tunnel_autostart,
+    tunnel_start,
+    tunnel_status,
+    tunnel_stop,
+)
 from app.vault.api import (
     VaultExportBody,
     VaultMonitorImportBody,
@@ -93,7 +99,9 @@ app = FastAPI(
 
 @app.on_event("startup")
 def vault_startup_auto_unlock() -> None:
+    # Vault first so named-tunnel tokens from unlock are available to autostart.
     attempt_auto_unlock()
+    attempt_tunnel_autostart()
 
 
 @app.get("/internal/watch/health")

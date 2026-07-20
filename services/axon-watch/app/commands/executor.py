@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from app.connectors.catalog import load_watch_connector_definitions
 from app.connectors.probe import probe_connector
+from app.connectors.summary import reset_connector_probe_cache, store_connector_probe_record
+from app.monitors.dashpro_monitor import reset_monitor_probe_cache
 from app.signals.suppression_store import acknowledge_signals
 from app.tunnel.slice_registry import load_tunnel_slice
 from app.tunnel.tunnel_probe import probe_cloudflare_tunnel
@@ -26,6 +28,7 @@ def execute_reprobe_connector(*, connector_id: str) -> dict[str, object]:
         tunnel_id = str((tunnel_config or {}).get("connector_id") or "cloudflare_tunnel").strip()
         if normalized_id == tunnel_id and tunnel_config is not None:
             record = probe_cloudflare_tunnel(tunnel_config)
+            store_connector_probe_record(record)
             return {
                 "connector_id": normalized_id,
                 "connector_status": record.get("status"),
@@ -36,6 +39,7 @@ def execute_reprobe_connector(*, connector_id: str) -> dict[str, object]:
         raise WatchCommandError(f"connector not found: {normalized_id}")
 
     record = probe_connector(definition)
+    store_connector_probe_record(record)
     return {
         "connector_id": normalized_id,
         "connector_status": record.get("status"),
@@ -46,6 +50,8 @@ def execute_reprobe_connector(*, connector_id: str) -> dict[str, object]:
 
 
 def execute_refresh_summary() -> dict[str, object]:
+    reset_connector_probe_cache()
+    reset_monitor_probe_cache()
     summary = build_watch_summary()
     return {
         "summary_status": summary.get("status"),

@@ -14,7 +14,11 @@ from app.adapters.watch_client import fetch_watch_inbox, fetch_watch_summary
 from app.cli_runtime.catalog import runtime_identity_snapshot, runtime_status_snapshot
 from app.cli_runtime.readiness import cli_runtime_degraded_reasons, summarize_cli_runtime_readiness
 from app.operator_briefing_signals import summarize_actionable_inbox
-from app.runs.service import approval_summary, list_active_runs, to_runtime_summary_active_run
+from app.runs.service import (
+    approval_summary,
+    list_operator_facing_active_runs,
+    to_runtime_summary_active_run,
+)
 
 _APP_VERSION = "0.1.0"
 _PROCESS_STARTED_AT = time.monotonic()
@@ -174,7 +178,7 @@ def assemble_runtime_summary(
     degraded_reasons.extend(cli_runtime_degraded_reasons(cli_status_snapshot))
 
     approvals = approval_summary()
-    active_run_records = list_active_runs()
+    active_run_records = list_operator_facing_active_runs()
     active_runs = [to_runtime_summary_active_run(record) for record in active_run_records]
 
     return {

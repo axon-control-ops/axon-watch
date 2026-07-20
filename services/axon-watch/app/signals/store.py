@@ -27,14 +27,17 @@ def get_inbox_snapshot(
     items: list[dict[str, object]] = []
     if include_summary_degraded_signal(connector_records=connector_records):
         items.append(summary_degraded_inbox_item())
+    connector_items: list[dict[str, object]] = []
     if connector_records is not None:
-        items.extend(connector_inbox_items(connector_records))
+        connector_items = connector_inbox_items(connector_records)
+        items.extend(connector_items)
     monitor_records = probe_monitor_records()
     release_resolved_monitor_acknowledgements(monitor_records)
     monitor_items = monitor_inbox_items(monitor_records)
     items.extend(monitor_items)
-    items.extend(email_inbox_items())
-    if should_emit_bootstrap_signal(monitor_items):
+    email_items = email_inbox_items()
+    items.extend(email_items)
+    if should_emit_bootstrap_signal(monitor_items, connector_items, email_items):
         items.insert(0, bootstrap_inbox_item())
 
     ranked = rank_inbox_items(items)

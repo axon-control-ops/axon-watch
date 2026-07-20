@@ -81,6 +81,27 @@ class Test4WatchCommandEventAcceptance(unittest.TestCase):
         self.assertEqual(200, show_status)
         self.assertEqual("reprobe_connector", show_payload.get("command_type"))
 
+        connectors_status, connectors_payload = _request(
+            "GET",
+            f"{CONTROL_PLANE_BASE}/api/connectors",
+        )
+        self.assertEqual(200, connectors_status)
+        self.assertIsInstance(connectors_payload, dict)
+        items = connectors_payload.get("items")
+        self.assertIsInstance(items, list)
+        by_id = {
+            str(item.get("connector_id")): item
+            for item in items
+            if isinstance(item, dict)
+        }
+        control_plane = by_id.get("control_plane")
+        self.assertIsInstance(control_plane, dict)
+        assert isinstance(control_plane, dict)
+        result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+        expected_status = str(result.get("connector_status") or control_plane.get("status") or "")
+        self.assertTrue(expected_status)
+        self.assertEqual(expected_status, control_plane.get("status"))
+
     def test_watch_events_and_summary_observation(self) -> None:
         _request(
             "POST",

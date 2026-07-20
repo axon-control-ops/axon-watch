@@ -3,29 +3,50 @@
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-WATCH_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
-sys.path.insert(0, str(WATCH_ROOT))
-
-from app.tunnel import tunnel_control  # noqa: E402
-from app.tunnel import native_process  # noqa: E402
-from app.tunnel.native_process import build_cloudflared_command  # noqa: E402
-from app.tunnel.tunnel_credentials import (  # noqa: E402
-    resolve_cloudflare_tunnel_token_state,
-)
-from app.tunnel.tunnel_probe import (  # noqa: E402
-    _classify_public_health_body,
-    _remote_ingress_from_logs,
-    build_tunnel_diagnostics,
-)
+from tests.support.watch_app_loader import prepare_watch_imports, restore_app_modules
 
 
-class TunnelCredentialsWatchTests(unittest.TestCase):
+class WatchTunnelTestCase(unittest.TestCase):
+    _saved_modules: dict[str, object]
+    tunnel_control: object
+    native_process: object
+    build_cloudflared_command: object
+    resolve_cloudflare_tunnel_token_state: object
+    build_tunnel_diagnostics: object
+    _classify_public_health_body: object
+    _remote_ingress_from_logs: object
+
+    def setUp(self) -> None:
+        self._saved_modules = prepare_watch_imports()
+        from app.tunnel import native_process, tunnel_control  # noqa: WPS433
+        from app.tunnel.native_process import build_cloudflared_command  # noqa: WPS433
+        from app.tunnel.tunnel_credentials import (  # noqa: WPS433
+            resolve_cloudflare_tunnel_token_state,
+        )
+        from app.tunnel.tunnel_probe import (  # noqa: WPS433
+            _classify_public_health_body,
+            _remote_ingress_from_logs,
+            build_tunnel_diagnostics,
+        )
+
+        self.tunnel_control = tunnel_control
+        self.native_process = native_process
+        self.build_cloudflared_command = build_cloudflared_command
+        self.resolve_cloudflare_tunnel_token_state = resolve_cloudflare_tunnel_token_state
+        self.build_tunnel_diagnostics = build_tunnel_diagnostics
+        self._classify_public_health_body = _classify_public_health_body
+        self._remote_ingress_from_logs = _remote_ingress_from_logs
+
+    def tearDown(self) -> None:
+        restore_app_modules(self._saved_modules)
+
+
+class TunnelCredentialsWatchTests(WatchTunnelTestCase):
     def test_skips_zero_byte_cloudflared_on_path(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
@@ -53,7 +74,7 @@ class TunnelCredentialsWatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             home = Path(tempdir)
             with patch.dict(os.environ, {"AXON_CLOUDFLARE_TUNNEL_TOKEN": "env-token"}, clear=False):
-                state = resolve_cloudflare_tunnel_token_state("", home_path=home)
+                state = self.resolve_cloudflare_tunnel_token_state("", home_path=home)
         self.assertEqual("env-token", state["token"])
         self.assertEqual("environment", state["source"])
 
@@ -68,7 +89,7 @@ class TunnelCredentialsWatchTests(unittest.TestCase):
             "app.tunnel.tunnel_probe._tunnel_process_running",
             return_value=False,
         ):
-            diagnostics = build_tunnel_diagnostics(
+            diagnostics = self.build_tunnel_diagnostics(
                 {
                     "enabled": True,
                     "connector_id": "cloudflare_tunnel",
@@ -98,7 +119,7 @@ class TunnelCredentialsWatchTests(unittest.TestCase):
             "app.tunnel.tunnel_probe._tunnel_process_running",
             return_value=False,
         ):
-            diagnostics = build_tunnel_diagnostics(
+            diagnostics = self.build_tunnel_diagnostics(
                 {
                     "enabled": True,
                     "connector_id": "cloudflare_tunnel",
@@ -115,9 +136,9 @@ class TunnelCredentialsWatchTests(unittest.TestCase):
         )
 
 
-class TunnelProbeWatchTests(unittest.TestCase):
+class TunnelProbeWatchTests(WatchTunnelTestCase):
     def test_marks_missing_binary_unavailable(self) -> None:
-        diagnostics = build_tunnel_diagnostics(
+        diagnostics = self.build_tunnel_diagnostics(
             {
                 "enabled": True,
                 "connector_id": "cloudflare_tunnel",
@@ -158,7 +179,7 @@ class TunnelProbeWatchTests(unittest.TestCase):
             "app.tunnel.tunnel_probe.named_tunnel_ready",
             return_value=True,
         ):
-            diagnostics = build_tunnel_diagnostics(
+            diagnostics = self.build_tunnel_diagnostics(
                 {
                     "enabled": True,
                     "connector_id": "cloudflare_tunnel",
@@ -182,19 +203,19 @@ class TunnelProbeWatchTests(unittest.TestCase):
                 '\\"warp-routing\\":{\\"enabled\\":false}}" version=1\n',
                 encoding="utf-8",
             )
-            hostname, service = _remote_ingress_from_logs([str(log_path)])
+            hostname, service = self._remote_ingress_from_logs([str(log_path)])
         self.assertEqual("axon.edudashpro.org.za", hostname)
         self.assertEqual("http://localhost:7734", service)
 
     def test_classifies_control_plane_health_as_axon_x(self) -> None:
-        ok, detail = _classify_public_health_body(
+        ok, detail = self._classify_public_health_body(
             '{"service":"control-plane","status":"ok"}'
         )
         self.assertTrue(ok)
         self.assertIn("axon-x", detail)
 
     def test_classifies_axon_local_health_as_not_axon_x(self) -> None:
-        ok, detail = _classify_public_health_body(
+        ok, detail = self._classify_public_health_body(
             '{"status":"ok","port":7734,"runtime":{"repo_root":"/home/edp/axon-nvme/repos/axon-local"}}'
         )
         self.assertFalse(ok)
@@ -239,7 +260,7 @@ class TunnelProbeWatchTests(unittest.TestCase):
                 "app.tunnel.tunnel_probe._probe_public_axon_x",
                 return_value=(True, 12, "axon-x control-plane"),
             ):
-                diagnostics = build_tunnel_diagnostics(
+                diagnostics = self.build_tunnel_diagnostics(
                     {
                         "enabled": True,
                         "connector_id": "cloudflare_tunnel",
@@ -256,9 +277,9 @@ class TunnelProbeWatchTests(unittest.TestCase):
         self.assertIn("soft cutover", diagnostics["detail"])
 
 
-class NativeTunnelControlTests(unittest.TestCase):
+class NativeTunnelControlTests(WatchTunnelTestCase):
     def test_named_command_keeps_token_out_of_process_arguments(self) -> None:
-        command, env = build_cloudflared_command(
+        command, env = self.build_cloudflared_command(
             {"tunnel_mode": "named"},
             "/usr/bin/cloudflared",
             token="secret-token",
@@ -272,7 +293,7 @@ class NativeTunnelControlTests(unittest.TestCase):
         self.assertEqual("secret-token", env["TUNNEL_TOKEN"])
 
     def test_trycloudflare_command_uses_configured_local_origin(self) -> None:
-        command, _ = build_cloudflared_command(
+        command, _ = self.build_cloudflared_command(
             {
                 "tunnel_mode": "trycloudflare",
                 "local_origin_url": "http://127.0.0.1:4173",
@@ -283,7 +304,7 @@ class NativeTunnelControlTests(unittest.TestCase):
         self.assertIn("http://127.0.0.1:4173", command)
 
     def test_trycloudflare_defaults_to_axon_x_operator_origin(self) -> None:
-        command, _ = build_cloudflared_command(
+        command, _ = self.build_cloudflared_command(
             {"tunnel_mode": "trycloudflare"},
             "/usr/bin/cloudflared",
         )
@@ -300,19 +321,19 @@ class NativeTunnelControlTests(unittest.TestCase):
         }
         running = {**stopped, "running": True, "managed": True, "pid": 4321}
         with patch.object(
-            tunnel_control,
+            self.tunnel_control,
             "tunnel_status",
             side_effect=[stopped, running],
         ), patch.object(
-            tunnel_control,
+            self.tunnel_control,
             "_resolved_tunnel_token",
             return_value="token",
         ), patch.object(
-            tunnel_control,
+            self.tunnel_control,
             "start_managed_process",
             return_value=4321,
         ) as start_process:
-            result = tunnel_control.tunnel_start({"tunnel_mode": "named"})
+            result = self.tunnel_control.tunnel_start({"tunnel_mode": "named"})
 
         start_process.assert_called_once_with(
             {"tunnel_mode": "named"},
@@ -323,23 +344,23 @@ class NativeTunnelControlTests(unittest.TestCase):
 
     def test_stop_refuses_to_kill_unmanaged_tunnel(self) -> None:
         with patch.object(
-            tunnel_control,
+            self.tunnel_control,
             "tunnel_status",
             return_value={"running": True, "managed": False},
         ):
             with self.assertRaisesRegex(
-                tunnel_control.TunnelControlError,
+                self.tunnel_control.TunnelControlError,
                 "not managed by Axon-X",
             ):
-                tunnel_control.tunnel_stop({"tunnel_mode": "named"})
+                self.tunnel_control.tunnel_stop({"tunnel_mode": "named"})
 
     def test_start_reports_unmanaged_tunnel_without_taking_ownership(self) -> None:
         with patch.object(
-            tunnel_control,
+            self.tunnel_control,
             "tunnel_status",
             return_value={"running": True, "managed": False},
-        ), patch.object(tunnel_control, "start_managed_process") as start_process:
-            result = tunnel_control.tunnel_start({"tunnel_mode": "named"})
+        ), patch.object(self.tunnel_control, "start_managed_process") as start_process:
+            result = self.tunnel_control.tunnel_start({"tunnel_mode": "named"})
 
         start_process.assert_not_called()
         self.assertIn("not managed by Axon-X", result["msg"])
@@ -354,32 +375,112 @@ class NativeTunnelControlTests(unittest.TestCase):
                 "native_log_path": str(Path(tempdir) / "cloudflared.log"),
             }
             with patch.object(
-                native_process,
+                self.native_process,
                 "managed_process_snapshot",
                 return_value={"managed": False, "pid": None},
             ), patch.object(
-                native_process.subprocess,
+                self.native_process.subprocess,
                 "Popen",
                 return_value=process,
             ), patch.object(
-                native_process,
+                self.native_process,
                 "_write_process_state",
                 side_effect=PermissionError("read only"),
             ), patch.object(
-                native_process.os,
+                self.native_process.os,
                 "killpg",
             ) as kill_group, patch.object(
-                native_process.time,
+                self.native_process.time,
                 "sleep",
             ):
                 with self.assertRaises(PermissionError):
-                    native_process.start_managed_process(
+                    self.native_process.start_managed_process(
                         config,
                         binary_path="/usr/bin/cloudflared",
                     )
 
-        kill_group.assert_called_once_with(4321, native_process.signal.SIGTERM)
+        kill_group.assert_called_once_with(4321, self.native_process.signal.SIGTERM)
         process.wait.assert_called_once_with(timeout=5)
+
+
+class TunnelAutostartTests(WatchTunnelTestCase):
+    def test_tunnel_autostart_defaults_enabled(self) -> None:
+        with patch.dict(os.environ, {"AXON_WATCH_TUNNEL_AUTOSTART": "1"}, clear=False):
+            self.assertTrue(self.tunnel_control.tunnel_autostart_enabled())
+
+    def test_tunnel_autostart_respects_disable_sentinels(self) -> None:
+        for value in ("0", "false", "NO", "off"):
+            with patch.dict(os.environ, {"AXON_WATCH_TUNNEL_AUTOSTART": value}, clear=False):
+                self.assertFalse(self.tunnel_control.tunnel_autostart_enabled())
+
+    def test_attempt_tunnel_autostart_skips_when_disabled(self) -> None:
+        with patch.dict(os.environ, {"AXON_WATCH_TUNNEL_AUTOSTART": "0"}, clear=False), patch.object(
+            self.tunnel_control,
+            "tunnel_start",
+        ) as start_mock:
+            result = self.tunnel_control.attempt_tunnel_autostart()
+
+        start_mock.assert_not_called()
+        self.assertEqual({"attempted": False, "reason": "disabled"}, result)
+
+    def test_attempt_tunnel_autostart_skips_when_slice_disabled(self) -> None:
+        with patch.object(self.tunnel_control, "load_tunnel_slice", return_value=None), patch.object(
+            self.tunnel_control,
+            "tunnel_start",
+        ) as start_mock:
+            result = self.tunnel_control.attempt_tunnel_autostart()
+
+        start_mock.assert_not_called()
+        self.assertEqual({"attempted": False, "reason": "slice_disabled"}, result)
+
+    def test_attempt_tunnel_autostart_starts_tunnel_when_configured(self) -> None:
+        config = {"tunnel_mode": "named", "connector_id": "cloudflare_tunnel"}
+        snapshot = {
+            "running": True,
+            "managed": True,
+            "msg": "Already running",
+            "status": "ok",
+            "detail": "reachable",
+        }
+        with patch.object(self.tunnel_control, "load_tunnel_slice", return_value=config), patch.object(
+            self.tunnel_control,
+            "tunnel_start",
+            return_value=snapshot,
+        ) as start_mock:
+            result = self.tunnel_control.attempt_tunnel_autostart()
+
+        start_mock.assert_called_once_with(config)
+        self.assertTrue(result["attempted"])
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["running"])
+        self.assertTrue(result["managed"])
+        self.assertEqual("ok", result["status"])
+
+    def test_attempt_tunnel_autostart_swallows_control_errors(self) -> None:
+        config = {"tunnel_mode": "named"}
+        with patch.object(self.tunnel_control, "load_tunnel_slice", return_value=config), patch.object(
+            self.tunnel_control,
+            "tunnel_start",
+            side_effect=self.tunnel_control.TunnelControlError("cloudflared binary not found"),
+        ):
+            result = self.tunnel_control.attempt_tunnel_autostart()
+
+        self.assertTrue(result["attempted"])
+        self.assertFalse(result["ok"])
+        self.assertIn("cloudflared binary not found", str(result["reason"]))
+
+    def test_attempt_tunnel_autostart_swallows_unexpected_errors(self) -> None:
+        config = {"tunnel_mode": "named"}
+        with patch.object(self.tunnel_control, "load_tunnel_slice", return_value=config), patch.object(
+            self.tunnel_control,
+            "tunnel_start",
+            side_effect=RuntimeError("boom"),
+        ):
+            result = self.tunnel_control.attempt_tunnel_autostart()
+
+        self.assertTrue(result["attempted"])
+        self.assertFalse(result["ok"])
+        self.assertEqual("unexpected_error", result["reason"])
 
 
 if __name__ == "__main__":
