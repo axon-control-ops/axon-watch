@@ -232,10 +232,15 @@ def fail_run(
             f"fail requires executing, review_ready, or paused phase, found {record['phase']}",
         )
 
+    # Keep operator-visible current_step informative — never bare "Run failed".
+    step = " ".join(str(receipt_summary or "").split()).strip() or "Run failed"
+    if len(step) > 180:
+        step = step[:179].rstrip() + "…"
+
     return _transition_record(
         record,
         to_phase="failed",
-        current_step="Run failed",
+        current_step=step,
         actor=actor,
         receipt_type="run_failed",
         receipt_summary=receipt_summary,

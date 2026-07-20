@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   companyHasWorkingEmployees,
   companyHeadline,
+  employeeFailureLine,
   employeeGlowTone,
   employeeIsWorking,
   employeeMetaLine,
@@ -52,6 +53,36 @@ describe('company-roster-view', () => {
   it('builds company headline with employee count', () => {
     expect(companyHeadline('Axon-X', 5)).toBe('Axon-X · 5 employees');
     expect(companyHeadline('Solo', 1)).toBe('Solo · 1 employee');
+  });
+
+  it('surfaces last shift failure detail instead of bare FAILED', () => {
+    expect(
+      employeeFailureLine(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toContain('out of usage');
+    expect(
+      employeeTalkLine(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toContain('Last shift failed');
+    expect(
+      employeeFailureLine(
+        employee({
+          status: 'executing',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toBeNull();
   });
 
   it('maps working status, glow tone, and talk lines', () => {

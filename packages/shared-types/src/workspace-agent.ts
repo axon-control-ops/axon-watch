@@ -65,6 +65,11 @@ export interface CompanyEmployeeRecord {
   owns: string;
   enabled: boolean;
   primary: boolean;
+  /** Newest role-tagged shift outcome: failed | completed | phase name. */
+  last_outcome?: string | null;
+  /** Human-readable failure/success detail — never bare FAILED. */
+  last_outcome_detail?: string | null;
+  last_run_id?: string | null;
 }
 
 export interface CompanyRosterRecord {

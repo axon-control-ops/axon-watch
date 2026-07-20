@@ -83,7 +83,27 @@ function stablePickIndex(seed: string, modulo: number): number {
   return hash % modulo;
 }
 
+export function employeeFailureLine(employee: CompanyEmployeeRecord): string | null {
+  const outcome = (employee.last_outcome ?? '').trim().toLowerCase();
+  if (outcome !== 'failed') {
+    return null;
+  }
+  // Active shifts supersede the last failure banner.
+  if (employeeIsWorking(employee.status)) {
+    return null;
+  }
+  const detail = (employee.last_outcome_detail ?? '').trim();
+  if (detail) {
+    return `Last shift failed: ${detail}`;
+  }
+  return 'Last shift failed — open the run for receipts.';
+}
+
 export function employeeTalkLine(employee: CompanyEmployeeRecord): string | null {
+  const failure = employeeFailureLine(employee);
+  if (failure) {
+    return failure;
+  }
   if (!employeeIsWorking(employee.status)) {
     return null;
   }
