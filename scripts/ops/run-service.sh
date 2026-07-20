@@ -51,8 +51,14 @@ case "${service_name}" in
       --port "${AXON_WATCH_CONTROL_PLANE_PORT}"
     ;;
   console-web)
+    # Always use vite preview so /api proxies to control-plane (same-origin operator UI).
+    # Plain http.server on dist/ breaks soft-cutover health and the SPA API client.
     cd "${AXON_WATCH_REPO_ROOT}/apps/console-web"
-    if [[ -d dist ]]; then
+    if [[ ! -d dist ]]; then
+      echo "console-web dist missing; run: npm run build -w @axon-watch/console-web" >&2
+      exit 1
+    fi
+    if [[ "${AXON_WATCH_CONSOLE_STATIC_ONLY:-0}" == "1" ]]; then
       exec "${AXON_WATCH_PYTHON}" -m http.server "${AXON_WATCH_CONSOLE_WEB_PORT}" \
         --bind "${AXON_WATCH_BIND_HOST}" \
         --directory dist
