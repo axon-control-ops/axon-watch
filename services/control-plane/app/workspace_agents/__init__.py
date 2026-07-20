@@ -23,6 +23,7 @@ from app.workspace_agents.config_loader import (
     _schedule_label,
     _title_display_name,
 )
+from app.workspace_agents.run_outcome import latest_role_run_outcome
 from app.workspace_agents.status import (
     active_role_run_status,
     derive_agent_status,
@@ -106,21 +107,25 @@ def build_company_roster(
         )
         if employee.primary:
             primary_employee_id = emp_id
-        employee_rows.append(
-            {
-                "employee_id": emp_id,
-                "workspace_id": normalized_id,
-                "name": name,
-                "role": role,
-                "role_label": _role_label(role),
-                "schedule": schedule,
-                "schedule_label": _schedule_label(schedule),
-                "status": status,
-                "owns": owns,
-                "enabled": True,
-                "primary": employee.primary,
-            }
-        )
+        outcome = latest_role_run_outcome(normalized_id, role)
+        row: dict[str, object] = {
+            "employee_id": emp_id,
+            "workspace_id": normalized_id,
+            "name": name,
+            "role": role,
+            "role_label": _role_label(role),
+            "schedule": schedule,
+            "schedule_label": _schedule_label(schedule),
+            "status": status,
+            "owns": owns,
+            "enabled": True,
+            "primary": employee.primary,
+        }
+        if outcome:
+            row["last_outcome"] = outcome.get("outcome")
+            row["last_outcome_detail"] = outcome.get("detail")
+            row["last_run_id"] = outcome.get("run_id")
+        employee_rows.append(row)
 
     if primary_employee_id is None and employee_rows:
         employee_rows[0]["primary"] = True

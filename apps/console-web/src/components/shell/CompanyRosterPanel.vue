@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { useWorkspaceCompany } from '../../features/workspace-agents/use-workspace-company';
 import {
   companyHeadline,
+  employeeFailureLine,
   employeeGlowTone,
   employeeIsWorking,
   employeeMetaLine,
@@ -163,8 +164,12 @@ function rowClasses(employee: CompanyEmployeeRecord): Record<string, boolean> {
         <p
           v-if="employeeTalkLine(employee)"
           class="company-roster__talk"
-          :class="`company-roster__talk--${employeeGlowTone(employee)}`"
-          :data-status="employee.status"
+          :class="[
+            `company-roster__talk--${employeeGlowTone(employee)}`,
+            { 'company-roster__talk--failed': !!employeeFailureLine(employee) },
+          ]"
+          :data-status="employeeFailureLine(employee) ? 'failed' : employee.status"
+          :title="employee.last_outcome_detail || undefined"
         >
           {{ employeeTalkLine(employee) }}
         </p>

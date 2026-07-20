@@ -1,7 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+
 import type { ComposerMode } from '../../../composables/useAgentDockComposer';
+import type { ComposerTypeaheadRow } from '../../../composables/agent-dock/use-composer-typeahead';
 import type { ComposerClipboardImage } from '../../../lib/composer-clipboard-paste';
 import type { ComposerAccessTone } from '../../../lib/sandbox-session-view';
+import {
+  COMPOSER_TYPEAHEAD_LISTBOX_ID,
+  composerTypeaheadActiveDescendant,
+} from '../../../lib/composer-typeahead-view';
+import AgentDockComposerTypeahead from './AgentDockComposerTypeahead.vue';
 
 type AttachmentChip = {
   key: string;
@@ -47,6 +55,11 @@ const props = defineProps<{
   speechCaptureSupported: boolean;
   speechCapturing: boolean;
   privacyMode: boolean;
+  typeaheadOpen?: boolean;
+  typeaheadCaption?: string;
+  typeaheadLoading?: boolean;
+  typeaheadRows?: ComposerTypeaheadRow[];
+  typeaheadSelectedIndex?: number;
 }>();
 
 const emit = defineEmits<{
@@ -65,7 +78,18 @@ const emit = defineEmits<{
   steer: [];
   'toggle-voice': [];
   stop: [];
+  'typeahead-select': [row: ComposerTypeaheadRow];
+  'typeahead-hover': [index: number];
+  'sync-typeahead': [];
 }>();
+
+const typeaheadActiveDescendantId = computed(() =>
+  composerTypeaheadActiveDescendant(
+    Boolean(props.typeaheadOpen),
+    props.typeaheadRows?.length ?? 0,
+    props.typeaheadSelectedIndex ?? 0,
+  ),
+);
 </script>
 
 <template>
@@ -166,6 +190,15 @@ const emit = defineEmits<{
   </div>
 
   <div class="agent-dock-composer__input-row">
+    <AgentDockComposerTypeahead
+      :open="Boolean(typeaheadOpen)"
+      :caption="typeaheadCaption || ''"
+      :loading="Boolean(typeaheadLoading)"
+      :rows="typeaheadRows || []"
+      :selected-index="typeaheadSelectedIndex || 0"
+      @select="emit('typeahead-select', $event)"
+      @hover="emit('typeahead-hover', $event)"
+    />
     <textarea
       id="agent-dock-composer-input"
       :ref="(element) => { props.setInputRef?.(element as HTMLTextAreaElement | null) }"
@@ -175,8 +208,16 @@ const emit = defineEmits<{
       :aria-label="composerMode === 'kairo' ? `${operatorPersonaName} composer` : 'Agent composer'"
       :placeholder="placeholder"
       :disabled="!workspaceSelected"
+      autocomplete="off"
+      spellcheck="true"
+      :aria-expanded="Boolean(typeaheadOpen)"
+      :aria-controls="typeaheadOpen ? COMPOSER_TYPEAHEAD_LISTBOX_ID : undefined"
+      :aria-activedescendant="typeaheadActiveDescendantId"
+      aria-autocomplete="list"
       @input="emit('update:draft', ($event.target as HTMLTextAreaElement).value); emit('sync-height')"
       @keydown="emit('keydown', $event)"
+      @keyup="emit('sync-typeahead')"
+      @click="emit('sync-typeahead')"
       @paste="emit('paste', $event)"
     />
   </div>
