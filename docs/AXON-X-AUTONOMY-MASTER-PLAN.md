@@ -51,7 +51,9 @@ Until that loop is proven, continuous workers must not freely edit the live Dash
 | Tests are chosen before work starts | Workers cannot grade their own homework |
 | Pull requests before merge | Dirty folders are not a delivery method |
 | Production stays human-gated first | Secrets, store promotion, and irreversible actions remain protected |
-| Pause before expand | Do not add autonomy while the current DashPro tree is unsorted |
+| Pause before expand | Do not add autonomy while dirty live canary trees are unsorted |
+| Post-receipt Critical Review Clause | Every agent (incl. Verifier when Gate 6 lands) ends with rewrite + `Confidence: N/10`; missing confidence fails closed |
+| Workspace-scoped platform capability | DashPro is Wave A canary; the same loop applies to every bound `workspace_id` |
 
 ---
 

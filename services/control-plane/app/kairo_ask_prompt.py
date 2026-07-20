@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.operator_persona_name import OPERATOR_PERSONA_BACKRONYM, OPERATOR_PERSONA_NAME
+from app.workspace_agents.critical_review_clause import append_critical_review_clause
 
 _REPLY_STYLE = (
     "Reply in first person. Use plain language anyone can follow — "
@@ -28,4 +29,4 @@ _NEUTRAL_ASK_RULES = (
 
 def build_ask_system_prompt(*, persona_enabled: bool = True) -> str:
     base = _KAIRO_ASK_PERSONA if persona_enabled else _NEUTRAL_ASK_RULES
-    return f"{base} {_REPLY_STYLE}"
+    return append_critical_review_clause(f"{base} {_REPLY_STYLE}")

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.workspace_agents.critical_review_clause import append_critical_review_clause
+
 _DEBUG_LOG_PATH = ".axon/debug-session.ndjson"
 
 _REPLY_STYLE = (
@@ -41,7 +43,7 @@ def build_debug_system_prompt(
     log_path = _DEBUG_LOG_PATH
 
     if execution_tier == "executing":
-        return (
+        return append_critical_review_clause(
             "You are Axon-X in Debug mode with Full Access. "
             "Find root causes and fix tricky bugs using hypothesis generation, "
             "log instrumentation, and runtime analysis — not guesswork. "
@@ -67,7 +69,7 @@ def build_debug_system_prompt(
             f"directories.{research} {_REPLY_STYLE}"
         )
 
-    return (
+    return append_critical_review_clause(
         "You are Axon-X in Debug mode (consultative). "
         "Help diagnose bugs with an evidence-first approach: explore the codebase, "
         "list at most five ranked hypotheses in plain prose, and outline the "

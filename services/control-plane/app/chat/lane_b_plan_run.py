@@ -8,12 +8,17 @@ from app.runs.service import (
     fail_run,
     mark_review_ready,
 )
+from app.workspace_agents.critical_review_clause import (
+    MISSING_CONFIDENCE_DETAIL,
+    parse_confidence,
+)
 
 
 def finalize_lane_b_plan_run(
     *,
     run_id: str,
     lane_b_result: dict[str, object],
+    reply_text: str = "",
 ) -> tuple[bool, dict[str, object] | None]:
     """Record the planning result and leave successful plans ready for review."""
 
@@ -35,6 +40,26 @@ def finalize_lane_b_plan_run(
     )
     try:
         if dispatched:
+            confidence = parse_confidence(reply_text)
+            if confidence is None:
+                run_record = append_run_execution_receipt(
+                    run_id,
+                    receipt_type="critical_review",
+                    receipt_summary=MISSING_CONFIDENCE_DETAIL,
+                    actor="critical_review",
+                    success=False,
+                    intent="lane_b_plan",
+                )
+                run_record = fail_run(run_id, receipt_summary=MISSING_CONFIDENCE_DETAIL)
+                return False, run_record
+            run_record = append_run_execution_receipt(
+                run_id,
+                receipt_type="critical_review",
+                receipt_summary=f"Critical Review Confidence: {confidence}/10",
+                actor="critical_review",
+                success=True,
+                intent="lane_b_plan",
+            )
             run_record = mark_review_ready(run_id)
         else:
             run_record = fail_run(run_id, receipt_summary=receipt_summary)

@@ -93,6 +93,8 @@ For this assessment, a fully autonomous DashPro workflow means:
 11. It checks whether staging is healthy.
 12. It either asks for production approval or automatically rolls back.
 13. Every decision has a receipt explaining what happened.
+14. Every agent shift (including Verifier and independent review) ends with the
+    mandatory Critical Review Clause and `Confidence: N/10` before completion.
 
 “Fully autonomous” should **not** mean “unlimited authority.”
 

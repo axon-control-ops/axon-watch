@@ -124,6 +124,7 @@ def dispatch_continuous_worker_run(
         dispatched, finalized = finalize_lane_b_agent_run(
             dispatch_run_id=run_id,
             lane_b_result=lane_b_result,
+            reply_text=str(lane_b_result.get("content") or ""),
         )
     except Exception as exc:  # noqa: BLE001 — never leave role-tagged runs stuck executing
         logger.exception(

@@ -32,6 +32,7 @@ from app.cli_runtime.plan_system_prompt import (
     ask_fence_instruction,
     build_plan_system_prompt,
 )
+from app.workspace_agents.critical_review_clause import append_critical_review_clause
 from app.research.availability import format_capability_line, research_capability_snapshot
 from app.persistence.operator_presence_settings_store import load_settings
 from app.runs.service import RunNotFoundError, get_run
@@ -99,7 +100,7 @@ def _system_prompt(
                 "For live web facts, call axon_research_search or axon_research_fetch before citing sources. "
                 "Built-in webSearch/webFetch are unavailable in this headless runtime. "
             )
-        return (
+        return append_critical_review_clause(
             "You are Axon-X Lane B in Agent mode with Full Access. Tool execution is "
             "allowed: edit files and run commands inside the Project root shown in "
             "workspace context as needed to complete the request now. Use "
@@ -108,7 +109,7 @@ def _system_prompt(
             f"of what changed. {ask_fence_instruction()}"
             f"{_INSTRUCTION_TAKING} {research_clause}{research_line} {_REPLY_STYLE}"
         )
-    return (
+    return append_critical_review_clause(
         "You are Axon-X Lane B in Agent mode (consultative slice). Answer using the "
         "supplied workspace context, propose concrete next steps, and do not claim you "
         f"edited files or ran commands. {ask_fence_instruction()}"

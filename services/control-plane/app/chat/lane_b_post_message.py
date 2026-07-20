@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext, generate_lane_b_result
+from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext
 from app.chat.lane_b_fast_paths import post_image_redisplay_message, post_workspace_switch_message
 from app.chat.lane_b_generated_image_actions import (
     bind_agent_generated_images,
@@ -297,10 +297,12 @@ def post_lane_b_message(
         dispatch_run_id="",
         dispatched=False,
     )
+    from app.chat import service as chat_service
+
     lane_b_result: dict[str, object]
 
     if is_run_linked_composer_mode(composer_mode) and run_record is not None:
-        lane_b_result = generate_lane_b_result(
+        lane_b_result = chat_service.generate_lane_b_result(
             context=context,
             user_prompt=content,
             run_id=dispatch_run_id,
@@ -309,7 +311,7 @@ def post_lane_b_message(
             execution_access=execution_access,
         )
     else:
-        lane_b_result = generate_lane_b_result(
+        lane_b_result = chat_service.generate_lane_b_result(
             context=context,
             user_prompt=content,
             runtime_target=runtime_target,
@@ -324,6 +326,7 @@ def post_lane_b_message(
         dispatched, run_record = _finalize_lane_b_agent_run(
             dispatch_run_id=dispatch_run_id,
             lane_b_result=lane_b_result,
+            reply_text=agent_content,
         )
         system_content = _lane_b_system_content(
             composer_mode=composer_mode,
@@ -335,6 +338,7 @@ def post_lane_b_message(
         dispatched, run_record = finalize_lane_b_plan_run(
             run_id=dispatch_run_id,
             lane_b_result=lane_b_result,
+            reply_text=agent_content,
         )
         system_content = _lane_b_system_content(
             composer_mode=composer_mode,

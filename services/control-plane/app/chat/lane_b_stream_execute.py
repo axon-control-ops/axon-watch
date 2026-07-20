@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext, generate_lane_b_result
+from app.chat.lane_b_agent import EditorSelectionContext, LaneBContext
 from app.chat.lane_b_generated_image_actions import (
     bind_agent_generated_images,
     lane_b_open_file_ui_action,
@@ -31,6 +31,10 @@ from app.runs.service import (
     get_run,
 )
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+from app.workspace_agents.critical_review_clause import (
+    MISSING_CONFIDENCE_DETAIL,
+    parse_confidence,
+)
 
 
 @dataclass(frozen=True)
@@ -113,6 +117,7 @@ def finalize_lane_b_agent_run(
     *,
     dispatch_run_id: str,
     lane_b_result: dict[str, object],
+    reply_text: str = "",
 ) -> tuple[bool, dict[str, object] | None]:
     dispatched = bool(lane_b_result.get("dispatched"))
     runtime_label = str(lane_b_result.get("runtime_label") or "runtime fallback")
@@ -132,6 +137,29 @@ def finalize_lane_b_agent_run(
     )
     try:
         if dispatched:
+            confidence = parse_confidence(reply_text)
+            if confidence is None:
+                run_record = append_run_execution_receipt(
+                    dispatch_run_id,
+                    receipt_type="critical_review",
+                    receipt_summary=MISSING_CONFIDENCE_DETAIL,
+                    actor="critical_review",
+                    success=False,
+                    intent="lane_b_agent",
+                )
+                run_record = fail_run(
+                    dispatch_run_id,
+                    receipt_summary=MISSING_CONFIDENCE_DETAIL,
+                )
+                return False, run_record
+            run_record = append_run_execution_receipt(
+                dispatch_run_id,
+                receipt_type="critical_review",
+                receipt_summary=f"Critical Review Confidence: {confidence}/10",
+                actor="critical_review",
+                success=True,
+                intent="lane_b_agent",
+            )
             run_record = complete_run(dispatch_run_id)
         else:
             run_record = fail_run(
@@ -182,8 +210,10 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             updated_at=_utc_now(),
         )
 
+    from app.chat import service as chat_service
+
     try:
-        lane_b_result = generate_lane_b_result(
+        lane_b_result = chat_service.generate_lane_b_result(
             context=context,
             user_prompt=job.content,
             run_id=job.dispatch_run_id,
@@ -242,6 +272,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             dispatched, run_record = finalize_lane_b_agent_run(
                 dispatch_run_id=job.dispatch_run_id,
                 lane_b_result=lane_b_result,
+                reply_text=agent_content,
             )
             if verification_warnings:
                 append_run_execution_receipt(

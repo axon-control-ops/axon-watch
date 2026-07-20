@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from app.workspace_agents.critical_review_clause import append_critical_review_clause
+
 
 def build_plan_system_prompt(*, offline_clause: str, research_line: str, instruction_taking: str, reply_style: str) -> str:
-    return (
+    return append_critical_review_clause(
         "You are Axon-X Lane B in Plan mode. Produce a complete durable plan as your "
         f"final assistant markdown reply using the supplied workspace context. {offline_clause}"
         "CRITICAL: Do NOT call CreatePlan, Createplan, AskQuestion, or any plan-file tool. "

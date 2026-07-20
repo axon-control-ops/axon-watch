@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.workspace_agents.catalog import _DEFAULT_OWNS
 from app.workspace_agents.config_loader import EmployeeConfig
+from app.workspace_agents.critical_review_clause import append_critical_review_clause
 from app.workspace_agents.employee_persona_prompt import build_employee_identity_line
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 
@@ -39,11 +40,9 @@ def build_continuous_worker_prompt(*, workspace_id: str, employee: EmployeeConfi
     if role in {"watcher", "backend", "integrations"}:
         ci_clause = (
             " If git/working-tree or open PR changes are in your scope: "
-            "(1) critically review the change for factual errors, missing steps, "
-            "unsupported assumptions, and invented/unverified details; "
-            "(2) rewrite the claim to be precise; end with Confidence: X/10; "
-            "(3) only then run local verify (`npm run verify:contracts` and targeted tests) "
-            "and report the real command output. "
+            "after the Critical Review Clause rewrite, run local verify "
+            "(`npm run verify:contracts` and targeted tests) and report the real "
+            "command output. "
             "Never report FAILED without the exact failing check, file, and error text. "
         )
     memory_clause = (
@@ -53,7 +52,7 @@ def build_continuous_worker_prompt(*, workspace_id: str, employee: EmployeeConfi
         "already listening. Axon-X operator UI is :4173 — do not start legacy :7734. "
     )
     prior_failure = _prior_failure_clause(workspace_id=workspace_id, role=role)
-    return (
+    return append_critical_review_clause(
         f"{identity} "
         f"This is a bounded continuous shift ({schedule}). "
         f"{prior_failure}"

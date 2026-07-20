@@ -58,6 +58,7 @@ class LaneBRunDispatchTests(unittest.TestCase):
                 "dispatched": True,
                 "runtime_label": "Cursor CLI",
             },
+            reply_text="Plan ready.\n\nConfidence: 8/10",
         )
         self.assertTrue(dispatched)
         self.assertIsNotNone(reviewed)
