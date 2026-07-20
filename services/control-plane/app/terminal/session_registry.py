@@ -9,6 +9,7 @@ from threading import Lock
 from uuid import uuid4
 
 _OPERATOR_SESSION_ID = "terminal-operator"
+_AGENT_SESSION_ID = "terminal-agent"
 
 
 @dataclass(frozen=True)
@@ -77,9 +78,11 @@ def create_session(
     clean_run_id = str(run_id or "").strip() or None
     clean_session_id = str(session_id or "").strip()
     if not clean_session_id:
+        # Prefer a stable agent session id when callers mint agent lanes without
+        # going through ensure_agent_session (keeps the dock from proliferating).
         clean_session_id = (
-            f"terminal-agent-{clean_run_id[-8:]}"
-            if normalized_role == "agent" and clean_run_id
+            _AGENT_SESSION_ID
+            if normalized_role == "agent"
             else f"terminal-{uuid4().hex[:10]}"
         )
 
@@ -87,6 +90,21 @@ def create_session(
     with _lock:
         existing = _sessions.get(key)
         if existing is not None:
+            if (
+                normalized_role == "agent"
+                and clean_run_id
+                and existing.run_id != clean_run_id
+            ):
+                updated = TerminalSessionRecord(
+                    session_id=existing.session_id,
+                    workspace_id=existing.workspace_id,
+                    role=existing.role,
+                    title=existing.title or "vaxon",
+                    run_id=clean_run_id,
+                    created_at=existing.created_at,
+                )
+                _sessions[key] = updated
+                return deepcopy(updated)
             return deepcopy(existing)
 
         resolved_title = str(title or "").strip()
@@ -109,11 +127,14 @@ def ensure_agent_session(*, workspace_id: str, run_id: str) -> TerminalSessionRe
     clean_run_id = str(run_id or "").strip()
     if not clean_run_id:
         raise ValueError("run_id is required for agent terminal sessions")
+    # One shared vaxon tab per workspace (mirrors terminal-operator), not one
+    # tab per run_id — worker/IDE shifts previously flooded the dock.
     return create_session(
         workspace_id=workspace_id,
         role="agent",
         title="vaxon",
         run_id=clean_run_id,
+        session_id=_AGENT_SESSION_ID,
     )
 
 
