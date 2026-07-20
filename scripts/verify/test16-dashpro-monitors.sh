@@ -33,6 +33,9 @@ echo "[2/5] Monitor slice unit tests"
 PYTHONPATH=services/axon-watch python3 -m unittest \
   tests.test_monitor_slice_registry \
   tests.test_dashpro_monitor_slice \
+  tests.test_dashpro_posthog \
+  tests.test_dashpro_sentry \
+  tests.test_dashpro_supabase_storage \
   tests.test_dashpro_monitor_vault_action \
   tests.test_actionable_inbox_signals \
   tests.test_operator_briefing_signals \
