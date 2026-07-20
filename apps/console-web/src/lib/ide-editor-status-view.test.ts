@@ -152,6 +152,48 @@ describe('buildIdeEditorStatusAgentChip', () => {
       showPulse: true,
       reviewReady: true,
       alive: true,
+      failure: false,
+      interrupted: false,
     });
+  });
+
+  it('surfaces failure styling when a teammate hard-failed with the dock collapsed', () => {
+    const chip = buildIdeEditorStatusAgentChip({
+      agentDockCollapsed: true,
+      state: {
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+        employeeFailureLine: 'Last shift failed: timeout',
+      },
+    });
+
+    expect(chip).toMatchObject({
+      showPulse: true,
+      failure: true,
+      interrupted: false,
+    });
+    expect(chip?.title).toContain('Last shift failed');
+  });
+
+  it('surfaces interrupted styling when a teammate shift was cut short', () => {
+    const chip = buildIdeEditorStatusAgentChip({
+      agentDockCollapsed: true,
+      state: {
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+        employeeFailureLine:
+          'Last shift interrupted before it could finish — use Retry shift to continue.',
+        employeeShiftInterrupted: true,
+      },
+    });
+
+    expect(chip).toMatchObject({
+      showPulse: true,
+      failure: false,
+      interrupted: true,
+    });
+    expect(chip?.title).toContain('Shift interrupted');
   });
 });

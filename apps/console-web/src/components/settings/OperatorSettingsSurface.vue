@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
+import AgentFleetControlPanel from './AgentFleetControlPanel.vue';
 import AppGeneralSettingsPanel from './AppGeneralSettingsPanel.vue';
 import EmailSettingsPanel from './EmailSettingsPanel.vue';
 import OperatorPresenceSettingsForm from './OperatorPresenceSettingsForm.vue';
 import RuntimeAuthSettingsPanel from './RuntimeAuthSettingsPanel.vue';
 import type { OperatorPresenceSettings } from '../../contracts/canonical';
 import { navigateToAppSurface } from '../../lib/app-surface-route';
+import {
+  readSettingsSectionHash,
+  SETTINGS_SECTION_EVENT,
+  writeSettingsSectionHash,
+  type SettingsSection,
+} from '../../lib/settings-section-route';
 import { useShellStore } from '../../stores/shell';
 
-type SettingsSection = 'voice' | 'runtime' | 'email' | 'app';
-
 const shell = useShellStore();
-const activeSection = ref<SettingsSection>('voice');
+const activeSection = ref<SettingsSection>(readSettingsSectionHash() ?? 'voice');
 const presenceFormRef = ref<{
   flushIfDirty: () => Promise<boolean>;
   dirty: { value: boolean };
@@ -21,13 +26,19 @@ const presenceDirty = ref(false);
 
 const sections = [
   { id: 'voice' as const, label: 'Voice & presence', hint: 'VAXON persona, narration, privacy', mark: '01' },
-  { id: 'runtime' as const, label: 'CLI runtime', hint: 'Cursor & Codex host auth', mark: '02' },
-  { id: 'email' as const, label: 'Email & triage', hint: 'IMAP mailboxes, bridge, inbox', mark: '03' },
-  { id: 'app' as const, label: 'App & console', hint: 'Layout, workspace, diagnostics', mark: '04' },
+  { id: 'agents' as const, label: 'Agents', hint: 'Continuous workers, concurrency, stop', mark: '02' },
+  { id: 'runtime' as const, label: 'CLI runtime', hint: 'Cursor & Codex host auth', mark: '03' },
+  { id: 'email' as const, label: 'Email & triage', hint: 'IMAP mailboxes, bridge, inbox', mark: '04' },
+  { id: 'app' as const, label: 'App & console', hint: 'Layout, workspace, diagnostics', mark: '05' },
 ];
 
 const sectionMeta = computed(() => {
   switch (activeSection.value) {
+    case 'agents':
+      return {
+        title: 'Agent fleet',
+        subtitle: 'Turn continuous workers on or off, cap concurrency, and stop active shifts.',
+      };
     case 'runtime':
       return {
         title: 'CLI runtime auth',
@@ -72,11 +83,28 @@ const syncStatus = computed(() => {
   return { tone: 'idle' as const, label: 'Synced with control plane' };
 });
 
+function syncSectionFromHash(): void {
+  const fromHash = readSettingsSectionHash();
+  if (fromHash && fromHash !== activeSection.value) {
+    activeSection.value = fromHash;
+  }
+}
+
 onMounted(() => {
+  syncSectionFromHash();
+  writeSettingsSectionHash(activeSection.value);
+  window.addEventListener('popstate', syncSectionFromHash);
+  window.addEventListener(SETTINGS_SECTION_EVENT, syncSectionFromHash);
   void shell.loadOperatorPresenceSettings({ reportError: true });
 });
 
+watch(activeSection, (section) => {
+  writeSettingsSectionHash(section);
+});
+
 onBeforeUnmount(() => {
+  window.removeEventListener('popstate', syncSectionFromHash);
+  window.removeEventListener(SETTINGS_SECTION_EVENT, syncSectionFromHash);
   void presenceFormRef.value?.flushIfDirty();
 });
 
@@ -118,6 +146,7 @@ async function returnToConsole(): Promise<void> {
             type="button"
             class="settings-surface__nav-button"
             :class="{ 'settings-surface__nav-button--active': activeSection === section.id }"
+            :aria-current="activeSection === section.id ? 'page' : undefined"
             @click="leaveVoiceSectionIfNeeded(section.id)"
           >
             <span class="settings-surface__nav-mark">{{ section.mark }}</span>
@@ -160,6 +189,7 @@ async function returnToConsole(): Promise<void> {
               @dirty="presenceDirty = $event"
             />
 
+            <AgentFleetControlPanel v-else-if="activeSection === 'agents'" />
             <RuntimeAuthSettingsPanel v-else-if="activeSection === 'runtime'" />
             <EmailSettingsPanel v-else-if="activeSection === 'email'" />
             <AppGeneralSettingsPanel v-else />

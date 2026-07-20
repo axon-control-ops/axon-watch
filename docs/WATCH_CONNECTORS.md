@@ -42,7 +42,7 @@ Default connectors:
 | ID | Target | Required |
 |---|---|---|
 | `control_plane` | `${AXON_WATCH_CONTROL_PLANE_BASE_URL}/api/health` | yes |
-| `console_web` | `${AXON_WATCH_PUBLIC_BASE_URL}/` | yes |
+| `console_web` | `${AXON_WATCH_PUBLIC_BASE_URL}/api/health` | yes |
 | `axon_local` | `http://127.0.0.1:7734/api/health` | no |
 
 ## Watch service routes
@@ -60,7 +60,16 @@ Default connectors:
 | `GET /api/connectors` | Proxies watch connector snapshot for operator tooling |
 | `GET /api/runtime/summary` | Adds `connectors` block with aggregate counts |
 
-Runtime summary marks `degraded.active` when `required_unavailable > 0`.
+Runtime summary marks `degraded.active` when connector inbox items exist or
+`required_unavailable > 0`. The `required_unavailable` count includes any
+required connector that is not `ok` (both `degraded` and `unavailable`).
+
+## Probe failure detail
+
+Failed HTTP probes store operator-readable `detail` strings such as
+`Connection refused on http://127.0.0.1:4173/api/health`, `Timed out on …`,
+or `HTTP 503`. Connector inbox signals and runtime summary degraded reasons
+prefer that detail over generic fallback copy.
 
 ## Probe caching
 
@@ -74,8 +83,10 @@ summary, connectors, and inbox reads do not re-hit every health URL on each requ
 ## Signal behavior
 
 - Source: `connector`
-- Emitted only for **required** connectors with status `degraded` or `unavailable`
-- Optional connector failures remain visible in `/api/connectors` only (v1)
+- Emitted for **required** connectors with status `degraded` or `unavailable`
+- Also emitted for optional **Cloudflare tunnel** probes when remote ingress
+  still targets a legacy origin (`ingress_matches_axon: false`)
+- Other optional connector failures remain visible in `/api/connectors` only (v1)
 
 ## Verification
 

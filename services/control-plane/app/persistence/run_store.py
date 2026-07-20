@@ -103,6 +103,7 @@ def reset_store() -> None:
     with _managed_connection() as connection:
         connection.execute("DELETE FROM operator_presence_settings")
         connection.execute("DELETE FROM email_operator_settings")
+        connection.execute("DELETE FROM worker_scheduler_settings")
         connection.execute("DELETE FROM run_history")
         connection.execute("DELETE FROM runs")
         connection.commit()

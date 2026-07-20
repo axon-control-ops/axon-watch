@@ -338,11 +338,45 @@
   cursor: pointer;
 }
 
+.agent-dock-composer__chip--skill {
+  gap: 0.28rem;
+  padding: 0.18rem 0.42rem 0.18rem 0.34rem;
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(39, 44, 54, 0.96);
+  color: rgba(226, 232, 240, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.agent-dock-composer__chip--skill:hover {
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(48, 54, 66, 0.98);
+}
+
+.agent-dock-composer__chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 0.28rem;
+  background: rgba(99, 102, 241, 0.22);
+  color: rgba(196, 181, 253, 0.98);
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
 .agent-dock-composer__chip-kind {
   color: rgba(148, 163, 184, 0.88);
   font-family: var(--font-mono);
   font-size: 0.54rem;
   text-transform: uppercase;
+}
+
+.agent-dock-composer__chip--skill .agent-dock-composer__chip-label {
+  font-size: 0.68rem;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  color: rgba(241, 245, 249, 0.96);
 }
 
 .agent-dock-composer__chip-label {
@@ -354,6 +388,11 @@
 
 .agent-dock-composer__chip-remove {
   color: rgba(148, 163, 184, 0.88);
+}
+
+.agent-dock-composer__chip--skill .agent-dock-composer__chip-remove {
+  margin-left: 0.05rem;
+  color: rgba(148, 163, 184, 0.72);
 }
 
 .agent-dock-composer__image-strip {
@@ -373,5 +412,14 @@
   border-radius: 10px;
   background: rgba(8, 12, 18, 0.92);
   overflow: hidden;
+}
+
+.agent-dock-composer__image-open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
 }

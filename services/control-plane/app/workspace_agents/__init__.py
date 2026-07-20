@@ -23,8 +23,10 @@ from app.workspace_agents.config_loader import (
     _schedule_label,
     _title_display_name,
 )
+from app.persistence import worker_scheduler_settings_store
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 from app.workspace_agents.status import (
+    active_role_run_id,
     active_role_run_status,
     derive_agent_status,
     employee_status,
@@ -88,8 +90,6 @@ def build_company_roster(
     primary_employee_id: str | None = None
 
     for index, employee in enumerate(employees):
-        if not employee.enabled:
-            continue
         role = employee.role or "workspace_agent"
         schedule = employee.schedule or _normalize_schedule(None, role=role)
         emp_id = employee.employee_id or _employee_id(normalized_id, role, index)
@@ -97,6 +97,11 @@ def build_company_roster(
         owns = employee.owns or _DEFAULT_OWNS.get(
             role,
             f"{_title_display_name(display_name)} assigned work only",
+        )
+        enabled = worker_scheduler_settings_store.is_employee_enabled(
+            normalized_id,
+            role,
+            file_enabled=bool(employee.enabled),
         )
         status = employee_status(
             role=role,
@@ -118,13 +123,18 @@ def build_company_roster(
             "schedule_label": _schedule_label(schedule),
             "status": status,
             "owns": owns,
-            "enabled": True,
+            "enabled": enabled,
             "primary": employee.primary,
         }
+        if employee.azure_voice_id:
+            row["azure_voice_id"] = employee.azure_voice_id
         if outcome:
             row["last_outcome"] = outcome.get("outcome")
             row["last_outcome_detail"] = outcome.get("detail")
             row["last_run_id"] = outcome.get("run_id")
+        active_run = active_role_run_id(normalized_id, role)
+        if active_run:
+            row["active_run_id"] = active_run
         employee_rows.append(row)
 
     if primary_employee_id is None and employee_rows:

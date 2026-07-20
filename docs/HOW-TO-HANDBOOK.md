@@ -15,7 +15,7 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-06 — production operator at `:4173`, vault subscription auth + IDE composer catalog.
+**Last verified:** 2026-07-20 — production operator at `:4173`; one-word stack commands `axonhealth` / `axonrestart` / `axonrevive`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
@@ -73,6 +73,24 @@ This section is the living operator onboarding guide.
 
 ### Start the stack
 
+**Always-on host (this machine — preferred):**
+
+| Command | What it does |
+| --- | --- |
+| `axonhealth` | Probe console + control-plane + watch (+ key APIs) |
+| `axonrestart` | Soft restart of systemd user units, then health check |
+| `axonrevive` | **Use when the shell is empty** (Runtime unavailable / No workspace). Force-kills a wedged control-plane, restarts all three units, health-checks |
+
+```bash
+axonhealth          # is everything up?
+axonrevive          # empty shell / hung API — fix it
+# then hard-refresh http://127.0.0.1:4173
+```
+
+These are on your PATH (`~/.local/bin` → `bin/` in this repo). See [Snippet cookbook](#snippet-cookbook).
+
+**Dev bootstrap (alternate, not used when systemd owns the ports):**
+
 ```bash
 cd /home/edp/axon-nvme/repos/axon-watch
 ./scripts/dev/up.sh
@@ -80,6 +98,8 @@ cd /home/edp/axon-nvme/repos/axon-watch
 ```
 
 Open **http://127.0.0.1:4173** and hard-refresh after upgrades (`Ctrl+Shift+R`).
+
+> **Important:** `./scripts/dev/down.sh` does **not** stop systemd always-on units. On this host use `axonrestart` / `axonrevive`.
 
 ### Pick a real workspace
 
@@ -1135,14 +1155,27 @@ Avoid:
 
 Use this order when something breaks:
 
-1. **Stack health** — `./scripts/dev/check-health.sh` (all three services + key APIs).
-2. **Restart clean** — `./scripts/dev/down.sh && ./scripts/dev/up.sh` after backend route changes.
-3. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
-4. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
-5. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
-6. **Logs** — `.local/logs/` per service; pid files under `.local/run/`.
+1. **Stack health** — `axonhealth` (or `./scripts/dev/check-health.sh`).
+2. **Empty shell / Runtime unavailable** — `axonrevive`, then hard-refresh `:4173`. Do **not** rely on `./scripts/dev/down.sh` when systemd owns the ports.
+3. **Soft refresh** — `axonrestart` after backend route changes (if the API still answers).
+4. **Stale UI on `:4173`** — rebuild console-web (`npm run build -w @axon-watch/console-web`), `systemctl --user restart console-web.service`, then hard-refresh. Source-only / `:5173` Vite edits do **not** update the systemd bundle.
+5. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
+6. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
+7. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
+8. **Logs** — `journalctl --user -u control-plane.service -n 80` (always-on) or `.local/logs/` (dev bootstrap).
 
 Symptom-specific fixes continue in the sections below.
+
+## Problem: Runtime unavailable / No workspace selected / Briefing unavailable
+
+This is the **wedged control-plane** pattern. The Vue shell is up, but `/api/*` times out (even `/api/health`). Bootstrap never selects a workspace, so explorer + chat look empty.
+
+```bash
+axonrevive
+# hard-refresh http://127.0.0.1:4173
+```
+
+Why `./scripts/dev/down.sh` / `up.sh` fail here: this host runs **user systemd units** (`control-plane.service`, etc.). Dev down/up skip those listeners. Soft `systemctl --user restart` can also hang on a stuck worker — `axonrevive` force-kills first.
 
 ## Problem: online research falls back / Google search returns 403
 
@@ -1315,6 +1348,60 @@ Note:
 - changed decisions should be superseded, not silently edited
 
 ## Tips And Tricks
+
+## Snippet cookbook
+
+### One-word stack commands (always-on host)
+
+Installed on PATH via `~/.local/bin` → repo `bin/`:
+
+| Command | Expands to | When to use |
+| --- | --- | --- |
+| **`axonhealth`** | `./scripts/dev/check-health.sh` | Quick “is the stack OK?” |
+| **`axonrestart`** | `systemctl --user restart` axon-watch + control-plane + console-web, then health | Soft restart when APIs still respond |
+| **`axonrevive`** | Force-kill control-plane → restart all three → health | Empty shell, hung health, wedged worker |
+
+```bash
+axonhealth
+axonrestart
+axonrevive
+```
+
+Repo scripts (same behavior without PATH):
+
+```bash
+./scripts/ops/axonhealth.sh
+./scripts/ops/axonrestart.sh
+./scripts/ops/axonrevive.sh
+```
+
+Open console after revive: **http://127.0.0.1:4173** (hard-refresh).
+
+### Console-web rebuild (always-on `:4173`)
+
+`:4173` serves the **built** `apps/console-web/dist` via systemd `console-web.service`. Source edits (including Vite `:5173`) are **not** live on `:4173` until:
+
+```bash
+npm run build -w @axon-watch/console-web
+systemctl --user restart console-web.service
+# then hard-refresh http://127.0.0.1:4173
+```
+
+### Local verify loop
+
+```bash
+./scripts/ops/change-verify-loop.sh              # dirty working tree
+./scripts/ops/change-verify-loop.sh --head-only  # committed HEAD only
+./scripts/ops/change-verify-loop.sh --watch
+```
+
+### Dev bootstrap (when systemd is not owning ports)
+
+```bash
+./scripts/dev/up.sh
+./scripts/dev/down.sh
+./scripts/dev/check-health.sh
+```
 
 ## Upgrading and updating
 

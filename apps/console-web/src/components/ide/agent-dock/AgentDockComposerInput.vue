@@ -15,6 +15,7 @@ type AttachmentChip = {
   key: string;
   label: string;
   kind: string;
+  title?: string;
 };
 
 type ActivityChip = {
@@ -103,10 +104,19 @@ const typeaheadActiveDescendantId = computed(() =>
       :key="chip.key"
       type="button"
       class="agent-dock-composer__chip"
-      :title="chip.label"
+      :class="{ 'agent-dock-composer__chip--skill': chip.kind === 'skill' }"
+      :title="chip.title || chip.label"
       @click="emit('remove-chip', chip.key)"
     >
-      <span class="agent-dock-composer__chip-kind">{{ chip.kind }}</span>
+      <span
+        v-if="chip.kind === 'skill'"
+        class="agent-dock-composer__chip-icon"
+        aria-hidden="true"
+      >✦</span>
+      <span
+        v-else
+        class="agent-dock-composer__chip-kind"
+      >{{ chip.kind }}</span>
       <span class="agent-dock-composer__chip-label">{{ chip.label }}</span>
       <span class="agent-dock-composer__chip-remove" aria-hidden="true">×</span>
     </button>
@@ -117,19 +127,23 @@ const typeaheadActiveDescendantId = computed(() =>
     class="agent-dock-composer__image-strip"
     aria-label="Attached images"
   >
-    <button
+    <div
       v-for="image in composerImages"
       :key="image.id"
-      type="button"
       class="agent-dock-composer__image-card"
-      :title="`Open ${image.name}`"
-      @click="emit('open-image', image)"
     >
-      <img
-        class="agent-dock-composer__image-preview"
-        :src="image.previewUrl"
-        :alt="image.name"
+      <button
+        type="button"
+        class="agent-dock-composer__image-open"
+        :title="`Open ${image.name}`"
+        @click="emit('open-image', image)"
       >
+        <img
+          class="agent-dock-composer__image-preview"
+          :src="image.previewUrl"
+          :alt="image.name"
+        >
+      </button>
       <button
         type="button"
         class="agent-dock-composer__image-remove"
@@ -138,7 +152,7 @@ const typeaheadActiveDescendantId = computed(() =>
       >
         ×
       </button>
-    </button>
+    </div>
   </div>
 
   <div
@@ -228,17 +242,27 @@ const typeaheadActiveDescendantId = computed(() =>
       class="agent-dock-composer__activity-chips"
       aria-label="Live agent activity"
     >
-      <button
+      <template
         v-for="chip in activityChips"
         :key="chip.id"
-        type="button"
-        class="agent-dock-composer__activity-chip"
-        :class="`agent-dock-composer__activity-chip--${chip.kind}`"
-        :disabled="chip.kind !== 'terminal'"
-        @click="chip.kind === 'terminal' ? emit('reveal-terminal') : undefined"
       >
-        {{ chip.label }}
-      </button>
+        <button
+          v-if="chip.kind === 'terminal'"
+          type="button"
+          class="agent-dock-composer__activity-chip agent-dock-composer__activity-chip--terminal"
+          aria-label="Reveal terminal panel"
+          @click="emit('reveal-terminal')"
+        >
+          {{ chip.label }}
+        </button>
+        <span
+          v-else
+          class="agent-dock-composer__activity-chip"
+          :class="`agent-dock-composer__activity-chip--${chip.kind}`"
+        >
+          {{ chip.label }}
+        </span>
+      </template>
     </div>
 
     <slot name="toolbar" />

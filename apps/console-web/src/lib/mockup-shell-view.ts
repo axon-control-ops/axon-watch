@@ -333,16 +333,16 @@ export function buildWorkspaceStatusCardRows(input: {
   runtimeSummary: RuntimeSummary | null;
   runtimeSummaryLoadState: RuntimeSummaryLoadState;
 }): WorkspaceStatusCardRow[] {
-  if (input.runtimeSummaryLoadState === 'loading') {
-    return [
-      { label: 'Environment', value: 'loading…' },
-      { label: 'Last Summary', value: 'loading…' },
-      { label: 'Control Plane', value: 'loading…' },
-      { label: 'Signals', value: '…' },
-    ];
-  }
+  if (!input.runtimeSummary) {
+    if (input.runtimeSummaryLoadState === 'loading') {
+      return [
+        { label: 'Environment', value: 'loading…' },
+        { label: 'Last Summary', value: 'loading…' },
+        { label: 'Control Plane', value: 'loading…' },
+        { label: 'Signals', value: '…' },
+      ];
+    }
 
-  if (input.runtimeSummaryLoadState === 'error' || !input.runtimeSummary) {
     return [
       { label: 'Environment', value: 'unavailable' },
       { label: 'Last Summary', value: 'unavailable' },
@@ -369,15 +369,15 @@ export function buildStatusBarZones(input: {
   idePresenceProfile?: IdePresenceProfile;
   activeSignalCount?: number | null;
 }): StatusBarZones {
-  if (input.runtimeSummaryLoadState === 'loading') {
-    return {
-      left: [{ id: 'loading', label: 'LOADING RUNTIME…', tone: 'default' }],
-      center: [],
-      right: [],
-    };
-  }
+  if (!input.runtimeSummary) {
+    if (input.runtimeSummaryLoadState === 'loading') {
+      return {
+        left: [{ id: 'loading', label: 'LOADING RUNTIME…', tone: 'default' }],
+        center: [],
+        right: [],
+      };
+    }
 
-  if (input.runtimeSummaryLoadState === 'error' || !input.runtimeSummary) {
     return {
       left: [{ id: 'unavailable', label: 'RUNTIME UNAVAILABLE', tone: 'warning' }],
       center: [],

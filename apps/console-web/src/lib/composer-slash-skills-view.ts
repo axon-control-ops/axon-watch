@@ -105,25 +105,104 @@ export function filterSlashPaletteRows(
   return filtered.slice(0, limit);
 }
 
-/** Apply a skill: attach `@file:SKILL.md` and leave any trailing prompt args. */
+/** True when a path points at a Cursor-style `SKILL.md` under a skills folder. */
+export function isComposerSkillFilePath(path: string): boolean {
+  const normalized = path.trim().replace(/\\/g, '/');
+  return /(^|\/)skills\/[^/]+\/SKILL\.md$/i.test(normalized);
+}
+
+/** Skill folder slug from `.github/skills/super-coder/SKILL.md` → `super-coder`. */
+export function composerSkillSlugFromPath(path: string): string {
+  const normalized = path.trim().replace(/\\/g, '/');
+  const match = normalized.match(/(?:^|\/)skills\/([^/]+)\/SKILL\.md$/i);
+  return match?.[1]?.trim() || 'skill';
+}
+
+export type ComposerSkillFileToken = {
+  path: string;
+  slug: string;
+  label: string;
+  token: string;
+};
+
+const SKILL_FILE_TOKEN_RE =
+  /(^|\s)@file:([^\s]+skills\/[^/\s]+\/SKILL\.md)(?=\s|$)/gim;
+
+/** List unique `@file:…/skills/<slug>/SKILL.md` tokens in a composer draft. */
+export function listComposerSkillFileTokens(draft: string): ComposerSkillFileToken[] {
+  const found: ComposerSkillFileToken[] = [];
+  const seen = new Set<string>();
+  const text = draft ?? '';
+  for (const match of text.matchAll(SKILL_FILE_TOKEN_RE)) {
+    const path = String(match[2] || '').trim();
+    if (!path || seen.has(path) || !isComposerSkillFilePath(path)) {
+      continue;
+    }
+    seen.add(path);
+    const slug = composerSkillSlugFromPath(path);
+    found.push({
+      path,
+      slug,
+      label: slug,
+      token: `@file:${path}`,
+    });
+  }
+  return found;
+}
+
+/** Remove skill `@file:` tokens from the visible composer draft. */
+export function stripComposerSkillFileTokens(draft: string): string {
+  return (draft ?? '')
+    .replace(SKILL_FILE_TOKEN_RE, '$1')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ ]{2,}/g, ' ')
+    .trim();
+}
+
+export function removeComposerSkillFileToken(draft: string, skillPath: string): string {
+  const fileToken = `@file:${skillPath}`;
+  const escaped = fileToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (draft ?? '')
+    .replace(new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, 'gm'), '$1')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ ]{2,}/g, ' ')
+    .trim();
+}
+
+/** Re-attach skill file tokens at the top of the draft for submit/steer. */
+export function prependComposerSkillFileTokens(
+  draft: string,
+  skillPaths: readonly string[],
+): string {
+  const uniquePaths = [
+    ...new Set(
+      skillPaths
+        .map((path) => path.trim())
+        .filter((path) => path && isComposerSkillFilePath(path)),
+    ),
+  ];
+  if (!uniquePaths.length) {
+    return (draft ?? '').trim();
+  }
+  const body = stripComposerSkillFileTokens(draft);
+  const header = uniquePaths.map((path) => `@file:${path}`).join('\n');
+  return body ? `${header}\n${body}` : header;
+}
+
+/**
+ * Apply a skill slash command: leave trailing prompt args in the draft.
+ * The `@file:SKILL.md` attachment is tracked as a Cursor-style chip (not raw text).
+ */
 export function applySlashSkillToDraft(
   draft: string,
   token: { start: number; end: number },
   skillPath: string,
-): { next: string; caret: number } {
-  const fileToken = `@file:${skillPath}`;
+): { next: string; caret: number; skillPath: string } {
   const remainder = draft.slice(token.end).replace(/^\s+/, '');
-  const withoutToken = `${draft.slice(0, token.start)}${remainder}`.trim();
-  const hasFile = new RegExp(
-    `(^|\\s)${fileToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$)`,
-    'm',
-  ).test(withoutToken);
-  const next = hasFile
-    ? withoutToken
-    : withoutToken
-      ? `${fileToken}\n${withoutToken}`
-      : fileToken;
-  return { next, caret: next.length };
+  const next = `${draft.slice(0, token.start)}${remainder}`.replace(/[ ]{2,}/g, ' ').trimStart();
+  return { next, caret: Math.min(token.start, next.length), skillPath };
 }
 
 export function slashHelpText(rows: SlashPaletteRow[]): string {

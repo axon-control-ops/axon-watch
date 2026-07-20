@@ -8,7 +8,7 @@
     },
     "console_web": {
       "display_name": "Console web",
-      "health_url": "${AXON_WATCH_PUBLIC_BASE_URL}/",
+      "health_url": "${AXON_WATCH_PUBLIC_BASE_URL}/api/health",
       "required": true,
       "workspace_id": "workspace_axon_watch"
     },

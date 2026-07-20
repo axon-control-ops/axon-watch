@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   applySlashSkillToDraft,
   buildSlashPaletteCatalog,
+  composerSkillSlugFromPath,
   filterSlashPaletteRows,
+  isComposerSkillFilePath,
+  listComposerSkillFileTokens,
+  prependComposerSkillFileTokens,
+  stripComposerSkillFileTokens,
 } from './composer-slash-skills-view';
 
 const skills = [
@@ -40,14 +45,37 @@ describe('composer-slash-skills-view', () => {
     expect(rows[0]?.command).toBe('/super-coder');
   });
 
-  it('attaches skill file token and keeps trailing args', () => {
+  it('applies slash skill without dumping raw @file into the draft', () => {
     const result = applySlashSkillToDraft(
       '/super-coder fix the dock',
       { start: 0, end: 13 },
       '.github/skills/super-coder/SKILL.md',
     );
-    expect(result.next).toBe(
-      '@file:.github/skills/super-coder/SKILL.md\nfix the dock',
+    expect(result.next).toBe('fix the dock');
+    expect(result.skillPath).toBe('.github/skills/super-coder/SKILL.md');
+  });
+
+  it('parses, strips, and prepends skill file tokens for Cursor-style chips', () => {
+    expect(isComposerSkillFilePath('.github/skills/super-coder/SKILL.md')).toBe(true);
+    expect(composerSkillSlugFromPath('.github/skills/super-coder/SKILL.md')).toBe(
+      'super-coder',
     );
+
+    const draft =
+      '@file:.github/skills/super-coder/SKILL.md\n@file:README.md\nfix the dock';
+    expect(listComposerSkillFileTokens(draft)).toEqual([
+      {
+        path: '.github/skills/super-coder/SKILL.md',
+        slug: 'super-coder',
+        label: 'super-coder',
+        token: '@file:.github/skills/super-coder/SKILL.md',
+      },
+    ]);
+    expect(stripComposerSkillFileTokens(draft)).toBe('@file:README.md\nfix the dock');
+    expect(
+      prependComposerSkillFileTokens('fix the dock', [
+        '.github/skills/super-coder/SKILL.md',
+      ]),
+    ).toBe('@file:.github/skills/super-coder/SKILL.md\nfix the dock');
   });
 });

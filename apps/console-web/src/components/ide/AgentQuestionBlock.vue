@@ -3,7 +3,12 @@ import { computed, ref, useId, watch } from 'vue';
 
 import {
   AGENT_QUESTION_OTHER_ID,
+  AGENT_QUESTION_PROMPT_MAX,
+  formatAnsweredQuestionChoice,
   isAgentQuestionOtherOption,
+  moveQuestionOptionSelection,
+  truncateQuestionOptionLabel,
+  truncateQuestionPrompt,
   withOtherQuestionOption,
   type AgentQuestionOption,
 } from '../../lib/agent-question-view';
@@ -56,6 +61,23 @@ const groupLabelId = computed(
   () => `axon-agent-question-label-${instanceId}-${props.messageId || 'local'}-${props.segmentIndex ?? 0}`,
 );
 
+const promptExpanded = ref(false);
+const normalizedPrompt = computed(() => props.prompt.trim());
+const promptNeedsExpand = computed(() => normalizedPrompt.value.length > AGENT_QUESTION_PROMPT_MAX);
+const displayPrompt = computed(() => {
+  if (promptExpanded.value || !promptNeedsExpand.value) {
+    return normalizedPrompt.value;
+  }
+  return truncateQuestionPrompt(normalizedPrompt.value);
+});
+const answeredChoiceLabel = computed(() =>
+  resolvedAnswer.value ? formatAnsweredQuestionChoice(resolvedAnswer.value) : '',
+);
+
+function optionDisplayLabel(option: AgentQuestionOption): string {
+  return truncateQuestionOptionLabel(option.label);
+}
+
 watch(
   () => props.options,
   () => {
@@ -79,6 +101,41 @@ function selectOption(optionId: string): void {
     return;
   }
   selectedId.value = optionId;
+}
+
+function optionButtonId(optionId: string): string {
+  return `${instanceId}-option-${optionId}`;
+}
+
+function focusOptionButton(optionId: string): void {
+  document.getElementById(optionButtonId(optionId))?.focus();
+}
+
+function handleOptionKeydown(event: KeyboardEvent, optionId: string): void {
+  if (props.live || submitting.value || isAnswered.value) {
+    return;
+  }
+
+  if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+    event.preventDefault();
+    const nextId = moveQuestionOptionSelection(displayOptions.value, selectedId.value, 'next');
+    selectOption(nextId);
+    focusOptionButton(nextId);
+    return;
+  }
+
+  if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+    event.preventDefault();
+    const prevId = moveQuestionOptionSelection(displayOptions.value, selectedId.value, 'prev');
+    selectOption(prevId);
+    focusOptionButton(prevId);
+    return;
+  }
+
+  if (event.key === 'Enter' && optionId === selectedId.value && !otherSelected.value) {
+    event.preventDefault();
+    void continueWithSelection();
+  }
 }
 
 async function continueWithSelection(): Promise<void> {
@@ -127,11 +184,21 @@ async function continueWithSelection(): Promise<void> {
         :id="groupLabelId"
         class="agent-block__question-prompt"
       >
-        {{ prompt }}
+        {{ displayPrompt }}
       </p>
-      <p class="agent-block__question-answered-choice">
-        <span class="agent-block__question-id">{{ resolvedAnswer.id }}</span>
-        <span class="agent-block__question-label">{{ resolvedAnswer.label }}</span>
+      <button
+        v-if="promptNeedsExpand"
+        type="button"
+        class="agent-block__question-expand"
+        @click="promptExpanded = !promptExpanded"
+      >
+        {{ promptExpanded ? 'Show less' : 'Show full question' }}
+      </button>
+      <p
+        class="agent-block__question-answered-choice"
+        :title="resolvedAnswer.label"
+      >
+        {{ answeredChoiceLabel }}
       </p>
     </template>
     <template v-else>
@@ -140,8 +207,16 @@ async function continueWithSelection(): Promise<void> {
         :id="groupLabelId"
         class="agent-block__question-prompt"
       >
-        {{ prompt }}
+        {{ displayPrompt }}
       </p>
+      <button
+        v-if="promptNeedsExpand"
+        type="button"
+        class="agent-block__question-expand"
+        @click="promptExpanded = !promptExpanded"
+      >
+        {{ promptExpanded ? 'Show less' : 'Show full question' }}
+      </button>
       <div
         class="agent-block__question-options"
         role="radiogroup"
@@ -149,6 +224,7 @@ async function continueWithSelection(): Promise<void> {
       >
         <button
           v-for="option in displayOptions"
+          :id="optionButtonId(option.id)"
           :key="`${instanceId}-${option.id}`"
           type="button"
           class="agent-block__question-option"
@@ -156,14 +232,21 @@ async function continueWithSelection(): Promise<void> {
           role="radio"
           :aria-checked="selectedId === option.id"
           :disabled="live || submitting"
+          :tabindex="selectedId === option.id ? 0 : -1"
           @click="selectOption(option.id)"
+          @keydown="handleOptionKeydown($event, option.id)"
         >
           <span
             class="agent-block__question-radio"
             aria-hidden="true"
           />
           <span class="agent-block__question-id">{{ option.id }}</span>
-          <span class="agent-block__question-label">{{ option.label }}</span>
+          <span
+            class="agent-block__question-label"
+            :title="option.label"
+          >
+            {{ optionDisplayLabel(option) }}
+          </span>
         </button>
       </div>
       <div

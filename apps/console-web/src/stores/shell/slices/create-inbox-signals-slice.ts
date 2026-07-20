@@ -20,29 +20,43 @@ interface CreateInboxSignalsSliceInput {
   pendingHandoffDismissSignalId: Ref<string | null>;
   operatorBriefing: Ref<OperatorBriefing | null>;
   loadOperatorBriefing: () => Promise<void>;
-  loadRuntimeSummary: () => Promise<void>;
+  loadRuntimeSummary: (options?: { background?: boolean }) => Promise<void>;
 }
 
 export function createInboxSignalsSlice(input: CreateInboxSignalsSliceInput) {
+  let inflightInbox: Promise<void> | null = null;
+
   async function loadInbox(options?: { background?: boolean }): Promise<void> {
-    const backgroundRefresh =
-      options?.background === true && input.inboxLoadState.value === 'loaded';
-    if (!backgroundRefresh) {
+    const hasCached = input.inboxLoadState.value === 'loaded';
+    const background = options?.background === true || hasCached;
+
+    if (inflightInbox) {
+      return inflightInbox;
+    }
+
+    if (!background) {
       input.inboxLoadState.value = 'loading';
       input.inboxError.value = null;
     }
 
-    try {
-      const inbox = await fetchInbox();
-      input.inboxItems.value = inbox.items;
-      input.signalViews.value = inbox.items;
-      input.inboxLoadState.value = 'loaded';
-    } catch (error) {
-      if (!backgroundRefresh) {
-        input.inboxLoadState.value = 'error';
-        input.inboxError.value = error instanceof Error ? error.message : 'inbox request failed';
+    inflightInbox = (async () => {
+      try {
+        const inbox = await fetchInbox();
+        input.inboxItems.value = inbox.items;
+        input.signalViews.value = inbox.items;
+        input.inboxLoadState.value = 'loaded';
+        input.inboxError.value = null;
+      } catch (error) {
+        if (!hasCached) {
+          input.inboxLoadState.value = 'error';
+          input.inboxError.value = error instanceof Error ? error.message : 'inbox request failed';
+        }
+      } finally {
+        inflightInbox = null;
       }
-    }
+    })();
+
+    return inflightInbox;
   }
 
   async function dismissInboxSignalIds(signalIds: string[]): Promise<void> {

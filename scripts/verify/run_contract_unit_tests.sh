@@ -36,8 +36,15 @@ main_tests=(
   tests.test_control_plane_terminal
   tests.test_control_plane_chat
   tests.test_control_plane_chat_health
+  tests.test_employee_chat_thread
+  tests.test_employee_persona_prompt
   tests.test_command_executor
   tests.test_workspace_agent_scheduler
+  tests.test_failure_detail
+  tests.test_run_outcome
+  tests.test_workspace_agents
+  tests.test_worker_scheduler_routes
+  tests.test_worker_scheduler_settings_store
   tests.test_workspace_worker_prompt
   tests.test_chat_orchestration
   tests.test_watch_bootstrap_signal

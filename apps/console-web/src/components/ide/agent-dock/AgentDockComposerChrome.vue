@@ -4,6 +4,7 @@ import BriefingSurfaceFollowupPrompt from '../../../features/kairo-conversation/
 import AgentDockComposerImageLightbox from './AgentDockComposerImageLightbox.vue';
 import AgentDockApprovalBanner from './AgentDockApprovalBanner.vue';
 import AgentDockDebugReproduceBanner from './AgentDockDebugReproduceBanner.vue';
+import AgentDockEmployeeFailureBanner from './AgentDockEmployeeFailureBanner.vue';
 import AgentDockFullAccessConsent from './AgentDockFullAccessConsent.vue';
 import AgentDockSandboxConsent from './AgentDockSandboxConsent.vue';
 import AgentDockIdeVoiceHint from './AgentDockIdeVoiceHint.vue';
@@ -87,6 +88,7 @@ const emit = defineEmits<{
     @proceed="emit('debugReproduceProceed', debugReproduceRequest.messageId)"
     @dismiss="emit('debugReproduceDismiss')"
   />
+  <AgentDockEmployeeFailureBanner />
   <AgentDockApprovalBanner
     :show="showApprovalBanner"
     :can-approve="canApproveIdeAgentRun"

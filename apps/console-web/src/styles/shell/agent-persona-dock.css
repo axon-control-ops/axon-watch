@@ -1,0 +1,502 @@
+/* Presence strip + selected Agent Persona Dock (Team rail). */
+
+.company-presence-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0.15rem 0 0.55rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 0.35rem;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+}
+
+.company-presence-strip:focus-within {
+  outline: none;
+}
+
+.company-presence-strip:focus-visible {
+  outline: 2px solid rgba(0, 242, 255, 0.55);
+  outline-offset: 2px;
+  border-radius: 0.35rem;
+}
+
+.company-presence-strip__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  flex: 0 0 auto;
+  min-width: 3.1rem;
+  padding: 0.2rem;
+  border: none;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  transition: background 120ms ease;
+  scroll-snap-align: center;
+}
+
+.company-presence-strip__btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.company-presence-strip__btn--selected {
+  background: rgba(0, 242, 255, 0.07);
+}
+
+.company-presence-strip__btn--selected:hover {
+  background: rgba(0, 242, 255, 0.11);
+}
+
+.company-presence-strip:focus-visible .company-presence-strip__btn--selected {
+  outline: 2px solid rgba(0, 242, 255, 0.55);
+  outline-offset: 2px;
+}
+
+.company-presence-strip__btn:focus-visible {
+  outline: 2px solid rgba(0, 242, 255, 0.55);
+  outline-offset: 2px;
+}
+
+.company-presence-strip__avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(140, 170, 200, 0.35);
+}
+
+.company-presence-strip__fail-mark,
+.company-presence-strip__interrupt-mark,
+.company-presence-strip__pause-mark {
+  position: absolute;
+  right: -0.08rem;
+  bottom: -0.08rem;
+  display: grid;
+  place-items: center;
+  width: 0.82rem;
+  height: 0.82rem;
+  border-radius: 999px;
+  font-size: 0.52rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95);
+}
+
+.company-presence-strip__fail-mark {
+  color: rgba(255, 230, 220, 0.98);
+  background: rgba(180, 45, 35, 0.95);
+}
+
+.company-presence-strip__interrupt-mark {
+  font-size: 0.56rem;
+  color: rgba(255, 240, 210, 0.98);
+  background: rgba(180, 110, 30, 0.95);
+}
+
+.company-presence-strip__pause-mark {
+  font-size: 0.44rem;
+  color: rgba(255, 230, 190, 0.96);
+  background: rgba(120, 80, 20, 0.92);
+}
+
+.company-presence-strip__avatar[data-presence='working'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(80, 220, 180, 0.75),
+    0 0 12px rgba(60, 200, 160, 0.35);
+  animation: presence-avatar-working-glow 2.4s ease-in-out infinite;
+}
+
+.company-presence-strip__avatar[data-presence='failed'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 110, 90, 0.85),
+    0 0 12px rgba(220, 70, 60, 0.35);
+}
+
+.company-presence-strip__avatar[data-presence='interrupted'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 180, 90, 0.88),
+    0 0 12px rgba(255, 160, 60, 0.35);
+}
+
+.company-presence-strip__avatar[data-presence='paused'] {
+  opacity: 0.55;
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(180, 150, 90, 0.5);
+}
+
+/* Role accent on idle avatars — data-glow is set in Vue but was previously unstyled. */
+.company-presence-strip__avatar[data-glow='lead'][data-presence='idle'],
+.agent-persona-dock__avatar[data-glow='lead'][data-presence='idle'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(80, 210, 255, 0.55),
+    0 0 10px rgba(40, 160, 230, 0.22);
+}
+
+.company-presence-strip__avatar[data-glow='watcher'][data-presence='idle'],
+.agent-persona-dock__avatar[data-glow='watcher'][data-presence='idle'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(70, 230, 180, 0.5),
+    0 0 10px rgba(30, 170, 130, 0.2);
+}
+
+.company-presence-strip__avatar[data-glow='frontend'][data-presence='idle'],
+.agent-persona-dock__avatar[data-glow='frontend'][data-presence='idle'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(110, 170, 255, 0.55),
+    0 0 10px rgba(50, 120, 230, 0.22);
+}
+
+.company-presence-strip__avatar[data-glow='backend'][data-presence='idle'],
+.agent-persona-dock__avatar[data-glow='backend'][data-presence='idle'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(240, 190, 90, 0.55),
+    0 0 10px rgba(190, 140, 40, 0.2);
+}
+
+.company-presence-strip__avatar[data-glow='integrations'][data-presence='idle'],
+.agent-persona-dock__avatar[data-glow='integrations'][data-presence='idle'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 150, 130, 0.52),
+    0 0 10px rgba(200, 90, 70, 0.2);
+}
+
+.company-presence-strip__btn--selected .company-presence-strip__avatar {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(0, 242, 255, 0.9),
+    0 0 14px rgba(0, 200, 220, 0.4);
+}
+
+.company-presence-strip__btn--selected .company-presence-strip__avatar[data-presence='failed'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 110, 90, 0.92),
+    0 0 14px rgba(220, 70, 60, 0.42), 0 0 0 4px rgba(0, 242, 255, 0.55);
+}
+
+.company-presence-strip__btn--selected .company-presence-strip__avatar[data-presence='interrupted'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(255, 180, 90, 0.92),
+    0 0 14px rgba(255, 160, 60, 0.42), 0 0 0 4px rgba(0, 242, 255, 0.55);
+}
+
+.company-presence-strip__btn--selected .company-presence-strip__avatar[data-presence='working'] {
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(80, 220, 180, 0.82),
+    0 0 14px rgba(60, 200, 160, 0.38), 0 0 0 4px rgba(0, 242, 255, 0.55);
+  animation: presence-avatar-working-glow 2.4s ease-in-out infinite;
+}
+
+.company-presence-strip__btn--selected .company-presence-strip__avatar[data-presence='paused'] {
+  opacity: 0.72;
+  box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(180, 150, 90, 0.62),
+    0 0 0 4px rgba(0, 242, 255, 0.45);
+}
+
+.company-presence-strip__name {
+  max-width: 3.4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.58rem;
+  letter-spacing: 0.02em;
+  color: rgba(170, 200, 220, 0.78);
+}
+
+.company-presence-strip__btn--selected .company-presence-strip__name {
+  color: rgba(210, 240, 255, 0.95);
+}
+
+.agent-persona-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.7rem 0.65rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.55rem;
+  background: linear-gradient(
+    165deg,
+    rgba(18, 32, 48, 0.92) 0%,
+    rgba(10, 18, 28, 0.88) 100%
+  );
+  animation: agent-persona-dock-in 240ms ease-out;
+}
+
+.agent-persona-dock[data-presence='failed'] {
+  border-color: rgba(255, 120, 100, 0.35);
+}
+
+.agent-persona-dock[data-presence='interrupted'],
+.agent-persona-dock--interrupted {
+  border-color: rgba(255, 180, 90, 0.34);
+}
+
+.agent-persona-dock[data-presence='working'] {
+  border-color: rgba(80, 220, 180, 0.32);
+  box-shadow: 0 0 18px rgba(60, 200, 160, 0.08);
+}
+
+.agent-persona-dock[data-presence='paused'] {
+  border-color: rgba(180, 150, 90, 0.28);
+  opacity: 0.92;
+}
+
+.agent-persona-dock__hero {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.65rem;
+  align-items: start;
+}
+
+.agent-persona-dock__avatar-btn {
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.agent-persona-dock__avatar {
+  display: grid;
+  place-items: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(0, 242, 255, 0.35);
+}
+
+.agent-persona-dock__avatar[data-presence='working'] {
+  box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(80, 220, 180, 0.8),
+    0 0 16px rgba(60, 200, 160, 0.4);
+  animation: presence-avatar-working-glow 2.4s ease-in-out infinite;
+}
+
+.agent-persona-dock__avatar[data-presence='failed'] {
+  box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(255, 110, 90, 0.9),
+    0 0 16px rgba(220, 70, 60, 0.4);
+}
+
+.agent-persona-dock__avatar[data-presence='interrupted'] {
+  box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(255, 180, 90, 0.9),
+    0 0 16px rgba(255, 160, 60, 0.4);
+}
+
+.agent-persona-dock__avatar[data-presence='paused'] {
+  opacity: 0.58;
+  box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(180, 150, 90, 0.55);
+}
+
+.agent-persona-dock__avatar-btn:focus-visible .agent-persona-dock__avatar {
+  outline: 2px solid rgba(0, 242, 255, 0.55);
+  outline-offset: 3px;
+}
+
+.agent-persona-dock__identity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.agent-persona-dock__name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.agent-persona-dock__name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: rgba(235, 245, 255, 0.96);
+}
+
+.agent-persona-dock__meta {
+  margin: 0;
+  font-size: 0.64rem;
+  color: rgba(155, 185, 210, 0.72);
+}
+
+.agent-persona-dock__owns {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: rgba(170, 200, 220, 0.82);
+}
+
+.agent-persona-dock__status {
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  text-transform: lowercase;
+  padding: 0.14rem 0.35rem;
+  border-radius: 999px;
+  color: rgba(180, 210, 230, 0.9);
+  background: rgba(70, 100, 130, 0.3);
+  white-space: nowrap;
+  align-self: start;
+}
+
+.agent-persona-dock__status[data-status='failed'] {
+  color: rgba(255, 200, 190, 0.95);
+  background: rgba(140, 40, 35, 0.45);
+}
+
+.agent-persona-dock__status[data-status='interrupted'] {
+  color: rgba(255, 230, 195, 0.96);
+  background: rgba(100, 65, 18, 0.48);
+}
+
+.agent-persona-dock__status[data-status='executing'],
+.agent-persona-dock__status[data-status='watching'] {
+  color: rgba(180, 255, 220, 0.95);
+  background: rgba(30, 100, 70, 0.4);
+}
+
+.agent-persona-dock__status[data-status='idle'] {
+  color: rgba(180, 210, 230, 0.88);
+}
+
+.agent-persona-dock__beat {
+  margin: 0;
+  padding: 0.5rem 0.55rem;
+  border-radius: 0.4rem;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: rgba(200, 225, 240, 0.9);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.agent-persona-dock__beat--failed {
+  color: rgba(255, 210, 200, 0.95);
+  background: rgba(90, 28, 24, 0.4);
+  border-color: rgba(255, 120, 100, 0.28);
+  overflow-wrap: anywhere;
+}
+
+.agent-persona-dock__beat--interrupted {
+  color: rgba(255, 230, 195, 0.96);
+  background: rgba(80, 52, 18, 0.42);
+  border-color: rgba(255, 180, 90, 0.34);
+  overflow-wrap: anywhere;
+}
+
+.agent-persona-dock--interrupted .company-roster__action--retry {
+  color: rgba(255, 240, 210, 0.98);
+  border-color: rgba(255, 180, 90, 0.42);
+  background: rgba(100, 65, 18, 0.55);
+}
+
+.agent-persona-dock--interrupted .company-roster__action--retry:hover,
+.agent-persona-dock--interrupted .company-roster__action--retry:focus-visible {
+  border-color: rgba(255, 200, 110, 0.58);
+  background: rgba(120, 78, 22, 0.72);
+  box-shadow: 0 0 8px rgba(200, 140, 40, 0.2);
+}
+
+.agent-persona-dock__receipt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.agent-persona-dock__receipt-label {
+  margin: 0;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(150, 180, 200, 0.65);
+}
+
+.agent-persona-dock__receipt-detail {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: rgba(200, 220, 235, 0.88);
+}
+
+.agent-persona-dock__receipt-run {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.62rem;
+  color: rgba(140, 190, 210, 0.75);
+}
+
+.agent-persona-dock__receipt-run-btn {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: rgba(170, 220, 255, 0.88);
+  text-decoration: underline;
+  text-decoration-color: rgba(120, 190, 230, 0.45);
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
+.agent-persona-dock__receipt-run-btn:hover,
+.agent-persona-dock__receipt-run-btn:focus-visible {
+  color: rgba(210, 245, 255, 0.98);
+  text-decoration-color: rgba(0, 242, 255, 0.65);
+  outline: none;
+}
+
+.agent-persona-dock__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+@keyframes presence-avatar-working-glow {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.14);
+  }
+}
+
+@keyframes agent-persona-dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.15rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@container roster-dock (max-width: 17.5rem) {
+  .agent-persona-dock__hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .agent-persona-dock__status {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-presence-strip {
+    scroll-behavior: auto;
+    scroll-snap-type: none;
+  }
+
+  .agent-persona-dock {
+    animation: none;
+  }
+
+  .company-presence-strip__avatar[data-presence='working'],
+  .agent-persona-dock__avatar[data-presence='working'] {
+    animation: none;
+  }
+}

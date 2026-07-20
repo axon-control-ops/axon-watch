@@ -435,9 +435,21 @@
   display: flex;
   align-items: stretch;
   min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  /* Keep visible so the chat-history panel is not clipped under the transcript. */
+  overflow: visible;
+  position: relative;
+  z-index: 30;
   margin: 0.35rem -0.65rem -0.4rem;
   border-top: 1px solid rgba(0, 242, 255, 0.14);
   background: #031622;
+}
+
+.agent-dock__head-tabs > .agent-dock-thread-tabbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
 }
 
 .agent-dock__head-pills {

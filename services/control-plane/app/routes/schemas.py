@@ -50,6 +50,9 @@ class PostChatMessageRequest(BaseModel):
 class CreateWorkspaceChatThreadRequest(BaseModel):
     surface: str = "ide"
     run_id: str | None = None
+    title: str | None = None
+    employee_id: str | None = None
+    employee_role: str | None = None
 
 
 class CreateTerminalSessionRequest(BaseModel):

@@ -25,7 +25,7 @@ class RuntimeVaultIntegrationTests(unittest.TestCase):
         self.addCleanup(self._tmpdir.cleanup)
         self.addCleanup(vault_keys.invalidate_runtime_vault_cache)
 
-    @patch("app.cli_runtime.catalog.fetch_runtime_context")
+    @patch("app.cli_runtime.catalog_snapshot.fetch_runtime_context")
     @patch("app.cli_runtime.catalog.find_cursor_cli", return_value="/usr/bin/cursor")
     @patch("app.cli_runtime.catalog.find_codex_cli", return_value="")
     @patch("app.cli_runtime.auth_probes._run_command")
@@ -52,7 +52,7 @@ class RuntimeVaultIntegrationTests(unittest.TestCase):
         self.assertFalse(cursor["ready"])
         self.assertEqual("vault_locked", cursor["auth"]["vault_posture"])
 
-    @patch("app.cli_runtime.catalog.fetch_runtime_context")
+    @patch("app.cli_runtime.catalog_snapshot.fetch_runtime_context")
     @patch("app.cli_runtime.catalog.find_cursor_cli", return_value="/usr/bin/cursor")
     @patch("app.cli_runtime.catalog.find_codex_cli", return_value="")
     @patch("app.cli_runtime.auth_probes._run_command")

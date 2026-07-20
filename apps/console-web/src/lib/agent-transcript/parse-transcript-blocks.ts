@@ -1,4 +1,4 @@
-import { parseAskOptions, tryParseClarifyingMarkdown } from '../agent-question-view';
+import { parseAskOptions, resolveAskBlockPrompt, tryParseClarifyingMarkdown } from '../agent-question-view';
 import { sanitizeResearchCardTitle, sanitizeResearchSnippet } from '../research-snippet';
 import { inferResearchBlockKind, type ResearchBlockKind } from '../research-provider';
 import type { AgentTranscriptSegment, ResearchTranscriptItem } from './types';
@@ -162,14 +162,13 @@ export function parseAgentTranscriptBlocksUncached(
         index += 1;
       }
       const options = parseAskOptions(body);
-      const promptFromBody = body
-        .map((entry) => entry.trim())
-        .filter((entry) => entry && !/^\s*[-*]?\s*\d+\s*[|.)]/.test(entry))
-        .join(' ')
-        .trim();
       segments.push({
         kind: 'question',
-        prompt: headerPrompt || promptFromBody || 'Choose an option to continue',
+        prompt: resolveAskBlockPrompt({
+          headerPrompt,
+          bodyLines: body,
+          options,
+        }),
         options:
           options.length > 0
             ? options

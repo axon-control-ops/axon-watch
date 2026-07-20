@@ -25,6 +25,9 @@ _THREAD_COLUMNS = (
     "workspace_id",
     "run_id",
     "thread_kind",
+    "title",
+    "employee_id",
+    "employee_role",
     "created_at",
     "updated_at",
 )
@@ -84,11 +87,18 @@ def _message_row_to_record(row: Any) -> dict[str, Any]:
 
 
 def _thread_row_to_record(row: Any) -> dict[str, Any]:
+    keys = set(row.keys())
+    title = str(row["title"] or "").strip() if "title" in keys else ""
+    employee_id = str(row["employee_id"] or "").strip() if "employee_id" in keys else ""
+    employee_role = str(row["employee_role"] or "").strip() if "employee_role" in keys else ""
     return {
         "thread_id": row["thread_id"],
         "workspace_id": row["workspace_id"],
         "run_id": row["run_id"],
-        "thread_kind": str(row["thread_kind"] if "thread_kind" in row.keys() else "operator"),
+        "thread_kind": str(row["thread_kind"] if "thread_kind" in keys else "operator"),
+        "title": title or None,
+        "employee_id": employee_id or None,
+        "employee_role": employee_role or None,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -100,16 +110,25 @@ def create_thread(
     run_id: str | None,
     created_at: str,
     thread_kind: str = "operator",
+    title: str | None = None,
+    employee_id: str | None = None,
+    employee_role: str | None = None,
 ) -> dict[str, Any]:
     thread_id = f"thread_{uuid4().hex}"
     kind = str(thread_kind or "operator").strip().lower() or "operator"
     if kind not in {"operator", "ide"}:
         kind = "operator"
+    cleaned_title = str(title or "").strip() or None
+    cleaned_employee_id = str(employee_id or "").strip() or None
+    cleaned_employee_role = str(employee_role or "").strip().lower() or None
     record = {
         "thread_id": thread_id,
         "workspace_id": workspace_id,
         "run_id": run_id,
         "thread_kind": kind,
+        "title": cleaned_title,
+        "employee_id": cleaned_employee_id,
+        "employee_role": cleaned_employee_role,
         "created_at": created_at,
         "updated_at": created_at,
     }
@@ -117,19 +136,48 @@ def create_thread(
         connection.execute(
             f"""
             INSERT INTO chat_threads ({", ".join(_THREAD_COLUMNS)})
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["thread_id"],
                 record["workspace_id"],
                 record["run_id"],
                 record["thread_kind"],
+                record["title"],
+                record["employee_id"],
+                record["employee_role"],
                 record["created_at"],
                 record["updated_at"],
             ),
         )
         connection.commit()
     return deepcopy(record)
+
+
+def find_thread_for_employee(
+    workspace_id: str,
+    *,
+    employee_id: str,
+    thread_kind: str = "ide",
+) -> dict[str, Any] | None:
+    cleaned_employee = str(employee_id or "").strip()
+    if not cleaned_employee:
+        return None
+    kind = str(thread_kind or "ide").strip().lower() or "ide"
+    with _managed_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM chat_threads
+            WHERE workspace_id = ?
+              AND thread_kind = ?
+              AND employee_id = ?
+            ORDER BY updated_at DESC, created_at DESC, rowid DESC
+            LIMIT 1
+            """,
+            (workspace_id.strip(), kind, cleaned_employee),
+        ).fetchone()
+    return _thread_row_to_record(row) if row is not None else None
 
 
 def get_thread(thread_id: str) -> dict[str, Any] | None:

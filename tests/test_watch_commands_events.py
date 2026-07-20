@@ -99,6 +99,69 @@ class WatchCommandsAndEventsTests(unittest.TestCase):
         )
         self.assertEqual(400, response.status_code)
 
+    def test_failed_reprobe_surfaces_detail_on_summary_observation(self) -> None:
+        response = self.client.post(
+            "/internal/watch/commands",
+            json={
+                "command_type": "reprobe_connector",
+                "target_id": "missing_connector",
+                "requested_by": "test",
+            },
+        )
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["accepted"])
+        self.assertEqual("failed", payload["status"])
+        self.assertIn("connector not found", payload["receipt"]["error"])
+
+        summary_response = self.client.get("/internal/watch/summary")
+        observation = summary_response.json()["observation"]
+        self.assertEqual("failed", observation["last_command_status"])
+        self.assertIn("connector not found", observation["last_command_detail"])
+        self.assertNotEqual("failed", observation["last_command_detail"])
+
+    def test_reprobe_unavailable_connector_surfaces_probe_detail_on_observation(self) -> None:
+        probe_detail = "Connection refused on http://127.0.0.1:4173/api/health"
+
+        def _unavailable_probe(definition, *, timeout_seconds: float = 0.75) -> dict[str, object]:
+            return {
+                "connector_id": definition.connector_id,
+                "display_name": definition.display_name,
+                "health_url": definition.health_url,
+                "required": definition.required,
+                "workspace_id": definition.workspace_id,
+                "status": "unavailable",
+                "detail": probe_detail,
+                "last_checked_at": "2026-07-18T08:00:00Z",
+                "latency_ms": 1,
+            }
+
+        with patch(
+            "app.commands.executor.probe_connector",
+            side_effect=_unavailable_probe,
+        ):
+            response = self.client.post(
+                "/internal/watch/commands",
+                json={
+                    "command_type": "reprobe_connector",
+                    "target_id": "console_web",
+                    "requested_by": "test",
+                },
+            )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["accepted"])
+        self.assertEqual("completed", payload["status"])
+        self.assertEqual("unavailable", payload["receipt"]["result"]["connector_status"])
+        self.assertEqual(probe_detail, payload["receipt"]["result"]["detail"])
+
+        summary_response = self.client.get("/internal/watch/summary")
+        observation = summary_response.json()["observation"]
+        self.assertEqual("completed", observation["last_command_status"])
+        self.assertEqual(probe_detail, observation["last_command_detail"])
+        self.assertNotEqual("unavailable", observation["last_command_detail"])
+
 
 if __name__ == "__main__":
     unittest.main()

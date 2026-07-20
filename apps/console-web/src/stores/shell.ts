@@ -81,12 +81,14 @@ import {
 } from '../lib/shell-terminal-session-store';
 import { createWorkspaceFileOps } from '../lib/shell-workspace-file-ops';
 import { sortIdeThreadsNewestFirst } from '../lib/ide-thread-picker-view';
+import { employeeIdeThreadTitle } from '../features/workspace-agents/employee-thread';
 import {
   ensureOpenIdeThreadTabs,
   openIdeThreadTab,
   pruneOpenIdeThreadTabs,
   resolveIdeThreadTabAfterClose,
   resolveOpenIdeThreadTabItems,
+  seedOpenIdeTabsFromHistory,
 } from '../lib/ide-thread-tabs-view';
 import {
   readOpenIdeThreadIdsByWorkspace,
@@ -307,6 +309,7 @@ import { createRuntimeProbesSlice } from './shell/slices/create-runtime-probes-s
 import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary-slice';
 import { createShellDisplaySlice } from './shell/slices/create-shell-display-slice';
 import { createThreadSurfaceSlice } from './shell/slices/create-thread-surface-slice';
+import { createCompanyRosterSlice } from './shell/slices/create-company-roster-slice';
 import { createViewportCompactSlice } from './shell/slices/create-viewport-compact-slice';
 import { createKairoVoiceSlice } from './shell/slices/create-kairo-voice-slice';
 import { createChatStreamSessionSlice } from './shell/slices/create-chat-stream-session-slice';
@@ -520,6 +523,7 @@ export const useShellStore = defineStore('shell', () => {
   const ideTerminalRevealToken = ref(0);
   const ideTerminalToggleToken = ref(0);
   const workbenchTerminalPanelVisible = ref(false);
+  const teamRosterRevealToken = ref(0);
 
 
   const layoutModeLabel = computed(() =>
@@ -741,7 +745,7 @@ export const useShellStore = defineStore('shell', () => {
       criticalSignals: summary?.signals.critical_count ?? 0,
       highSignals: summary?.signals.high_count ?? 0,
       watchConnected: Boolean(summary?.watch.connected),
-      runtimeLoaded: runtimeSummaryLoadState.value === 'loaded' && Boolean(summary),
+      runtimeLoaded: Boolean(summary),
     });
   });
 
@@ -972,6 +976,21 @@ export const useShellStore = defineStore('shell', () => {
     return sortIdeThreadsNewestFirst(ideThreadsByWorkspaceId.value[workspaceId] ?? []);
   });
 
+  const {
+    activeIdeThread,
+    activeIdeEmployee,
+    activeIdeEmployeeRecord,
+    activeIdeEmployeeFailureLine,
+    activeIdeEmployeeShiftInterrupted,
+    companyEmployeesForCurrentWorkspace,
+    loadCompanyEmployees,
+  } = createCompanyRosterSlice({
+    currentWorkspace,
+    activeIdeThreadId,
+    ideThreadsForCurrentWorkspace,
+    agentStreamActive,
+  });
+
   const openIdeThreadTabsForCurrentWorkspace = computed(() => {
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (!workspaceId) {
@@ -999,8 +1018,13 @@ export const useShellStore = defineStore('shell', () => {
     const activeId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
     const currentOpen = openIdeThreadIdsByWorkspaceId.value[workspaceId] ?? [];
     const pruned = pruneOpenIdeThreadTabs(currentOpen, knownIds);
+    const seeded = seedOpenIdeTabsFromHistory({
+      openIds: pruned,
+      threads,
+      activeThreadId: activeId,
+    });
     const next = ensureOpenIdeThreadTabs(
-      activeId ? openIdeThreadTab(pruned, activeId) : pruned,
+      activeId ? openIdeThreadTab(seeded, activeId) : seeded,
       activeId,
     );
     if (next.join('|') !== currentOpen.join('|')) {
@@ -1046,6 +1070,7 @@ export const useShellStore = defineStore('shell', () => {
 
   const workspaceThreadLoadQueue = createWorkspaceThreadLoadQueue();
   const ideThreadsLoadPromises = new Map<string, Promise<void>>();
+  const ideChatHydratePromises = new Map<string, Promise<void>>();
 
   function bootstrapIdeActiveThreadId(workspaceId: string): string | null {
     const resolved = resolveBootstrapIdeThreadId({
@@ -1136,12 +1161,37 @@ export const useShellStore = defineStore('shell', () => {
     return promise;
   }
 
-  async function hydrateWorkspaceIdeChat(workspaceId: string): Promise<void> {
+  async function hydrateWorkspaceIdeChatImpl(workspaceId: string): Promise<void> {
+    // Restore cached transcript immediately so the dock does not flash empty while
+    // thread list + history requests are in flight.
+    applyIdeThreadMessagesToView(workspaceId);
     await loadIdeThreads(workspaceId);
     bootstrapIdeActiveThreadId(workspaceId);
+    applyIdeThreadMessagesToView(workspaceId);
     const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    if (!threadId) {
+      return;
+    }
     await loadWorkspaceThread(workspaceId, 'ide', threadId);
     applyIdeThreadMessagesToView(workspaceId);
+  }
+
+  async function hydrateWorkspaceIdeChat(workspaceId: string): Promise<void> {
+    const cleaned = workspaceId.trim();
+    if (!cleaned) {
+      return;
+    }
+
+    const inflight = ideChatHydratePromises.get(cleaned);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = hydrateWorkspaceIdeChatImpl(cleaned).finally(() => {
+      ideChatHydratePromises.delete(cleaned);
+    });
+    ideChatHydratePromises.set(cleaned, promise);
+    return promise;
   }
 
   async function createIdeThread(): Promise<string | null> {
@@ -1170,6 +1220,61 @@ export const useShellStore = defineStore('shell', () => {
     } catch (error) {
       commandMutationError.value =
         error instanceof Error ? error.message : 'Failed to create a new chat';
+      return null;
+    }
+  }
+
+  /** Find or create a titled IDE thread owned by a company teammate, then focus it. */
+  async function openOrFocusEmployeeIdeThread(employee: {
+    employee_id: string;
+    name: string;
+    role: string;
+    role_label?: string;
+  }): Promise<string | null> {
+    const workspaceId = currentWorkspace.value?.workspace_id;
+    const employeeId = employee.employee_id?.trim();
+    if (!workspaceId || !employeeId) {
+      return null;
+    }
+
+    const title = employeeIdeThreadTitle(employee);
+
+    try {
+      await loadIdeThreads(workspaceId);
+      const existing = (ideThreadsByWorkspaceId.value[workspaceId] ?? []).find(
+        (thread) => (thread.employee_id ?? '').trim() === employeeId,
+      );
+      if (existing?.thread_id) {
+        flushIdeComposerDraft();
+        await selectIdeThread(existing.thread_id);
+        openIdeComposer({ keepActivityView: true });
+        return existing.thread_id;
+      }
+
+      const created = await createWorkspaceChatThread(workspaceId, {
+        surface: 'ide',
+        title,
+        employeeId,
+        employeeRole: employee.role,
+      });
+      ideThreadsByWorkspaceId.value = {
+        ...ideThreadsByWorkspaceId.value,
+        [workspaceId]: sortIdeThreadsNewestFirst([
+          created,
+          ...(ideThreadsByWorkspaceId.value[workspaceId] ?? []).filter(
+            (thread) => thread.thread_id !== created.thread_id,
+          ),
+        ]),
+      };
+      flushIdeComposerDraft();
+      await selectIdeThread(created.thread_id);
+      ideComposerDraft.value = '';
+      persistIdeComposerDraft(workspaceId, '', created.thread_id);
+      openIdeComposer({ keepActivityView: true });
+      return created.thread_id;
+    } catch (error) {
+      commandMutationError.value =
+        error instanceof Error ? error.message : 'Failed to open teammate chat';
       return null;
     }
   }
@@ -1497,7 +1602,9 @@ export const useShellStore = defineStore('shell', () => {
     const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
     let streamedContent = '';
     let terminalAutoRevealSeen = false;
-    const streamIncremental = createAgentStreamIncrementalState();
+    const streamIncremental = createAgentStreamIncrementalState({
+      personaName: activeIdeEmployee.value?.name ?? null,
+    });
     const streamUiBatcher = createRafStreamUiBatcher<Partial<WorkspaceStreamUiState>>(
       (wsId, partial) => setWorkspaceStreamUi(wsId, partial),
     );
@@ -2136,9 +2243,11 @@ export const useShellStore = defineStore('shell', () => {
     setIdeActivityView,
     toggleIdeExplorer,
     toggleAgentDock,
+    revealTeamRosterForActiveEmployee,
   } = createIdeWorkbenchChromeSlice({
     ideTerminalRevealToken,
     ideTerminalToggleToken,
+    teamRosterRevealToken,
     ideActivityView,
     ideExplorerCollapsed,
     agentDockCollapsed,
@@ -3013,7 +3122,7 @@ export const useShellStore = defineStore('shell', () => {
       loadRuntimeStatus(),
       loadRuntimeSummary({ background: runtimeBackground }),
       loadInbox({ background: inboxBackground }),
-      loadConnectors(),
+      loadConnectors({ background: connectorsLoadState.value === 'loaded' }),
       loadOperatorBriefing({ background: briefingBackground }),
       loadOperatorFleetHealth({ background: operatorFleetHealthLoadState.value === 'loaded' }),
       operatorBrainGraphLoadState.value === 'loaded'
@@ -3436,6 +3545,13 @@ export const useShellStore = defineStore('shell', () => {
     ideComposerActivity,
     ideDebugModeSelected,
     activeIdeThreadId,
+    activeIdeThread,
+    activeIdeEmployee,
+    activeIdeEmployeeRecord,
+    activeIdeEmployeeFailureLine,
+    activeIdeEmployeeShiftInterrupted,
+    companyEmployeesForCurrentWorkspace,
+    loadCompanyEmployees,
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,
     activeTerminalSession,
@@ -3468,6 +3584,8 @@ export const useShellStore = defineStore('shell', () => {
     ideTerminalToggleToken,
     workbenchTerminalPanelVisible,
     syncWorkbenchTerminalPanelVisible,
+    teamRosterRevealToken,
+    revealTeamRosterForActiveEmployee,
     layoutMode,
     layoutModeLabel,
     leftSidebarAttentionBadgeCount,
@@ -3501,6 +3619,7 @@ export const useShellStore = defineStore('shell', () => {
     loadIdeThreads,
     hydrateWorkspaceIdeChat,
     createIdeThread,
+    openOrFocusEmployeeIdeThread,
     selectIdeThread,
     closeIdeThreadTab,
     loadTerminalSessions,

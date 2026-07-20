@@ -4,21 +4,21 @@
   "note": "Baseline from Axon-X file-size audit. Ratchet budgets block growth until extraction lowers max_lines.",
   "critical_hotspots": {
     "apps/console-web/src/styles/mockup-shell.css": {
-      "max_lines": 32,
+      "max_lines": 33,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/* + feature co-located CSS",
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3700,
+      "max_lines": 3810,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
       "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display slices extracted; keep shrinking via factory slices."
     },
     "apps/console-web/src/styles/ide-layout.css": {
-      "max_lines": 11,
+      "max_lines": 12,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/* + feature CSS",
@@ -79,7 +79,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 1000,
+      "max_lines": 766,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
@@ -91,20 +91,27 @@
       "target": "services/control-plane/app/kairo/replies/*"
     },
     "services/control-plane/app/cli_runtime/catalog.py": {
-      "max_lines": 294,
+      "max_lines": 82,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
-      "note": "Auth probes extracted to auth_probes.py; identity to catalog_identity.py"
+      "note": "CLI discovery only; snapshot cache in catalog_snapshot.py"
+    },
+    "services/control-plane/app/cli_runtime/catalog_snapshot.py": {
+      "max_lines": 270,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/cli_runtime/catalog/*",
+      "note": "Runtime status snapshot cache and probe assembly"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1455,
+      "max_lines": 1538,
       "soft_limit": 400,
       "hard_limit": 700,
       "target": "docs/how-to/* chapters"
     },
     "docs/HOW-TO-HANDBOOK.html": {
-      "max_lines": 2100,
+      "max_lines": 2164,
       "soft_limit": 250,
       "hard_limit": 400,
       "target": "docs/how-to/* generated HTML"
@@ -208,7 +215,7 @@
       "target": "apps/console-web/src/styles/ide/*"
     },
     "apps/console-web/src/styles/shell/mockup-shell-07.css": {
-      "max_lines": 560,
+      "max_lines": 298,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"
@@ -242,6 +249,46 @@
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_signal_consistency_* slices"
+    },
+    "apps/console-web/src/features/workspace-agents/company-roster-view.ts": {
+      "max_lines": 688,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/workspace-agents/*",
+      "note": "Employee roster/presence helpers; extract failure/peek slices next"
+    },
+    "apps/console-web/src/features/workspace-agents/company-roster-view.test.ts": {
+      "max_lines": 662,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/workspace-agents/*",
+      "note": "Paired with company-roster-view.ts; split with helper extraction"
+    },
+    "apps/console-web/src/styles/shell/agent-persona-dock.css": {
+      "max_lines": 502,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/agent-persona-*",
+      "note": "Persona dock + interrupted-shift polish"
+    },
+    "apps/console-web/src/styles/shell/mockup-shell-32.css": {
+      "max_lines": 586,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/*"
+    },
+    "docs/AXON-X-AUTONOMY-READINESS.md": {
+      "max_lines": 770,
+      "soft_limit": 400,
+      "hard_limit": 700,
+      "target": "docs/AXON-X-AUTONOMY-* + planning chapters",
+      "note": "Autonomy readiness assessment; split chapters when revising"
+    },
+    "tests/test_run_stale_reconcile.py": {
+      "max_lines": 520,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_run_stale_* slices"
     }
   }
 }

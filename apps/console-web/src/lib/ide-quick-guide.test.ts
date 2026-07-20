@@ -51,6 +51,82 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.actions).toEqual([{ id: 'expand-agent-dock', label: 'Expand agent dock' }]);
   });
 
+  it('prioritizes failed teammate shift guidance when the dock is collapsed', () => {
+    const failureLine = 'Last shift failed: vitest assertion failed';
+    const guide = buildIdeQuickGuide({
+      ...base,
+      employeeFailureLine: failureLine,
+    });
+
+    expect(guide?.title).toContain('Last shift failed');
+    expect(guide?.tone).toBe('failure');
+    expect(guide?.steps[0]).toBe(failureLine);
+    expect(guide?.steps.join(' ')).toContain('Retry shift');
+    expect(guide?.actions).toEqual([{ id: 'expand-agent-dock', label: 'Expand agent dock' }]);
+  });
+
+  it('guides interrupted teammate shifts to continue rather than retry', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      employeeFailureLine:
+        'Last shift interrupted before it could finish — use Retry shift to continue.',
+      employeeShiftInterrupted: true,
+    });
+
+    expect(guide?.title).toContain('Shift interrupted');
+    expect(guide?.tone).toBe('interrupted');
+    expect(guide?.steps.join(' ')).toContain('continue');
+  });
+
+  it('guides retry from the dock banner when a teammate failed with the dock already open', () => {
+    const failureLine = 'Last shift failed: vitest assertion failed';
+    const guide = buildIdeQuickGuide({
+      ...base,
+      agentDockCollapsed: false,
+      terminalVisible: true,
+      employeeFailureLine: failureLine,
+    });
+
+    expect(guide?.title).toContain('Last shift failed');
+    expect(guide?.tone).toBe('failure');
+    expect(guide?.steps[0]).toBe(failureLine);
+    expect(guide?.steps.join(' ')).toContain('Retry shift');
+    expect(guide?.steps.join(' ')).toContain('agent dock composer');
+    expect(guide?.actions).toEqual([]);
+  });
+
+  it('offers terminal reopen when the dock is open and a shift was interrupted', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      agentDockCollapsed: false,
+      terminalVisible: false,
+      employeeFailureLine:
+        'Last shift interrupted before it could finish — use Retry shift to continue.',
+      employeeShiftInterrupted: true,
+    });
+
+    expect(guide?.title).toContain('Shift interrupted');
+    expect(guide?.tone).toBe('interrupted');
+    expect(guide?.actions).toEqual([{ id: 'show-terminal', label: 'Show terminal' }]);
+  });
+
+  it('keeps failed-shift guidance below approvals and streaming', () => {
+    expect(
+      buildIdeQuickGuide({
+        ...base,
+        pendingApprovals: 1,
+        employeeFailureLine: 'Last shift failed: timeout',
+      })?.title,
+    ).toContain('Approval waiting');
+    expect(
+      buildIdeQuickGuide({
+        ...base,
+        streaming: true,
+        employeeFailureLine: 'Last shift failed: timeout',
+      })?.title,
+    ).toContain('responding');
+  });
+
   it('lists layout shortcuts when agent dock and terminal are both hidden', () => {
     const guide = buildIdeQuickGuide(base);
 

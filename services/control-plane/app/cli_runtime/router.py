@@ -17,10 +17,10 @@ from app.cli_runtime.recovery import ordered_runtime_candidates
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.cursor_agent import CursorAgentReply, run_cursor_local
 from app.cli_runtime.runtime_auth import (
+    cursor_dispatch_env,
     env_has_api_key,
     env_without_api_keys,
     looks_like_auth_error,
-    prefer_subscription_over_process_api_key,
     summarize_auth_error,
 )
 from app.cli_runtime.vault_keys import runtime_subprocess_env
@@ -124,13 +124,26 @@ def _build_prompt(
     execution_tier: str = "consultative",
     research_snapshot: dict[str, object] | None = None,
 ) -> str:
+    from app.workspace_agents.employee_persona_prompt import (
+        adapt_lane_b_system_prompt_for_employee,
+        split_employee_persona_from_context,
+    )
+
     snapshot = research_snapshot or research_capability_snapshot()
     workbook_policy = assignment_workbook_policy_appendix(user_prompt, context_block)
     policy_block = f"\n\n{workbook_policy}" if workbook_policy else ""
+    system = adapt_lane_b_system_prompt_for_employee(
+        _system_prompt(composer_mode, execution_tier, research_snapshot=snapshot),
+        context_block,
+    )
+    persona_block, remainder_context = split_employee_persona_from_context(context_block)
+    persona_section = f"\n\n{persona_block}" if persona_block else ""
+    workspace_body = remainder_context if persona_block else context_block
     return (
-        f"{_system_prompt(composer_mode, execution_tier, research_snapshot=snapshot)}"
-        f"{policy_block}\n\n"
-        f"Workspace context:\n{context_block}\n\n"
+        f"{system}"
+        f"{policy_block}"
+        f"{persona_section}\n\n"
+        f"Workspace context:\n{workspace_body}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
 
@@ -240,7 +253,10 @@ def dispatch_ide_composer(
     def _finish(payload: dict[str, object]) -> dict[str, object]:
         return _attach_dispatch_metadata(payload, composer_mode=composer_mode)
 
-    snapshot = runtime_status_snapshot()
+    subprocess_env = runtime_subprocess_env()
+    snapshot = runtime_status_snapshot(
+        force_refresh=bool(subprocess_env.get("CURSOR_API_KEY")),
+    )
     workspace_root = _resolve_workspace_root(workspace_id)
     if workspace_root is None:
         return _finish({
@@ -278,9 +294,6 @@ def dispatch_ide_composer(
         execution_access=execution_access,
     )
     errors: list[str] = []
-    subprocess_env = runtime_subprocess_env()
-    if prefer_subscription_over_process_api_key() and subprocess_env.get("CURSOR_API_KEY"):
-        subprocess_env = env_without_api_keys(subprocess_env, family="cursor")
 
     for record in _ordered_candidates_for_dispatch(snapshot, runtime_target):
         runtime_id = str(record.get("id") or "")
@@ -292,9 +305,11 @@ def dispatch_ide_composer(
         target_type = str(record.get("target_type") or "local")
         model = _effective_cli_model(family, str(runtime_model or ""))
         dispatch_env = subprocess_env
-        auth_method = str((record.get("auth") or {}).get("auth_method") or "")
-        if family == "cursor" and auth_method == "oauth":
-            dispatch_env = env_without_api_keys(subprocess_env, family="cursor")
+        if family == "cursor":
+            dispatch_env = cursor_dispatch_env(
+                subprocess_env,
+                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+            )
         try:
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
@@ -402,7 +417,13 @@ def dispatch_ide_composer(
                         return _finish(payload)
                     except RuntimeError as retry_exc:
                         detail = str(retry_exc)
-            errors.append(summarize_auth_error(family=family, detail=detail))
+            errors.append(
+                summarize_auth_error(
+                    family=family,
+                    detail=detail,
+                    had_api_key=env_has_api_key(dispatch_env, family=family),
+                )
+            )
 
     reason = "; ".join(item for item in errors if item) or "no CLI runtime is installed"
     return _finish({

@@ -49,6 +49,9 @@ type UseComposerActionsOptions = {
   planSoftSwitchNotice: Ref<PlanSoftSwitchNotice | null>;
   /** Return true when `/` or `@` typeahead consumed the key. */
   handleTypeaheadKeydown?: (event: KeyboardEvent) => boolean;
+  /** Merge Cursor-style skill chips into the draft right before submit/steer. */
+  withSkillTokensForSubmit?: (draft: string) => string;
+  clearSkillAttachments?: () => void;
 };
 
 export function useComposerActions(options: UseComposerActionsOptions) {
@@ -69,6 +72,8 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     onDebugReproduceProceed,
     planSoftSwitchNotice,
     handleTypeaheadKeydown,
+    withSkillTokensForSubmit,
+    clearSkillAttachments,
   } = options;
 
   function handleApproveRun(): void {
@@ -118,6 +123,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       } else {
         shell.ideComposerDraft = '';
       }
+      clearSkillAttachments?.();
       return;
     }
     if (composerMode.value === 'kairo') {
@@ -125,8 +131,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       return;
     }
     let modeForSubmit: IdeComposerMode = composerMode.value;
+    const submitDraft = withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
     if (modeForSubmit === 'agent') {
-      const decision = shouldSoftSwitchAgentToPlan(modeForSubmit, draft);
+      const decision = shouldSoftSwitchAgentToPlan(modeForSubmit, submitDraft);
       if (decision.shouldSwitch) {
         planSoftSwitchNotice.value = {
           reason: decision.reason,
@@ -137,7 +144,9 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
     }
     const attachmentFiles = composerImages.value.map((image) => image.file);
+    shell.ideComposerDraft = submitDraft;
     await shell.submitIdeComposer(modeForSubmit, { attachmentFiles });
+    clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);
   }
 
@@ -160,8 +169,11 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       return;
     }
     const draft = shell.ideComposerDraft.trim();
+    const submitDraft = withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
+    shell.ideComposerDraft = submitDraft;
     const attachmentFiles = composerImages.value.map((image) => image.file);
     await shell.steerIdeComposer(composerMode.value, { attachmentFiles });
+    clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);
   }
 

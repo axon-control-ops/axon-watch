@@ -17,35 +17,40 @@
       "company_name": "Axon-X",
       "employees": [
         {
-          "name": "Axon-X Lead",
+          "name": "Mira",
           "role": "lead",
           "owns": "priorities, handoffs, and product direction",
           "schedule": "on_demand",
-          "primary": true
+          "primary": true,
+          "azure_voice_id": "en-GB-SoniaNeural"
         },
         {
-          "name": "Night Watch",
+          "name": "Rowan",
           "role": "watcher",
           "owns": "signals, connectors, and runtime health",
-          "schedule": "always_on"
+          "schedule": "always_on",
+          "azure_voice_id": "en-GB-ThomasNeural"
         },
         {
-          "name": "Shell Craft",
+          "name": "Jules",
           "role": "frontend",
           "owns": "console UI/UX, dock, and shell polish",
-          "schedule": "continuous"
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
         },
         {
-          "name": "Control Plane",
+          "name": "Reed",
           "role": "backend",
           "owns": "APIs, runs, approvals, and persistence",
-          "schedule": "continuous"
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
         },
         {
-          "name": "Bridge",
+          "name": "Quinn",
           "role": "integrations",
           "owns": "connectors, watch service, and cross-repo wiring",
-          "schedule": "continuous"
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
         }
       ]
     },
@@ -53,42 +58,47 @@
       "company_name": "DashPro",
       "employees": [
         {
-          "name": "DashPro Lead",
+          "name": "Dana",
           "role": "lead",
           "owns": "DashPro product priorities, CI triage decisions, and handoffs",
           "schedule": "on_demand",
-          "primary": true
+          "primary": true,
+          "azure_voice_id": "en-US-AriaNeural"
         },
         {
-          "name": "DashPro Night Watch",
+          "name": "Cass",
           "role": "watcher",
           "owns": "DashPro signals, runtime health, and CI red-build alerts",
-          "schedule": "always_on"
+          "schedule": "always_on",
+          "azure_voice_id": "en-US-DavisNeural"
         },
         {
-          "name": "DashPro Frontend",
+          "name": "Priya",
           "role": "frontend",
           "owns": "DashPro UI/UX and Expo/Android app-config CI breaks",
-          "schedule": "continuous"
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-JennyNeural"
         },
         {
-          "name": "DashPro Backend",
+          "name": "Marco",
           "role": "backend",
           "owns": "DashPro APIs, services, and quality-gate CI failures",
-          "schedule": "continuous"
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-GuyNeural"
         },
         {
-          "name": "DashPro Integrations",
+          "name": "Soren",
           "role": "integrations",
           "owns": "DashPro connectors, GitHub Actions, runner/SDK/secrets CI wiring",
-          "schedule": "continuous"
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-SaraNeural"
         }
       ]
     }
   },
   "agents": {
     "workspace_axon_local": {
-      "agent_name": "Axon Local Lead",
+      "agent_name": "Avery",
       "role": "lead",
       "owns": "legacy axon-local reference and donor patterns",
       "schedule": "on_demand"

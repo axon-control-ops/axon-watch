@@ -2,10 +2,13 @@
 import { computed } from 'vue';
 
 import type { IdeActivityView } from '../../lib/ide-layout-prefs';
+import { resolveIdeActivityBarSelectAction } from '../../lib/ide-activity-bar-select';
 import {
   agentDockActivityBarAriaLabel,
   agentDockActivityBarTitle,
   agentDockReopenAlive,
+  agentDockReopenEmployeeFailure,
+  agentDockReopenEmployeeInterrupted,
 } from '../../lib/agent-dock-reopen-view';
 import {
   type IdeSidebarActivityView,
@@ -58,9 +61,19 @@ const agentDockState = computed(() => ({
   streaming: shell.agentStreamActive,
   pendingApprovals: shell.pendingApprovalsCount,
   runPhase: shell.primaryActiveRun?.phase ?? null,
+  employeeFailureLine: shell.activeIdeEmployeeFailureLine,
+  employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
 }));
 
 const agentDockAlive = computed(() => agentDockReopenAlive(agentDockState.value));
+
+const agentDockEmployeeFailure = computed(() =>
+  agentDockReopenEmployeeFailure(agentDockState.value),
+);
+
+const agentDockEmployeeInterrupted = computed(() =>
+  agentDockReopenEmployeeInterrupted(agentDockState.value),
+);
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 
@@ -157,34 +170,32 @@ function isActive(item: (typeof items)[number]): boolean {
 }
 
 function selectView(view: IdeActivityView): void {
-  if (view === 'agent') {
-    if (agentDockExpanded.value) {
-      shell.toggleAgentDock();
-      shell.focusIdeSidebarView('agent');
-      return;
-    }
-    shell.setIdeActivityView('agent');
+  const action = resolveIdeActivityBarSelectAction({
+    view,
+    currentView: shell.ideActivityView,
+    explorerCollapsed: shell.ideExplorerCollapsed,
+    agentDockCollapsed: shell.agentDockCollapsed,
+    terminalPanelVisible: shell.workbenchTerminalPanelVisible,
+    sidebarViews,
+  });
+
+  if (action === 'toggle-agent') {
+    shell.toggleAgentDock();
+    shell.focusIdeSidebarView('agent');
     return;
   }
 
-  if (view === 'terminal') {
-    if (shell.workbenchTerminalPanelVisible) {
-      shell.toggleIdeTerminalPanel();
-      shell.focusIdeSidebarView('terminal');
-      return;
-    }
-    shell.setIdeActivityView('terminal');
+  if (action === 'toggle-terminal') {
+    shell.toggleIdeTerminalPanel();
+    shell.focusIdeSidebarView('terminal');
     return;
   }
 
-  if (
-    sidebarViews.has(view as IdeSidebarActivityView) &&
-    shell.ideActivityView === view &&
-    !shell.ideExplorerCollapsed
-  ) {
+  if (action === 'toggle-explorer') {
     shell.toggleIdeExplorer();
     return;
   }
+
   shell.setIdeActivityView(view);
 }
 </script>
@@ -199,7 +210,15 @@ function selectView(view: IdeActivityView): void {
       :class="{
         'ide-activity-bar__button--active': isActive(item),
         'ide-activity-bar__button--agent-alive':
-          item.id === 'agent' && agentDockAlive && shell.agentDockCollapsed,
+          item.id === 'agent' &&
+          agentDockAlive &&
+          shell.agentDockCollapsed &&
+          !agentDockEmployeeFailure &&
+          !agentDockEmployeeInterrupted,
+        'ide-activity-bar__button--agent-failure':
+          item.id === 'agent' && agentDockEmployeeFailure && shell.agentDockCollapsed,
+        'ide-activity-bar__button--agent-interrupted':
+          item.id === 'agent' && agentDockEmployeeInterrupted && shell.agentDockCollapsed,
         'ide-activity-bar__button--agent-streaming':
           item.id === 'agent' && shell.agentStreamActive && shell.agentDockCollapsed,
         'ide-activity-bar__button--agent-approvals':
@@ -250,6 +269,16 @@ function selectView(view: IdeActivityView): void {
       <span
         v-else-if="item.id === 'run' && runNeedsAttention"
         class="ide-activity-bar__pulse ide-activity-bar__pulse--glance"
+        aria-hidden="true"
+      />
+      <span
+        v-else-if="item.id === 'agent' && agentDockEmployeeInterrupted && shell.agentDockCollapsed"
+        class="ide-activity-bar__pulse ide-activity-bar__pulse--interrupted"
+        aria-hidden="true"
+      />
+      <span
+        v-else-if="item.id === 'agent' && agentDockEmployeeFailure && shell.agentDockCollapsed"
+        class="ide-activity-bar__pulse ide-activity-bar__pulse--failure"
         aria-hidden="true"
       />
       <span

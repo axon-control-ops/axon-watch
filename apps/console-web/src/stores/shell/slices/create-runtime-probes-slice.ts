@@ -17,30 +17,54 @@ interface CreateRuntimeProbesSliceInput {
 }
 
 export function createRuntimeProbesSlice(input: CreateRuntimeProbesSliceInput) {
-  async function loadRuntimeStatus(forceRefresh = false): Promise<void> {
-    input.runtimeStatusLoadState.value = 'loading';
-    input.runtimeStatusError.value = null;
+  let inflightStatus: Promise<void> | null = null;
 
-    try {
-      const status = await fetchRuntimeStatus({ forceRefresh });
-      input.runtimeStatus.value = status;
-      input.runtimeStatusLoadState.value = 'loaded';
-    } catch (error) {
-      input.runtimeStatusLoadState.value = 'error';
-      input.runtimeStatusError.value =
-        error instanceof Error ? error.message : 'runtime status request failed';
+  async function loadRuntimeStatus(forceRefresh = false): Promise<void> {
+    const hasCached = Boolean(input.runtimeStatus.value);
+
+    if (inflightStatus) {
+      return inflightStatus;
     }
+
+    if (!hasCached) {
+      input.runtimeStatusLoadState.value = 'loading';
+      input.runtimeStatusError.value = null;
+    }
+
+    inflightStatus = (async () => {
+      try {
+        const status = await fetchRuntimeStatus({ forceRefresh });
+        input.runtimeStatus.value = status;
+        input.runtimeStatusLoadState.value = 'loaded';
+        input.runtimeStatusError.value = null;
+      } catch (error) {
+        if (!hasCached) {
+          input.runtimeStatusLoadState.value = 'error';
+          input.runtimeStatusError.value =
+            error instanceof Error ? error.message : 'runtime status request failed';
+        }
+      } finally {
+        inflightStatus = null;
+      }
+    })();
+
+    return inflightStatus;
   }
 
   async function loadRuntimeMcpTools(): Promise<void> {
-    input.runtimeMcpToolsLoadState.value = 'loading';
+    const hasCached = Boolean(input.runtimeMcpTools.value);
+    if (!hasCached) {
+      input.runtimeMcpToolsLoadState.value = 'loading';
+    }
 
     try {
       input.runtimeMcpTools.value = await fetchRuntimeMcpTools();
       input.runtimeMcpToolsLoadState.value = 'loaded';
     } catch {
-      input.runtimeMcpTools.value = null;
-      input.runtimeMcpToolsLoadState.value = 'error';
+      if (!hasCached) {
+        input.runtimeMcpTools.value = null;
+        input.runtimeMcpToolsLoadState.value = 'error';
+      }
     }
   }
 

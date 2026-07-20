@@ -3,7 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
 import { fetchWorkspaceCompany } from '../../api/workspace-api';
 import type { CompanyEmployeeRecord, CompanyRosterRecord } from '../../contracts/canonical';
 
-const COMPANY_REFRESH_MS = 12_000;
+/** Shared poll interval for workspace company roster snapshots. */
+export const COMPANY_REFRESH_MS = 12_000;
 
 export function useWorkspaceCompany(currentWorkspaceId: Ref<string | null | undefined>) {
   const company = ref<CompanyRosterRecord | null>(null);
@@ -12,7 +13,7 @@ export function useWorkspaceCompany(currentWorkspaceId: Ref<string | null | unde
   const loadError = ref<string | null>(null);
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-  async function loadCompany(options?: { reason?: string }): Promise<void> {
+  async function loadCompany(options?: { background?: boolean }): Promise<void> {
     const workspaceId = currentWorkspaceId.value?.trim();
     if (!workspaceId) {
       company.value = null;
@@ -21,22 +22,27 @@ export function useWorkspaceCompany(currentWorkspaceId: Ref<string | null | unde
       return;
     }
 
-    loadState.value = 'loading';
-    loadError.value = null;
+    const background = options?.background === true && loadState.value === 'loaded';
+    if (!background) {
+      loadState.value = 'loading';
+      loadError.value = null;
+    }
     try {
       const snapshot = await fetchWorkspaceCompany(workspaceId);
       company.value = snapshot.company;
       loadState.value = 'loaded';
     } catch (error) {
-      loadState.value = 'error';
-      loadError.value = error instanceof Error ? error.message : 'workspace company request failed';
+      if (!background) {
+        loadState.value = 'error';
+        loadError.value = error instanceof Error ? error.message : 'workspace company request failed';
+      }
     }
   }
 
   onMounted(() => {
-    void loadCompany({ reason: 'mount' });
+    void loadCompany();
     refreshTimer = setInterval(() => {
-      void loadCompany({ reason: 'interval' });
+      void loadCompany({ background: true });
     }, COMPANY_REFRESH_MS);
   });
 
@@ -48,7 +54,7 @@ export function useWorkspaceCompany(currentWorkspaceId: Ref<string | null | unde
   });
 
   watch(currentWorkspaceId, () => {
-    void loadCompany({ reason: 'workspace-change' });
+    void loadCompany();
   });
 
   return {

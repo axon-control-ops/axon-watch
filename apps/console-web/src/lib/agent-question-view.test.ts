@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatAnsweredQuestionChoice,
   formatQuestionAnswer,
+  moveQuestionOptionSelection,
   parseAskOptions,
+  resolveAskBlockPrompt,
+  truncateQuestionOptionLabel,
   tryParseClarifyingMarkdown,
   withOtherQuestionOption,
 } from './agent-question-view';
@@ -68,6 +72,83 @@ describe('agent question view', () => {
         '\n',
       ),
     );
+  });
+
+  it('uses a short header prompt when ask body is a status dump', () => {
+    const dump = 'ActionRequiredError: out of usage. '.repeat(40);
+    const segments = parseAgentTranscriptBlocks(
+      [
+        ':::ask Ready to proceed?',
+        dump,
+        '- 1 | Added tests/test_connector_signal.py',
+        '- 2 | Updated scripts/verify/run_contract_unit_tests.sh',
+        ':::',
+      ].join('\n'),
+    );
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toMatchObject({
+      kind: 'question',
+      prompt: 'Ready to proceed?',
+    });
+  });
+
+  it('falls back to a generic prompt when ask body is prose without a header', () => {
+    const segments = parseAgentTranscriptBlocks(
+      [
+        ':::ask',
+        'ActionRequiredError: out of usage.',
+        'Coverage is still missing for connector signals.',
+        '- 1 | Added tests/test_connector_signal.py',
+        '- 2 | Updated scripts/verify/run_contract_unit_tests.sh',
+        ':::',
+      ].join('\n'),
+    );
+    expect(segments[0]).toMatchObject({
+      kind: 'question',
+      prompt: 'Choose an option to continue',
+    });
+  });
+
+  it('does not upgrade long status dumps into question cards', () => {
+    const text = [
+      'ActionRequiredError: out of usage.',
+      'Coverage is still missing for connector signals.',
+      '1. Added tests/test_connector_signal.py',
+      '2. Updated scripts/verify/run_contract_unit_tests.sh',
+    ].join('\n');
+    expect(tryParseClarifyingMarkdown(text)).toBeNull();
+  });
+
+  it('truncates long option labels for display', () => {
+    const label = 'Updated '.concat('scripts/verify/run_contract_unit_tests.sh '.repeat(8));
+    expect(truncateQuestionOptionLabel(label).endsWith('…')).toBe(true);
+    expect(resolveAskBlockPrompt({
+      headerPrompt: 'Proceed?',
+      bodyLines: [],
+      options: [{ id: '1', label: 'Yes' }],
+    })).toBe('Proceed?');
+  });
+
+  it('formats answered choices without raw option ids', () => {
+    expect(formatAnsweredQuestionChoice({ id: '2', label: 'Mobile remote control' })).toBe(
+      'Mobile remote control',
+    );
+    expect(formatAnsweredQuestionChoice({ id: 'other', label: 'Use local docs only' })).toBe(
+      'Use local docs only',
+    );
+    expect(formatAnsweredQuestionChoice({ id: 'other', label: 'Other' })).toBe('Other');
+  });
+
+  it('moves question option selection with wrap-around', () => {
+    const options = [
+      { id: '1', label: 'Alpha' },
+      { id: '2', label: 'Beta' },
+      { id: 'other', label: 'Other' },
+    ];
+    expect(moveQuestionOptionSelection(options, '1', 'next')).toBe('2');
+    expect(moveQuestionOptionSelection(options, '2', 'next')).toBe('other');
+    expect(moveQuestionOptionSelection(options, 'other', 'next')).toBe('1');
+    expect(moveQuestionOptionSelection(options, '1', 'prev')).toBe('other');
   });
 
   it('appends a single Other option and formats free-text answers', () => {

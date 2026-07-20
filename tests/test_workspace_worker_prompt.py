@@ -4,6 +4,7 @@ import unittest
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -27,6 +28,83 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("frontend", prompt)
         self.assertIn("Shell Craft", prompt)
         self.assertIn("Vue shell and IDE polish", prompt)
+
+    def test_backend_prompt_includes_ci_review_clause(self) -> None:
+        prompt = build_continuous_worker_prompt(
+            workspace_id="workspace_axon_watch",
+            employee=EmployeeConfig(
+                name="Control Plane",
+                role="backend",
+                owns="APIs, runs, approvals, and persistence",
+                schedule="continuous",
+            ),
+        )
+        self.assertIn("verify:contracts", prompt)
+        self.assertIn("Confidence: X/10", prompt)
+        self.assertNotIn("bare FAILED", prompt.replace("never a bare FAILED", ""))
+
+    def test_prompt_includes_prior_failure_detail_for_retry(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            return_value={
+                "run_id": "run_failed_backend",
+                "outcome": "failed",
+                "detail": "verify:contracts — test_run_outcome.py: assertion failed",
+                "phase": "failed",
+                "terminal": "1",
+            },
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Control Plane",
+                    role="backend",
+                    owns="APIs, runs, approvals, and persistence",
+                    schedule="continuous",
+                ),
+            )
+        self.assertIn("Prior shift failed (run run_failed_backend)", prompt)
+        self.assertIn("assertion failed", prompt)
+        self.assertIn("Prefer fixing or clearing that failure", prompt)
+
+    def test_prompt_omits_prior_failure_when_last_shift_completed(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            return_value={
+                "run_id": "run_ok_backend",
+                "outcome": "completed",
+                "detail": "Shipped scheduler controls with receipts.",
+                "phase": "completed",
+                "terminal": "1",
+            },
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Control Plane",
+                    role="backend",
+                    owns="APIs, runs, approvals, and persistence",
+                    schedule="continuous",
+                ),
+            )
+        self.assertNotIn("Prior shift failed", prompt)
+
+    def test_prompt_omits_prior_failure_for_control_plane_restart(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.latest_role_run_outcome",
+            return_value=None,
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Rowan",
+                    role="watcher",
+                    owns="signals, connectors, and runtime health",
+                    schedule="always_on",
+                ),
+            )
+        self.assertNotIn("Prior shift failed", prompt)
+        self.assertNotIn("control-plane restart", prompt)
 
 
 if __name__ == "__main__":

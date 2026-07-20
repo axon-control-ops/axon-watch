@@ -7,9 +7,12 @@ import type { PersonaMarkSize } from '../lib/operator-persona-mark-view';
 const props = withDefaults(
   defineProps<{
     size?: PersonaMarkSize | number;
+    /** Override glyph (e.g. employee initials). Defaults to VAXON mark. */
+    mark?: string | null;
   }>(),
   {
     size: 'md',
+    mark: null,
   },
 );
 
@@ -20,6 +23,11 @@ const sizeClass = computed(() =>
 const customStyle = computed(() =>
   typeof props.size === 'number' ? { fontSize: `${props.size}px` } : undefined,
 );
+
+const glyph = computed(() => {
+  const override = props.mark?.trim();
+  return override || OPERATOR_PERSONA_MARK;
+});
 </script>
 
 <template>
@@ -28,5 +36,5 @@ const customStyle = computed(() =>
     :class="sizeClass"
     :style="customStyle"
     aria-hidden="true"
-  >{{ OPERATOR_PERSONA_MARK }}</span>
+  >{{ glyph }}</span>
 </template>

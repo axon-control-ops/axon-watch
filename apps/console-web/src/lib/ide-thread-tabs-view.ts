@@ -51,6 +51,58 @@ export function ensureOpenIdeThreadTabs(
   return [];
 }
 
+/** True when every open tab is an untitled empty chat (or missing from catalog). */
+export function openIdeTabsAreOnlyPlaceholders(
+  openIds: readonly string[],
+  threads: readonly { thread_id: string; preview_label: string }[],
+): boolean {
+  if (!openIds.length) {
+    return true;
+  }
+  const byId = new Map(threads.map((thread) => [thread.thread_id, thread.preview_label]));
+  return openIds.every((id) => {
+    const label = byId.get(id);
+    const trimmed = String(label || '').trim().toLowerCase();
+    return !trimmed || trimmed === 'new chat';
+  });
+}
+
+/**
+ * When the tab strip is only empty "New chat" slots, reopen recent titled history
+ * so past conversations are one click away again.
+ */
+export function seedOpenIdeTabsFromHistory(input: {
+  openIds: readonly string[];
+  threads: readonly { thread_id: string; preview_label: string; updated_at?: string }[];
+  activeThreadId: string | null;
+  maxTabs?: number;
+}): string[] {
+  const maxTabs = input.maxTabs ?? 6;
+  const sorted = [...input.threads].sort((left, right) =>
+    String(right.updated_at || '').localeCompare(String(left.updated_at || '')),
+  );
+  const historyIds = sorted
+    .filter((thread) => {
+      const label = String(thread.preview_label || '').trim().toLowerCase();
+      return Boolean(label) && label !== 'new chat';
+    })
+    .map((thread) => thread.thread_id);
+
+  if (!historyIds.length) {
+    return ensureOpenIdeThreadTabs(input.openIds, input.activeThreadId);
+  }
+
+  if (!openIdeTabsAreOnlyPlaceholders(input.openIds, input.threads)) {
+    return ensureOpenIdeThreadTabs(input.openIds, input.activeThreadId);
+  }
+
+  let next = historyIds.slice(0, maxTabs);
+  if (input.activeThreadId?.trim() && !next.includes(input.activeThreadId.trim())) {
+    next = [input.activeThreadId.trim(), ...next].slice(0, maxTabs);
+  }
+  return next;
+}
+
 export function ideThreadTabTitle(previewLabel: string | null | undefined): string {
   return previewLabel?.trim() || 'New chat';
 }

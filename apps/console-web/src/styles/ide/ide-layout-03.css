@@ -172,30 +172,94 @@
 }
 
 .agent-dock-thread-tabbar {
+  display: flex;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
+  max-width: 100%;
   border-bottom: 0;
   background: transparent;
   padding-inline: 0.35rem 0.45rem;
 }
 
+/* flex-basis 0 forces a bounded width so overflow-x can scroll (not grow/clip). */
+.agent-dock-thread-tabbar.editor-tabbar--mockup .agent-dock-thread-tabbar__tabs,
 .agent-dock-thread-tabbar__tabs {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
+  width: 0;
   overflow-x: auto;
-  scrollbar-width: none;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  /* Inherit Cursor overlay scrollbar from mockup-shell-01 (do not set scrollbar-*). */
+  -webkit-overflow-scrolling: touch;
 }
 
-.agent-dock-thread-tabbar__tabs::-webkit-scrollbar {
-  display: none;
+.agent-dock-thread-tabbar__scroll {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  align-self: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0 0.05rem;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 6px;
+  background: rgba(8, 14, 22, 0.72);
+  color: rgba(186, 230, 253, 0.92);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__scroll:hover:not(:disabled) {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.agent-dock-thread-tabbar__scroll:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .agent-dock-thread-tabbar__tab {
+  flex: 0 0 auto;
   max-width: 9.5rem;
 }
 
 .agent-dock-thread-tabbar__tab-icon {
   flex-shrink: 0;
   color: rgba(191, 219, 254, 0.88);
+}
+
+.agent-dock-thread-tabbar__tab-fail-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  font-size: 0.48rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255, 230, 220, 0.98);
+  background: rgba(180, 45, 35, 0.95);
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95);
+}
+
+.agent-dock-thread-tabbar__tab--active .agent-dock-thread-tabbar__tab-fail-mark {
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95), 0 0 0 2px rgba(255, 110, 90, 0.45);
+}
+
+.agent-dock-thread-tabbar__tab--failed:not(.agent-dock-thread-tabbar__tab--active) {
+  border-color: rgba(255, 110, 90, 0.32);
+  background: rgba(90, 28, 24, 0.22);
+}
+
+.agent-dock-thread-tabbar__tab--failed.agent-dock-thread-tabbar__tab--active {
+  border-color: rgba(255, 110, 90, 0.52);
+  box-shadow: 0 0 0 1px rgba(255, 110, 90, 0.18);
 }
 
 .agent-dock-thread-tabbar__tab-label {
@@ -242,17 +306,17 @@
   position: absolute;
   top: calc(100% + 0.35rem);
   right: 0;
-  z-index: 12;
+  z-index: 80;
   display: flex;
   flex-direction: column;
   gap: 0.14rem;
-  width: 14rem;
-  max-height: 14rem;
+  width: min(18rem, 72vw);
+  max-height: min(22rem, 55vh);
   padding: 0.32rem;
   border: 1px solid rgba(138, 154, 173, 0.16);
   border-radius: 10px;
   background: rgba(10, 14, 20, 0.98);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   overflow: auto;
 }
 
@@ -293,11 +357,37 @@
   min-width: 0;
 }
 
+.agent-dock-thread-tabbar__history-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.agent-dock-thread-tabbar__history-fail-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  font-size: 0.48rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255, 230, 220, 0.98);
+  background: rgba(180, 45, 35, 0.95);
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95);
+}
+
 .agent-dock-thread-tabbar__history-label,
 .agent-dock-thread-tabbar__history-meta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agent-dock-thread-tabbar__history-item--failed .agent-dock-thread-tabbar__history-label {
+  color: rgba(255, 210, 200, 0.95);
 }
 
 .agent-dock-thread-tabbar__history-meta {
@@ -318,6 +408,11 @@
 .agent-dock-thread-tabbar__history-item:hover,
 .agent-dock-thread-tabbar__history-item--active {
   background: rgba(0, 242, 255, 0.08);
+}
+
+.agent-dock-thread-tabbar__history-item--failed:hover,
+.agent-dock-thread-tabbar__history-item--failed.agent-dock-thread-tabbar__history-item--active {
+  background: rgba(120, 40, 32, 0.22);
 }
 
 .agent-dock-workspace-menu__item:hover,

@@ -202,6 +202,9 @@ def workspace_chat_threads_create(
             workspace_id,
             thread_kind=body.surface,
             run_id=body.run_id,
+            title=body.title,
+            employee_id=body.employee_id,
+            employee_role=body.employee_role,
         )
     except WorkspaceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

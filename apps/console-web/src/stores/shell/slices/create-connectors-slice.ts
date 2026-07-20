@@ -24,27 +24,47 @@ interface CreateConnectorsSliceInput {
   connectorsLoadState: Ref<ConnectorsLoadState>;
   connectorsError: Ref<string | null>;
   connectorMutationPending: Ref<boolean>;
-  loadRuntimeSummary: () => Promise<void>;
+  loadRuntimeSummary: (options?: { background?: boolean }) => Promise<void>;
   loadInbox: () => Promise<void>;
   loadOperatorBriefing: () => Promise<void>;
   loadOperatorFleetHealth: () => Promise<void>;
 }
 
 export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
-  async function loadConnectors(): Promise<void> {
-    input.connectorsLoadState.value = 'loading';
-    input.connectorsError.value = null;
+  let inflightConnectors: Promise<void> | null = null;
 
-    try {
-      const snapshot = await fetchConnectors();
-      input.connectorsItems.value = snapshot.items;
-      input.connectorsSummary.value = snapshot.summary;
-      input.connectorsLoadState.value = 'loaded';
-    } catch (error) {
-      input.connectorsLoadState.value = 'error';
-      input.connectorsError.value =
-        error instanceof Error ? error.message : 'connectors request failed';
+  async function loadConnectors(options?: { background?: boolean }): Promise<void> {
+    const hasCached = input.connectorsLoadState.value === 'loaded' && input.connectorsSummary.value;
+    const background = options?.background === true || hasCached;
+
+    if (inflightConnectors) {
+      return inflightConnectors;
     }
+
+    if (!background) {
+      input.connectorsLoadState.value = 'loading';
+      input.connectorsError.value = null;
+    }
+
+    inflightConnectors = (async () => {
+      try {
+        const snapshot = await fetchConnectors();
+        input.connectorsItems.value = snapshot.items;
+        input.connectorsSummary.value = snapshot.summary;
+        input.connectorsLoadState.value = 'loaded';
+        input.connectorsError.value = null;
+      } catch (error) {
+        if (!hasCached) {
+          input.connectorsLoadState.value = 'error';
+          input.connectorsError.value =
+            error instanceof Error ? error.message : 'connectors request failed';
+        }
+      } finally {
+        inflightConnectors = null;
+      }
+    })();
+
+    return inflightConnectors;
   }
 
   async function reprobeConnector(connectorId: string): Promise<void> {
@@ -59,8 +79,8 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
         requested_by: 'operator',
       });
       await Promise.all([
-        loadConnectors(),
-        input.loadRuntimeSummary(),
+        loadConnectors({ background: true }),
+        input.loadRuntimeSummary({ background: true }),
         input.loadInbox(),
       ]);
     } catch (error) {
@@ -81,8 +101,8 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
         requested_by: 'operator',
       });
       await Promise.all([
-        loadConnectors(),
-        input.loadRuntimeSummary(),
+        loadConnectors({ background: true }),
+        input.loadRuntimeSummary({ background: true }),
         input.loadInbox(),
         input.loadOperatorBriefing(),
         input.loadOperatorFleetHealth(),
@@ -102,8 +122,8 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
     try {
       await startTunnel();
       await Promise.all([
-        loadConnectors(),
-        input.loadRuntimeSummary(),
+        loadConnectors({ background: true }),
+        input.loadRuntimeSummary({ background: true }),
         input.loadInbox(),
       ]);
     } catch (error) {
@@ -121,8 +141,8 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
     try {
       await stopTunnel();
       await Promise.all([
-        loadConnectors(),
-        input.loadRuntimeSummary(),
+        loadConnectors({ background: true }),
+        input.loadRuntimeSummary({ background: true }),
         input.loadInbox(),
       ]);
     } catch (error) {

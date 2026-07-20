@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from app.probe_failure_detail import format_probe_failure
 from app.signals.iso_time import utc_now_iso
 from app.tunnel.cloudflared_binary import cloudflared_version, find_cloudflared_binary
 from app.tunnel.native_process import managed_process_snapshot
@@ -65,7 +66,7 @@ def _probe_http(url: str, *, timeout_seconds: float = 3.0) -> tuple[bool, int | 
             return True, latency_ms, "reachable"
     except (URLError, TimeoutError, OSError, ValueError) as exc:
         latency_ms = int((time.monotonic() - started) * 1000)
-        return False, latency_ms, str(exc) or "probe failed"
+        return False, latency_ms, format_probe_failure(exc, url)
 
 
 def _classify_public_health_body(body: str) -> tuple[bool, str]:
@@ -118,7 +119,7 @@ def _probe_public_axon_x(
             return is_axon_x, latency_ms, detail
     except (URLError, TimeoutError, OSError, ValueError) as exc:
         latency_ms = int((time.monotonic() - started) * 1000)
-        return False, latency_ms, str(exc) or "probe failed"
+        return False, latency_ms, format_probe_failure(exc, url)
 
 
 def _tunnel_process_running(binary_path: str) -> bool:
@@ -278,6 +279,22 @@ def build_tunnel_diagnostics(config: dict[str, object] | None = None) -> dict[st
     elif not process_running:
         status = "degraded"
         detail = f"tunnel stopped (auth={auth_source})"
+        if process_count > 0:
+            plural = "process" if process_count == 1 else "processes"
+            detail = (
+                f"{detail}; {process_count} cloudflared {plural} on host "
+                "but none match the managed Axon-X tunnel"
+            )
+        if (
+            tunnel_mode == "named"
+            and remote_service
+            and not ingress_matches_axon
+            and not soft_origin_cutover
+        ):
+            detail = (
+                f"{detail}; remote ingress still points at {remote_service}; "
+                f"expected {expected_origin}"
+            )
     elif process_count > 1:
         status = "degraded"
         detail = (

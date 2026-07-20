@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+BIN_DIR="$(cd -- "$(dirname -- "${SCRIPT_PATH}")" && pwd)"
+REPO_ROOT="$(cd -- "$BIN_DIR/.." && pwd)"
+exec "$REPO_ROOT/scripts/ops/axonrestart.sh" "$@"

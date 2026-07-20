@@ -47,7 +47,7 @@ export function buildRequiredConnectorAlertChip(
     return null;
   }
 
-  if (input.connectorsLoadState !== 'loaded' || !input.summary) {
+  if (!input.summary) {
     return null;
   }
 
@@ -84,7 +84,7 @@ export function buildConnectorGlanceChip(
     return null;
   }
 
-  if (input.connectorsLoadState !== 'loaded' || !input.summary) {
+  if (!input.summary) {
     return null;
   }
 

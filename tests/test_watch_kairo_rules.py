@@ -65,6 +65,49 @@ class WatchKairoRuleTests(unittest.TestCase):
         self.assertEqual("observe", rule["mode"])
         self.assertFalse(rule["interrupts"])
 
+    def test_required_connector_failure_uses_advise_and_interrupts(self) -> None:
+        from unittest.mock import patch
+
+        probe_detail = "Connection refused on http://127.0.0.1:4173/api/health"
+        connector_records = [
+            {
+                "connector_id": "control_plane",
+                "display_name": "Control plane",
+                "health_url": "http://127.0.0.1:8787/api/health",
+                "required": True,
+                "workspace_id": "workspace_axon_watch",
+                "status": "ok",
+                "detail": "ok",
+                "last_checked_at": "2026-07-18T08:00:00Z",
+                "latency_ms": 1,
+            },
+            {
+                "connector_id": "console_web",
+                "display_name": "Console web",
+                "health_url": "http://127.0.0.1:4173/api/health",
+                "required": True,
+                "workspace_id": "workspace_axon_watch",
+                "status": "unavailable",
+                "detail": probe_detail,
+                "last_checked_at": "2026-07-18T08:00:00Z",
+                "latency_ms": 1,
+            },
+        ]
+        with patch(
+            "app.main.probe_all_connectors",
+            return_value=connector_records,
+        ), patch(
+            "app.signals.store.probe_monitor_records",
+            return_value=[],
+        ):
+            item = self._inbox_item("signal_connector_console_web_unavailable")
+
+        rule = item["watch_rule"]
+        self.assertEqual("advise", rule["mode"])
+        self.assertEqual("high_urgency_signal", rule["reason"])
+        self.assertTrue(rule["interrupts"])
+        self.assertEqual(probe_detail, item["summary"])
+
     def test_watch_rule_modes_are_canonical(self) -> None:
         from app.signals.watch_rule import watch_rule_for_inbox_item  # noqa: WPS433
 

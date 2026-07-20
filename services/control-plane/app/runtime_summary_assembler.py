@@ -11,7 +11,12 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from app.adapters.watch_client import fetch_watch_inbox, fetch_watch_summary
-from app.cli_runtime.catalog import runtime_identity_snapshot, runtime_status_snapshot
+from app.probe_failure_detail import format_probe_failure
+from app.cli_runtime.catalog import (
+    runtime_identity_snapshot,
+    runtime_status_snapshot,
+    schedule_runtime_status_refresh,
+)
 from app.cli_runtime.readiness import cli_runtime_degraded_reasons, summarize_cli_runtime_readiness
 from app.operator_briefing_signals import summarize_actionable_inbox
 from app.runs.service import (
@@ -60,8 +65,10 @@ def default_watch_probe(timeout_seconds: float = 0.5) -> tuple[bool, str, str | 
         request = Request(url, headers={"Accept": "application/json"})
         with urlopen(request, timeout=timeout_seconds) as response:
             body = json.loads(response.read().decode("utf-8"))
-    except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
-        return False, "unavailable", "watch probe failed", generated_at
+    except (URLError, TimeoutError, OSError) as exc:
+        return False, "unavailable", format_probe_failure(exc, url), generated_at
+    except (json.JSONDecodeError, ValueError):
+        return False, "unavailable", "watch health returned invalid response", generated_at
 
     status = str(body.get("status", "unknown"))
     if status == "ok":
@@ -113,6 +120,45 @@ def _signals_summary_from_inbox(
     }
 
 
+def _connector_inbox_reasons(watch_inbox: dict[str, object] | None) -> list[str]:
+    reasons: list[str] = []
+    if not watch_inbox:
+        return reasons
+
+    items = watch_inbox.get("items", [])
+    if not isinstance(items, list):
+        return reasons
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("source", "")).strip() != "connector":
+            continue
+        summary = str(item.get("summary", "")).strip()
+        if summary and summary not in reasons:
+            reasons.append(summary)
+    return reasons
+
+
+def _connector_degraded_reasons(
+    watch_inbox: dict[str, object] | None,
+    watch_summary: dict[str, object] | None,
+    *,
+    generated_at: str,
+) -> list[str]:
+    """Surface operator-readable connector probe failures in runtime degraded reasons."""
+    reasons = _connector_inbox_reasons(watch_inbox)
+    if reasons:
+        return reasons
+
+    connectors = _connectors_summary_from_watch(watch_summary, generated_at)
+    required_unavailable = int(connectors.get("required_unavailable", 0))
+    if required_unavailable <= 0:
+        return []
+
+    return [f"{required_unavailable} required connector(s) unavailable"]
+
+
 def _connectors_summary_from_watch(
     watch_summary: dict[str, object] | None,
     generated_at: str,
@@ -158,20 +204,26 @@ def assemble_runtime_summary(
         # Presence ticks must not wait on watch summary or CLI auth rebuilds.
         watch_inbox = None
         watch_summary = None
-        cli_status_snapshot = runtime_status_snapshot(allow_stale=True)
     else:
         watch_inbox = inbox_loader() if watch_connected else None
         watch_summary = summary_loader() if watch_connected else None
-        cli_status_snapshot = runtime_status_snapshot(force_refresh=False)
+
+    # Always SWR for CLI auth — cold `cursor agent status` must not stall topbar.
+    cli_status_snapshot = runtime_status_snapshot(allow_stale=True)
+    schedule_runtime_status_refresh()
 
     degraded_reasons: list[str] = []
     if not watch_connected and watch_degraded_reason:
         degraded_reasons.append(watch_degraded_reason)
 
     connectors = _connectors_summary_from_watch(watch_summary, generated_at)
-    if watch_connected and connectors["required_unavailable"] > 0:
-        degraded_reasons.append(
-            f"{connectors['required_unavailable']} required connector(s) unavailable",
+    if watch_connected:
+        degraded_reasons.extend(
+            _connector_degraded_reasons(
+                watch_inbox,
+                watch_summary,
+                generated_at=generated_at,
+            )
         )
 
     cli_runtime = summarize_cli_runtime_readiness(cli_status_snapshot)

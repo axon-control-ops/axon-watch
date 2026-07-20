@@ -44,6 +44,15 @@ def list_operator_facing_active_runs() -> list[dict[str, Any]]:
     ]
 
 
+def is_employee_shift_run(record: dict[str, Any]) -> bool:
+    """True when a run was started as a roster employee continuous shift."""
+    return is_background_employee_run(record)
+
+
+def list_active_employee_runs() -> list[dict[str, Any]]:
+    return [record for record in list_active_runs() if is_employee_shift_run(record)]
+
+
 def list_pending_approval_runs() -> list[dict[str, Any]]:
     return [record for record in run_store.list_runs() if record["phase"] == "awaiting_approval"]
 
@@ -83,6 +92,8 @@ def to_runtime_summary_active_run(record: dict[str, Any]) -> dict[str, Any]:
 __all__ = [
     "approval_summary",
     "is_background_employee_run",
+    "is_employee_shift_run",
+    "list_active_employee_runs",
     "list_active_runs",
     "list_operator_facing_runs",
     "list_operator_facing_active_runs",

@@ -15,6 +15,7 @@ DEPLOYMENT_ENV_EXAMPLE = REPO_ROOT / "config" / "deployment.env.example"
 LOCAL_ENV_EXAMPLE = REPO_ROOT / ".env.example"
 CADDY_EXAMPLE = REPO_ROOT / "infra" / "caddy" / "Caddyfile.example"
 SYSTEMD_DIR = REPO_ROOT / "infra" / "systemd"
+SYSTEMD_USER_DIR = SYSTEMD_DIR / "user"
 
 REQUIRED_DEPLOYMENT_KEYS = {
     "AXON_WATCH_DEPLOYMENT_MODE",
@@ -140,12 +141,63 @@ def validate_systemd_units() -> list[str]:
     return errors
 
 
+def validate_user_systemd_units() -> list[str]:
+    errors: list[str] = []
+    expected = (
+        "axon-watch.service",
+        "control-plane.service",
+        "console-web.service",
+    )
+    for name in expected:
+        path = SYSTEMD_USER_DIR / name
+        if not path.is_file():
+            errors.append(f"missing user systemd unit: infra/systemd/user/{name}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "EnvironmentFile=" not in text:
+            errors.append(f"user {name} must reference EnvironmentFile=")
+        if "run-service.sh" not in text:
+            errors.append(f"user {name} must invoke scripts/ops/run-service.sh")
+    return errors
+
+
+def validate_bin_wrappers() -> list[str]:
+    errors: list[str] = []
+    expected = (
+        ("axonhealth", "axonhealth.sh"),
+        ("axonrestart", "axonrestart.sh"),
+        ("axonrevive", "axonrevive.sh"),
+    )
+    for bin_name, script_name in expected:
+        bin_path = REPO_ROOT / "bin" / bin_name
+        script_path = REPO_ROOT / "scripts" / "ops" / script_name
+        if not bin_path.is_file():
+            errors.append(f"missing bin wrapper: bin/{bin_name}")
+            continue
+        if not script_path.is_file():
+            errors.append(f"missing ops script: scripts/ops/{script_name}")
+            continue
+        if not bin_path.stat().st_mode & 0o111:
+            errors.append(f"bin/{bin_name} must be executable")
+        if not script_path.stat().st_mode & 0o111:
+            errors.append(f"scripts/ops/{script_name} must be executable")
+        bin_text = bin_path.read_text(encoding="utf-8")
+        if f"scripts/ops/{script_name}" not in bin_text:
+            errors.append(f"bin/{bin_name} must exec scripts/ops/{script_name}")
+    install_script = REPO_ROOT / "scripts" / "ops" / "install-bin-wrappers.sh"
+    if not install_script.is_file():
+        errors.append("missing scripts/ops/install-bin-wrappers.sh")
+    return errors
+
+
 def run_validation() -> list[str]:
     errors: list[str] = []
     errors.extend(validate_topology())
     errors.extend(validate_deployment_env_example())
     errors.extend(validate_caddy_example())
     errors.extend(validate_systemd_units())
+    errors.extend(validate_user_systemd_units())
+    errors.extend(validate_bin_wrappers())
     return errors
 
 

@@ -141,11 +141,6 @@
   color: rgba(0, 242, 255, 0.78);
 }
 
-.settings-surface__primary {
-  border-color: rgba(0, 242, 255, 0.45) !important;
-  background: rgba(0, 242, 255, 0.16) !important;
-}
-
 .email-settings-panel__vault-callout {
   display: grid;
   gap: 0.75rem;

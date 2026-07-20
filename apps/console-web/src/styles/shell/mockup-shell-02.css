@@ -247,7 +247,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   flex-shrink: 0;
-  scrollbar-width: thin;
 }
 
 .attention-stack--sidebar .dock-run-receipts__label {

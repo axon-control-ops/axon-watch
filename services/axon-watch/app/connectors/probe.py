@@ -8,6 +8,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from app.connectors.catalog import WatchConnectorDefinition
+from app.probe_failure_detail import format_probe_failure
 from app.signals.iso_time import utc_now_iso
 
 ConnectorStatus = str  # ok | degraded | unavailable
@@ -62,5 +63,5 @@ def probe_connector(
         latency_ms = int((time.monotonic() - started) * 1000)
         record["latency_ms"] = latency_ms
         record["status"] = "unavailable"
-        record["detail"] = str(exc) or "probe failed"
+        record["detail"] = format_probe_failure(exc, definition.health_url)
         return record

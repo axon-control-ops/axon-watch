@@ -1,0 +1,59 @@
+.ide-panel-search {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0.55rem;
+  padding: 0.65rem;
+}
+
+.ide-panel-search__input {
+  width: 100%;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+  border-radius: 8px;
+  background: rgba(10, 14, 20, 0.9);
+  color: var(--text-primary);
+  padding: 0.45rem 0.55rem;
+}
+
+.ide-panel-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.ide-panel-list__button {
+  width: 100%;
+  border: 1px solid rgba(138, 154, 173, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(210, 220, 230, 0.94);
+  padding: 0.42rem 0.5rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ide-panel-list__button:hover {
+  border-color: rgba(0, 242, 255, 0.2);
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.ide-panel-caption {
+  margin: 0;
+}
+
+.ide-panel-action {
+  align-self: flex-start;
+  border: 1px solid rgba(255, 111, 111, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 111, 111, 0.08);
+  color: #ffb4b4;
+  padding: 0.28rem 0.65rem;
+  cursor: pointer;
+}

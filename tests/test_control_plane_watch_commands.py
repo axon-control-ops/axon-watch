@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from tests.support.control_plane_db import isolate_control_plane_db
 from tests.support.ephemeral_uvicorn import EphemeralUvicorn
-from tests.support.watch_app_loader import load_watch_app, restore_app_modules
+from tests.support.watch_app_loader import load_control_plane_watch_pair, restore_app_modules
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -21,8 +21,8 @@ from app.persistence import run_store  # noqa: E402
 
 class ControlPlaneWatchCommandsTests(unittest.TestCase):
     def setUp(self) -> None:
-        watch_app, self._watch_modules = load_watch_app()
-        self._watch_server = EphemeralUvicorn(watch_app)
+        watch_asgi, self._control_plane_modules = load_control_plane_watch_pair()
+        self._watch_server = EphemeralUvicorn(watch_asgi)
         self._watch_server.start("/internal/watch/health")
 
         isolate_control_plane_db(self, run_store)
@@ -39,7 +39,7 @@ class ControlPlaneWatchCommandsTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self._watch_server.stop()
-        restore_app_modules(self._watch_modules)
+        restore_app_modules(self._control_plane_modules)
 
     def test_watch_command_proxy_reprobe_connector(self) -> None:
         response = self.client.post(

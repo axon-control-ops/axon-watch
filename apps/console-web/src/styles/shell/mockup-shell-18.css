@@ -184,7 +184,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   --hud-surface-fill: rgba(0, 8, 14, 0.82);
 }
 

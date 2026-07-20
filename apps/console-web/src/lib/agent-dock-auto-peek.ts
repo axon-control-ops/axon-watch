@@ -66,3 +66,32 @@ export function shouldAutoPeekAgentDockForRun(input: AgentDockRunAutoPeekInput):
 
   return !input.alreadyPeekedRunIds.has(runId);
 }
+
+export type AgentDockEmployeeFailureAutoPeekInput = {
+  layoutMode: 'operator' | 'ide';
+  agentDockCollapsed: boolean;
+  employeeFailureLine: string | null;
+  employeeFailurePeekKey: string | null;
+  agentStreamActive: boolean;
+  alreadyPeekedFailureKeys: ReadonlySet<string>;
+};
+
+/** Expand the agent dock once when a teammate shift fails while the dock is collapsed. */
+export function shouldAutoPeekAgentDockForEmployeeFailure(
+  input: AgentDockEmployeeFailureAutoPeekInput,
+): boolean {
+  if (input.layoutMode !== 'ide' || !input.agentDockCollapsed) {
+    return false;
+  }
+
+  if (input.agentStreamActive) {
+    return false;
+  }
+
+  const peekKey = input.employeeFailurePeekKey?.trim() ?? '';
+  if (!peekKey || !input.employeeFailureLine) {
+    return false;
+  }
+
+  return !input.alreadyPeekedFailureKeys.has(peekKey);
+}

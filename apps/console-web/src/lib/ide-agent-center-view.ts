@@ -226,23 +226,34 @@ export function shouldShowIdeAgentReviewStrip(input: {
   return input.editedFileCount > 0;
 }
 
-export function parseIdeAgentThreadStatusLabel(label: string): { body: string } {
+export function parseIdeAgentThreadStatusLabel(
+  label: string,
+  personaName: string = OPERATOR_PERSONA_NAME,
+): { body: string } {
   const trimmed = label.trim();
+  const name = personaName.trim() || OPERATOR_PERSONA_NAME;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = trimmed.match(
-    new RegExp(`^(?:${OPERATOR_PERSONA_NAME}|X|KAIRO)\\s*[—-]\\s*(.+)$`, 'i'),
+    new RegExp(`^(?:${escaped}|${OPERATOR_PERSONA_NAME}|X|KAIRO)\\s*[—-]\\s*(.+)$`, 'i'),
   );
   return { body: match?.[1]?.trim() || trimmed };
 }
 
 export function buildIdeAgentThreadStatusLabel(input: {
   activityLabel: string | null | undefined;
+  personaName?: string | null;
 }): string {
+  const persona = input.personaName?.trim() || OPERATOR_PERSONA_NAME;
   const label = String(input.activityLabel ?? 'Agent is working…').trim();
-  if (new RegExp(`^${OPERATOR_PERSONA_NAME}\\b`, 'i').test(label)) {
+  const escaped = persona.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (new RegExp(`^(?:${escaped}|${OPERATOR_PERSONA_NAME})\\b`, 'i').test(label)) {
     return label;
   }
-  const body = label.replace(new RegExp(`^(?:${OPERATOR_PERSONA_NAME}|KAIRO)[:\\s—-]+`, 'i'), '').trim() || 'Agent is working…';
-  return personaThreadPrefix(body);
+  const body =
+    label
+      .replace(new RegExp(`^(?:${escaped}|${OPERATOR_PERSONA_NAME}|KAIRO)[:\\s—-]+`, 'i'), '')
+      .trim() || 'Agent is working…';
+  return personaThreadPrefix(body, persona);
 }
 
 export function shouldShowIdeAgentThreadStatusStrip(input: {

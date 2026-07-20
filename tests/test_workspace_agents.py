@@ -91,6 +91,17 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
                 role_run_status="executing",
             ),
         )
+        # Single-employee rosters auto-mark primary; specialists still mirror their shift.
+        self.assertEqual(
+            "executing",
+            employee_status(
+                role="backend",
+                schedule="continuous",
+                workspace_status="idle",
+                primary=True,
+                role_run_status="executing",
+            ),
+        )
         self.assertEqual(
             "verifying",
             employee_status(
@@ -134,7 +145,7 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
             self.assertEqual("Demo-only work", configs["workspace_demo"].owns)
             self.assertEqual("{display_name} Agent", defaults["name_template"])
 
-    def test_builds_default_agent_name_from_display_name(self) -> None:
+    def test_builds_default_agent_name_from_role_catalog(self) -> None:
         record = build_workspace_agent_record(
             "workspace_demo",
             record={
@@ -151,7 +162,8 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
             companies={},
             staffing_template=[{"role": "lead", "schedule": "on_demand"}],
         )
-        self.assertEqual("DashPro Lead", record["agent_name"])
+        # Default staffing uses catalog persona names, not "{display_name} Lead".
+        self.assertEqual("Mira", record["agent_name"])
         self.assertEqual("workspace-agent-workspace_demo", record["agent_id"])
         self.assertEqual("lead", record["role"])
 

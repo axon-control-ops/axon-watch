@@ -74,6 +74,35 @@ export function ideDisplayKairoState(
   return state;
 }
 
+/** Surface a failed teammate shift on the compact Kairo chip when nothing else is live. */
+export function resolveIdeKairoChipState(input: {
+  profileState: KairoPresenceState;
+  employeeFailureLine: string | null;
+  agentStreamActive: boolean;
+  kairoSpeechActive: boolean;
+}): KairoPresenceState {
+  if (
+    input.employeeFailureLine &&
+    !input.agentStreamActive &&
+    !input.kairoSpeechActive &&
+    input.profileState === 'idle'
+  ) {
+    return 'alerting';
+  }
+
+  return input.profileState;
+}
+
+/** Composer dock, sidebar, and footer share this gate for failure chrome. */
+export function shouldSurfaceIdeEmployeeFailure(input: {
+  profileState: KairoPresenceState;
+  employeeFailureLine: string | null;
+  agentStreamActive: boolean;
+  kairoSpeechActive: boolean;
+}): boolean {
+  return resolveIdeKairoChipState(input) === 'alerting';
+}
+
 export function ideShowKairoSidebarExpanded(profile: IdePresenceProfile): boolean {
   return profile === 'interrupt' || profile === 'voice';
 }

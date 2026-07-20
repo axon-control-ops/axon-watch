@@ -13,11 +13,11 @@ from tests.support.control_plane_db import isolate_control_plane_db
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.persistence import run_store  # noqa: E402
-from app.runs.service import create_run, get_run  # noqa: E402
+from app.persistence import run_store, worker_scheduler_settings_store  # noqa: E402
+from app.runs.service import create_run, fail_run, get_run, stop_run  # noqa: E402
 from app.workspace_agents import build_company_roster  # noqa: E402
 from app.workspace_agents.scheduler import run_continuous_worker_tick  # noqa: E402
-from app.workspace_agents.status import active_role_run_status  # noqa: E402
+from app.workspace_agents.status import active_role_run_id, active_role_run_status  # noqa: E402
 
 
 class WorkspaceAgentSchedulerTests(unittest.TestCase):
@@ -53,6 +53,19 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         assert stored is not None
         self.assertEqual("frontend", stored.get("employee_role"))
         self.assertEqual("executing", active_role_run_status("workspace_role_tag", "frontend"))
+
+    def test_active_role_run_helpers_ignore_paused_shift(self) -> None:
+        created = create_run(
+            workspace_id="workspace_role_paused",
+            mode="agent",
+            summary="Backend continuous shift",
+            employee_role="backend",
+        )
+        run_id = str(created["run_id"])
+        stop_run(run_id)
+        self.assertEqual("paused", get_run(run_id)["phase"])
+        self.assertIsNone(active_role_run_status("workspace_role_paused", "backend"))
+        self.assertIsNone(active_role_run_id("workspace_role_paused", "backend"))
 
     def test_company_roster_specialist_reflects_role_tagged_run(self) -> None:
         create_run(
@@ -144,6 +157,7 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                 },
                 clear=False,
             ):
+                worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
                 first = run_continuous_worker_tick()
                 second = run_continuous_worker_tick()
 
@@ -222,6 +236,56 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         history = run_store.list_history(get_run(run_id)["history_ref"])
         receipt_types = [str(item.get("receipt", {}).get("type") or "") for item in history]
         self.assertIn("worker_dispatch_started", receipt_types)
+
+    def test_continuous_worker_tick_skips_role_after_usage_limit_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            agents_file = Path(tempdir) / "agents.json"
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_axon_watch": {
+                                "company_name": "Axon-X",
+                                "employees": [
+                                    {
+                                        "name": "Quinn",
+                                        "role": "integrations",
+                                        "schedule": "continuous",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_WORKER_SCHEDULER": "1",
+                    "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
+                },
+                clear=False,
+            ):
+                worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
+                failed = create_run(
+                    workspace_id="workspace_axon_watch",
+                    mode="agent",
+                    summary="Quinn: continuous worker shift",
+                    employee_role="integrations",
+                )
+                fail_run(
+                    failed["run_id"],
+                    receipt_summary=(
+                        "Lane B agent fallback reply generated "
+                        "(ActionRequiredError: Increase limits for faster responses "
+                        "You're out of usage.)"
+                    ),
+                )
+                started = run_continuous_worker_tick()
+
+        self.assertEqual([], started)
 
 
 if __name__ == "__main__":

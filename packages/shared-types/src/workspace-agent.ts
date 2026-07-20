@@ -70,6 +70,10 @@ export interface CompanyEmployeeRecord {
   /** Human-readable failure/success detail — never bare FAILED. */
   last_outcome_detail?: string | null;
   last_run_id?: string | null;
+  /** Newest non-terminal role-tagged run, when a shift is in progress. */
+  active_run_id?: string | null;
+  /** Optional Azure neural voice for Talk / teammate TTS (falls back to operator voice). */
+  azure_voice_id?: string | null;
 }
 
 export interface CompanyRosterRecord {

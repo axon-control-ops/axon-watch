@@ -30,7 +30,15 @@ system units:
 ./scripts/ops/install-user-always-on.sh --takeover   # hand ports to systemd
 ```
 
-Units live under `infra/systemd/user/` and install to `~/.config/systemd/user/`.
-This keeps watch + control-plane restarting on failure; it does not invent
-cloud agent execution. Remote phone access still needs a working Cloudflare
-tunnel token.
+Units live under `infra/systemd/user/` (`axon-watch`, `control-plane`, `console-web`)
+and install to `~/.config/systemd/user/`. This keeps all three stack services
+restarting on failure. Legacy axon-local **:7734** is not started — run
+`./scripts/ops/disable-legacy-7734-autostart.sh` (also invoked by the installer).
+
+Memory caps (user units) stop one runaway service from freezing the desktop:
+control-plane MemoryMax=5G, console-web 1G, axon-watch 800M.
+
+One-word health/restart commands (`axonhealth`, `axonrestart`, `axonrevive`) install
+via `./scripts/ops/install-bin-wrappers.sh` (included in `install-user-always-on.sh`).
+
+Remote phone access still needs a working Cloudflare tunnel token.

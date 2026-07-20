@@ -32,7 +32,10 @@ const RESEARCH_HEADER_RE = /^:::research\s+/;
 const DEBUG_REPRODUCE_HEADER_RE = /^:::debug-reproduce\s*$/;
 const BLOCK_CLOSE_RE = /^:::\s*$/;
 
-export function createAgentStreamIncrementalState(): AgentStreamIncrementalState {
+export function createAgentStreamIncrementalState(options?: {
+  personaName?: string | null;
+}): AgentStreamIncrementalState {
+  const personaName = options?.personaName?.trim() || undefined;
   let processedLength = 0;
   let lineBuffer = '';
   let inBlock: 'thinking' | 'other' | null = null;
@@ -46,6 +49,10 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
   let terminalCount = 0;
   let researchCount = 0;
   let lastToolLabel = '';
+
+  function prefixLabel(body: string): string {
+    return personaName ? personaThreadPrefix(body, personaName) : personaThreadPrefix(body);
+  }
 
   function reset(): void {
     processedLength = 0;
@@ -213,7 +220,7 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
       if (sanitized) {
         const displayBody = truncateAgentLiveLineForDisplay(sanitized, AGENT_LIVE_LINE_DISPLAY_MAX);
         return {
-          label: personaThreadPrefix(displayBody),
+          label: prefixLabel(displayBody),
           liveBodyFull: sanitized,
           liveBodySpoken: firstSpeakableAgentLiveBlock(sanitized),
           liveBodyTruncated: isAgentLiveLineTruncated(sanitized, displayBody),
@@ -221,7 +228,7 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
       }
       const fallback = fullAccess ? 'Full Access agent running…' : 'Agent running…';
       return {
-        label: personaThreadPrefix(fallback),
+        label: prefixLabel(fallback),
         liveBodyFull: null,
         liveBodySpoken: null,
         liveBodyTruncated: false,
@@ -230,7 +237,7 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
 
     if (lastToolLabel) {
       return {
-        label: personaThreadPrefix(lastToolLabel),
+        label: prefixLabel(lastToolLabel),
         liveBodyFull: lastToolLabel,
         liveBodySpoken: firstSpeakableAgentLiveBlock(lastToolLabel),
         liveBodyTruncated: false,
@@ -239,7 +246,7 @@ export function createAgentStreamIncrementalState(): AgentStreamIncrementalState
 
     const fallback = fullAccess ? 'Full Access agent running…' : 'Agent running…';
     return {
-      label: personaThreadPrefix(fallback),
+      label: prefixLabel(fallback),
       liveBodyFull: null,
       liveBodySpoken: null,
       liveBodyTruncated: false,

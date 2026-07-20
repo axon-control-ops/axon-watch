@@ -33,6 +33,7 @@ export interface WatchObservationSnapshot {
   last_command_id?: string;
   last_command_status?: string;
   last_command_at?: string;
+  last_command_detail?: string;
   receipts_count?: number;
   last_receipt_at?: string;
   last_receipt_result?: string;
