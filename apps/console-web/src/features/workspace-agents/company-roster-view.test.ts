@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   companyFailedEmployees,
   companyFailedEmployeesHint,
+  companyFailedEmployeesHintTooltip,
   companyHasFailedEmployees,
   companyHasWorkingEmployees,
   companyHeadline,
   employeeDisplayStatus,
+  employeeShiftNeedsContinuation,
   employeeDockReceiptDetail,
   employeeDockReceiptRunId,
   employeeDockReceiptRunLabel,
@@ -14,6 +16,7 @@ import {
   employeeFailureDetailTooltip,
   employeeFailureBannerCopy,
   employeeFailureBannerAriaLabel,
+  employeeFailureBeatAriaLabel,
   employeeGlowTone,
   employeeIsWorking,
   employeeMetaLine,
@@ -25,6 +28,7 @@ import {
   employeePresenceStripTitle,
   firstFailedRosterEmployee,
   pickDefaultRosterEmployee,
+  normalizeOperatorFailureDetail,
   presenceStripOptionId,
   selectedPresenceStripEmployee,
   employeeStatusLabel,
@@ -70,6 +74,7 @@ describe('company-roster-view', () => {
     ).toBe('Always on (24/7)');
     expect(employeeStatusLabel('waiting_approval')).toBe('waiting approval');
     expect(employeeStatusLabel('failed')).toBe('last shift failed');
+    expect(employeeStatusLabel('interrupted')).toBe('shift interrupted');
   });
 
   it('builds company headline with employee count', () => {
@@ -83,36 +88,36 @@ describe('company-roster-view', () => {
         employee({
           status: 'idle',
           last_outcome: 'failed',
-          last_outcome_detail: 'ActionRequiredError: out of usage',
+          last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
-    ).toContain('out of usage');
+    ).toContain('vitest: assertion failed');
     expect(
       employeeFailureBannerCopy(
         employee({
           name: 'Jules',
           status: 'idle',
           last_outcome: 'failed',
-          last_outcome_detail: 'ActionRequiredError: out of usage',
+          last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
-    ).toBe('Jules — Last shift failed: ActionRequiredError: out of usage');
+    ).toBe('Jules — Last shift failed: vitest: assertion failed');
     expect(
       employeeFailureBannerAriaLabel(
         employee({
           name: 'Jules',
           status: 'idle',
           last_outcome: 'failed',
-          last_outcome_detail: 'ActionRequiredError: out of usage',
+          last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
-    ).toContain('Jules — Last shift failed: ActionRequiredError: out of usage');
+    ).toContain('Jules — Last shift failed: vitest: assertion failed');
     expect(
       employeeTalkLine(
         employee({
           status: 'idle',
           last_outcome: 'failed',
-          last_outcome_detail: 'ActionRequiredError: out of usage',
+          last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
     ).toContain('Last shift failed');
@@ -121,7 +126,7 @@ describe('company-roster-view', () => {
         employee({
           status: 'idle',
           last_outcome: 'failed',
-          last_outcome_detail: 'ActionRequiredError: out of usage',
+          last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
     ).toBe('failed');
@@ -131,7 +136,7 @@ describe('company-roster-view', () => {
         employee({
           status: 'executing',
           last_outcome: 'failed',
-          last_outcome_detail: 'ActionRequiredError: out of usage',
+          last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
     ).toBeNull();
@@ -140,10 +145,44 @@ describe('company-roster-view', () => {
         employee({
           status: 'executing',
           last_outcome: 'failed',
-          last_outcome_detail: 'ActionRequiredError: out of usage',
+          last_outcome_detail: 'vitest: assertion failed',
         }),
       ),
     ).toBe('executing');
+  });
+
+  it('maps usage-limit failures to operator-friendly copy', () => {
+    const usageBlocked = employee({
+      name: 'Jules',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        "Lane B agent fallback reply generated (ActionRequiredError: Increase limits for faster responses You're out of usage.)",
+    });
+    const friendlyLine =
+      'Last shift could not start — usage limits blocked the agent runtime. Restore limits, then use Retry shift.';
+    expect(employeeFailureLine(usageBlocked)).toBe(friendlyLine);
+    expect(employeeFailureBannerCopy(usageBlocked)).toBe(`Jules — ${friendlyLine}`);
+    expect(employeeFailureBannerAriaLabel(usageBlocked)).toContain('Full detail:');
+    expect(employeeFailureBannerAriaLabel(usageBlocked)).toContain('out of usage');
+    expect(
+      employeeFailureLine(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toBe(friendlyLine);
+    expect(
+      employeeTalkLine(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'ActionRequiredError: out of usage',
+        }),
+      ),
+    ).toContain('usage limits blocked the agent runtime');
   });
 
   it('maps restart-interrupted failures to operator-friendly copy', () => {
@@ -153,6 +192,8 @@ describe('company-roster-view', () => {
       last_outcome_detail: 'Run interrupted by control-plane restart',
       last_run_id: 'run_5c0253a7808a',
     });
+    expect(employeeShiftNeedsContinuation(interrupted)).toBe(true);
+    expect(employeeDisplayStatus(interrupted)).toBe('interrupted');
     expect(employeeFailureLine(interrupted)).toBe(
       'Last shift interrupted by server restart — use Retry shift to continue.',
     );
@@ -174,18 +215,50 @@ describe('company-roster-view', () => {
       last_outcome_detail: detail,
       last_run_id: 'run_95ec3ce2d508',
     });
+    expect(employeeShiftNeedsContinuation(failed)).toBe(true);
+    expect(employeeDisplayStatus(failed)).toBe('interrupted');
     expect(employeeFailureLine(failed)).toBe(
-      'Last shift stopped — agent runtime unavailable. Use Retry shift.',
+      'Last shift interrupted before it could finish — use Retry shift to continue.',
     );
     expect(employeeFailureBannerCopy(failed)).toBe(
-      'Jules — Last shift stopped — agent runtime unavailable. Use Retry shift.',
+      'Jules — Last shift interrupted before it could finish — use Retry shift to continue.',
     );
-    expect(employeeFailureDetailTooltip(failed)).toBe(detail);
+    expect(employeeFailureDetailTooltip(failed)).toBe('Cursor CLI exited with status 143.');
     expect(employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(
       /agent session was interrupted/i,
     );
     expect(employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' })).not.toMatch(
       /Codex CLI/i,
+    );
+  });
+
+  it('normalizes lane b fallback wrappers and dispatch prefixes', () => {
+    const wrapped =
+      'Lane B agent fallback reply generated (CLI runtime timed out after 240s.; Cursor Cloud Agent unavailable; Codex CLI (local) unavailable; Codex Cloud Task unavailable)';
+    expect(normalizeOperatorFailureDetail(wrapped)).toBe('CLI runtime timed out after 240s.');
+    expect(
+      normalizeOperatorFailureDetail('continuous worker dispatch failed: cursor agent unavailable'),
+    ).toBe('cursor agent unavailable');
+  });
+
+  it('shows normalized api failure detail without lane b wrapper noise', () => {
+    const failed = employee({
+      name: 'Reed',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'CLI runtime timed out after 240s.',
+      last_run_id: 'run_34e5116fecb6',
+    });
+    expect(employeeShiftNeedsContinuation(failed)).toBe(false);
+    expect(employeeDisplayStatus(failed)).toBe('failed');
+    expect(employeeFailureLine(failed)).toBe(
+      'Last shift failed: CLI runtime timed out after 240s.',
+    );
+    expect(employeeFailureBannerCopy(failed)).toBe(
+      'Reed — Last shift failed: CLI runtime timed out after 240s.',
+    );
+    expect(employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(
+      /240s/i,
     );
   });
 
@@ -324,7 +397,7 @@ describe('company-roster-view', () => {
   });
 
   it('truncates very long failure detail in the talk banner', () => {
-    const longDetail = `${'ActionRequiredError: '.repeat(20)}out of usage`;
+    const longDetail = `${'vitest: '.repeat(20)}assertion failed`;
     const line = employeeFailureLine(
       employee({
         status: 'idle',
@@ -348,6 +421,8 @@ describe('company-roster-view', () => {
     expect(employeeFailureDetailTooltip(employee({ status: 'executing', last_outcome: 'failed' }))).toBeUndefined();
     expect(employeeFailureBannerAriaLabel(row)).toContain('Full detail:');
     expect(employeeFailureBannerAriaLabel(row)).toContain(longDetail);
+    expect(employeeFailureBeatAriaLabel(row)).toContain('Full detail:');
+    expect(employeeFailureBeatAriaLabel(row)).toContain(longDetail);
     expect(employeePresenceStripHoverTitle(row)).toBe(longDetail);
     expect(employeePresenceSelectAriaLabel(row)).toContain('Full detail:');
     expect(employeePresenceSelectAriaLabel(row)).toContain(longDetail);
@@ -362,6 +437,7 @@ describe('company-roster-view', () => {
     });
     expect(employeePresenceStripHoverTitle(row)).toBe('Jules — Last shift failed: timeout');
     expect(employeePresenceSelectAriaLabel(row)).toBe('Select Jules, Last shift failed: timeout');
+    expect(employeeFailureBeatAriaLabel(row)).toBe('Last shift failed: timeout');
   });
 
   it('uses failure-aware callback speak when idle after a failed shift', () => {
@@ -445,7 +521,32 @@ describe('company-roster-view', () => {
           last_outcome_detail: 'vitest',
         }),
       ]),
-    ).toContain("Shell Craft's last shift failed");
+    ).toBe('Shell Craft — Last shift failed: vitest');
+    expect(
+      companyFailedEmployeesHint([
+        employee({
+          name: 'Jules',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'Run interrupted by control-plane restart',
+        }),
+      ]),
+    ).toBe(
+      'Jules — Last shift interrupted by server restart — use Retry shift to continue.',
+    );
+    expect(
+      companyFailedEmployeesHint([
+        employee({
+          name: 'Jules',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail:
+            'Lane B agent fallback reply generated (Cursor CLI exited with status 143.; Cursor Cloud Agent unavailable)',
+        }),
+      ]),
+    ).toBe(
+      'Jules — Last shift interrupted before it could finish — use Retry shift to continue.',
+    );
     expect(
       companyFailedEmployeesHint([
         employee({
@@ -464,8 +565,29 @@ describe('company-roster-view', () => {
         }),
       ]),
     ).toBe(
-      "2 teammates' last shifts failed — select one for Retry shift, or click to talk it through.",
+      '2 teammates need attention after a failed shift — select one for Retry shift, or click to talk it through.',
     );
+  });
+
+  it('exposes full failure detail on roster alert hint hover when truncated', () => {
+    const longDetail = `${'ActionRequiredError: '.repeat(20)}out of usage`;
+    const row = employee({
+      name: 'Jules',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: longDetail,
+    });
+    expect(companyFailedEmployeesHintTooltip([row])).toBe(`Jules — ${longDetail}`);
+    expect(companyFailedEmployeesHintTooltip([row, employee({ employee_id: 'e2', last_outcome: 'failed' })])).toBeNull();
+    expect(
+      companyFailedEmployeesHintTooltip([
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'timeout',
+        }),
+      ]),
+    ).toBeNull();
   });
 
   it('maps working status, glow tone, and talk lines', () => {

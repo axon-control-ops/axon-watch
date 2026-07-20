@@ -8,6 +8,7 @@ import {
   employeeFailureBannerAriaLabel,
   employeeFailureBannerCopy,
   employeeFailureDetailTooltip,
+  employeeShiftNeedsContinuation,
 } from '../../../features/workspace-agents/company-roster-view';
 import { focusAgentDockComposerInput } from '../../../lib/agent-dock-composer-focus';
 import { requestIdeComposerMode } from '../../../lib/ide-composer-restore-request';
@@ -37,6 +38,9 @@ const failureAriaLabel = computed(() =>
 );
 const showReceiptsAction = computed(() =>
   employee.value ? Boolean(employeeDockReceiptRunId(employee.value)) : false,
+);
+const interruptedShift = computed(() =>
+  employee.value ? employeeShiftNeedsContinuation(employee.value) : false,
 );
 const actionsDisabled = computed(() => shell.composerAgentBusy);
 
@@ -76,6 +80,7 @@ function handleOpenTeam(): void {
   <div
     v-if="showBanner"
     class="agent-dock-composer__employee-failure-banner"
+    :class="{ 'agent-dock-composer__employee-failure-banner--interrupted': interruptedShift }"
     role="status"
     aria-live="polite"
     :aria-label="failureAriaLabel"

@@ -4,7 +4,9 @@ import { SERVER_RESTART_CONTINUATION_PROMPT } from '../../lib/ide-run-recovery';
 import {
   employeeDockReceiptRunId,
   employeeFailureLine,
-  isRestartInterruptedFailure,
+  isShiftContinuationFailure,
+  isUsageLimitFailure,
+  normalizeOperatorFailureDetail,
 } from './company-roster-view';
 
 export type TeamMemberChatKind = 'talk' | 'status' | 'assign' | 'retry' | 'receipts';
@@ -46,11 +48,17 @@ export function employeeAssignDraft(employee: CompanyEmployeeRecord): string {
 export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
   const name = employee.name.trim() || 'this teammate';
   const owns = ownsSnippet(employee);
-  const detail = (employee.last_outcome_detail ?? '').trim();
-  if (isRestartInterruptedFailure(detail)) {
+  const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
+  if (isShiftContinuationFailure(detail)) {
     return (
       `${name} (${owns}): ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
       `Summarize what changed and include receipts.`
+    );
+  }
+  if (isUsageLimitFailure(employee.last_outcome_detail)) {
+    return (
+      `${name} (${owns}): Usage limits blocked the last shift. Once limits are restored, ` +
+      `retry the bounded continuous shift. Summarize what changed and include receipts.`
     );
   }
   const errorHint = detail ? ` Last error: ${detail}` : '';
@@ -60,12 +68,20 @@ export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
 export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
   const name = employee.name.trim() || 'this teammate';
   const runId = employeeDockReceiptRunId(employee);
-  const detail = (employee.last_outcome_detail ?? '').trim();
-  if (isRestartInterruptedFailure(detail)) {
+  const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
+  if (isShiftContinuationFailure(detail)) {
     const runHint = runId ? ` (${runId})` : '';
     return (
       `Walk me through what was in progress when the server restarted for ${name}'s shift${runHint}. ` +
       `${SERVER_RESTART_CONTINUATION_PROMPT} Summarize what was incomplete, cite commands, and suggest next steps.`
+    );
+  }
+  if (isUsageLimitFailure(employee.last_outcome_detail)) {
+    const runHint = runId ? ` (${runId})` : '';
+    return (
+      `Walk me through receipts for ${name}'s last shift${runHint}. ` +
+      `The shift never started because usage limits blocked the agent runtime. ` +
+      `Summarize what was attempted and suggest next steps once limits are restored.`
     );
   }
   const detailHint = detail ? ` Error: ${detail}` : '';

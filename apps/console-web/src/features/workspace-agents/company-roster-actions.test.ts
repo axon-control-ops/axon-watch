@@ -129,6 +129,18 @@ describe('company-roster-actions', () => {
     expect(employeeChatComposerMode('receipts')).toBe('ask');
   });
 
+  it('uses continuation prompt when the last failure was a SIGTERM agent session', () => {
+    const interrupted = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'Cursor CLI exited with status 143.',
+      last_run_id: 'run_1787e8045f65',
+    });
+    const retry = employeeRetryDraft(interrupted);
+    expect(retry).toContain('Continue the interrupted run from after the server restart');
+    expect(retry).not.toContain('status 143');
+  });
+
   it('uses continuation prompt when the last failure was a server restart', () => {
     const interrupted = employee({
       status: 'idle',
@@ -142,6 +154,38 @@ describe('company-roster-actions', () => {
     const receipts = employeeReceiptsDraft(interrupted);
     expect(receipts).toContain('run_5c0253a7808a');
     expect(receipts).toContain('Continue the interrupted run from after the server restart');
+  });
+
+  it('normalizes lane b wrapper noise in retry and receipts drafts', () => {
+    const wrapped =
+      'Lane B agent fallback reply generated (CLI runtime timed out after 240s.; Cursor Cloud Agent unavailable; Codex CLI (local) unavailable; Codex Cloud Task unavailable)';
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: wrapped,
+      last_run_id: 'run_34e5116fecb6',
+    });
+    expect(employeeRetryDraft(failed)).toContain('CLI runtime timed out after 240s.');
+    expect(employeeRetryDraft(failed)).not.toContain('Lane B agent fallback');
+    expect(employeeRetryDraft(failed)).not.toContain('Codex Cloud Task');
+    expect(employeeReceiptsDraft(failed)).toContain('CLI runtime timed out after 240s.');
+    expect(employeeReceiptsDraft(failed)).not.toContain('Lane B agent fallback');
+  });
+
+  it('uses usage-limit guidance in retry and receipts drafts', () => {
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        "Lane B agent fallback reply generated (ActionRequiredError: You're out of usage.)",
+      last_run_id: 'run_7ae605411d4d',
+    });
+    expect(employeeRetryDraft(failed)).toContain('Usage limits blocked the last shift');
+    expect(employeeRetryDraft(failed)).toContain('Once limits are restored');
+    expect(employeeRetryDraft(failed)).not.toContain('ActionRequiredError');
+    expect(employeeReceiptsDraft(failed)).toContain('run_7ae605411d4d');
+    expect(employeeReceiptsDraft(failed)).toContain('usage limits blocked the agent runtime');
+    expect(employeeReceiptsDraft(failed)).not.toContain('ActionRequiredError');
   });
 
   it('hides duplicate view receipts in the dock when the run link is shown', () => {

@@ -1,5 +1,26 @@
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 
+import {
+  employeeResolvedFailureDetail,
+  failureSpeakDetail,
+  isAgentSessionInterruptedFailure,
+  isRestartInterruptedFailure,
+  isShiftContinuationFailure,
+  isUsageLimitFailure,
+  truncateFailureDetail,
+} from './employee-failure-detail';
+
+export {
+  employeeResolvedFailureDetail,
+  failureSpeakDetail,
+  isAgentRuntimeFallbackFailure,
+  isAgentSessionInterruptedFailure,
+  isRestartInterruptedFailure,
+  isShiftContinuationFailure,
+  isUsageLimitFailure,
+  normalizeOperatorFailureDetail,
+} from './employee-failure-detail';
+
 const WORKING_STATUSES = new Set([
   'watching',
   'planning',
@@ -25,6 +46,9 @@ export function employeeStatusLabel(status: string | null | undefined): string {
   }
   if (value === 'failed') {
     return 'last shift failed';
+  }
+  if (value === 'interrupted') {
+    return 'shift interrupted';
   }
   return value.replace(/_/g, ' ');
 }
@@ -55,56 +79,7 @@ export function employeeGlowTone(employee: CompanyEmployeeRecord): EmployeeGlowT
 
 export type EmployeeTalkSpeakMode = 'intro' | 'callback';
 
-const FAILURE_DETAIL_MAX = 120;
-const SPEAK_DETAIL_MAX = 160;
 const DOCK_RECEIPT_DETAIL_MAX = 180;
-
-function truncateFailureDetail(detail: string, max = FAILURE_DETAIL_MAX): string {
-  if (detail.length <= max) {
-    return detail;
-  }
-  return `${detail.slice(0, max - 1)}…`;
-}
-
-/** Matches control-plane restart reconciliation summaries on orphaned runs. */
-export function isRestartInterruptedFailure(detail: string | null | undefined): boolean {
-  const text = (detail ?? '').trim().toLowerCase();
-  if (!text) {
-    return false;
-  }
-  return text.includes('control-plane restart');
-}
-
-const AGENT_RUNTIME_FALLBACK_RE =
-  /^Lane B (?:agent fallback reply generated|plan fallback failed)\s*\(/i;
-
-/** Matches Lane B runtime fallback receipts where no CLI/cloud agent could run the shift. */
-export function isAgentRuntimeFallbackFailure(detail: string | null | undefined): boolean {
-  const text = (detail ?? '').trim();
-  if (!text) {
-    return false;
-  }
-  if (AGENT_RUNTIME_FALLBACK_RE.test(text)) {
-    return true;
-  }
-  return text.toLowerCase().includes('runtime unavailable');
-}
-
-function agentRuntimeFallbackSpeakDetail(detail: string): string {
-  const match = detail.match(/\(([^)]+)\)/);
-  const reason = (match?.[1] ?? detail).trim();
-  const firstClause = reason.split(';')[0]?.trim() ?? reason;
-  if (/exited with status 143/i.test(firstClause)) {
-    return 'the agent session was interrupted before it could finish';
-  }
-  if (/unavailable/i.test(firstClause)) {
-    return 'no agent runtime was ready';
-  }
-  if (/out of usage/i.test(firstClause)) {
-    return 'usage limits blocked the agent runtime';
-  }
-  return truncateFailureDetail(firstClause, SPEAK_DETAIL_MAX);
-}
 
 function stablePickIndex(seed: string, modulo: number): number {
   if (modulo <= 0) {
@@ -124,20 +99,6 @@ function employeeOwnsPhrase(employee: CompanyEmployeeRecord): string {
 function employeeFirstName(employee: CompanyEmployeeRecord): string {
   const name = employee.name.trim() || 'Teammate';
   return name.split(/\s+/)[0] || name;
-}
-
-function failureSpeakDetail(employee: CompanyEmployeeRecord): string | null {
-  const detail = (employee.last_outcome_detail ?? '').trim();
-  if (!detail) {
-    return null;
-  }
-  if (isRestartInterruptedFailure(detail)) {
-    return 'the server restarted and cut the shift short';
-  }
-  if (isAgentRuntimeFallbackFailure(detail)) {
-    return agentRuntimeFallbackSpeakDetail(detail);
-  }
-  return truncateFailureDetail(detail, SPEAK_DETAIL_MAX);
 }
 
 function roleVoiceHook(employee: CompanyEmployeeRecord): string {
@@ -199,13 +160,16 @@ export function employeeFailureLine(employee: CompanyEmployeeRecord): string | n
   if (employeeIsWorking(employee.status)) {
     return null;
   }
-  const detail = (employee.last_outcome_detail ?? '').trim();
+  const detail = employeeResolvedFailureDetail(employee);
   if (detail) {
     if (isRestartInterruptedFailure(detail)) {
       return 'Last shift interrupted by server restart — use Retry shift to continue.';
     }
-    if (isAgentRuntimeFallbackFailure(detail)) {
-      return 'Last shift stopped — agent runtime unavailable. Use Retry shift.';
+    if (isAgentSessionInterruptedFailure(detail)) {
+      return 'Last shift interrupted before it could finish — use Retry shift to continue.';
+    }
+    if (isUsageLimitFailure(employee.last_outcome_detail)) {
+      return 'Last shift could not start — usage limits blocked the agent runtime. Restore limits, then use Retry shift.';
     }
     return `Last shift failed: ${truncateFailureDetail(detail)}`;
   }
@@ -219,7 +183,7 @@ export function employeeFailureDetailTooltip(
   if (!employeeFailureLine(employee)) {
     return undefined;
   }
-  const detail = (employee.last_outcome_detail ?? '').trim();
+  const detail = employeeResolvedFailureDetail(employee);
   return detail || undefined;
 }
 
@@ -244,17 +208,38 @@ export function employeeFailureBannerAriaLabel(
   if (!copy) {
     return undefined;
   }
+  return employeeFailureStatusAriaLabel(copy, employee);
+}
+
+/** Screen-reader label for persona dock / roster failure beats — full detail when truncated. */
+export function employeeFailureBeatAriaLabel(
+  employee: CompanyEmployeeRecord,
+): string | undefined {
+  const line = employeeFailureLine(employee);
+  if (!line) {
+    return undefined;
+  }
+  return employeeFailureStatusAriaLabel(line, employee);
+}
+
+function employeeFailureStatusAriaLabel(
+  spokenLine: string,
+  employee: CompanyEmployeeRecord,
+): string {
   const detail = employeeFailureDetailTooltip(employee);
   const line = employeeFailureLine(employee);
-  if (detail && detail !== (line ?? '').trim()) {
-    return `${copy}. Full detail: ${detail}`;
+  if (!detail || !line) {
+    return spokenLine;
   }
-  return copy;
+  if (line.endsWith('…') || !line.includes(detail)) {
+    return `${spokenLine}. Full detail: ${detail}`;
+  }
+  return spokenLine;
 }
 
 /** Dock receipt body — skip when the failure beat already carries outcome detail. */
 export function employeeDockReceiptDetail(employee: CompanyEmployeeRecord): string | null {
-  const detail = (employee.last_outcome_detail ?? '').trim();
+  const detail = employeeResolvedFailureDetail(employee);
   if (!detail || employeeFailureLine(employee)) {
     return null;
   }
@@ -434,10 +419,18 @@ export function selectedPresenceStripEmployee(
   return employees.find((row) => row.employee_id === id) ?? null;
 }
 
+/** Restart or SIGTERM — retry should continue rather than treat as a hard failure. */
+export function employeeShiftNeedsContinuation(employee: CompanyEmployeeRecord): boolean {
+  if (!employeeFailureLine(employee)) {
+    return false;
+  }
+  return isShiftContinuationFailure(employee.last_outcome_detail);
+}
+
 /** Status chip value: surfaces failed when the last shift failed and the teammate is idle. */
 export function employeeDisplayStatus(employee: CompanyEmployeeRecord): string {
   if (employeeFailureLine(employee)) {
-    return 'failed';
+    return employeeShiftNeedsContinuation(employee) ? 'interrupted' : 'failed';
   }
   const status = (employee.status ?? '').trim();
   return status || 'idle';
@@ -641,8 +634,31 @@ export function companyFailedEmployeesHint(
     return null;
   }
   if (failed.length === 1) {
-    const name = failed[0].name.trim() || 'A teammate';
+    const row = failed[0];
+    const name = row.name.trim() || 'A teammate';
+    const line = employeeFailureLine(row);
+    if (line) {
+      return `${name} — ${line}`;
+    }
     return `${name}'s last shift failed — select them for Retry shift, or click to talk it through.`;
   }
-  return `${failed.length} teammates' last shifts failed — select one for Retry shift, or click to talk it through.`;
+  return `${failed.length} teammates need attention after a failed shift — select one for Retry shift, or click to talk it through.`;
+}
+
+/** Hover title for the roster alert hint when a single teammate failed with truncated detail. */
+export function companyFailedEmployeesHintTooltip(
+  employees: readonly CompanyEmployeeRecord[] | null | undefined,
+): string | null {
+  const failed = companyFailedEmployees(employees);
+  if (failed.length !== 1) {
+    return null;
+  }
+  const row = failed[0];
+  const detail = employeeFailureDetailTooltip(row);
+  const line = employeeFailureLine(row);
+  if (!detail || !line || (!line.endsWith('…') && line.includes(detail))) {
+    return null;
+  }
+  const name = row.name.trim() || 'A teammate';
+  return `${name} — ${detail}`;
 }

@@ -223,12 +223,22 @@
   background: rgba(90, 28, 24, 0.42);
 }
 
+.agent-dock-composer__employee-failure-banner--interrupted {
+  border-color: rgba(255, 180, 90, 0.34);
+  background: rgba(80, 52, 18, 0.42);
+}
+
 .agent-dock-composer__employee-failure-copy {
   margin: 0;
   font-size: 0.62rem;
   line-height: 1.45;
   color: rgba(255, 210, 200, 0.96);
   overflow-wrap: anywhere;
+}
+
+.agent-dock-composer__employee-failure-banner--interrupted
+  .agent-dock-composer__employee-failure-copy {
+  color: rgba(255, 230, 195, 0.96);
 }
 
 .agent-dock-composer__employee-failure-actions {
@@ -255,6 +265,21 @@
 .agent-dock-composer__employee-failure-btn--retry:focus-visible:not(:disabled) {
   border-color: rgba(220, 110, 90, 0.62);
   background: rgba(110, 36, 28, 0.72);
+}
+
+.agent-dock-composer__employee-failure-banner--interrupted
+  .agent-dock-composer__employee-failure-btn--retry {
+  border-color: rgba(255, 180, 90, 0.42);
+  background: rgba(100, 65, 18, 0.55);
+  color: rgba(255, 240, 210, 0.98);
+}
+
+.agent-dock-composer__employee-failure-banner--interrupted
+  .agent-dock-composer__employee-failure-btn--retry:hover:not(:disabled),
+.agent-dock-composer__employee-failure-banner--interrupted
+  .agent-dock-composer__employee-failure-btn--retry:focus-visible:not(:disabled) {
+  border-color: rgba(255, 200, 110, 0.58);
+  background: rgba(120, 78, 22, 0.72);
 }
 
 .agent-dock-composer__employee-failure-btn--receipts {
