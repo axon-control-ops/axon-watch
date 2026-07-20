@@ -163,10 +163,10 @@ export function employeeFailureLine(employee: CompanyEmployeeRecord): string | n
   const detail = employeeResolvedFailureDetail(employee);
   if (detail) {
     if (isRestartInterruptedFailure(detail)) {
-      return 'Last shift interrupted by server restart — use Retry shift to continue.';
+      return 'Last shift interrupted by server restart — use Continue shift to pick up where you left off.';
     }
     if (isAgentSessionInterruptedFailure(detail)) {
-      return 'Last shift interrupted before it could finish — use Retry shift to continue.';
+      return 'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.';
     }
     if (isUsageLimitFailure(employee.last_outcome_detail)) {
       return 'Last shift could not start — usage limits blocked the agent runtime. Restore limits, then use Retry shift.';
@@ -441,6 +441,14 @@ export function employeeShiftNeedsContinuation(employee: CompanyEmployeeRecord):
     return false;
   }
   return isShiftContinuationFailure(employee.last_outcome_detail);
+}
+
+/** Primary recovery action label for failed or interrupted teammate shifts. */
+export function employeeFailureRetryActionLabel(employee: CompanyEmployeeRecord): string {
+  if (!employeeFailureLine(employee)) {
+    return 'Retry shift';
+  }
+  return employeeShiftNeedsContinuation(employee) ? 'Continue shift' : 'Retry shift';
 }
 
 /** Status chip value: surfaces failed when the last shift failed and the teammate is idle. */

@@ -4,6 +4,7 @@ import { SERVER_RESTART_CONTINUATION_PROMPT } from '../../lib/ide-run-recovery';
 import {
   employeeDockReceiptRunId,
   employeeFailureLine,
+  employeeFailureRetryActionLabel,
   isShiftContinuationFailure,
   isUsageLimitFailure,
   normalizeOperatorFailureDetail,
@@ -168,7 +169,7 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
   };
   const retryAction: TeamMemberQuickAction = {
     id: 'retry',
-    label: 'Retry shift',
+    label: employeeFailureRetryActionLabel(employee),
     kind: 'chat',
     chatKind: 'retry',
     composerMode: 'agent',

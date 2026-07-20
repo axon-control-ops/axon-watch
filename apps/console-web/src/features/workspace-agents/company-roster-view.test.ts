@@ -196,7 +196,7 @@ describe('company-roster-view', () => {
     expect(employeeShiftNeedsContinuation(interrupted)).toBe(true);
     expect(employeeDisplayStatus(interrupted)).toBe('interrupted');
     expect(employeeFailureLine(interrupted)).toBe(
-      'Last shift interrupted by server restart — use Retry shift to continue.',
+      'Last shift interrupted by server restart — use Continue shift to pick up where you left off.',
     );
     expect(employeeSpeakLine(interrupted, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(
       /server restarted and cut the shift short/i,
@@ -219,10 +219,10 @@ describe('company-roster-view', () => {
     expect(employeeShiftNeedsContinuation(failed)).toBe(true);
     expect(employeeDisplayStatus(failed)).toBe('interrupted');
     expect(employeeFailureLine(failed)).toBe(
-      'Last shift interrupted before it could finish — use Retry shift to continue.',
+      'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
     );
     expect(employeeFailureBannerCopy(failed)).toBe(
-      'Jules — Last shift interrupted before it could finish — use Retry shift to continue.',
+      'Jules — Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
     );
     expect(employeeFailureDetailTooltip(failed)).toBe('Cursor CLI exited with status 143.');
     expect(employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' })).toMatch(

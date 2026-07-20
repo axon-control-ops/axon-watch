@@ -27,6 +27,18 @@ function withEmployeeFailureDetail(
   return detail ? [detail, ...steps] : steps;
 }
 
+function employeeFailureBannerStep(interrupted: boolean): string {
+  const action = interrupted ? 'Continue shift' : 'Retry shift';
+  return interrupted
+    ? `Use ${action} in the failure banner to continue, or open Team to talk it through.`
+    : `Use ${action} in the failure banner, or open Team to talk it through.`;
+}
+
+function employeeFailureComposerBannerStep(interrupted: boolean): string {
+  const action = interrupted ? 'Continue shift' : 'Retry shift';
+  return `Use ${action} in the failure banner at the top of the agent dock composer.`;
+}
+
 export function buildIdeQuickGuide(input: {
   layoutMode: 'operator' | 'ide';
   agentDockCollapsed: boolean;
@@ -82,9 +94,7 @@ export function buildIdeQuickGuide(input: {
       actions: [{ id: 'expand-agent-dock', label: 'Expand agent dock' }],
       steps: withEmployeeFailureDetail(input.employeeFailureLine, [
         'Ctrl/Cmd+\\ toggles the agent dock.',
-        interrupted
-          ? 'Use Retry shift in the failure banner to continue, or open Team to talk it through.'
-          : 'Use Retry shift in the failure banner, or open Team to talk it through.',
+        employeeFailureBannerStep(interrupted),
         'Click AGENT in the editor status bar or the right-edge reopen strip.',
       ]),
     };
@@ -110,7 +120,7 @@ export function buildIdeQuickGuide(input: {
       tone: interrupted ? 'interrupted' : 'failure',
       actions,
       steps: withEmployeeFailureDetail(input.employeeFailureLine, [
-        'Use Retry shift in the failure banner at the top of the agent dock composer.',
+        employeeFailureComposerBannerStep(interrupted),
         'Open Team in the left sidebar to review receipts or talk it through.',
         ...(input.terminalVisible
           ? []

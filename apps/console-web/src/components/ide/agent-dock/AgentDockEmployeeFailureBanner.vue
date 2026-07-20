@@ -8,6 +8,7 @@ import {
   employeeFailureBannerAriaLabel,
   employeeFailureBannerCopy,
   employeeFailureDetailTooltip,
+  employeeFailureRetryActionLabel,
   employeeShiftNeedsContinuation,
 } from '../../../features/workspace-agents/company-roster-view';
 import { focusAgentDockComposerInput } from '../../../lib/agent-dock-composer-focus';
@@ -41,6 +42,9 @@ const showReceiptsAction = computed(() =>
 );
 const interruptedShift = computed(() =>
   employee.value ? employeeShiftNeedsContinuation(employee.value) : false,
+);
+const retryActionLabel = computed(() =>
+  employee.value ? employeeFailureRetryActionLabel(employee.value) : 'Retry shift',
 );
 const actionsDisabled = computed(() => shell.composerAgentBusy);
 
@@ -98,7 +102,7 @@ function handleOpenTeam(): void {
         :disabled="actionsDisabled"
         @click="handleRetry"
       >
-        Retry shift
+        {{ retryActionLabel }}
       </button>
       <button
         v-if="showReceiptsAction"
