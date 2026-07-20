@@ -90,7 +90,14 @@ class DashProSupabaseStorageMonitorTests(unittest.TestCase):
             def __exit__(self, exc_type, exc, tb):
                 return False
 
-        rows = [{"bucket_id": "tts-audio", "object_count": 10, "total_bytes": 850_000_000}]
+        # 85% of the default 1 GiB quota (850M was only ~79% and returned ok).
+        rows = [
+            {
+                "bucket_id": "tts-audio",
+                "object_count": 10,
+                "total_bytes": int(1_073_741_824 * 0.85),
+            }
+        ]
 
         def fake_urlopen(req, timeout=0):
             if "/storage/v1/bucket" in req.full_url:
