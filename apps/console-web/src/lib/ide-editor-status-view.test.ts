@@ -184,7 +184,7 @@ describe('buildIdeEditorStatusAgentChip', () => {
         pendingApprovals: 0,
         runPhase: null,
         employeeFailureLine:
-          'Last shift interrupted before it could finish — use Retry shift to continue.',
+          'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
         employeeShiftInterrupted: true,
       },
     });

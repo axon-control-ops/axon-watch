@@ -234,6 +234,22 @@ describe('company-roster-view', () => {
     );
   });
 
+  it('labels recovery actions as continue vs retry by failure kind', () => {
+    const interrupted = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'Run interrupted by control-plane restart',
+    });
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'vitest assertion failed',
+    });
+    expect(employeeFailureRetryActionLabel(interrupted)).toBe('Continue shift');
+    expect(employeeFailureRetryActionLabel(failed)).toBe('Retry shift');
+    expect(employeeFailureRetryActionLabel(employee({ status: 'idle' }))).toBe('Retry shift');
+  });
+
   it('normalizes lane b fallback wrappers and dispatch prefixes', () => {
     const wrapped =
       'Lane B agent fallback reply generated (CLI runtime timed out after 240s.; Cursor Cloud Agent unavailable; Codex CLI (local) unavailable; Codex Cloud Task unavailable)';

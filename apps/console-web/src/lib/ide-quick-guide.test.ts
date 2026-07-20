@@ -65,17 +65,29 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.actions).toEqual([{ id: 'expand-agent-dock', label: 'Expand agent dock' }]);
   });
 
+  it('uses Continue shift in interrupted quick-guide steps', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      employeeFailureLine:
+        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+      employeeShiftInterrupted: true,
+    });
+
+    expect(guide?.steps.join(' ')).toContain('Continue shift');
+    expect(guide?.steps.join(' ')).not.toContain('Retry shift in the failure banner');
+  });
+
   it('guides interrupted teammate shifts to continue rather than retry', () => {
     const guide = buildIdeQuickGuide({
       ...base,
       employeeFailureLine:
-        'Last shift interrupted before it could finish — use Retry shift to continue.',
+        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
       employeeShiftInterrupted: true,
     });
 
     expect(guide?.title).toContain('Shift interrupted');
     expect(guide?.tone).toBe('interrupted');
-    expect(guide?.steps.join(' ')).toContain('continue');
+    expect(guide?.steps.join(' ')).toContain('Continue shift');
   });
 
   it('guides retry from the dock banner when a teammate failed with the dock already open', () => {
@@ -101,7 +113,7 @@ describe('buildIdeQuickGuide', () => {
       agentDockCollapsed: false,
       terminalVisible: false,
       employeeFailureLine:
-        'Last shift interrupted before it could finish — use Retry shift to continue.',
+        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
       employeeShiftInterrupted: true,
     });
 

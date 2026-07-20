@@ -121,6 +121,9 @@ describe('company-roster-actions', () => {
       'assign',
       'toggle_enabled',
     ]);
+    expect(employeeQuickActions(failed).find((action) => action.id === 'retry')?.label).toBe(
+      'Retry shift',
+    );
     expect(employeeRetryDraft(failed)).toContain('Retry the last failed shift');
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
     expect(employeeChatDraft(failed, 'retry')).toBe(employeeRetryDraft(failed));
@@ -139,6 +142,9 @@ describe('company-roster-actions', () => {
     const retry = employeeRetryDraft(interrupted);
     expect(retry).toContain('Continue the interrupted run from after the server restart');
     expect(retry).not.toContain('status 143');
+    expect(employeeQuickActions(interrupted).find((action) => action.id === 'retry')?.label).toBe(
+      'Continue shift',
+    );
   });
 
   it('uses continuation prompt when the last failure was a server restart', () => {
