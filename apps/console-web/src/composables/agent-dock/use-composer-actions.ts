@@ -47,6 +47,8 @@ type UseComposerActionsOptions = {
   stopVoiceCapture: () => void;
   onDebugReproduceProceed?: (messageId: string) => void;
   planSoftSwitchNotice: Ref<PlanSoftSwitchNotice | null>;
+  /** Return true when `/` or `@` typeahead consumed the key. */
+  handleTypeaheadKeydown?: (event: KeyboardEvent) => boolean;
 };
 
 export function useComposerActions(options: UseComposerActionsOptions) {
@@ -66,6 +68,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     stopVoiceCapture,
     onDebugReproduceProceed,
     planSoftSwitchNotice,
+    handleTypeaheadKeydown,
   } = options;
 
   function handleApproveRun(): void {
@@ -189,6 +192,10 @@ export function useComposerActions(options: UseComposerActionsOptions) {
   }
 
   function handleComposerKeydown(event: KeyboardEvent): void {
+    if (handleTypeaheadKeydown?.(event)) {
+      return;
+    }
+
     if (inputRef.value) {
       if (
         shouldRecallPreviousAgentComposerHistory({
