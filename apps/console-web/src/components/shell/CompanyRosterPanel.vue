@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 
-import AgentPersonaDock from './AgentPersonaDock.vue';
-import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
 import { useWorkspaceCompany } from '../../features/workspace-agents/use-workspace-company';
 import { resolveRosterSelectionForIdeThread } from '../../features/workspace-agents/active-ide-employee';
 import {
-  companyHeadline,
   companyFailedEmployees,
   companyFailedEmployeesHint,
   companyHasFailedEmployees,
-  COMPANY_ROSTER_DOCK_ID,
+  companyHeadline,
   employeeFailureLine,
+  employeeGlowTone,
+  employeeIsWorking,
+  employeeMetaLine,
   employeeSpeakLine,
+  employeeStatusLabel,
+  employeeTalkLine,
   firstFailedRosterEmployee,
   pickDefaultRosterEmployee,
 } from '../../features/workspace-agents/company-roster-view';
@@ -40,16 +42,18 @@ const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?
 const { company, employees, loadState, loadError, loadCompany } =
   useWorkspaceCompany(currentWorkspaceId);
 const selectedEmployeeId = ref<string | null>(null);
-const dockRootRef = ref<HTMLElement | null>(null);
-const presenceStripRef = ref<{ focusEmployee: (employeeId: string | null | undefined) => void } | null>(
-  null,
-);
+const listRootRef = ref<HTMLElement | null>(null);
 const controlBusyId = ref<string | null>(null);
 const controlError = ref<string | null>(null);
 
-function scrollDockIntoView(): void {
+function scrollSelectedIntoView(): void {
   void nextTick(() => {
-    const target = dockRootRef.value;
+    const root = listRootRef.value;
+    const id = selectedEmployeeId.value;
+    if (!root || !id) {
+      return;
+    }
+    const target = root.querySelector<HTMLElement>(`[data-employee-id="${CSS.escape(id)}"]`);
     if (!target) {
       return;
     }
@@ -77,10 +81,7 @@ watch(
       return;
     }
     selectedEmployeeId.value = nextSelection;
-    const row = employees.value.find((entry) => entry.employee_id === nextSelection);
-    if (row && employeeFailureLine(row)) {
-      scrollDockIntoView();
-    }
+    scrollSelectedIntoView();
   },
 );
 
@@ -102,9 +103,6 @@ watch(
     const next = pickDefaultRosterEmployee(employees.value);
     if (next) {
       selectedEmployeeId.value = next.employee_id;
-      if (employeeFailureLine(next)) {
-        scrollDockIntoView();
-      }
     }
   },
   { immediate: true },
@@ -124,12 +122,7 @@ watch(
     if (nextSelection && nextSelection !== selectedEmployeeId.value) {
       selectedEmployeeId.value = nextSelection;
     }
-    const row = selectedEmployee.value;
-    if (!row) {
-      return;
-    }
-    presenceStripRef.value?.focusEmployee(row.employee_id);
-    scrollDockIntoView();
+    scrollSelectedIntoView();
   },
 );
 
@@ -138,9 +131,7 @@ const headline = computed(() =>
 );
 
 const hasFailedEmployees = computed(() => companyHasFailedEmployees(employees.value));
-
 const failedEmployeeCount = computed(() => companyFailedEmployees(employees.value).length);
-
 const failedEmployeesHint = computed(() => companyFailedEmployeesHint(employees.value));
 
 const selectedEmployee = computed(
@@ -232,7 +223,8 @@ async function onControlAction(
     }
     return;
   }
-  if (action.control === 'stop') {
+
+  if (action.control === 'stop_run') {
     const runId = employee.active_run_id?.trim();
     if (!runId) {
       return;
@@ -242,17 +234,25 @@ async function onControlAction(
     try {
       await stopRun(runId);
       await loadCompany({ reason: 'employee-stop' });
+      await shell.refreshRunSurfaces({ light: true });
     } catch (error) {
-      controlError.value = error instanceof Error ? error.message : 'Could not stop shift';
+      controlError.value = error instanceof Error ? error.message : 'Could not stop active run';
     } finally {
       controlBusyId.value = null;
     }
   }
 }
 
-function onQuickAction(employee: CompanyEmployeeRecord, action: TeamMemberQuickAction): void {
+async function onRowActivate(employee: CompanyEmployeeRecord): Promise<void> {
+  await startChat(employee, 'talk');
+}
+
+async function onQuickAction(
+  employee: CompanyEmployeeRecord,
+  action: TeamMemberQuickAction,
+): Promise<void> {
   if (action.kind === 'control') {
-    void onControlAction(employee, action);
+    await onControlAction(employee, action);
     return;
   }
   if (action.kind === 'surface' && action.surface) {
@@ -261,38 +261,42 @@ function onQuickAction(employee: CompanyEmployeeRecord, action: TeamMemberQuickA
     return;
   }
   if (action.chatKind) {
-    void startChat(employee, action.chatKind);
+    await startChat(employee, action.chatKind);
   }
 }
 
-function openFleetSettings(): void {
-  navigateToSettingsSection('agents');
-}
-
-async function focusFailedEmployee(): Promise<void> {
+function focusFailedEmployee(): void {
   const target = firstFailedRosterEmployee(employees.value);
   if (!target) {
     return;
   }
-  selectEmployee(target);
-  presenceStripRef.value?.focusEmployee(target.employee_id);
-  await shell.openOrFocusEmployeeIdeThread(target);
-  scrollDockIntoView();
+  selectedEmployeeId.value = target.employee_id;
+  scrollSelectedIntoView();
+  void startChat(target, 'retry');
 }
 
-async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> {
-  selectEmployee(employee);
-  if (employeeFailureLine(employee)) {
-    await shell.openOrFocusEmployeeIdeThread(employee);
-    scrollDockIntoView();
-  }
+function openFleetSettings(): void {
+  navigateToSettingsSection('agent-fleet');
+}
+
+function rowClasses(employee: CompanyEmployeeRecord): Record<string, boolean> {
+  const working = employeeIsWorking(employee.status);
+  return {
+    'company-roster__row--primary': employee.primary,
+    'company-roster__row--selected': selectedEmployeeId.value === employee.employee_id,
+    'company-roster__row--working': working,
+    'company-roster__row--failed': Boolean(employeeFailureLine(employee)),
+    [`company-roster__row--${employee.role}`]: true,
+    [`company-roster__row--glow-${employeeGlowTone(employee)}`]: working,
+    [`company-roster__row--status-${employee.status}`]: working,
+  };
 }
 </script>
 
 <template>
   <section
     v-if="currentWorkspaceId"
-    class="company-roster company-roster--ide company-roster--persona-dock"
+    class="company-roster company-roster--ide"
     aria-label="Company employees"
   >
     <header class="company-roster__header">
@@ -332,7 +336,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
         {{ failedEmployeesHint }}
       </button>
       <p v-else class="company-roster__hint">
-        Select a teammate below to open their dock. Talk for a check-in; first click of the day is an intro.
+        Click a teammate to open their chat thread. First click of the day is an intro; later clicks get a quick check-in.
       </p>
     </header>
 
@@ -351,24 +355,78 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
         {{ controlError }}
       </p>
 
-      <CompanyPresenceStrip
-        ref="presenceStripRef"
-        :employees="employees"
-        :selected-employee-id="selectedEmployeeId"
-        @select="onPresenceSelect"
-      />
+      <ul ref="listRootRef" class="company-roster__list">
+        <li
+          v-for="employee in employees"
+          :key="employee.employee_id"
+          class="company-roster__item"
+          :data-employee-id="employee.employee_id"
+          :class="{ 'company-roster__item--working': employeeIsWorking(employee.status) }"
+        >
+          <p
+            v-if="employeeTalkLine(employee)"
+            class="company-roster__talk"
+            :class="[
+              `company-roster__talk--${employeeGlowTone(employee)}`,
+              { 'company-roster__talk--failed': !!employeeFailureLine(employee) },
+            ]"
+            :data-status="employeeFailureLine(employee) ? 'failed' : employee.status"
+            :title="employee.last_outcome_detail || undefined"
+          >
+            {{ employeeTalkLine(employee) }}
+          </p>
+          <button
+            type="button"
+            class="company-roster__row"
+            :class="rowClasses(employee)"
+            :aria-pressed="selectedEmployeeId === employee.employee_id ? 'true' : 'false'"
+            :aria-label="`Talk to ${employee.name}`"
+            @click="onRowActivate(employee)"
+          >
+            <span class="company-roster__identity">
+              <span class="company-roster__name">
+                {{ employee.name }}
+                <span v-if="employee.primary" class="company-roster__badge">Lead</span>
+                <span
+                  v-if="!employee.enabled"
+                  class="company-roster__badge company-roster__badge--paused"
+                >
+                  Paused
+                </span>
+              </span>
+              <span class="company-roster__meta">{{ employeeMetaLine(employee) }}</span>
+              <span class="company-roster__owns">{{ employee.owns }}</span>
+            </span>
+            <span class="company-roster__status" :data-status="employee.status">
+              {{ employeeStatusLabel(employee.status) }}
+            </span>
+          </button>
 
-      <div :id="COMPANY_ROSTER_DOCK_ID" ref="dockRootRef" class="company-roster__dock-host">
-        <AgentPersonaDock
-          v-if="selectedEmployee"
-          :key="selectedEmployee.employee_id"
-          :employee="selectedEmployee"
-          :actions="selectedActions"
-          :control-busy="controlBusyId === selectedEmployee.employee_id"
-          @talk="void startChat(selectedEmployee, 'talk')"
-          @action="onQuickAction(selectedEmployee, $event)"
-        />
-      </div>
+          <div
+            v-if="selectedEmployeeId === employee.employee_id && selectedActions.length"
+            class="company-roster__actions"
+            role="group"
+            :aria-label="`Actions for ${employee.name}`"
+          >
+            <button
+              v-for="action in selectedActions"
+              :key="action.id"
+              type="button"
+              class="company-roster__action"
+              :class="{
+                'company-roster__action--surface': action.kind === 'surface',
+                'company-roster__action--retry': action.id === 'retry',
+                'company-roster__action--receipts': action.id === 'receipts',
+                'company-roster__action--control': action.kind === 'control',
+              }"
+              :disabled="controlBusyId === employee.employee_id && action.kind === 'control'"
+              @click.stop="onQuickAction(employee, action)"
+            >
+              {{ action.label }}
+            </button>
+          </div>
+        </li>
+      </ul>
     </template>
   </section>
 </template>
