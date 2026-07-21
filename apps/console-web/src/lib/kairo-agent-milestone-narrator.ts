@@ -18,6 +18,7 @@ interface CreateKairoAgentMilestoneNarratorOptions {
   voiceDeliveryAllowed: () => boolean;
   operatorPrompt: () => string;
   fullAccess: () => boolean;
+  azureVoiceId?: () => string | null | undefined;
 }
 
 const SPEAK_TIMEOUT_MS = 12_000;
@@ -122,7 +123,10 @@ export function createKairoAgentMilestoneNarrator(
             message,
           },
           sessionStorage,
-          { priority: 'narration' },
+          {
+            priority: 'narration',
+            azureVoiceId: options.azureVoiceId?.() ?? null,
+          },
         );
       })
       .catch(() => undefined);

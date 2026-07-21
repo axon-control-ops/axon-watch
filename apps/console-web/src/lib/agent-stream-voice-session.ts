@@ -23,6 +23,8 @@ export function createAgentStreamVoiceSession(input: {
   fullAccess: () => boolean;
   layoutMode: () => 'operator' | 'ide';
   idePresenceProfile: () => IdePresenceProfile;
+  /** Employee neural voice for this IDE thread, when present. */
+  azureVoiceId?: () => string | null | undefined;
 }): ChatStreamVoiceNarration {
   const voiceNarration = createChatStreamVoiceNarration({
     composerMode: input.composerMode,
@@ -34,6 +36,7 @@ export function createAgentStreamVoiceSession(input: {
     voiceDeliveryAllowed: input.voiceDeliveryAllowed,
     operatorPrompt: input.operatorPrompt,
     fullAccess: input.fullAccess,
+    azureVoiceId: input.azureVoiceId,
   });
 
   if (voiceNarration.toolNarrationEnabled) {
@@ -55,12 +58,23 @@ export function handleAgentStreamVoiceDelta(input: {
   fullAccessNarration: boolean;
   patchActivity: (view: StreamingActivityView) => void;
 }): void {
-  for (const milestone of input.streamIncremental.consumeFullContent(input.content)) {
-    if (input.voiceNarration.toolNarrationEnabled) {
-      input.voiceNarration.narrateAgentMilestone(milestone);
-    }
-  }
+  // Parse first so completed thinking lands in the speech queue.
+  const milestones = input.streamIncremental.consumeFullContent(input.content);
   input.patchActivity(input.streamIncremental.toStreamingActivityView(input.fullAccessNarration));
+
+  // Speak closed :::thinking intent before tool milestones in this same delta.
   const spokenBlock = input.streamIncremental.takeCompletedThinkingSpeech()?.trim() ?? '';
-  input.voiceNarration.maybeSpeakThinkingBlock(spokenBlock);
+  const spokeThinking = input.voiceNarration.maybeSpeakThinkingBlock(spokenBlock);
+
+  if (!input.voiceNarration.toolNarrationEnabled) {
+    return;
+  }
+  for (const milestone of milestones) {
+    if (spokeThinking && milestone.key.startsWith('thinking:')) {
+      continue;
+    }
+    input.voiceNarration.narrateAgentMilestone(milestone, {
+      preserveQueue: spokeThinking,
+    });
+  }
 }

@@ -17,6 +17,7 @@ interface CreateKairoProgressNarratorOptions {
   workspaceId: () => string;
   narration: () => KairoNarrationLevel;
   voiceDeliveryAllowed: () => boolean;
+  azureVoiceId?: () => string | null | undefined;
 }
 
 const TERMINAL_RANK: Record<string, number> = {
@@ -110,7 +111,10 @@ export function createKairoProgressNarrator(options: CreateKairoProgressNarrator
             message: line,
           },
           sessionStorage,
-          { priority: 'narration' },
+          {
+            priority: 'narration',
+            azureVoiceId: options.azureVoiceId?.() ?? null,
+          },
         );
       })
       .catch(() => undefined);

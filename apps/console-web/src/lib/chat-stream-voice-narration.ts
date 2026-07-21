@@ -29,7 +29,10 @@ export type ChatStreamVoiceNarration = {
   agentMilestoneNarrator: Narrator | null;
   answerNarrator: Narrator | null;
   maybeSpeakThinkingBlock: (spokenBlock: string) => boolean;
-  narrateAgentMilestone: (milestone: NarrationMilestone) => void;
+  narrateAgentMilestone: (
+    milestone: NarrationMilestone,
+    options?: { preserveQueue?: boolean },
+  ) => void;
   narrateProgress: (payload: {
     event_key?: string;
     event_type?: string;
@@ -49,11 +52,13 @@ export function createChatStreamVoiceNarration(input: {
   voiceDeliveryAllowed: () => boolean;
   operatorPrompt: () => string;
   fullAccess: () => boolean;
+  azureVoiceId?: () => string | null | undefined;
 }): ChatStreamVoiceNarration {
   const toolNarrationEnabled = isToolCapableComposerMode(input.composerMode);
   const answerMode = isAnswerNarrationComposerMode(input.composerMode);
   const thinkingThrottle = createKairoThinkingSpeechThrottle();
   const toolThrottle = createKairoIntervalThrottle({ intervalMs: TOOL_MILESTONE_INTERVAL_MS });
+  const azureVoiceId = input.azureVoiceId;
 
   const progressNarrator = toolNarrationEnabled
     ? createKairoProgressNarrator({
@@ -62,6 +67,7 @@ export function createChatStreamVoiceNarration(input: {
         workspaceId: input.workspaceId,
         narration: input.narration,
         voiceDeliveryAllowed: input.voiceDeliveryAllowed,
+        azureVoiceId,
       })
     : null;
 
@@ -75,6 +81,7 @@ export function createChatStreamVoiceNarration(input: {
         voiceDeliveryAllowed: input.voiceDeliveryAllowed,
         operatorPrompt: input.operatorPrompt,
         fullAccess: input.fullAccess,
+        azureVoiceId,
       })
     : null;
 
@@ -87,6 +94,7 @@ export function createChatStreamVoiceNarration(input: {
         voiceDeliveryAllowed: input.voiceDeliveryAllowed,
         operatorPrompt: input.operatorPrompt,
         fullAccess: input.fullAccess,
+        azureVoiceId,
       })
     : null;
 
@@ -121,7 +129,10 @@ export function createChatStreamVoiceNarration(input: {
     return true;
   }
 
-  function narrateAgentMilestone(milestone: NarrationMilestone): void {
+  function narrateAgentMilestone(
+    milestone: NarrationMilestone,
+    options?: { preserveQueue?: boolean },
+  ): void {
     if (!toolNarrationEnabled) {
       return;
     }
@@ -138,7 +149,9 @@ export function createChatStreamVoiceNarration(input: {
     if (milestone.key.startsWith('tool:') && !toolThrottle.canSpeak()) {
       return;
     }
-    cancelStaleNarration();
+    if (!options?.preserveQueue) {
+      cancelStaleNarration();
+    }
     agentMilestoneNarrator?.narrate(milestone);
     if (milestone.key.startsWith('tool:')) {
       toolThrottle.recordSpoken();

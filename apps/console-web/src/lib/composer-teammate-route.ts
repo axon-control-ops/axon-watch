@@ -59,6 +59,12 @@ const ROLE_BAGS: RoleBag[] = [
     ],
   },
   {
+    // Extra weight so UI confirmation work beats OTA/release vocabulary.
+    role: 'frontend',
+    weight: 2,
+    patterns: [/\bconfirmation\b/i, /\benrol+ment\b/i, /\bpopup\b/i, /\bmodal\b/i],
+  },
+  {
     role: 'backend',
     weight: 1,
     patterns: [

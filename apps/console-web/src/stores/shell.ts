@@ -1621,6 +1621,7 @@ export const useShellStore = defineStore('shell', () => {
       fullAccess: () => voiceContext.fullAccess,
       layoutMode: () => layoutMode.value,
       idePresenceProfile: () => idePresenceProfile.value,
+      azureVoiceId: () => activeIdeEmployee.value?.azure_voice_id ?? null,
     });
     chatStreamSessionsByWorkspace.set(workspaceId, startChatStreamSession({
         threadId,

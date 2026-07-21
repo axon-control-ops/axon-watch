@@ -15,6 +15,8 @@ export type DeliverSpokenAlertOptions = {
   priority?: KairoVoicePriority;
   /** Allow explicit triggers to speak even if a matching alert was already marked spoken. */
   dedupe?: boolean;
+  /** Prefer employee neural voice when narrating an employee IDE thread. */
+  azureVoiceId?: string | null;
 };
 
 let voiceDeckSpokenAlertHandler: VoiceDeckSpokenAlertHandler | null = null;
@@ -47,6 +49,7 @@ export async function deliverSpokenOperatorAlert(
 
   const result = await speakKairoLine(alert.message, {
     priority: options.priority ?? 'alert',
+    azureVoiceId: options.azureVoiceId?.trim() || undefined,
   });
   if (result.engine === 'azure') {
     return 'azure';
