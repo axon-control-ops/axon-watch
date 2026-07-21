@@ -94,6 +94,47 @@
           "azure_voice_id": "en-US-SaraNeural"
         }
       ]
+    },
+    "workspace_edudashpro_school": {
+      "company_name": "EduDash PRO School of Excellence",
+      "employees": [
+        {
+          "name": "Lindi",
+          "role": "lead",
+          "owns": "Centre priorities, Aftercare/Preschool planning order, and handoffs",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-ZA-LeahNeural"
+        },
+        {
+          "name": "Thabo",
+          "role": "watcher",
+          "owns": "School workspace readiness signals and planning blockers",
+          "schedule": "always_on",
+          "azure_voice_id": "en-ZA-LukeNeural"
+        },
+        {
+          "name": "Naledi",
+          "role": "frontend",
+          "owns": "Planning docs layout and parent-facing materials structure",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Sipho",
+          "role": "backend",
+          "owns": "Ops checklists, enrolment/process notes, and data hygiene",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Amara",
+          "role": "integrations",
+          "owns": "EduDash PRO product linkage notes for the centre",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
     }
   },
   "agents": {
