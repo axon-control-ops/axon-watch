@@ -53,11 +53,22 @@ def shell_output_from_result(result: Any) -> str:
     for container in (result.get("success"), result):
         if not isinstance(container, dict):
             continue
+        # Cursor's interleaved output is the complete ordered stream. Prefer it
+        # outright so separately populated stdout/stderr are not repeated.
+        interleaved = container.get("interleavedOutput")
+        if isinstance(interleaved, str) and interleaved.strip():
+            return interleaved.rstrip()
         parts: list[str] = []
+        seen: set[str] = set()
         for key in ("stdout", "output", "stderr"):
             value = container.get(key)
-            if isinstance(value, str) and value.strip():
-                parts.append(value.rstrip())
+            if not isinstance(value, str):
+                continue
+            trimmed = value.rstrip()
+            if not trimmed or trimmed in seen:
+                continue
+            seen.add(trimmed)
+            parts.append(trimmed)
         if parts:
             return "\n".join(parts)
     return ""
@@ -78,6 +89,18 @@ def shell_command_from_tool_call(tool_call: dict[str, Any]) -> str:
     return ""
 
 
+def shell_description_from_tool_call(tool_call: dict[str, Any]) -> str:
+    for shell_key in _SHELL_TOOL_KEYS:
+        shell_call = tool_call.get(shell_key)
+        if not isinstance(shell_call, dict):
+            continue
+        args = shell_call.get("args") if isinstance(shell_call.get("args"), dict) else {}
+        description = str(args.get("description") or shell_call.get("description") or "").strip()
+        if description:
+            return description
+    return ""
+
+
 def shell_call_from_tool_call(tool_call: dict[str, Any]) -> dict[str, Any] | None:
     for shell_key in _SHELL_TOOL_KEYS:
         shell_call = tool_call.get(shell_key)
@@ -94,10 +117,13 @@ def terminal_block(command: str, output: str) -> str:
     return f"\n:::terminal {command}{body}:::\n"
 
 
-def terminal_started_block(command: str) -> str:
+def terminal_started_block(command: str, description: str = "") -> str:
     trimmed = command.strip()
     if not trimmed:
         return ""
+    detail = description.strip()
+    if detail:
+        return f"\n:::terminal {trimmed}\n# {detail}\n"
     return f"\n:::terminal {trimmed}\n"
 
 
@@ -117,7 +143,10 @@ def terminal_started_block_from_event(event: dict[str, Any]) -> str:
     tool_call = event.get("tool_call")
     if not isinstance(tool_call, dict):
         return ""
-    return terminal_started_block(shell_command_from_tool_call(tool_call))
+    return terminal_started_block(
+        shell_command_from_tool_call(tool_call),
+        shell_description_from_tool_call(tool_call),
+    )
 
 
 def shell_completion_from_event(event: dict[str, Any]) -> tuple[str, str] | None:
