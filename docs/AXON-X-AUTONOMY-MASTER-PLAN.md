@@ -655,53 +655,15 @@ Mobile autonomy / control is **done** only when:
 
 ---
 
-## Evidence log template
+## Evidence log
 
-Append one block per completed gate:
-
-```text
-### Gate N — YYYY-MM-DD
-- owner:
-- commit:
-- commands run:
-- pass/fail:
-- exit criteria met: yes/no
-- residual risks:
-- next gate unlocked:
-```
-
-### Gate 0 — 2026-07-21
-- owner: operator + agent
-- commit: `9c86389` (evidence on live tree; see `docs/ops/agent-reports/gate0-pause-preserve-2026-07-21.md`)
-- commands run: `GET /api/worker-scheduler`; DashPro + axon-watch dirty inventory
-- pass/fail: pass
-- exit criteria met: yes
-- residual risks: DashPro OTA/affiliation KEEP cluster; Axon-X large mixed dirty tree preserved
-- next gate unlocked: Gate 1
-
-### Gate 1 — 2026-07-21
-- owner: agent
-- commit: working tree atop `9c86389` (commit pending); report `docs/ops/agent-reports/gate1-trustworthy-baseline-2026-07-21.md`
-- commands run: `npm run verify:contracts`; `npm run verify:console-web`
-- pass/fail: pass (contracts exit 0; Vitest 236 files / 1242 tests; build ok)
-- exit criteria met: yes on working tree; SHA pin pending commit
-- residual risks: baseline not on remote until committed/pushed
-- next gate unlocked: Gate 2 finish / Gate 3 prep
-
-### Gate 2 — 2026-07-21 (thin slice)
-- owner: agent
-- commit: working tree atop `9c86389`; report `docs/ops/agent-reports/gate2-auth-containment-2026-07-21.md`
-- commands run: `tests.test_gate2_auth_containment` (11 OK); included in `verify:contracts`
-- pass/fail: pass for thin slice
-- exit criteria met: partial — local_token + internal watch token + vault remote refuse + worker trust policy; **not** full CSRF/rate-limit/step-up
-- residual risks: default auth mode still `placeholder`; must set tokens for non-loopback; rate limit/CSRF/step-up outstanding
-- next gate unlocked: Gate 3 (per-task worktrees) — keep scheduler off until worktrees land
+Gate exit receipts are appended in [`docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md`](./ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md) (kept out of this file to stay under the markdown hard limit).
 
 ---
 
 ## Immediate next actions (start now)
 
-1. **Commit** the green Gates 0–2 working tree when ready (pins Gate 1 SHA).
+1. Confirm Fast Gate green on the pinned commit after evidence-log extraction.
 2. **Start Gate 3** — per-task disposable checkout / worktrees (scheduler stays off until ready).
 3. **Do not** re-enable continuous live-checkout editing.
 4. **Do not** build mobile mutation features until Gate 2 residuals (CSRF/rate-limit + forced token mode on remote) are closed.
@@ -712,6 +674,7 @@ Append one block per completed gate:
 ## Related documents
 
 - Assessment: `docs/AXON-X-AUTONOMY-READINESS.md`
+- Evidence log: `docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md`
 - Interactive canvas: workspace canvases `axon-x-autonomy-readiness.canvas.tsx`
 - Self-improvement contract: `docs/SELF_IMPROVEMENT_CONTRACT.md`
 - DashPro CI playbook: `docs/planning/DASHPRO_CI_AGENT_PLAYBOOK.md`
