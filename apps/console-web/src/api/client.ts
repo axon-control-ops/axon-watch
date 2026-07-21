@@ -80,7 +80,6 @@ export async function fetchJson<T>(
   timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
 ): Promise<T> {
   const { signal, clear } = mergeAbortSignals(timeoutMs, init.signal);
-  const startedAt = performance.now();
   try {
     const response = await fetch(apiUrl(path), { ...init, signal });
     if (!response.ok) {
@@ -91,9 +90,6 @@ export async function fetchJson<T>(
     }
     return (await response.json()) as T;
   } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'frontend-api',hypothesisId:'H2',location:'api/client.ts:fetchJson-catch',message:'frontend API request failed',data:{path,method:init.method ?? 'GET',status:error instanceof ApiRequestError ? error.status : null,errorName:error instanceof Error ? error.name : typeof error,elapsedMs:Math.round(performance.now()-startedAt),aborted:signal.aborted},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (error instanceof ApiRequestError) {
       throw error;
     }

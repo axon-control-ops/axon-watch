@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed } from 'vue';
 
 import IdeInterruptPanel from '../ide/IdeInterruptPanel.vue';
 import KairoPresenceBar from './KairoPresenceBar.vue';
@@ -38,28 +38,6 @@ const showIdeInterruptTopbar = computed(
     activeSurface.value === 'console' &&
     shell.layoutMode === 'ide' &&
     shell.idePresenceProfile === 'interrupt',
-);
-
-watch(
-  () => ({
-    displayedState: shell.ideDisplayKairoPresenceState,
-    baseState: shell.kairoPresenceState,
-    profile: shell.idePresenceProfile,
-    speechActive: shell.kairoSpeechActive,
-    voicePaused: shell.kairoVoicePaused,
-    agentStreamActive: shell.agentStreamActive,
-    activeEmployeeRole: shell.activeIdeEmployee?.role ?? null,
-    hasEmployeeFailure: Boolean(shell.activeIdeEmployeeFailureLine),
-    criticalSignals: shell.runtimeSummary?.signals.critical_count ?? null,
-    highSignals: shell.runtimeSummary?.signals.high_count ?? null,
-    watchConnected: shell.runtimeSummary?.watch.connected ?? null,
-  }),
-  (next, previous) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'topbar-state',hypothesisId:'H2,H3,H4',location:'TopBar.vue:presence-watch',message:'topbar presence inputs changed',data:{previous,next},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  },
-  { immediate: true },
 );
 
 function openSurface(surface: AppSurface): void {

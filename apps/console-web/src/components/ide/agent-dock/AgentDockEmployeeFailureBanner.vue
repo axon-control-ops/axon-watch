@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, watch } from 'vue';
+import { computed } from 'vue';
 
 import type { CompanyEmployeeRecord } from '../../../contracts/canonical';
 import { employeeComposerOpenPayload } from '../../../features/workspace-agents/company-roster-actions';
@@ -47,19 +47,6 @@ const retryActionLabel = computed(() =>
   employee.value ? employeeFailureRetryActionLabel(employee.value) : 'Retry shift',
 );
 const actionsDisabled = computed(() => shell.composerAgentBusy);
-
-watch(
-  showBanner,
-  async (next, previous) => {
-    await nextTick();
-    const banner = document.querySelector('.agent-dock-composer__employee-failure-banner');
-    const transcript = document.querySelector('.agent-dock__transcript');
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'failure-banner',hypothesisId:'H6',location:'AgentDockEmployeeFailureBanner.vue:showBanner-watch',message:'employee failure banner visibility changed',data:{previous,next,profile:shell.idePresenceProfile,displayedState:shell.ideDisplayKairoPresenceState,employeeRole:shell.activeIdeEmployee?.role ?? null,hasFailure:Boolean(failureLine.value),bannerHeight:banner instanceof HTMLElement ? Math.round(banner.getBoundingClientRect().height) : 0,transcriptHeight:transcript instanceof HTMLElement ? Math.round(transcript.getBoundingClientRect().height) : 0},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  },
-  { immediate: true },
-);
 
 function openComposerDraft(row: CompanyEmployeeRecord, kind: 'retry' | 'receipts'): void {
   const { mode, draft } = employeeComposerOpenPayload(row, kind);

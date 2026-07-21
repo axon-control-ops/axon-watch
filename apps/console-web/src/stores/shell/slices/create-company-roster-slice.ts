@@ -48,9 +48,6 @@ export function createCompanyRosterSlice(input: CreateCompanyRosterSliceInput) {
       const snapshot = await fetchWorkspaceCompany(cleaned);
       const nextEmployees = snapshot.company.employees ?? [];
       const previous = companyEmployeesByWorkspaceId.value[cleaned];
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'roster-poll',hypothesisId:'H4',location:'create-company-roster-slice.ts:loadCompanyEmployees',message:'company roster poll received',data:{workspaceId:cleaned,unchanged:companyEmployeesUnchanged(previous,nextEmployees),employees:nextEmployees.map((row)=>({role:row.role,status:row.status ?? null,outcome:row.last_outcome ?? null,activeRun:Boolean((row.active_run_id ?? '').trim()),lastRunId:row.last_run_id ?? null}))},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (companyEmployeesUnchanged(previous, nextEmployees)) {
         return;
       }

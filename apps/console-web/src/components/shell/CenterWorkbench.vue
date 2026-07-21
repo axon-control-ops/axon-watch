@@ -444,7 +444,6 @@ function startTerminalResize(event: MouseEvent): void {
 
 let resizeObserver: ResizeObserver | undefined;
 let resizeObserverFrame: number | null = null;
-let resizeObserverDebugCount = 0;
 
 function syncShellColumnHeights(): void {
   const workbench = workbenchRef.value;
@@ -539,13 +538,7 @@ onMounted(() => {
   requestAnimationFrame(() => runLayoutSync('mount'));
 
   if (workbenchRef.value) {
-    resizeObserver = new ResizeObserver((entries) => {
-      resizeObserverDebugCount += 1;
-      if (resizeObserverDebugCount <= 12 || resizeObserverDebugCount % 50 === 0) {
-        // #region agent log
-        fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'workbench-layout',hypothesisId:'H5',location:'CenterWorkbench.vue:ResizeObserver',message:'workbench resize observer fired',data:{count:resizeObserverDebugCount,framePending:resizeObserverFrame!==null,entries:entries.map((entry)=>({target:(entry.target as HTMLElement).className,width:Math.round(entry.contentRect.width),height:Math.round(entry.contentRect.height)}))},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-      }
+    resizeObserver = new ResizeObserver(() => {
       // Never write observed geometry from inside the observer callback.
       // Coalesce bursts into one frame to prevent ResizeObserver feedback loops.
       scheduleResizeLayoutSync();
