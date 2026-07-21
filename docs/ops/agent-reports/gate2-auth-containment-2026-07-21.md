@@ -61,7 +61,7 @@ Included in `npm run verify:contracts` via `scripts/verify/run_contract_unit_tes
 | Every remote action has revocable identity | **Partial** — operator token + optional internal service token; no full OIDC/session revocation product yet. |
 | Workers least-privilege by default | **Met** for Cursor flag policy on worker trust. |
 | Vault unlock explicit + audited | **Met** for remote auto-unlock refusal + CP audit on enable attempt. |
-| Rate limits / CSRF / step-up Full Access | **Not done** — residual (Gate 2 backlog). |
+| Rate limits / CSRF / step-up Full Access | **Partial** — same-origin Origin/Referer guard on mutating routes when remotely reachable (`app/auth/origin_guard.py`). Rate limits + step-up Full Access still residual. |
 | mTLS watch exposure | **Not done** — shared secret is the thin equivalent for now. |
 
 **Gate 2 result:** **Thin containment slice CLOSED** for unlocking Gate 3 engineering.  

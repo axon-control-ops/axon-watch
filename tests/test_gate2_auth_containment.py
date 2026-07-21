@@ -35,6 +35,74 @@ class _FakeRequest:
             self.headers["x-axon-operator-token"] = token_header
 
 
+class Gate2OriginGuardTests(unittest.TestCase):
+    def test_rejects_mismatched_origin_when_remotely_reachable(self) -> None:
+        from app.auth.origin_guard import reject_cross_origin_mutation
+        from starlette.requests import Request
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "https",
+            "path": "/api/runs",
+            "raw_path": b"/api/runs",
+            "query_string": b"",
+            "headers": [(b"origin", b"https://evil.example")],
+            "client": ("10.0.0.2", 443),
+            "server": ("axon.example.com", 443),
+        }
+        request = Request(scope)
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.example.com",
+                "AXON_WATCH_REMOTELY_REACHABLE": "1",
+            },
+            clear=False,
+        ):
+            detail = reject_cross_origin_mutation(request)
+        self.assertIsNotNone(detail)
+        self.assertIn("cross-origin", detail or "")
+
+    def test_allows_matching_origin_and_missing_origin(self) -> None:
+        from app.auth.origin_guard import reject_cross_origin_mutation
+        from starlette.requests import Request
+
+        def make(headers: list[tuple[bytes, bytes]]) -> Request:
+            return Request(
+                {
+                    "type": "http",
+                    "asgi": {"version": "3.0"},
+                    "http_version": "1.1",
+                    "method": "POST",
+                    "scheme": "https",
+                    "path": "/api/runs",
+                    "raw_path": b"/api/runs",
+                    "query_string": b"",
+                    "headers": headers,
+                    "client": ("10.0.0.2", 443),
+                    "server": ("axon.example.com", 443),
+                }
+            )
+
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.example.com",
+                "AXON_WATCH_REMOTELY_REACHABLE": "1",
+            },
+            clear=False,
+        ):
+            self.assertIsNone(
+                reject_cross_origin_mutation(
+                    make([(b"origin", b"https://axon.example.com")])
+                )
+            )
+            self.assertIsNone(reject_cross_origin_mutation(make([])))
+
+
 class Gate2AuthSettingsTests(unittest.TestCase):
     def test_remotely_reachable_from_public_base_url(self) -> None:
         with patch.dict(
@@ -96,6 +164,30 @@ class Gate2MutatingAuthMiddlewareTests(unittest.TestCase):
         )
         self.assertEqual(200, response.status_code)
         self.assertIn("run_id", response.json())
+
+    def test_cross_origin_mutation_forbidden_when_remote(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.example.com",
+                "AXON_WATCH_REMOTELY_REACHABLE": "1",
+            },
+            clear=False,
+        ):
+            response = self.client.post(
+                "/api/runs",
+                json={
+                    "workspace_id": "workspace_axon_watch",
+                    "summary": "csrf",
+                    "mode": "agent",
+                },
+                headers={
+                    "Authorization": "Bearer gate2-secret-token",
+                    "Origin": "https://evil.example",
+                },
+            )
+        self.assertEqual(403, response.status_code)
+        self.assertTrue(response.json().get("csrf_blocked"))
 
     def test_health_remains_public(self) -> None:
         response = self.client.get("/api/health")

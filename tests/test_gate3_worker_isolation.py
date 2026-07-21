@@ -11,14 +11,6 @@ from unittest.mock import patch
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.safe_improvement.isolated_executor import IsolationError  # noqa: E402
-from app.workspace_agents.worker_isolation import (  # noqa: E402
-    cleanup_worker_isolation,
-    create_worker_isolation,
-    worker_agent_workspace,
-)
-
-
 class Gate3WorkerIsolationTests(unittest.TestCase):
     def setUp(self) -> None:
         self._tmpdir = tempfile.TemporaryDirectory()
@@ -51,23 +43,26 @@ class Gate3WorkerIsolationTests(unittest.TestCase):
         )
 
     def test_worker_isolation_is_not_live_checkout_and_cleans_up(self) -> None:
-        with patch(
-            "app.workspace_agents.worker_isolation.resolve_workspace_root",
-            return_value=self.bound,
-        ):
-            isolation = create_worker_isolation(workspace_id="workspace_demo", run_id="run_gate3")
-            agent_root = worker_agent_workspace(isolation)
+        # Import inside the test so we bind the same module object Gate 2 may have reloaded.
+        from app.workspace_agents import worker_isolation as wi
+
+        with patch.object(wi, "resolve_workspace_root", return_value=self.bound):
+            isolation = wi.create_worker_isolation(workspace_id="workspace_demo", run_id="run_gate3")
+            agent_root = wi.worker_agent_workspace(isolation)
             self.assertTrue(agent_root.is_dir())
             self.assertNotEqual(agent_root.resolve(), self.bound.resolve())
             self.assertTrue((agent_root / "README.md").is_file())
             # Mutate only the disposable tree.
             (agent_root / "worker-only.txt").write_text("isolated\n", encoding="utf-8")
             self.assertFalse((self.bound / "worker-only.txt").exists())
-            cleanup = cleanup_worker_isolation(isolation)
+            cleanup = wi.cleanup_worker_isolation(isolation)
             self.assertTrue(cleanup.get("cleaned") or cleanup.get("removed"))
             self.assertFalse(agent_root.exists())
 
     def test_refuse_missing_isolation_root(self) -> None:
+        from app.safe_improvement.isolated_executor import IsolationError
+        from app.workspace_agents.worker_isolation import worker_agent_workspace
+
         with self.assertRaises(IsolationError):
             worker_agent_workspace(None)  # type: ignore[arg-type]
 

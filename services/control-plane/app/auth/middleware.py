@@ -11,6 +11,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.auth.desktop_session import extract_session_token, validate_session_token
 from app.auth.identity import bind_request_identity, reset_identity_token
+from app.auth.origin_guard import reject_cross_origin_mutation
 from app.auth.settings import (
     allow_loopback_bypass,
     auth_mode,
@@ -78,6 +79,16 @@ class MutatingAuthMiddleware(BaseHTTPMiddleware):
         token = None
         try:
             if method in _MUTATING and not _is_exempt(path):
+                origin_error = reject_cross_origin_mutation(request)
+                if origin_error is not None:
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "detail": origin_error,
+                            "auth_required": True,
+                            "csrf_blocked": True,
+                        },
+                    )
                 resolved, error = resolve_mutating_identity(request)
                 if resolved is None:
                     return JSONResponse(
