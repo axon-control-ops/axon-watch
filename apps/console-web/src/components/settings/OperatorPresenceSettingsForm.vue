@@ -10,6 +10,7 @@ import {
   normalizeOperatorPresenceSettings,
 } from '../../lib/operator-presence-settings';
 import OperatorPresenceVoiceRoutingFields from './OperatorPresenceVoiceRoutingFields.vue';
+import OperatorPresenceSettingsFooter from './OperatorPresenceSettingsFooter.vue';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
@@ -469,46 +470,23 @@ defineExpose({
         </label>
       </section>
 
-      <section class="operator-settings-form__section">
-        <header class="operator-settings-form__section-header">
-          <h2>Mobile &amp; layout</h2>
-          <p>Compact operator surfaces over tunnel or small viewports.</p>
-        </header>
-        <label class="operator-settings-form__row">
-          <input v-model="mobileCompactPreferred" type="checkbox" :disabled="saving" />
-          <span class="operator-settings-form__copy">
-            <strong>Prefer compact mobile layout</strong>
-            <small>Use the field-unit cockpit when the viewport is narrow.</small>
-          </span>
-        </label>
-      </section>
-
-      <div class="operator-settings-form__actions operator-settings-form__actions--footer">
-        <button
-          type="button"
-          class="operator-settings-form__button"
-          :disabled="saving || !dirty"
-          @click="commitSave"
-        >
-          {{ saving ? 'Saving…' : 'Save' }}
-        </button>
-        <button
-          type="button"
-          class="operator-settings-form__button operator-settings-form__button--ghost"
-          :disabled="saving || !dirty"
-          @click="discardDraft"
-        >
-          Discard
-        </button>
-        <button
-          type="button"
-          class="operator-settings-form__button operator-settings-form__button--ghost"
-          :disabled="saving"
-          @click="requestReset"
-        >
-          Reset to defaults
-        </button>
-      </div>
+      <OperatorPresenceSettingsFooter
+        :saving="Boolean(saving)"
+        :dirty="dirty"
+        @save="commitSave"
+        @discard="discardDraft"
+        @reset="requestReset"
+      >
+        <template #mobile>
+          <label class="operator-settings-form__row">
+            <input v-model="mobileCompactPreferred" type="checkbox" :disabled="saving" />
+            <span class="operator-settings-form__copy">
+              <strong>Prefer compact mobile layout</strong>
+              <small>Use the field-unit cockpit when the viewport is narrow.</small>
+            </span>
+          </label>
+        </template>
+      </OperatorPresenceSettingsFooter>
     </div>
   </div>
 </template>

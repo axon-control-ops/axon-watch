@@ -2,15 +2,6 @@
 import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 
-import {
-  galaxyOrbHint,
-  galaxyOrbModeClass,
-  galaxyOrbModeLabel,
-  galaxyOrbModelLabel,
-  galaxyOrbStateClass,
-  galaxyOrbStatusLabel,
-  galaxyOrbTriggerAriaLabel,
-} from './kairo-galaxy-orb-view';
 import KairoGalaxyOrbChrome from './KairoGalaxyOrbChrome.vue';
 import KairoGalaxyOrbDragHandle from './KairoGalaxyOrbDragHandle.vue';
 import KairoGalaxyOrbFrame from './KairoGalaxyOrbFrame.vue';
@@ -25,12 +16,12 @@ import { handleKairoGalaxyOrbInterrupt } from './kairo-galaxy-orb-interrupt';
 import { useKairoGalaxyOrbChromeFlags } from './use-kairo-galaxy-orb-chrome-flags';
 import { useKairoGalaxyOrbTtsBadge } from './use-kairo-galaxy-orb-tts-badge';
 import { useGalaxyOrbRadialMenu } from './use-galaxy-orb-radial-menu';
+import { useKairoGalaxyOrbViewModel } from './use-kairo-galaxy-orb-view-model';
 import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_ORB_LABEL } from '../../lib/operator-persona-name';
 import {
   kairoConversationPhase,
   kairoConversationReply,
 } from '../kairo-conversation/kairo-conversation-state';
-import { kairoCaptureMode } from '../kairo-conversation/kairo-shared-speech-capture';
 import { useShellStore } from '../../stores/shell';
 
 const props = withDefaults(
@@ -66,37 +57,15 @@ const {
 } = useKairoGalaxyOrbPresence(shell);
 
 let toggleHandsFree: ((source: string) => Promise<void>) | null = null;
-
 const radialMenu = useGalaxyOrbRadialMenu({
   shell,
-  onTalk: () => {
-    void toggleHandsFree?.('radial-talk');
-  },
+  onTalk: () => { void toggleHandsFree?.('radial-talk'); },
 });
-
 const {
-  kairoSpeaking,
-  voiceBeat,
-  modeFlash,
-  handleOrbClick,
-  handleOrbPointerDown,
-  handleOrbPointerUp,
-  cancelOrbPointerGesture,
-  toggleHandsFreeMode,
-} = useKairoGalaxyOrbVoice({
-  shell,
-  speechCapture,
-  voiceBlocked,
-  orbBusy,
-  handsFreeEnabled,
-  // Short tap toggles hands-free directly (radial opens via right-click).
-});
+  kairoSpeaking, voiceBeat, modeFlash, handleOrbClick,
+  handleOrbPointerDown, handleOrbPointerUp, cancelOrbPointerGesture, toggleHandsFreeMode,
+} = useKairoGalaxyOrbVoice({ shell, speechCapture, voiceBlocked, orbBusy, handsFreeEnabled });
 toggleHandsFree = toggleHandsFreeMode;
-
-function handleOrbContextMenu(event: MouseEvent): void {
-  event.preventDefault();
-  radialMenu.toggleMenu();
-}
 
 const replySignal = computed(
   () => `${kairoConversationReply.value ?? ''}|${kairoConversationPhase.value}`,
@@ -135,52 +104,37 @@ const { onTriggerPointerDown, onTriggerPointerMove, onTriggerPointerUp } =
   );
 
 const speaking = computed(() => kairoSpeaking.value || shell.kairoSpeechActive);
-const captureMode = computed(() => kairoCaptureMode.value);
-const orbStateClass = computed(() =>
-  galaxyOrbStateClass(
-    presenceState.value,
-    speaking.value,
-    kairoConversationPhase.value,
-    speechCapture.capturing.value,
-    shell.agentStreamActive,
-    captureMode.value,
-  ),
-);
-/** Intent class (not unlock-gated) so a tap always changes the orb look. */
-const orbModeClass = computed(() => galaxyOrbModeClass(handsFreeEnabled.value));
-const modelLabel = computed(() => galaxyOrbModelLabel(shell.selectedComposerModel));
-const hint = computed(() =>
-  galaxyOrbHint(
-    presenceState.value,
-    speaking.value,
-    kairoConversationPhase.value,
-    handsFreeArmed.value,
-    gateFeedback.value,
-  ),
-);
-const modeLabel = computed(() =>
-  galaxyOrbModeLabel(
-    handsFreeEnabled.value,
-    kairoConversationPhase.value,
-    handsFreeArmed.value,
-  ),
-);
-const orbStatusLabel = computed(() =>
-  galaxyOrbStatusLabel(
-    kairoConversationPhase.value,
-    speaking.value,
-    speechCapture.capturing.value,
-    captureMode.value,
-  ),
-);
-const triggerAriaLabel = computed(() =>
-  galaxyOrbTriggerAriaLabel(personaName, voiceBlocked.value, handsFreeArmed.value),
-);
+const {
+  captureMode,
+  orbStateClass,
+  orbModeClass,
+  modelLabel,
+  hint,
+  modeLabel,
+  orbStatusLabel,
+  triggerAriaLabel,
+} = useKairoGalaxyOrbViewModel({
+  personaName,
+  presenceState,
+  speaking,
+  speechCapture,
+  agentStreamActive: computed(() => shell.agentStreamActive),
+  handsFreeEnabled,
+  handsFreeArmed,
+  gateFeedback,
+  voiceBlocked,
+  selectedComposerModel: computed(() => shell.selectedComposerModel),
+});
 const { showInterrupt, showIdeClose } = useKairoGalaxyOrbChromeFlags({
   shell,
   placementMode: props.placementMode,
 });
 const ttsBadge = useKairoGalaxyOrbTtsBadge(speaking);
+
+function handleOrbContextMenu(event: MouseEvent): void {
+  event.preventDefault();
+  radialMenu.toggleMenu();
+}
 </script>
 
 <template>

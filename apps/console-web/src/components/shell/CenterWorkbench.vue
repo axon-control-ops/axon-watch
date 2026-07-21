@@ -369,18 +369,10 @@ useWorkbenchPanelAutoPeek({
   onShowTerminal: showTerminalPanel,
   onShowAgentDock: showAgentDock,
 });
-
-useWorkbenchTerminalAutoClose({
-  terminalPanelVisible,
-  onHideTerminal: hideTerminalPanel,
-});
+useWorkbenchTerminalAutoClose({ terminalPanelVisible, onHideTerminal: hideTerminalPanel });
 
 function toggleTerminalPanel(): void {
-  if (terminalPanelVisible.value) {
-    hideTerminalPanel();
-    return;
-  }
-  showTerminalPanel();
+  terminalPanelVisible.value ? hideTerminalPanel() : showTerminalPanel();
 }
 
 const onIdeQuickGuideAction = (actionId: IdeQuickGuideActionId): void =>

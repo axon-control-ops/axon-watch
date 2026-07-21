@@ -26,7 +26,7 @@
     <div class="cover-footer">
       <div class="cover-meta">
         <strong>Last verified</strong> · 2026-07-20 — production operator at `:4173`; one-word stack commands `axonhealth` / `axonrestart` / `axonrevive`.<br/>
-        Generated 21 Jul 2026
+        Generated 22 Jul 2026
       </div>
       <div class="cover-chips">
         <span class="cover-chip">console-web</span>
@@ -731,80 +731,7 @@ echo &quot;${CURSOR_API_KEY:+set}&quot; # empty = good for Pro path
 curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
 </code></pre>
 </div></section><section class="chapter" id="chapter-vaxon-desktop"><div class="chapter-header"><span class="chapter-num">05</span><h2 id="vaxon-desktop">VAXON Desktop</h2></div><div class="chapter-body">
-<p>Packaged Linux desktop shell for operators who want Axon-X without keeping a
-browser tab on <code>:4173</code>. The app is Tauri 2; it starts frozen Watch + Control Plane
-sidecars and opens the same console UI from loopback <code>:8787</code>.</p>
-<h3>Supported systems</h3>
-<ul>
-<li>Debian-family x86_64 with WebKitGTK 4.1</li>
-<li>Current frozen sidecars need <strong>glibc ≥ 2.42</strong> (proven on Kali rolling). Older LTS bases (e.g. Bookworm / Ubuntu 24.04) need sidecars rebuilt on that base.</li>
-<li>Artifact: <code>apps/console-desktop/src-tauri/target/release/bundle/deb/VAXON_0.1.0_amd64.deb</code></li>
-</ul>
-<h3>Verify / prove</h3>
-<pre><code class="language-bash">npm run verify:desktop
-npm run prove:desktop:clean-install   # Kali rolling container .deb install + sidecar health
-npm run prove:desktop:voice           # live Azure TTS + system WebKitGTK unlock click
-</code></pre>
-<p>Evidence log: <code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code>.</p>
-<h3>Install / upgrade / uninstall</h3>
-<pre><code class="language-bash"># Build (from a checkout with Node + Rust + PyInstaller)
-npm run build:desktop:linux
-
-# Install
-sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/deb/VAXON_*.deb
-
-# Upgrade = install the newer .deb the same way
-# Uninstall (preserves ~/.config/axon-watch and ~/.local/share/axon-watch)
-sudo apt-get remove vaxon
-</code></pre>
-<h3>First run</h3>
-<ol>
-<li>Launch <strong>VAXON</strong> from the app menu (or <code>axon-console-desktop</code>).</li>
-<li>First run writes <code>~/.config/axon-watch/deployment.env</code> and state under
-   <code>~/.local/share/axon-watch/state</code>.</li>
-<li>The packaged binary detects its sidecars under <code>/usr/bin</code> (no special env needed
-   on the desktop entry) and starts Watch (<code>:8788</code>) then Control Plane (<code>:8787</code>).</li>
-<li>The window loads the Control Plane origin after health succeeds.</li>
-<li>Unlock Vault and enter Azure Speech credentials if you want Azure TTS (not
-   robotic browser speech). Cursor agent work still needs a separately
-   authenticated Cursor CLI on the host.</li>
-</ol>
-<h3>Operator controls</h3>
-<ul>
-<li>Tray: hide-on-close; reopen from the tray icon (verify on your host).</li>
-<li>Galaxy panes: drag the resize handles; double-click / Enter resets widths.</li>
-<li>Attention <strong>Details</strong>: plain-English what happened / what you do / what the agent should do.</li>
-<li>Development without frozen sidecars: set <code>AXON_DESKTOP_ALLOW_PYTHON_FALLBACK=1</code>
-  (never required for the packaged <code>.deb</code>).</li>
-</ul>
-<h3>Health checks and voice troubleshooting</h3>
-<pre><code class="language-bash">npm run verify:desktop
-curl -s http://127.0.0.1:8787/api/health
-</code></pre>
-<p>If voice sounds robotic: confirm Azure credentials, click once in the window to
-unlock media, then retry the voice sample. Packaged builds prefer Azure; browser
-speech is fallback only.</p>
-<h3>Development vs installed updates</h3>
-<table>
-<thead>
-<tr>
-<th>Change</th>
-<th>How you pick it up</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Day-to-day UI while developing</td>
-<td>Browser <code>:4173</code> / Vite HMR</td>
-</tr>
-<tr>
-<td>Desktop packaging, Rust, sidecars, icons</td>
-<td>Rebuild <code>.deb</code> (<code>npm run build:desktop:linux</code>) and reinstall</td>
-</tr>
-</tbody>
-</table>
-<p>Evidence log: <a href="VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a>.
-Contracts: <a href="DUAL_RUNTIME_STARTUP_CONTRACT.md"><code>docs/DUAL_RUNTIME_STARTUP_CONTRACT.md</code></a>.</p>
+<p>See <a href="how-to/vaxon-desktop.md"><code>docs/how-to/vaxon-desktop.md</code></a>.</p>
 </div></section><section class="chapter" id="chapter-terminology-and-abbreviations"><div class="chapter-header"><span class="chapter-num">06</span><h2 id="terminology-and-abbreviations">Terminology And Abbreviations</h2></div><div class="chapter-body">
 <p>Use this glossary when reading plans, ADRs, code, or agent summaries.</p>
 <table>
@@ -1797,14 +1724,7 @@ meaning.</p>
 </ul>
 <p>That distinction matters during review.</p>
 <h2>Tip 7: Do not overreact to incomplete polish</h2>
-<p>At this stage, review should focus on:</p>
-<ul>
-<li>boundaries</li>
-<li>ownership</li>
-<li>contracts</li>
-<li>verification</li>
-</ul>
-<p>Not whether the shell is already pretty or feature-rich.</p>
+<p>Prefer contracts and verify harness first; cosmetic cleanup can wait.</p>
 </div></section><section class="chapter" id="chapter-what-a-good-next-slice-looks-like"><div class="chapter-header"><span class="chapter-num">28</span><h2 id="what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</h2></div><div class="chapter-body">
 <p>A good next slice should:</p>
 <ul>
@@ -2188,6 +2108,20 @@ curl -X POST http://127.0.0.1:8787/api/runs/reconcile-stale
 </code></pre>
 <p><strong>PDF:</strong> This chapter is bundled into <code>~/Desktop/Axon-X-How-To-Handbook.pdf</code> when you run
 <code>./scripts/docs/build-howto-handbook-pdf.sh</code> (rebuild after handbook edits).</p>
+<hr>
+<h3>VAXON Desktop</h3>
+<p>Packaged Linux desktop shell (Tauri 2) with frozen Watch + Control Plane sidecars on loopback <code>:8787</code>.</p>
+<h4>Verify</h4>
+<pre><code class="language-bash">npm run verify:desktop
+npm run prove:desktop:clean-install
+npm run prove:desktop:voice
+</code></pre>
+<p>Evidence: <a href="../VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a>.</p>
+<h4>Install</h4>
+<pre><code class="language-bash">npm run build:desktop:linux
+sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/deb/VAXON_*.deb
+</code></pre>
+<p>Requires Debian-family x86_64 + WebKitGTK 4.1; current sidecars need <strong>glibc ≥ 2.42</strong>. Full first-run / tray / update notes: <a href="../VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a> and <a href="../DUAL_RUNTIME_STARTUP_CONTRACT.md"><code>docs/DUAL_RUNTIME_STARTUP_CONTRACT.md</code></a>.</p>
 <hr>
 </div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">36</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
 <p>Preferred → fallback order (matches the control-plane research path):</p>
