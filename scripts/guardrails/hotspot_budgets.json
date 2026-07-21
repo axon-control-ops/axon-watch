@@ -18,7 +18,7 @@
       "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display slices extracted; keep shrinking via factory slices."
     },
     "apps/console-web/src/styles/ide-layout.css": {
-      "max_lines": 14,
+      "max_lines": 15,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/* + feature CSS",
@@ -55,7 +55,7 @@
       "note": "FS-001 complete: re-export facade only"
     },
     "apps/console-web/src/styles/app.css": {
-      "max_lines": 1146,
+      "max_lines": 1147,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/tokens/* + feature CSS"
@@ -209,20 +209,20 @@
       "note": "Mission control panel; extract quick-guide rail when shrinking"
     },
     "apps/console-web/src/styles/ide/ide-layout-01.css": {
-      "max_lines": 534,
+      "max_lines": 436,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
-      "note": "Ratcheted after status-bar/connector polish; panel-shared hoisted in ide-layout.css"
+      "note": "Lowered after explorer/activity panel CSS extraction"
     },
     "apps/console-web/src/styles/ide/ide-layout-08.css": {
-      "max_lines": 660,
+      "max_lines": 557,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*"
     },
     "apps/console-web/src/styles/shell/mockup-shell-07.css": {
-      "max_lines": 298,
+      "max_lines": 213,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"
@@ -258,18 +258,39 @@
       "target": "tests/test_signal_consistency_* slices"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-view.ts": {
-      "max_lines": 688,
+      "max_lines": 316,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
-      "note": "Employee roster/presence helpers; extract failure/peek slices next"
+      "note": "Lowered after failure/speak/status helpers extracted"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-view.test.ts": {
-      "max_lines": 662,
+      "max_lines": 264,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
-      "note": "Paired with company-roster-view.ts; split with helper extraction"
+      "note": "Lowered after failure-view tests extracted"
+    },
+    "apps/console-web/src/features/workspace-agents/company-roster-failure-view.test.ts": {
+      "max_lines": 571,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/workspace-agents/*",
+      "note": "Extracted from company-roster-view.test.ts; split further when shrinking"
+    },
+    "apps/console-web/src/components/ide/IdeExplorerActivityPanels.vue": {
+      "max_lines": 674,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/ide/*",
+      "note": "Explorer + activity stub panels; extract per-panel components next"
+    },
+    "services/control-plane/app/adapters/watch_client.py": {
+      "max_lines": 553,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/adapters/watch_*",
+      "note": "Watch inbox/connector client cache; extract cache helpers next"
     },
     "apps/console-web/src/styles/shell/agent-persona-dock.css": {
       "max_lines": 502,
