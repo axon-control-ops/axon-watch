@@ -79,7 +79,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 766,
+      "max_lines": 684,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
