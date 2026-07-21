@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Narrow VAXON desktop capabilities — no broad shell/fs.","local":true,"windows":["main"],"permissions":["core:default","core:event:default","core:window:allow-show","core:window:allow-hide","core:window:allow-set-focus","core:tray:default"]}}

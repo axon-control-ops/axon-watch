@@ -58,6 +58,10 @@ export interface OperatorBriefingMemoryHighlight {
   source_refs: Array<Record<string, unknown>>;
   created_at: string;
   updated_at: string;
+  due_at?: string;
+  why_now?: string;
+  priority?: string;
+  status?: string;
 }
 
 export interface OperatorBriefing {
@@ -74,5 +78,7 @@ export interface OperatorBriefing {
   cli_runtime?: CliRuntimeReadiness;
   connectivity: OperatorBriefingConnectivity;
   memory_highlights?: OperatorBriefingMemoryHighlight[];
+  due_reminders?: OperatorBriefingMemoryHighlight[];
+  host_artifacts?: Array<Record<string, unknown>>;
   operator_presence?: OperatorPresence;
 }

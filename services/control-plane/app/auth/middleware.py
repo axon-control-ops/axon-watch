@@ -9,6 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from app.auth.desktop_session import extract_session_token, validate_session_token
 from app.auth.identity import bind_request_identity, reset_identity_token
 from app.auth.settings import (
     allow_loopback_bypass,
@@ -20,6 +21,9 @@ from app.auth.settings import (
 _MUTATING = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _EXEMPT_PREFIXES = (
     "/api/health",
+    "/api/desktop/bootstrap",
+    "/api/desktop/bootstrap-code",
+    "/api/desktop/status",
     "/docs",
     "/openapi.json",
     "/redoc",
@@ -49,6 +53,10 @@ def resolve_mutating_identity(request: Request) -> tuple[str | None, str | None]
     presented = _extract_bearer(request)
     if token and presented and secrets.compare_digest(presented, token):
         return "operator", None
+
+    session = extract_session_token(request.cookies, request.headers)
+    if validate_session_token(session):
+        return "desktop_session", None
 
     client_host = request.client.host if request.client else None
     if allow_loopback_bypass() and client_is_loopback(client_host):

@@ -29,7 +29,7 @@ describe('voice deck', () => {
     expect(speakKairoLine).toHaveBeenCalledOnce();
     expect(speakKairoLine).toHaveBeenCalledWith(
       'VAXON: 1 approval waiting for your review.',
-      { priority: 'alert', preferBrowser: true },
+      { priority: 'alert' },
     );
   });
 

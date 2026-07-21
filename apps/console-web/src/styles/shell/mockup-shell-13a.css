@@ -9,7 +9,7 @@
 
 .brain-galaxy-stage__hud {
   position: absolute;
-  z-index: 3;
+  z-index: 20;
   pointer-events: none;
 }
 
@@ -104,7 +104,7 @@
   top: 0.75rem;
   left: 0.75rem;
   bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.55rem);
-  width: min(14rem, 22vw);
+  width: var(--galaxy-left-width, min(14rem, 22vw));
   max-height: none;
   overflow: auto;
   padding: 0.55rem 0.55rem 0.65rem;
@@ -126,7 +126,7 @@
   bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.55rem);
   left: auto;
   transform: none;
-  width: min(22.5rem, 32vw);
+  width: var(--galaxy-inspector-width, min(22.5rem, 32vw));
   max-height: none;
   overflow: visible;
   padding: 0;
@@ -134,7 +134,7 @@
   background: transparent;
   backdrop-filter: none;
   text-align: left;
-  z-index: 4;
+  z-index: 30;
 }
 
 .galaxy-inspector {

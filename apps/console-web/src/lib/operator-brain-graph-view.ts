@@ -1,4 +1,15 @@
-export type BrainNodeKind = 'core' | 'workspace' | 'run' | 'signal' | 'connector' | 'mailbox';
+export type BrainNodeKind =
+  | 'core'
+  | 'workspace'
+  | 'run'
+  | 'signal'
+  | 'connector'
+  | 'mailbox'
+  | 'device'
+  | 'application'
+  | 'artifact'
+  | 'media'
+  | 'open_loop';
 export type BrainNodeTone = 'nominal' | 'attention' | 'critical';
 
 export type BrainGraphNode = {
@@ -53,6 +64,11 @@ const NODE_RADIUS: Record<string, number> = {
   signal: 11,
   mailbox: 12,
   run: 9,
+  device: 16,
+  application: 11,
+  artifact: 10,
+  media: 10,
+  open_loop: 12,
 };
 
 /**

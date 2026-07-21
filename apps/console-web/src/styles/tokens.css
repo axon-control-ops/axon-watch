@@ -46,6 +46,19 @@
   --motion-fast: 120ms;
   --motion-normal: 180ms;
   --motion-emphasis: 260ms;
+  --motion-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --motion-intensity: 0.55;
+
+  --glass-tier-1: rgba(4, 14, 22, 0.72);
+  --glass-tier-2: rgba(6, 18, 28, 0.82);
+  --glass-tier-3: rgba(8, 22, 34, 0.92);
+  --glass-specular: rgba(255, 255, 255, 0.06);
+  --glass-edge: rgba(0, 242, 255, 0.22);
+  --glass-contrast-text: #edf8ff;
+  --depth-1: 0 8px 24px rgba(0, 0, 0, 0.28);
+  --depth-2: 0 16px 40px rgba(0, 0, 0, 0.36);
 
   --font-display: Inter, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   --font-ui: var(--font-display);
@@ -70,5 +83,41 @@
     --motion-fast: 0ms;
     --motion-normal: 0ms;
     --motion-emphasis: 0ms;
+    --motion-intensity: 0;
   }
+}
+
+.glass-surface {
+  background: var(--glass-tier-2);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--depth-1), inset 0 1px 0 var(--glass-specular);
+  color: var(--glass-contrast-text);
+}
+
+.glass-surface--tier-1 {
+  background: var(--glass-tier-1);
+}
+
+.glass-surface--tier-2 {
+  background: var(--glass-tier-2);
+}
+
+.glass-surface--tier-3 {
+  background: var(--glass-tier-3);
+}
+
+.motion-panel-enter-active,
+.motion-panel-leave-active {
+  transition:
+    opacity var(--motion-emphasis) var(--motion-ease-out),
+    transform var(--motion-emphasis) var(--motion-spring),
+    filter var(--motion-emphasis) var(--motion-ease-out);
+}
+
+.motion-panel-enter-from,
+.motion-panel-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+  filter: blur(4px);
 }

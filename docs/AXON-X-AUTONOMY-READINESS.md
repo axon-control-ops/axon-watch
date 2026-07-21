@@ -1,7 +1,10 @@
 # Axon-X Autonomy Readiness
 
-**Plain-language assessment for DashPro and the Axon-X mobile control plane**  
-**Assessment date:** 20 July 2026  
+**Plain-language assessment focused on DashPro as the first proving ground, plus
+the Axon-X mobile control plane. The autonomy target is multi-workspace: any
+bound workspace working in its own project/app under the same safety rules.**  
+**Assessment date:** 20 July 2026 (live evidence below is a snapshot; re-check
+before acting)  
 **Repository:** `axon-watch`  
 **Current branch during assessment:** `dev`
 
@@ -268,8 +271,10 @@ yet an installable PWA or native phone application.
 
 ## What the live inspection found
 
-The following results came from the running system and current project folders,
-not only from documentation.
+The following results came from the running system and current project folders
+on **20 July 2026**, not only from documentation. They are **time-stamped
+evidence**, not permanent facts. Re-verify before using them as current state
+(for example, scheduler enablement and DashPro dirty-tree size can change).
 
 | Finding | What it means |
 | --- | --- |

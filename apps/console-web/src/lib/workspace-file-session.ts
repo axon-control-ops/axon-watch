@@ -2,6 +2,7 @@ import type { EditorDocumentLanguage, WorkspaceDocumentDescriptor } from './work
 import {
   isBinaryFilePath,
   isImageFilePath,
+  isPdfFilePath,
   languageForFilePath,
   workspaceFileDocumentId,
 } from './workspace-file-language';
@@ -60,6 +61,7 @@ export function buildOpenedFileDocuments(
   return openedPaths.flatMap((path) => {
     const entry = entryByPath.get(path);
     const imageFile = isImageFilePath(path);
+    const pdfFile = isPdfFilePath(path);
     const binaryFile = isBinaryFilePath(path);
     if (!entry) {
       if (!binaryFile) {
@@ -71,7 +73,11 @@ export function buildOpenedFileDocuments(
           title: path,
           language: languageForFilePath(path) as EditorDocumentLanguage,
           value: '',
-          description: imageFile ? 'Image preview.' : 'Binary file preview.',
+          description: imageFile
+            ? 'Image preview.'
+            : pdfFile
+              ? 'PDF preview.'
+              : 'Binary file preview.',
           source: 'file',
           filePath: path,
           readOnly: true,
@@ -93,11 +99,13 @@ export function buildOpenedFileDocuments(
         value: pending ? '' : content,
         description: imageFile
           ? `Image preview (${entry.size_bytes} bytes).`
-          : binaryFile
-            ? `Binary file (${entry.size_bytes} bytes) — not editable as text.`
-            : pending
-              ? 'Loading workspace file…'
-              : `Workspace file on disk (${entry.size_bytes} bytes). Editable — use Save.`,
+          : pdfFile
+            ? `PDF preview (${entry.size_bytes} bytes).`
+            : binaryFile
+              ? `Binary file (${entry.size_bytes} bytes) — not editable as text.`
+              : pending
+                ? 'Loading workspace file…'
+                : `Workspace file on disk (${entry.size_bytes} bytes). Editable — use Save.`,
         source: 'file',
         filePath: path,
         readOnly: pending || binaryFile,

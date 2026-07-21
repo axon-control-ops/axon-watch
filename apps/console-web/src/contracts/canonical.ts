@@ -22,3 +22,10 @@ export type {
   CompanyRosterRecord,
   CompanyRosterSnapshot,
 } from '../../../../packages/shared-types/src/index';
+export type {
+  DesktopRuntime,
+  HostActionReceipt,
+  HostArtifactRecord,
+  HostCapabilitiesSnapshot,
+  OperatorReminderRecord,
+} from '../../../../packages/shared-types/src/index';

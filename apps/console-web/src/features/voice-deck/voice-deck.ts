@@ -10,7 +10,9 @@ export async function handleVoiceDeckSpokenAlert(
     return false;
   }
 
-  await speakKairoLine(alert.message.trim(), { priority: 'alert', preferBrowser: true });
+  // Azure-first: browser speechSynthesis is only a diagnosed fallback inside
+  // kairo-voice-playback when Azure fetch/play fails (WebKit autoplay, vault, etc.).
+  await speakKairoLine(alert.message.trim(), { priority: 'alert' });
   return true;
 }
 

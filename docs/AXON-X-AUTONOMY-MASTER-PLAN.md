@@ -37,7 +37,8 @@ Approved goal
   → Receipt for every step
 ```
 
-Until that loop is proven, continuous workers must not freely edit the live DashPro checkout.
+Until that loop is proven, continuous workers must not freely edit any live
+bound workspace checkout (DashPro is the highest-risk example today).
 
 ---
 
@@ -605,18 +606,26 @@ Allow only reversible, pre-approved production classes.
 
 ---
 
-## Definition of done for “DashPro autonomous”
+## Definition of done for “workspace autonomy”
 
-DashPro autonomy is **done** only when all of the following are true:
+A **bound workspace** (any project-path workspace, not only DashPro) is
+autonomous enough only when all of the following are true for that workspace:
 
 1. Continuous workers never write the live operator checkout.
 2. Every run is tied to a leased task with acceptance checks.
-3. Lead can turn one approved goal into a conflict-safe task plan.
+3. Lead (or equivalent planner) can turn one approved goal into a conflict-safe task plan.
 4. Draft PRs are the normal delivery unit.
 5. CI failures create repair tasks automatically, with attempt budgets.
 6. Staging rollback works without a human present.
-7. The 20-task canary meets the success bar.
-8. Merge to `main`, Play promotion, secrets, and destructive ops remain human-gated.
+7. A bounded canary (for example 20 tasks) meets the success bar for that workspace.
+8. Merge to protected branches, store promotion, secrets, and destructive ops remain human-gated.
+
+### DashPro proving-ground note
+
+DashPro is the first workspace used to prove the loop above. Passing the
+DashPro canary unlocks the pattern; it does **not** automatically declare every
+other bound workspace done until the same controls are enabled and measured
+there.
 
 ---
 
@@ -661,15 +670,42 @@ Append one block per completed gate:
 - next gate unlocked:
 ```
 
+### Gate 0 — 2026-07-21
+- owner: operator + agent
+- commit: `9c86389` (evidence on live tree; see `docs/ops/agent-reports/gate0-pause-preserve-2026-07-21.md`)
+- commands run: `GET /api/worker-scheduler`; DashPro + axon-watch dirty inventory
+- pass/fail: pass
+- exit criteria met: yes
+- residual risks: DashPro OTA/affiliation KEEP cluster; Axon-X large mixed dirty tree preserved
+- next gate unlocked: Gate 1
+
+### Gate 1 — 2026-07-21
+- owner: agent
+- commit: working tree atop `9c86389` (commit pending); report `docs/ops/agent-reports/gate1-trustworthy-baseline-2026-07-21.md`
+- commands run: `npm run verify:contracts`; `npm run verify:console-web`
+- pass/fail: pass (contracts exit 0; Vitest 236 files / 1242 tests; build ok)
+- exit criteria met: yes on working tree; SHA pin pending commit
+- residual risks: baseline not on remote until committed/pushed
+- next gate unlocked: Gate 2 finish / Gate 3 prep
+
+### Gate 2 — 2026-07-21 (thin slice)
+- owner: agent
+- commit: working tree atop `9c86389`; report `docs/ops/agent-reports/gate2-auth-containment-2026-07-21.md`
+- commands run: `tests.test_gate2_auth_containment` (11 OK); included in `verify:contracts`
+- pass/fail: pass for thin slice
+- exit criteria met: partial — local_token + internal watch token + vault remote refuse + worker trust policy; **not** full CSRF/rate-limit/step-up
+- residual risks: default auth mode still `placeholder`; must set tokens for non-loopback; rate limit/CSRF/step-up outstanding
+- next gate unlocked: Gate 3 (per-task worktrees) — keep scheduler off until worktrees land
+
 ---
 
 ## Immediate next actions (start now)
 
-1. **Pause** continuous mutation affecting the shared DashPro checkout.
-2. **Inventory** the current DashPro dirty tree and map files to runs/roles.
-3. **Fix** the failing autonomy tests and record a green baseline SHA.
-4. **Do not** build mobile mutation features until Gate 2 is green.
-5. **Do not** re-enable continuous live-checkout editing after Gate 0.
+1. **Commit** the green Gates 0–2 working tree when ready (pins Gate 1 SHA).
+2. **Start Gate 3** — per-task disposable checkout / worktrees (scheduler stays off until ready).
+3. **Do not** re-enable continuous live-checkout editing.
+4. **Do not** build mobile mutation features until Gate 2 residuals (CSRF/rate-limit + forced token mode on remote) are closed.
+5. On any remote deploy: set `AXON_WATCH_AUTH_MODE=local_token`, operator token, and `AXON_WATCH_INTERNAL_SERVICE_TOKEN`.
 
 ---
 
@@ -680,3 +716,6 @@ Append one block per completed gate:
 - Self-improvement contract: `docs/SELF_IMPROVEMENT_CONTRACT.md`
 - DashPro CI playbook: `docs/planning/DASHPRO_CI_AGENT_PLAYBOOK.md`
 - Child project binding: `docs/CHILD_PROJECT_WORKSPACE.md`
+- Gate 0 evidence: `docs/ops/agent-reports/gate0-pause-preserve-2026-07-21.md`
+- Gate 1 evidence: `docs/ops/agent-reports/gate1-trustworthy-baseline-2026-07-21.md`
+- Gate 2 evidence: `docs/ops/agent-reports/gate2-auth-containment-2026-07-21.md`

@@ -2,6 +2,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch,
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
 import { subscribeKairoVoiceChunk } from '../../lib/kairo-voice-playback';
+import {
+  motionIntensityFromStorage,
+  planMotionTransition,
+} from '../host-context/motion-orchestrator';
 import { kairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
 import { BrainGalaxyScene } from './brain-galaxy-scene';
 import {
@@ -68,6 +72,21 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   }
 
   function selectNode(node: BrainGraphNode): void {
+    const reducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const intensity =
+      typeof window !== 'undefined'
+        ? motionIntensityFromStorage(window.localStorage.getItem('axon-motion-intensity'))
+        : 'subtle';
+    const plan = planMotionTransition('node_select', {
+      intensity,
+      reducedMotion,
+      presencePhase: presence.value.phase,
+    });
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--motion-emphasis', `${plan.durationMs}ms`);
+    }
     selectedNode.value = node;
     sceneRef.value?.setSelectedNode(node.node_id);
     options.onNodeClick(node);

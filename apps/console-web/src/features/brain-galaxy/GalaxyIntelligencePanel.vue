@@ -6,6 +6,7 @@ import {
   briefingActionCtaLabel,
   executeBriefingAction,
 } from '../../lib/briefing-action-executor';
+import HostCapabilityPanel from '../host-context/HostCapabilityPanel.vue';
 import { projectGalaxyIntelligence } from './galaxy-intelligence-projector';
 import type { GalaxyPresencePhase } from './galaxy-presence-state';
 import { useShellStore } from '../../stores/shell';
@@ -17,6 +18,7 @@ const props = defineProps<{
 
 const shell = useShellStore();
 const actionPendingId = ref<string | null>(null);
+const hostContextOpen = ref(false);
 
 const view = computed(() =>
   projectGalaxyIntelligence({
@@ -57,6 +59,20 @@ async function onActivateAction(action: BriefingAction): Promise<void> {
     <p class="galaxy-intelligence-panel__headline">{{ view.headline }}</p>
     <p v-if="view.notice" class="galaxy-intelligence-panel__notice">{{ view.notice }}</p>
     <p v-if="view.advise" class="galaxy-intelligence-panel__advise">{{ view.advise }}</p>
+
+    <div
+      v-if="(shell.operatorBriefing?.due_reminders?.length ?? 0) > 0"
+      class="galaxy-intelligence-panel__reminders"
+      aria-label="Due reminders"
+    >
+      <p
+        v-for="item in shell.operatorBriefing?.due_reminders?.slice(0, 2) ?? []"
+        :key="item.memory_id"
+        class="galaxy-intelligence-panel__reminder"
+      >
+        {{ item.title }}
+      </p>
+    </div>
 
     <div class="galaxy-intelligence-panel__chips" aria-label="Live signals">
       <span
@@ -155,5 +171,17 @@ async function onActivateAction(action: BriefingAction): Promise<void> {
     <p v-if="view.routingReceipt" class="galaxy-intelligence-panel__receipt">
       {{ view.routingReceipt }}
     </p>
+
+    <section class="galaxy-intelligence-panel__section">
+      <button
+        type="button"
+        class="galaxy-intelligence-panel__host-toggle"
+        :aria-expanded="hostContextOpen"
+        @click="hostContextOpen = !hostContextOpen"
+      >
+        Host context
+      </button>
+      <HostCapabilityPanel v-if="hostContextOpen" />
+    </section>
   </aside>
 </template>

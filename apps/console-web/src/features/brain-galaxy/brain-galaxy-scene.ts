@@ -129,10 +129,14 @@ export class BrainGalaxyScene {
 
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.setSize(width, height);
-    this.labelRenderer.domElement.style.position = 'absolute';
-    this.labelRenderer.domElement.style.inset = '0';
-    this.labelRenderer.domElement.style.pointerEvents = 'none';
-    this.container.appendChild(this.labelRenderer.domElement);
+    const labelRoot = this.labelRenderer.domElement;
+    labelRoot.className = 'brain-galaxy-stage__labels';
+    labelRoot.style.position = 'absolute';
+    labelRoot.style.inset = '0';
+    labelRoot.style.zIndex = '0';
+    labelRoot.style.pointerEvents = 'none';
+    labelRoot.style.overflow = 'hidden';
+    this.container.appendChild(labelRoot);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;

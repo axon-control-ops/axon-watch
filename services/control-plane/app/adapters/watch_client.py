@@ -10,6 +10,8 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from app.adapters.watch_http import watch_base_url, watch_request_headers
+
 # Boot stampede protection: /api/agents, /api/workspaces, /api/inbox, fleet-health,
 # and runtime/summary all share this fetch. Without SWR + single-flight, one cold
 # watch probe (up to 25s) stacks N blocked worker threads and starves the UI.
@@ -19,12 +21,8 @@ _INBOX_CACHE_LOCK = threading.Lock()
 _INBOX_BUILD_LOCK = threading.Lock()
 _INBOX_BACKGROUND_REFRESHING = False
 
-
-def watch_base_url() -> str:
-    return os.environ.get(
-        "AXON_WATCH_WATCH_SERVICE_BASE_URL",
-        "http://127.0.0.1:8788",
-    ).rstrip("/")
+# Re-export for callers that import watch_base_url from this module.
+__all__ = ("watch_base_url", "reset_watch_inbox_cache")
 
 
 def reset_watch_inbox_cache() -> None:
@@ -63,7 +61,7 @@ def _fetch_watch_inbox_uncached(timeout_seconds: float) -> dict[str, object] | N
     url = f"{watch_base_url()}/internal/watch/inbox"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
+        request = Request(url, headers=watch_request_headers())
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
@@ -171,7 +169,7 @@ def fetch_watch_summary(timeout_seconds: float = 1.5) -> dict[str, object] | Non
     url = f"{watch_base_url()}/internal/watch/summary"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
+        request = Request(url, headers=watch_request_headers())
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
@@ -186,7 +184,7 @@ def fetch_watch_monitors(timeout_seconds: float = 5.0) -> dict[str, object] | No
     url = f"{watch_base_url()}/internal/watch/monitors"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
+        request = Request(url, headers=watch_request_headers())
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
@@ -201,7 +199,7 @@ def fetch_watch_connectors(timeout_seconds: float = 5.0) -> dict[str, object] | 
     url = f"{watch_base_url()}/internal/watch/connectors"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
+        request = Request(url, headers=watch_request_headers())
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
@@ -216,7 +214,7 @@ def fetch_watch_tunnel(timeout_seconds: float = 1.0) -> dict[str, object] | None
     url = f"{watch_base_url()}/internal/watch/tunnel"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
+        request = Request(url, headers=watch_request_headers())
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
@@ -236,7 +234,7 @@ def post_watch_tunnel_action(action: str, timeout_seconds: float = 90.0) -> dict
     try:
         request = Request(
             url,
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=watch_request_headers(content_type="application/json"),
             method="POST",
             data=b"{}",
         )
@@ -258,7 +256,7 @@ def post_watch_command(body: dict[str, object], timeout_seconds: float = 2.0) ->
         request = Request(
             url,
             data=encoded,
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
         with urlopen(request, timeout=timeout_seconds) as response:
@@ -275,7 +273,7 @@ def get_watch_command(command_id: str, timeout_seconds: float = 1.0) -> dict[str
     url = f"{watch_base_url()}/internal/watch/commands/{command_id.strip()}"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
+        request = Request(url, headers=watch_request_headers())
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
@@ -298,7 +296,7 @@ def fetch_watch_events(
     url = f"{watch_base_url()}/internal/watch/events?{query}"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
+        request = Request(url, headers=watch_request_headers())
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
@@ -321,7 +319,7 @@ def fetch_watch_delivery_receipts(
     url = f"{watch_base_url()}/internal/watch/delivery/receipts?{query}"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
+        request = Request(url, headers=watch_request_headers())
         with urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
@@ -369,7 +367,7 @@ def post_watch_sentry_issue_resolve(
         request = Request(
             url,
             data=encoded,
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
         with urlopen(request, timeout=timeout_seconds) as response:
@@ -392,7 +390,7 @@ def post_watch_sentry_probe_write(timeout_seconds: float = 15.0) -> dict[str, ob
         request = Request(
             url,
             data=b"{}",
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
         with urlopen(request, timeout=timeout_seconds) as response:

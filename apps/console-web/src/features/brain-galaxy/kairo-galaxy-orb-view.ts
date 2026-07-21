@@ -146,6 +146,20 @@ export function galaxyOrbModeLabel(
   return 'Manual';
 }
 
+export function galaxyOrbTriggerAriaLabel(
+  personaName: string,
+  voiceBlocked: boolean,
+  handsFreeEnabled: boolean,
+): string {
+  if (voiceBlocked) {
+    return `${personaName} voice muted`;
+  }
+  if (handsFreeEnabled) {
+    return `${personaName} hands-free — tap to switch to manual mode`;
+  }
+  return `${personaName} manual — tap for hands-free, hold to talk, long-press to move`;
+}
+
 export function galaxyOrbStateClass(
   state: KairoPresenceState,
   speaking: boolean,

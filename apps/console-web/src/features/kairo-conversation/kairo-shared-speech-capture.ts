@@ -72,7 +72,10 @@ function notifyCaptureEnd(): void {
 }
 
 export function isKairoSpeechCaptureSupported(): boolean {
-  return isSpeechCaptureSupported();
+  return (
+    isSpeechCaptureSupported() ||
+    (!privacyBlocked() && isCloudAudioCaptureSupported())
+  );
 }
 
 function mapCaptureError(code: string): string | null {
@@ -203,7 +206,8 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
 
 function shouldUseCloudCapture(mode: KairoVoiceCaptureMode): boolean {
   return (
-    resolveSttCaptureMode(sttMode(), privacyBlocked()) === 'cloud' &&
+    (resolveSttCaptureMode(sttMode(), privacyBlocked()) === 'cloud' ||
+      !isSpeechCaptureSupported()) &&
     mode === 'manual' &&
     isCloudAudioCaptureSupported()
   );

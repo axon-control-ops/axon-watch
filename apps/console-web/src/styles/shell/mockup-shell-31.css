@@ -54,7 +54,7 @@
   top: 0.65rem;
   left: 0.65rem;
   bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.45rem);
-  width: min(16.5rem, 24vw);
+  width: var(--galaxy-left-width, min(16.5rem, 24vw));
   padding: 0;
   border: 0;
   background: transparent;
@@ -67,17 +67,64 @@
   top: 0.65rem;
   right: 0.65rem;
   bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.45rem);
-  width: min(23rem, 34vw);
+  width: var(--galaxy-inspector-width, min(23rem, 34vw));
 }
 
 .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--right {
   top: 0.65rem;
   right: 0.65rem;
-  width: clamp(13rem, 24vw, 16rem);
+  width: var(--galaxy-right-width, clamp(13rem, 24vw, 16rem));
 }
 
 .brain-galaxy-stage--mockup:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-stage__hud--right {
-  right: calc(min(23rem, 34vw) + 1rem);
+  right: calc(var(--galaxy-inspector-width, min(23rem, 34vw)) + 1rem);
+}
+
+.galaxy-panel__resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  width: 0.7rem;
+  cursor: col-resize;
+  pointer-events: auto;
+}
+
+.galaxy-panel__resize-handle--right-edge {
+  right: -0.35rem;
+}
+
+.galaxy-panel__resize-handle--left-edge {
+  left: -0.35rem;
+}
+
+.galaxy-panel__resize-grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: rgba(138, 154, 173, 0.28);
+  transform: translate(-50%, -50%);
+  transition: background 120ms ease, height 120ms ease;
+}
+
+.galaxy-panel__resize-handle:hover .galaxy-panel__resize-grip,
+.galaxy-panel__resize-handle:focus-visible .galaxy-panel__resize-grip,
+.galaxy-panel--resizing .galaxy-panel__resize-grip {
+  height: 3rem;
+  background: rgba(0, 245, 212, 0.72);
+}
+
+.galaxy-panel__resize-handle:focus-visible {
+  outline: none;
+}
+
+.brain-galaxy-stage__hud--left,
+.brain-galaxy-stage__hud--right,
+.brain-galaxy-stage__hud--inspector {
+  position: absolute;
 }
 
 .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--bottom {

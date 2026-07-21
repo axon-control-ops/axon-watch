@@ -8,6 +8,7 @@ import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
 import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
 import CenterWorkbenchEditorFooter from './CenterWorkbenchEditorFooter.vue';
+import EditorPdfPreview from './EditorPdfPreview.vue';
 import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import {
   clampWorkbenchTerminalHeight,
@@ -26,8 +27,10 @@ import {
 import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
-import { isBinaryFilePath, isImageFilePath } from '../../lib/workspace-file-language';
+import { isBinaryFilePath, isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
 import { resolveThreadImageUrl } from '../../lib/thread-image-url';
+import { useEditorPdfPreview } from '../../lib/use-editor-pdf-preview';
+import { useEditorBreadcrumbSegments } from '../../lib/use-editor-breadcrumb-segments';
 import {
   persistEditorMarkdownPreviewEnabled,
   resolveEditorMarkdownPreviewEnabled,
@@ -141,38 +144,14 @@ const editorMinimapEnabled = ref(readEditorMinimapEnabled());
 
 const problemItems = computed(() => buildWorkbenchProblemItems(shell));
 
-const editorBreadcrumbSegments = computed((): EditorBreadcrumbSegment[] => {
-  const workspace = shell.currentWorkspace?.workspace_id ?? 'workspace_smoke';
-  const document = shell.activeEditorDocument;
-  if (!document) {
-    return buildEditorBreadcrumbTrail({
-      workspaceId: workspace,
-      filePath: 'README.md',
-      content: '',
-      cursorLine: editorCursorLine.value,
-      language: 'markdown',
-    });
-  }
-
-  const filePath = resolveEditorBreadcrumbFilePath({
-    source: document.source,
-    filePath: document.filePath,
-    id: document.id,
-    title: document.title,
-    value: activeEditorValue.value,
-    resourcePath: editorDocumentResourcePath(document),
-  });
-
-  return buildEditorBreadcrumbTrail({
-    workspaceId: workspace,
-    filePath,
-    content: activeEditorValue.value,
-    cursorLine: editorCursorLine.value,
-    language: document.language,
-  });
+const activeEditorValue = computed(() => shell.activeEditorDocument?.value ?? '');
+const editorBreadcrumbSegments = useEditorBreadcrumbSegments({
+  activeDocument: computed(() => shell.activeEditorDocument),
+  activeEditorValue,
+  workspaceId: computed(() => shell.currentWorkspace?.workspace_id),
+  cursorLine: editorCursorLine,
 });
 
-const activeEditorValue = computed(() => shell.activeEditorDocument?.value ?? '');
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
 );
@@ -186,13 +165,17 @@ const isImageEditorDocument = computed(() => {
   }
   return document.source === 'file' && isImageFilePath(document.filePath ?? document.title);
 });
+const { isPdfEditorDocument, editorPdfPreviewUrl } = useEditorPdfPreview({
+  activeDocument: computed(() => shell.activeEditorDocument),
+  workspace: computed(() => shell.currentWorkspace),
+});
 const isBinaryEditorDocument = computed(() => {
   const document = shell.activeEditorDocument;
   if (!document || document.source !== 'file') {
     return false;
   }
   const path = document.filePath ?? document.title;
-  return isBinaryFilePath(path) && !isImageFilePath(path);
+  return isBinaryFilePath(path) && !isImageFilePath(path) && !isPdfFilePath(path);
 });
 const isAgentEditReviewDocument = computed(() =>
   isAgentEditReviewDocumentId(shell.activeEditorDocument?.id),
@@ -619,7 +602,7 @@ watch(
           :content="shell.activeEditorDocument.value"
         />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument && !isBinaryEditorDocument"
+          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
           :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
@@ -639,6 +622,11 @@ watch(
         <div v-else-if="shell.activeEditorDocument && isImageEditorDocument" class="editor-image-preview">
           <img class="editor-image-preview__img" :src="editorImagePreviewUrl" :alt="shell.activeEditorDocument.title">
         </div>
+        <EditorPdfPreview
+          v-else-if="shell.activeEditorDocument && isPdfEditorDocument"
+          :title="shell.activeEditorDocument.title"
+          :preview-url="editorPdfPreviewUrl"
+        />
         <div v-else-if="shell.activeEditorDocument && isBinaryEditorDocument" class="editor-binary-preview">
           <p class="editor-binary-preview__title">{{ shell.activeEditorDocument.title }}</p>
           <p class="editor-binary-preview__body">{{ shell.activeEditorDocument.description }}</p>

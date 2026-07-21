@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "VAXON",
+  "version": "0.1.0",
+  "identifier": "ai.axon.vaxon",
+  "build": {
+    "beforeDevCommand": "",
+    "devUrl": "http://127.0.0.1:4173",
+    "beforeBuildCommand": "npm run build -w @axon-watch/console-web",
+    "frontendDist": "../../console-web/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "VAXON",
+        "width": 1440,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.png"
+    ],
+    "resources": [
+      "../../console-web/dist"
+    ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1"
+        ]
+      }
+    }
+  },
+  "plugins": {}
+}

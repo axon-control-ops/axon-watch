@@ -11,7 +11,7 @@
   margin-bottom: 0.35rem;
 }
 
-.center-workbench__editor:not(:has(.surface-host--mockup, .agent-edit-review-viewer, .editor-image-preview, .editor-binary-preview, .editor-markdown-preview))
+.center-workbench__editor:not(:has(.surface-host--mockup, .agent-edit-review-viewer, .editor-image-preview, .editor-pdf-preview, .editor-binary-preview, .editor-markdown-preview))
   > .center-workbench__ide-guide:not(.center-workbench__ide-guide--with-editor) {
   flex: 1;
   display: flex;

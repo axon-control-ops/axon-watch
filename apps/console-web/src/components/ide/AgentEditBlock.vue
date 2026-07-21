@@ -10,7 +10,10 @@ import {
 } from '../../lib/ide-agent-edit-review';
 import { diffLineTone, normalizeEditedFilePath } from '../../lib/agent-transcript-blocks';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
+import { resolveThreadImageUrl } from '../../lib/thread-image-url';
+import { isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
 import { useShellStore } from '../../stores/shell';
+import ImagePreviewLightbox from './ImagePreviewLightbox.vue';
 
 const props = defineProps<{
   path: string;
@@ -24,9 +27,35 @@ const shell = useShellStore();
 // Collapsed by default: expanded markdown/diff previews are expensive, and a
 // long agent turn can otherwise freeze the main thread while streaming.
 const expanded = ref(false);
+const lightboxOpen = ref(false);
 
 const normalizedPath = computed(() => normalizeEditedFilePath(props.path));
 const isMarkdown = computed(() => isMarkdownAgentEditPath(normalizedPath.value));
+const isImage = computed(() => isImageFilePath(normalizedPath.value));
+const isPdf = computed(() => isPdfFilePath(normalizedPath.value));
+const isCanvasFile = computed(() => isImage.value || isPdf.value);
+
+const openActionLabel = computed(() => {
+  if (props.open) {
+    return 'Review streaming edit';
+  }
+  if (isImage.value) {
+    return 'Open in canvas';
+  }
+  if (isPdf.value) {
+    return 'Open PDF preview';
+  }
+  return 'Open in editor';
+});
+
+const imageUrl = computed(() => {
+  if (!isImage.value) {
+    return '';
+  }
+  return resolveThreadImageUrl(normalizedPath.value, {
+    workspaceId: shell.currentWorkspace?.workspace_id ?? null,
+  });
+});
 
 const markdownPreview = computed(() => {
   if (!expanded.value || !isMarkdown.value || !props.diff.trim()) {
@@ -41,7 +70,7 @@ const markdownPreview = computed(() => {
 });
 
 const diffPreview = computed(() => {
-  if (!expanded.value || isMarkdown.value) {
+  if (!expanded.value || isMarkdown.value || isCanvasFile.value) {
     return { lines: [] as Array<{ text: string; tone: string }>, truncated: false };
   }
   const truncated = truncateDiffLinesForDock(props.diff);
@@ -63,6 +92,17 @@ function openInEditor(): void {
     diff: props.diff,
     open: props.open,
   });
+}
+
+function openLightbox(): void {
+  if (!imageUrl.value) {
+    return;
+  }
+  lightboxOpen.value = true;
+}
+
+function closeLightbox(): void {
+  lightboxOpen.value = false;
 }
 
 function handlePreviewClick(event: MouseEvent): void {
@@ -90,19 +130,52 @@ function handlePreviewClick(event: MouseEvent): void {
       <button
         type="button"
         class="agent-block__edit-path agent-block__edit-path--link"
-        :title="`Open ${normalizedPath} in editor`"
+        :title="`${openActionLabel}: ${normalizedPath}`"
         @click="openInEditor"
       >
         {{ normalizedPath }}
       </button>
       <span class="agent-block__edit-stat agent-block__edit-stat--add">+{{ added }}</span>
       <span class="agent-block__edit-stat agent-block__edit-stat--remove">-{{ removed }}</span>
+      <button
+        v-if="!open"
+        type="button"
+        class="agent-block__edit-open-action"
+        :title="openActionLabel"
+        @click="openInEditor"
+      >
+        {{ isCanvasFile ? 'Canvas' : 'Open' }}
+      </button>
       <span v-if="open" class="agent-block__edit-streaming">streaming</span>
     </div>
 
     <div v-if="expanded" class="agent-block__edit-body">
+      <div v-if="isImage && imageUrl" class="agent-block__edit-canvas">
+        <button
+          type="button"
+          class="agent-block__edit-canvas-thumb"
+          :title="`Preview ${normalizedPath}`"
+          @click="openLightbox"
+        >
+          <img
+            class="agent-block__edit-canvas-img"
+            :src="imageUrl"
+            :alt="normalizedPath"
+            loading="lazy"
+          >
+        </button>
+        <button type="button" class="agent-block__edit-open-full" @click="openInEditor">
+          Open in canvas
+        </button>
+      </div>
+      <div v-else-if="isPdf" class="agent-block__edit-canvas agent-block__edit-canvas--pdf">
+        <p class="agent-block__edit-empty">PDF ready — open to preview in the editor canvas.</p>
+        <button type="button" class="agent-block__edit-open-full" @click="openInEditor">
+          Open PDF preview
+        </button>
+      </div>
       <div
-        v-if="isMarkdown && markdownPreview.html"
+        v-else-if="isMarkdown && markdownPreview.html"
         class="agent-block__edit-markdown conversation-seam__content conversation-seam__content--markdown"
         v-html="markdownPreview.html"
         @click="handlePreviewClick"
@@ -128,5 +201,10 @@ function handlePreviewClick(event: MouseEvent): void {
         Open full file in editor
       </button>
     </div>
+
+    <ImagePreviewLightbox
+      :preview="lightboxOpen && imageUrl ? { url: imageUrl, filename: normalizedPath.split('/').pop() || normalizedPath } : null"
+      @close="closeLightbox"
+    />
   </div>
 </template>

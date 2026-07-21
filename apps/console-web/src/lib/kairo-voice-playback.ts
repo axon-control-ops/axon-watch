@@ -6,6 +6,10 @@ import {
 } from './kairo-voice-diagnostics';
 import { postKairoTts, type KairoTtsResponse } from './kairo-tts-client';
 import { speakAzureChunksWithPrefetch } from './kairo-voice-azure-prefetch';
+import {
+  playAzureAudioToCompletion,
+  playbackErrorReason,
+} from './kairo-voice-azure-element';
 import { sanitizeSpokenReply, splitSpokenReplyChunks } from './sanitize-spoken-reply';
 import {
   isKairoPlaybackActive,
@@ -98,9 +102,6 @@ function resolveSpeechTuning(options: {
 }
 
 const AUDIO_PREROLL_MS = 280;
-/** Data/blob URLs sometimes never fire canplaythrough — never block forever. */
-const AUDIO_READY_TIMEOUT_MS = 2500;
-
 function speechPort(): SpeechPort | null {
   return typeof speechSynthesis === 'undefined' ? null : speechSynthesis;
 }
@@ -110,7 +111,6 @@ type AzureAudioHandle = {
   revoke: () => void;
 };
 
-/** Prefer blob URLs — large data: audio URLs often stall before canplaythrough. */
 function createAzureAudioHandle(
   audioBase64: string,
   contentType?: string,
@@ -125,11 +125,19 @@ function createAzureAudioHandle(
     }
     objectUrl = URL.createObjectURL(new Blob([bytes], { type: mime }));
     const audio = new Audio(objectUrl);
-    const url = objectUrl;
+    audio.preload = 'auto';
+    try {
+      audio.setAttribute('playsinline', 'true');
+    } catch {
+      // FakeAudio / older stubs may not implement setAttribute.
+    }
     return {
       audio,
       revoke: () => {
-        URL.revokeObjectURL(url);
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          objectUrl = null;
+        }
       },
     };
   } catch {
@@ -137,7 +145,16 @@ function createAzureAudioHandle(
       URL.revokeObjectURL(objectUrl);
     }
     const audio = new Audio(`data:${mime};base64,${audioBase64}`);
-    return { audio, revoke: () => undefined };
+    audio.preload = 'auto';
+    try {
+      audio.setAttribute('playsinline', 'true');
+    } catch {
+      // ignore
+    }
+    return {
+      audio,
+      revoke: () => undefined,
+    };
   }
 }
 
@@ -220,89 +237,6 @@ export { pauseKairoPlayback, resumeKairoPlayback };
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     globalThis.setTimeout(resolve, ms);
-  });
-}
-
-async function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
-  // Prefer HAVE_FUTURE_DATA so the first phonemes are buffered before play().
-  const readyEnough = (): boolean => audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
-  if (readyEnough()) {
-    return;
-  }
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const finish = (ok: boolean, error?: Error): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      if (ok) {
-        resolve();
-        return;
-      }
-      reject(error ?? new Error('audio preload failed'));
-    };
-    const onReady = (): void => {
-      if (readyEnough() || audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        finish(true);
-      }
-    };
-    const onError = (): void => {
-      finish(false, new Error('audio preload failed'));
-    };
-    const timer = globalThis.setTimeout(() => {
-      if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        finish(true);
-        return;
-      }
-      // Last resort: let play() decide — do not leave SPEAKING stuck forever.
-      finish(true);
-    }, AUDIO_READY_TIMEOUT_MS);
-    const cleanup = (): void => {
-      globalThis.clearTimeout(timer);
-      audio.removeEventListener('canplay', onReady);
-      audio.removeEventListener('canplaythrough', onReady);
-      audio.removeEventListener('loadeddata', onReady);
-      audio.removeEventListener('error', onError);
-    };
-    audio.addEventListener('canplay', onReady);
-    audio.addEventListener('canplaythrough', onReady);
-    audio.addEventListener('loadeddata', onReady);
-    audio.addEventListener('error', onError);
-  });
-}
-
-async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promise<void> {
-  audio.preload = 'auto';
-  await waitForAudioReady(audio);
-  // Do not seek to 0 after buffering — that can discard the primed start and clip.
-  await delay(AUDIO_PREROLL_MS);
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const finish = (): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      resolve();
-    };
-    const fail = (): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      reject(new Error('audio playback failed'));
-    };
-    const cleanup = (): void => {
-      audio.onended = null;
-      audio.onerror = null;
-    };
-    audio.onended = finish;
-    audio.onerror = fail;
-    void audio.play().then(undefined, fail);
   });
 }
 
@@ -433,9 +367,13 @@ export async function playKairoUtteranceNow(
           notifySpeaking(false);
           notifyIdle();
           return finishPlayback({ engine: 'azure', reason: azureReason }, trimmed);
-        } catch {
+        } catch (error) {
           registerKairoAudioElement(null);
-          return speakWithBrowser(trimmed, 'audio_playback_failed', tuning);
+          const reason =
+            error instanceof Error && error.message.startsWith('audio_playback_failed')
+              ? error.message
+              : playbackErrorReason(error);
+          return speakWithBrowser(trimmed, reason, tuning);
         } finally {
           registerKairoAudioElement(null);
           handle.revoke();

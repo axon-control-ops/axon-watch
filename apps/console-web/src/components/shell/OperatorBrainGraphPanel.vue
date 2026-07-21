@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch, Transition } from 'vue';
 
 import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import GalaxyWorkspacesRail from '../../features/brain-galaxy/GalaxyWorkspacesRail.vue';
 import GalaxyIntelligencePanel from '../../features/brain-galaxy/GalaxyIntelligencePanel.vue';
 import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
+import GalaxyPanelResizeHandle from '../../features/brain-galaxy/GalaxyPanelResizeHandle.vue';
+import GalaxyStatusBarActions from '../../features/brain-galaxy/GalaxyStatusBarActions.vue';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
 import OperatorEvidencePanel from '../../features/operator-evidence/OperatorEvidencePanel.vue';
 import {
@@ -30,11 +32,11 @@ import {
 } from '../../lib/operator-brain-graph-view';
 import { useShellStore } from '../../stores/shell';
 import {
-  operatorTerminalChipLabel,
   workbenchTerminalPanelAlive,
   workbenchTerminalPanelAriaLabel,
   workbenchTerminalPanelTitle,
 } from '../../lib/workbench-terminal-panel-view';
+import { useGalaxyPanelResize } from '../../composables/useGalaxyPanelResize';
 
 const props = defineProps<{
   terminalVisible: boolean;
@@ -51,6 +53,14 @@ const galaxyStage = ref<HTMLElement | null>(null);
 const bottomHud = ref<HTMLElement | null>(null);
 const legendOpen = ref(false);
 let bottomHudObserver: ResizeObserver | null = null;
+
+const {
+  widths: galaxyPanelWidths,
+  resizing: galaxyResizing,
+  startResize: startGalaxyResize,
+  onResizeKeydown: onGalaxyResizeKeydown,
+  resetWidth: resetGalaxyWidth,
+} = useGalaxyPanelResize({ stageRef: galaxyStage });
 
 function syncGalaxyBottomReserve(): void {
   const stage = galaxyStage.value;
@@ -350,6 +360,16 @@ function handleEvidenceHandoff(signal: {
     </header>
 
     <div class="brain-galaxy-stage__hud brain-galaxy-stage__hud--left">
+      <GalaxyPanelResizeHandle
+        edge="right"
+        label="Resize workspaces rail"
+        :value-min="180"
+        :value-max="420"
+        :value-now="galaxyPanelWidths.left"
+        @mousedown="startGalaxyResize('left', 'left', $event)"
+        @keydown="onGalaxyResizeKeydown('left', 'left', $event)"
+        @dblclick="resetGalaxyWidth('left')"
+      />
       <GalaxyWorkspacesRail
         :snapshot="snapshot"
         :workspaces="shell.workspaces"
@@ -364,25 +384,52 @@ function handleEvidenceHandoff(signal: {
     <div
       v-if="selectedNode"
       class="brain-galaxy-stage__hud brain-galaxy-stage__hud--inspector"
+      :class="{ 'galaxy-panel--resizing': galaxyResizing === 'inspector' }"
     >
-      <OperatorEvidencePanel
-        :node-id="selectedNode.node_id"
-        :fallback-title="inspector.title"
-        :fallback-body="inspector.body"
-        :fallback-hint="inspector.hint"
-        :pending-approvals="pendingApprovals"
-        :run-phase="shell.primaryActiveRun?.phase ?? null"
-        :action-tier="kairoLastActionTier"
-        :execution-access="shell.agentExecutionAccess"
-        :workspace-selected="Boolean(shell.currentWorkspace?.workspace_id)"
-        @dismiss="clearSelection"
-        @open-workspace="handleEvidenceWorkspace"
-        @open-signal="handleEvidenceSignal"
-        @handoff-signal="handleEvidenceHandoff"
+      <GalaxyPanelResizeHandle
+        edge="left"
+        label="Resize inspector panel"
+        :value-min="260"
+        :value-max="520"
+        :value-now="galaxyPanelWidths.inspector"
+        @mousedown="startGalaxyResize('inspector', 'right', $event)"
+        @keydown="onGalaxyResizeKeydown('inspector', 'right', $event)"
+        @dblclick="resetGalaxyWidth('inspector')"
       />
+      <Transition name="motion-panel">
+        <OperatorEvidencePanel
+          :key="selectedNode.node_id"
+          :node-id="selectedNode.node_id"
+          :fallback-title="inspector.title"
+          :fallback-body="inspector.body"
+          :fallback-hint="inspector.hint"
+          :pending-approvals="pendingApprovals"
+          :run-phase="shell.primaryActiveRun?.phase ?? null"
+          :action-tier="kairoLastActionTier"
+          :execution-access="shell.agentExecutionAccess"
+          :workspace-selected="Boolean(shell.currentWorkspace?.workspace_id)"
+          @dismiss="clearSelection"
+          @open-workspace="handleEvidenceWorkspace"
+          @open-signal="handleEvidenceSignal"
+          @handoff-signal="handleEvidenceHandoff"
+        />
+      </Transition>
     </div>
 
-    <aside class="brain-galaxy-stage__hud brain-galaxy-stage__hud--right">
+    <aside
+      class="brain-galaxy-stage__hud brain-galaxy-stage__hud--right"
+      :class="{ 'galaxy-panel--resizing': galaxyResizing === 'right' }"
+    >
+      <GalaxyPanelResizeHandle
+        edge="left"
+        label="Resize intelligence panel"
+        :value-min="180"
+        :value-max="360"
+        :value-now="galaxyPanelWidths.right"
+        @mousedown="startGalaxyResize('right', 'right', $event)"
+        @keydown="onGalaxyResizeKeydown('right', 'right', $event)"
+        @dblclick="resetGalaxyWidth('right')"
+      />
       <GalaxyIntelligencePanel
         :presence-phase="presence.phase"
         :routing-receipt="kairoLastRoutingReceipt"
@@ -435,51 +482,16 @@ function handleEvidenceHandoff(signal: {
     </footer>
 
     <Teleport defer to="#status-bar-galaxy-actions">
-      <div class="status-bar-mockup__galaxy-actions-inner" role="group" aria-label="Galaxy view controls">
-        <button
-          type="button"
-          class="status-bar-mockup__chip status-bar-mockup__chip--galaxy"
-          title="Fit camera and clear selection"
-          @click="resetView"
-        >
-          <span class="status-bar-mockup__chip-label">Fit</span>
-        </button>
-        <button
-          type="button"
-          class="status-bar-mockup__chip status-bar-mockup__chip--galaxy"
-          title="Switch to grid mission control"
-          @click="emit('switchGrid')"
-        >
-          <span class="status-bar-mockup__chip-label">Grid</span>
-        </button>
-        <button
-          type="button"
-          class="status-bar-mockup__chip status-bar-mockup__chip--galaxy"
-          :class="{
-            'status-bar-mockup__chip--galaxy-accent': !props.terminalVisible,
-            'status-bar-mockup__chip--galaxy-alive': terminalDockAlive,
-            'status-bar-mockup__chip--galaxy-executing':
-              !props.terminalVisible && terminalRunPhase === 'executing',
-            'status-bar-mockup__chip--galaxy-review-ready':
-              !props.terminalVisible && terminalRunPhase === 'review_ready',
-          }"
-          :title="terminalPanelTitle"
-          :aria-label="terminalPanelAriaLabel"
-          @click="emit('toggleTerminal')"
-        >
-          <span
-            class="status-bar-mockup__dot"
-            :class="{
-              'status-bar-mockup__dot--warn': !props.terminalVisible && !terminalDockAlive,
-              'status-bar-mockup__dot--alive': terminalDockAlive,
-            }"
-            aria-hidden="true"
-          />
-          <span class="status-bar-mockup__chip-label">{{
-            operatorTerminalChipLabel(props.terminalVisible)
-          }}</span>
-        </button>
-      </div>
+      <GalaxyStatusBarActions
+        :terminal-visible="props.terminalVisible"
+        :terminal-dock-alive="terminalDockAlive"
+        :terminal-run-phase="terminalRunPhase"
+        :terminal-panel-title="terminalPanelTitle"
+        :terminal-panel-aria-label="terminalPanelAriaLabel"
+        @reset-view="resetView"
+        @switch-grid="emit('switchGrid')"
+        @toggle-terminal="emit('toggleTerminal')"
+      />
     </Teleport>
   </section>
 </template>

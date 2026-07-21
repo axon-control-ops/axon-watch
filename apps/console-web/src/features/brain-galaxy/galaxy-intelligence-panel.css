@@ -59,6 +59,22 @@
   color: rgba(150, 220, 255, 0.92);
 }
 
+.galaxy-intelligence-panel__reminders {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.galaxy-intelligence-panel__reminder {
+  margin: 0;
+  padding: 0.3rem 0.4rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 210, 122, 0.35);
+  background: rgba(40, 28, 8, 0.55);
+  color: #ffd27a;
+  font-size: 0.58rem;
+  line-height: 1.3;
+}
+
 .galaxy-intelligence-panel__chips {
   display: flex;
   flex-wrap: wrap;
@@ -173,6 +189,23 @@
   font-family: var(--font-mono);
   font-size: 0.5rem;
   line-height: 1.35;
+}
+
+.galaxy-intelligence-panel__host-toggle {
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid rgba(72, 210, 255, 0.28);
+  border-radius: 0.35rem;
+  background: rgba(0, 22, 34, 0.82);
+  color: rgba(120, 220, 255, 0.95);
+  font: inherit;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
 }
 
 .brain-galaxy-stage__hud--right {

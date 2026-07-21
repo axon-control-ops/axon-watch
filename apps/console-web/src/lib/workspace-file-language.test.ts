@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { languageForFilePath, workspaceFileDocumentId } from './workspace-file-language';
+import {
+  isImageFilePath,
+  isPdfFilePath,
+  languageForFilePath,
+  workspaceFileDocumentId,
+} from './workspace-file-language';
 
 describe('workspace-file-language', () => {
   it('maps markdown extension to markdown language', () => {
@@ -14,6 +19,12 @@ describe('workspace-file-language', () => {
   it('maps css and tsx extensions', () => {
     expect(languageForFilePath('styles/app.css')).toBe('css');
     expect(languageForFilePath('Button.tsx')).toBe('typescript');
+  });
+
+  it('detects image and pdf canvas paths', () => {
+    expect(isImageFilePath('output/signs/young-eagles-parent-gate-sign.svg')).toBe(true);
+    expect(isPdfFilePath('output/signs/young-eagles-parent-gate-sign.pdf')).toBe(true);
+    expect(isPdfFilePath('src/app.ts')).toBe(false);
   });
 
   it('builds stable file document ids', () => {

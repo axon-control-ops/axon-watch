@@ -2571,7 +2571,7 @@ export const useShellStore = defineStore('shell', () => {
       if (layoutMode.value !== 'ide') {
         setLayoutMode('ide');
       }
-      // Markdown edits are already on disk — open the real file with Preview enabled.
+      // Completed edits are already on disk — open the real file (Preview / canvas).
       if (languageForFilePath(path) === 'markdown') {
         persistEditorMarkdownPreviewEnabled(workspaceFileDocumentId(path), true);
       }

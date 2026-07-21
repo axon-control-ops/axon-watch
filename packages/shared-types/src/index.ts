@@ -89,3 +89,14 @@ export type {
   WatchInboxSnapshot,
   WatchSummary,
 } from './watch';
+export type {
+  DesktopRuntime,
+  HostActionReceipt,
+  HostActionTier,
+  HostArtifactRecord,
+  HostCapabilitiesSnapshot,
+  HostDeviceRecord,
+  HostEventRecord,
+  OperatorReminderRecord,
+} from './host-context';
+export { DESKTOP_RUNTIMES, HOST_ACTION_TIERS } from './host-context';

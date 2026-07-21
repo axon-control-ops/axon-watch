@@ -389,6 +389,9 @@ def build_operator_brain_graph(
         edges=edges,
         workspace_node_ids=workspace_node_ids,
     )
+    from app.host_context.brain_projection import append_host_context_nodes
+
+    append_host_context_nodes(nodes=nodes, edges=edges, core_node_id=_CORE_NODE_ID)
 
     return {
         "generated_at": generated_at,

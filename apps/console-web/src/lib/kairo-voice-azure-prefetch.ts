@@ -81,9 +81,13 @@ export async function speakAzureChunksWithPrefetch(
     try {
       handlers.notifyChunk(chunk);
       await handlers.playToCompletion(handle.audio);
-    } catch {
+    } catch (error) {
       handlers.registerAudio(null);
-      return handlers.speakBrowserFallback(remaining, 'audio_playback_failed', tuning);
+      const reason =
+        error instanceof Error && error.message.startsWith('audio_playback_failed')
+          ? error.message
+          : 'audio_playback_failed';
+      return handlers.speakBrowserFallback(remaining, reason, tuning);
     } finally {
       handlers.registerAudio(null);
       handle.revoke();

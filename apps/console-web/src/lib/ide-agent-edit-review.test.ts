@@ -100,7 +100,7 @@ describe('ide-agent-edit-review', () => {
     );
   });
 
-  it('opens workspace files for empty diffs and completed markdown edits', () => {
+  it('opens workspace files for completed edits (Cursor-style), including SVG canvas paths', () => {
     expect(
       shouldOpenWorkspaceFileForEditReview({
         path: 'src/app.ts',
@@ -127,6 +127,20 @@ describe('ide-agent-edit-review', () => {
         path: 'src/app.ts',
         diff: '--- a/src/app.ts\n+++ b/src/app.ts\n+line',
         open: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldOpenWorkspaceFileForEditReview({
+        path: 'output/signs/young-eagles-parent-gate-sign.svg',
+        diff: '--- /dev/null\n+++ b/output/signs/young-eagles-parent-gate-sign.svg\n+<svg/>',
+        open: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldOpenWorkspaceFileForEditReview({
+        path: 'output/signs/young-eagles-parent-gate-sign.svg',
+        diff: '+streaming',
+        open: true,
       }),
     ).toBe(false);
   });

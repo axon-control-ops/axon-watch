@@ -1,0 +1,32 @@
+{
+  "desktop_shell": "scaffold",
+  "host_snapshots": "api_ready_sensors_stub",
+  "artifacts": "api_ready_no_local_indexer",
+  "safe_actions": "policy_ready_bridge_partial",
+  "reminders": "ready",
+  "galaxy_host_nodes": "ready",
+  "cinematic_motion": "partial_tokens_and_panel_transition",
+  "compact_hud_autostart": false,
+  "verified_on_this_host": {
+    "browser_4173": true,
+    "tauri_build": false,
+    "playwright_e2e": false,
+    "visual_regression": false
+  },
+  "rollout_order": [
+    "desktop_shell",
+    "host_snapshots",
+    "artifacts",
+    "safe_actions",
+    "reminders",
+    "galaxy_host_nodes",
+    "cinematic_motion",
+    "compact_hud_autostart"
+  ],
+  "notes": [
+    "HostCapabilityPanel is mounted under Galaxy Intelligence → Host context.",
+    "Tauri shell exists but requires pkg-config + WebKitGTK and npm install of @tauri-apps/cli.",
+    "Native sensors (MPRIS/windows/file watch/thumbnails/FTS) are not implemented yet.",
+    "Bridge posts are plain HTTP; not signed pairing yet."
+  ]
+}

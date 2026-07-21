@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 
 import {
@@ -9,8 +9,11 @@ import {
   galaxyOrbModelLabel,
   galaxyOrbStateClass,
   galaxyOrbStatusLabel,
+  galaxyOrbTriggerAriaLabel,
 } from './kairo-galaxy-orb-view';
 import KairoGalaxyOrbChrome from './KairoGalaxyOrbChrome.vue';
+import KairoGalaxyOrbDragHandle from './KairoGalaxyOrbDragHandle.vue';
+import KairoGalaxyOrbFrame from './KairoGalaxyOrbFrame.vue';
 import KairoGalaxyOrbSvg from './KairoGalaxyOrbSvg.vue';
 import { useKairoGalaxyOrbDrag } from './use-kairo-galaxy-orb-drag';
 import { useKairoGalaxyOrbPresence } from './use-kairo-galaxy-orb-presence';
@@ -42,6 +45,12 @@ const {
   voiceOrbAnchorStyle,
 } = storeToRefs(shell);
 const orbAnchor = ref<HTMLElement | null>(null);
+const orbFrameRef = ref<{ rootEl: HTMLElement | null } | null>(null);
+watch(
+  () => orbFrameRef.value?.rootEl ?? null,
+  (el) => { orbAnchor.value = el; },
+  { immediate: true },
+);
 
 const {
   handsFreeEnabled,
@@ -73,6 +82,7 @@ const replySignal = computed(
 const {
   orbDragging,
   orbAnchorStyle,
+  handleDragHandlePointerDown,
   handleLongPressPointerDown,
   handleOrbDragMove,
   finishOrbDrag,
@@ -133,41 +143,27 @@ const orbStatusLabel = computed(() =>
     speechCapture.capturing.value,
   ),
 );
+const triggerAriaLabel = computed(() =>
+  galaxyOrbTriggerAriaLabel(personaName, voiceBlocked.value, handsFreeEnabled.value),
+);
 const { showInterrupt, showIdeClose } = useKairoGalaxyOrbChromeFlags({
   shell,
   placementMode: props.placementMode,
 });
 const ttsBadge = useKairoGalaxyOrbTtsBadge(speaking);
-
-function handleInterrupt(): void {
-  handleKairoGalaxyOrbInterrupt(shell);
-}
 </script>
 
 <template>
-  <div
-    ref="orbAnchor"
-    class="brain-galaxy-stage__jarvis-float brain-galaxy-stage__jarvis-float--mockup"
-    :class="{
-      'brain-galaxy-stage__jarvis-float--dragging': orbDragging,
-      'brain-galaxy-stage__jarvis-float--viewport': placementMode === 'viewport',
-      'brain-galaxy-stage__jarvis-float--embedded': placementMode === 'embedded',
-      'brain-galaxy-stage__jarvis-float--chrome-live': showInterrupt,
-      'brain-galaxy-stage__jarvis-float--ide': showIdeClose,
-    }"
-    :style="placementMode === 'viewport' ? orbAnchorStyle : undefined"
+  <KairoGalaxyOrbFrame
+    ref="orbFrameRef"
+    :dragging="orbDragging"
+    :placement-mode="placementMode"
+    :chrome-live="showInterrupt"
+    :ide-close="showIdeClose"
+    :anchor-style="orbAnchorStyle"
+    :persona-name="personaName"
+    @hide="shell.hideVoiceOrb()"
   >
-    <button
-      v-if="showIdeClose"
-      type="button"
-      class="kairo-galaxy-orb__close"
-      :aria-label="`Hide ${personaName} voice orb`"
-      title="Hide voice orb"
-      @click.stop="shell.hideVoiceOrb()"
-    >
-      ×
-    </button>
-
     <div
       class="kairo-galaxy-orb"
       :class="[
@@ -182,18 +178,20 @@ function handleInterrupt(): void {
       ]"
       :aria-label="`${personaName} voice orb`"
     >
+      <KairoGalaxyOrbDragHandle
+        v-if="placementMode === 'viewport'"
+        @pointerdown="handleDragHandlePointerDown"
+        @pointermove="handleOrbDragMove"
+        @pointerup="finishOrbDrag"
+        @pointercancel="finishOrbDrag"
+      />
+
       <button
         type="button"
         class="kairo-galaxy-orb__trigger"
-        :disabled="voiceBlocked || !speechCapture.supported"
+        :aria-disabled="voiceBlocked"
         :title="`Tap for hands-free · hold to talk · long-press to move · double-click to reset`"
-        :aria-label="
-          voiceBlocked
-            ? `${personaName} voice muted`
-            : handsFreeEnabled
-              ? `${personaName} hands-free — tap to switch to manual mode`
-              : `${personaName} manual — tap for hands-free, hold to talk, long-press to move`
-        "
+        :aria-label="triggerAriaLabel"
         @click.stop="handleOrbClick"
         @dblclick.stop="resetOrbPosition"
         @pointerdown.prevent="onTriggerPointerDown"
@@ -212,9 +210,9 @@ function handleInterrupt(): void {
         :show-interrupt="showInterrupt"
         :hint="hint"
         :model-label="modelLabel"
-        @interrupt="handleInterrupt"
+        @interrupt="handleKairoGalaxyOrbInterrupt(shell)"
         @focus-briefing="shell.focusKairoBriefing()"
       />
     </div>
-  </div>
+  </KairoGalaxyOrbFrame>
 </template>

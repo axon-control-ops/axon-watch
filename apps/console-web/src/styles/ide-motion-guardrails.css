@@ -4,6 +4,10 @@
  * Persistent decorative motion reads as flicker in the dense operator console.
  * Keep explicit progress indicators functional, but render ambient attention,
  * status, voice, streaming, and radar indicators as stable states.
+ *
+ * Galaxy mode may use the shared motion orchestrator
+ * (`features/host-context/motion-orchestrator.ts`) with Off/Subtle/Cinematic.
+ * Fully honor prefers-reduced-motion via tokens.css (--motion-* → 0ms).
  */
 .console-shell--ide
   :is(

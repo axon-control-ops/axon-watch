@@ -159,6 +159,8 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     _ensure_chat_thread_persona_columns(connection)
     _ensure_runs_employee_role_column(connection)
     _ensure_chat_attachments_table(connection)
+    _ensure_operator_memory_reminder_columns(connection)
+    _ensure_host_context_tables(connection)
 
 
 def _ensure_runs_employee_role_column(connection: sqlite3.Connection) -> None:
@@ -222,6 +224,118 @@ def _ensure_chat_thread_kind_column(connection: sqlite3.Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_chat_threads_workspace_kind
             ON chat_threads(workspace_id, thread_kind, updated_at DESC)
+        """
+    )
+    connection.commit()
+
+
+def _ensure_operator_memory_reminder_columns(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(operator_memories)").fetchall()
+    }
+    additions = (
+        ("due_at", "TEXT NOT NULL DEFAULT ''"),
+        ("snoozed_until", "TEXT NOT NULL DEFAULT ''"),
+        ("trigger", "TEXT NOT NULL DEFAULT ''"),
+        ("priority", "TEXT NOT NULL DEFAULT ''"),
+        ("status", "TEXT NOT NULL DEFAULT ''"),
+        ("last_presented_at", "TEXT NOT NULL DEFAULT ''"),
+        ("dismiss_reason", "TEXT NOT NULL DEFAULT ''"),
+    )
+    changed = False
+    for name, ddl in additions:
+        if name in columns:
+            continue
+        connection.execute(f"ALTER TABLE operator_memories ADD COLUMN {name} {ddl}")
+        changed = True
+    if changed or "due_at" in columns:
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_operator_memories_due
+                ON operator_memories(status, due_at)
+            """
+        )
+    if changed:
+        connection.commit()
+
+
+def _ensure_host_context_tables(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS host_devices (
+            device_id TEXT PRIMARY KEY,
+            hostname TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            capabilities_json TEXT NOT NULL,
+            status TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS host_snapshots (
+            snapshot_id TEXT PRIMARY KEY,
+            device_id TEXT NOT NULL,
+            generated_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_host_snapshots_device
+            ON host_snapshots(device_id, generated_at DESC);
+
+        CREATE TABLE IF NOT EXISTS host_events (
+            event_id TEXT PRIMARY KEY,
+            device_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            detail TEXT NOT NULL,
+            occurred_at TEXT NOT NULL,
+            artifact_id TEXT NOT NULL,
+            sensitivity TEXT NOT NULL,
+            meta_json TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_host_events_device
+            ON host_events(device_id, occurred_at DESC);
+
+        CREATE TABLE IF NOT EXISTS host_artifacts (
+            artifact_id TEXT PRIMARY KEY,
+            device_id TEXT NOT NULL,
+            path TEXT NOT NULL,
+            title TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            origin TEXT NOT NULL,
+            sensitivity TEXT NOT NULL,
+            modified_at TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            thumbnail_local INTEGER NOT NULL,
+            workspace_id TEXT NOT NULL,
+            meta_json TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_host_artifacts_modified
+            ON host_artifacts(device_id, modified_at DESC);
+
+        CREATE TABLE IF NOT EXISTS host_action_receipts (
+            receipt_id TEXT PRIMARY KEY,
+            device_id TEXT NOT NULL,
+            command_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            tier TEXT NOT NULL,
+            status TEXT NOT NULL,
+            result_summary TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            meta_json TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_host_receipts_command
+            ON host_action_receipts(command_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS host_policy (
+            policy_key TEXT PRIMARY KEY,
+            policy_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
         """
     )
     connection.commit()

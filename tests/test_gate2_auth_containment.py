@@ -20,12 +20,15 @@ from tests.support.control_plane_app_loader import (  # noqa: E402
     load_control_plane_app,
     prepare_control_plane_imports,
 )
+from tests.support.watch_app_loader import load_watch_app, restore_app_modules  # noqa: E402
+from tests.support.watch_db import isolate_watch_db  # noqa: E402
 
 
 class _FakeRequest:
     def __init__(self, *, host: str | None, authorization: str = "", token_header: str = "") -> None:
         self.client = type("C", (), {"host": host})() if host is not None else None
         self.headers = {}
+        self.cookies = {}
         if authorization:
             self.headers["authorization"] = authorization
         if token_header:
@@ -172,6 +175,53 @@ class Gate2VaultAutoUnlockRemoteTests(unittest.TestCase):
             self.assertEqual(403, response.status_code)
             audit = Path(tmpdir.name, "audit.ndjson").read_text(encoding="utf-8")
             self.assertIn("vault_auto_unlock_enable", audit)
+
+
+class Gate2WatchInternalTokenTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_watch_db(self)
+        self._env = patch.dict(
+            os.environ,
+            {"AXON_WATCH_INTERNAL_SERVICE_TOKEN": "watch-internal-secret"},
+            clear=False,
+        )
+        self._env.start()
+        self.addCleanup(self._env.stop)
+        watch_app, self._watch_modules = load_watch_app()
+        self.client = TestClient(watch_app)
+        self.addCleanup(self.client.close)
+
+    def tearDown(self) -> None:
+        restore_app_modules(self._watch_modules)
+
+    def test_mutating_watch_route_denied_without_token(self) -> None:
+        response = self.client.post(
+            "/internal/watch/commands",
+            json={
+                "command_type": "reprobe_connector",
+                "target_type": "connector",
+                "target_id": "control_plane",
+            },
+        )
+        self.assertEqual(401, response.status_code)
+        self.assertTrue(response.json().get("auth_required"))
+
+    def test_mutating_watch_route_allowed_with_token(self) -> None:
+        response = self.client.post(
+            "/internal/watch/commands",
+            json={
+                "command_type": "reprobe_connector",
+                "target_type": "connector",
+                "target_id": "control_plane",
+            },
+            headers={"X-Axon-Internal-Token": "watch-internal-secret"},
+        )
+        # Auth passed the gate; command may succeed or fail for other reasons.
+        self.assertNotEqual(401, response.status_code)
+
+    def test_health_remains_public(self) -> None:
+        response = self.client.get("/internal/watch/health")
+        self.assertEqual(200, response.status_code)
 
 
 if __name__ == "__main__":

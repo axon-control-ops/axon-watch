@@ -79,7 +79,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 684,
+      "max_lines": 672,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
@@ -286,7 +286,7 @@
       "note": "Explorer + activity stub panels; extract per-panel components next"
     },
     "services/control-plane/app/adapters/watch_client.py": {
-      "max_lines": 408,
+      "max_lines": 406,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/adapters/watch_*",
