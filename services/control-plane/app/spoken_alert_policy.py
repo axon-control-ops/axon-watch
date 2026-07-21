@@ -17,11 +17,12 @@ def default_operator_presence_settings() -> dict[str, bool | str | float]:
         "kairo_narration": "conversational",
         "ide_voice_strip_enabled": False,
         "hands_free_enabled": False,
+        "proactive_duplex_enabled": False,
         # axon-local parity defaults (desktop voice deck).
         "speech_rate": 1.0,
         "speech_pitch": 1.04,
         "azure_voice_id": "en-GB-RyanNeural",
-        "stt_mode": "browser",
+        "stt_mode": "cloud",
         "voice_routing_mode": "template_first",
         "narrate_tool_progress": False,
     }

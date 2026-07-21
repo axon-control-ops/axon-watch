@@ -5,7 +5,7 @@
       "pending_approvals": 2,
       "reason": "operator_approval_required"
     },
-    "expect_spoken_contains": ["yes or no", "2"],
+    "expect_spoken_contains": ["yes or no", "2", "Approve or reject"],
     "expect_what_contains": ["2 agent jobs"],
     "expect_agent_do_contains": ["Do not continue until the operator approves"]
   },
@@ -20,7 +20,7 @@
         "recommended_action": "reply_or_investigate"
       }
     },
-    "expect_spoken_contains": ["CTO"],
+    "expect_spoken_contains": ["CTO", "Shall I triage"],
     "expect_what_contains": ["An email from CTO"],
     "expect_agent_do_contains": ["Triage the email from CTO"]
   },
@@ -35,7 +35,7 @@
         "monitor_status": "warning"
       }
     },
-    "expect_spoken_contains": ["DashPro"],
+    "expect_spoken_contains": ["DashPro", "Shall I investigate"],
     "expect_what_contains": ["DashPro"],
     "expect_agent_do_contains": ["Investigate the DashPro monitor"]
   },
@@ -45,7 +45,7 @@
       "signal_id": "signal_connector_console_web_unavailable",
       "title": "Console web connector unavailable"
     },
-    "expect_spoken_contains": ["connection"],
+    "expect_spoken_contains": ["connection", "Shall I diagnose"],
     "expect_what_contains": ["connection"],
     "expect_agent_do_contains": ["Diagnose"]
   },
@@ -55,7 +55,7 @@
       "signal_id": "signal_runtime_summary_degraded",
       "title": "Bootstrap: runtime summary stale"
     },
-    "expect_spoken_contains": ["warm-up"],
+    "expect_spoken_contains": ["warm-up", "confirm Watch"],
     "expect_what_contains": ["warming up"],
     "expect_agent_do_contains": ["not treat this as an incident"]
   },
@@ -66,7 +66,7 @@
       "title": "Unusual queue backlog",
       "summary": "Queue depth exceeded soft limit"
     },
-    "expect_spoken_contains": ["Unusual queue backlog"],
+    "expect_spoken_contains": ["Unusual queue backlog", "Shall I dig in"],
     "expect_what_contains": ["Queue depth exceeded soft limit"],
     "expect_agent_do_contains": ["Do not assume a category"]
   },
@@ -94,7 +94,7 @@
       "title": "Nightly health summary ready",
       "summary": "Scheduled health digest posted"
     },
-    "expect_spoken_contains": ["Nightly health summary"],
+    "expect_spoken_contains": ["Nightly health summary", "Shall I dig in"],
     "expect_what_contains": ["Scheduled health digest"],
     "expect_agent_do_contains": ["Do not assume a category"]
   }

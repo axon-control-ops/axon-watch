@@ -171,7 +171,7 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       }
     }
 
-    await speakKairoLine(message, {
+    const playback = await speakKairoLine(message, {
       priority: 'conversation',
       speechRate: input.operatorPresenceSettings.value.speech_rate,
       speechPitch: input.operatorPresenceSettings.value.speech_pitch,

@@ -334,7 +334,10 @@ onUnmounted(() => {
         <button
           type="button"
           class="kairo-conversation-bar__mic"
-          :class="{ 'kairo-conversation-bar__mic--active': speechCapture.capturing.value }"
+          :class="{
+            'kairo-conversation-bar__mic--active':
+              speechCapture.capturing.value && speechCapture.captureMode.value === 'manual',
+          }"
           :disabled="micDisabled"
           :title="micTitle"
           aria-label="Hold to talk"
@@ -343,7 +346,13 @@ onUnmounted(() => {
           @pointercancel.prevent="handleMicPointerUp"
           @pointerleave="handleMicPointerUp"
         >
-          {{ speechCapture.capturing.value ? 'Listening…' : 'Mic' }}
+          {{
+            speechCapture.capturing.value && speechCapture.captureMode.value === 'manual'
+              ? 'Listening…'
+              : speechCapture.capturing.value
+                ? 'Armed'
+                : 'Mic'
+          }}
         </button>
         <button type="submit" class="kairo-conversation-bar__send" :disabled="!canSubmit">
           Send

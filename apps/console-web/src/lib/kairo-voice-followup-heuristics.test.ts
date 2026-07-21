@@ -14,8 +14,12 @@ describe('kairo voice follow-up heuristics', () => {
     expect(looksLikeOperatorFollowUp('still degraded?')).toBe(true);
   });
 
-  it('accepts repeat/clarification follow-ups', () => {
-    expect(looksLikeOperatorFollowUp('can you repeat that please')).toBe(true);
-    expect(looksLikeOperatorFollowUp('say that again')).toBe(true);
+  it('accepts natural requests that start with filler (okay/can you…)', () => {
+    expect(
+      looksLikeOperatorFollowUp(
+        'okay can you turn a little bit about the best paid critical issues',
+      ),
+    ).toBe(true);
+    expect(looksLikeOperatorFollowUp('alright please check DashPro')).toBe(true);
   });
 });

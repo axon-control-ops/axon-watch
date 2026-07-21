@@ -1,6 +1,6 @@
 import { onBeforeUnmount, watch, type WatchStopHandle } from 'vue';
 
-import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
+import { clearKairoVoiceFollowupWindow, kairoVoiceFollowupExpiresAt } from '../../lib/kairo-voice-followup-window';
 import { isKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
 import {
   canStartKairoSpeechCapture,
@@ -14,6 +14,8 @@ import { kairoConversationPhase } from './kairo-conversation-state';
 
 const RESTART_DELAY_MS = 280;
 const POST_SPEECH_COOLDOWN_MS = 700;
+/** After a clean ambient end (Chromium no-speech), wait longer before restart to cut thrash. */
+const AMBIENT_RESTART_MS = 1600;
 const FAIL_BACKOFF_MS = [1200, 3000, 8000, 15000] as const;
 
 export function useKairoHandsFreeLoop(options: {
@@ -132,7 +134,7 @@ export function useKairoHandsFreeLoop(options: {
     }
     consecutiveStartFailures = 0;
     scheduleRestart(
-      wasVoiceOutputActive ? POST_SPEECH_COOLDOWN_MS : Math.max(RESTART_DELAY_MS, 900),
+      wasVoiceOutputActive ? POST_SPEECH_COOLDOWN_MS : AMBIENT_RESTART_MS,
     );
   });
 
@@ -145,6 +147,8 @@ export function useKairoHandsFreeLoop(options: {
         options.conversationPending(),
         kairoConversationPhase.value,
         kairoCaptureCapturing.value,
+        // Re-arm mic when a follow-up window opens after unsolicited speech.
+        kairoVoiceFollowupExpiresAt.value,
       ] as const,
     () => {
       syncHandsFreeState();

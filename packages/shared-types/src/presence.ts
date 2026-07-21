@@ -14,6 +14,11 @@ export interface OperatorPresenceSettings {
   kairo_narration: KairoNarrationLevel;
   ide_voice_strip_enabled: boolean;
   hands_free_enabled: boolean;
+  /**
+   * JARVIS duplex: after unsolicited speech, listen for a reply without wake word
+   * (uses the follow-up window). Implies hands-free once voice is unlocked.
+   */
+  proactive_duplex_enabled: boolean;
   /** Azure + browser speech rate (1.0 = engine default). */
   speech_rate: number;
   /** Azure + browser speech pitch (1.04 = axon-local Azure default). */

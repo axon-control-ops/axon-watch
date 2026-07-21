@@ -32,6 +32,7 @@ describe('operator presence helpers', () => {
           stt_mode: 'browser',
           voice_routing_mode: 'template_first',
           narrate_tool_progress: false,
+          proactive_duplex_enabled: false,
         },
         spoken_alert: {
           eligible: false,

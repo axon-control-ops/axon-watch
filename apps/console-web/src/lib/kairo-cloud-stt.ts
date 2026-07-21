@@ -1,6 +1,7 @@
 /**
  * Optional cloud STT adapter behind presence `stt_mode`.
- * Browser Web Speech remains the default and fallback; privacy mode blocks both.
+ * Azure cloud is the preferred path; browser Web Speech remains the fallback.
+ * Privacy mode blocks both.
  */
 
 export type CloudSttProbe = {

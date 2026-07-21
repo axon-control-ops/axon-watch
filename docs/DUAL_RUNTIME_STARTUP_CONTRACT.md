@@ -38,7 +38,8 @@ Still incomplete / host-dependent:
 - Signed pairing / keyring identity
 - Deep links, autostart, compact HUD window
 - Playwright desktop E2E and visual/motion regression suites
-- Human-finger Azure voice unlock inside packaged Tauri (WebKitGTK harness gesture + live Azure TTS is recorded)
+- Human-finger Azure voice unlock inside packaged Tauri (in-app unlock banner + queue-until-unlock shipped; WebKitGTK harness gesture + live Azure TTS is recorded; full packaged-window E2E still manual)
+- JARVIS proactive duplex (speak→listen follow-up) is implemented in console; enable via Settings → JARVIS duplex
 
 Prove harnesses: `npm run prove:desktop:clean-install`, `npm run prove:desktop:voice`
 

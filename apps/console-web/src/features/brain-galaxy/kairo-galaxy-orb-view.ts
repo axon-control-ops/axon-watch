@@ -32,14 +32,40 @@ export type GalaxyOrbGlassShard = {
 };
 
 const CENTER = 110;
-const TICK_COUNT = 72;
+const TICK_COUNT = 96;
+
+export type GalaxyOrbRingSpec = {
+  r: number;
+  kind: 'solid' | 'dashed' | 'fine' | 'heavy';
+  opacity: number;
+};
+
+export type GalaxyOrbGearSeg = {
+  d: string;
+  opacity: number;
+};
+
+export type GalaxyOrbSpark = {
+  cx: number;
+  cy: number;
+  r: number;
+  tone: 'amber' | 'cyan';
+};
+
+export type GalaxyOrbFreqTick = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  major: boolean;
+};
 
 export function galaxyOrbTicks(): GalaxyOrbTick[] {
   return Array.from({ length: TICK_COUNT }, (_, index) => {
     const angle = (index / TICK_COUNT) * Math.PI * 2 - Math.PI / 2;
-    const major = index % 8 === 0;
-    const outer = 98;
-    const inner = major ? 86 : 91;
+    const major = index % 6 === 0;
+    const outer = 102;
+    const inner = major ? 88 : 94;
     return {
       x1: CENTER + Math.cos(angle) * outer,
       y1: CENTER + Math.sin(angle) * outer,
@@ -50,14 +76,84 @@ export function galaxyOrbTicks(): GalaxyOrbTick[] {
   });
 }
 
+/** Dense frequency meter around the plasma core (JARVIS-style). */
+export function galaxyOrbFreqTicks(): GalaxyOrbFreqTick[] {
+  const count = 64;
+  return Array.from({ length: count }, (_, index) => {
+    const angle = (index / count) * Math.PI * 2 - Math.PI / 2;
+    const major = index % 4 === 0;
+    const outer = 48;
+    const inner = major ? 36 : 41;
+    return {
+      x1: CENTER + Math.cos(angle) * outer,
+      y1: CENTER + Math.sin(angle) * outer,
+      x2: CENTER + Math.cos(angle) * inner,
+      y2: CENTER + Math.sin(angle) * inner,
+      major,
+    };
+  });
+}
+
+export function galaxyOrbConcentricRings(): GalaxyOrbRingSpec[] {
+  return [
+    { r: 104, kind: 'fine', opacity: 0.28 },
+    { r: 97, kind: 'dashed', opacity: 0.55 },
+    { r: 90, kind: 'solid', opacity: 0.5 },
+    { r: 83, kind: 'dashed', opacity: 0.62 },
+    { r: 76, kind: 'heavy', opacity: 0.45 },
+    { r: 69, kind: 'fine', opacity: 0.4 },
+    { r: 62, kind: 'dashed', opacity: 0.58 },
+    { r: 55, kind: 'solid', opacity: 0.48 },
+    { r: 50, kind: 'fine', opacity: 0.55 },
+  ];
+}
+
+/** Armor / gear notches on mid rings. */
+export function galaxyOrbGearSegments(): GalaxyOrbGearSeg[] {
+  const segs: GalaxyOrbGearSeg[] = [];
+  const radius = 76;
+  const count = 18;
+  for (let i = 0; i < count; i += 1) {
+    if (i % 3 === 0) continue;
+    const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+    const span = 0.11;
+    const a0 = angle - span / 2;
+    const a1 = angle + span / 2;
+    const inner = radius - 3.5;
+    const outer = radius + 5.5;
+    const p = (a: number, r: number) =>
+      `${CENTER + Math.cos(a) * r},${CENTER + Math.sin(a) * r}`;
+    segs.push({
+      d: `M ${p(a0, inner)} L ${p(a0, outer)} L ${p(a1, outer)} L ${p(a1, inner)} Z`,
+      opacity: 0.35 + (i % 4) * 0.08,
+    });
+  }
+  return segs;
+}
+
+export function galaxyOrbSparks(): GalaxyOrbSpark[] {
+  const sparks: GalaxyOrbSpark[] = [];
+  for (let i = 0; i < 22; i += 1) {
+    const angle = (i / 22) * Math.PI * 2 + i * 0.17;
+    const radius = 92 + (i % 5) * 3.2;
+    sparks.push({
+      cx: CENTER + Math.cos(angle) * radius,
+      cy: CENTER + Math.sin(angle) * radius,
+      r: i % 3 === 0 ? 1.8 : 1.15,
+      tone: i % 4 === 0 ? 'amber' : 'cyan',
+    });
+  }
+  return sparks;
+}
+
 export function galaxyOrbBeads(): GalaxyOrbBead[] {
   const radius = 74;
   // Mockup amber cluster near top-left → top arc.
-  const angles = [-48, -32, -18, -6, 8].map((degrees) => (degrees * Math.PI) / 180);
+  const angles = [-48, -32, -18, -6, 8, 22, 38].map((degrees) => (degrees * Math.PI) / 180);
   return angles.map((angle, index) => ({
     cx: CENTER + Math.cos(angle) * radius,
     cy: CENTER + Math.sin(angle) * radius,
-    r: index === 0 ? 3.1 : 2.4,
+    r: index === 0 ? 3.1 : 2.2,
   }));
 }
 
@@ -116,6 +212,7 @@ export function galaxyOrbStatusLabel(
   conversationPhase: GalaxyOrbConversationPhase,
   speaking: boolean,
   capturing = false,
+  captureMode: 'manual' | 'hands_free' | 'barge_in' = 'manual',
 ): string {
   if (conversationPhase === 'thinking') {
     return 'BUSY';
@@ -123,8 +220,11 @@ export function galaxyOrbStatusLabel(
   if (speaking || conversationPhase === 'speaking') {
     return 'SPEAKING';
   }
-  // Only claim LISTENING when the mic session is actually open.
-  if (capturing || conversationPhase === 'listening') {
+  // Ambient hands-free capture restarts every Chromium no-speech cycle — do not
+  // claim LISTENING for that. Manual PTT owns the label.
+  const operatorOwnedListen =
+    conversationPhase === 'listening' || (capturing && captureMode === 'manual');
+  if (operatorOwnedListen) {
     return 'LISTENING';
   }
   return 'READY';
@@ -133,6 +233,7 @@ export function galaxyOrbStatusLabel(
 export function galaxyOrbModeLabel(
   handsFreeEnabled: boolean,
   conversationPhase: GalaxyOrbConversationPhase,
+  handsFreeArmed = handsFreeEnabled,
 ): string {
   if (conversationPhase === 'thinking') {
     return 'Checking…';
@@ -140,8 +241,11 @@ export function galaxyOrbModeLabel(
   if (conversationPhase === 'speaking') {
     return 'Voice live';
   }
-  if (handsFreeEnabled) {
+  if (handsFreeArmed) {
     return 'Hands-free';
+  }
+  if (handsFreeEnabled) {
+    return 'Unlock voice';
   }
   return 'Manual';
 }
@@ -155,9 +259,9 @@ export function galaxyOrbTriggerAriaLabel(
     return `${personaName} voice muted`;
   }
   if (handsFreeEnabled) {
-    return `${personaName} hands-free — tap to switch to manual mode`;
+    return `${personaName} hands-free — tap for command ring, hold to talk, long-press to move`;
   }
-  return `${personaName} manual — tap for hands-free, hold to talk, long-press to move`;
+  return `${personaName} manual — tap for command ring, hold to talk, long-press to move`;
 }
 
 export function galaxyOrbStateClass(
@@ -166,6 +270,7 @@ export function galaxyOrbStateClass(
   conversationPhase: GalaxyOrbConversationPhase = 'idle',
   capturing = false,
   agentStreamActive = false,
+  captureMode: 'manual' | 'hands_free' | 'barge_in' = 'manual',
 ): string {
   if (agentStreamActive) {
     return 'kairo-galaxy-orb--thinking kairo-galaxy-orb--busy kairo-galaxy-orb--autonomous';
@@ -176,7 +281,9 @@ export function galaxyOrbStateClass(
   if (speaking || conversationPhase === 'speaking') {
     return 'kairo-galaxy-orb--speaking';
   }
-  if (capturing || conversationPhase === 'listening') {
+  const operatorOwnedListen =
+    conversationPhase === 'listening' || (capturing && captureMode === 'manual');
+  if (operatorOwnedListen) {
     return 'kairo-galaxy-orb--listening';
   }
   if (state === 'alerting') {
@@ -232,7 +339,7 @@ export function galaxyOrbHint(
     return 'Listening — release to send';
   }
   if (state === 'alerting') {
-    return 'Tap for hands-free · hold to talk · long-press to move';
+    return 'Tap for command ring · hold to talk · long-press to move';
   }
-  return 'Tap for hands-free · hold to talk · say "change brain to …" to switch models';
+  return 'Tap for command ring · hold to talk · say "change brain to …" to switch models';
 }

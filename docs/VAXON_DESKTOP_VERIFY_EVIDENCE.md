@@ -83,3 +83,21 @@ Harness: `scripts/desktop/prove-packaged-voice.sh`
 Honesty note: unlock click is injected by the harness (not a human finger). This still proves
 WebKitGTK on this host can unlock audio and play a live Azure TTS payload — same engine family
 as packaged Tauri on Linux. It is not a full Tauri window E2E of the in-app unlock UX.
+
+## In-app voice unlock + proactive duplex (2026-07-21)
+
+**Result: implemented (unit-tested)**
+
+- Console shows a quiet **Click / press a key to unlock voice** banner until HTMLAudio media unlock succeeds (`VoiceUnlockBanner` + `kairo-audio-unlock` snapshot).
+- Spoken alerts with `alert` priority **queue until unlock** (no silent drop / unlabeled robotic surprise), then flush on unlock.
+- Successful alert delivery schedules the existing **30s follow-up listen window** so replies need no wake word.
+- Settings: **JARVIS duplex** (`proactive_duplex_enabled`) turns on hands-free + spoken alerts; orb shows **Hands-free** only when media is unlocked (else **Unlock voice**).
+- Ask-shaped spoken alert lines invite a verbal answer (“Approve or reject?”, “Shall I investigate?”).
+
+Non-claims: no always-on mic without wake word for cold ambient; no background mobile listen; no full AEC duplex; packaged Tauri human-finger E2E still manual.
+
+## Flicker fix (2026-07-21 evening)
+
+**Bug (verified in code):** Chromium Web Speech ends ambient hands-free sessions about once a second on silence. Galaxy presence / orb chrome treated `speechCapturing === true` as `LISTENING`, so with active signals the HUD thrashed **Listening ↔ Alerting/Ready** (Intelligence panel, ambient cards, orb status, mic label).
+
+**Fix:** ambient hands-free/barge-in no longer owns the Listening presence/orb label — only manual PTT (`conversationPhase === 'listening'`). Unlock banner teleported out of the mockup CSS grid. Ambient restart delay raised to 1.6s.

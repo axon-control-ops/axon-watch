@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue';
 import type { OperatorPresenceSettings } from '../../contracts/canonical';
 import { kairoVoiceLastReason } from '../../lib/kairo-voice-diagnostics';
 import {
+  applyJarvisDuplexPreset,
   defaultOperatorPresenceSettings,
   formatVoiceTuningValue,
   normalizeOperatorPresenceSettings,
@@ -89,6 +90,14 @@ const mobileCompactPreferred = computed({
 const handsFreeEnabled = computed({
   get: () => draft.value.hands_free_enabled,
   set: (value: boolean) => patchDraft({ hands_free_enabled: value }),
+});
+
+const proactiveDuplexEnabled = computed({
+  get: () => draft.value.proactive_duplex_enabled,
+  set: (value: boolean) => {
+    draft.value = applyJarvisDuplexPreset(draft.value, value);
+    markDirty();
+  },
 });
 
 const narrateToolProgress = computed({
@@ -413,6 +422,20 @@ defineExpose({
           :privacy-mode="privacyMode"
           @patch="patchDraft"
         />
+        <label class="operator-settings-form__row">
+          <input
+            v-model="proactiveDuplexEnabled"
+            type="checkbox"
+            :disabled="saving || privacyMode"
+          />
+          <span class="operator-settings-form__copy">
+            <strong>JARVIS duplex (proactive speak → listen)</strong>
+            <small>
+              After VAXON speaks an alert, stay listening for ~30s so you can answer without the wake
+              word. Turns on hands-free + spoken alerts. Cold ambient still needs “VAXON”.
+            </small>
+          </span>
+        </label>
         <label class="operator-settings-form__row">
           <input v-model="handsFreeEnabled" type="checkbox" :disabled="saving || privacyMode" />
           <span class="operator-settings-form__copy">

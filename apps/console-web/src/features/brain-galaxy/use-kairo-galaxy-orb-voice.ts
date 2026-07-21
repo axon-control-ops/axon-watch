@@ -16,17 +16,23 @@ export type UseKairoGalaxyOrbVoiceOptions = {
   voiceBlocked: Ref<boolean>;
   orbBusy: Ref<boolean>;
   handsFreeEnabled: Ref<boolean>;
+  /** Short tap handler — when set, replaces the default hands-free toggle on tap. */
+  onShortTap?: () => void;
 };
 
 export function useKairoGalaxyOrbVoice(options: UseKairoGalaxyOrbVoiceOptions) {
   const kairoSpeaking = ref(false);
   const voiceBeat = ref(false);
+  /** Brief visual pulse when hands-free / manual mode flips. */
+  const modeFlash = ref(false);
   let holdTimer: number | null = null;
   let pointerDownAt = 0;
-  let suppressModeToggleClick = false;
+  let ignoreSynthesizedClick = false;
+  let modeFlashTimer: number | null = null;
   let voiceBeatTimer: number | null = null;
   let unsubscribeSpeaking: (() => void) | null = null;
   let unsubscribeVoiceChunk: (() => void) | null = null;
+  let toggleInFlight = false;
 
   function clearHoldTimer(): void {
     if (holdTimer !== null) {
@@ -35,24 +41,56 @@ export function useKairoGalaxyOrbVoice(options: UseKairoGalaxyOrbVoiceOptions) {
     }
   }
 
-  async function toggleHandsFreeMode(): Promise<void> {
-    if (options.voiceBlocked.value) {
+  function flashModeChange(): void {
+    modeFlash.value = true;
+    if (modeFlashTimer !== null) {
+      window.clearTimeout(modeFlashTimer);
+    }
+    modeFlashTimer = window.setTimeout(() => {
+      modeFlash.value = false;
+      modeFlashTimer = null;
+    }, 700);
+  }
+
+  async function toggleHandsFreeMode(source: string): Promise<void> {
+    if (options.voiceBlocked.value || toggleInFlight) {
       return;
     }
+    toggleInFlight = true;
+    const enabling = !options.handsFreeEnabled.value;
+    // Flash immediately — store patch is optimistic; do not hold the lock through
+    // network + briefing reload or rapid taps look dead.
+    flashModeChange();
     if (options.handsFreeEnabled.value && options.speechCapture.capturing.value) {
       options.speechCapture.stopCapture();
     }
-    await options.shell.saveOperatorPresenceSettingsPatch({
-      hands_free_enabled: !options.handsFreeEnabled.value,
-    });
+    void options.shell
+      .saveOperatorPresenceSettingsPatch(
+        enabling
+          ? { hands_free_enabled: true, stt_mode: 'cloud' }
+          : { hands_free_enabled: false, proactive_duplex_enabled: false },
+      )
+      .catch(() => undefined);
+    window.setTimeout(() => {
+      toggleInFlight = false;
+    }, 320);
   }
 
-  function handleOrbClick(): void {
-    if (suppressModeToggleClick) {
-      suppressModeToggleClick = false;
+  function runShortTap(source: string): void {
+    if (options.onShortTap) {
+      options.onShortTap();
       return;
     }
-    void toggleHandsFreeMode();
+    void toggleHandsFreeMode(source);
+  }
+
+  /** @deprecated Prefer pointer-up short-tap path; kept for keyboard activation. */
+  function handleOrbClick(): void {
+    if (ignoreSynthesizedClick) {
+      ignoreSynthesizedClick = false;
+      return;
+    }
+    runShortTap('click');
   }
 
   function handleOrbPttStart(): void {
@@ -111,15 +149,29 @@ export function useKairoGalaxyOrbVoice(options: UseKairoGalaxyOrbVoiceOptions) {
       heldMs,
       holdToTalkMs: HOLD_TO_TALK_MS,
     });
-    suppressModeToggleClick = pointerUpResolution.suppressToggleClick;
+    // Swallow the synthetic click that follows pointerup so we never double-toggle
+    // (pointerup + click would flip mode twice and look like "nothing happened").
+    ignoreSynthesizedClick = true;
+    window.setTimeout(() => {
+      ignoreSynthesizedClick = false;
+    }, 450);
+
     if (pointerUpResolution.stopCapture) {
       options.speechCapture.stopCapture();
+    }
+
+    // Short tap toggles mode here — do not rely on the click event.
+    if (!pointerUpResolution.suppressToggleClick && heldMs > 0 && heldMs < HOLD_TO_TALK_MS) {
+      runShortTap('pointerup');
     }
   }
 
   function cancelOrbPointerGesture(): void {
     clearHoldTimer();
-    suppressModeToggleClick = true;
+    ignoreSynthesizedClick = true;
+    window.setTimeout(() => {
+      ignoreSynthesizedClick = false;
+    }, 450);
     if (options.speechCapture.capturing.value) {
       options.speechCapture.stopCapture();
     }
@@ -149,14 +201,20 @@ export function useKairoGalaxyOrbVoice(options: UseKairoGalaxyOrbVoiceOptions) {
       window.clearTimeout(voiceBeatTimer);
       voiceBeatTimer = null;
     }
+    if (modeFlashTimer !== null) {
+      window.clearTimeout(modeFlashTimer);
+      modeFlashTimer = null;
+    }
   });
 
   return {
     kairoSpeaking,
     voiceBeat,
+    modeFlash,
     handleOrbClick,
     handleOrbPointerDown,
     handleOrbPointerUp,
     cancelOrbPointerGesture,
+    toggleHandsFreeMode,
   };
 }

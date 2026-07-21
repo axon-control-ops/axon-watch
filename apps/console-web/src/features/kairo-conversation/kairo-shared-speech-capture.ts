@@ -2,7 +2,10 @@ import { ref } from 'vue';
 
 import { logKairoVoice } from '../../lib/kairo-voice-debug';
 import { isKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
-import { openKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
+import {
+  isKairoVoiceFollowupWindowActive,
+  openKairoVoiceFollowupWindow,
+} from '../../lib/kairo-voice-followup-window';
 import { normalizeVoiceTranscript } from '../../lib/kairo-entity-labels';
 import {
   detectVoiceInterruptPhrase,
@@ -10,7 +13,7 @@ import {
   type KairoVoiceCaptureMode,
 } from '../../lib/kairo-voice-gate';
 import { isSpeechCaptureSupported, SpeechCaptureSession } from './speech-capture';
-import { CloudAudioCaptureSession, isCloudAudioCaptureSupported } from './cloud-audio-capture';
+import { CloudAudioCaptureSession, isCloudAudioCaptureSupported, preferredCloudRecorderMimeType } from './cloud-audio-capture';
 import {
   probeCloudSttAvailability,
   resolveSttCaptureMode,
@@ -32,13 +35,15 @@ export const kairoCaptureLastAccepted = ref<boolean | null>(null);
 export const kairoCaptureLastSubmitState = ref<'submitted' | 'queued' | 'ignored' | 'dropped' | null>(null);
 
 let privacyBlocked: () => boolean = () => false;
-let sttMode: () => string = () => 'browser';
+let sttMode: () => string = () => 'cloud';
 let onVoiceInterrupt: () => void = () => {};
 let onCaptureEnd: () => void = () => {};
 const captureEndListeners = new Set<() => void>();
 
 let bargeInTriggered = false;
 let activeCaptureProvider: 'browser' | 'cloud' | null = null;
+/** True while cloud audio is stopping/uploading — blocks ambient restart storms. */
+let cloudFinishInFlight = false;
 
 export function registerKairoCaptureEndListener(listener: () => void): () => void {
   captureEndListeners.add(listener);
@@ -105,6 +110,7 @@ export function canStartKairoSpeechCapture(): boolean {
     isKairoSpeechCaptureSupported() &&
     !privacyBlocked() &&
     !kairoCaptureCapturing.value &&
+    !cloudFinishInFlight &&
     kairoConversationPhase.value !== 'thinking' &&
     kairoConversationPhase.value !== 'speaking'
   );
@@ -140,6 +146,7 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
   kairoCaptureInterim.value = '';
   kairoCaptureCapturing.value = false;
   kairoCaptureLastHeard.value = normalizeVoiceTranscript(transcript).trim();
+
 
   if (isKairoVoiceSpeaking() || kairoConversationPhase.value === 'speaking') {
     kairoCaptureLastAccepted.value = false;
@@ -180,6 +187,7 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
   kairoCaptureLastAccepted.value = gate.accept;
   kairoCaptureLastGateReason.value = gate.reason;
 
+
   if (gate.shouldInterrupt) {
     triggerVoiceInterrupt('final');
   }
@@ -204,13 +212,42 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
   notifyCaptureEnd();
 }
 
-function shouldUseCloudCapture(mode: KairoVoiceCaptureMode): boolean {
-  return (
-    (resolveSttCaptureMode(sttMode(), privacyBlocked()) === 'cloud' ||
-      !isSpeechCaptureSupported()) &&
-    mode === 'manual' &&
-    isCloudAudioCaptureSupported()
-  );
+function shouldUseCloudCapture(_mode: KairoVoiceCaptureMode): boolean {
+  const resolved = resolveSttCaptureMode(sttMode(), privacyBlocked());
+  if (resolved === 'blocked' || resolved === 'browser_continuous') {
+    return false;
+  }
+  // Prefer Azure (PCM WAV / ogg) whenever capture hardware is available.
+  // Explicit browser_continuous keeps Web Speech; plain browser still upgrades to cloud.
+  return isCloudAudioCaptureSupported();
+}
+
+async function startCloudCapture(mode: KairoVoiceCaptureMode): Promise<boolean> {
+  const probe = await probeCloudSttAvailability();
+  if (!probe.available) {
+    return startBrowserCapture(mode);
+  }
+  const autoStop =
+    mode === 'manual'
+      ? undefined
+      : {
+          minMs: 1100,
+          silenceMs: 1400,
+          maxMs: 14000,
+          onAutoStop: () => {
+            if (activeCaptureProvider === 'cloud' && kairoCaptureCapturing.value) {
+              void finishCloudCapture(kairoCaptureMode.value);
+            }
+          },
+        };
+  const started = await cloudSession.start({ autoStop });
+  if (!started) {
+    return startBrowserCapture(mode);
+  }
+  kairoCaptureCapturing.value = true;
+  activeCaptureProvider = 'cloud';
+  logKairoVoice('capture_start', { mode, provider: 'cloud' });
+  return true;
 }
 
 function startBrowserCapture(mode: KairoVoiceCaptureMode): boolean {
@@ -254,56 +291,78 @@ function startBrowserCapture(mode: KairoVoiceCaptureMode): boolean {
 }
 
 async function finishCloudCapture(mode: KairoVoiceCaptureMode): Promise<void> {
-  const blob = await cloudSession.stop();
-  kairoCaptureCapturing.value = false;
-  activeCaptureProvider = null;
-  kairoCaptureInterim.value = '';
-  if (!blob) {
-    kairoCaptureError.value = 'No audio captured — try again.';
-    setKairoConversationPhase('idle');
-    notifyCaptureEnd();
+  if (cloudFinishInFlight) {
     return;
   }
+  cloudFinishInFlight = true;
+  // Keep capturing claimed through Azure upload so the hands-free loop cannot
+  // spawn parallel sessions against the singleton recorder (causes stt_unavailable storms).
+  let notified = false;
+  let handedOffToBrowser = false;
+  try {
+    const blob = await cloudSession.stop();
+    const stopStats = cloudSession.lastStopStats;
+    activeCaptureProvider = null;
+    kairoCaptureInterim.value = '';
 
-  const result = await transcribeCloudStt(blob, { privacyBlocked: privacyBlocked() });
-  if (!result.transcript.trim()) {
-    if (result.reason !== 'privacy_mode' && isSpeechCaptureSupported()) {
-      logKairoVoice('cloud_stt_fallback', { mode, reason: result.reason });
-      const started = startBrowserCapture(mode);
-      if (started) {
-        return;
-      }
+    if (!blob) {
+      kairoCaptureError.value = mode === 'manual' ? 'No audio captured — try again.' : null;
+      setKairoConversationPhase('idle');
+      notifyCaptureEnd();
+      notified = true;
+      return;
     }
-    kairoCaptureError.value =
-      result.reason === 'privacy_mode'
-        ? null
-        : 'Cloud speech could not transcribe that clip — try again or switch to browser STT.';
-    setKairoConversationPhase('idle');
-    notifyCaptureEnd();
-    return;
-  }
 
-  logKairoVoice('cloud_stt_ok', {
-    mode,
-    provider: result.provider,
-    confidence: result.confidence,
-  });
-  await handleFinalTranscript(result.transcript, mode);
-}
+    // Skip Azure round-trip for pure silence timeouts — restart ambient loop instead.
+    if (mode !== 'manual' && stopStats && !stopStats.heardSpeech) {
+      setKairoConversationPhase('idle');
+      notifyCaptureEnd();
+      notified = true;
+      return;
+    }
 
-async function startCloudCapture(mode: KairoVoiceCaptureMode): Promise<boolean> {
-  const probe = await probeCloudSttAvailability();
-  if (!probe.available) {
-    return startBrowserCapture(mode);
+    const result = await transcribeCloudStt(blob, { privacyBlocked: privacyBlocked() });
+    if (!result.transcript.trim()) {
+      // Ambient/hands-free: do not fall back to brittle browser STT — restart cloud via loop.
+      if (mode === 'manual' && result.reason !== 'privacy_mode' && isSpeechCaptureSupported()) {
+        logKairoVoice('cloud_stt_fallback', { mode, reason: result.reason });
+        kairoCaptureCapturing.value = false;
+        const started = startBrowserCapture(mode);
+        if (started) {
+          handedOffToBrowser = true;
+          notified = true;
+          return;
+        }
+      }
+      kairoCaptureError.value =
+        result.reason === 'privacy_mode'
+          ? null
+          : mode === 'manual'
+            ? 'Cloud speech could not transcribe that clip — try again or switch to browser STT.'
+            : null;
+      setKairoConversationPhase('idle');
+      notifyCaptureEnd();
+      notified = true;
+      return;
+    }
+
+    logKairoVoice('cloud_stt_ok', {
+      mode,
+      provider: result.provider,
+      confidence: result.confidence,
+    });
+    await handleFinalTranscript(result.transcript, mode);
+    notified = true; // handleFinalTranscript notifies
+  } finally {
+    cloudFinishInFlight = false;
+    if (!handedOffToBrowser) {
+      kairoCaptureCapturing.value = false;
+      activeCaptureProvider = null;
+    }
+    if (!notified) {
+      notifyCaptureEnd();
+    }
   }
-  const started = await cloudSession.start();
-  if (!started) {
-    return startBrowserCapture(mode);
-  }
-  kairoCaptureCapturing.value = true;
-  activeCaptureProvider = 'cloud';
-  logKairoVoice('capture_start', { mode, provider: 'cloud' });
-  return true;
 }
 
 export function startKairoSpeechCapture(
@@ -338,12 +397,18 @@ export function startKairoSpeechCapture(
   }
 
   if (shouldUseCloudCapture(mode)) {
+    // Claim the mic slot before the async probe/start so the hands-free loop
+    // cannot spawn a second concurrent cloud session.
+    kairoCaptureCapturing.value = true;
+    activeCaptureProvider = 'cloud';
     void startCloudCapture(mode).then((started) => {
       if (!started) {
         kairoCaptureCapturing.value = false;
+        activeCaptureProvider = null;
         if (kairoConversationPhase.value === 'listening') {
           setKairoConversationPhase('idle');
         }
+        notifyCaptureEnd();
       }
     });
     return true;
@@ -353,6 +418,9 @@ export function startKairoSpeechCapture(
 }
 
 export function stopKairoSpeechCapture(): void {
+  if (cloudFinishInFlight) {
+    return;
+  }
   if (activeCaptureProvider === 'cloud' && kairoCaptureCapturing.value) {
     void finishCloudCapture(kairoCaptureMode.value);
     return;

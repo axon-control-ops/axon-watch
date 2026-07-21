@@ -4,9 +4,39 @@
  * robotic speechSynthesis.
  */
 
+import { readonly, ref } from 'vue';
+
 let unlocked = false;
 let mediaUnlocked = false;
 let unlockPromise: Promise<boolean> | null = null;
+
+const unlockListeners = new Set<() => void>();
+
+/** Reactive snapshot for shell chrome (banner / HUD). */
+const unlockSnapshot = ref({
+  unlocked: false,
+  mediaUnlocked: false,
+});
+
+export const kairoAudioUnlockSnapshot = readonly(unlockSnapshot);
+
+function syncSnapshot(): void {
+  unlockSnapshot.value = {
+    unlocked,
+    mediaUnlocked,
+  };
+}
+
+function notifyUnlocked(): void {
+  syncSnapshot();
+  for (const listener of [...unlockListeners]) {
+    try {
+      listener();
+    } catch {
+      // ignore listener errors
+    }
+  }
+}
 
 export function isDesktopWebView(): boolean {
   if (typeof window === 'undefined') {
@@ -71,9 +101,14 @@ async function attemptUnlock(): Promise<boolean> {
   if (unlocked && mediaUnlocked) {
     return true;
   }
+  const wasMedia = mediaUnlocked;
   const contextOk = await unlockAudioContext();
   const mediaOk = await unlockHtmlAudioElement();
   unlocked = contextOk || mediaOk || unlocked;
+  syncSnapshot();
+  if (mediaUnlocked && !wasMedia) {
+    notifyUnlocked();
+  }
   return unlocked && mediaUnlocked;
 }
 
@@ -88,6 +123,21 @@ export function unlockKairoAudioPlayback(): Promise<boolean> {
     });
   }
   return unlockPromise;
+}
+
+/** Subscribe to successful media unlock (Azure-ready). Returns unsubscribe. */
+export function onKairoAudioUnlocked(listener: () => void): () => void {
+  unlockListeners.add(listener);
+  if (mediaUnlocked) {
+    try {
+      listener();
+    } catch {
+      // ignore
+    }
+  }
+  return () => {
+    unlockListeners.delete(listener);
+  };
 }
 
 export function installKairoAudioUnlockListeners(): () => void {
@@ -105,6 +155,7 @@ export function installKairoAudioUnlockListeners(): () => void {
   if (isDesktopWebView()) {
     void unlockKairoAudioPlayback();
   }
+  syncSnapshot();
   return () => {
     window.removeEventListener('pointerdown', onGesture, opts);
     window.removeEventListener('keydown', onGesture, opts);
@@ -120,9 +171,16 @@ export function isKairoMediaUnlocked(): boolean {
   return mediaUnlocked;
 }
 
+/** True when Azure/HTMLAudio playback is allowed after a gesture. */
+export function isKairoVoicePlaybackArmed(): boolean {
+  return mediaUnlocked;
+}
+
 /** Test helper — reset unlock state between Vitest cases. */
 export function resetKairoAudioUnlockState(): void {
   unlocked = false;
   mediaUnlocked = false;
   unlockPromise = null;
+  unlockListeners.clear();
+  syncSnapshot();
 }

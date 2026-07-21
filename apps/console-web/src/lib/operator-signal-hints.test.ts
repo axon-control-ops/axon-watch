@@ -66,6 +66,7 @@ describe('operator-signal-hints', () => {
     expect(explained.youDo).toContain('Approve');
     expect(explained.agentDo).toContain('Do not continue until the operator approves');
     expect(explained.spoken).toContain('yes or no');
+    expect(explained.spoken).toContain('Approve or reject');
   });
 
   it('explains connector failures without jargon-only copy', () => {

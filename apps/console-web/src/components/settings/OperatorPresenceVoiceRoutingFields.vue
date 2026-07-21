@@ -50,7 +50,7 @@ function onVoiceRoutingChange(event: Event): void {
   <label class="operator-settings-form__row operator-settings-form__row--select">
     <span class="operator-settings-form__copy">
       <strong>Speech-to-text mode</strong>
-      <small>Browser Web Speech is default; cloud is optional with browser fallback.</small>
+      <small>Azure cloud STT is default (Whisper-class accuracy); browser Web Speech is fallback.</small>
     </span>
     <select
       class="operator-settings-form__select"
@@ -58,9 +58,9 @@ function onVoiceRoutingChange(event: Event): void {
       :disabled="saving || privacyMode"
       @change="onSttModeChange"
     >
+      <option value="cloud">Azure cloud (recommended)</option>
       <option value="browser">Browser</option>
       <option value="browser_continuous">Browser continuous</option>
-      <option value="cloud">Cloud (optional)</option>
     </select>
   </label>
   <label class="operator-settings-form__row operator-settings-form__row--select">

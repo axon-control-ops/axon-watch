@@ -13,6 +13,21 @@ export type OperatorAlertExplanation = {
   spoken: string;
 };
 
+/** One short spoken line that invites a verbal reply (JARVIS duplex). */
+export function askShapedSpoken(body: string, invite: string): string {
+  const base = String(body ?? '')
+    .trim()
+    .replace(/[.!?]+$/, '');
+  const ask = String(invite ?? '').trim();
+  if (!base) {
+    return ask;
+  }
+  if (!ask) {
+    return `${base}.`;
+  }
+  return `${base}. ${ask}`;
+}
+
 /** Normalize control-plane snake_case explanation into the console view shape. */
 export function normalizeServerAlertExplanation(
   raw: ServerAlertExplanation | Record<string, unknown> | null | undefined,
@@ -194,10 +209,12 @@ export function explainOperatorAlert(input: {
       youDo: 'Open Approvals, read the short summary, then tap Approve (let it continue) or Reject (stop it).',
       agentDo:
         'Do not continue until the operator approves. After approval, resume the paused run and finish the original task. After reject, stop cleanly and leave a short note of what was cancelled.',
-      spoken:
+      spoken: askShapedSpoken(
         count === 1
-          ? 'One job is waiting for your yes or no before I continue.'
-          : `${count} jobs are waiting for your yes or no before I continue.`,
+          ? 'One job is waiting for your yes or no before I continue'
+          : `${count} jobs are waiting for your yes or no before I continue`,
+        'Approve or reject?',
+      ),
     };
   }
 
@@ -208,7 +225,7 @@ export function explainOperatorAlert(input: {
       what: `An email from ${sender} needs a human decision (${action}).`,
       youDo: 'Open Attention, skim the email thread, then hand it to the agent if you want a draft reply or investigation.',
       agentDo: `Triage the email from ${sender}. Draft a reply or investigate the request, then pause for the operator to send or approve.`,
-      spoken: `Email from ${sender} needs a quick look.`,
+      spoken: askShapedSpoken(`Email from ${sender} needs a quick look`, 'Shall I triage it?'),
     };
   }
 
@@ -219,7 +236,10 @@ export function explainOperatorAlert(input: {
       what: `${label} raised ${status} on an outside service it watches (for example errors or downtime).`,
       youDo: 'Open the project’s Attention details. If it mentions missing keys, unlock Vault and add the credentials. Otherwise hand it to the agent.',
       agentDo: `Investigate the ${label} monitor alert (${status}). Check the linked service dashboard, confirm whether it is a real outage or a config gap, fix what is safe, and report back in plain English.`,
-      spoken: `${label} needs attention — something outside the app looked unhealthy.`,
+      spoken: askShapedSpoken(
+        `${label} needs attention — something outside the app looked unhealthy`,
+        'Shall I investigate?',
+      ),
     };
   }
 
@@ -229,7 +249,9 @@ export function explainOperatorAlert(input: {
       what: override.what,
       youDo: override.youDo,
       agentDo: override.agentDo,
-      spoken: override.spoken || `Heads up — ${title.replace(/^VAXON:\s*/i, '')}.`,
+      spoken:
+        override.spoken ||
+        askShapedSpoken(`Heads up — ${title.replace(/^VAXON:\s*/i, '')}`, 'Shall I dig in?'),
     };
   }
 
@@ -239,7 +261,10 @@ export function explainOperatorAlert(input: {
       what: `A connection Axon needs for ${project} is down or not answering.`,
       youDo: 'Check that the related service is running, then ask the agent to re-check. If it keeps failing, open Vault for missing credentials.',
       agentDo: `Diagnose why the connector for "${title}" is unavailable. Verify the service is up, credentials are valid, and restore the link. Explain the fix in plain English.`,
-      spoken: 'A connection Axon needs is down — I can help get it back.',
+      spoken: askShapedSpoken(
+        'A connection Axon needs is down — I can help get it back',
+        'Shall I diagnose it?',
+      ),
     };
   }
 
@@ -248,7 +273,10 @@ export function explainOperatorAlert(input: {
       what: 'This is a normal “still warming up” note in local development — not a production outage.',
       youDo: 'You can ignore it, or keep using Command as usual. No repair step is required.',
       agentDo: 'Do not treat this as an incident. Confirm Watch is connected, then continue with the operator’s real request.',
-      spoken: 'Just a warm-up note — nothing broken on your side.',
+      spoken: askShapedSpoken(
+        'Just a warm-up note — nothing broken on your side',
+        'Want me to confirm Watch?',
+      ),
     };
   }
 
@@ -257,7 +285,10 @@ export function explainOperatorAlert(input: {
       what: 'The coding agent could not start because its usage limit or login is blocked.',
       youDo: 'Open Runtime / Vault, switch model or top up Cursor usage, then retry the job.',
       agentDo: 'Do not retry blindly. Tell the operator which runtime is blocked and the exact fix (usage, login, or model switch), then wait for them.',
-      spoken: 'The agent could not start — usage or login needs a quick fix first.',
+      spoken: askShapedSpoken(
+        'The agent could not start — usage or login needs a quick fix first',
+        'Shall I walk you through it?',
+      ),
     };
   }
 
@@ -266,7 +297,10 @@ export function explainOperatorAlert(input: {
       what: 'A locked vault or missing key is stopping a connected service from working.',
       youDo: 'Open Vault, unlock it, and make sure the needed key is present. Then retry.',
       agentDo: 'Identify which key or unlock step is missing. Guide the operator to Vault; do not invent secrets. After unlock, re-check the failing connection.',
-      spoken: 'A key or vault unlock is needed before this can continue.',
+      spoken: askShapedSpoken(
+        'A key or vault unlock is needed before this can continue',
+        'Shall I guide you to Vault?',
+      ),
     };
   }
 
@@ -275,7 +309,10 @@ export function explainOperatorAlert(input: {
       what: 'Part of the system is running in a weaker “degraded” mode — some status may be incomplete.',
       youDo: 'Glance at the status strip. If something you need looks wrong, hand it to the agent; otherwise you can keep working.',
       agentDo: `Explain the degraded condition for "${title}" in plain English, list what still works, and fix or restart the unhealthy piece if it is safe.`,
-      spoken: 'Something is running in a weaker mode — worth a quick look, not a panic.',
+      spoken: askShapedSpoken(
+        'Something is running in a weaker mode — worth a quick look, not a panic',
+        'Want me to check it?',
+      ),
     };
   }
 
@@ -297,7 +334,9 @@ export function explainOperatorAlert(input: {
     what,
     youDo,
     agentDo,
-    spoken: override?.spoken || `Heads up — ${title.replace(/^VAXON:\s*/i, '')}.`,
+    spoken:
+      override?.spoken ||
+      askShapedSpoken(`Heads up — ${title.replace(/^VAXON:\s*/i, '')}`, 'Shall I dig in?'),
   };
 }
 

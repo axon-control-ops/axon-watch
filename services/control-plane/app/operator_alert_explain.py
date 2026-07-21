@@ -22,6 +22,17 @@ def is_bootstrap_summary_signal(signal_id: str, title: str) -> bool:
     )
 
 
+def _ask_shaped(body: str, invite: str) -> str:
+    """Turn an alert statement into a short ask that invites a spoken reply."""
+    base = str(body or "").strip().rstrip(".!?")
+    ask = str(invite or "").strip()
+    if not base:
+        return ask
+    if not ask:
+        return f"{base}."
+    return f"{base}. {ask}"
+
+
 def _workspace_label(meta: dict[str, Any] | None) -> str:
     if not isinstance(meta, dict):
         return "this project"
@@ -120,10 +131,13 @@ def explain_operator_alert(
         count = pending if pending > 0 else 1
         noun = "one agent job" if count == 1 else f"{count} agent jobs"
         verb = "is" if count == 1 else "are"
-        spoken = (
-            "One job is waiting for your yes or no before I continue."
-            if count == 1
-            else f"{count} jobs are waiting for your yes or no before I continue."
+        spoken = _ask_shaped(
+            (
+                "One job is waiting for your yes or no before I continue"
+                if count == 1
+                else f"{count} jobs are waiting for your yes or no before I continue"
+            ),
+            "Approve or reject?",
         )
         return {
             "what": f"{noun} {verb} paused and waiting for your go-ahead.",
@@ -152,7 +166,7 @@ def explain_operator_alert(
                 f"Triage the email from {sender}. Draft a reply or investigate the "
                 "request, then pause for the operator to send or approve."
             ),
-            "spoken": f"Email from {sender} needs a quick look.",
+            "spoken": _ask_shaped(f"Email from {sender} needs a quick look", "Shall I triage it?"),
         }
 
     if family == "child_project_monitor":
@@ -172,7 +186,10 @@ def explain_operator_alert(
                 "service dashboard, confirm whether it is a real outage or a config gap, "
                 "fix what is safe, and report back in plain English."
             ),
-            "spoken": f"{label} needs attention — something outside the app looked unhealthy.",
+            "spoken": _ask_shaped(
+                f"{label} needs attention — something outside the app looked unhealthy",
+                "Shall I investigate?",
+            ),
         }
 
     override = _meta_plain_override(meta)
@@ -182,7 +199,7 @@ def explain_operator_alert(
         and override.get("you_do")
         and override.get("agent_do")
     ):
-        spoken = override.get("spoken") or f"Heads up — {title}."
+        spoken = override.get("spoken") or _ask_shaped(f"Heads up — {title}", "Shall I dig in?")
         return {
             "what": override["what"],
             "you_do": override["you_do"],
@@ -202,7 +219,10 @@ def explain_operator_alert(
                 f'Diagnose why the connector for "{title}" is unavailable. Verify the service '
                 "is up, credentials are valid, and restore the link. Explain the fix in plain English."
             ),
-            "spoken": "A connection Axon needs is down — I can help get it back.",
+            "spoken": _ask_shaped(
+                "A connection Axon needs is down — I can help get it back",
+                "Shall I diagnose it?",
+            ),
         }
 
     if is_bootstrap_summary_signal(signal_id, title):
@@ -216,7 +236,10 @@ def explain_operator_alert(
                 "Do not treat this as an incident. Confirm Watch is connected, then "
                 "continue with the operator’s real request."
             ),
-            "spoken": "Just a warm-up note — nothing broken on your side.",
+            "spoken": _ask_shaped(
+                "Just a warm-up note — nothing broken on your side",
+                "Want me to confirm Watch?",
+            ),
         }
 
     if _looks_like_runtime_usage(title, summary):
@@ -227,7 +250,10 @@ def explain_operator_alert(
                 "Do not retry blindly. Tell the operator which runtime is blocked and the "
                 "exact fix (usage, login, or model switch), then wait for them."
             ),
-            "spoken": "The agent could not start — usage or login needs a quick fix first.",
+            "spoken": _ask_shaped(
+                "The agent could not start — usage or login needs a quick fix first",
+                "Shall I walk you through it?",
+            ),
         }
 
     if _looks_like_auth_or_vault(title, summary):
@@ -238,7 +264,10 @@ def explain_operator_alert(
                 "Identify which key or unlock step is missing. Guide the operator to Vault; "
                 "do not invent secrets. After unlock, re-check the failing connection."
             ),
-            "spoken": "A key or vault unlock is needed before this can continue.",
+            "spoken": _ask_shaped(
+                "A key or vault unlock is needed before this can continue",
+                "Shall I guide you to Vault?",
+            ),
         }
 
     if _looks_like_degraded(title, summary, signal_id):
@@ -255,7 +284,10 @@ def explain_operator_alert(
                 f'Explain the degraded condition for "{title}" in plain English, list what '
                 "still works, and fix or restart the unhealthy piece if it is safe."
             ),
-            "spoken": "Something is running in a weaker mode — worth a quick look, not a panic.",
+            "spoken": _ask_shaped(
+                "Something is running in a weaker mode — worth a quick look, not a panic",
+                "Want me to check it?",
+            ),
         }
 
     detail = summary if summary and summary.lower() != title.lower() else title
@@ -278,7 +310,10 @@ def explain_operator_alert(
         "summarize in plain English for a non-technical operator, fix only what is safe, "
         "and say exactly what changed."
     )
-    spoken = (override or {}).get("spoken") or f"Heads up — {clean_title}."
+    spoken = (override or {}).get("spoken") or _ask_shaped(
+        f"Heads up — {clean_title}",
+        "Shall I dig in?",
+    )
     return {
         "what": what,
         "you_do": you_do,

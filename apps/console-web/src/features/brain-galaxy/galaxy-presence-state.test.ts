@@ -43,12 +43,20 @@ describe('resolveGalaxyPresence', () => {
     expect(resolved.phase).toBe('speaking');
   });
 
-  it('maps listening and thinking', () => {
+  it('maps listening from manual PTT phase only — not ambient speechCapturing', () => {
+    expect(resolveGalaxyPresence({ ...base, speechCapturing: true }).phase).toBe('idle');
     expect(
-      resolveGalaxyPresence({ ...base, speechCapturing: true }).phase,
+      resolveGalaxyPresence({
+        ...base,
+        speechCapturing: true,
+        criticalSignals: 1,
+      }).phase,
+    ).toBe('alerting');
+    expect(
+      resolveGalaxyPresence({ ...base, conversationPhase: 'listening' }).phase,
     ).toBe('listening');
     expect(
-      resolveGalaxyPresence({ ...base, speechCapturing: true }).presenceAmp,
+      resolveGalaxyPresence({ ...base, conversationPhase: 'listening' }).presenceAmp,
     ).toBe(0.55);
     expect(
       resolveGalaxyPresence({ ...base, conversationPhase: 'thinking' }).phase,
