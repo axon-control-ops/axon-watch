@@ -9,7 +9,7 @@ import {
   galaxyOrbStatusLabel,
   galaxyOrbTriggerAriaLabel,
 } from './kairo-galaxy-orb-view';
-import type { GalaxyPresenceState } from './galaxy-presence-state';
+import type { KairoPresenceState } from '../../lib/kairo-presence';
 import { kairoCaptureMode } from '../kairo-conversation/kairo-shared-speech-capture';
 import { kairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
 
@@ -20,7 +20,7 @@ type SpeechCaptureLike = {
 /** Shared orb HUD labels / classes so KairoGalaxyOrb.vue stays under the ratchet. */
 export function useKairoGalaxyOrbViewModel(input: {
   personaName: string;
-  presenceState: ComputedRef<GalaxyPresenceState> | Ref<GalaxyPresenceState>;
+  presenceState: ComputedRef<KairoPresenceState> | Ref<KairoPresenceState>;
   speaking: ComputedRef<boolean>;
   speechCapture: SpeechCaptureLike;
   agentStreamActive: ComputedRef<boolean> | Ref<boolean> | boolean;

@@ -50,7 +50,7 @@ export function isCloudAudioCaptureSupported(): boolean {
 }
 
 function rmsFromAnalyser(analyser: AnalyserNode, buffer: Uint8Array): number {
-  analyser.getByteTimeDomainData(buffer);
+  analyser.getByteTimeDomainData(buffer as Uint8Array<ArrayBuffer>);
   let sum = 0;
   for (let i = 0; i < buffer.length; i += 1) {
     const centered = (buffer[i] ?? 128) - 128;
