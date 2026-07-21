@@ -1,10 +1,12 @@
 /* JARVIS-style living VAXON voice orb — volumetric plasma core + HUD dials. */
 @import './voice-orb-3d-motion.css';
 @import './voice-orb-alive.css';
+@import './voice-orb-cinematic.css';
+@import '../../features/brain-galaxy/galaxy-orb-radial-menu.css';
 @import '../../features/brain-galaxy/kairo-galaxy-orb-aura.css';
 
 .brain-galaxy-stage__jarvis-float--mockup {
-  width: 12.1rem;
+  width: 14.5rem;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -91,8 +93,8 @@
   position: relative;
   isolation: isolate;
   perspective: 42rem;
-  width: 12.1rem;
-  height: 12.1rem;
+  width: 14.5rem;
+  height: 14.5rem;
   border-radius: 50%;
   filter: drop-shadow(0 0 1.1rem rgba(0, 210, 255, 0.38));
 }
@@ -303,11 +305,11 @@
 }
 
 .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__core-text {
-  fill: rgba(245, 252, 255, 0.98);
+  fill: rgba(210, 245, 255, 0.92);
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 13.5px;
+  font-size: 9.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-anchor: middle;
   dominant-baseline: middle;
 }

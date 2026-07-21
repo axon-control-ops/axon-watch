@@ -56,6 +56,7 @@ import {
   useIdeEditorStatusBar,
 } from '../../composables/useIdeEditorStatusBar';
 import { useWorkbenchPanelAutoPeek } from '../../composables/useWorkbenchPanelAutoPeek';
+import { useWorkbenchTerminalAutoClose } from '../../composables/useWorkbenchTerminalAutoClose';
 import { buildWorkbenchProblemItems } from '../../lib/workbench-problem-items';
 import { useEditorPlanBuild } from '../../composables/use-editor-plan-build';
 import { useEditorStatusBarMeta } from '../../composables/useEditorStatusBarMeta';
@@ -367,6 +368,11 @@ useWorkbenchPanelAutoPeek({
   terminalPanelVisible,
   onShowTerminal: showTerminalPanel,
   onShowAgentDock: showAgentDock,
+});
+
+useWorkbenchTerminalAutoClose({
+  terminalPanelVisible,
+  onHideTerminal: hideTerminalPanel,
 });
 
 function toggleTerminalPanel(): void {

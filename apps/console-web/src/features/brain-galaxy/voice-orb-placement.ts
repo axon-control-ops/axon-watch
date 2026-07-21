@@ -41,6 +41,11 @@ export const VOICE_ORB_OBSTACLE_SELECTORS = [
   '.agent-dock',
   '.center-workbench__terminal-panel',
   '.brain-galaxy-stage__hud--bottom',
+  '.brain-galaxy-stage__hud--left',
+  '.brain-galaxy-stage__hud--right',
+  '.brain-galaxy-stage__hud--inspector',
+  '.brain-galaxy-stage__hud--top',
+  '.galaxy-ambient-hud',
   '.mobile-voice-cockpit-strip',
 ] as const;
 

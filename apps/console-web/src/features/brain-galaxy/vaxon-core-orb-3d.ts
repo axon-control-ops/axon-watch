@@ -17,7 +17,7 @@ import {
   buildVaxonCoreHolograms,
 } from './vaxon-core-holograms';
 
-export const VAXON_CORE_ORB_RADIUS = 0.78;
+export const VAXON_CORE_ORB_RADIUS = 0.92;
 
 type CoreMotionProfile = {
   waveFreq: number;
@@ -143,11 +143,11 @@ export function decorateVaxonCoreOrb(
   const shell = mesh.material as MeshStandardMaterial;
   shell.color = new Color(0x7aebff);
   shell.emissive = new Color(colors.emissive || 0x28b8ff);
-  shell.emissiveIntensity = Math.max(colors.emissiveIntensity, 2.1);
-  shell.metalness = 0.12;
-  shell.roughness = 0.16;
+  shell.emissiveIntensity = Math.max(colors.emissiveIntensity, 2.6);
+  shell.metalness = 0.08;
+  shell.roughness = 0.12;
   shell.transparent = true;
-  shell.opacity = 0.94;
+  shell.opacity = 1;
 
   const inner = new Mesh(
     new SphereGeometry(radius * 0.55, 32, 32),

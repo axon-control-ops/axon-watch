@@ -1,12 +1,13 @@
 <script setup lang="ts">
 defineProps<{
   personaName: string;
-  orbStatusLabel: string;
-  modeLabel: string;
+  /** Kept for API stability; movie mode hides status/mode/tts/hint/model text. */
+  orbStatusLabel?: string;
+  modeLabel?: string;
   ttsBadge?: string;
   showInterrupt: boolean;
-  hint: string;
-  modelLabel: string;
+  hint?: string;
+  modelLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -16,13 +17,8 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="kairo-galaxy-orb__chrome">
-    <div class="kairo-galaxy-orb__status">
-      <span class="kairo-galaxy-orb__status-dot" aria-hidden="true" />
-      <span class="kairo-galaxy-orb__status-label">{{ orbStatusLabel }}</span>
-    </div>
-    <p v-if="modeLabel" class="kairo-galaxy-orb__mode-pill">{{ modeLabel }}</p>
-    <p v-if="ttsBadge" class="kairo-galaxy-orb__tts-badge">{{ ttsBadge }}</p>
+  <!-- Movie-JARVIS: almost no chrome text — speaking is orb glow/spin only. -->
+  <div class="kairo-galaxy-orb__chrome kairo-galaxy-orb__chrome--minimal">
     <button
       v-if="showInterrupt"
       type="button"
@@ -32,16 +28,6 @@ const emit = defineEmits<{
       @click.stop="emit('interrupt')"
     >
       Interrupt
-    </button>
-    <p class="kairo-galaxy-orb__hint">{{ hint }}</p>
-    <button
-      type="button"
-      class="kairo-galaxy-orb__model"
-      @pointerdown.stop
-      @click="emit('focusBriefing')"
-    >
-      <span aria-hidden="true">◆</span>
-      {{ modelLabel }}
     </button>
   </div>
 </template>

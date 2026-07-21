@@ -6,25 +6,9 @@ export type WorkbenchTerminalAutoPeekInput = {
   alreadyPeekedRunIds: ReadonlySet<string>;
 };
 
-const AUTO_PEEK_RUN_PHASES = new Set(['executing', 'review_ready']);
-
-/** Open the workbench terminal once per run when shell output matters. */
+/** Terminal never auto-opens — operator must reveal it (status chip / Ctrl+J / agent tool). */
 export function shouldAutoPeekWorkbenchTerminal(
-  input: WorkbenchTerminalAutoPeekInput,
+  _input: WorkbenchTerminalAutoPeekInput,
 ): boolean {
-  if (input.terminalVisible) {
-    return false;
-  }
-
-  if (input.layoutMode !== 'operator' && input.layoutMode !== 'ide') {
-    return false;
-  }
-
-  const runId = input.runId?.trim() ?? '';
-  const phase = input.runPhase ?? '';
-  if (!runId || !AUTO_PEEK_RUN_PHASES.has(phase)) {
-    return false;
-  }
-
-  return !input.alreadyPeekedRunIds.has(runId);
+  return false;
 }

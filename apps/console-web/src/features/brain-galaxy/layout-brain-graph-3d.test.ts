@@ -85,6 +85,13 @@ describe('layout-brain-graph-3d', () => {
     expect(layoutBrainGraph3D(snapshot)).toEqual(layoutBrainGraph3D(snapshot));
   });
 
+  it('spreads nodes in true 3D depth (not a flat radar ring)', () => {
+    const layout = layoutBrainGraph3D(snapshot);
+    const ys = layout.nodes.map((node) => node.y);
+    const span = Math.max(...ys) - Math.min(...ys);
+    expect(span).toBeGreaterThan(1.2);
+  });
+
   it('returns empty layout for null snapshot', () => {
     const layout = layoutBrainGraph3D(null);
     expect(layout.nodes).toHaveLength(0);

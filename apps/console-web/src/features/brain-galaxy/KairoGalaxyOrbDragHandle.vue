@@ -18,6 +18,6 @@ const emit = defineEmits<{
     @pointerup.stop.prevent="emit('pointerup', $event)"
     @pointercancel.stop.prevent="emit('pointercancel', $event)"
   >
-    MOVE
+    <span class="kairo-galaxy-orb__drag-grip" aria-hidden="true" />
   </button>
 </template>

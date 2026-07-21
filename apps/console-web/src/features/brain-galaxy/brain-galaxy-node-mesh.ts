@@ -51,7 +51,7 @@ export function buildGalaxyNodeMesh(node: PositionedBrainNode3D): GalaxyNodeMesh
     }
     if (node.kind === 'core') {
       label.classList.add('brain-galaxy-node-label--core');
-      label.textContent = 'VAXON Core';
+      label.textContent = 'VAXON';
     } else {
       label.textContent = node.label;
     }

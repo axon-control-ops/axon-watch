@@ -17,7 +17,7 @@ function mockShell(overrides: Record<string, unknown> = {}) {
 }
 
 describe('useWorkbenchPanelAutoPeek', () => {
-  it('opens the terminal and agent dock once when a run starts executing', () => {
+  it('does not auto-open the terminal; still opens the agent dock once when a run starts executing', () => {
     const onShowTerminal = vi.fn();
     const onShowAgentDock = vi.fn();
     const shell = mockShell({
@@ -32,7 +32,7 @@ describe('useWorkbenchPanelAutoPeek', () => {
       onShowAgentDock,
     });
 
-    expect(onShowTerminal).toHaveBeenCalledOnce();
+    expect(onShowTerminal).not.toHaveBeenCalled();
     expect(onShowAgentDock).toHaveBeenCalledOnce();
   });
 

@@ -349,7 +349,6 @@ function handleEvidenceHandoff(signal: {
     </div>
 
     <GalaxySpeechCaptions />
-    <GalaxyAmbientHud :presence-phase="presence.phase" />
 
     <header class="brain-galaxy-stage__hud brain-galaxy-stage__hud--top">
       <div class="brain-galaxy-stage__title-row">
@@ -368,6 +367,7 @@ function handleEvidenceHandoff(signal: {
         @keydown="onGalaxyResizeKeydown('left', 'left', $event)"
         @dblclick="resetGalaxyWidth('left')"
       />
+      <GalaxyAmbientHud :presence-phase="presence.phase" />
       <GalaxyWorkspacesRail
         :snapshot="snapshot"
         :workspaces="shell.workspaces"

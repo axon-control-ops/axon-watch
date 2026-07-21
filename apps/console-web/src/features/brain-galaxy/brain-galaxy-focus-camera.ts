@@ -1,12 +1,12 @@
 /**
- * Camera offset used when focusing a galaxy node.
- * Matches the default overview orbit distance so workspace selection
- * frames the node without filling the viewport.
+ * Camera offset for overview + node focus.
+ * Lower elevation + nearer orbit so the spherical shell reads as 3D
+ * (the old high/far offset flattened the galaxy into a radar ring).
  */
 export const GALAXY_FOCUS_CAMERA_OFFSET = {
-  x: 2.4,
-  y: 3.8,
-  z: 7.2,
+  x: 4.6,
+  y: 1.85,
+  z: 5.4,
 } as const;
 
 export function galaxyFocusCameraPosition(node: {

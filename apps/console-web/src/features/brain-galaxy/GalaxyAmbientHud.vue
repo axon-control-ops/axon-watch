@@ -1,87 +1,51 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+/**
+ * Ambient HUD kept for a11y live region only — no visible “Online / Continuous watch”
+ * chips around the orb (movie-JARVIS minimal chrome).
+ */
+import { computed } from 'vue';
 
-import { teammateRouteNotice } from '../../lib/teammate-route-notice';
-import { useShellStore } from '../../stores/shell';
-import { formatSpecialtyRouteChip } from './specialty-dispatch-filament';
-import {
-  buildGalaxyAmbientPanels,
-  galaxyAmbientSpokenLine,
-  selectVisibleAmbientPanels,
-} from './galaxy-ambient-hud-view';
 import type { GalaxyPresencePhase } from './galaxy-presence-state';
-import { runPhaseTag } from '../../lib/mockup-shell-view';
 
 const props = defineProps<{
   presencePhase: GalaxyPresencePhase;
 }>();
 
-const shell = useShellStore();
-const nowMs = ref(Date.now());
-let timer: number | null = null;
-
-const specialtyRouteLine = computed(() => {
-  const notice = teammateRouteNotice.value;
-  return notice ? formatSpecialtyRouteChip(notice) : null;
-});
-
-const hudInput = computed(() => {
-  const briefing = shell.operatorBriefing;
-  const critical =
-    briefing?.top_signals.filter((signal) => signal.severity === 'critical').length ?? 0;
-  const high =
-    briefing?.top_signals.filter((signal) => signal.severity === 'high').length ?? 0;
-  const top =
-    briefing?.top_signals.find((signal) => signal.severity === 'critical') ??
-    briefing?.top_signals[0] ??
-    null;
-  return {
-    nowMs: nowMs.value,
-    presencePhase: props.presencePhase,
-    workspaceLabel:
-      shell.currentWorkspace?.display_name ?? shell.currentWorkspace?.workspace_id ?? null,
-    criticalSignals: critical,
-    highSignals: high,
-    runPhaseLabel: shell.primaryActiveRun ? runPhaseTag(shell.primaryActiveRun.phase) : null,
-    topSignalTitle: top?.title ?? null,
-    specialtyRouteLine: specialtyRouteLine.value,
-    watchConnected: Boolean(briefing?.connectivity?.watch_connected ?? true),
-  };
-});
-
-const panels = computed(() =>
-  selectVisibleAmbientPanels(buildGalaxyAmbientPanels(hudInput.value), nowMs.value),
-);
-
-const spoken = computed(() => galaxyAmbientSpokenLine(hudInput.value));
-
-onMounted(() => {
-  timer = window.setInterval(() => {
-    nowMs.value = Date.now();
-  }, 700);
-});
-
-onBeforeUnmount(() => {
-  if (timer !== null) {
-    window.clearInterval(timer);
+const spoken = computed(() => {
+  switch (props.presencePhase) {
+    case 'speaking':
+      return 'VAXON speaking';
+    case 'listening':
+      return 'VAXON listening';
+    case 'thinking':
+      return 'VAXON working';
+    case 'alerting':
+      return 'VAXON attention';
+    default:
+      return 'VAXON ready';
   }
 });
 </script>
 
 <template>
-  <div class="galaxy-ambient-hud" aria-label="VAXON ambient activity">
-    <p class="galaxy-ambient-hud__voice" aria-live="polite">{{ spoken }}</p>
-    <TransitionGroup name="galaxy-ambient-panel" tag="div" class="galaxy-ambient-hud__panels">
-      <article
-        v-for="panel in panels"
-        :key="panel.id"
-        class="galaxy-ambient-hud__panel"
-        :data-kind="panel.kind"
-        :data-tone="panel.tone"
-      >
-        <header>{{ panel.title }}</header>
-        <p>{{ panel.body }}</p>
-      </article>
-    </TransitionGroup>
+  <div class="galaxy-ambient-hud galaxy-ambient-hud--silent" aria-label="VAXON ambient activity">
+    <p class="galaxy-ambient-hud__voice sr-only" aria-live="polite">{{ spoken }}</p>
   </div>
 </template>
+
+<style scoped>
+.galaxy-ambient-hud--silent {
+  pointer-events: none;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>

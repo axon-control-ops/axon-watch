@@ -1,7 +1,7 @@
 export const WORKBENCH_TERMINAL_HEIGHT_KEY = 'axon-x-workbench-terminal-height-v3';
-// v2 resets the old IDE-default-open preference. v1 could be written "true"
-// without an operator action, so carrying it forward would reopen the dock.
-export const WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY = 'axon-x-workbench-terminal-panel-visible-v2';
+// v3 drops v2 session keys that could leave the dock stuck open after auto-peek.
+// v2 reset the old IDE-default-open preference; v1 could reopen without an action.
+export const WORKBENCH_TERMINAL_PANEL_VISIBLE_KEY = 'axon-x-workbench-terminal-panel-visible-v3';
 export const DEFAULT_WORKBENCH_TERMINAL_HEIGHT = 240;
 export const DEFAULT_WORKBENCH_TERMINAL_HEIGHT_RATIO = 0.26;
 export const OPERATOR_WORKBENCH_TERMINAL_HEIGHT_RATIO = 0.2;

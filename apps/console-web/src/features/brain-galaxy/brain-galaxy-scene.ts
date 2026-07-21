@@ -127,7 +127,7 @@ export class BrainGalaxyScene {
     labelRoot.className = 'brain-galaxy-stage__labels';
     labelRoot.style.position = 'absolute';
     labelRoot.style.inset = '0';
-    labelRoot.style.zIndex = '0';
+    labelRoot.style.zIndex = '2';
     labelRoot.style.pointerEvents = 'none';
     labelRoot.style.overflow = 'hidden';
     this.container.appendChild(labelRoot);
@@ -136,9 +136,9 @@ export class BrainGalaxyScene {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.06;
     this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 0.22;
-    this.controls.minDistance = 3.2;
-    this.controls.maxDistance = 12;
+    this.controls.autoRotateSpeed = 0.38;
+    this.controls.minDistance = 2.8;
+    this.controls.maxDistance = 11;
     this.controls.enablePan = false;
 
     this.scene.add(buildGalaxyLighting());

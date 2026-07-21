@@ -31,13 +31,28 @@
 
 .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--top {
   top: 0.65rem;
-  left: calc(min(16.5rem, 24vw) + 1.2rem);
-  right: calc(min(23rem, 34vw) + 1.2rem);
-  z-index: 5;
+  left: calc(var(--galaxy-left-width, min(16.5rem, 24vw)) + 1.2rem);
+  right: auto;
+  width: max-content;
+  max-width: min(
+    22rem,
+    calc(
+      100% - var(--galaxy-left-width, min(16.5rem, 24vw)) -
+        var(--galaxy-right-width, clamp(13rem, 24vw, 16rem)) - 2.8rem
+    )
+  );
+  z-index: 8;
+  pointer-events: none;
 }
 
-.brain-galaxy-stage--mockup:not(:has(.brain-galaxy-stage__hud--inspector)) .brain-galaxy-stage__hud--top {
-  right: calc(clamp(13rem, 24vw, 16rem) + 1rem);
+.brain-galaxy-stage--mockup:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-stage__hud--top {
+  max-width: min(
+    18rem,
+    calc(
+      100% - var(--galaxy-left-width, min(16.5rem, 24vw)) -
+        var(--galaxy-inspector-width, min(23rem, 34vw)) - 2.8rem
+    )
+  );
 }
 
 .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--top .brain-galaxy-stage__top-actions {
@@ -62,6 +77,10 @@
   box-shadow: none;
   backdrop-filter: none;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  z-index: 20;
 }
 
 .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--inspector {
@@ -135,4 +154,34 @@
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+/* Full-bleed WebGL viewport (inset: 0 from mockup-shell-12). Side HUDs
+   overlay the galaxy; do not shrink the canvas into a radar corridor. */
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--right,
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--inspector {
+  background: rgba(2, 8, 14, 0.78);
+  backdrop-filter: blur(12px) saturate(1.08);
+  pointer-events: auto;
+}
+
+@media (max-width: 1180px) {
+  .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--right {
+    width: var(--galaxy-right-width, clamp(11.5rem, 22vw, 14rem));
+  }
+
+  .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--left {
+    width: var(--galaxy-left-width, min(14.5rem, 26vw));
+  }
+}
+
+@media (max-width: 960px) {
+  .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--right {
+    max-height: min(42vh, 22rem);
+    overflow: auto;
+  }
+
+  .brain-galaxy-stage__hud--left .galaxy-ambient-hud__panels {
+    display: none;
+  }
 }

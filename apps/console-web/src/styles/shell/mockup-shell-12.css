@@ -208,14 +208,21 @@
 }
 
 .brain-galaxy-stage__labels {
-  z-index: 0 !important;
+  z-index: 2 !important;
   pointer-events: none !important;
 }
 
-/* WebKitGTK/Tauri: CSS2D chips were painting over the inspector glass. */
-.brain-galaxy-stage:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-node-label {
+/* WebKitGTK/Tauri: workspace CSS2D chips were painting over the inspector glass.
+   Keep the VAXON Core label — it is the graph's identity mark for the hub orb. */
+.brain-galaxy-stage:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-node-label:not(.brain-galaxy-node-label--core) {
   opacity: 0 !important;
   visibility: hidden !important;
+}
+
+.brain-galaxy-stage:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-node-label--core {
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 2;
 }
 
 .brain-galaxy-stage__viewport::after {

@@ -2,8 +2,8 @@
 
 .galaxy-speech-captions {
   position: absolute;
-  /* Sit in the open lane beside the left rail / VAXON orb, not stage-center. */
-  left: calc(min(16.5rem, 24vw) + 1.25rem);
+  /* Sit in the open lane beside the left rail, clear of side panels. */
+  left: calc(var(--galaxy-left-width, min(16.5rem, 24vw)) + 1.25rem);
   bottom: calc(var(--galaxy-bottom-reserve, 6.5rem) + 0.35rem);
   z-index: 4;
   display: flex;
@@ -11,7 +11,10 @@
   align-items: flex-start;
   gap: 0.55rem;
   width: min(28rem, 42vw);
-  max-width: calc(100% - min(16.5rem, 24vw) - min(23rem, 34vw) - 2.5rem);
+  max-width: calc(
+    100% - var(--galaxy-left-width, min(16.5rem, 24vw)) -
+      var(--galaxy-right-width, clamp(13rem, 24vw, 16rem)) - 2.5rem
+  );
   pointer-events: none;
   text-align: left;
 }
