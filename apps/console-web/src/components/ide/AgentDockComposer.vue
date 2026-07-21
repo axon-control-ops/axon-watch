@@ -29,6 +29,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     :can-approve-ide-agent-run="composer.shell.canApproveIdeAgentRun"
     :run-mutation-pending="composer.shell.runMutationPending"
     :plan-soft-switch-notice="composer.planSoftSwitchNotice.value"
+    :teammate-route-notice="composer.teammateRouteNotice.value"
     @update:full-access-consent-checked="composer.fullAccessConsentChecked.value = $event"
     @cancel-full-access-consent="composer.cancelFullAccessConsent()"
     @confirm-full-access-consent="composer.confirmFullAccessConsent()"
@@ -42,6 +43,8 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     @reject-run="composer.handleRejectRun()"
     @undo-plan-soft-switch="composer.undoPlanSoftSwitch()"
     @dismiss-plan-soft-switch="composer.dismissPlanSoftSwitch()"
+    @undo-teammate-route="composer.undoTeammateRoute()"
+    @dismiss-teammate-route="composer.dismissTeammateRoute()"
   />
   <form
     class="agent-dock-composer"

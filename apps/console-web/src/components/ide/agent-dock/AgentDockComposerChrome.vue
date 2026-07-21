@@ -9,7 +9,11 @@ import AgentDockFullAccessConsent from './AgentDockFullAccessConsent.vue';
 import AgentDockSandboxConsent from './AgentDockSandboxConsent.vue';
 import AgentDockIdeVoiceHint from './AgentDockIdeVoiceHint.vue';
 import AgentDockPlanSwitchBanner from './AgentDockPlanSwitchBanner.vue';
-import type { PlanSoftSwitchNotice } from '../../../composables/agent-dock/use-composer-actions';
+import AgentDockTeammateRouteBanner from './AgentDockTeammateRouteBanner.vue';
+import type {
+  PlanSoftSwitchNotice,
+  TeammateRouteNotice,
+} from '../../../composables/agent-dock/use-composer-actions';
 import { PLAN_SOFT_SWITCH_REASON_LABEL } from '../../../composables/agent-dock/use-agent-dock-composer-toolbar-props';
 import type { DebugReproduceRequest } from '../../../lib/debug-reproduce-view';
 import type { ComposerClipboardImage } from '../../../lib/composer-clipboard-paste';
@@ -36,6 +40,7 @@ const props = defineProps<{
   canApproveIdeAgentRun: boolean;
   runMutationPending: boolean;
   planSoftSwitchNotice: PlanSoftSwitchNotice | null;
+  teammateRouteNotice: TeammateRouteNotice | null;
 }>();
 
 const planSoftSwitchReasonLabel = computed(() => {
@@ -57,6 +62,8 @@ const emit = defineEmits<{
   rejectRun: [];
   undoPlanSoftSwitch: [];
   dismissPlanSoftSwitch: [];
+  undoTeammateRoute: [];
+  dismissTeammateRoute: [];
 }>();
 </script>
 
@@ -106,5 +113,13 @@ const emit = defineEmits<{
     :reason-label="planSoftSwitchReasonLabel"
     @undo="emit('undoPlanSoftSwitch')"
     @dismiss="emit('dismissPlanSoftSwitch')"
+  />
+  <AgentDockTeammateRouteBanner
+    :show="Boolean(teammateRouteNotice)"
+    :to-name="teammateRouteNotice?.toName ?? ''"
+    :role-label="teammateRouteNotice?.toRoleLabel"
+    :from-name="teammateRouteNotice?.fromName"
+    @undo="emit('undoTeammateRoute')"
+    @dismiss="emit('dismissTeammateRoute')"
   />
 </template>

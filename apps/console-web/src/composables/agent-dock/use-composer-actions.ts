@@ -15,6 +15,7 @@ import {
 import { kairoConversationReply } from '../../features/kairo-conversation/kairo-conversation-state';
 import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
 import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
+import { shouldSoftRouteToTeammate } from '../../lib/composer-teammate-route';
 import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import {
   findIdeComposerQueueEntry,
@@ -29,6 +30,14 @@ type ShellStore = ReturnType<typeof useShellStore>;
 export type PlanSoftSwitchNotice = {
   reason: string;
   previousMode: 'agent';
+};
+
+export type TeammateRouteNotice = {
+  reason: string;
+  toName: string;
+  toRoleLabel: string;
+  fromName: string;
+  previousEmployeeId: string;
 };
 
 type UseComposerActionsOptions = {
@@ -47,6 +56,7 @@ type UseComposerActionsOptions = {
   stopVoiceCapture: () => void;
   onDebugReproduceProceed?: (messageId: string) => void;
   planSoftSwitchNotice: Ref<PlanSoftSwitchNotice | null>;
+  teammateRouteNotice: Ref<TeammateRouteNotice | null>;
   /** Return true when `/` or `@` typeahead consumed the key. */
   handleTypeaheadKeydown?: (event: KeyboardEvent) => boolean;
   /** Merge Cursor-style skill chips into the draft right before submit/steer. */
@@ -71,6 +81,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     stopVoiceCapture,
     onDebugReproduceProceed,
     planSoftSwitchNotice,
+    teammateRouteNotice,
     handleTypeaheadKeydown,
     withSkillTokensForSubmit,
     clearSkillAttachments,
@@ -143,7 +154,31 @@ export function useComposerActions(options: UseComposerActionsOptions) {
         modeForSubmit = 'plan';
       }
     }
+
+    const routeDecision = shouldSoftRouteToTeammate(
+      submitDraft,
+      shell.activeIdeEmployeeRecord,
+      shell.companyEmployeesForCurrentWorkspace,
+    );
+    if (routeDecision.shouldRoute && routeDecision.employee) {
+      const previousEmployeeId = routeDecision.fromEmployeeId ?? '';
+      const opened = await shell.openOrFocusEmployeeIdeThread(routeDecision.employee);
+      if (opened) {
+        teammateRouteNotice.value = {
+          reason: routeDecision.reason,
+          toName: routeDecision.employee.name.trim() || 'teammate',
+          toRoleLabel:
+            routeDecision.employee.role_label?.trim() ||
+            routeDecision.employee.role.trim() ||
+            'role',
+          fromName: routeDecision.fromName ?? 'teammate',
+          previousEmployeeId,
+        };
+      }
+    }
+
     const attachmentFiles = composerImages.value.map((image) => image.file);
+    // openOrFocusEmployeeIdeThread may clear/restore drafts — keep the routed prompt.
     shell.ideComposerDraft = submitDraft;
     await shell.submitIdeComposer(modeForSubmit, { attachmentFiles });
     clearSkillAttachments?.();
@@ -161,6 +196,25 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   function dismissPlanSoftSwitch(): void {
     planSoftSwitchNotice.value = null;
+  }
+
+  async function undoTeammateRoute(): Promise<void> {
+    const notice = teammateRouteNotice.value;
+    if (!notice) {
+      return;
+    }
+    const previous = shell.companyEmployeesForCurrentWorkspace.find(
+      (row) => row.employee_id === notice.previousEmployeeId,
+    );
+    teammateRouteNotice.value = null;
+    if (!previous) {
+      return;
+    }
+    await shell.openOrFocusEmployeeIdeThread(previous);
+  }
+
+  function dismissTeammateRoute(): void {
+    teammateRouteNotice.value = null;
   }
 
   async function handleSteer(event?: Event): Promise<void> {
@@ -263,6 +317,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   return {
     dismissPlanSoftSwitch,
+    dismissTeammateRoute,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
@@ -277,5 +332,6 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     revealComposerTerminalPanel,
     toggleVoiceCapture,
     undoPlanSoftSwitch,
+    undoTeammateRoute,
   };
 }

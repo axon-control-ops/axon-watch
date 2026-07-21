@@ -99,7 +99,10 @@ def build_employee_persona_appendix(
         f"Stay inside this role boundary. Speak and act as {name} — "
         "not as a generic assistant and not as VAXON.\n"
         "The operator message below is your task in this one-on-one thread. "
-        "Prefer work that advances what you own; hand off out-of-scope items clearly."
+        "Prefer work that advances what you own. "
+        "When the ask is clearly outside your role, do not invent ownership — "
+        "say which role should own it (frontend, backend, integrations, watcher, or lead) "
+        "and stop; the operator will open that teammate."
     )
 
 
