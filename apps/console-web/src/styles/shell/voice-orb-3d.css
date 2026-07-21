@@ -1,5 +1,7 @@
 /* JARVIS-style living VAXON voice orb — volumetric plasma core + HUD dials. */
 @import './voice-orb-3d-motion.css';
+@import './voice-orb-alive.css';
+@import '../../features/brain-galaxy/kairo-galaxy-orb-aura.css';
 
 .brain-galaxy-stage__jarvis-float--mockup {
   width: 12.1rem;
@@ -10,9 +12,11 @@
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
+  overflow: visible;
 }
 
-.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__chrome,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__hint,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__model,
 .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__close {
   opacity: 0;
   pointer-events: none;
@@ -20,11 +24,14 @@
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.brain-galaxy-stage__jarvis-float--mockup:hover .kairo-galaxy-orb__chrome,
-.brain-galaxy-stage__jarvis-float--mockup:focus-within .kairo-galaxy-orb__chrome,
+.brain-galaxy-stage__jarvis-float--mockup:hover .kairo-galaxy-orb__hint,
+.brain-galaxy-stage__jarvis-float--mockup:focus-within .kairo-galaxy-orb__hint,
+.brain-galaxy-stage__jarvis-float--mockup:hover .kairo-galaxy-orb__model,
+.brain-galaxy-stage__jarvis-float--mockup:focus-within .kairo-galaxy-orb__model,
 .brain-galaxy-stage__jarvis-float--mockup:hover .kairo-galaxy-orb__close,
 .brain-galaxy-stage__jarvis-float--mockup:focus-within .kairo-galaxy-orb__close,
-.brain-galaxy-stage__jarvis-float--mockup.brain-galaxy-stage__jarvis-float--chrome-live .kairo-galaxy-orb__chrome {
+.brain-galaxy-stage__jarvis-float--mockup.brain-galaxy-stage__jarvis-float--chrome-live .kairo-galaxy-orb__hint,
+.brain-galaxy-stage__jarvis-float--mockup.brain-galaxy-stage__jarvis-float--chrome-live .kairo-galaxy-orb__model {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
@@ -73,6 +80,11 @@
   align-items: center;
   gap: 0.2rem;
   width: 100%;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb {
+  position: relative;
+  z-index: 2;
 }
 
 .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__trigger {
@@ -441,6 +453,7 @@
   z-index: 46;
   left: 0;
   top: 0;
+  overflow: visible;
   transition: left 260ms ease, top 260ms ease;
 }
 

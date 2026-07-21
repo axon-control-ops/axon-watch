@@ -130,6 +130,58 @@ fn resource_sidecar(name: &str) -> Option<PathBuf> {
     None
 }
 
+/// True when this process should run the packaged sidecar + CP-origin boot path.
+/// Detects env flags OR an installed/FHS layout with sidecar binaries beside the exe.
+pub fn is_packaged_runtime() -> bool {
+    if std::env::var("AXON_DESKTOP_PACKAGED").ok().as_deref() == Some("1") {
+        return true;
+    }
+    if std::env::var("AXON_WATCH_CONSOLE_DIST").is_ok() {
+        return true;
+    }
+    if std::env::var("AXON_DESKTOP_SPAWN_SIDECARS").ok().as_deref() == Some("1") {
+        return true;
+    }
+    let has_watch = resource_sidecar("axon-watch-sidecar").is_some();
+    let has_cp = resource_sidecar("axon-control-plane-sidecar").is_some();
+    if has_watch && has_cp {
+        return true;
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let path = exe.to_string_lossy();
+        if path.contains("/usr/bin/axon-console-desktop")
+            || path.contains("/usr/lib/VAXON/")
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn resolve_console_dist() -> Option<PathBuf> {
+    if let Ok(dist) = std::env::var("AXON_WATCH_CONSOLE_DIST") {
+        let path = PathBuf::from(dist);
+        if path.is_dir() {
+            return Some(path);
+        }
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return None;
+    };
+    let Some(dir) = exe.parent() else {
+        return None;
+    };
+    let candidates = [
+        dir.join("console-web-dist"),
+        dir.join("resources/console-web-dist"),
+        dir.join("../lib/VAXON/console-web-dist"),
+        dir.join("../lib/VAXON/resources/console-web-dist"),
+        // Legacy accidental nesting from relative ../../console-web/dist resources.
+        dir.join("../lib/VAXON/_up_/_up_/console-web/dist"),
+    ];
+    candidates.into_iter().find(|candidate| candidate.is_dir())
+}
+
 fn apply_common_env(cmd: &mut Command, paths: &DesktopPaths, service: &str, port: u16) {
     cmd.env("AXON_WATCH_BIND_HOST", "127.0.0.1")
         .env("AXON_WATCH_STATE_DIR", &paths.state_dir)
@@ -157,15 +209,8 @@ fn apply_common_env(cmd: &mut Command, paths: &DesktopPaths, service: &str, port
         }
     }
     if service == "control-plane" {
-        if let Ok(dist) = std::env::var("AXON_WATCH_CONSOLE_DIST") {
+        if let Some(dist) = resolve_console_dist() {
             cmd.env("AXON_WATCH_CONSOLE_DIST", dist);
-        } else if let Ok(exe) = std::env::current_exe() {
-            if let Some(dir) = exe.parent() {
-                let dist = dir.join("console-web-dist");
-                if dist.is_dir() {
-                    cmd.env("AXON_WATCH_CONSOLE_DIST", dist);
-                }
-            }
         }
     }
 }
@@ -220,27 +265,45 @@ fn spawn_sidecar_binary(
     cmd.spawn()
 }
 
+fn python_fallback_allowed() -> bool {
+    std::env::var("AXON_DESKTOP_ALLOW_PYTHON_FALLBACK")
+        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
+fn spawn_service(
+    name: &str,
+    service: &str,
+    paths: &DesktopPaths,
+    port: u16,
+) -> Result<Child, String> {
+    if let Some(bin) = resource_sidecar(name) {
+        return spawn_sidecar_binary(&bin, paths, service, port)
+            .map_err(|e| format!("failed to start {name} sidecar: {e}"));
+    }
+    if python_fallback_allowed() {
+        return spawn_python_service(service, paths, port)
+            .map_err(|e| format!("failed to start {service} via python fallback: {e}"));
+    }
+    Err(format!(
+        "missing packaged sidecar '{name}'. Rebuild with ./scripts/desktop/build-python-sidecars.sh \
+(or set AXON_DESKTOP_ALLOW_PYTHON_FALLBACK=1 for local repo development only)."
+    ))
+}
+
 pub fn start_sidecars(paths: &DesktopPaths) -> Result<(), String> {
     let mut guard = SIDECARS.lock().map_err(|e| e.to_string())?;
     if guard.is_some() {
         return Ok(());
     }
 
-    let watch = if let Some(bin) = resource_sidecar("axon-watch-sidecar") {
-        spawn_sidecar_binary(&bin, paths, "axon-watch", WATCH_PORT)
-            .map_err(|e| format!("failed to start watch sidecar: {e}"))?
-    } else {
-        spawn_python_service("axon-watch", paths, WATCH_PORT)
-            .map_err(|e| format!("failed to start watch via python: {e}"))?
-    };
-
-    let control_plane = if let Some(bin) = resource_sidecar("axon-control-plane-sidecar") {
-        spawn_sidecar_binary(&bin, paths, "control-plane", CONTROL_PLANE_PORT)
-            .map_err(|e| format!("failed to start control-plane sidecar: {e}"))?
-    } else {
-        spawn_python_service("control-plane", paths, CONTROL_PLANE_PORT)
-            .map_err(|e| format!("failed to start control-plane via python: {e}"))?
-    };
+    let watch = spawn_service("axon-watch-sidecar", "axon-watch", paths, WATCH_PORT)?;
+    let control_plane = spawn_service(
+        "axon-control-plane-sidecar",
+        "control-plane",
+        paths,
+        CONTROL_PLANE_PORT,
+    )?;
 
     *guard = Some(SidecarSet {
         watch: Some(watch),
@@ -270,7 +333,7 @@ pub fn control_plane_url() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::read_env_value;
+    use super::{is_packaged_runtime, read_env_value};
 
     #[test]
     fn parses_operator_token_line() {
@@ -279,5 +342,12 @@ mod tests {
             read_env_value(contents, "AXON_WATCH_OPERATOR_TOKEN").as_deref(),
             Some("abc123")
         );
+    }
+
+    #[test]
+    fn packaged_runtime_honors_explicit_env_flag() {
+        std::env::set_var("AXON_DESKTOP_PACKAGED", "1");
+        assert!(is_packaged_runtime());
+        std::env::remove_var("AXON_DESKTOP_PACKAGED");
     }
 }

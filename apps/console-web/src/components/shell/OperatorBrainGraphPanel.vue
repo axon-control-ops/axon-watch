@@ -5,6 +5,7 @@ import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import GalaxyWorkspacesRail from '../../features/brain-galaxy/GalaxyWorkspacesRail.vue';
 import GalaxyIntelligencePanel from '../../features/brain-galaxy/GalaxyIntelligencePanel.vue';
 import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
+import GalaxyAmbientHud from '../../features/brain-galaxy/GalaxyAmbientHud.vue';
 import GalaxyPanelResizeHandle from '../../features/brain-galaxy/GalaxyPanelResizeHandle.vue';
 import GalaxyStatusBarActions from '../../features/brain-galaxy/GalaxyStatusBarActions.vue';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
@@ -20,11 +21,15 @@ import {
   galaxyLegendItems,
   galaxyNodeCounts,
   galaxyTopHubs,
-  resolveGalaxyWorkspaceNavigation,
 } from '../../features/brain-galaxy/brain-galaxy-hud-view';
 import type { GalaxyMockupRailItem } from '../../features/brain-galaxy/galaxy-mockup-rail-view';
 import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
 import { resolveBrainGalaxyNodeSelection } from '../../features/brain-galaxy/brain-galaxy-node-selection';
+import {
+  focusGalaxyEvidenceSignal,
+  handoffGalaxyEvidenceSignal,
+  openGalaxyEvidenceWorkspace,
+} from '../../features/brain-galaxy/galaxy-evidence-actions';
 import {
   brainGraphHeadline,
   layoutBrainGraph,
@@ -38,14 +43,8 @@ import {
 } from '../../lib/workbench-terminal-panel-view';
 import { useGalaxyPanelResize } from '../../composables/useGalaxyPanelResize';
 
-const props = defineProps<{
-  terminalVisible: boolean;
-}>();
-
-const emit = defineEmits<{
-  toggleTerminal: [];
-  switchGrid: [];
-}>();
+const props = defineProps<{ terminalVisible: boolean }>();
+const emit = defineEmits<{ toggleTerminal: []; switchGrid: [] }>();
 
 const shell = useShellStore();
 const galaxyHost = ref<HTMLElement | null>(null);
@@ -268,19 +267,17 @@ function handleSvgNodeClick(node: BrainGraphNode): void {
 }
 
 function handleEvidenceWorkspace(workspaceId: string): void {
-  const nav = resolveGalaxyWorkspaceNavigation(workspaceId);
-  if (!nav) {
-    return;
-  }
-  const label =
-    selectedNode.value?.label ??
-    topHubs.value.find((hub) => hub.workspace_id === workspaceId)?.label ??
-    workspaceId;
-  enterWorkspace(nav.workspaceId, `ws_${workspaceId}`, label);
+  openGalaxyEvidenceWorkspace({
+    workspaceId,
+    selectedNode: selectedNode.value,
+    fallbackLabel:
+      topHubs.value.find((hub) => hub.workspace_id === workspaceId)?.label ?? workspaceId,
+    enterWorkspace,
+  });
 }
 
 function handleEvidenceSignal(signalId: string): void {
-  shell.focusAttentionSidebar(signalId);
+  focusGalaxyEvidenceSignal(shell, signalId);
 }
 
 function handleEvidenceHandoff(signal: {
@@ -290,7 +287,7 @@ function handleEvidenceHandoff(signal: {
   summary?: string | null;
   meta?: Record<string, unknown> | null;
 }): void {
-  void shell.handoffSignalToIde(signal, { autoSubmit: true });
+  handoffGalaxyEvidenceSignal(shell, signal);
 }
 </script>
 
@@ -352,6 +349,7 @@ function handleEvidenceHandoff(signal: {
     </div>
 
     <GalaxySpeechCaptions />
+    <GalaxyAmbientHud :presence-phase="presence.phase" />
 
     <header class="brain-galaxy-stage__hud brain-galaxy-stage__hud--top">
       <div class="brain-galaxy-stage__title-row">

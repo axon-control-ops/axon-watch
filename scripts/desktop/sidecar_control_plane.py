@@ -7,14 +7,23 @@ import os
 import sys
 
 
+def _prepare_import_path() -> None:
+    if getattr(sys, "frozen", False):
+        return
+    repo = os.environ.get("AXON_WATCH_REPO_ROOT")
+    if not repo:
+        return
+    cp_src = os.path.join(repo, "services", "control-plane")
+    if cp_src not in sys.path:
+        sys.path.insert(0, cp_src)
+
+
 def main() -> None:
+    _prepare_import_path()
     host = os.environ.get("AXON_WATCH_BIND_HOST", "127.0.0.1")
     port = int(os.environ.get("AXON_WATCH_CONTROL_PLANE_PORT", "8787"))
-    repo = os.environ.get("AXON_WATCH_REPO_ROOT")
-    if repo:
-        cp_src = os.path.join(repo, "services", "control-plane")
-        if cp_src not in sys.path:
-            sys.path.insert(0, cp_src)
+    # Ensure PyInstaller traces the FastAPI app package.
+    import app.main  # noqa: F401
     import uvicorn
 
     uvicorn.run(

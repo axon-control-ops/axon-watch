@@ -1,13 +1,10 @@
 import {
-  Color,
   Group,
   Line,
-  Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
   Raycaster,
   Scene,
-  SphereGeometry,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -16,10 +13,7 @@ import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
-import {
-  GALAXY_BACKGROUND,
-  galaxyNodeColors,
-} from './brain-galaxy-colors';
+import { GALAXY_BACKGROUND } from './brain-galaxy-colors';
 import { applyGalaxySelectionFocus } from './brain-galaxy-selection-effects';
 import {
   animateGalaxyAmbience,
@@ -30,26 +24,25 @@ import {
 import {
   layoutBrainGraph3D,
   type BrainGraphLayout3D,
-  type PositionedBrainNode3D,
 } from './layout-brain-graph-3d';
 import { animateLiveEdge, buildLiveEdge } from './network-edge-effects';
-import { animateVaxonCoreOrb, decorateVaxonCoreOrb } from './vaxon-core-orb-3d';
-import { animateWorkspaceNode, decorateWorkspaceNode } from './workspace-node-effects';
+import {
+  animateSpecialtyDispatchFilament,
+  buildSpecialtyDispatchFilament,
+  disposeSpecialtyDispatchFilament,
+  type SpecialtyDispatchFilament,
+} from './specialty-dispatch-filament';
+import { animateVaxonCoreOrb } from './vaxon-core-orb-3d';
+import { animateWorkspaceNode } from './workspace-node-effects';
 import type { GalaxyCoreOrbMode } from './galaxy-presence-state';
 import { presenceAmpForCoreMode } from './galaxy-presence-state';
 import { GALAXY_FOCUS_CAMERA_OFFSET, galaxyFocusCameraPosition } from './brain-galaxy-focus-camera';
+import { buildGalaxyNodeMesh, type GalaxyNodeMesh } from './brain-galaxy-node-mesh';
 
 export type BrainGalaxyNodeClickHandler = (node: BrainGraphNode) => void;
 export type BrainGalaxyClearSelectionHandler = () => void;
 
-type GalaxyNodeUserData = {
-  node: BrainGraphNode;
-  originY: number;
-};
-
-type NodeMesh = Mesh<SphereGeometry, MeshStandardMaterial> & {
-  userData: GalaxyNodeUserData;
-};
+type NodeMesh = GalaxyNodeMesh;
 
 export class BrainGalaxyScene {
   private readonly container: HTMLElement;
@@ -79,6 +72,7 @@ export class BrainGalaxyScene {
   private agentStreamActive = false;
   private streamWorkspaceId: string | null = null;
   private vaxonCoreMode: GalaxyCoreOrbMode = 'idle';
+  private specialtyFx: SpecialtyDispatchFilament | null = null;
   private readonly defaultCameraPosition = new Vector3(
     GALAXY_FOCUS_CAMERA_OFFSET.x,
     GALAXY_FOCUS_CAMERA_OFFSET.y,
@@ -209,8 +203,8 @@ export class BrainGalaxyScene {
   setVaxonBusy(busy: boolean): void {
     if (busy && this.presenceAmp < 1) {
       this.presenceAmp = 1;
-    } else if (!busy && this.vaxonCoreMode === 'idle') {
-      this.presenceAmp = 0;
+    } else if (!busy) {
+      this.presenceAmp = presenceAmpForCoreMode(this.vaxonCoreMode);
     }
   }
 
@@ -228,6 +222,37 @@ export class BrainGalaxyScene {
     this.streamWorkspaceId = workspaceId;
   }
 
+  playSpecialtyDispatch(workspaceId: string, label: string): void {
+    if (!this.scene || this.disposed) {
+      return;
+    }
+    const target = this.nodeMeshes.find(
+      (mesh) =>
+        mesh.userData.node.kind === 'workspace' &&
+        mesh.userData.node.workspace_id === workspaceId,
+    );
+    if (!target) {
+      return;
+    }
+    const core = this.nodeMeshes.find((mesh) => mesh.userData.node.kind === 'core');
+    this.clearSpecialtyDispatch();
+    this.specialtyFx = buildSpecialtyDispatchFilament({
+      from: core?.position ?? new Vector3(0, 0, 0),
+      to: target.position,
+      label,
+    });
+    this.scene.add(this.specialtyFx.group);
+    this.focusNode(target.userData.node.node_id);
+  }
+
+  clearSpecialtyDispatch(): void {
+    if (!this.specialtyFx) {
+      return;
+    }
+    disposeSpecialtyDispatchFilament(this.specialtyFx);
+    this.specialtyFx = null;
+  }
+
   private applySelectionHighlight(nodeId: string | null): void {
     const focus = applyGalaxySelectionFocus(
       this.nodeMeshes,
@@ -242,6 +267,7 @@ export class BrainGalaxyScene {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.animationId);
+    this.clearSpecialtyDispatch();
 
     if (this.renderer) {
       this.renderer.domElement.removeEventListener('click', this.handleClick);
@@ -296,53 +322,10 @@ export class BrainGalaxyScene {
     }
 
     for (const node of this.layout.nodes) {
-      const mesh = this.buildNodeMesh(node);
+      const mesh = buildGalaxyNodeMesh(node);
       this.nodeMeshes.push(mesh);
       this.graphGroup.add(mesh);
     }
-  }
-
-  private buildNodeMesh(node: PositionedBrainNode3D): NodeMesh {
-    const colors = galaxyNodeColors(node);
-    const geometry = new SphereGeometry(node.radius, node.kind === 'core' ? 48 : 24, node.kind === 'core' ? 48 : 24);
-    const material = new MeshStandardMaterial({
-      color: colors.base,
-      emissive: new Color(colors.emissive),
-      emissiveIntensity: colors.emissiveIntensity,
-      metalness: 0.35,
-      roughness: 0.4,
-    });
-    const mesh = new Mesh(geometry, material);
-    mesh.position.set(node.x, node.y, node.z);
-    (mesh.userData as GalaxyNodeUserData) = { node, originY: node.y };
-
-    if (node.kind === 'core') {
-      decorateVaxonCoreOrb(mesh, node.radius, colors);
-    } else if (node.kind === 'workspace') {
-      decorateWorkspaceNode(mesh, node.radius, colors, node.x * 1.7 + node.z * 1.3);
-    }
-
-    if (node.kind === 'core' || node.kind === 'workspace') {
-      const label = document.createElement('span');
-      label.className = 'brain-galaxy-node-label';
-      if (node.tone === 'attention') {
-        label.classList.add('brain-galaxy-node-label--attention');
-      }
-      if (node.tone === 'critical') {
-        label.classList.add('brain-galaxy-node-label--critical');
-      }
-      if (node.kind === 'core') {
-        label.classList.add('brain-galaxy-node-label--core');
-        label.textContent = 'VAXON Core';
-      } else {
-        label.textContent = node.label;
-      }
-      const labelObject = new CSS2DObject(label);
-      labelObject.position.set(0, node.radius + (node.kind === 'core' ? 0.42 : 0.18), 0);
-      mesh.add(labelObject);
-    }
-
-    return mesh as NodeMesh;
   }
 
   private disposeObjectTree(object: Group['children'][number]): void {
@@ -422,6 +405,9 @@ export class BrainGalaxyScene {
     }
 
     this.liveEdges.forEach((edge) => animateLiveEdge(edge, this.clock, this.presenceAmp));
+    if (this.specialtyFx && !animateSpecialtyDispatchFilament(this.specialtyFx, performance.now())) {
+      this.clearSpecialtyDispatch();
+    }
     if (this.scene) {
       animateGalaxyAmbience(this.scene, this.starfield, this.clock, this.presenceAmp);
     }

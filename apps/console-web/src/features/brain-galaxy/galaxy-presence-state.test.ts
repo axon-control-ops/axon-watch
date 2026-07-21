@@ -49,7 +49,7 @@ describe('resolveGalaxyPresence', () => {
     ).toBe('listening');
     expect(
       resolveGalaxyPresence({ ...base, speechCapturing: true }).presenceAmp,
-    ).toBe(0.45);
+    ).toBe(0.55);
     expect(
       resolveGalaxyPresence({ ...base, conversationPhase: 'thinking' }).phase,
     ).toBe('thinking');
@@ -64,7 +64,7 @@ describe('resolveGalaxyPresence', () => {
     ).toBe('alerting');
     expect(
       resolveGalaxyPresence({ ...base, pendingApprovals: 1 }).presenceAmp,
-    ).toBe(0.45);
+    ).toBe(0.55);
     expect(
       resolveGalaxyPresence({
         ...base,
@@ -72,6 +72,10 @@ describe('resolveGalaxyPresence', () => {
         conversationPhase: 'thinking',
       }).phase,
     ).toBe('thinking');
+  });
+
+  it('keeps ambient energy while idle', () => {
+    expect(resolveGalaxyPresence(base).presenceAmp).toBe(0.32);
   });
 
   it('maps workspace selection when idle', () => {
@@ -82,5 +86,6 @@ describe('resolveGalaxyPresence', () => {
     });
     expect(resolved.phase).toBe('workspace_selected');
     expect(resolved.coreOrbMode).toBe('idle');
+    expect(resolved.presenceAmp).toBe(0.28);
   });
 });

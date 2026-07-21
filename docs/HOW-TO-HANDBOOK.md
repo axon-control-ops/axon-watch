@@ -33,6 +33,7 @@ Use it to:
 3. [Operator manual](#operator-manual) — daily rituals
 3.5. [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools) — Pro vs API key, native vs Cursor
 3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, company roster
+3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
 6. [Source index](#source-index) — where truth lives
@@ -56,7 +57,7 @@ Use it to:
 
 | Audience | Start here | Then read |
 |---|---|---|
-| **Operator (daily use)** | [Quick Start](#quick-start) | [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [Operator manual](#operator-manual) |
+| **Operator (daily use)** | [Quick Start](#quick-start) | [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [VAXON Desktop](#vaxon-desktop), [Operator manual](#operator-manual) |
 | **Teacher / reviewer** | [Teaching Axon-X](#teaching-axon-x-to-someone-else) | [Verification](#verification-commands), `docs/FINAL_PARITY_VERIFICATION.md` |
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
 | **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), GitHub Actions → Axon-X Fast Gate |
@@ -147,7 +148,7 @@ Still thin or deferred (use axon-local `:7734` fallback if needed):
 - General conversational chat (“Hi”, “explain this repo”)
 - Full agent tool loop parity with classic Axon
 - Child-project connectors and legacy integration surfaces
-- Packaged desktop app / native notifications
+- Native tray notifications beyond hide-on-close packaging
 
 ### Supported commands (Operator mode)
 
@@ -438,6 +439,83 @@ cursor agent status          # expect: Logged in as …
 echo "${CURSOR_API_KEY:+set}" # empty = good for Pro path
 curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
 ```
+
+## VAXON Desktop
+
+Packaged Linux desktop shell for operators who want Axon-X without keeping a
+browser tab on `:4173`. The app is Tauri 2; it starts frozen Watch + Control Plane
+sidecars and opens the same console UI from loopback `:8787`.
+
+### Supported systems
+
+- Debian-family x86_64 with WebKitGTK 4.1
+- Current frozen sidecars need **glibc ≥ 2.42** (proven on Kali rolling). Older LTS bases (e.g. Bookworm / Ubuntu 24.04) need sidecars rebuilt on that base.
+- Artifact: `apps/console-desktop/src-tauri/target/release/bundle/deb/VAXON_0.1.0_amd64.deb`
+
+### Verify / prove
+
+```bash
+npm run verify:desktop
+npm run prove:desktop:clean-install   # Kali rolling container .deb install + sidecar health
+npm run prove:desktop:voice           # live Azure TTS + system WebKitGTK unlock click
+```
+
+Evidence log: `docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md`.
+
+### Install / upgrade / uninstall
+
+```bash
+# Build (from a checkout with Node + Rust + PyInstaller)
+npm run build:desktop:linux
+
+# Install
+sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/deb/VAXON_*.deb
+
+# Upgrade = install the newer .deb the same way
+# Uninstall (preserves ~/.config/axon-watch and ~/.local/share/axon-watch)
+sudo apt-get remove vaxon
+```
+
+### First run
+
+1. Launch **VAXON** from the app menu (or `axon-console-desktop`).
+2. First run writes `~/.config/axon-watch/deployment.env` and state under
+   `~/.local/share/axon-watch/state`.
+3. The packaged binary detects its sidecars under `/usr/bin` (no special env needed
+   on the desktop entry) and starts Watch (`:8788`) then Control Plane (`:8787`).
+4. The window loads the Control Plane origin after health succeeds.
+5. Unlock Vault and enter Azure Speech credentials if you want Azure TTS (not
+   robotic browser speech). Cursor agent work still needs a separately
+   authenticated Cursor CLI on the host.
+
+### Operator controls
+
+- Tray: hide-on-close; reopen from the tray icon (verify on your host).
+- Galaxy panes: drag the resize handles; double-click / Enter resets widths.
+- Attention **Details**: plain-English what happened / what you do / what the agent should do.
+- Development without frozen sidecars: set `AXON_DESKTOP_ALLOW_PYTHON_FALLBACK=1`
+  (never required for the packaged `.deb`).
+
+### Health checks and voice troubleshooting
+
+```bash
+npm run verify:desktop
+curl -s http://127.0.0.1:8787/api/health
+```
+
+If voice sounds robotic: confirm Azure credentials, click once in the window to
+unlock media, then retry the voice sample. Packaged builds prefer Azure; browser
+speech is fallback only.
+
+### Development vs installed updates
+
+| Change | How you pick it up |
+| --- | --- |
+| Day-to-day UI while developing | Browser `:4173` / Vite HMR |
+| Desktop packaging, Rust, sidecars, icons | Rebuild `.deb` (`npm run build:desktop:linux`) and reinstall |
+
+Evidence log: [`docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md`](VAXON_DESKTOP_VERIFY_EVIDENCE.md).
+Contracts: [`docs/DUAL_RUNTIME_STARTUP_CONTRACT.md`](DUAL_RUNTIME_STARTUP_CONTRACT.md).
 
 ## Terminology And Abbreviations
 

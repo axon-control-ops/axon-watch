@@ -2,16 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from app.operator_alert_explain import explain_operator_alert
 from app.operator_persona_name import OPERATOR_PERSONA_PREFIX
-
-
-def _workspace_focus_label(workspace_id: str) -> str:
-    clean = str(workspace_id or "").strip()
-    if not clean:
-        return ""
-    if clean.startswith("workspace_"):
-        clean = clean[len("workspace_") :]
-    return clean.replace("_", " ").strip() or str(workspace_id).strip()
 
 
 def build_persona_voice_line(
@@ -23,57 +17,58 @@ def build_persona_voice_line(
     persona_enabled: bool = True,
     top_signal_workspace_id: str = "",
     top_signal_summary: str = "",
+    top_signal_id: str = "",
+    top_signal_meta: dict[str, Any] | None = None,
 ) -> str:
-    """Build a short presence line from live briefing facts (not a generic canned ask)."""
+    """Build a short presence line in plain English for the operator."""
     prefix = OPERATOR_PERSONA_PREFIX if persona_enabled else ""
 
     if load_state == "loading":
         return (
-            f"{prefix}Standing by while briefing loads, sir."
+            f"{prefix}Hang on — I'm still getting your status ready."
             if persona_enabled
-            else "Standing by while briefing loads."
+            else "Hang on — status is still loading."
         )
     if load_state == "error":
         return (
-            f"{prefix}Briefing unavailable, sir. Check control-plane connectivity."
+            f"{prefix}I can't reach the status service right now. Check that Axon is running."
             if persona_enabled
-            else "Briefing unavailable. Check control-plane connectivity."
+            else "Can't reach the status service. Check that Axon is running."
         )
 
     if pending_approvals > 0:
-        suffix = "" if pending_approvals == 1 else "s"
-        return (
-            f"{prefix}{pending_approvals} approval{suffix} need your review before I can continue, sir."
-            if persona_enabled
-            else f"{pending_approvals} approval{suffix} need your review before execution can continue."
+        explained = explain_operator_alert(
+            pending_approvals=pending_approvals,
+            reason="operator_approval_required",
         )
+        spoken = explained["spoken"]
+        return f"{prefix}{spoken}" if persona_enabled else spoken
 
     title = top_signal_title.strip()
     if title:
-        workspace = _workspace_focus_label(top_signal_workspace_id)
-        summary = top_signal_summary.strip()
-        detail = f"{title} — {summary}" if summary and summary.lower() not in title.lower() else title
-        if workspace:
-            return (
-                f"{prefix}Top signal on {workspace}, sir — {detail}."
-                if persona_enabled
-                else f"Top signal on {workspace}: {detail}."
-            )
-        return (
-            f"{prefix}Top signal needs review, sir — {detail}."
-            if persona_enabled
-            else f"Top signal needs review: {detail}."
+        meta = dict(top_signal_meta or {})
+        if top_signal_workspace_id and "workspace_id" not in meta:
+            meta["workspace_id"] = top_signal_workspace_id
+        explained = explain_operator_alert(
+            signal_id=top_signal_id,
+            title=title,
+            summary=top_signal_summary,
+            meta=meta or None,
         )
+        spoken = explained["spoken"]
+        return f"{prefix}{spoken}" if persona_enabled else spoken
 
     if degraded_active:
-        return (
-            f"{prefix}Runtime is degraded, sir. Review the status strip before continuing."
-            if persona_enabled
-            else "Runtime is degraded. Review the status strip before continuing."
+        explained = explain_operator_alert(
+            title="Runtime degraded",
+            summary="Runtime is degraded",
+            signal_id="signal_runtime_degraded",
         )
+        spoken = explained["spoken"]
+        return f"{prefix}{spoken}" if persona_enabled else spoken
 
     return (
-        f"{prefix}I'm listening, sir. Tell me what to focus on."
+        f"{prefix}I'm listening. Tell me what to focus on."
         if persona_enabled
         else "Ready. Tell me what to focus on."
     )

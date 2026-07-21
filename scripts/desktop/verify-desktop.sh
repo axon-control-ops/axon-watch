@@ -40,11 +40,33 @@ if [[ -d "$DEB_DIR" ]]; then
   if [[ -n "${DEB:-}" ]]; then
     echo "Found $DEB"
     dpkg-deb -I "$DEB" | rg -n 'Package:|Version:|Depends:|Architecture:'
+    LISTING="$(mktemp)"
+    dpkg-deb -c "$DEB" >"$LISTING"
+    if ! rg -q 'axon-watch-sidecar' "$LISTING"; then
+      echo "ERROR: .deb missing axon-watch-sidecar externalBin" >&2
+      exit 1
+    fi
+    if ! rg -q 'axon-control-plane-sidecar' "$LISTING"; then
+      echo "ERROR: .deb missing axon-control-plane-sidecar externalBin" >&2
+      exit 1
+    fi
+    if ! rg -q 'console-web-dist/index\.html' "$LISTING"; then
+      echo "ERROR: .deb missing console-web-dist/index.html resource" >&2
+      exit 1
+    fi
+    SIZE_BYTES="$(stat -c%s "$DEB")"
+    if (( SIZE_BYTES < 30000000 )); then
+      echo "ERROR: .deb is only ${SIZE_BYTES} bytes — sidecars likely missing (expect >30MB)" >&2
+      exit 1
+    fi
+    echo "Deb contains SPA + both sidecars (${SIZE_BYTES} bytes)"
   else
     echo "No .deb yet — run scripts/desktop/build-portable-deb.sh"
+    exit 1
   fi
 else
   echo "No bundle dir yet — run scripts/desktop/build-portable-deb.sh"
+  exit 1
 fi
 
 echo "verify:desktop OK"

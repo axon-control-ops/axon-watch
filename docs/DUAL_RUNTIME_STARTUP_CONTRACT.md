@@ -2,10 +2,10 @@
 
 ## Decision
 
-Axon-X supports a **verified browser** operator path and a **scaffolded desktop** path:
+Axon-X supports a **verified browser** operator path and a **packaged desktop** path:
 
-1. **Browser** (verified default): `http://127.0.0.1:4173`
-2. **Desktop (Tauri 2 scaffold)**: `apps/console-desktop` — not yet verified to build/run on every host
+1. **Browser** (verified default for development): `http://127.0.0.1:4173`
+2. **Desktop (Tauri 2)**: `apps/console-desktop` — builds a Debian `.deb` with SPA + frozen Watch/Control Plane sidecars
 
 Desktop-only controls must remain gated behind `detectDesktopCapabilities()` /
 `window.__AXON_DESKTOP__`. Dead controls must not appear in browser mode.
@@ -17,25 +17,34 @@ Desktop-only controls must remain gated behind `detectDesktopCapabilities()` /
 3. Capability detection reports `runtime: browser`
 4. Host APIs and reminders work without a native shell (ingest/read/pause)
 
-## Desktop flow (scaffold status)
+## Desktop flow
 
-Implemented in-tree:
+Packaged startup (no special env required on the `.deb` Exec line):
 
-- Tauri 2 project + tray hide-on-close code
-- Narrow Rust commands: bootstrap, snapshot stub, action evaluate, snapshot POST
-- Control-plane `/api/host/*` policy, receipts, artifacts, reminders
+1. `axon-console-desktop` detects packaged runtime via sidecar binaries beside the
+   exe and/or FHS install paths (`is_packaged_runtime()`), or explicit env flags
+2. Creates XDG config/state if missing
+3. Starts `axon-watch-sidecar` then `axon-control-plane-sidecar` (no Python/repo fallback unless `AXON_DESKTOP_ALLOW_PYTHON_FALLBACK=1`)
+4. Waits for Control Plane health on `127.0.0.1:8787`
+5. Bootstraps an HttpOnly desktop session cookie
+6. Navigates the webview to the Control Plane origin (SPA via `AXON_WATCH_CONSOLE_DIST` / packaged `console-web-dist`)
 
-Not yet complete / not verified here:
+Local development without frozen binaries may set `AXON_DESKTOP_ALLOW_PYTHON_FALLBACK=1`.
 
-- Successful `tauri build` / `tauri dev` (needs WebKitGTK + pkg-config + npm deps)
+Still incomplete / host-dependent:
+
+- Full clean-machine *GUI* Tauri session (tray / Galaxy resize) — container clean-install of sidecars+health is recorded in `docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md`
 - Real host sensors (windows/media/file watch/thumbnails)
 - Signed pairing / keyring identity
 - Deep links, autostart, compact HUD window
 - Playwright desktop E2E and visual/motion regression suites
+- Human-finger Azure voice unlock inside packaged Tauri (WebKitGTK harness gesture + live Azure TTS is recorded)
+
+Prove harnesses: `npm run prove:desktop:clean-install`, `npm run prove:desktop:voice`
 
 ## Capability matrix (honest)
 
-| Capability | Browser | Desktop scaffold |
+| Capability | Browser | Desktop |
 |---|---|---|
 | Briefing / Galaxy | yes | yes (same UI) |
 | Due reminders | yes | yes |
@@ -44,6 +53,7 @@ Not yet complete / not verified here:
 | Open/reveal path | UI gated off | policy + receipt; OS open not fully wired |
 | Media control | no | flagged false |
 | Pause awareness | yes | yes |
+| Frozen sidecars in `.deb` | n/a | yes (verify:desktop asserts) |
 
 See `config/vaxon-desktop-flags.json` for rollout honesty flags.
 
@@ -58,6 +68,7 @@ See `config/vaxon-desktop-flags.json` for rollout honesty flags.
 
 ```bash
 npm run verify:host-context
+npm run verify:desktop
 npm run test -w @axon-watch/console-web -- \
   src/lib/desktop-capability.test.ts \
   src/features/host-context/motion-orchestrator.test.ts
@@ -76,5 +87,6 @@ cd apps/console-desktop/src-tauri && cargo test
 
 - `config/vaxon-desktop-flags.json`
 - `apps/console-desktop/README.md`
+- `docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md`
 - `docs/BROWSER_ONLY_STARTUP_CONTRACT.md` (superseded pointer)
 - `scripts/dev/up.sh`

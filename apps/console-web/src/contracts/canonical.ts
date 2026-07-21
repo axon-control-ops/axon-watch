@@ -1,6 +1,7 @@
 export type {
   ApprovalRecord,
   BriefingAction,
+  OperatorAlertExplanation,
   OperatorBriefing,
   ExecutiveOperatorRhythm,
   KairoNarrationLevel,

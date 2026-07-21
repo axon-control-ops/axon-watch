@@ -94,11 +94,11 @@ export function briefingNotice(
   options?: BriefingNoticeOptions,
 ): string {
   if (loadState === 'loading') {
-    return 'Standing by while briefing loads.';
+    return "Hang on — I'm still getting your status ready.";
   }
 
   if (loadState === 'error') {
-    return 'Briefing unavailable. Check control-plane connectivity.';
+    return "I can't reach the status service right now. Check that Axon is running.";
   }
 
   const primaryActiveRun = options?.primaryActiveRun ?? null;

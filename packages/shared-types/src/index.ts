@@ -26,13 +26,13 @@ export type {
 } from './briefing';
 export { BRIEFING_ACTION_KINDS } from './briefing';
 export type {
+  OperatorAlertExplanation,
   OperatorPresence,
   OperatorPresenceMobile,
   OperatorPresenceSettings,
   OperatorPresenceState,
   KairoNarrationLevel,
   SpokenAlertEligibility,
-  OperatorAlertExplanation,
   SttMode,
   VoiceRoutingMode,
 } from './presence';

@@ -1,6 +1,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue';
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
+import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { subscribeKairoVoiceChunk } from '../../lib/kairo-voice-playback';
 import {
   motionIntensityFromStorage,
@@ -13,6 +14,7 @@ import {
   type GalaxyPresencePhase,
   type GalaxyPresenceResolved,
 } from './galaxy-presence-state';
+import { formatSpecialtyRouteChip } from './specialty-dispatch-filament';
 
 export type UseBrainGalaxyOptions = {
   container: Ref<HTMLElement | null>;
@@ -205,6 +207,25 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     [() => options.agentStreamActive?.value, () => options.streamWorkspaceId?.value],
     () => {
       syncPresenceToScene();
+    },
+  );
+
+  watch(
+    teammateRouteNotice,
+    (notice) => {
+      const scene = sceneRef.value;
+      if (!scene) {
+        return;
+      }
+      if (!notice) {
+        scene.clearSpecialtyDispatch();
+        return;
+      }
+      const workspaceId = options.streamWorkspaceId?.value?.trim() ?? '';
+      if (!workspaceId) {
+        return;
+      }
+      scene.playSpecialtyDispatch(workspaceId, formatSpecialtyRouteChip(notice));
     },
   );
 

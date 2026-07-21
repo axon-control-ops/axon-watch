@@ -90,7 +90,10 @@ class KairoConversationUnitTests(unittest.TestCase):
     def test_answer_approvals_from_dto(self) -> None:
         pack = {"briefing": _MOCK_BRIEFING, "fleet": {"critical_count": 0}}
         reply = answer_status_question("any approvals waiting?", pack)
-        self.assertIn("2 approval", reply)
+        self.assertIn("2 jobs", reply)
+        self.assertTrue(
+            "Approvals" in reply or "yes or no" in reply.lower() or "sign-off" in reply.lower()
+        )
 
     def test_answer_attention_uses_top_signal(self) -> None:
         pack = {

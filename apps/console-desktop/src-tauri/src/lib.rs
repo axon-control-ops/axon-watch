@@ -3,8 +3,8 @@ mod runtime;
 
 use host::{evaluate_local_action, local_snapshot};
 use runtime::{
-    control_plane_url, ensure_deployment_env, start_sidecars, stop_sidecars, xdg_paths,
-    CONTROL_PLANE_PORT,
+    control_plane_url, ensure_deployment_env, is_packaged_runtime, start_sidecars, stop_sidecars,
+    xdg_paths, CONTROL_PLANE_PORT,
 };
 use serde::Serialize;
 use tauri::{
@@ -131,13 +131,13 @@ async fn host_post_snapshot(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Prefer packaged same-origin CP; fall back to existing :4173 for pure shell/dev.
-    let packaged = std::env::var("AXON_DESKTOP_PACKAGED").ok().as_deref() == Some("1")
-        || std::env::var("AXON_WATCH_CONSOLE_DIST").is_ok();
+    // Packaged install is detected from env OR sidecar binaries / FHS layout — not only
+    // AXON_DESKTOP_PACKAGED (the .deb Exec line does not set that env var).
+    let packaged = is_packaged_runtime();
 
     let paths = xdg_paths();
     let token = ensure_deployment_env(&paths).unwrap_or_default();
-    if packaged || std::env::var("AXON_DESKTOP_SPAWN_SIDECARS").ok().as_deref() == Some("1") {
+    if packaged {
         if let Err(err) = start_sidecars(&paths) {
             eprintln!("VAXON: sidecar start failed: {err}");
         }
@@ -208,8 +208,7 @@ pub fn run() {
 
             let handle = app.handle().clone();
             let token_for_boot = token_owned.clone();
-            let navigate_packaged = packaged_owned
-                || std::env::var("AXON_DESKTOP_SPAWN_SIDECARS").ok().as_deref() == Some("1");
+            let navigate_packaged = packaged_owned;
             tauri::async_runtime::spawn(async move {
                 if navigate_packaged {
                     if let Err(err) = wait_for_control_plane(45_000).await {

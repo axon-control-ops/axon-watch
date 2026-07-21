@@ -91,7 +91,7 @@ describe('mockup shell view helpers', () => {
       "I'm listening. Tell me what to focus on.",
     );
     expect(buildBriefingHeroSubtitle(null, 'loading')).toBe(
-      'Standing by while briefing loads.',
+      "Hang on — I'm still getting your status ready.",
     );
   });
 

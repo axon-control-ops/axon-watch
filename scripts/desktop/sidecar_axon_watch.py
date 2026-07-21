@@ -7,15 +7,22 @@ import os
 import sys
 
 
+def _prepare_import_path() -> None:
+    if getattr(sys, "frozen", False):
+        return
+    repo = os.environ.get("AXON_WATCH_REPO_ROOT")
+    if not repo:
+        return
+    watch_src = os.path.join(repo, "services", "axon-watch")
+    if watch_src not in sys.path:
+        sys.path.insert(0, watch_src)
+
+
 def main() -> None:
+    _prepare_import_path()
     host = os.environ.get("AXON_WATCH_BIND_HOST", "127.0.0.1")
     port = int(os.environ.get("AXON_WATCH_WATCH_SERVICE_PORT", "8788"))
-    # Ensure service package imports resolve when frozen or run from source.
-    repo = os.environ.get("AXON_WATCH_REPO_ROOT")
-    if repo:
-        watch_src = os.path.join(repo, "services", "axon-watch")
-        if watch_src not in sys.path:
-            sys.path.insert(0, watch_src)
+    import app.main  # noqa: F401
     import uvicorn
 
     uvicorn.run(

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+import KairoGalaxyOrbAura from './KairoGalaxyOrbAura.vue';
+
 defineProps<{
   dragging: boolean;
   placementMode: 'viewport' | 'embedded';
@@ -31,6 +33,7 @@ defineExpose({ rootEl });
     }"
     :style="placementMode === 'viewport' ? anchorStyle : undefined"
   >
+    <KairoGalaxyOrbAura />
     <button
       v-if="ideClose"
       type="button"

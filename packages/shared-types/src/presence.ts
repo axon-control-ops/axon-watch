@@ -28,6 +28,7 @@ export interface OperatorPresenceSettings {
   narrate_tool_progress: boolean;
 }
 
+/** Plain-English alert guide (control-plane authority; console may fall back locally). */
 export interface OperatorAlertExplanation {
   what: string;
   you_do: string;

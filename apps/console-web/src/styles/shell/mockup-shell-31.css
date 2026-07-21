@@ -6,6 +6,7 @@
 @import '../../features/operator-evidence/galaxy-evidence-panel.css';
 @import '../../features/brain-galaxy/galaxy-operator-console.css';
 @import '../../features/brain-galaxy/galaxy-speech-captions.css';
+@import '../../features/brain-galaxy/galaxy-ambient-hud.css';
 
 /* Brain galaxy mockup chase — stage geometry only. Panels live in feature CSS. */
 

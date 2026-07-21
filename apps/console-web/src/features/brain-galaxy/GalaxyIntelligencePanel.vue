@@ -6,9 +6,15 @@ import {
   briefingActionCtaLabel,
   executeBriefingAction,
 } from '../../lib/briefing-action-executor';
+import {
+  dismissEmployeeSpecialtyRoute,
+  undoEmployeeSpecialtyRoute,
+} from '../../lib/apply-employee-specialty-route';
+import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import HostCapabilityPanel from '../host-context/HostCapabilityPanel.vue';
 import { projectGalaxyIntelligence } from './galaxy-intelligence-projector';
 import type { GalaxyPresencePhase } from './galaxy-presence-state';
+import { formatSpecialtyRouteChip } from './specialty-dispatch-filament';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
@@ -19,6 +25,11 @@ const props = defineProps<{
 const shell = useShellStore();
 const actionPendingId = ref<string | null>(null);
 const hostContextOpen = ref(false);
+
+const specialtyChip = computed(() => {
+  const notice = teammateRouteNotice.value;
+  return notice ? formatSpecialtyRouteChip(notice) : null;
+});
 
 const view = computed(() =>
   projectGalaxyIntelligence({
@@ -42,6 +53,14 @@ async function onActivateAction(action: BriefingAction): Promise<void> {
     actionPendingId.value = null;
   }
 }
+
+async function undoSpecialtyRoute(): Promise<void> {
+  await undoEmployeeSpecialtyRoute(shell, teammateRouteNotice.value);
+}
+
+function dismissSpecialtyRoute(): void {
+  dismissEmployeeSpecialtyRoute();
+}
 </script>
 
 <template>
@@ -59,6 +78,20 @@ async function onActivateAction(action: BriefingAction): Promise<void> {
     <p class="galaxy-intelligence-panel__headline">{{ view.headline }}</p>
     <p v-if="view.notice" class="galaxy-intelligence-panel__notice">{{ view.notice }}</p>
     <p v-if="view.advise" class="galaxy-intelligence-panel__advise">{{ view.advise }}</p>
+
+    <div
+      v-if="specialtyChip"
+      class="galaxy-intelligence-panel__specialty-route"
+      role="status"
+    >
+      <p class="galaxy-intelligence-panel__specialty-route-copy">{{ specialtyChip }}</p>
+      <div class="galaxy-intelligence-panel__specialty-route-actions">
+        <button type="button" @click="undoSpecialtyRoute">Undo</button>
+        <button type="button" aria-label="Dismiss specialty route" @click="dismissSpecialtyRoute">
+          Dismiss
+        </button>
+      </div>
+    </div>
 
     <div
       v-if="(shell.operatorBriefing?.due_reminders?.length ?? 0) > 0"

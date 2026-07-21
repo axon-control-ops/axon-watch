@@ -54,11 +54,9 @@ export function createSignalHandoffSlice(input: HandoffSliceInput) {
     autoSubmit: boolean;
   }): Promise<void> {
     input.setCurrentWorkspace(options.targetWorkspaceId);
-    input.setLayoutMode('ide');
     input.ideComposerDraft.value = options.task;
-    await input.hydrateWorkspaceIdeChat(options.targetWorkspaceId);
     await input.loadCompanyEmployees(options.targetWorkspaceId);
-    await routeEmployeeSpecialtyTask({
+    const routed = await routeEmployeeSpecialtyTask({
       shell: {
         activeIdeThreadId: input.activeIdeThreadId.value,
         activeIdeEmployeeRecord: input.activeIdeEmployeeRecord.value,
@@ -76,8 +74,22 @@ export function createSignalHandoffSlice(input: HandoffSliceInput) {
       restorePrompt: (prompt) => {
         input.ideComposerDraft.value = prompt;
       },
-      submit: options.autoSubmit ? () => input.submitIdeComposer('agent') : undefined,
+      // Defer submit until after galaxy filament can play.
     });
+    const preferMotion =
+      typeof window === 'undefined' ||
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (routed.applied.routed && preferMotion) {
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 1300);
+      });
+    }
+    input.setLayoutMode('ide');
+    await input.hydrateWorkspaceIdeChat(options.targetWorkspaceId);
+    input.ideComposerDraft.value = options.task;
+    if (options.autoSubmit) {
+      await input.submitIdeComposer('agent');
+    }
   }
 
   async function handoffSignalToIde(

@@ -75,7 +75,7 @@
     "watch_connected": true
   },
   "operator_presence": {
-    "persona_voice_line": "KAIRO: 1 approval need your review before I can continue.",
+    "persona_voice_line": "VAXON: One job is waiting for your yes or no before I continue.",
     "presence_state": "alerting",
     "settings": {
       "operator_persona_enabled": true,
@@ -87,7 +87,13 @@
       "eligible": true,
       "reason": "operator_approval_required",
       "signal_id": null,
-      "message": "KAIRO: 1 approval waiting for your review."
+      "message": "VAXON: One job is waiting for your yes or no before I continue.",
+      "explanation": {
+        "what": "one agent job is paused and waiting for your go-ahead.",
+        "you_do": "Open Approvals, read the short summary, then tap Approve (let it continue) or Reject (stop it).",
+        "agent_do": "Do not continue until the operator approves. After approval, resume the paused run and finish the original task. After reject, stop cleanly and leave a short note of what was cancelled.",
+        "spoken": "One job is waiting for your yes or no before I continue."
+      }
     },
     "mobile": {
       "compact_layout": false,

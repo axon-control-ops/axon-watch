@@ -86,15 +86,16 @@ export function presenceAmpForPhase(phase: GalaxyPresencePhase): number {
   switch (phase) {
     case 'listening':
     case 'alerting':
-      return 0.45;
+      return 0.55;
     case 'thinking':
     case 'speaking':
     case 'autonomous':
       return 1;
     case 'workspace_selected':
-      return 0.12;
+      return 0.28;
     default:
-      return 0;
+      // Never fully dead — continuous JARVIS-like ambient energy.
+      return 0.32;
   }
 }
 
@@ -102,12 +103,12 @@ export function presenceAmpForCoreMode(mode: GalaxyCoreOrbMode): number {
   switch (mode) {
     case 'listening':
     case 'alerting':
-      return 0.45;
+      return 0.55;
     case 'busy':
     case 'speaking':
     case 'autonomous':
       return 1;
     default:
-      return 0;
+      return 0.32;
   }
 }

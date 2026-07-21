@@ -280,9 +280,9 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
       input.operatorBriefing.value?.pending_approvals.count ??
       0;
     if (pending === 0) {
-      return 'No pending approvals';
+      return 'Nothing waiting for your yes or no';
     }
-    return `${pending} pending approval${pending === 1 ? '' : 's'}`;
+    return `${pending} job${pending === 1 ? '' : 's'} waiting for your yes or no`;
   });
 
   const canApprovePrimaryRun = computed(

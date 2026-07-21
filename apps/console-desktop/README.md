@@ -1,31 +1,50 @@
-# VAXON Desktop (Tauri 2) — scaffold
+# VAXON Desktop (Tauri 2)
 
-Packages `apps/console-web` inside a native shell with a **narrow** Rust bridge.
+Native shell around `apps/console-web` with frozen Watch + Control Plane sidecars.
 
-## Current status (honest)
+## Status (honest)
 
 | Piece | Status |
 |---|---|
-| Project layout (`src-tauri`) | present |
-| Tray hide-on-close | coded, not verified on this host |
-| Host policy mirror | unit-tested in Python; Rust needs GTK deps to compile |
-| Real sensors / file index / MPRIS | **not implemented** (snapshot is identity stub) |
-| Signed CP pairing / keyring | **not implemented** |
-| Compact HUD / autostart / deep links | **not implemented** |
+| Packaged `.deb` with SPA + both sidecars | **built** (~59 MB); see `docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md` |
+| `npm run verify:desktop` | **PASS** on this host (2026-07-21) |
+| Clean VM install without checkout/Python | **not yet recorded** |
+| Tray hide-on-close | coded; confirm on your host |
+| Host sensors / MPRIS / file index | stub / not implemented |
+| Signed CP pairing / keyring | not implemented |
 
-Browser `:4173` remains the supported operator path.
+Browser `:4173` remains the preferred day-to-day development path.
 
-## Desktop launcher (Linux)
+## Packaged install
 
-Installed for the current user as **Axon-X Operator Console** (not the older
-“Axon Desktop” axon-local entry):
+```bash
+npm run build:desktop:linux
+sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/deb/VAXON_*.deb
+axon-console-desktop
+```
+
+State lives under:
+
+- `~/.config/axon-watch/` (deployment.env, operator token)
+- `~/.local/share/axon-watch/state/` (SQLite / runtime state)
+
+Uninstall preserves those directories.
+
+## Dev launcher (repo checkout)
+
+Installed user desktop entry still points at the Vite path for developers:
 
 - Desktop file: `~/.local/share/applications/ai.axon.x.console.desktop`
-- Icon: `ai.axon.x.console`
-- Repo copy: `apps/console-desktop/packaging/ai.axon.x.console.desktop`
 - Launcher: `scripts/desktop/axon-x-console.sh`
+- Requires console-web on `:4173` (or `AXON_X_DEV_URL`)
 
-Requires console-web on `:4173` (or `AXON_X_DEV_URL`).
+For `tauri.dev` without frozen sidecars:
+
+```bash
+export AXON_DESKTOP_ALLOW_PYTHON_FALLBACK=1
+export AXON_WATCH_REPO_ROOT="$PWD"
+npm run dev:console-desktop
+```
 
 ## Dev prerequisites
 
@@ -36,20 +55,15 @@ npm install
 source "$HOME/.cargo/env"
 ```
 
-`tauri.dev` reuses the existing console-web Vite on `:4173` (does not start a
-second Vite). Keep browser/preview up first:
-
 ```bash
-# terminal A — already your normal path
+# terminal A
 npm run dev:console-web
-# or whatever already serves http://127.0.0.1:4173
 
-# terminal B — desktop shell
+# terminal B
 source "$HOME/.cargo/env"
+export AXON_DESKTOP_ALLOW_PYTHON_FALLBACK=1
 npm run dev:console-desktop
 ```
-
-Control-plane should be on `:8787` for host-bridge POSTs.
 
 ## Exposed commands (narrow)
 

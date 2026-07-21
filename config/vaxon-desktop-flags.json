@@ -1,5 +1,5 @@
 {
-  "desktop_shell": "scaffold",
+  "desktop_shell": "packaged_deb_with_sidecars",
   "host_snapshots": "api_ready_sensors_stub",
   "artifacts": "api_ready_no_local_indexer",
   "safe_actions": "policy_ready_bridge_partial",
@@ -9,9 +9,15 @@
   "compact_hud_autostart": false,
   "verified_on_this_host": {
     "browser_4173": true,
-    "tauri_build": false,
+    "tauri_build": true,
+    "verify_desktop": true,
+    "deb_contains_sidecars_and_spa": true,
+    "clean_vm_install": true,
+    "clean_vm_image": "kalilinux/kali-rolling (glibc >= 2.42 required by frozen sidecars)",
     "playwright_e2e": false,
-    "visual_regression": false
+    "visual_regression": false,
+    "webkit_azure_voice_gesture": true,
+    "webkit_azure_voice_harness": "system_webkitgtk_4_1_gesture_unlock_plus_live_azure_tts"
   },
   "rollout_order": [
     "desktop_shell",
@@ -24,9 +30,13 @@
     "compact_hud_autostart"
   ],
   "notes": [
-    "HostCapabilityPanel is mounted under Galaxy Intelligence → Host context.",
-    "Tauri shell exists but requires pkg-config + WebKitGTK and npm install of @tauri-apps/cli.",
+    "HostCapabilityPanel is mounted under Galaxy Intelligence \u2192 Host context.",
+    "Packaged .deb includes SPA + axon-watch-sidecar + axon-control-plane-sidecar (see docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md).",
+    "Installed Exec=axon-console-desktop auto-detects packaged runtime via sidecar binaries / FHS paths (is_packaged_runtime).",
+    "Clean install proved via scripts/desktop/clean-install-prove.sh on kalilinux/kali-rolling (glibc >= 2.42); not a full GUI Tauri session.",
+    "WebKitGTK Azure voice proved via scripts/desktop/prove-packaged-voice.sh (harness unlock click + live Azure TTS).",
     "Native sensors (MPRIS/windows/file watch/thumbnails/FTS) are not implemented yet.",
-    "Bridge posts are plain HTTP; not signed pairing yet."
+    "Bridge posts are plain HTTP; not signed pairing yet.",
+    "Packaged mode does not fall back to system/repo Python; set AXON_DESKTOP_ALLOW_PYTHON_FALLBACK=1 only for local tauri.dev."
   ]
 }

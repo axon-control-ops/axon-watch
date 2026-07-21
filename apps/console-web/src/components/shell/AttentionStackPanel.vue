@@ -15,7 +15,8 @@ import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import {
   deliveryStateLabel,
   deliveryStateTooltip,
-  signalOperatorHint,
+  resolveOperatorAlertExplanation,
+  type OperatorAlertExplanation,
   watchRuleLabel,
   watchRuleTooltip,
 } from '../../lib/operator-signal-hints';
@@ -116,17 +117,33 @@ function isSignalExpanded(signalId: string): boolean {
   return shell.highlightedSignalId === signalId;
 }
 
-function signalHint(signal: {
+function signalExplanation(signal: {
   signal_id: string;
   title: string;
   summary?: string | null;
   meta?: Record<string, unknown> | null;
-}): string {
-  return signalOperatorHint({
+}): OperatorAlertExplanation {
+  const spoken = shell.operatorBriefing?.operator_presence?.spoken_alert;
+  return resolveOperatorAlertExplanation({
     signalId: signal.signal_id,
     title: signal.title,
     summary: signal.summary,
     meta: signal.meta,
+    pendingApprovals: shell.pendingApprovalsCount,
+    serverExplanation: spoken?.explanation ?? null,
+    serverSignalId: spoken?.signal_id ?? null,
+    serverReason: spoken?.reason ?? null,
+  });
+}
+
+function approvalExplanation(): OperatorAlertExplanation {
+  const spoken = shell.operatorBriefing?.operator_presence?.spoken_alert;
+  return resolveOperatorAlertExplanation({
+    pendingApprovals: Math.max(1, shell.pendingApprovalsCount),
+    reason: 'operator_approval_required',
+    serverExplanation: spoken?.explanation ?? null,
+    serverSignalId: spoken?.signal_id ?? null,
+    serverReason: spoken?.reason ?? null,
   });
 }
 </script>
@@ -270,8 +287,10 @@ function signalHint(signal: {
       @toggle="shell.toggleDockSeam('approvals')"
     >
       <p class="dock-seam__lead">
-        {{ shell.pendingApprovalsCount }} approval{{ shell.pendingApprovalsCount === 1 ? '' : 's' }}
-        pending
+        {{ approvalExplanation().what }}
+      </p>
+      <p v-if="shell.pendingApprovalsCount > 0" class="region-copy">
+        {{ approvalExplanation().youDo }}
       </p>
       <ul v-if="shell.operatorBriefing?.pending_approvals.items.length" class="dock-list">
         <li
@@ -279,17 +298,23 @@ function signalHint(signal: {
           :key="item.approval_id"
           class="dock-list__item"
         >
-          <span class="dock-list__title">{{ item.approval_id }}</span>
-          <span class="dock-tag dock-tag--high">{{ index === 0 ? 'HIGH' : 'MEDIUM' }}</span>
+          <span class="dock-list__title">
+            Job waiting for your yes or no
+            <template v-if="shell.primaryApprovalRun && index === 0">
+              — {{ formatRunDisplayName(shell.primaryApprovalRun) }}
+            </template>
+          </span>
+          <span class="dock-tag dock-tag--high">{{ index === 0 ? 'NEEDS YOU' : 'WAITING' }}</span>
+          <span class="region-copy dock-list__tech-note">ID {{ item.approval_id }}</span>
         </li>
       </ul>
-      <p v-else class="region-copy">No pending approvals</p>
+      <p v-else class="region-copy">Nothing waiting for your yes or no</p>
 
       <div v-if="shell.primaryApprovalRun" class="dock-approval-run">
-        <p class="dock-approval-run__label">Primary approval run</p>
+        <p class="dock-approval-run__label">Job waiting for your decision</p>
         <div class="dock-approval-run__header">
           <strong>{{ formatRunDisplayName(shell.primaryApprovalRun) }}</strong>
-          <span class="dock-tag dock-tag--warning">AWAITING</span>
+          <span class="dock-tag dock-tag--warning">WAITING</span>
         </div>
         <p class="region-copy">{{ shell.primaryApprovalRun.summary }}</p>
       </div>
@@ -305,7 +330,7 @@ function signalHint(signal: {
           :disabled="!shell.canApprovePrimaryRun"
           @click="shell.approvePrimaryRun()"
         >
-          {{ shell.runMutationState === 'approving' ? 'APPROVING…' : 'APPROVE RUN' }}
+          {{ shell.runMutationState === 'approving' ? 'APPROVING…' : 'APPROVE (LET IT CONTINUE)' }}
         </button>
         <button
           type="button"
@@ -313,7 +338,7 @@ function signalHint(signal: {
           :disabled="!shell.canRejectPrimaryRun"
           @click="shell.rejectPrimaryRun()"
         >
-          {{ shell.runMutationState === 'rejecting' ? 'REJECTING…' : 'REJECT RUN' }}
+          {{ shell.runMutationState === 'rejecting' ? 'REJECTING…' : 'REJECT (STOP IT)' }}
         </button>
       </div>
     </HudSeamCard>
@@ -341,7 +366,7 @@ function signalHint(signal: {
         </button>
       </div>
       <p class="dock-signals__hint">
-        Tap title for details · OBSERVE / DELIVERED = status labels
+        Tap Details for plain-English: what happened, what you do, what the agent should do
       </p>
       <ul v-if="attentionSignals.length" class="dock-list dock-list--signals">
         <li
@@ -396,9 +421,29 @@ function signalHint(signal: {
             role="region"
             :aria-label="`Details for ${signal.title}`"
           >
-            <p class="dock-signal-row__detail-copy">{{ signalHint(signal) }}</p>
-            <p v-if="signal.summary && signal.summary !== signalHint(signal)" class="region-copy">
-              {{ signal.summary }}
+            <div class="dock-signal-row__explain" aria-label="Plain-English alert guide">
+              <p class="dock-signal-row__explain-block">
+                <span class="dock-signal-row__explain-label">What happened</span>
+                {{ signalExplanation(signal).what }}
+              </p>
+              <p class="dock-signal-row__explain-block">
+                <span class="dock-signal-row__explain-label">What you should do</span>
+                {{ signalExplanation(signal).youDo }}
+              </p>
+              <p class="dock-signal-row__explain-block">
+                <span class="dock-signal-row__explain-label">What the agent should do</span>
+                {{ signalExplanation(signal).agentDo }}
+              </p>
+            </div>
+            <p
+              v-if="
+                signal.summary &&
+                signal.summary !== signalExplanation(signal).what &&
+                !signal.summary.toLowerCase().includes('bootstrap')
+              "
+              class="region-copy"
+            >
+              Tech note: {{ signal.summary }}
             </p>
             <p v-if="signal.latest_receipt_id" class="region-copy dock-signal-row__receipt">
               Receipt {{ signal.latest_receipt_id }}

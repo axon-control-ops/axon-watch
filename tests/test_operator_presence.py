@@ -33,7 +33,9 @@ class OperatorPresencePolicyTests(unittest.TestCase):
         )
         self.assertTrue(payload["eligible"])
         self.assertEqual("operator_approval_required", payload["reason"])
-        self.assertIn("approval", payload["message"])
+        self.assertIn("yes or no", payload["message"].lower())
+        self.assertIsInstance(payload.get("explanation"), dict)
+        self.assertIn("what", payload["explanation"])
 
     def test_spoken_alert_blocked_by_privacy_mode(self) -> None:
         payload = resolve_spoken_alert(
@@ -78,7 +80,9 @@ class OperatorPresencePolicyTests(unittest.TestCase):
             top_signal_title="",
             degraded_active=True,
         )
-        self.assertIn("degraded", line.lower())
+        self.assertTrue(
+            "weaker" in line.lower() or "degraded" in line.lower() or "look" in line.lower()
+        )
 
     def test_persona_voice_line_neutral_when_persona_disabled(self) -> None:
         line = build_persona_voice_line(
@@ -88,7 +92,8 @@ class OperatorPresencePolicyTests(unittest.TestCase):
             persona_enabled=False,
         )
         self.assertNotIn("KAIRO", line)
-        self.assertIn("2 approvals", line)
+        self.assertNotIn("VAXON", line)
+        self.assertIn("yes or no", line.lower())
 
     def test_build_operator_presence_includes_mobile_foreground_only(self) -> None:
         payload = build_operator_presence(

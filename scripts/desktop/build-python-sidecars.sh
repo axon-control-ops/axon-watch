@@ -25,11 +25,12 @@ fi
 build_one() {
   local name="$1"
   local entry="$2"
+  local service_root="$3"
   local work="$ROOT/.local/desktop-sidecar/$name"
   rm -rf "$work"
   mkdir -p "$work"
-  echo "Building sidecar: $name"
-  "$PYTHON" -m PyInstaller \
+  echo "Building sidecar: $name (PYTHONPATH=$service_root)"
+  PYTHONPATH="$service_root${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON" -m PyInstaller \
     --noconfirm \
     --clean \
     --onefile \
@@ -37,6 +38,8 @@ build_one() {
     --distpath "$work/dist" \
     --workpath "$work/build" \
     --specpath "$work" \
+    --paths "$service_root" \
+    --collect-submodules app \
     --hidden-import uvicorn \
     --hidden-import uvicorn.logging \
     --hidden-import uvicorn.loops \
@@ -51,6 +54,8 @@ build_one() {
     --hidden-import fastapi \
     --hidden-import multipart \
     --hidden-import websockets \
+    --hidden-import pydantic \
+    --hidden-import starlette \
     "$entry"
   local dest="$OUT_DIR/${name}-${TRIPLE}"
   cp "$work/dist/$name" "$dest"
@@ -58,8 +63,8 @@ build_one() {
   echo "Wrote $dest"
 }
 
-build_one "axon-watch-sidecar" "$ROOT/scripts/desktop/sidecar_axon_watch.py"
-build_one "axon-control-plane-sidecar" "$ROOT/scripts/desktop/sidecar_control_plane.py"
+build_one "axon-watch-sidecar" "$ROOT/scripts/desktop/sidecar_axon_watch.py" "$ROOT/services/axon-watch"
+build_one "axon-control-plane-sidecar" "$ROOT/scripts/desktop/sidecar_control_plane.py" "$ROOT/services/control-plane"
 
 echo "Sidecar build complete → $OUT_DIR"
 ls -la "$OUT_DIR"

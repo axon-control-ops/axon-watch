@@ -191,6 +191,50 @@
   line-height: 1.35;
 }
 
+.galaxy-intelligence-panel__specialty-route {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(94, 240, 255, 0.45);
+  background:
+    linear-gradient(135deg, rgba(0, 60, 80, 0.55), rgba(0, 20, 30, 0.72));
+  box-shadow: 0 0 1rem rgba(0, 220, 255, 0.18);
+}
+
+.galaxy-intelligence-panel__specialty-route-copy {
+  margin: 0;
+  color: rgba(180, 250, 255, 0.96);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+.galaxy-intelligence-panel__specialty-route-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.galaxy-intelligence-panel__specialty-route-actions button {
+  appearance: none;
+  margin: 0;
+  padding: 0.18rem 0.4rem;
+  border-radius: 0.28rem;
+  border: 1px solid rgba(94, 240, 255, 0.4);
+  background: rgba(0, 30, 42, 0.85);
+  color: rgba(150, 240, 255, 0.95);
+  font: inherit;
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.galaxy-intelligence-panel__specialty-route-actions button:hover {
+  border-color: rgba(150, 250, 255, 0.7);
+  color: #fff;
+}
+
 .galaxy-intelligence-panel__host-toggle {
   appearance: none;
   width: 100%;

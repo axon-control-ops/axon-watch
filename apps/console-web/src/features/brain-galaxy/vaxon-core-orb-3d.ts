@@ -12,6 +12,10 @@ import {
 
 import type { GalaxyNodeColors } from './brain-galaxy-colors';
 import type { GalaxyCoreOrbMode } from './galaxy-presence-state';
+import {
+  animateVaxonCoreHolograms,
+  buildVaxonCoreHolograms,
+} from './vaxon-core-holograms';
 
 export const VAXON_CORE_ORB_RADIUS = 0.78;
 
@@ -32,31 +36,31 @@ type CoreMotionProfile = {
 
 const CORE_MOTION: Record<GalaxyCoreOrbMode, CoreMotionProfile> = {
   idle: {
-    waveFreq: 1.8,
-    spinMul: 1,
-    opacityMul: 1,
-    scaleSwing: 0.08,
-    lightMul: 1,
-    orbitMul: 1,
-    pulseFreq: 2.2,
-    pulseAmp: 0.045,
-    yawSpeed: 0.002,
-    emissiveBase: 1.55,
-    emissiveSwing: 0.38,
-    tint: null,
+    waveFreq: 2.6,
+    spinMul: 1.85,
+    opacityMul: 1.15,
+    scaleSwing: 0.11,
+    lightMul: 1.35,
+    orbitMul: 2.1,
+    pulseFreq: 2.8,
+    pulseAmp: 0.07,
+    yawSpeed: 0.0045,
+    emissiveBase: 1.95,
+    emissiveSwing: 0.55,
+    tint: 0x5ad8ff,
   },
   listening: {
-    waveFreq: 3.4,
-    spinMul: 2.2,
-    opacityMul: 1.2,
-    scaleSwing: 0.12,
-    lightMul: 1.45,
-    orbitMul: 2.4,
-    pulseFreq: 3.6,
-    pulseAmp: 0.065,
-    yawSpeed: 0.004,
-    emissiveBase: 2.05,
-    emissiveSwing: 0.55,
+    waveFreq: 3.8,
+    spinMul: 2.8,
+    opacityMul: 1.35,
+    scaleSwing: 0.15,
+    lightMul: 1.7,
+    orbitMul: 3.2,
+    pulseFreq: 4.2,
+    pulseAmp: 0.09,
+    yawSpeed: 0.006,
+    emissiveBase: 2.25,
+    emissiveSwing: 0.7,
     tint: 0x5cffb4,
   },
   busy: {
@@ -208,6 +212,7 @@ export function decorateVaxonCoreOrb(
   mesh.add(rings);
 
   mesh.add(buildEnergyOrbit(radius));
+  mesh.add(buildVaxonCoreHolograms(radius));
 
   const light = new PointLight(0x48c4ff, 2.4, radius * 8, 2);
   light.position.set(0, 0, 0);
@@ -359,4 +364,5 @@ export function animateVaxonCoreOrb(
   if (profile.tint) {
     material.emissive = new Color(profile.tint);
   }
+  animateVaxonCoreHolograms(mesh, clock, profile.spinMul, profile.opacityMul);
 }

@@ -17,22 +17,28 @@ export AXON_WATCH_REPO_ROOT="$ROOT"
 echo "==> Building console-web dist"
 npm run build -w @axon-watch/console-web
 
-echo "==> Building Python sidecars (optional if PyInstaller available)"
-if [[ "${AXON_DESKTOP_SKIP_SIDECARS:-0}" == "1" ]]; then
-  echo "Skipping sidecar freeze (AXON_DESKTOP_SKIP_SIDECARS=1)"
-elif ./scripts/desktop/build-python-sidecars.sh; then
-  echo "Sidecars ready"
-else
-  echo "WARNING: sidecar freeze failed — packaged app will fall back to system/repo Python" >&2
-fi
+echo "==> Staging SPA into Tauri resources/console-web-dist"
+RESOURCE_DIST="$ROOT/apps/console-desktop/src-tauri/resources/console-web-dist"
+mkdir -p "$RESOURCE_DIST"
+rsync -a --delete "$ROOT/apps/console-web/dist/" "$RESOURCE_DIST/"
+test -f "$RESOURCE_DIST/index.html"
 
-# Copy sidecars next to resources if present
-SIDECAR_DIR="$ROOT/apps/console-desktop/src-tauri/binaries"
-RESOURCE_SIDECARS="$ROOT/apps/console-desktop/src-tauri/resources/sidecars"
-if [[ -d "$SIDECAR_DIR" ]]; then
-  mkdir -p "$RESOURCE_SIDECARS"
-  cp -f "$SIDECAR_DIR"/axon-*-sidecar-* "$RESOURCE_SIDECARS/" 2>/dev/null || true
+echo "==> Building Python sidecars"
+if [[ "${AXON_DESKTOP_SKIP_SIDECARS:-0}" == "1" ]]; then
+  echo "ERROR: AXON_DESKTOP_SKIP_SIDECARS=1 is not allowed for portable builds" >&2
+  echo "Unset it and ensure PyInstaller can freeze Watch + Control Plane." >&2
+  exit 1
 fi
+./scripts/desktop/build-python-sidecars.sh
+
+SIDECAR_DIR="$ROOT/apps/console-desktop/src-tauri/binaries"
+TRIPLE="${AXON_DESKTOP_TARGET_TRIPLE:-x86_64-unknown-linux-gnu}"
+for name in axon-watch-sidecar axon-control-plane-sidecar; do
+  if [[ ! -x "$SIDECAR_DIR/${name}-${TRIPLE}" ]]; then
+    echo "ERROR: missing sidecar binary $SIDECAR_DIR/${name}-${TRIPLE}" >&2
+    exit 1
+  fi
+done
 
 echo "==> Building Tauri .deb"
 npm run tauri -w @axon-watch/console-desktop -- build --bundles deb

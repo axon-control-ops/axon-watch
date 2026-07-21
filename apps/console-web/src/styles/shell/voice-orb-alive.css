@@ -1,0 +1,140 @@
+/* Always-on living presence for the floating VAXON orb — beyond default JARVIS chrome. */
+
+/* Keep core status readable without hover (hint/model stay progressive). */
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__status,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__mode-pill,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__tts-badge {
+  opacity: 1 !important;
+  pointer-events: auto;
+  transform: none;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__chrome {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__hint,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__model {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.2rem);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup:hover .kairo-galaxy-orb__hint,
+.brain-galaxy-stage__jarvis-float--mockup:focus-within .kairo-galaxy-orb__hint,
+.brain-galaxy-stage__jarvis-float--mockup:hover .kairo-galaxy-orb__model,
+.brain-galaxy-stage__jarvis-float--mockup:focus-within .kairo-galaxy-orb__model,
+.brain-galaxy-stage__jarvis-float--mockup.brain-galaxy-stage__jarvis-float--chrome-live .kairo-galaxy-orb__hint,
+.brain-galaxy-stage__jarvis-float--mockup.brain-galaxy-stage__jarvis-float--chrome-live .kairo-galaxy-orb__model {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+/* Continuous idle life — ripples + sweep even when quiet. */
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ripple {
+  stroke: rgba(72, 210, 255, 0.28);
+  opacity: 1;
+  animation: voice-orb-listen-ripple 3.4s ease-out infinite;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ripple--b {
+  animation-delay: 0.7s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ripple--c {
+  animation-delay: 1.4s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__arc--sweep {
+  animation-duration: 3.2s;
+  stroke: rgba(140, 240, 255, 0.75);
+  filter: drop-shadow(0 0 8px rgba(72, 220, 255, 0.65));
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ticks {
+  animation-duration: 18s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__beads {
+  animation-duration: 12s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__mesh {
+  animation-duration: 26s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__shards {
+  animation-duration: 28s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ellipse--a {
+  animation-duration: 6.2s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ellipse--b {
+  animation-duration: 8s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__plasma {
+  animation-duration: 2.2s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__trigger {
+  filter:
+    drop-shadow(0 0 1.35rem rgba(0, 220, 255, 0.55))
+    drop-shadow(0 0 2.6rem rgba(0, 140, 255, 0.28));
+  animation: voice-orb-alive-hover 4.8s ease-in-out infinite;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__trigger::before {
+  width: 6.2rem;
+  height: 6.2rem;
+  box-shadow:
+    0 0 2.2rem rgba(0, 230, 255, 0.55),
+    0 0 4rem rgba(0, 160, 255, 0.3);
+  animation-duration: 2.4s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__status-dot {
+  box-shadow: 0 0 0.55rem rgba(45, 255, 154, 0.85);
+  animation: voice-orb-beacon 1.6s ease-in-out infinite;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--listening .kairo-galaxy-orb__ripple,
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--ptt .kairo-galaxy-orb__ripple {
+  stroke: rgba(72, 255, 190, 0.7);
+  animation-duration: 1.45s;
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--speaking .kairo-galaxy-orb__trigger::before {
+  box-shadow:
+    0 0 2.4rem rgba(158, 240, 255, 0.75),
+    0 0 4.2rem rgba(72, 196, 255, 0.4);
+}
+
+.brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb--autonomous .kairo-galaxy-orb__arc--sweep {
+  stroke: rgba(255, 179, 71, 0.85);
+  animation-duration: 2.2s;
+}
+
+@keyframes voice-orb-alive-hover {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.18rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__trigger,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__ripple,
+  .brain-galaxy-stage__jarvis-float--mockup .kairo-galaxy-orb__status-dot {
+    animation: none !important;
+  }
+}
