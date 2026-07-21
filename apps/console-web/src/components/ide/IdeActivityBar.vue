@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
+
+import { ensureWatchConnectorsLoaded } from '../../composables/useIdeEditorStatusBar';
 
 import type { IdeActivityView } from '../../lib/ide-layout-prefs';
 import { resolveIdeActivityBarSelectAction } from '../../lib/ide-activity-bar-select';
@@ -12,11 +14,20 @@ import {
 } from '../../lib/agent-dock-reopen-view';
 import {
   type IdeSidebarActivityView,
+  buildIdeActivityBarTeamAttention,
+  ideActivityBarGitAriaLabel,
+  ideActivityBarGitNeedsAttention,
+  ideActivityBarGitTitle,
   ideActivityBarRunAriaLabel,
   ideActivityBarRunNeedsAttention,
   ideActivityBarRunTitle,
+  ideActivityBarSearchAriaLabel,
+  ideActivityBarSearchNeedsAttention,
+  ideActivityBarSearchTitle,
   ideActivityBarSidebarAriaLabel,
   ideActivityBarSidebarTitle,
+  ideActivityBarTeamAriaLabel,
+  ideActivityBarTeamTitle,
 } from '../../lib/ide-activity-bar-view';
 import {
   effectiveRequiredConnectorsUnavailable,
@@ -29,6 +40,7 @@ import {
 } from '../../lib/workbench-terminal-panel-view';
 import IdeActivityIcon from './IdeActivityIcon.vue';
 import { navigateToAppSurface } from '../../lib/app-surface-route';
+import { countIdeDirtyFileTabs } from '../../lib/ide-activity-panel-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -53,6 +65,37 @@ const runConnectorAttention = computed(() => ({
 
 const runNeedsAttention = computed(() =>
   ideActivityBarRunNeedsAttention(runConnectorAttention.value),
+);
+
+const teamAttention = computed(() =>
+  buildIdeActivityBarTeamAttention(shell.companyEmployeesForCurrentWorkspace),
+);
+
+const teamNeedsAttention = computed(() => teamAttention.value.count > 0);
+
+const dirtyFileCount = computed(() => countIdeDirtyFileTabs(shell.editorDocuments));
+
+const gitNeedsAttention = computed(() => ideActivityBarGitNeedsAttention(dirtyFileCount.value));
+
+const searchHasWorkspace = computed(() => Boolean(shell.currentWorkspace?.workspace_id));
+
+const searchAttentionInput = computed(() => ({
+  loadState: shell.workspaceFilesLoadState,
+  hasWorkspace: searchHasWorkspace.value,
+}));
+
+const searchNeedsAttention = computed(() =>
+  ideActivityBarSearchNeedsAttention(searchAttentionInput.value),
+);
+
+watch(
+  runNeedsAttention,
+  (shouldRefresh) => {
+    if (shouldRefresh) {
+      ensureWatchConnectorsLoaded(shell);
+    }
+  },
+  { immediate: true },
 );
 
 const items: Array<{ id: IdeActivityView; label: string }> = [
@@ -113,6 +156,21 @@ function itemTitle(item: (typeof items)[number]): string {
     );
   }
 
+  if (item.id === 'team') {
+    return ideActivityBarTeamTitle(
+      sidebarExpanded('team'),
+      shell.companyEmployeesForCurrentWorkspace,
+    );
+  }
+
+  if (item.id === 'git') {
+    return ideActivityBarGitTitle(sidebarExpanded('git'), dirtyFileCount.value);
+  }
+
+  if (item.id === 'search') {
+    return ideActivityBarSearchTitle(sidebarExpanded('search'), searchAttentionInput.value);
+  }
+
   if (sidebarViews.has(item.id as IdeSidebarActivityView)) {
     return ideActivityBarSidebarTitle(
       item.id as IdeSidebarActivityView,
@@ -140,6 +198,21 @@ function itemAriaLabel(item: (typeof items)[number]): string {
       sidebarExpanded('run'),
       runConnectorAttention.value,
     );
+  }
+
+  if (item.id === 'team') {
+    return ideActivityBarTeamAriaLabel(
+      sidebarExpanded('team'),
+      shell.companyEmployeesForCurrentWorkspace,
+    );
+  }
+
+  if (item.id === 'git') {
+    return ideActivityBarGitAriaLabel(sidebarExpanded('git'), dirtyFileCount.value);
+  }
+
+  if (item.id === 'search') {
+    return ideActivityBarSearchAriaLabel(sidebarExpanded('search'), searchAttentionInput.value);
   }
 
   if (sidebarViews.has(item.id as IdeSidebarActivityView)) {
@@ -256,6 +329,16 @@ function selectView(view: IdeActivityView): void {
         'ide-activity-bar__button--run-warning':
           item.id === 'run' &&
           (!watchConnected || requiredConnectorsUnavailable > 0),
+        'ide-activity-bar__button--team-attention':
+          item.id === 'team' && teamNeedsAttention && teamAttention.tone === 'failure',
+        'ide-activity-bar__button--team-attention-interrupted':
+          item.id === 'team' && teamAttention.tone === 'interrupted',
+        'ide-activity-bar__button--team-attention-mixed':
+          item.id === 'team' && teamAttention.tone === 'mixed',
+        'ide-activity-bar__button--git-attention':
+          item.id === 'git' && gitNeedsAttention,
+        'ide-activity-bar__button--search-attention':
+          item.id === 'search' && searchNeedsAttention,
       }"
       :aria-label="itemAriaLabel(item)"
       :title="itemTitle(item)"
@@ -269,6 +352,30 @@ function selectView(view: IdeActivityView): void {
       >
         {{ shell.pendingApprovalsCount }}
       </span>
+      <span
+        v-else-if="item.id === 'team' && teamAttention.count > 0"
+        class="ide-activity-bar__badge"
+        :class="{
+          'ide-activity-bar__badge--failure': teamAttention.tone === 'failure',
+          'ide-activity-bar__badge--interrupted': teamAttention.tone === 'interrupted',
+          'ide-activity-bar__badge--mixed': teamAttention.tone === 'mixed',
+        }"
+        aria-hidden="true"
+      >
+        {{ teamAttention.count }}
+      </span>
+      <span
+        v-else-if="item.id === 'git' && dirtyFileCount > 0"
+        class="ide-activity-bar__badge ide-activity-bar__badge--dirty"
+        aria-hidden="true"
+      >
+        {{ dirtyFileCount }}
+      </span>
+      <span
+        v-else-if="item.id === 'search' && searchNeedsAttention"
+        class="ide-activity-bar__pulse ide-activity-bar__pulse--warning"
+        aria-hidden="true"
+      />
       <span
         v-else-if="item.id === 'run' && requiredConnectorsUnavailable > 0"
         class="ide-activity-bar__badge ide-activity-bar__badge--warning"

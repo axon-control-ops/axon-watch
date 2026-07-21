@@ -5,6 +5,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
@@ -42,6 +43,35 @@ class CliRuntimeProcessRegistryTests(unittest.TestCase):
         self.assertTrue(process_registry.terminate("run_test_stop"))
         thread.join(timeout=5)
         self.assertFalse(process_registry.is_registered("run_test_stop"))
+
+    def test_terminate_stops_systemd_scope_for_wrapped_agent_command(self) -> None:
+        wrapped_args = [
+            "systemd-run",
+            "--user",
+            "--scope",
+            "--collect",
+            "--unit=axon-agent-deadbeef",
+            "--property=MemoryMax=2G",
+            "--property=MemoryHigh=1536M",
+            "--",
+            "cursor-agent",
+            "--print",
+            "hello",
+        ]
+        proc = MagicMock()
+        proc.poll.return_value = None
+        proc.args = wrapped_args
+        process_registry.register("run_scope_stop", proc)
+
+        with patch(
+            "app.cli_runtime.process_registry.stop_agent_scope",
+            return_value=True,
+        ) as stop_scope_mock:
+            self.assertTrue(process_registry.terminate("run_scope_stop"))
+
+        stop_scope_mock.assert_called_once_with("axon-agent-deadbeef")
+        proc.terminate.assert_called_once()
+        self.assertFalse(process_registry.is_registered("run_scope_stop"))
 
 
 class StopRunProcessRegistryIntegrationTests(unittest.TestCase):

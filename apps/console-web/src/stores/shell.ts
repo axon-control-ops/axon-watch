@@ -207,7 +207,7 @@ import {
 import {
   filePathFromDocumentId,
   languageForFilePath,
-  isImageFilePath,
+  isBinaryFilePath,
   workspaceFileDocumentId,
 } from '../lib/workspace-file-language';
 import {
@@ -2383,7 +2383,7 @@ export const useShellStore = defineStore('shell', () => {
       return;
     }
 
-    if (isImageFilePath(path)) {
+    if (isBinaryFilePath(path)) {
       fileContentLoadStates.value = {
         ...fileContentLoadStates.value,
         [path]: 'loaded',
@@ -2430,7 +2430,7 @@ export const useShellStore = defineStore('shell', () => {
       return;
     }
 
-    if (isImageFilePath(path)) {
+    if (isBinaryFilePath(path)) {
       fileContentLoadStates.value = {
         ...fileContentLoadStates.value,
         [path]: 'loaded',
@@ -2919,6 +2919,7 @@ export const useShellStore = defineStore('shell', () => {
     connectorsLoadState,
     connectorsError,
     connectorMutationPending,
+    watchConnected: () => Boolean(runtimeSummary.value?.watch.connected),
     loadRuntimeSummary: () => loadRuntimeSummary(),
     loadInbox: () => loadInbox(),
     loadOperatorBriefing: () => loadOperatorBriefing(),

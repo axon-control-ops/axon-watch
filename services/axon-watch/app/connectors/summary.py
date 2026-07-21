@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import os
+import threading
 import time
 
 from app.connectors.catalog import load_watch_connector_definitions
@@ -16,6 +17,9 @@ _CONNECTOR_PROBE_CACHE: dict[str, object] = {
     "loaded_at": 0.0,
     "records": [],
 }
+_CONNECTOR_PROBE_LOCK = threading.Lock()
+_CONNECTOR_REFRESH_LOCK = threading.Lock()
+_CONNECTOR_BACKGROUND_REFRESHING = False
 
 
 def _connector_cache_ttl_seconds() -> float:
@@ -27,8 +31,9 @@ def _connector_cache_ttl_seconds() -> float:
 
 
 def reset_connector_probe_cache() -> None:
-    _CONNECTOR_PROBE_CACHE["loaded_at"] = 0.0
-    _CONNECTOR_PROBE_CACHE["records"] = []
+    with _CONNECTOR_PROBE_LOCK:
+        _CONNECTOR_PROBE_CACHE["loaded_at"] = 0.0
+        _CONNECTOR_PROBE_CACHE["records"] = []
 
 
 def store_connector_probe_record(record: dict[str, object]) -> None:
@@ -37,14 +42,22 @@ def store_connector_probe_record(record: dict[str, object]) -> None:
     if not connector_id:
         return
 
-    cached = _CONNECTOR_PROBE_CACHE.get("records")
-    if not isinstance(cached, list) or not cached:
+    with _CONNECTOR_PROBE_LOCK:
+        cached = _CONNECTOR_PROBE_CACHE.get("records")
+        needs_seed = not isinstance(cached, list) or not cached
+
+    if needs_seed:
         records = _probe_all_connectors_live()
-        _CONNECTOR_PROBE_CACHE["loaded_at"] = time.monotonic()
-        _CONNECTOR_PROBE_CACHE["records"] = deepcopy(records)
-        cached = _CONNECTOR_PROBE_CACHE["records"]
-        if not isinstance(cached, list):
-            return
+        with _CONNECTOR_PROBE_LOCK:
+            _CONNECTOR_PROBE_CACHE["loaded_at"] = time.monotonic()
+            _CONNECTOR_PROBE_CACHE["records"] = deepcopy(records)
+            cached = _CONNECTOR_PROBE_CACHE["records"]
+    else:
+        with _CONNECTOR_PROBE_LOCK:
+            cached = _CONNECTOR_PROBE_CACHE.get("records")
+
+    if not isinstance(cached, list):
+        return
 
     next_records: list[dict[str, object]] = []
     replaced = False
@@ -60,8 +73,9 @@ def store_connector_probe_record(record: dict[str, object]) -> None:
     if not replaced:
         next_records.append(deepcopy(record))
 
-    _CONNECTOR_PROBE_CACHE["records"] = next_records
-    _CONNECTOR_PROBE_CACHE["loaded_at"] = time.monotonic()
+    with _CONNECTOR_PROBE_LOCK:
+        _CONNECTOR_PROBE_CACHE["records"] = next_records
+        _CONNECTOR_PROBE_CACHE["loaded_at"] = time.monotonic()
 
 
 def _probe_all_connectors_live() -> list[dict[str, object]]:
@@ -73,24 +87,87 @@ def _probe_all_connectors_live() -> list[dict[str, object]]:
     return records
 
 
-def probe_all_connectors(*, force: bool = False) -> list[dict[str, object]]:
-    ttl = _connector_cache_ttl_seconds()
-    cached = _CONNECTOR_PROBE_CACHE.get("records")
-    loaded_at = float(_CONNECTOR_PROBE_CACHE.get("loaded_at") or 0.0)
-    now = time.monotonic()
-    if (
-        not force
-        and ttl > 0
+def _cache_is_fresh(loaded_at: float, now: float, ttl: float, cached: object) -> bool:
+    return (
+        ttl > 0
         and isinstance(cached, list)
         and loaded_at > 0
         and now - loaded_at < ttl
-    ):
-        return deepcopy(cached)
+    )
 
+
+def _store_connector_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    with _CONNECTOR_PROBE_LOCK:
+        _CONNECTOR_PROBE_CACHE["loaded_at"] = time.monotonic()
+        _CONNECTOR_PROBE_CACHE["records"] = deepcopy(records)
+    return deepcopy(records)
+
+
+def _refresh_connector_records_locked() -> list[dict[str, object]]:
     records = _probe_all_connectors_live()
-    _CONNECTOR_PROBE_CACHE["loaded_at"] = time.monotonic()
-    _CONNECTOR_PROBE_CACHE["records"] = deepcopy(records)
-    return records
+    return _store_connector_records(records)
+
+
+def _start_background_connector_refresh(*, force: bool = False) -> None:
+    global _CONNECTOR_BACKGROUND_REFRESHING
+
+    def _runner() -> None:
+        global _CONNECTOR_BACKGROUND_REFRESHING
+        try:
+            with _CONNECTOR_REFRESH_LOCK:
+                if force:
+                    _refresh_connector_records_locked()
+                else:
+                    ttl = _connector_cache_ttl_seconds()
+                    now = time.monotonic()
+                    with _CONNECTOR_PROBE_LOCK:
+                        cached = _CONNECTOR_PROBE_CACHE.get("records")
+                        loaded_at = float(_CONNECTOR_PROBE_CACHE.get("loaded_at") or 0.0)
+                        if _cache_is_fresh(loaded_at, now, ttl, cached):
+                            return
+                    _refresh_connector_records_locked()
+        finally:
+            with _CONNECTOR_PROBE_LOCK:
+                _CONNECTOR_BACKGROUND_REFRESHING = False
+
+    thread = threading.Thread(
+        target=_runner,
+        name="axon-watch-connector-probe-refresh",
+        daemon=True,
+    )
+    thread.start()
+
+
+def probe_all_connectors(*, force: bool = False) -> list[dict[str, object]]:
+    global _CONNECTOR_BACKGROUND_REFRESHING
+    ttl = _connector_cache_ttl_seconds()
+    now = time.monotonic()
+    with _CONNECTOR_PROBE_LOCK:
+        cached = _CONNECTOR_PROBE_CACHE.get("records")
+        loaded_at = float(_CONNECTOR_PROBE_CACHE.get("loaded_at") or 0.0)
+        if (
+            not force
+            and _cache_is_fresh(loaded_at, now, ttl, cached)
+        ):
+            return deepcopy(cached)  # type: ignore[arg-type]
+
+        stale = deepcopy(cached) if isinstance(cached, list) and cached else None
+        if not force and stale is not None:
+            if not _CONNECTOR_BACKGROUND_REFRESHING:
+                _CONNECTOR_BACKGROUND_REFRESHING = True
+                _start_background_connector_refresh()
+            return stale
+
+    with _CONNECTOR_REFRESH_LOCK:
+        now = time.monotonic()
+        with _CONNECTOR_PROBE_LOCK:
+            cached = _CONNECTOR_PROBE_CACHE.get("records")
+            loaded_at = float(_CONNECTOR_PROBE_CACHE.get("loaded_at") or 0.0)
+            if not force and _cache_is_fresh(loaded_at, now, ttl, cached):
+                return deepcopy(cached)  # type: ignore[arg-type]
+            if not force and isinstance(cached, list) and cached:
+                return deepcopy(cached)
+        return _refresh_connector_records_locked()
 
 
 def build_connectors_snapshot(items: list[dict[str, object]] | None = None) -> dict[str, object]:

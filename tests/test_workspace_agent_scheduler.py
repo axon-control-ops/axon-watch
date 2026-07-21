@@ -287,6 +287,103 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
 
         self.assertEqual([], started)
 
+    def test_continuous_worker_tick_skips_role_after_runtime_auth_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            agents_file = Path(tempdir) / "agents.json"
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_axon_watch": {
+                                "company_name": "Axon-X",
+                                "employees": [
+                                    {
+                                        "name": "Rowan",
+                                        "role": "watcher",
+                                        "schedule": "always_on",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_WORKER_SCHEDULER": "1",
+                    "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
+                },
+                clear=False,
+            ):
+                worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
+                failed = create_run(
+                    workspace_id="workspace_axon_watch",
+                    mode="agent",
+                    summary="Rowan: continuous worker shift",
+                    employee_role="watcher",
+                )
+                fail_run(
+                    failed["run_id"],
+                    receipt_summary=(
+                        "Lane B agent fallback reply generated "
+                        "(Cursor is installed but not signed in. Run `cursor agent login` "
+                        "or unlock /vault.; Cursor Cloud Agent unavailable)"
+                    ),
+                )
+                started = run_continuous_worker_tick()
+
+        self.assertEqual([], started)
+
+    def test_continuous_worker_tick_retries_after_session_interrupt_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            agents_file = Path(tempdir) / "agents.json"
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_axon_watch": {
+                                "company_name": "Axon-X",
+                                "employees": [
+                                    {
+                                        "name": "Reed",
+                                        "role": "backend",
+                                        "schedule": "continuous",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_WORKER_SCHEDULER": "1",
+                    "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
+                },
+                clear=False,
+            ):
+                worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
+                failed = create_run(
+                    workspace_id="workspace_axon_watch",
+                    mode="agent",
+                    summary="Reed: continuous worker shift",
+                    employee_role="backend",
+                )
+                fail_run(
+                    failed["run_id"],
+                    receipt_summary="Cursor CLI exited with status 143.",
+                )
+                started = run_continuous_worker_tick()
+
+        roles = [str(run.get("employee_role") or "") for run in started]
+        self.assertEqual(["backend"], roles)
+
 
 if __name__ == "__main__":
     unittest.main()

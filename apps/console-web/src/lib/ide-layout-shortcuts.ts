@@ -1,11 +1,14 @@
 export type IdeLayoutShortcutAction =
   | 'toggle-explorer'
   | 'toggle-agent-dock'
-  | 'toggle-terminal';
+  | 'toggle-terminal'
+  | 'open-search'
+  | 'open-source-control';
 
 export type IdeLayoutShortcutContext = {
   layoutMode: string;
   modKey: boolean;
+  shiftKey: boolean;
   key: string;
   editableTarget: boolean;
 };
@@ -14,7 +17,7 @@ function isShellLayoutMode(layoutMode: string): boolean {
   return layoutMode === 'ide' || layoutMode === 'operator';
 }
 
-/** Resolve shell layout keyboard shortcuts (Ctrl/Cmd+B, J, \\). */
+/** Resolve shell layout keyboard shortcuts (Ctrl/Cmd+B, Shift+G, J, \\). */
 export function resolveIdeLayoutShortcut(
   context: IdeLayoutShortcutContext,
 ): IdeLayoutShortcutAction | null {
@@ -32,7 +35,15 @@ export function resolveIdeLayoutShortcut(
     return null;
   }
 
-  if (normalizedKey === 'b') {
+  if (context.shiftKey && normalizedKey === 'f') {
+    return 'open-search';
+  }
+
+  if (context.shiftKey && normalizedKey === 'g') {
+    return 'open-source-control';
+  }
+
+  if (normalizedKey === 'b' && !context.shiftKey) {
     return 'toggle-explorer';
   }
 

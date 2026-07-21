@@ -3,11 +3,10 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import AgentPersonaDock from './AgentPersonaDock.vue';
 import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
-import { useWorkspaceCompany } from '../../features/workspace-agents/use-workspace-company';
 import { resolveRosterSelectionForIdeThread } from '../../features/workspace-agents/active-ide-employee';
 import {
+  buildCompanyRosterAlertBadge,
   companyHeadline,
-  companyFailedEmployees,
   companyFailedEmployeesHint,
   companyFailedEmployeesHintTooltip,
   companyHasFailedEmployees,
@@ -38,8 +37,23 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
-const { company, employees, loadState, loadError, loadCompany } =
-  useWorkspaceCompany(currentWorkspaceId);
+/** Single roster source of truth — shell owns the poll; do not dual-poll here (causes IDE flicker). */
+const employees = computed(() => shell.companyEmployeesForCurrentWorkspace);
+const loadState = computed<'idle' | 'loading' | 'loaded'>(() => {
+  if (!currentWorkspaceId.value) {
+    return 'idle';
+  }
+  return employees.value.length ? 'loaded' : 'idle';
+});
+const loadError = computed(() => null as string | null);
+
+async function loadCompany(): Promise<void> {
+  const workspaceId = currentWorkspaceId.value;
+  if (!workspaceId) {
+    return;
+  }
+  await shell.loadCompanyEmployees(workspaceId);
+}
 const selectedEmployeeId = ref<string | null>(null);
 const dockRootRef = ref<HTMLElement | null>(null);
 const presenceStripRef = ref<{ focusEmployee: (employeeId: string | null | undefined) => void } | null>(
@@ -135,12 +149,15 @@ watch(
 );
 
 const headline = computed(() =>
-  companyHeadline(company.value?.company_name, company.value?.employee_count),
+  companyHeadline(
+    shell.currentWorkspace?.display_name ?? shell.currentWorkspace?.workspace_id,
+    employees.value.length,
+  ),
 );
 
 const hasFailedEmployees = computed(() => companyHasFailedEmployees(employees.value));
 
-const failedEmployeeCount = computed(() => companyFailedEmployees(employees.value).length);
+const rosterAlertBadge = computed(() => buildCompanyRosterAlertBadge(employees.value));
 
 const failedEmployeesHint = computed(() => companyFailedEmployeesHint(employees.value));
 
@@ -307,14 +324,19 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           <h3 class="company-roster__title">
             {{ headline }}
             <button
-              v-if="failedEmployeeCount"
+              v-if="rosterAlertBadge"
               type="button"
               class="company-roster__alert-badge"
-              :title="`${failedEmployeeCount} teammate${failedEmployeeCount === 1 ? '' : 's'} need attention after a failed shift`"
-              :aria-label="`Jump to ${failedEmployeeCount} failed teammate${failedEmployeeCount === 1 ? '' : 's'}`"
+              :class="{
+                'company-roster__alert-badge--interrupted':
+                  rosterAlertBadge.tone === 'interrupted',
+                'company-roster__alert-badge--mixed': rosterAlertBadge.tone === 'mixed',
+              }"
+              :title="rosterAlertBadge.title"
+              :aria-label="rosterAlertBadge.ariaLabel"
               @click="focusFailedEmployee"
             >
-              {{ failedEmployeeCount }} failed
+              {{ rosterAlertBadge.label }}
             </button>
           </h3>
         </div>

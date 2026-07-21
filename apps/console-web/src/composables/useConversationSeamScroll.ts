@@ -81,21 +81,28 @@ export function useConversationSeamScroll(options: {
     stickToBottom.value = isNearBottom(container);
   }
 
-  async function scrollToLatest(): Promise<void> {
+  async function scrollToLatest(reason = 'explicit'): Promise<void> {
     await nextTick();
     const container = scrollContainerElement();
     if (!container) {
       return;
     }
+    const previousTop = container.scrollTop;
+    const targetTop = container.scrollHeight;
+    if (Math.abs(targetTop - previousTop) > 1) {
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'conversation-scroll',hypothesisId:'H8',location:'useConversationSeamScroll.ts:scrollToLatest',message:'conversation transcript auto-scroll requested',data:{reason,previousTop:Math.round(previousTop),targetTop:Math.round(targetTop),clientHeight:Math.round(container.clientHeight),scrollHeight:Math.round(container.scrollHeight),stickToBottom:stickToBottom.value},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+    }
     container.scrollTop = container.scrollHeight;
     stickToBottom.value = true;
   }
 
-  async function scrollToLatestIfPinned(): Promise<void> {
+  async function scrollToLatestIfPinned(reason = 'pinned'): Promise<void> {
     if (!stickToBottom.value) {
       return;
     }
-    await scrollToLatest();
+    await scrollToLatest(reason);
   }
 
   function bindScrollContainer(): void {
@@ -130,13 +137,13 @@ export function useConversationSeamScroll(options: {
   function handleContentChange(): void {
     options.onContentChange();
     bindScrollContainer();
-    void scrollToLatestIfPinned();
+    void scrollToLatestIfPinned('content-change');
   }
 
   onMounted(() => {
     bindScrollContainer();
     resizeObserver = new ResizeObserver(() => {
-      void scrollToLatestIfPinned();
+      void scrollToLatestIfPinned('resize-observer');
     });
     if (options.rootRef.value) {
       resizeObserver.observe(options.rootRef.value);
@@ -144,7 +151,7 @@ export function useConversationSeamScroll(options: {
     if (options.listRef.value) {
       resizeObserver.observe(options.listRef.value);
     }
-    void scrollToLatest();
+    void scrollToLatest('mount');
   });
 
   onUnmounted(() => {

@@ -1,6 +1,6 @@
 import type { InboxItem } from '../contracts/canonical';
 
-import { apiUrl, fetchJson } from './client';
+import { apiUrl, fetchJson, INBOX_FETCH_TIMEOUT_MS } from './client';
 
 export interface InboxSnapshot {
   items: InboxItem[];
@@ -17,7 +17,12 @@ export interface AcknowledgeInboxSignalsResult {
 }
 
 export async function fetchInbox(): Promise<InboxSnapshot> {
-  return fetchJson<InboxSnapshot>('/api/inbox', {}, 'inbox request failed');
+  return fetchJson<InboxSnapshot>(
+    '/api/inbox',
+    {},
+    'inbox request failed',
+    INBOX_FETCH_TIMEOUT_MS,
+  );
 }
 
 async function acknowledgeInboxSignalsViaWatchCommand(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 import os
 from pathlib import Path
+import threading
 import time
 
 from app.monitors.monitor_probe import probe_all_monitor_slices, probe_monitor_slice
@@ -31,6 +32,9 @@ _MONITOR_PROBE_CACHE: dict[str, object] = {
     "loaded_at": 0.0,
     "records": [],
 }
+_MONITOR_PROBE_LOCK = threading.Lock()
+_MONITOR_REFRESH_LOCK = threading.Lock()
+_MONITOR_BACKGROUND_REFRESHING = False
 
 
 def _monitor_cache_ttl_seconds() -> float:
@@ -42,8 +46,9 @@ def _monitor_cache_ttl_seconds() -> float:
 
 
 def reset_monitor_probe_cache() -> None:
-    _MONITOR_PROBE_CACHE["loaded_at"] = 0.0
-    _MONITOR_PROBE_CACHE["records"] = []
+    with _MONITOR_PROBE_LOCK:
+        _MONITOR_PROBE_CACHE["loaded_at"] = 0.0
+        _MONITOR_PROBE_CACHE["records"] = []
 
 
 def probe_dashpro_monitor_records() -> list[dict[str, object]]:
@@ -51,15 +56,73 @@ def probe_dashpro_monitor_records() -> list[dict[str, object]]:
     return probe_monitor_slice(config)
 
 
-def probe_monitor_records() -> list[dict[str, object]]:
-    ttl = _monitor_cache_ttl_seconds()
-    cached = _MONITOR_PROBE_CACHE.get("records")
-    loaded_at = float(_MONITOR_PROBE_CACHE.get("loaded_at") or 0.0)
-    now = time.monotonic()
-    if ttl > 0 and isinstance(cached, list) and loaded_at > 0 and now - loaded_at < ttl:
-        return deepcopy(cached)
+def _cache_is_fresh(loaded_at: float, now: float, ttl: float, cached: object) -> bool:
+    return (
+        ttl > 0
+        and isinstance(cached, list)
+        and loaded_at > 0
+        and now - loaded_at < ttl
+    )
 
+
+def _store_monitor_records(records: list[dict[str, object]]) -> list[dict[str, object]]:
+    with _MONITOR_PROBE_LOCK:
+        _MONITOR_PROBE_CACHE["loaded_at"] = time.monotonic()
+        _MONITOR_PROBE_CACHE["records"] = deepcopy(records)
+    return deepcopy(records)
+
+
+def _refresh_monitor_records_locked() -> list[dict[str, object]]:
     records = probe_all_monitor_slices()
-    _MONITOR_PROBE_CACHE["loaded_at"] = time.monotonic()
-    _MONITOR_PROBE_CACHE["records"] = deepcopy(records)
-    return records
+    return _store_monitor_records(records)
+
+
+def _start_background_monitor_refresh() -> None:
+    global _MONITOR_BACKGROUND_REFRESHING
+
+    def _runner() -> None:
+        global _MONITOR_BACKGROUND_REFRESHING
+        try:
+            with _MONITOR_REFRESH_LOCK:
+                _refresh_monitor_records_locked()
+        finally:
+            with _MONITOR_PROBE_LOCK:
+                _MONITOR_BACKGROUND_REFRESHING = False
+
+    thread = threading.Thread(
+        target=_runner,
+        name="axon-watch-monitor-probe-refresh",
+        daemon=True,
+    )
+    thread.start()
+
+
+def probe_monitor_records() -> list[dict[str, object]]:
+    global _MONITOR_BACKGROUND_REFRESHING
+    ttl = _monitor_cache_ttl_seconds()
+    now = time.monotonic()
+    with _MONITOR_PROBE_LOCK:
+        cached = _MONITOR_PROBE_CACHE.get("records")
+        loaded_at = float(_MONITOR_PROBE_CACHE.get("loaded_at") or 0.0)
+        if _cache_is_fresh(loaded_at, now, ttl, cached):
+            return deepcopy(cached)  # type: ignore[arg-type]
+
+        stale = deepcopy(cached) if isinstance(cached, list) and cached else None
+        if stale is not None:
+            if not _MONITOR_BACKGROUND_REFRESHING:
+                _MONITOR_BACKGROUND_REFRESHING = True
+                _start_background_monitor_refresh()
+            return stale
+
+    # Cold cache: single-flight the live probe so concurrent inbox polls do not
+    # stampede Sentry / IMAP and blow past the control-plane timeout.
+    with _MONITOR_REFRESH_LOCK:
+        now = time.monotonic()
+        with _MONITOR_PROBE_LOCK:
+            cached = _MONITOR_PROBE_CACHE.get("records")
+            loaded_at = float(_MONITOR_PROBE_CACHE.get("loaded_at") or 0.0)
+            if _cache_is_fresh(loaded_at, now, ttl, cached):
+                return deepcopy(cached)  # type: ignore[arg-type]
+            if isinstance(cached, list) and cached:
+                return deepcopy(cached)
+        return _refresh_monitor_records_locked()

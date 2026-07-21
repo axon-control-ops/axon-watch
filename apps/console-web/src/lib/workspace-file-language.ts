@@ -30,6 +30,43 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
 };
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
+const BINARY_EXTENSIONS = new Set([
+  ...IMAGE_EXTENSIONS,
+  'pdf',
+  'zip',
+  'gz',
+  'tgz',
+  'bz2',
+  'xz',
+  '7z',
+  'rar',
+  'exe',
+  'dll',
+  'so',
+  'dylib',
+  'bin',
+  'wasm',
+  'woff',
+  'woff2',
+  'ttf',
+  'otf',
+  'eot',
+  'ico',
+  'mp3',
+  'mp4',
+  'webm',
+  'mov',
+  'avi',
+  'wav',
+  'ogg',
+  'sqlite',
+  'sqlite3',
+  'db',
+  'apk',
+  'aab',
+  'dmg',
+  'iso',
+]);
 
 export function languageForFilePath(path: string): string {
   const extension = path.split('.').pop()?.toLowerCase() ?? '';
@@ -39,6 +76,11 @@ export function languageForFilePath(path: string): string {
 export function isImageFilePath(path: string): boolean {
   const extension = path.split('.').pop()?.toLowerCase() ?? '';
   return IMAGE_EXTENSIONS.has(extension);
+}
+
+export function isBinaryFilePath(path: string): boolean {
+  const extension = path.split('.').pop()?.toLowerCase() ?? '';
+  return BINARY_EXTENSIONS.has(extension);
 }
 
 export function workspaceFileDocumentId(path: string): string {

@@ -7,6 +7,7 @@ import {
   stopTunnel,
   type ConnectorProbeRecord,
 } from '../../../api/control-plane';
+import { connectorMutationBlockedWhenWatchOffline } from '../../../lib/connector-rail-view';
 
 type ConnectorsLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 
@@ -24,6 +25,7 @@ interface CreateConnectorsSliceInput {
   connectorsLoadState: Ref<ConnectorsLoadState>;
   connectorsError: Ref<string | null>;
   connectorMutationPending: Ref<boolean>;
+  watchConnected: () => boolean;
   loadRuntimeSummary: (options?: { background?: boolean }) => Promise<void>;
   loadInbox: () => Promise<void>;
   loadOperatorBriefing: () => Promise<void>;
@@ -32,6 +34,10 @@ interface CreateConnectorsSliceInput {
 
 export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
   let inflightConnectors: Promise<void> | null = null;
+
+  function blockConnectorMutationWhenWatchOffline(): string | null {
+    return connectorMutationBlockedWhenWatchOffline(input.watchConnected());
+  }
 
   async function loadConnectors(options?: { background?: boolean }): Promise<void> {
     const hasCached = input.connectorsLoadState.value === 'loaded' && input.connectorsSummary.value;
@@ -68,6 +74,12 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
   }
 
   async function reprobeConnector(connectorId: string): Promise<void> {
+    const blocked = blockConnectorMutationWhenWatchOffline();
+    if (blocked) {
+      input.connectorsError.value = blocked;
+      return;
+    }
+
     input.connectorMutationPending.value = true;
     input.connectorsError.value = null;
 
@@ -92,6 +104,12 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
   }
 
   async function refreshWatchSummary(): Promise<void> {
+    const blocked = blockConnectorMutationWhenWatchOffline();
+    if (blocked) {
+      input.connectorsError.value = blocked;
+      return;
+    }
+
     input.connectorMutationPending.value = true;
     input.connectorsError.value = null;
 
@@ -116,6 +134,12 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
   }
 
   async function startCloudflareTunnel(): Promise<void> {
+    const blocked = blockConnectorMutationWhenWatchOffline();
+    if (blocked) {
+      input.connectorsError.value = blocked;
+      return;
+    }
+
     input.connectorMutationPending.value = true;
     input.connectorsError.value = null;
 
@@ -135,6 +159,12 @@ export function createConnectorsSlice(input: CreateConnectorsSliceInput) {
   }
 
   async function stopCloudflareTunnel(): Promise<void> {
+    const blocked = blockConnectorMutationWhenWatchOffline();
+    if (blocked) {
+      input.connectorsError.value = blocked;
+      return;
+    }
+
     input.connectorMutationPending.value = true;
     input.connectorsError.value = null;
 

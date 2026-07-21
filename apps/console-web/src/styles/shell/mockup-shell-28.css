@@ -93,8 +93,9 @@
 }
 
 .status-bar-mockup__chip--watch-offline {
-  border-color: rgba(255, 176, 96, 0.38);
-  background: rgba(32, 18, 8, 0.92);
+  border-style: dashed;
+  border-color: rgba(255, 176, 96, 0.48);
+  background: rgba(32, 18, 8, 0.88);
   cursor: pointer;
   font: inherit;
   color: inherit;

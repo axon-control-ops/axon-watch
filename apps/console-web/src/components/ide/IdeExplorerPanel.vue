@@ -1,92 +1,52 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 import WorkspaceFileTree from '../WorkspaceFileTree.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
-import {
-  effectiveRequiredConnectorsUnavailable,
-  isLegacyConnectorGlanceVisible,
-} from '../../lib/connector-glance-view';
-import {
-  buildIdeAgentSidebarStub,
-  buildIdeRunPanelConnectorNotice,
-  buildIdeTerminalSidebarStub,
-} from '../../lib/ide-sidebar-stub-view';
+import IdeExplorerActivityPanels from './IdeExplorerActivityPanels.vue';
+import { ensureWorkspaceFilesLoaded } from '../../composables/useIdeEditorStatusBar';
+import { ideActivityPanelCollapseAriaLabel } from '../../lib/ide-activity-panel-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
-const searchQuery = ref('');
 const showExplorerMenu = ref(false);
+const explorerMenuWrapRef = ref<HTMLElement | null>(null);
 const fileTreeRef = ref<InstanceType<typeof WorkspaceFileTree> | null>(null);
-
-const searchResults = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase();
-  if (!query) {
-    return shell.workspaceFileEntries.slice(0, 24);
-  }
-  return shell.workspaceFileEntries
-    .filter((entry) => entry.path.toLowerCase().includes(query))
-    .slice(0, 32);
-});
-
-const dirtyDocuments = computed(() =>
-  shell.editorDocuments.filter((document) => document.source === 'file' && document.dirty),
-);
-
-const agentSidebarStub = computed(() =>
-  buildIdeAgentSidebarStub({
-    agentDockCollapsed: shell.agentDockCollapsed,
-    streaming: shell.agentStreamActive,
-    pendingApprovals: shell.pendingApprovalsCount,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
-    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-  }),
-);
-
-const terminalSidebarStub = computed(() =>
-  buildIdeTerminalSidebarStub({
-    terminalVisible: shell.workbenchTerminalPanelVisible,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-  }),
-);
-
-const runConnectorNotice = computed(() =>
-  buildIdeRunPanelConnectorNotice({
-    requiredConnectorsUnavailable: effectiveRequiredConnectorsUnavailable(
-      shell.connectorsSummary,
-      shell.runtimeSummary?.watch.connected ?? false,
-    ),
-    legacyConnectorGlanceVisible: isLegacyConnectorGlanceVisible({
-      connectorsLoadState: shell.connectorsLoadState,
-      items: shell.connectorsItems,
-      summary: shell.connectorsSummary,
-      watchConnected: shell.runtimeSummary?.watch.connected ?? false,
-      layoutMode: 'ide',
-    }),
-  }),
-);
-
-function toggleAgentDockFromStub(): void {
-  shell.toggleAgentDock();
-}
-
-function toggleTerminalFromStub(): void {
-  shell.toggleIdeTerminalPanel();
-}
-
-function openWatchConnectors(): void {
-  void shell.loadConnectors();
-  shell.focusWatchConnectors();
-}
-
-function openSearchResult(path: string): void {
-  void shell.openWorkspaceFile(path);
-}
 
 function closeExplorerMenu(): void {
   showExplorerMenu.value = false;
 }
+
+function handleExplorerMenuPointerDown(event: MouseEvent): void {
+  if (!showExplorerMenu.value) {
+    return;
+  }
+
+  const target = event.target;
+  if (!(target instanceof Node)) {
+    return;
+  }
+
+  if (!explorerMenuWrapRef.value?.contains(target)) {
+    closeExplorerMenu();
+  }
+}
+
+function handleExplorerMenuKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    closeExplorerMenu();
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleExplorerMenuPointerDown);
+  document.addEventListener('keydown', handleExplorerMenuKeydown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleExplorerMenuPointerDown);
+  document.removeEventListener('keydown', handleExplorerMenuKeydown);
+});
 
 function toggleExplorerMenu(): void {
   showExplorerMenu.value = !showExplorerMenu.value;
@@ -124,6 +84,16 @@ function handleCreateFile(path: string): void {
 function handleCreateFolder(path: string): void {
   void shell.createWorkspaceFolder(path);
 }
+
+watch(
+  () => shell.ideActivityView === 'explorer' && !shell.ideExplorerCollapsed,
+  (active) => {
+    if (active) {
+      ensureWorkspaceFilesLoaded(shell);
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -170,7 +140,7 @@ function handleCreateFolder(path: string): void {
         >
           <span class="ide-explorer-panel__collapse-all" aria-hidden="true">⊟</span>
         </button>
-        <div class="ide-explorer-panel__menu-wrap">
+        <div ref="explorerMenuWrapRef" class="ide-explorer-panel__menu-wrap">
           <button
             type="button"
             class="ide-explorer-panel__action"
@@ -233,8 +203,8 @@ function handleCreateFolder(path: string): void {
         <button
           type="button"
           class="panel-heading__action ide-explorer-panel__collapse"
-          aria-label="Collapse explorer panel"
-          title="Collapse explorer panel"
+          :aria-label="ideActivityPanelCollapseAriaLabel('explorer')"
+          :title="ideActivityPanelCollapseAriaLabel('explorer')"
           @click="shell.toggleIdeExplorer()"
         >
           ‹
@@ -256,188 +226,7 @@ function handleCreateFolder(path: string): void {
     </div>
   </section>
 
-  <section
-    v-else-if="!shell.ideExplorerCollapsed && shell.ideActivityView === 'search'"
-    class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
-  >
-    <div class="panel-heading ide-explorer-panel__heading">
-      <p class="panel-heading__title">SEARCH</p>
-      <button
-        type="button"
-        class="panel-heading__action ide-explorer-panel__collapse"
-        aria-label="Collapse panel"
-        @click="shell.toggleIdeExplorer()"
-      >
-        ‹
-      </button>
-    </div>
-    <div class="ide-panel-search">
-      <input
-        v-model="searchQuery"
-        class="ide-panel-search__input"
-        type="search"
-        placeholder="Search file paths..."
-      />
-      <ul class="ide-panel-list">
-        <li v-for="entry in searchResults" :key="entry.path">
-          <button type="button" class="ide-panel-list__button" @click="openSearchResult(entry.path)">
-            {{ entry.path }}
-          </button>
-        </li>
-      </ul>
-    </div>
-  </section>
-
-  <section
-    v-else-if="!shell.ideExplorerCollapsed && shell.ideActivityView === 'git'"
-    class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
-  >
-    <div class="panel-heading ide-explorer-panel__heading">
-      <p class="panel-heading__title">SOURCE CONTROL</p>
-      <button
-        type="button"
-        class="panel-heading__action ide-explorer-panel__collapse"
-        aria-label="Collapse panel"
-        @click="shell.toggleIdeExplorer()"
-      >
-        ‹
-      </button>
-    </div>
-    <div class="ide-panel-search">
-      <p class="region-copy ide-panel-caption">
-        {{ dirtyDocuments.length ? `${dirtyDocuments.length} file(s) with unsaved changes` : 'No unsaved files in the current workspace.' }}
-      </p>
-      <ul v-if="dirtyDocuments.length" class="ide-panel-list">
-        <li v-for="document in dirtyDocuments" :key="document.id">
-          <button type="button" class="ide-panel-list__button" @click="shell.setActiveEditorDocument(document.id)">
-            {{ document.title }}
-          </button>
-        </li>
-      </ul>
-    </div>
-  </section>
-
-  <section
-    v-else-if="!shell.ideExplorerCollapsed && shell.ideActivityView === 'run'"
-    class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
-    :class="runConnectorNotice ? `ide-explorer-panel--stub-${runConnectorNotice.tone}` : undefined"
-  >
-    <div class="panel-heading ide-explorer-panel__heading">
-      <p class="panel-heading__title">RUN</p>
-      <button
-        type="button"
-        class="panel-heading__action ide-explorer-panel__collapse"
-        aria-label="Collapse panel"
-        @click="shell.toggleIdeExplorer()"
-      >
-        ‹
-      </button>
-    </div>
-    <div
-      v-if="runConnectorNotice"
-      class="ide-explorer-panel__stub-body ide-explorer-panel__run-notice"
-    >
-      <p
-        v-for="(line, index) in runConnectorNotice.lines"
-        :key="index"
-        class="region-copy ide-explorer-panel__stub-copy"
-      >
-        {{ line }}
-      </p>
-      <button
-        type="button"
-        class="ide-explorer-panel__stub-action"
-        @click="openWatchConnectors"
-      >
-        {{ runConnectorNotice.actionLabel }}
-      </button>
-    </div>
-    <div class="ide-panel-search">
-      <p class="region-copy ide-panel-caption">
-        {{ shell.primaryActiveRun ? `${shell.primaryActiveRun.run_id} · ${shell.primaryActiveRun.phase}` : 'No active run' }}
-      </p>
-      <p v-if="shell.primaryActiveRun" class="region-copy ide-panel-caption">
-        {{ shell.primaryActiveRun.summary }}
-      </p>
-      <button
-        v-if="shell.primaryActiveRun && (shell.canStopPrimaryRun || shell.primaryActiveRun.phase === 'executing')"
-        type="button"
-        class="ide-panel-action"
-        :disabled="!shell.canStopPrimaryRun && shell.primaryActiveRun.phase !== 'executing'"
-        @click="shell.stopPrimaryRun()"
-      >
-        {{ shell.runMutationState === 'stopping' ? 'STOPPING…' : 'STOP RUN' }}
-      </button>
-    </div>
-  </section>
-
-  <section
-    v-else-if="!shell.ideExplorerCollapsed && shell.ideActivityView === 'agent'"
-    class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
-    :class="`ide-explorer-panel--stub-${agentSidebarStub.tone}`"
-  >
-    <div class="panel-heading ide-explorer-panel__heading">
-      <p class="panel-heading__title">AGENT</p>
-      <button
-        type="button"
-        class="panel-heading__action ide-explorer-panel__collapse"
-        aria-label="Collapse panel"
-        @click="shell.toggleIdeExplorer()"
-      >
-        ‹
-      </button>
-    </div>
-    <div class="ide-explorer-panel__stub-body">
-      <p
-        v-for="(line, index) in agentSidebarStub.lines"
-        :key="index"
-        class="region-copy ide-explorer-panel__stub-copy"
-      >
-        {{ line }}
-      </p>
-      <button
-        v-if="agentSidebarStub.actionLabel"
-        type="button"
-        class="ide-explorer-panel__stub-action"
-        @click="toggleAgentDockFromStub"
-      >
-        {{ agentSidebarStub.actionLabel }}
-      </button>
-    </div>
-  </section>
-
-  <section
-    v-else-if="!shell.ideExplorerCollapsed && shell.ideActivityView === 'terminal'"
-    class="ide-explorer-panel ide-explorer-panel--stub hud-panel-frame"
-    :class="`ide-explorer-panel--stub-${terminalSidebarStub.tone}`"
-  >
-    <div class="panel-heading ide-explorer-panel__heading">
-      <p class="panel-heading__title">TERMINAL</p>
-      <button
-        type="button"
-        class="panel-heading__action ide-explorer-panel__collapse"
-        aria-label="Collapse panel"
-        @click="shell.toggleIdeExplorer()"
-      >
-        ‹
-      </button>
-    </div>
-    <div class="ide-explorer-panel__stub-body">
-      <p
-        v-for="(line, index) in terminalSidebarStub.lines"
-        :key="index"
-        class="region-copy ide-explorer-panel__stub-copy"
-      >
-        {{ line }}
-      </p>
-      <button
-        v-if="terminalSidebarStub.actionLabel"
-        type="button"
-        class="ide-explorer-panel__stub-action"
-        @click="toggleTerminalFromStub"
-      >
-        {{ terminalSidebarStub.actionLabel }}
-      </button>
-    </div>
-  </section>
+  <IdeExplorerActivityPanels
+    v-else-if="!shell.ideExplorerCollapsed"
+  />
 </template>

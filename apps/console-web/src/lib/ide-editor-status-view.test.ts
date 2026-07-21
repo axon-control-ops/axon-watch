@@ -1,10 +1,31 @@
 import { describe, expect, it } from 'vitest';
 
+import type { CompanyEmployeeRecord } from '../contracts/canonical';
 import {
   buildIdeEditorStatusAgentChip,
   buildIdeEditorStatusConnectorChip,
+  buildIdeEditorStatusGitChip,
+  buildIdeEditorStatusSearchChip,
+  buildIdeEditorStatusTeamChip,
   buildIdeEditorStatusTerminalChip,
 } from './ide-editor-status-view';
+
+function employee(overrides: Partial<CompanyEmployeeRecord> = {}): CompanyEmployeeRecord {
+  return {
+    employee_id: 'e1',
+    workspace_id: 'workspace_demo',
+    name: 'Shell Craft',
+    role: 'frontend',
+    role_label: 'UI/UX',
+    schedule: 'continuous',
+    schedule_label: 'Continuous',
+    status: 'idle',
+    owns: 'console UI/UX, dock, and shell polish',
+    enabled: true,
+    primary: false,
+    ...overrides,
+  };
+}
 
 describe('buildIdeEditorStatusConnectorChip', () => {
   const base = {
@@ -119,6 +140,154 @@ describe('buildIdeEditorStatusConnectorChip', () => {
         ],
       })?.id,
     ).toBe('watch-offline');
+  });
+});
+
+describe('buildIdeEditorStatusGitChip', () => {
+  it('returns null when Source Control is already open', () => {
+    expect(
+      buildIdeEditorStatusGitChip({ dirtyFileCount: 2, sourceControlExpanded: true }),
+    ).toBeNull();
+  });
+
+  it('returns null when every file tab is saved', () => {
+    expect(
+      buildIdeEditorStatusGitChip({ dirtyFileCount: 0, sourceControlExpanded: false }),
+    ).toBeNull();
+  });
+
+  it('surfaces a compact unsaved count when file tabs need saving', () => {
+    expect(
+      buildIdeEditorStatusGitChip({ dirtyFileCount: 1, sourceControlExpanded: false }),
+    ).toMatchObject({
+      label: '1 UNSAVED',
+      count: 1,
+    });
+    expect(
+      buildIdeEditorStatusGitChip({ dirtyFileCount: 3, sourceControlExpanded: false }),
+    ).toMatchObject({
+      label: '3 UNSAVED',
+      count: 3,
+    });
+    expect(
+      buildIdeEditorStatusGitChip({ dirtyFileCount: 2, sourceControlExpanded: false })?.ariaLabel,
+    ).toContain('2 unsaved files');
+    expect(
+      buildIdeEditorStatusGitChip({ dirtyFileCount: 2, sourceControlExpanded: false })?.ariaLabel,
+    ).toContain('Source Control sidebar');
+  });
+});
+
+describe('buildIdeEditorStatusSearchChip', () => {
+  it('returns null when Search is already expanded or files loaded cleanly', () => {
+    expect(
+      buildIdeEditorStatusSearchChip({
+        loadState: 'error',
+        hasWorkspace: true,
+        searchExpanded: true,
+      }),
+    ).toBeNull();
+    expect(
+      buildIdeEditorStatusSearchChip({
+        loadState: 'loaded',
+        hasWorkspace: true,
+        searchExpanded: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('surfaces a compact chip when the workspace file index fails to load', () => {
+    expect(
+      buildIdeEditorStatusSearchChip({
+        loadState: 'error',
+        hasWorkspace: true,
+        searchExpanded: false,
+      }),
+    ).toMatchObject({
+      label: 'SEARCH ERR',
+    });
+    expect(
+      buildIdeEditorStatusSearchChip({
+        loadState: 'error',
+        hasWorkspace: true,
+        searchExpanded: false,
+      })?.ariaLabel,
+    ).toContain('Workspace files failed to load');
+    expect(
+      buildIdeEditorStatusSearchChip({
+        loadState: 'error',
+        hasWorkspace: true,
+        searchExpanded: false,
+      })?.ariaLabel,
+    ).toContain('Search sidebar');
+  });
+});
+
+describe('buildIdeEditorStatusTeamChip', () => {
+  it('returns null when Team is already expanded or everyone is healthy', () => {
+    expect(
+      buildIdeEditorStatusTeamChip({
+        employees: [employee({ last_outcome: 'failed', last_outcome_detail: 'timeout' })],
+        teamExpanded: true,
+      }),
+    ).toBeNull();
+    expect(
+      buildIdeEditorStatusTeamChip({
+        employees: [employee()],
+        teamExpanded: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('surfaces failed and interrupted counts when the Team sidebar is collapsed', () => {
+    expect(
+      buildIdeEditorStatusTeamChip({
+        employees: [employee({ last_outcome: 'failed', last_outcome_detail: 'timeout' })],
+        teamExpanded: false,
+      }),
+    ).toMatchObject({
+      label: '1 FAILED',
+      tone: 'failure',
+      count: 1,
+    });
+
+    expect(
+      buildIdeEditorStatusTeamChip({
+        employees: [
+          employee({
+            employee_id: 'e2',
+            name: 'Alex',
+            last_outcome: 'failed',
+            last_outcome_detail: 'run interrupted by control-plane restart',
+          }),
+        ],
+        teamExpanded: false,
+      }),
+    ).toMatchObject({
+      label: '1 INTERRUPTED',
+      tone: 'interrupted',
+      count: 1,
+    });
+
+    const mixed = buildIdeEditorStatusTeamChip({
+      employees: [
+        employee({ last_outcome: 'failed', last_outcome_detail: 'timeout' }),
+        employee({
+          employee_id: 'e2',
+          name: 'Alex',
+          last_outcome: 'failed',
+          last_outcome_detail: 'run interrupted by control-plane restart',
+        }),
+      ],
+      teamExpanded: false,
+    });
+
+    expect(mixed).toMatchObject({
+      label: '2 NEED ATTENTION',
+      tone: 'mixed',
+      count: 2,
+    });
+    expect(mixed?.ariaLabel).toContain('Team sidebar');
   });
 });
 

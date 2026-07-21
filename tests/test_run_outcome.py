@@ -169,6 +169,36 @@ class RunOutcomeTests(unittest.TestCase):
 
         self.assertIsNone(latest_role_run_outcome("workspace_axon_watch", "watcher"))
 
+    def test_latest_role_outcome_skips_employee_restart_cancelled_run(self) -> None:
+        real_failure = create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Reed: backend shift",
+            employee_role="backend",
+        )
+        fail_run(
+            real_failure["run_id"],
+            receipt_summary="verify:contracts — test_run_outcome.py: assertion failed",
+        )
+
+        restarted = create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Reed: continuous worker shift",
+            employee_role="backend",
+        )
+        from app.runs.restart_reconcile import interrupt_run_on_restart
+
+        cancelled = interrupt_run_on_restart(restarted["run_id"])
+        assert cancelled is not None
+        self.assertEqual("cancelled", cancelled["phase"])
+
+        outcome = latest_role_run_outcome("workspace_axon_watch", "backend")
+        assert outcome is not None
+        self.assertEqual("failed", outcome["outcome"])
+        self.assertIn("assertion failed", outcome["detail"])
+        self.assertEqual(real_failure["run_id"], outcome["run_id"])
+
 
 class RunOutcomeRosterApiTests(unittest.TestCase):
     def setUp(self) -> None:

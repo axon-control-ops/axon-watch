@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
-import { useShellStore } from '../../stores/shell';
+import { openWatchConnectors } from '../../composables/useIdeEditorStatusBar';
 import { isConnectorStatusBarChip } from '../../lib/connector-glance-view';
+import { useShellStore } from '../../stores/shell';
 import SupportedCommandsFooter from './SupportedCommandsFooter.vue';
 import PersonaTitle from '../PersonaTitle.vue';
 
@@ -19,8 +20,7 @@ function onCenterChipClick(id: string): void {
     return;
   }
 
-  void shell.loadConnectors();
-  shell.focusWatchConnectors();
+  openWatchConnectors(shell);
 }
 
 function connectorChipTitle(id: string): string | undefined {
@@ -125,7 +125,8 @@ onUnmounted(() => {
           class="status-bar-mockup__chip"
           :class="{
             'status-bar-mockup__chip--brand': item.tone === 'brand',
-            'status-bar-mockup__chip--warning': item.tone === 'warning',
+            'status-bar-mockup__chip--warning':
+              item.tone === 'warning' && item.id !== 'watch-offline',
             'status-bar-mockup__chip--connector-glance': item.id === 'connector-glance',
             'status-bar-mockup__chip--connector-required-alert':
               item.id === 'connector-required-alert',

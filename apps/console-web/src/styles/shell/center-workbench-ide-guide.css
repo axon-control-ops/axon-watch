@@ -11,7 +11,7 @@
   margin-bottom: 0.35rem;
 }
 
-.center-workbench__editor:not(:has(.surface-host--mockup, .agent-edit-review-viewer, .editor-image-preview, .editor-markdown-preview))
+.center-workbench__editor:not(:has(.surface-host--mockup, .agent-edit-review-viewer, .editor-image-preview, .editor-binary-preview, .editor-markdown-preview))
   > .center-workbench__ide-guide:not(.center-workbench__ide-guide--with-editor) {
   flex: 1;
   display: flex;
@@ -39,14 +39,48 @@
   color: rgba(255, 190, 170, 0.96);
 }
 
-.center-workbench__ide-guide--failure .center-workbench__ide-guide-action {
+.center-workbench__ide-guide--failure:has(.center-workbench__ide-guide-action--secondary)
+  .center-workbench__ide-guide-action:not(.center-workbench__ide-guide-action--secondary) {
+  border-color: rgba(140, 190, 230, 0.32);
+  background: rgba(20, 40, 58, 0.35);
+  color: rgba(200, 230, 255, 0.92);
+}
+
+.center-workbench__ide-guide--failure:has(.center-workbench__ide-guide-action--secondary)
+  .center-workbench__ide-guide-action:not(.center-workbench__ide-guide-action--secondary):hover,
+.center-workbench__ide-guide--failure:has(.center-workbench__ide-guide-action--secondary)
+  .center-workbench__ide-guide-action:not(.center-workbench__ide-guide-action--secondary):focus-visible {
+  border-color: rgba(120, 200, 255, 0.42);
+  background: rgba(24, 52, 78, 0.48);
+}
+
+.center-workbench__ide-guide--failure .center-workbench__ide-guide-action--secondary {
+  border-color: rgba(255, 140, 120, 0.52);
+  background: rgba(120, 40, 32, 0.62);
+  color: rgba(255, 240, 230, 0.98);
+  box-shadow: 0 0 10px rgba(160, 60, 40, 0.18);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.center-workbench__ide-guide--failure .center-workbench__ide-guide-action--secondary:hover,
+.center-workbench__ide-guide--failure .center-workbench__ide-guide-action--secondary:focus-visible {
+  border-color: rgba(220, 110, 90, 0.62);
+  background: rgba(110, 36, 28, 0.72);
+  box-shadow: 0 0 12px rgba(160, 60, 40, 0.28);
+}
+
+.center-workbench__ide-guide--failure:not(:has(.center-workbench__ide-guide-action--secondary))
+  .center-workbench__ide-guide-action {
   border-color: rgba(255, 110, 90, 0.38);
   background: rgba(120, 40, 32, 0.42);
   color: rgba(255, 230, 220, 0.96);
 }
 
-.center-workbench__ide-guide--failure .center-workbench__ide-guide-action:hover,
-.center-workbench__ide-guide--failure .center-workbench__ide-guide-action:focus-visible {
+.center-workbench__ide-guide--failure:not(:has(.center-workbench__ide-guide-action--secondary))
+  .center-workbench__ide-guide-action:hover,
+.center-workbench__ide-guide--failure:not(:has(.center-workbench__ide-guide-action--secondary))
+  .center-workbench__ide-guide-action:focus-visible {
   border-color: rgba(220, 110, 90, 0.52);
   background: rgba(110, 36, 28, 0.55);
 }
@@ -60,14 +94,48 @@
   color: rgba(255, 230, 190, 0.96);
 }
 
-.center-workbench__ide-guide--interrupted .center-workbench__ide-guide-action {
+.center-workbench__ide-guide--interrupted:has(.center-workbench__ide-guide-action--secondary)
+  .center-workbench__ide-guide-action:not(.center-workbench__ide-guide-action--secondary) {
+  border-color: rgba(140, 190, 230, 0.32);
+  background: rgba(20, 40, 58, 0.35);
+  color: rgba(200, 230, 255, 0.92);
+}
+
+.center-workbench__ide-guide--interrupted:has(.center-workbench__ide-guide-action--secondary)
+  .center-workbench__ide-guide-action:not(.center-workbench__ide-guide-action--secondary):hover,
+.center-workbench__ide-guide--interrupted:has(.center-workbench__ide-guide-action--secondary)
+  .center-workbench__ide-guide-action:not(.center-workbench__ide-guide-action--secondary):focus-visible {
+  border-color: rgba(120, 200, 255, 0.42);
+  background: rgba(24, 52, 78, 0.48);
+}
+
+.center-workbench__ide-guide--interrupted .center-workbench__ide-guide-action--secondary {
+  border-color: rgba(255, 180, 90, 0.48);
+  background: rgba(100, 65, 18, 0.62);
+  color: rgba(255, 245, 220, 0.98);
+  box-shadow: 0 0 10px rgba(180, 120, 40, 0.18);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.center-workbench__ide-guide--interrupted .center-workbench__ide-guide-action--secondary:hover,
+.center-workbench__ide-guide--interrupted .center-workbench__ide-guide-action--secondary:focus-visible {
+  border-color: rgba(255, 200, 110, 0.58);
+  background: rgba(120, 78, 22, 0.72);
+  box-shadow: 0 0 12px rgba(180, 120, 40, 0.28);
+}
+
+.center-workbench__ide-guide--interrupted:not(:has(.center-workbench__ide-guide-action--secondary))
+  .center-workbench__ide-guide-action {
   border-color: rgba(255, 180, 90, 0.38);
   background: rgba(100, 65, 18, 0.42);
   color: rgba(255, 240, 210, 0.96);
 }
 
-.center-workbench__ide-guide--interrupted .center-workbench__ide-guide-action:hover,
-.center-workbench__ide-guide--interrupted .center-workbench__ide-guide-action:focus-visible {
+.center-workbench__ide-guide--interrupted:not(:has(.center-workbench__ide-guide-action--secondary))
+  .center-workbench__ide-guide-action:hover,
+.center-workbench__ide-guide--interrupted:not(:has(.center-workbench__ide-guide-action--secondary))
+  .center-workbench__ide-guide-action:focus-visible {
   border-color: rgba(255, 200, 110, 0.52);
   background: rgba(110, 72, 20, 0.55);
 }

@@ -176,10 +176,43 @@ Type natural commands in the **Command** hero. Supported intents:
 
 Footer **Commands → Run** submits immediately (does not copy-only).
 
-Watch **Connectors** in Mission Control shows probe status, **Reprobe**, **Refresh summary**,
-and **Open :7734 fallback** for unmigrated axon-local paths.
+Watch **Connectors** in Mission Control shows live probe rows (including failure
+detail such as `Connection refused on …`), **Reprobe**, **Refresh summary**,
+tunnel controls when configured, and **Open :7734 fallback** for unmigrated
+axon-local paths. When the watch lane is offline, probe counts pause and reprobe/
+refresh are disabled until `./scripts/dev/up.sh` is healthy again.
 
 Unsupported text gets a helpful capability list back — not a silent failure.
+
+### Watch connectors and commands (API)
+
+Connector probes run in the **watch** service (8788) and surface through the
+control-plane proxy on **8787**. Config: `config/watch-connectors.json`.
+
+```bash
+# Connector snapshot (probe rows + aggregate counts)
+curl -s http://127.0.0.1:8787/api/connectors | python3 -m json.tool
+
+# Runtime summary includes connectors.{ok,required_unavailable,…}
+curl -s http://127.0.0.1:8787/api/runtime/summary | python3 -m json.tool
+
+# Reprobe one connector (same as Mission Control row action)
+curl -s -X POST http://127.0.0.1:8787/api/watch/commands \
+  -H 'Content-Type: application/json' \
+  -d '{"command_type":"reprobe_connector","target_type":"connector","target_id":"control_plane"}' \
+  | python3 -m json.tool
+
+# Refresh watch summary (clears probe caches; same as Connectors footer)
+curl -s -X POST http://127.0.0.1:8787/api/watch/commands \
+  -H 'Content-Type: application/json' \
+  -d '{"command_type":"refresh_summary"}' | python3 -m json.tool
+
+# Observation event log (command_accepted, connector_reprobed, …)
+curl -s 'http://127.0.0.1:8787/api/watch/events?limit=10' | python3 -m json.tool
+```
+
+Deeper reference: `docs/WATCH_CONNECTORS.md`, `docs/WATCH_COMMAND_EVENT_DEPTH.md`.
+Acceptance gate: `npm run verify:test3`.
 
 ### Runs (explicit execution units)
 
@@ -346,7 +379,7 @@ runs against the real axon-local tree when bindings and stack are up.
 
 **Do not expect yet:**
 
-- full axon-local feature parity (voice, mobile cockpit, full KAIRO rules, watch connectors)
+- full axon-local feature parity (voice, mobile cockpit, full KAIRO rules)
 - every workspace in the sidebar (bound repos are API-visible first)
 - automatic cross-workspace agent migration (handoff = record + summary, manual switch)
 - production deployment / dedicated-server cutover
@@ -375,6 +408,9 @@ curl -s http://127.0.0.1:8787/api/runtime/summary | python3 -m json.tool
 # Briefing (Notice / Advise)
 curl -s http://127.0.0.1:8787/api/briefing | python3 -m json.tool
 
+# Connectors + watch commands (see section above)
+curl -s http://127.0.0.1:8787/api/connectors | python3 -m json.tool
+
 # Post a chat command
 curl -s -X POST http://127.0.0.1:8787/api/chat/messages \
   -H 'Content-Type: application/json' \
@@ -396,6 +432,8 @@ curl -s http://127.0.0.1:8787/api/workspaces/workspace_smoke/chat/thread | pytho
 | Project bindings | `docs/WORKSPACE_PROJECT_CONNECTION.md` |
 | Handoffs | `docs/WORKSPACE_HANDOFF.md` |
 | Cutover readiness | `docs/AXON_X_CUTOVER_TODO.md` |
+| Watch connectors | `docs/WATCH_CONNECTORS.md` |
+| Watch commands / events | `docs/WATCH_COMMAND_EVENT_DEPTH.md` |
 | Layout rules | `docs/UI_LAYOUT_LOCK.md` |
 
 ---

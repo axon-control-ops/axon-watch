@@ -6,6 +6,11 @@ import subprocess
 import threading
 from typing import Any
 
+from app.cli_runtime.agent_process_scope import (
+    agent_scope_unit_from_wrapped_command,
+    stop_agent_scope,
+)
+
 _lock = threading.Lock()
 _processes: dict[str, subprocess.Popen[Any]] = {}
 
@@ -43,6 +48,9 @@ def terminate(run_id: str) -> bool:
     if proc is None:
         return False
     if proc.poll() is None:
+        scope_unit = agent_scope_unit_from_wrapped_command(proc.args)
+        if scope_unit:
+            stop_agent_scope(scope_unit)
         proc.terminate()
         try:
             proc.wait(timeout=5)

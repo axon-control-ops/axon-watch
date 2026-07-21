@@ -7,14 +7,12 @@ from typing import Any
 from app.domain.run_state import is_terminal_phase
 from app.persistence import run_store
 from app.runs.service import list_runs
-from app.workspace_agents.failure_detail import normalize_operator_failure_detail
+from app.workspace_agents.failure_detail import (
+    is_restart_interrupted_failure,
+    normalize_operator_failure_detail,
+)
 
 _MAX_DETAIL = 180
-_RESTART_INTERRUPT_MARKERS = (
-    "Run interrupted by control-plane restart",
-    "Run cancelled after control-plane restart",
-    "Run paused after control-plane restart",
-)
 
 
 def _truncate(text: str, limit: int = _MAX_DETAIL) -> str:
@@ -47,7 +45,7 @@ def _failure_detail_from_history(history_ref: str) -> str | None:
 def _is_restart_interrupt_run(run: dict[str, Any]) -> bool:
     """Return True when a run ended only because the control-plane process restarted."""
     step = str(run.get("current_step") or "").strip()
-    if any(marker in step for marker in _RESTART_INTERRUPT_MARKERS):
+    if step and is_restart_interrupted_failure(step):
         return True
     history_ref = str(run.get("history_ref") or "").strip()
     if not history_ref:
@@ -57,6 +55,9 @@ def _is_restart_interrupt_run(run: dict[str, Any]) -> bool:
         if not isinstance(receipt, dict):
             continue
         if str(receipt.get("type") or "").strip() == "control_plane_restart":
+            return True
+        summary = str(receipt.get("summary") or "").strip()
+        if summary and is_restart_interrupted_failure(summary):
             return True
     return False
 

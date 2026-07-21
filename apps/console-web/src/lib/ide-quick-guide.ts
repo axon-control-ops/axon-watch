@@ -1,3 +1,8 @@
+import type { CompanyRosterAlertBadgeTone } from '../features/workspace-agents/company-roster-failure-view';
+
+import { buildConnectorIdeQuickGuide } from './ide-quick-guide-connectors';
+import { ideSidebarStubActionAriaLabel } from './ide-sidebar-stub-view';
+
 export type IdeQuickGuideTone =
   | 'neutral'
   | 'attention'
@@ -9,12 +14,62 @@ export type IdeQuickGuideActionId =
   | 'expand-agent-dock'
   | 'show-terminal'
   | 'open-connectors'
+  | 'open-team'
+  | 'open-source-control'
+  | 'open-search'
   | 'retry-employee-shift';
 
 export type IdeQuickGuideAction = {
   id: IdeQuickGuideActionId;
   label: string;
 };
+
+/** Whether a quick-guide CTA uses the emphasized secondary styling when paired with expand. */
+export function ideQuickGuideActionIsSecondary(
+  actionId: IdeQuickGuideActionId,
+  actions: IdeQuickGuideAction[],
+): boolean {
+  const ids = new Set(actions.map((action) => action.id));
+
+  if (actionId === 'retry-employee-shift' && ids.has('expand-agent-dock')) {
+    return true;
+  }
+
+  return false;
+}
+
+/** Descriptive label for quick-guide CTA buttons (visible text stays short). */
+export function ideQuickGuideActionAriaLabel(action: IdeQuickGuideAction): string {
+  if (action.id === 'open-connectors') {
+    return 'Open connectors in Mission Control';
+  }
+
+  if (action.id === 'open-team') {
+    return 'Open Team sidebar in the left activity bar';
+  }
+
+  if (action.id === 'open-source-control') {
+    return 'Open Source Control sidebar in the left activity bar';
+  }
+
+  if (action.id === 'open-search') {
+    return 'Open Search sidebar in the left activity bar';
+  }
+
+  if (action.id === 'expand-agent-dock') {
+    return ideSidebarStubActionAriaLabel('Expand agent dock', 'agent');
+  }
+
+  if (action.id === 'show-terminal') {
+    return ideSidebarStubActionAriaLabel('Show terminal', 'terminal');
+  }
+
+  if (action.id === 'retry-employee-shift') {
+    return ideSidebarStubActionAriaLabel(action.label, 'agent');
+  }
+
+  return action.label;
+}
 
 export type IdeQuickGuide = {
   title: string;
@@ -43,6 +98,97 @@ function employeeFailureComposerBannerStep(interrupted: boolean): string {
   return `Use ${action} in the failure banner at the top of the agent dock composer.`;
 }
 
+function rosterFailureQuickGuideTone(
+  tone: CompanyRosterAlertBadgeTone | null | undefined,
+): IdeQuickGuideTone {
+  return tone === 'interrupted' ? 'interrupted' : 'failure';
+}
+
+function rosterFailureQuickGuideTitle(
+  count: number,
+  tone: CompanyRosterAlertBadgeTone | null | undefined,
+): string {
+  if (count === 1) {
+    return tone === 'interrupted'
+      ? 'Teammate shift interrupted — open Team to continue'
+      : 'Teammate shift failed — open Team to review';
+  }
+
+  if (tone === 'interrupted') {
+    return `${count} interrupted shifts — open Team to continue`;
+  }
+
+  return `${count} teammates need attention — open Team to review`;
+}
+
+function rosterFailureQuickGuideFallbackStep(
+  count: number,
+  tone: CompanyRosterAlertBadgeTone | null | undefined,
+): string {
+  if (count === 1) {
+    return tone === 'interrupted'
+      ? 'A teammate has an interrupted shift that can be continued.'
+      : 'A teammate needs attention after a failed shift.';
+  }
+
+  if (tone === 'interrupted') {
+    return `${count} teammates have interrupted shifts that can be continued.`;
+  }
+
+  if (tone === 'mixed') {
+    return `${count} teammates need attention after failed or interrupted shifts.`;
+  }
+
+  return `${count} teammates need attention after failed shifts.`;
+}
+
+function rosterFailureRecoveryStep(
+  tone: CompanyRosterAlertBadgeTone | null | undefined,
+): string {
+  if (tone === 'interrupted') {
+    return 'Team in the left activity bar shows who was interrupted and offers Continue shift.';
+  }
+
+  if (tone === 'mixed') {
+    return 'Team in the left activity bar shows who needs attention and offers Continue shift or Retry shift.';
+  }
+
+  return 'Team in the left activity bar shows who failed and offers Retry shift.';
+}
+
+function buildRosterFailureQuickGuide(input: {
+  failedEmployeeCount?: number;
+  failedEmployeesHint?: string | null;
+  rosterAlertTone?: CompanyRosterAlertBadgeTone | null;
+  terminalVisible: boolean;
+}): IdeQuickGuide | null {
+  const count = input.failedEmployeeCount ?? 0;
+  if (count <= 0) {
+    return null;
+  }
+
+  const tone = input.rosterAlertTone ?? 'failure';
+  const hint = (input.failedEmployeesHint ?? '').trim();
+  const actions: IdeQuickGuideAction[] = [{ id: 'open-team', label: 'Open Team' }];
+  if (!input.terminalVisible) {
+    actions.push({ id: 'show-terminal', label: 'Show terminal' });
+  }
+
+  return {
+    title: rosterFailureQuickGuideTitle(count, tone),
+    tone: rosterFailureQuickGuideTone(tone),
+    actions,
+    steps: [
+      hint || rosterFailureQuickGuideFallbackStep(count, tone),
+      rosterFailureRecoveryStep(tone),
+      'Activity bar Team badge · editor status bar chip · roster alert hint · select a teammate to open their dock.',
+      ...(input.terminalVisible
+        ? []
+        : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
+    ],
+  };
+}
+
 export function buildIdeQuickGuide(input: {
   layoutMode: 'operator' | 'ide';
   agentDockCollapsed: boolean;
@@ -56,6 +202,14 @@ export function buildIdeQuickGuide(input: {
   employeeRetryActionLabel?: string | null;
   requiredConnectorsUnavailable?: number;
   legacyConnectorGlanceVisible?: boolean;
+  watchConnected?: boolean;
+  failedEmployeeCount?: number;
+  failedEmployeesHint?: string | null;
+  rosterAlertTone?: CompanyRosterAlertBadgeTone | null;
+  dirtyFileCount?: number;
+  sourceControlExpanded?: boolean;
+  workspaceFilesLoadState?: 'idle' | 'loading' | 'loaded' | 'error';
+  searchExpanded?: boolean;
 }): IdeQuickGuide | null {
   if (input.layoutMode !== 'ide') {
     return null;
@@ -63,6 +217,7 @@ export function buildIdeQuickGuide(input: {
 
   const requiredConnectorsUnavailable = input.requiredConnectorsUnavailable ?? 0;
   const legacyConnectorGlanceVisible = input.legacyConnectorGlanceVisible ?? false;
+  const watchConnected = input.watchConnected ?? true;
   const idleRun = input.runPhase !== 'executing' && input.runPhase !== 'review_ready';
 
   if (input.pendingApprovals > 0 && input.agentDockCollapsed) {
@@ -143,47 +298,58 @@ export function buildIdeQuickGuide(input: {
     };
   }
 
-  if (idleRun && requiredConnectorsUnavailable > 0) {
-    const count = requiredConnectorsUnavailable;
-    const actions: IdeQuickGuideAction[] = [{ id: 'open-connectors', label: 'Open connectors' }];
-    if (!input.terminalVisible) {
-      actions.push({ id: 'show-terminal', label: 'Show terminal' });
-    }
+  const connectorGuide = buildConnectorIdeQuickGuide({
+    idleRun,
+    terminalVisible: input.terminalVisible,
+    watchConnected,
+    requiredConnectorsUnavailable,
+    legacyConnectorGlanceVisible,
+  });
+  if (connectorGuide) {
+    return connectorGuide;
+  }
 
+  if (idleRun && !(input.employeeFailureLine ?? '').trim()) {
+    const rosterGuide = buildRosterFailureQuickGuide(input);
+    if (rosterGuide) {
+      return rosterGuide;
+    }
+  }
+
+  const dirtyFileCount = input.dirtyFileCount ?? 0;
+  if (idleRun && dirtyFileCount > 0 && !input.sourceControlExpanded) {
     return {
       title:
-        count === 1
-          ? 'Required connector down — restore the watch lane'
-          : `${count} required connectors down — restore the watch lane`,
+        dirtyFileCount === 1
+          ? 'Unsaved changes — open Source Control to review'
+          : `${dirtyFileCount} unsaved files — open Source Control to review`,
       tone: 'attention',
-      actions,
+      actions: [{ id: 'open-source-control', label: 'Open Source Control' }],
       steps: [
-        'Switch to Mission Control → Connectors for live probe status and reprobe actions.',
-        'Reprobe after fixing credentials, network, or the downstream service.',
-        'Editor status bar chip · footer status bar chip · quick guide Open connectors.',
-        ...(input.terminalVisible
-          ? []
-          : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
+        dirtyFileCount === 1
+          ? 'One workspace file tab has edits that are not saved yet.'
+          : `${dirtyFileCount} workspace file tabs have edits that are not saved yet.`,
+        'Source Control in the left activity bar lists each unsaved file — click to jump back.',
+        'Ctrl/Cmd+Shift+G opens Source Control from anywhere in the IDE.',
+        'Activity bar badge · status bar Unsaved chip and pill · dirty dot on editor tabs · save from the editor when ready.',
       ],
     };
   }
 
-  if (idleRun && legacyConnectorGlanceVisible) {
-    const actions: IdeQuickGuideAction[] = [{ id: 'open-connectors', label: 'Open connectors' }];
-    if (!input.terminalVisible) {
-      actions.push({ id: 'show-terminal', label: 'Show terminal' });
-    }
-
+  if (
+    idleRun &&
+    input.workspaceFilesLoadState === 'error' &&
+    (input.watchConnected ?? true) &&
+    !input.searchExpanded
+  ) {
     return {
-      title: 'Legacy Axon Local is offline — Axon-X stack is healthy',
-      tone: 'neutral',
-      actions,
+      title: 'Workspace files failed to load — open Search to retry',
+      tone: 'attention',
+      actions: [{ id: 'open-search', label: 'Open Search' }],
       steps: [
-        'Editor status bar LEGACY OFFLINE chip · footer chip · quick guide Open connectors.',
-        'Optional connector only — reprobe or open the :7734 fallback when you still need classic Axon Local.',
-        ...(input.terminalVisible
-          ? []
-          : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
+        'Could not load workspace files — use Retry in the Search sidebar, or check the watch connection.',
+        'Ctrl/Cmd+Shift+F opens Search from anywhere in the IDE.',
+        'Activity bar warning pulse · editor status bar SEARCH ERR chip · Search panel retry button.',
       ],
     };
   }
@@ -268,6 +434,8 @@ export function buildIdeQuickGuide(input: {
         'Ctrl/Cmd+\\ — agent dock (conversation + composer)',
         'Ctrl/Cmd+J — terminal panel in the workbench',
         'Ctrl/Cmd+B — file explorer sidebar',
+        'Ctrl/Cmd+Shift+F — Search sidebar (filter workspace file paths)',
+        'Ctrl/Cmd+Shift+G — Source Control sidebar',
         'Editor status bar chips and the left activity bar work too when you prefer clicking.',
       ],
     };
@@ -283,6 +451,13 @@ export function buildIdeQuickGuide(input: {
         'Click AGENT in the editor status bar, the right-edge reopen strip, or the agent icon in the left activity bar.',
       ],
     };
+  }
+
+  if (!(input.employeeFailureLine ?? '').trim()) {
+    const rosterGuide = buildRosterFailureQuickGuide(input);
+    if (rosterGuide) {
+      return rosterGuide;
+    }
   }
 
   return null;

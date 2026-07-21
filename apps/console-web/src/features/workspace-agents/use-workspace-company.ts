@@ -2,9 +2,12 @@ import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
 
 import { fetchWorkspaceCompany } from '../../api/workspace-api';
 import type { CompanyEmployeeRecord, CompanyRosterRecord } from '../../contracts/canonical';
+import {
+  COMPANY_REFRESH_MS,
+  companyEmployeesUnchanged,
+} from '../../lib/ui-refresh-guardrails';
 
-/** Shared poll interval for workspace company roster snapshots. */
-export const COMPANY_REFRESH_MS = 12_000;
+export { COMPANY_REFRESH_MS } from '../../lib/ui-refresh-guardrails';
 
 export function useWorkspaceCompany(currentWorkspaceId: Ref<string | null | undefined>) {
   const company = ref<CompanyRosterRecord | null>(null);
@@ -29,6 +32,12 @@ export function useWorkspaceCompany(currentWorkspaceId: Ref<string | null | unde
     }
     try {
       const snapshot = await fetchWorkspaceCompany(workspaceId);
+      if (
+        background &&
+        companyEmployeesUnchanged(company.value?.employees, snapshot.company.employees ?? [])
+      ) {
+        return;
+      }
       company.value = snapshot.company;
       loadState.value = 'loaded';
     } catch (error) {

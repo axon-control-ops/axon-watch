@@ -115,9 +115,15 @@
   background: rgba(14, 116, 144, 0.95);
 }
 
+.editor-markdown-toolbar__build-plan:focus-visible:not(:disabled) {
+  background: rgba(14, 116, 144, 0.95);
+  outline: 2px solid rgba(0, 242, 255, 0.55);
+  outline-offset: 2px;
+}
+
 .editor-markdown-toolbar__build-plan:disabled {
   opacity: 0.55;
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .editor-markdown-toolbar__build-error {

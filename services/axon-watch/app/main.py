@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
@@ -102,6 +103,24 @@ def vault_startup_auto_unlock() -> None:
     # Vault first so named-tunnel tokens from unlock are available to autostart.
     attempt_auto_unlock()
     attempt_tunnel_autostart()
+    # Warm connector/monitor caches off the request path so post-revive inbox
+    # polls do not all stampede a cold Sentry/IMAP probe and 503 at the CP.
+    def _warm_probe_caches() -> None:
+        try:
+            from app.connectors.summary import probe_all_connectors
+            from app.monitors.dashpro_monitor import probe_monitor_records
+
+            probe_all_connectors()
+            probe_monitor_records()
+        except Exception:
+            # Startup must stay healthy even when external probes fail.
+            return
+
+    threading.Thread(
+        target=_warm_probe_caches,
+        name="axon-watch-probe-cache-warm",
+        daemon=True,
+    ).start()
 
 
 @app.get("/internal/watch/health")

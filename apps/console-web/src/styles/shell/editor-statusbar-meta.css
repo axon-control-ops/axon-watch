@@ -1,0 +1,93 @@
+/* IDE editor status bar shell + meta strip (save state, minimap toggle) */
+
+.editor-statusbar--mockup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: auto;
+  padding: 0.18rem 0.7rem;
+  border-top: 1px solid rgba(138, 154, 173, 0.12);
+  background: #0a1018;
+  color: rgba(148, 163, 184, 0.82);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-caption);
+  letter-spacing: 0.02em;
+}
+
+.editor-statusbar__meta {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-left: auto;
+}
+
+.editor-statusbar__state {
+  color: rgba(0, 242, 255, 0.88);
+}
+
+.editor-statusbar__state--saved {
+  color: rgba(0, 242, 255, 0.88);
+}
+
+.editor-statusbar__state--empty {
+  color: rgba(127, 148, 168, 0.88);
+}
+
+.editor-statusbar__state--read-only {
+  color: rgba(127, 148, 168, 0.88);
+}
+
+.editor-statusbar__state--preview {
+  color: rgba(127, 148, 168, 0.88);
+}
+
+.editor-statusbar__state--loading {
+  color: rgba(255, 200, 130, 0.92);
+}
+
+.editor-statusbar__state--unsaved {
+  padding: 0.08rem 0.42rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(150, 231, 255, 0.96);
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.editor-statusbar__state--unsaved:hover,
+.editor-statusbar__state--unsaved:focus-visible {
+  border-color: rgba(0, 242, 255, 0.42);
+  background: rgba(0, 242, 255, 0.12);
+  color: rgba(190, 245, 255, 1);
+  outline: 1px solid rgba(0, 245, 212, 0.55);
+  outline-offset: 1px;
+}
+
+.editor-statusbar__toggle {
+  padding: 0.08rem 0.42rem;
+  border: 1px solid rgba(0, 242, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(127, 148, 168, 0.88);
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.editor-statusbar__toggle--active,
+.editor-statusbar__toggle:hover {
+  border-color: rgba(0, 242, 255, 0.34);
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(0, 242, 255, 0.9);
+}
+
+.editor-statusbar__toggle:focus-visible {
+  border-color: rgba(0, 242, 255, 0.34);
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(0, 242, 255, 0.9);
+  outline: 1px solid rgba(0, 245, 212, 0.55);
+  outline-offset: 1px;
+}

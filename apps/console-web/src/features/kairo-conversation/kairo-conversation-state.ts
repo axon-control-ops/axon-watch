@@ -10,6 +10,9 @@ export const kairoLastActionTier = ref<string | null>(null);
 export const kairoLastModelReceipt = ref<Record<string, unknown> | null>(null);
 
 export function setKairoConversationPhase(phase: KairoConversationPhase): void {
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'voice-state',hypothesisId:'H3',location:'kairo-conversation-state.ts:setKairoConversationPhase',message:'Kairo conversation phase transition requested',data:{previous:kairoConversationPhase.value,next:phase,changed:kairoConversationPhase.value!==phase},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   kairoConversationPhase.value = phase;
 }
 

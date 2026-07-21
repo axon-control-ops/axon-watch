@@ -8,6 +8,7 @@
 @import './data-surface.css';
 @import './skills-surface.css';
 @import './settings-surface.css';
+@import './ide-motion-guardrails.css';
 
 :root {
   font-family: var(--font-display);

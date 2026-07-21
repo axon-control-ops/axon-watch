@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildConnectorRailRows,
   buildConnectorRailSummaryLabel,
+  buildConnectorRailWatchOfflineStatus,
+  connectorMutationBlockedWhenWatchOffline,
   connectorRailNeedsEmphasis,
 } from './connector-rail-view';
 
@@ -63,6 +65,26 @@ describe('buildConnectorRailSummaryLabel', () => {
     expect(
       buildConnectorRailSummaryLabel({ loading: false, summary, watchConnected: true }),
     ).toBe('2/3 ok · 1 required down');
+  });
+
+  it('reports unavailable when probe summary is missing', () => {
+    expect(
+      buildConnectorRailSummaryLabel({ loading: false, summary: null, watchConnected: true }),
+    ).toBe('Connectors unavailable');
+  });
+});
+
+describe('buildConnectorRailWatchOfflineStatus', () => {
+  it('returns offline guidance when watch is disconnected', () => {
+    expect(buildConnectorRailWatchOfflineStatus(false)).toContain('Watch offline');
+    expect(buildConnectorRailWatchOfflineStatus(true)).toBeNull();
+  });
+});
+
+describe('connectorMutationBlockedWhenWatchOffline', () => {
+  it('blocks watch commands when the lane is disconnected', () => {
+    expect(connectorMutationBlockedWhenWatchOffline(false)).toContain('commands paused');
+    expect(connectorMutationBlockedWhenWatchOffline(true)).toBeNull();
   });
 });
 

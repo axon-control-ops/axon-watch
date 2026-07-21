@@ -314,6 +314,13 @@
   cursor: pointer;
 }
 
+.editor-breadcrumb__segment:not(:disabled):focus-visible {
+  background: rgba(148, 163, 184, 0.1);
+  color: rgba(226, 232, 240, 0.96);
+  outline: 2px solid rgba(0, 242, 255, 0.45);
+  outline-offset: 1px;
+}
+
 .editor-breadcrumb__segment--symbol {
   color: rgba(125, 211, 252, 0.9);
 }

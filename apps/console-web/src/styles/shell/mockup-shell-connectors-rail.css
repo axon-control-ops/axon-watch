@@ -181,6 +181,14 @@
   color: rgba(251, 191, 36, 0.92);
 }
 
+.connectors-rail-panel--watch-offline .connectors-rail-panel__list {
+  opacity: 0.78;
+}
+
+.connectors-rail-panel--watch-offline .connectors-rail-panel__item {
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
 .connectors-rail-panel--emphasized {
   animation: connectors-rail-emphasis 1.2s ease;
 }

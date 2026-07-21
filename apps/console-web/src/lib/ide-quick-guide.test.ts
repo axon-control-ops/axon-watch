@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildIdeQuickGuide } from './ide-quick-guide';
+import { buildIdeQuickGuide, ideQuickGuideActionAriaLabel, ideQuickGuideActionIsSecondary } from './ide-quick-guide';
 
 describe('buildIdeQuickGuide', () => {
   const base = {
@@ -160,6 +160,8 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.tone).toBe('neutral');
     expect(guide?.steps.join(' ')).toContain('Ctrl/Cmd+J');
     expect(guide?.steps.join(' ')).toContain('Ctrl/Cmd+B');
+    expect(guide?.steps.join(' ')).toContain('Ctrl/Cmd+Shift+F');
+    expect(guide?.steps.join(' ')).toContain('Ctrl/Cmd+Shift+G');
     expect(guide?.actions.map((action) => action.id)).toEqual([
       'expand-agent-dock',
       'show-terminal',
@@ -258,44 +260,184 @@ describe('buildIdeQuickGuide', () => {
     ).toBeNull();
   });
 
-  it('prioritizes required connector guidance when idle and probes are down', () => {
+  it('surfaces roster failure guidance when another teammate failed', () => {
     const guide = buildIdeQuickGuide({
       ...base,
-      requiredConnectorsUnavailable: 2,
+      failedEmployeeCount: 1,
+      failedEmployeesHint: 'Alex — Last shift failed: timeout',
+      rosterAlertTone: 'failure',
+    });
+
+    expect(guide?.tone).toBe('failure');
+    expect(guide?.title).toContain('Teammate shift failed');
+    expect(guide?.steps[0]).toBe('Alex — Last shift failed: timeout');
+    expect(guide?.steps.join(' ')).toContain('Retry shift');
+    expect(guide?.actions.map((action) => action.id)).toEqual(['open-team', 'show-terminal']);
+  });
+
+  it('uses interrupted styling when another teammate has an interrupted shift', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      failedEmployeeCount: 1,
+      failedEmployeesHint:
+        'Alex — Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+      rosterAlertTone: 'interrupted',
+    });
+
+    expect(guide?.tone).toBe('interrupted');
+    expect(guide?.title).toContain('Teammate shift interrupted');
+    expect(guide?.steps.join(' ')).toContain('Continue shift');
+  });
+
+  it('uses mixed roster copy when teammates have both failed and interrupted shifts', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      failedEmployeeCount: 2,
+      rosterAlertTone: 'mixed',
+    });
+
+    expect(guide?.tone).toBe('failure');
+    expect(guide?.title).toContain('2 teammates need attention');
+    expect(guide?.steps.join(' ')).toContain('Continue shift or Retry shift');
+  });
+
+  it('shows roster failure guidance even when agent dock and terminal are both open', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      agentDockCollapsed: false,
+      terminalVisible: true,
+      failedEmployeeCount: 2,
+      failedEmployeesHint:
+        '2 teammates need attention after a failed shift — select one for Retry shift, or click to talk it through.',
+    });
+
+    expect(guide?.tone).toBe('failure');
+    expect(guide?.title).toContain('2 teammates need attention');
+    expect(guide?.actions).toEqual([{ id: 'open-team', label: 'Open Team' }]);
+  });
+
+  it('keeps active teammate failure guidance above roster failures', () => {
+    expect(
+      buildIdeQuickGuide({
+        ...base,
+        employeeFailureLine: 'Last shift failed: timeout',
+        failedEmployeeCount: 2,
+      })?.title,
+    ).toContain('Last shift failed');
+  });
+
+  it('surfaces unsaved-file guidance when Source Control is collapsed', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      dirtyFileCount: 2,
+      sourceControlExpanded: false,
     });
 
     expect(guide?.tone).toBe('attention');
-    expect(guide?.title).toContain('2 required connectors down');
-    expect(guide?.steps.join(' ')).toContain('Reprobe');
-    expect(guide?.actions.map((action) => action.id)).toEqual([
-      'open-connectors',
-      'show-terminal',
+    expect(guide?.title).toContain('2 unsaved files');
+    expect(guide?.steps.join(' ')).toContain('Source Control');
+    expect(guide?.steps.join(' ')).toContain('Ctrl/Cmd+Shift+G');
+    expect(guide?.steps.join(' ')).toContain('status bar Unsaved chip and pill');
+    expect(guide?.actions).toEqual([
+      { id: 'open-source-control', label: 'Open Source Control' },
     ]);
   });
 
-  it('surfaces legacy connector guidance when optional Axon Local is offline', () => {
+  it('skips unsaved-file guidance when Source Control is already open', () => {
     const guide = buildIdeQuickGuide({
       ...base,
-      terminalVisible: true,
-      legacyConnectorGlanceVisible: true,
+      dirtyFileCount: 1,
+      sourceControlExpanded: true,
     });
 
-    expect(guide?.title).toContain('Legacy Axon Local');
-    expect(guide?.steps.join(' ')).toContain('LEGACY OFFLINE');
-    expect(guide?.actions).toEqual([{ id: 'open-connectors', label: 'Open connectors' }]);
+    expect(guide?.title).not.toContain('Unsaved');
   });
 
-  it('does not override run guidance when a run is active', () => {
+  it('surfaces search load-failure guidance when the file index errors', () => {
     const guide = buildIdeQuickGuide({
       ...base,
-      runPhase: 'executing',
-      requiredConnectorsUnavailable: 1,
+      workspaceFilesLoadState: 'error',
+      searchExpanded: false,
     });
 
-    expect(guide?.title).toContain('Run in progress');
-    expect(guide?.actions.map((action) => action.id)).toEqual([
-      'expand-agent-dock',
-      'show-terminal',
-    ]);
+    expect(guide?.tone).toBe('attention');
+    expect(guide?.title).toContain('Workspace files failed to load');
+    expect(guide?.steps.join(' ')).toContain('Ctrl/Cmd+Shift+F');
+    expect(guide?.steps.join(' ')).toContain('SEARCH ERR');
+    expect(guide?.actions).toEqual([{ id: 'open-search', label: 'Open Search' }]);
+  });
+
+  it('skips search load-failure guidance when Search is already open', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      workspaceFilesLoadState: 'error',
+      searchExpanded: true,
+    });
+
+    expect(guide?.title).not.toContain('Workspace files failed to load');
+  });
+
+  it('keeps unsaved-file guidance above search load-failure nudges', () => {
+    expect(
+      buildIdeQuickGuide({
+        ...base,
+        dirtyFileCount: 2,
+        workspaceFilesLoadState: 'error',
+      })?.title,
+    ).toContain('2 unsaved files');
+  });
+
+  it('keeps roster failure guidance above unsaved-file nudges', () => {
+    expect(
+      buildIdeQuickGuide({
+        ...base,
+        dirtyFileCount: 3,
+        failedEmployeeCount: 1,
+      })?.title,
+    ).toContain('Teammate shift failed');
+  });
+});
+
+describe('ideQuickGuideActionIsSecondary', () => {
+  it('emphasizes retry when expand is also offered', () => {
+    const actions = [
+      { id: 'expand-agent-dock' as const, label: 'Expand agent dock' },
+      { id: 'retry-employee-shift' as const, label: 'Retry shift' },
+    ];
+
+    expect(ideQuickGuideActionIsSecondary('retry-employee-shift', actions)).toBe(true);
+    expect(ideQuickGuideActionIsSecondary('expand-agent-dock', actions)).toBe(false);
+  });
+
+  it('keeps a lone retry action fully emphasized', () => {
+    const actions = [{ id: 'retry-employee-shift' as const, label: 'Retry shift' }];
+
+    expect(ideQuickGuideActionIsSecondary('retry-employee-shift', actions)).toBe(false);
+  });
+});
+
+describe('ideQuickGuideActionAriaLabel', () => {
+  it('expands quick-guide button labels for screen readers', () => {
+    expect(
+      ideQuickGuideActionAriaLabel({ id: 'open-connectors', label: 'Open connectors' }),
+    ).toContain('Mission Control');
+    expect(
+      ideQuickGuideActionAriaLabel({ id: 'expand-agent-dock', label: 'Expand agent dock' }),
+    ).toContain('right edge');
+    expect(
+      ideQuickGuideActionAriaLabel({ id: 'show-terminal', label: 'Show terminal' }),
+    ).toContain('below the editor');
+    expect(
+      ideQuickGuideActionAriaLabel({ id: 'retry-employee-shift', label: 'Continue shift' }),
+    ).toContain('agent dock composer');
+    expect(
+      ideQuickGuideActionAriaLabel({ id: 'open-team', label: 'Open Team' }),
+    ).toContain('left activity bar');
+    expect(
+      ideQuickGuideActionAriaLabel({
+        id: 'open-source-control',
+        label: 'Open Source Control',
+      }),
+    ).toContain('Source Control sidebar');
   });
 });

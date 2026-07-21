@@ -31,6 +31,11 @@
   cursor: default;
 }
 
+.editor-tabbar__tool-button:focus-visible:not(:disabled) {
+  outline: 2px solid rgba(0, 242, 255, 0.45);
+  outline-offset: 2px;
+}
+
 .editor-tabbar__icon {
   opacity: 0.75;
 }

@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue';
 import {
   buildConnectorRailRows,
   buildConnectorRailSummaryLabel,
+  buildConnectorRailWatchOfflineStatus,
   connectorRailNeedsEmphasis,
 } from '../../lib/connector-rail-view';
 import { useShellStore } from '../../stores/shell';
@@ -26,6 +27,12 @@ const summaryLabel = computed(() =>
     summary: shell.connectorsSummary,
     watchConnected: watchConnected.value,
   }),
+);
+const watchOfflineStatus = computed(() =>
+  buildConnectorRailWatchOfflineStatus(watchConnected.value),
+);
+const probeActionsPaused = computed(
+  () => !watchConnected.value || shell.connectorMutationPending,
 );
 
 function openLegacyFallback(url: string): void {
@@ -67,7 +74,10 @@ onMounted(() => {
   <section
     id="watch-connectors-rail"
     class="connectors-rail-panel"
-    :class="{ 'connectors-rail-panel--emphasized': emphasized }"
+    :class="{
+      'connectors-rail-panel--emphasized': emphasized,
+      'connectors-rail-panel--watch-offline': Boolean(watchOfflineStatus) && !loading,
+    }"
     aria-label="Watch connectors"
   >
     <header class="connectors-rail-panel__header">
@@ -84,7 +94,15 @@ onMounted(() => {
 
     <p v-else-if="loading" class="connectors-rail-panel__status">Loading connectors…</p>
 
-    <ul v-else-if="rows.length" class="connectors-rail-panel__list">
+    <template v-else>
+      <p
+        v-if="watchOfflineStatus"
+        class="connectors-rail-panel__status connectors-rail-panel__status--offline"
+      >
+        {{ watchOfflineStatus }}
+      </p>
+
+      <ul v-if="rows.length" class="connectors-rail-panel__list">
       <li
         v-for="row in rows"
         :key="row.connectorId"
@@ -107,8 +125,12 @@ onMounted(() => {
               'connectors-rail-panel__action--pending':
                 reprobingConnectorId === row.connectorId && shell.connectorMutationPending,
             }"
-            :disabled="shell.connectorMutationPending"
-            :title="`Reprobe ${row.label}`"
+            :disabled="probeActionsPaused"
+            :title="
+              watchConnected
+                ? `Reprobe ${row.label}`
+                : 'Watch offline — reprobe paused until the watch reconnects'
+            "
             :aria-label="`Reprobe ${row.label} connector`"
             :aria-busy="reprobingConnectorId === row.connectorId && shell.connectorMutationPending"
             @click="handleReprobe(row.connectorId)"
@@ -119,7 +141,7 @@ onMounted(() => {
             v-if="row.isTunnelConnector && row.tunnelStartAllowed"
             type="button"
             class="connectors-rail-panel__action connectors-rail-panel__action--primary"
-            :disabled="shell.connectorMutationPending"
+            :disabled="probeActionsPaused"
             @click="shell.startCloudflareTunnel()"
           >
             Start tunnel
@@ -128,7 +150,7 @@ onMounted(() => {
             v-if="row.isTunnelConnector && row.tunnelRunning && row.tunnelManaged"
             type="button"
             class="connectors-rail-panel__action"
-            :disabled="shell.connectorMutationPending"
+            :disabled="probeActionsPaused"
             @click="shell.stopCloudflareTunnel()"
           >
             Stop tunnel
@@ -151,17 +173,30 @@ onMounted(() => {
           </button>
         </div>
       </li>
-    </ul>
+      </ul>
 
-    <p v-else class="connectors-rail-panel__status">No connectors configured.</p>
+      <p v-else class="connectors-rail-panel__status">No connectors configured.</p>
+    </template>
 
     <footer class="connectors-rail-panel__footer">
       <button
         type="button"
         class="connectors-rail-panel__refresh"
-        :disabled="shell.connectorMutationPending"
-        :title="shell.connectorMutationPending ? 'Refreshing watch summary' : 'Refresh watch summary'"
-        :aria-label="shell.connectorMutationPending ? 'Refreshing watch summary' : 'Refresh watch summary'"
+        :disabled="probeActionsPaused"
+        :title="
+          shell.connectorMutationPending
+            ? 'Refreshing watch summary'
+            : watchConnected
+              ? 'Refresh watch summary'
+              : 'Watch offline — refresh paused until the watch reconnects'
+        "
+        :aria-label="
+          shell.connectorMutationPending
+            ? 'Refreshing watch summary'
+            : watchConnected
+              ? 'Refresh watch summary'
+              : 'Watch offline — refresh paused until the watch reconnects'
+        "
         @click="shell.refreshWatchSummary()"
       >
         {{ shell.connectorMutationPending ? 'Refreshing…' : 'Refresh summary' }}

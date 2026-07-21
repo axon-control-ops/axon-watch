@@ -63,6 +63,15 @@ describe('kairo-shared-speech-capture busy gating', () => {
     expect(kairoConversationPhase.value).toBe('listening');
   });
 
+  it('keeps ambient hands-free capture out of the visible conversation phase', () => {
+    expect(startKairoSpeechCapture('hands_free')).toBe(true);
+    expect(kairoConversationPhase.value).toBe('idle');
+
+    captureCallbacks?.onEnd?.();
+
+    expect(kairoConversationPhase.value).toBe('idle');
+  });
+
   it('blocks capture while thinking', () => {
     setKairoConversationPhase('thinking');
     expect(canStartKairoSpeechCapture()).toBe(false);

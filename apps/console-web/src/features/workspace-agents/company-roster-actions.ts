@@ -5,6 +5,7 @@ import {
   employeeDockReceiptRunId,
   employeeFailureLine,
   employeeFailureRetryActionLabel,
+  isRuntimeAuthFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
   normalizeOperatorFailureDetail,
@@ -62,6 +63,12 @@ export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
       `retry the bounded continuous shift. Summarize what changed and include receipts.`
     );
   }
+  if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
+    return (
+      `${name} (${owns}): Runtime auth blocked the last shift. Run \`cursor agent login\` on the host ` +
+      `or unlock /vault, then retry the bounded continuous shift. Summarize what changed and include receipts.`
+    );
+  }
   const errorHint = detail ? ` Last error: ${detail}` : '';
   return `Retry the last failed shift for ${name} (${owns}).${errorHint} Summarize what changed and include receipts.`;
 }
@@ -83,6 +90,14 @@ export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
       `Walk me through receipts for ${name}'s last shift${runHint}. ` +
       `The shift never started because usage limits blocked the agent runtime. ` +
       `Summarize what was attempted and suggest next steps once limits are restored.`
+    );
+  }
+  if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
+    const runHint = runId ? ` (${runId})` : '';
+    return (
+      `Walk me through receipts for ${name}'s last shift${runHint}. ` +
+      `The shift could not run because runtime auth is not ready. ` +
+      `Summarize what was attempted and suggest next steps once auth is fixed.`
     );
   }
   const detailHint = detail ? ` Error: ${detail}` : '';

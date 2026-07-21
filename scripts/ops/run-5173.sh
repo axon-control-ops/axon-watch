@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# run-5173 — Vite HMR edit window for Axon-X console-web on :5173
+# run-5173 — stable Vite source window for Axon-X console-web on :5173
 #
 # Keeps always-on daily driver on :4173. Shares control-plane :8787.
+# HMR is deliberately opt-in so agent/source edits cannot flicker an active UI.
 # Usage:
 #   ./scripts/ops/run-5173.sh
+#   ./scripts/ops/run-5173.sh --hmr
 #   npm run run:5173
 
 set -euo pipefail
@@ -13,6 +15,35 @@ cd "$ROOT"
 
 PORT="${AXON_WATCH_CONSOLE_EDIT_PORT:-5173}"
 HOST="${AXON_WATCH_CONSOLE_EDIT_HOST:-127.0.0.1}"
+HMR="${AXON_WATCH_VITE_HMR:-0}"
+
+if [[ "${1:-}" == "--hmr" ]]; then
+  HMR=1
+  shift
+fi
+if (($#)); then
+  echo "run-5173: unknown argument: $1" >&2
+  echo "Usage: $0 [--hmr]" >&2
+  exit 2
+fi
+export AXON_WATCH_VITE_HMR="$HMR"
+
+# Gate 2: local_token + AUTH_ALLOW_LOOPBACK=0 means the Vite /api proxy must
+# inject AXON_WATCH_OPERATOR_TOKEN. Always-on :4173 gets this via systemd
+# EnvironmentFile; load the same deployment.env for the :5173 edit window.
+env_file="${AXON_WATCH_DEPLOYMENT_ENV:-${HOME}/.config/axon-watch/deployment.env}"
+if [[ ! -f "${env_file}" && -f /etc/axon-watch/deployment.env ]]; then
+  env_file=/etc/axon-watch/deployment.env
+fi
+if [[ -f "${env_file}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${env_file}"
+  set +a
+  echo "run-5173: loaded operator auth from ${env_file}"
+else
+  echo "run-5173: warning: no deployment.env found; mutating /api calls may 401" >&2
+fi
 
 if ! curl -fsS --max-time 2 "http://127.0.0.1:8787/api/health" >/dev/null 2>&1; then
   echo "run-5173: control-plane :8787 is not healthy." >&2
@@ -28,6 +59,11 @@ if ss -ltn "( sport = :${PORT} )" 2>/dev/null | grep -q ":${PORT}"; then
   exit 1
 fi
 
-echo "run-5173: starting Vite edit window on http://${HOST}:${PORT}/"
+echo "run-5173: starting Vite source window on http://${HOST}:${PORT}/"
+if [[ "$HMR" == "1" ]]; then
+  echo "run-5173: HMR enabled — source edits may reload the page."
+else
+  echo "run-5173: stability mode — HMR disabled; refresh manually to load source edits."
+fi
 echo "run-5173: daily driver stays on http://127.0.0.1:4173/ (same API :8787)"
 exec npm run dev -w @axon-watch/console-web -- --host "$HOST" --port "$PORT" --strictPort

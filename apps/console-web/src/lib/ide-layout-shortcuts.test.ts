@@ -6,6 +6,7 @@ describe('ide layout shortcuts', () => {
   const base = {
     layoutMode: 'ide',
     modKey: true,
+    shiftKey: false,
     editableTarget: false,
   };
 
@@ -36,5 +37,31 @@ describe('ide layout shortcuts', () => {
     expect(
       resolveIdeLayoutShortcut({ ...base, layoutMode: 'operator', key: '\\' }),
     ).toBeNull();
+  });
+
+  it('maps Source Control open in IDE mode with Ctrl/Cmd+Shift+G', () => {
+    expect(
+      resolveIdeLayoutShortcut({ ...base, shiftKey: true, key: 'g' }),
+    ).toBe('open-source-control');
+    expect(
+      resolveIdeLayoutShortcut({ ...base, shiftKey: true, key: 'G' }),
+    ).toBe('open-source-control');
+    expect(
+      resolveIdeLayoutShortcut({ ...base, layoutMode: 'operator', shiftKey: true, key: 'g' }),
+    ).toBeNull();
+    expect(resolveIdeLayoutShortcut({ ...base, key: 'g' })).toBeNull();
+  });
+
+  it('maps Search open in IDE mode with Ctrl/Cmd+Shift+F', () => {
+    expect(
+      resolveIdeLayoutShortcut({ ...base, shiftKey: true, key: 'f' }),
+    ).toBe('open-search');
+    expect(
+      resolveIdeLayoutShortcut({ ...base, shiftKey: true, key: 'F' }),
+    ).toBe('open-search');
+    expect(
+      resolveIdeLayoutShortcut({ ...base, layoutMode: 'operator', shiftKey: true, key: 'f' }),
+    ).toBeNull();
+    expect(resolveIdeLayoutShortcut({ ...base, key: 'f' })).toBeNull();
   });
 });

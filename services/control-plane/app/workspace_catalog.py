@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+from app.adapters.watch_client import fetch_watch_inbox
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
 from app.runs.service import list_runs
 from app.operator_workspace_scope import filter_operator_workspace_records
 from app.workspace_project_bindings import WorkspaceProjectBinding, load_workspace_project_bindings
+
+
+def _catalog_inbox_fetcher() -> dict[str, object] | None:
+    """Never block agent/workspace lists on a cold watch inbox probe."""
+    return fetch_watch_inbox(cached_only=True)
 
 _OPERATOR_WORKSPACE_IDS = (
     "workspace_smoke",
@@ -56,7 +62,7 @@ def list_workspace_records(
     workspace_ids.update(bindings.keys())
 
     inbox_snapshot = build_inbox_response(
-        inbox_fetcher=inbox_fetcher,
+        inbox_fetcher=inbox_fetcher or _catalog_inbox_fetcher,
         allow_empty_unavailable=True,
     )
     for item in inbox_snapshot.get("items", []):

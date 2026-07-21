@@ -8,8 +8,55 @@ export type IdeSidebarStubTone =
 export type IdeSidebarStubPanel = {
   lines: string[];
   actionLabel: string | null;
+  /** Optional second CTA — e.g. Retry shift when the dock stays collapsed. */
+  secondaryActionLabel?: string | null;
   tone: IdeSidebarStubTone;
 };
+
+/** Whether agent/terminal stub copy should announce through a live region. */
+export function ideSidebarStubUsesLiveRegion(
+  tone: IdeSidebarStubTone,
+  scope: 'agent' | 'terminal',
+): boolean {
+  if (scope === 'terminal') {
+    return tone === 'attention';
+  }
+
+  return tone !== 'neutral';
+}
+
+/** Descriptive label for stub CTA buttons (visible text stays short). */
+export function ideSidebarStubActionAriaLabel(
+  actionLabel: string,
+  scope: 'agent' | 'terminal',
+): string {
+  if (scope === 'agent') {
+    if (actionLabel === 'Expand agent dock') {
+      return 'Expand agent dock on the right edge';
+    }
+    if (actionLabel === 'Collapse agent dock') {
+      return 'Collapse agent dock on the right edge';
+    }
+  }
+
+  if (scope === 'terminal') {
+    if (actionLabel === 'Show terminal') {
+      return 'Show terminal panel below the editor';
+    }
+    if (actionLabel === 'Hide terminal') {
+      return 'Hide terminal panel below the editor';
+    }
+  }
+
+  if (actionLabel === 'Retry shift') {
+    return 'Retry shift from the agent dock composer';
+  }
+  if (actionLabel === 'Continue shift') {
+    return 'Continue shift from the agent dock composer';
+  }
+
+  return actionLabel;
+}
 
 function approvalPhrase(count: number): string {
   return `${count} approval${count === 1 ? '' : 's'} waiting`;
@@ -30,6 +77,7 @@ export function buildIdeAgentSidebarStub(input: {
   runPhase: string | null;
   employeeFailureLine?: string | null;
   employeeShiftInterrupted?: boolean;
+  employeeRetryActionLabel?: string | null;
 }): IdeSidebarStubPanel {
   if (!input.agentDockCollapsed) {
     return {
@@ -69,6 +117,7 @@ export function buildIdeAgentSidebarStub(input: {
   const idleRun = input.runPhase !== 'executing' && input.runPhase !== 'review_ready';
   if (failureLine && idleRun) {
     const interrupted = Boolean(input.employeeShiftInterrupted);
+    const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
     return {
       tone: interrupted ? 'interrupted' : 'failure',
       lines: [
@@ -77,6 +126,7 @@ export function buildIdeAgentSidebarStub(input: {
         'Ctrl/Cmd+\\ · editor status bar AGENT chip · right-edge reopen strip.',
       ],
       actionLabel: 'Expand agent dock',
+      secondaryActionLabel: retryLabel || null,
     };
   }
 
@@ -120,9 +170,22 @@ export type IdeRunPanelConnectorNotice = {
 
 /** Watch-lane connector notice for the IDE Run sidebar when probes need attention. */
 export function buildIdeRunPanelConnectorNotice(input: {
+  watchConnected: boolean;
   requiredConnectorsUnavailable: number;
   legacyConnectorGlanceVisible: boolean;
 }): IdeRunPanelConnectorNotice | null {
+  if (!input.watchConnected) {
+    return {
+      tone: 'attention',
+      lines: [
+        'Watch offline — connector probes paused until the watch reconnects.',
+        'Mission Control → Connectors shows live status once the stack is back up.',
+        'Editor status bar WATCH OFFLINE chip · footer chip · Run activity pulse.',
+      ],
+      actionLabel: 'Open connectors',
+    };
+  }
+
   const required = input.requiredConnectorsUnavailable;
   if (required > 0) {
     return {

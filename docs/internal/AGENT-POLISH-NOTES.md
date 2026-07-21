@@ -74,7 +74,8 @@ Side notes for future slices — not operator-facing. Keep concise and actionabl
    when cold); `refresh_summary` clears connector and monitor caches so the next
    summary rebuild probes live.
 
-8. **Starter guide** — add “Watch commands” section with curl examples once UI exists.
+8. **Starter guide** — Shipped: `docs/AXON-X-STARTER-GUIDE.md` Watch connectors +
+   commands curl block; removed stale “watch connectors not expected yet” copy.
 
 ### Do not regress
 

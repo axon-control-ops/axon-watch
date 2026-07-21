@@ -10,13 +10,22 @@ export function truncateFailureDetail(detail: string, max = FAILURE_DETAIL_MAX):
   return `${detail.slice(0, max - 1)}…`;
 }
 
+const RESTART_INTERRUPT_MARKERS = [
+  'run interrupted by control-plane restart',
+  'run cancelled after control-plane restart',
+  'run paused after control-plane restart',
+  'continuous worker dispatch lost on control-plane restart',
+  'continuous worker dispatch paused on control-plane restart',
+  'continuous worker dispatch cancelled after control-plane restart',
+];
+
 /** Matches control-plane restart reconciliation summaries on orphaned runs. */
 export function isRestartInterruptedFailure(detail: string | null | undefined): boolean {
-  const text = (detail ?? '').trim().toLowerCase();
-  if (!text) {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
     return false;
   }
-  return text.includes('control-plane restart');
+  return RESTART_INTERRUPT_MARKERS.some((marker) => normalized.includes(marker));
 }
 
 const AGENT_RUNTIME_FALLBACK_RE =
@@ -44,18 +53,41 @@ export function normalizeOperatorFailureDetail(detail: string | null | undefined
   return cleaned;
 }
 
-/** Matches SIGTERM (status 143) when the agent CLI session was killed before finishing. */
+/** True when the operator stopped the CLI before the shift could finish. */
+export function isOperatorStoppedFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail);
+  if (!normalized) {
+    return false;
+  }
+  const lowered = normalized.toLowerCase();
+  return (
+    lowered.includes('runtime execution stopped by operator') ||
+    lowered.includes('stopped by operator before the cli finished')
+  );
+}
+
+/** Matches SIGTERM (143) or SIGKILL/OOM (137 / -9) when the agent session was killed. */
 export function isAgentSessionInterruptedFailure(detail: string | null | undefined): boolean {
   const normalized = normalizeOperatorFailureDetail(detail);
   if (!normalized) {
     return false;
   }
-  return /exited with status 143/i.test(normalized);
+  return (
+    /exited with status 143/i.test(normalized) ||
+    /exited with status 137/i.test(normalized) ||
+    /exited with status -?9\b/i.test(normalized) ||
+    /\boom[- ]?kill/i.test(normalized) ||
+    /\bkilled by.*oom\b/i.test(normalized)
+  );
 }
 
-/** Restart or SIGTERM — retry should continue rather than treat as a hard failure. */
+/** Restart, operator stop, or SIGTERM — retry should continue rather than treat as a hard failure. */
 export function isShiftContinuationFailure(detail: string | null | undefined): boolean {
-  return isRestartInterruptedFailure(detail) || isAgentSessionInterruptedFailure(detail);
+  return (
+    isRestartInterruptedFailure(detail) ||
+    isOperatorStoppedFailure(detail) ||
+    isAgentSessionInterruptedFailure(detail)
+  );
 }
 
 export function employeeResolvedFailureDetail(employee: CompanyEmployeeRecord): string {
@@ -75,6 +107,27 @@ export function isUsageLimitFailure(detail: string | null | undefined): boolean 
   );
 }
 
+const RUNTIME_AUTH_MARKERS = [
+  /not signed in/i,
+  /cursor agent login/i,
+  /codex login/i,
+  /unlock \/vault/i,
+  /vault locked/i,
+  /cursor rejected CURSOR_API_KEY/i,
+  /authentication failed/i,
+  /authentication required/i,
+  /api_key_invalid/i,
+];
+
+/** True when the agent runtime could not authenticate (CLI login or vault keys). */
+export function isRuntimeAuthFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail);
+  if (!normalized) {
+    return false;
+  }
+  return RUNTIME_AUTH_MARKERS.some((marker) => marker.test(normalized));
+}
+
 /** Matches Lane B runtime fallback receipts where no CLI/cloud agent could run the shift. */
 export function isAgentRuntimeFallbackFailure(detail: string | null | undefined): boolean {
   const text = (detail ?? '').trim();
@@ -91,6 +144,9 @@ export function agentRuntimeFallbackSpeakDetail(detail: string): string {
   const normalized = normalizeOperatorFailureDetail(detail);
   const reason = normalized || detail.trim();
   const firstClause = reason.split(';')[0]?.trim() ?? reason;
+  if (isOperatorStoppedFailure(firstClause)) {
+    return 'the shift was stopped before it could finish';
+  }
   if (/exited with status 143/i.test(firstClause)) {
     return 'the agent session was interrupted before it could finish';
   }
@@ -99,6 +155,9 @@ export function agentRuntimeFallbackSpeakDetail(detail: string): string {
   }
   if (/out of usage/i.test(firstClause)) {
     return 'usage limits blocked the agent runtime';
+  }
+  if (isRuntimeAuthFailure(firstClause)) {
+    return 'runtime auth is not ready';
   }
   return truncateFailureDetail(firstClause, SPEAK_DETAIL_MAX);
 }

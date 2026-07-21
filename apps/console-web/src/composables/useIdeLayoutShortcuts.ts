@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted } from 'vue';
 
 import { resolveIdeLayoutShortcut } from '../lib/ide-layout-shortcuts';
+import { handleIdeLayoutShortcutAction } from './useIdeEditorStatusBar';
 import { useShellStore } from '../stores/shell';
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -24,6 +25,7 @@ export function useIdeLayoutShortcuts(): void {
     const action = resolveIdeLayoutShortcut({
       layoutMode: shell.layoutMode,
       modKey: event.metaKey || event.ctrlKey,
+      shiftKey: event.shiftKey,
       key: event.key,
       editableTarget: isEditableTarget(event.target),
     });
@@ -33,18 +35,7 @@ export function useIdeLayoutShortcuts(): void {
     }
 
     event.preventDefault();
-
-    if (action === 'toggle-explorer') {
-      shell.toggleIdeExplorer();
-      return;
-    }
-
-    if (action === 'toggle-agent-dock') {
-      shell.toggleAgentDock();
-      return;
-    }
-
-    shell.toggleIdeTerminalPanel();
+    handleIdeLayoutShortcutAction(action, shell);
   }
 
   onMounted(() => {

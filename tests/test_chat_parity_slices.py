@@ -64,7 +64,7 @@ class ChatParitySliceTests(unittest.TestCase):
         attachment_id = upload.json()["attachment_id"]
 
         with patch(
-            "app.chat.lane_b_post_message.generate_lane_b_result",
+            "app.chat.service.generate_lane_b_result",
             return_value={
                 "content": "I see the diagram.",
                 "dispatched": True,
@@ -156,7 +156,7 @@ class ChatParitySliceTests(unittest.TestCase):
 
     def test_list_and_create_workspace_chat_threads(self) -> None:
         with patch(
-            "app.chat.lane_b_post_message.generate_lane_b_result",
+            "app.chat.service.generate_lane_b_result",
             return_value={
                 "content": "First thread",
                 "dispatched": False,
@@ -193,7 +193,7 @@ class ChatParitySliceTests(unittest.TestCase):
             "app.chat.service._lane_b_streaming_enabled",
             return_value=False,
         ), patch(
-            "app.chat.lane_b_post_message.generate_lane_b_result",
+            "app.chat.service.generate_lane_b_result",
             return_value={
                 "content": "Agent done",
                 "dispatched": True,

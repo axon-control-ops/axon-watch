@@ -1,5 +1,10 @@
 import type { EditorDocumentLanguage, WorkspaceDocumentDescriptor } from './workspace-documents';
-import { isImageFilePath, languageForFilePath, workspaceFileDocumentId } from './workspace-file-language';
+import {
+  isBinaryFilePath,
+  isImageFilePath,
+  languageForFilePath,
+  workspaceFileDocumentId,
+} from './workspace-file-language';
 
 export type FileContentLoadState = 'idle' | 'loading' | 'loaded' | 'error';
 
@@ -54,8 +59,10 @@ export function buildOpenedFileDocuments(
 
   return openedPaths.flatMap((path) => {
     const entry = entryByPath.get(path);
+    const imageFile = isImageFilePath(path);
+    const binaryFile = isBinaryFilePath(path);
     if (!entry) {
-      if (!isImageFilePath(path)) {
+      if (!binaryFile) {
         return [];
       }
       return [
@@ -64,7 +71,7 @@ export function buildOpenedFileDocuments(
           title: path,
           language: languageForFilePath(path) as EditorDocumentLanguage,
           value: '',
-          description: 'Image preview.',
+          description: imageFile ? 'Image preview.' : 'Binary file preview.',
           source: 'file',
           filePath: path,
           readOnly: true,
@@ -76,8 +83,7 @@ export function buildOpenedFileDocuments(
     const content = contents[path] ?? '';
     const saved = savedContents[path];
     const loadState = loadStates[path] ?? 'idle';
-    const pending = !isImageFilePath(path) && (loadState === 'idle' || loadState === 'loading');
-    const imageFile = isImageFilePath(path);
+    const pending = !binaryFile && (loadState === 'idle' || loadState === 'loading');
 
     return [
       {
@@ -87,13 +93,15 @@ export function buildOpenedFileDocuments(
         value: pending ? '' : content,
         description: imageFile
           ? `Image preview (${entry.size_bytes} bytes).`
-          : pending
-            ? 'Loading workspace file…'
-            : `Workspace file on disk (${entry.size_bytes} bytes). Editable — use Save.`,
+          : binaryFile
+            ? `Binary file (${entry.size_bytes} bytes) — not editable as text.`
+            : pending
+              ? 'Loading workspace file…'
+              : `Workspace file on disk (${entry.size_bytes} bytes). Editable — use Save.`,
         source: 'file',
         filePath: path,
-        readOnly: pending || imageFile,
-        dirty: !imageFile && saved !== undefined && saved !== content,
+        readOnly: pending || binaryFile,
+        dirty: !binaryFile && saved !== undefined && saved !== content,
       },
     ];
   });

@@ -6,32 +6,10 @@ vi.mock('../lib/agent-dock-composer-focus', () => ({
 }));
 
 import {
-  handleIdeQuickGuideAction,
-  openEmployeeShiftRetry,
-  openWatchConnectors,
+  ensureWorkspaceFilesLoaded,
   useIdeEditorStatusBar,
 } from './useIdeEditorStatusBar';
-
-function mockShell(overrides: Record<string, unknown> = {}) {
-  return {
-    agentDockCollapsed: true,
-    pendingApprovalsCount: 0,
-    agentStreamActive: false,
-    primaryActiveRun: null,
-    activeIdeEmployeeFailureLine: null,
-    activeIdeEmployeeShiftInterrupted: false,
-    activeIdeEmployeeRecord: null,
-    connectorsLoadState: 'loaded',
-    connectorsItems: [],
-    connectorsSummary: { required_unavailable: 0 },
-    runtimeSummary: { watch: { connected: true } },
-    loadConnectors: vi.fn(),
-    focusWatchConnectors: vi.fn(),
-    openIdeComposerWithDraft: vi.fn(),
-    openIdeComposer: vi.fn(),
-    ...overrides,
-  };
-}
+import { mockShell } from './useIdeEditorStatusBar.fixture';
 
 describe('useIdeEditorStatusBar', () => {
   it('builds terminal, agent, connector, and quick-guide chips from shell state', () => {
@@ -102,8 +80,11 @@ describe('useIdeEditorStatusBar', () => {
       label: 'WATCH OFFLINE',
       tone: 'warning',
     });
-    expect(ideQuickGuide.value?.title).toContain('Panels closed');
+    expect(ideQuickGuide.value?.title).toContain('Watch offline');
     expect(ideQuickGuide.value?.title).not.toContain('connectors down');
+    expect(ideQuickGuide.value?.actions.map((action) => action.id)).toContain(
+      'open-connectors',
+    );
   });
 
   it('surfaces interrupted teammate guidance through the quick guide', () => {
@@ -149,122 +130,273 @@ describe('useIdeEditorStatusBar', () => {
       label: 'Continue shift',
     });
   });
-});
 
-describe('openWatchConnectors', () => {
-  it('loads connectors and focuses the watch connectors surface', () => {
-    const shell = mockShell();
-
-    openWatchConnectors(shell as never);
-
-    expect(shell.loadConnectors).toHaveBeenCalledOnce();
-    expect(shell.focusWatchConnectors).toHaveBeenCalledOnce();
-  });
-});
-
-describe('openEmployeeShiftRetry', () => {
-  it('opens the agent dock and seeds the composer with a retry draft', () => {
-    const employee = {
-      employee_id: 'e1',
-      workspace_id: 'workspace_demo',
-      name: 'Jules',
-      role: 'frontend',
-      role_label: 'UI/UX',
-      schedule: 'continuous',
-      schedule_label: 'Continuous',
-      status: 'idle',
-      owns: 'console UI/UX',
-      enabled: true,
-      primary: false,
-      last_outcome: 'failed',
-      last_outcome_detail: 'vitest assertion failed',
-    };
-    const shell = mockShell({ activeIdeEmployeeRecord: employee });
-    const showAgentDock = vi.fn();
-
-    openEmployeeShiftRetry({ shell: shell as never, showAgentDock });
-
-    expect(showAgentDock).toHaveBeenCalledOnce();
-    expect(shell.openIdeComposerWithDraft).toHaveBeenCalledOnce();
-    const draft = vi.mocked(shell.openIdeComposerWithDraft).mock.calls[0]?.[0] ?? '';
-    expect(draft).toContain('Jules');
-    expect(draft).toContain('vitest assertion failed');
-  });
-});
-
-describe('handleIdeQuickGuideAction', () => {
-  it('expands the agent dock', () => {
-    const showAgentDock = vi.fn();
-    const showTerminalPanel = vi.fn();
-
-    handleIdeQuickGuideAction('expand-agent-dock', {
-      shell: mockShell() as never,
-      showAgentDock,
-      showTerminalPanel,
+  it('surfaces roster failure guidance when another teammate failed', () => {
+    const shell = mockShell({
+      companyEmployeesForCurrentWorkspace: [
+        {
+          employee_id: 'e2',
+          workspace_id: 'workspace_demo',
+          name: 'Alex',
+          role: 'backend',
+          role_label: 'Backend',
+          schedule: 'continuous',
+          schedule_label: 'Continuous',
+          status: 'idle',
+          owns: 'API',
+          enabled: true,
+          primary: false,
+          last_outcome: 'failed',
+          last_outcome_detail: 'timeout',
+        },
+      ],
     });
-
-    expect(showAgentDock).toHaveBeenCalledOnce();
-    expect(showTerminalPanel).not.toHaveBeenCalled();
-  });
-
-  it('opens watch connectors', () => {
-    const shell = mockShell();
-    const showAgentDock = vi.fn();
-    const showTerminalPanel = vi.fn();
-
-    handleIdeQuickGuideAction('open-connectors', {
+    const { ideQuickGuide } = useIdeEditorStatusBar({
       shell: shell as never,
-      showAgentDock,
-      showTerminalPanel,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
     });
 
-    expect(shell.loadConnectors).toHaveBeenCalledOnce();
-    expect(shell.focusWatchConnectors).toHaveBeenCalledOnce();
-    expect(showAgentDock).not.toHaveBeenCalled();
+    expect(ideQuickGuide.value?.tone).toBe('failure');
+    expect(ideQuickGuide.value?.title).toContain('Teammate shift failed');
+    expect(ideQuickGuide.value?.actions.map((action) => action.id)).toContain('open-team');
   });
 
-  it('shows the terminal panel for show-terminal actions', () => {
-    const showAgentDock = vi.fn();
-    const showTerminalPanel = vi.fn();
-
-    handleIdeQuickGuideAction('show-terminal', {
-      shell: mockShell() as never,
-      showAgentDock,
-      showTerminalPanel,
+  it('surfaces a Team status-bar chip when roster teammates need attention', () => {
+    const shell = mockShell({
+      companyEmployeesForCurrentWorkspace: [
+        {
+          employee_id: 'e2',
+          workspace_id: 'workspace_demo',
+          name: 'Alex',
+          role: 'backend',
+          role_label: 'Backend',
+          schedule: 'continuous',
+          schedule_label: 'Continuous',
+          status: 'idle',
+          owns: 'API',
+          enabled: true,
+          primary: false,
+          last_outcome: 'failed',
+          last_outcome_detail: 'timeout',
+        },
+      ],
+      ideActivityView: 'explorer',
     });
-
-    expect(showTerminalPanel).toHaveBeenCalledOnce();
-    expect(showAgentDock).not.toHaveBeenCalled();
-  });
-
-  it('retries the active teammate shift from the quick guide', () => {
-    const employee = {
-      employee_id: 'e1',
-      workspace_id: 'workspace_demo',
-      name: 'Jules',
-      role: 'frontend',
-      role_label: 'UI/UX',
-      schedule: 'continuous',
-      schedule_label: 'Continuous',
-      status: 'idle',
-      owns: 'console UI/UX',
-      enabled: true,
-      primary: false,
-      last_outcome: 'failed',
-      last_outcome_detail: 'timeout',
-    };
-    const shell = mockShell({ activeIdeEmployeeRecord: employee });
-    const showAgentDock = vi.fn();
-    const showTerminalPanel = vi.fn();
-
-    handleIdeQuickGuideAction('retry-employee-shift', {
+    const { ideEditorStatusTeamChip } = useIdeEditorStatusBar({
       shell: shell as never,
-      showAgentDock,
-      showTerminalPanel,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
     });
 
-    expect(showAgentDock).toHaveBeenCalledOnce();
-    expect(shell.openIdeComposerWithDraft).toHaveBeenCalledOnce();
-    expect(showTerminalPanel).not.toHaveBeenCalled();
+    expect(ideEditorStatusTeamChip.value).toMatchObject({
+      label: '1 FAILED',
+      tone: 'failure',
+      count: 1,
+    });
+
+    const expanded = useIdeEditorStatusBar({
+      shell: {
+        ...shell,
+        ideActivityView: 'team',
+        ideExplorerCollapsed: false,
+      } as never,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
+    });
+    expect(expanded.ideEditorStatusTeamChip.value).toBeNull();
+  });
+
+  it('uses interrupted quick-guide styling when another teammate has an interrupted shift', () => {
+    const shell = mockShell({
+      companyEmployeesForCurrentWorkspace: [
+        {
+          employee_id: 'e2',
+          workspace_id: 'workspace_demo',
+          name: 'Alex',
+          role: 'backend',
+          role_label: 'Backend',
+          schedule: 'continuous',
+          schedule_label: 'Continuous',
+          status: 'idle',
+          owns: 'API',
+          enabled: true,
+          primary: false,
+          last_outcome: 'failed',
+          last_outcome_detail: 'run interrupted by control-plane restart',
+        },
+      ],
+    });
+    const { ideQuickGuide } = useIdeEditorStatusBar({
+      shell: shell as never,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
+    });
+
+    expect(ideQuickGuide.value?.tone).toBe('interrupted');
+    expect(ideQuickGuide.value?.title).toContain('Teammate shift interrupted');
+    expect(ideQuickGuide.value?.steps.join(' ')).toContain('Continue shift');
+  });
+
+  it('surfaces unsaved-file guidance from dirty editor tabs', () => {
+    const shell = mockShell({
+      editorDocuments: [
+        { source: 'file', dirty: true },
+        { source: 'file', dirty: true },
+        { source: 'scratch', dirty: true },
+      ],
+      ideActivityView: 'explorer',
+    });
+    const { ideQuickGuide, ideEditorStatusGitChip } = useIdeEditorStatusBar({
+      shell: shell as never,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
+    });
+
+    expect(ideQuickGuide.value?.tone).toBe('attention');
+    expect(ideQuickGuide.value?.title).toContain('2 unsaved files');
+    expect(ideQuickGuide.value?.actions.map((action) => action.id)).toContain(
+      'open-source-control',
+    );
+    expect(ideEditorStatusGitChip.value).toMatchObject({
+      label: '2 UNSAVED',
+      count: 2,
+    });
+  });
+
+  it('hides the git chip when Source Control is already expanded', () => {
+    const shell = mockShell({
+      editorDocuments: [{ source: 'file', dirty: true }],
+      ideActivityView: 'git',
+      ideExplorerCollapsed: false,
+    });
+    const { ideEditorStatusGitChip } = useIdeEditorStatusBar({
+      shell: shell as never,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
+    });
+
+    expect(ideEditorStatusGitChip.value).toBeNull();
+  });
+
+  it('surfaces search failure guidance and chip when the file index fails to load', () => {
+    const shell = mockShell({
+      workspaceFilesLoadState: 'error',
+      ideActivityView: 'explorer',
+    });
+    const { ideQuickGuide, ideEditorStatusSearchChip } = useIdeEditorStatusBar({
+      shell: shell as never,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
+    });
+
+    expect(ideQuickGuide.value?.title).toContain('Workspace files failed to load');
+    expect(ideQuickGuide.value?.actions.map((action) => action.id)).toContain('open-search');
+    expect(ideEditorStatusSearchChip.value).toMatchObject({
+      label: 'SEARCH ERR',
+    });
+  });
+
+  it('hides the search chip when Search is already expanded', () => {
+    const shell = mockShell({
+      workspaceFilesLoadState: 'error',
+      ideActivityView: 'search',
+      ideExplorerCollapsed: false,
+    });
+    const { ideEditorStatusSearchChip } = useIdeEditorStatusBar({
+      shell: shell as never,
+      workbenchLayoutMode: computed(() => 'ide'),
+      terminalPanelVisible: ref(false),
+      terminalReopenRunPhase: computed(() => null),
+      agentDockReopenState: computed(() => ({
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+      })),
+    });
+
+    expect(ideEditorStatusSearchChip.value).toBeNull();
+  });
+});
+
+describe('ensureWorkspaceFilesLoaded', () => {
+  it('loads files when the index is still idle', () => {
+    const shell = mockShell({ workspaceFilesLoadState: 'idle' });
+
+    ensureWorkspaceFilesLoaded(shell as never);
+
+    expect(shell.loadWorkspaceFiles).toHaveBeenCalledOnce();
+  });
+
+  it('retries after a failed file-index fetch', () => {
+    const shell = mockShell({ workspaceFilesLoadState: 'error' });
+
+    ensureWorkspaceFilesLoaded(shell as never);
+
+    expect(shell.loadWorkspaceFiles).toHaveBeenCalledOnce();
+  });
+
+  it('does not reload while a fetch is in flight or already cached', () => {
+    const loadingShell = mockShell({ workspaceFilesLoadState: 'loading' });
+    const loadedShell = mockShell({ workspaceFilesLoadState: 'loaded' });
+
+    ensureWorkspaceFilesLoaded(loadingShell as never);
+    ensureWorkspaceFilesLoaded(loadedShell as never);
+
+    expect(loadingShell.loadWorkspaceFiles).not.toHaveBeenCalled();
+    expect(loadedShell.loadWorkspaceFiles).not.toHaveBeenCalled();
+  });
+
+  it('skips when no workspace is selected', () => {
+    const shell = mockShell({
+      currentWorkspace: null,
+      workspaceFilesLoadState: 'idle',
+    });
+
+    ensureWorkspaceFilesLoaded(shell as never);
+
+    expect(shell.loadWorkspaceFiles).not.toHaveBeenCalled();
   });
 });

@@ -158,6 +158,11 @@ class ConnectorProbeCacheTests(unittest.TestCase):
         self.assertEqual("ok", by_id["console_web"]["status"])
 
     def test_cache_ttl_starts_after_probe_finishes(self) -> None:
+        clock = {"value": 100.0}
+
+        def _monotonic() -> float:
+            return float(clock["value"])
+
         with patch.object(
             self.connector_summary,
             "_probe_all_connectors_live",
@@ -165,9 +170,10 @@ class ConnectorProbeCacheTests(unittest.TestCase):
         ) as probe_mock, patch.object(
             self.connector_summary.time,
             "monotonic",
-            side_effect=[100.0, 112.0, 113.0],
+            side_effect=_monotonic,
         ):
             first = self.connector_summary.probe_all_connectors()
+            clock["value"] = 112.0
             second = self.connector_summary.probe_all_connectors()
 
         self.assertEqual(first, second)
@@ -341,7 +347,11 @@ class ConnectorProbeCacheTests(unittest.TestCase):
                 [{"connector_id": "cached", "status": "ok", "required": True}],
                 [{"connector_id": "fresh", "status": "degraded", "required": True}],
             ],
-        ) as probe_mock, patch(
+        ) as probe_mock, patch.object(
+            self.connector_summary,
+            "_connector_cache_ttl_seconds",
+            return_value=3600.0,
+        ), patch(
             "app.monitors.dashpro_monitor.probe_monitor_records",
             return_value=[],
         ):

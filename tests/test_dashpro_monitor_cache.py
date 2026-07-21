@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -67,6 +68,11 @@ class DashProMonitorCacheTests(unittest.TestCase):
         self.assertEqual(2, probe_mock.call_count)
 
     def test_cache_ttl_starts_after_probe_finishes(self) -> None:
+        clock = {"value": 100.0}
+
+        def _monotonic() -> float:
+            return float(clock["value"])
+
         with patch.object(
             self.dashpro_monitor,
             "probe_all_monitor_slices",
@@ -74,13 +80,46 @@ class DashProMonitorCacheTests(unittest.TestCase):
         ) as probe_mock, patch.object(
             self.dashpro_monitor.time,
             "monotonic",
-            side_effect=[100.0, 112.0, 113.0],
+            side_effect=_monotonic,
         ):
             first = self.dashpro_monitor.probe_monitor_records()
+            clock["value"] = 112.0
             second = self.dashpro_monitor.probe_monitor_records()
 
         self.assertEqual(first, second)
         self.assertEqual(1, probe_mock.call_count)
+
+    def test_expired_cache_returns_stale_while_refreshing(self) -> None:
+        import time as wall_time
+
+        clock = {"value": 100.0}
+
+        def _monotonic() -> float:
+            return float(clock["value"])
+
+        with patch.object(
+            self.dashpro_monitor,
+            "probe_all_monitor_slices",
+            side_effect=[
+                [{"check_id": "stale", "status": "warning"}],
+                [{"check_id": "fresh", "status": "critical"}],
+            ],
+        ) as probe_mock, patch.object(
+            self.dashpro_monitor.time,
+            "monotonic",
+            side_effect=_monotonic,
+        ):
+            first = self.dashpro_monitor.probe_monitor_records()
+            clock["value"] = 200.0  # past 15s TTL
+            second = self.dashpro_monitor.probe_monitor_records()
+            # Allow background refresh to finish.
+            deadline = wall_time.time() + 2.0
+            while probe_mock.call_count < 2 and wall_time.time() < deadline:
+                wall_time.sleep(0.01)
+
+        self.assertEqual([{"check_id": "stale", "status": "warning"}], first)
+        self.assertEqual([{"check_id": "stale", "status": "warning"}], second)
+        self.assertGreaterEqual(probe_mock.call_count, 2)
 
     def test_execute_refresh_summary_clears_monitor_cache(self) -> None:
         from app.commands.executor import execute_refresh_summary

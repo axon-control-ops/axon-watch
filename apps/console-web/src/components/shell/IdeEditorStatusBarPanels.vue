@@ -2,18 +2,27 @@
 import type {
   IdeEditorStatusAgentChip,
   IdeEditorStatusConnectorChip,
+  IdeEditorStatusGitChip,
+  IdeEditorStatusSearchChip,
+  IdeEditorStatusTeamChip,
   IdeEditorStatusTerminalChip,
 } from '../../lib/ide-editor-status-view';
 
 defineProps<{
   terminalChip: IdeEditorStatusTerminalChip | null;
   connectorChip: IdeEditorStatusConnectorChip | null;
+  gitChip: IdeEditorStatusGitChip | null;
+  searchChip: IdeEditorStatusSearchChip | null;
+  teamChip: IdeEditorStatusTeamChip | null;
   agentChip: IdeEditorStatusAgentChip | null;
 }>();
 
 const emit = defineEmits<{
   showTerminal: [];
   openConnectors: [];
+  openSourceControl: [];
+  openSearch: [];
+  openTeam: [];
   showAgent: [];
 }>();
 </script>
@@ -45,14 +54,62 @@ const emit = defineEmits<{
       type="button"
       class="editor-statusbar__panel-toggle editor-statusbar__panel-toggle--connector"
       :class="{
-        'editor-statusbar__panel-toggle--connector-warning': connectorChip.tone === 'warning',
+        'editor-statusbar__panel-toggle--connector-required-alert':
+          connectorChip.id === 'connector-required-alert',
+        'editor-statusbar__panel-toggle--connector-watch-offline':
+          connectorChip.id === 'watch-offline',
         'editor-statusbar__panel-toggle--connector-glance': connectorChip.id === 'connector-glance',
       }"
       :title="connectorChip.title"
       :aria-label="connectorChip.ariaLabel"
       @click="emit('openConnectors')"
     >
+      <span
+        v-if="connectorChip.id === 'connector-required-alert'"
+        class="editor-statusbar__panel-icon editor-statusbar__panel-icon--connector-required-alert"
+        aria-hidden="true"
+      />
+      <span
+        v-else-if="connectorChip.id === 'watch-offline'"
+        class="editor-statusbar__panel-icon editor-statusbar__panel-icon--watch-offline"
+        aria-hidden="true"
+      />
       {{ connectorChip.label }}
+    </button>
+    <button
+      v-if="gitChip"
+      type="button"
+      class="editor-statusbar__panel-toggle editor-statusbar__panel-toggle--git-unsaved"
+      :title="gitChip.title"
+      :aria-label="gitChip.ariaLabel"
+      @click="emit('openSourceControl')"
+    >
+      {{ gitChip.label }}
+    </button>
+    <button
+      v-if="searchChip"
+      type="button"
+      class="editor-statusbar__panel-toggle editor-statusbar__panel-toggle--search-error"
+      :title="searchChip.title"
+      :aria-label="searchChip.ariaLabel"
+      @click="emit('openSearch')"
+    >
+      {{ searchChip.label }}
+    </button>
+    <button
+      v-if="teamChip"
+      type="button"
+      class="editor-statusbar__panel-toggle editor-statusbar__panel-toggle--team"
+      :class="{
+        'editor-statusbar__panel-toggle--team-failure': teamChip.tone === 'failure',
+        'editor-statusbar__panel-toggle--team-interrupted': teamChip.tone === 'interrupted',
+        'editor-statusbar__panel-toggle--team-mixed': teamChip.tone === 'mixed',
+      }"
+      :title="teamChip.title"
+      :aria-label="teamChip.ariaLabel"
+      @click="emit('openTeam')"
+    >
+      {{ teamChip.label }}
     </button>
     <button
       v-if="agentChip"

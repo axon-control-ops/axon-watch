@@ -194,6 +194,21 @@ describe('company-roster-actions', () => {
     expect(employeeReceiptsDraft(failed)).not.toContain('ActionRequiredError');
   });
 
+  it('uses runtime-auth guidance in retry and receipts drafts', () => {
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Lane B agent fallback reply generated (Cursor is installed but not signed in. Run `cursor agent login` or unlock /vault.; Cursor Cloud Agent unavailable)',
+      last_run_id: 'run_43ca086d22d4',
+    });
+    expect(employeeRetryDraft(failed)).toContain('Runtime auth blocked the last shift');
+    expect(employeeRetryDraft(failed)).toContain('cursor agent login');
+    expect(employeeRetryDraft(failed)).not.toContain('Lane B agent fallback');
+    expect(employeeReceiptsDraft(failed)).toContain('run_43ca086d22d4');
+    expect(employeeReceiptsDraft(failed)).toContain('runtime auth is not ready');
+  });
+
   it('hides duplicate view receipts in the dock when the run link is shown', () => {
     const failed = employee({
       status: 'idle',

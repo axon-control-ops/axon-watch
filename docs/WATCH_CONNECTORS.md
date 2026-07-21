@@ -69,7 +69,24 @@ required connector that is not `ok` (both `degraded` and `unavailable`).
 Failed HTTP probes store operator-readable `detail` strings such as
 `Connection refused on http://127.0.0.1:4173/api/health`, `Timed out on …`,
 or `HTTP 503`. Connector inbox signals and runtime summary degraded reasons
-prefer that detail over generic fallback copy.
+prefer that detail over generic fallback copy. Mission Control **Connectors**
+shows the same `detail` on each probe row when present.
+
+## Watch offline
+
+When `runtimeSummary.watch.connected` is false, connector probe counts and
+required-down emphasis are **suppressed** so stale snapshots do not look like live
+failures. The console surfaces this consistently:
+
+- Mission Control **Connectors** rail — summary shows `Watch offline — probe counts paused`,
+  body copy explains probes are paused, reprobe/refresh/tunnel actions are disabled
+- Status bar — `WATCH OFFLINE` chip replaces connector-down chips
+- IDE — editor status bar chip, Run sidebar notice, activity-bar pulse, and quick guide
+  all prefer watch-offline guidance over stale connector counts
+
+Store mutations (`reprobe_connector`, `refresh_summary`, tunnel start/stop) fail fast
+with the same offline copy instead of posting watch commands while disconnected.
+`GET /api/connectors` may still return the last cached snapshot for reference.
 
 ## Probe caching
 

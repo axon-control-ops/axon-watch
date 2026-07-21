@@ -7,7 +7,9 @@ import {
   failureSpeakDetail,
   isAgentRuntimeFallbackFailure,
   isAgentSessionInterruptedFailure,
+  isOperatorStoppedFailure,
   isRestartInterruptedFailure,
+  isRuntimeAuthFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
   normalizeOperatorFailureDetail,
@@ -45,10 +47,29 @@ describe('employee-failure-detail', () => {
     );
   });
 
-  it('detects restart and SIGTERM continuation failures', () => {
+  it('detects restart, operator stop, and SIGTERM continuation failures', () => {
     expect(isRestartInterruptedFailure('Run interrupted by control-plane restart')).toBe(true);
+    expect(
+      isRestartInterruptedFailure('Continuous worker dispatch lost on control-plane restart'),
+    ).toBe(true);
+    expect(
+      isOperatorStoppedFailure('Runtime execution stopped by operator before the CLI finished.'),
+    ).toBe(true);
+    expect(
+      isOperatorStoppedFailure(
+        'Lane B agent fallback reply generated (Runtime execution stopped by operator before the CLI finished.)',
+      ),
+    ).toBe(true);
     expect(isAgentSessionInterruptedFailure('Cursor CLI exited with status 143.')).toBe(true);
+    expect(isAgentSessionInterruptedFailure('Cursor CLI exited with status 137.')).toBe(true);
+    expect(isAgentSessionInterruptedFailure('Process killed by oom-kill')).toBe(true);
     expect(isShiftContinuationFailure('Cursor CLI exited with status 143.')).toBe(true);
+    expect(isShiftContinuationFailure('Cursor CLI exited with status 137.')).toBe(true);
+    expect(
+      isShiftContinuationFailure(
+        'Runtime execution stopped by operator before the CLI finished.',
+      ),
+    ).toBe(true);
     expect(isShiftContinuationFailure('vitest: assertion failed')).toBe(false);
   });
 
@@ -64,6 +85,17 @@ describe('employee-failure-detail', () => {
     ).toBe(true);
     expect(isUsageLimitFailure('vitest: assertion failed')).toBe(false);
     expect(agentRuntimeFallbackSpeakDetail(wrapped)).toMatch(/usage limits blocked/i);
+  });
+
+  it('detects runtime-auth failures after lane b wrapper normalization', () => {
+    const wrapped =
+      'Lane B agent fallback reply generated (Cursor is installed but not signed in. Run `cursor agent login` or unlock /vault.; Cursor Cloud Agent unavailable; Codex CLI (local) unavailable)';
+    expect(isRuntimeAuthFailure(wrapped)).toBe(true);
+    expect(normalizeOperatorFailureDetail(wrapped)).toBe(
+      'Cursor is installed but not signed in. Run `cursor agent login` or unlock /vault.',
+    );
+    expect(agentRuntimeFallbackSpeakDetail(wrapped)).toMatch(/runtime auth is not ready/i);
+    expect(isRuntimeAuthFailure('vitest: assertion failed')).toBe(false);
   });
 
   it('maps runtime fallback receipts to operator-friendly speak detail', () => {

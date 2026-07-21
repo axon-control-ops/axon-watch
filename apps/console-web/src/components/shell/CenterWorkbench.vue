@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import WorkbenchIcon from '../WorkbenchIcon.vue';
 import WorkbenchTerminalDock from '../WorkbenchTerminalDock.vue';
 import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
 import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
-import IdeEditorStatusBarPanels from './IdeEditorStatusBarPanels.vue';
+import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
+import CenterWorkbenchEditorFooter from './CenterWorkbenchEditorFooter.vue';
 import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import {
   clampWorkbenchTerminalHeight,
@@ -26,17 +26,13 @@ import {
 import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
-import { isImageFilePath } from '../../lib/workspace-file-language';
+import { isBinaryFilePath, isImageFilePath } from '../../lib/workspace-file-language';
 import { resolveThreadImageUrl } from '../../lib/thread-image-url';
 import {
   persistEditorMarkdownPreviewEnabled,
   resolveEditorMarkdownPreviewEnabled,
 } from '../../lib/editor-markdown-preview-prefs';
-import {
-  editorDocumentResourcePath,
-  editorTabLabelForDocument,
-  editorTabLabelsForDocuments,
-} from '../../lib/editor-tab-labels';
+import { editorDocumentResourcePath } from '../../lib/editor-tab-labels';
 import {
   buildEditorBreadcrumbTrail,
   resolveEditorBreadcrumbFilePath,
@@ -47,20 +43,19 @@ import {
   readEditorMinimapEnabled,
 } from '../../lib/editor-surface-prefs';
 import { isAgentEditReviewDocumentId } from '../../lib/ide-agent-edit-review';
-import { type IdeQuickGuideActionId } from '../../lib/ide-quick-guide';
+import { type IdeQuickGuide, type IdeQuickGuideActionId } from '../../lib/ide-quick-guide';
 import {
   handleIdeQuickGuideAction,
+  openIdeSearch,
+  openIdeSourceControl,
+  openIdeTeam,
   openWatchConnectors,
   useIdeEditorStatusBar,
 } from '../../composables/useIdeEditorStatusBar';
 import { useWorkbenchPanelAutoPeek } from '../../composables/useWorkbenchPanelAutoPeek';
 import { buildWorkbenchProblemItems } from '../../lib/workbench-problem-items';
-import {
-  workbenchTerminalPanelAlive,
-  workbenchTerminalReopenAriaLabel,
-  workbenchTerminalReopenTitle,
-} from '../../lib/workbench-terminal-panel-view';
 import { useEditorPlanBuild } from '../../composables/use-editor-plan-build';
+import { useEditorStatusBarMeta } from '../../composables/useEditorStatusBarMeta';
 
 const shell = useShellStore();
 const { activePlanId, buildingPlan, buildPlanError, buildActivePlan } = useEditorPlanBuild(shell);
@@ -78,29 +73,63 @@ const agentDockReopenState = computed(() => ({
   employeeFailureLine: shell.activeIdeEmployeeFailureLine,
   employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
 }));
-const terminalReopenRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
-const terminalReopenAlive = computed(
-  () =>
-    !terminalPanelVisible.value &&
-    workbenchTerminalPanelAlive(terminalReopenRunPhase.value),
-);
-const terminalReopenTitle = computed(() =>
-  workbenchTerminalReopenTitle({ runPhase: terminalReopenRunPhase.value }),
-);
-const terminalReopenAriaLabel = computed(() =>
-  workbenchTerminalReopenAriaLabel({ runPhase: terminalReopenRunPhase.value }),
-);
 const {
   ideEditorStatusTerminalChip,
   ideEditorStatusAgentChip,
   ideEditorStatusConnectorChip,
+  ideEditorStatusGitChip,
+  ideEditorStatusSearchChip,
+  ideEditorStatusTeamChip,
   ideQuickGuide,
 } = useIdeEditorStatusBar({
   shell,
   workbenchLayoutMode,
   terminalPanelVisible,
-  terminalReopenRunPhase,
+  terminalReopenRunPhase: computed(() => shell.primaryActiveRun?.phase ?? null),
   agentDockReopenState,
+});
+
+/** Hold the last guide briefly and skip no-op identity updates so attention chrome does not remount. */
+const ideQuickGuideSticky = ref<IdeQuickGuide | null>(null);
+let ideQuickGuideClearTimer: ReturnType<typeof setTimeout> | null = null;
+const IDE_QUICK_GUIDE_HOLD_MS = 800;
+
+function ideQuickGuideIdentity(guide: IdeQuickGuide): string {
+  return [guide.tone, guide.title, ...guide.steps, ...guide.actions.map((action) => action.id)].join(
+    '\x1f',
+  );
+}
+
+watch(
+  ideQuickGuide,
+  (next) => {
+    if (next) {
+      if (ideQuickGuideClearTimer !== null) {
+        clearTimeout(ideQuickGuideClearTimer);
+        ideQuickGuideClearTimer = null;
+      }
+      const previous = ideQuickGuideSticky.value;
+      if (!previous || ideQuickGuideIdentity(previous) !== ideQuickGuideIdentity(next)) {
+        ideQuickGuideSticky.value = next;
+      }
+      return;
+    }
+    if (!ideQuickGuideSticky.value || ideQuickGuideClearTimer !== null) {
+      return;
+    }
+    ideQuickGuideClearTimer = setTimeout(() => {
+      ideQuickGuideSticky.value = null;
+      ideQuickGuideClearTimer = null;
+    }, IDE_QUICK_GUIDE_HOLD_MS);
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  if (ideQuickGuideClearTimer !== null) {
+    clearTimeout(ideQuickGuideClearTimer);
+    ideQuickGuideClearTimer = null;
+  }
 });
 const workbenchRef = ref<HTMLElement | null>(null);
 const terminalHeight = ref(240);
@@ -109,7 +138,6 @@ const terminalHeightCustomized = ref(false);
 const editorCursorLine = ref(1);
 const editorCursorColumn = ref(1);
 const editorMinimapEnabled = ref(readEditorMinimapEnabled());
-const editorTabsRef = ref<HTMLElement | null>(null);
 
 const problemItems = computed(() => buildWorkbenchProblemItems(shell));
 
@@ -145,42 +173,6 @@ const editorBreadcrumbSegments = computed((): EditorBreadcrumbSegment[] => {
 });
 
 const activeEditorValue = computed(() => shell.activeEditorDocument?.value ?? '');
-const editorLineCount = computed(() => {
-  const value = activeEditorValue.value;
-  return value.length === 0 ? 1 : value.split(/\r\n|\r|\n/).length;
-});
-const editorEol = computed(() => (activeEditorValue.value.includes('\r\n') ? 'CRLF' : 'LF'));
-const editorLanguageLabel = computed(() => {
-  if (isAgentEditReviewDocument.value && !isMarkdownEditorDocument.value) {
-    return 'Diff review';
-  }
-  if (isAgentEditReviewDocument.value && isMarkdownEditorDocument.value) {
-    return 'Markdown review';
-  }
-  const language = shell.activeEditorDocument?.language ?? 'plaintext';
-  const labels: Record<string, string> = {
-    markdown: 'Markdown',
-    json: 'JSON',
-    plaintext: 'Plain Text',
-    typescript: 'TypeScript',
-    javascript: 'JavaScript',
-    python: 'Python',
-    shell: 'Shell',
-    html: 'HTML',
-    css: 'CSS',
-    image: 'Image',
-  };
-  return labels[language] ?? language;
-});
-const editorAccessLabel = computed(() => {
-  if (!shell.activeEditorDocument) {
-    return 'No document';
-  }
-  if (shell.activeEditorDocument.readOnly) {
-    return 'Read-only';
-  }
-  return shell.activeEditorDocument.dirty ? 'Unsaved' : 'Saved';
-});
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
 );
@@ -194,6 +186,14 @@ const isImageEditorDocument = computed(() => {
   }
   return document.source === 'file' && isImageFilePath(document.filePath ?? document.title);
 });
+const isBinaryEditorDocument = computed(() => {
+  const document = shell.activeEditorDocument;
+  if (!document || document.source !== 'file') {
+    return false;
+  }
+  const path = document.filePath ?? document.title;
+  return isBinaryFilePath(path) && !isImageFilePath(path);
+});
 const isAgentEditReviewDocument = computed(() =>
   isAgentEditReviewDocumentId(shell.activeEditorDocument?.id),
 );
@@ -201,6 +201,15 @@ const isAgentEditReviewDocument = computed(() =>
 const showAgentDiffReviewViewer = computed(
   () => isAgentEditReviewDocument.value && !isMarkdownEditorDocument.value,
 );
+const { editorLineCount, editorEol, editorLanguageLabel, editorAccessStatus } =
+  useEditorStatusBarMeta({
+    activeDocument: computed(() => shell.activeEditorDocument),
+    activeEditorValue,
+    isAgentEditReviewDocument,
+    isMarkdownEditorDocument,
+    isBinaryEditorDocument,
+    isImageEditorDocument,
+  });
 const editorPreviewEnabled = ref(false);
 
 watch(
@@ -258,38 +267,9 @@ function setEditorPreviewMode(enabled: boolean): void {
   persistEditorMarkdownPreviewEnabled(documentId, enabled);
 }
 
-function handleEditorTabsWheel(event: WheelEvent): void {
-  const tabs = editorTabsRef.value;
-  if (!tabs) {
-    return;
-  }
-  const delta =
-    Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
-  if (delta === 0 || tabs.scrollWidth <= tabs.clientWidth) {
-    return;
-  }
-  event.preventDefault();
-  tabs.scrollLeft += delta;
-}
-
 const editorTabDocuments = computed(() =>
   shell.editorDocuments.filter((document) => document.source === 'file' || document.source === 'draft'),
 );
-const editorTabLabels = computed(() => editorTabLabelsForDocuments(editorTabDocuments.value));
-
-function editorTabLabel(documentId: string, document: { title: string }): string {
-  return editorTabLabelForDocument(
-    editorTabDocuments.value.find((entry) => entry.id === documentId) ?? {
-      id: documentId,
-      title: document.title,
-      language: 'markdown',
-      value: '',
-      description: '',
-      source: 'draft',
-    },
-    editorTabLabels.value,
-  );
-}
 const outputLines = computed(() => {
   const document = shell.activeEditorDocument;
   return [
@@ -314,11 +294,6 @@ function handleEditorCursorChange(position: { line: number; column: number }): v
   editorCursorColumn.value = position.column;
 }
 
-function handleEditorTabClose(event: MouseEvent, documentId: string): void {
-  event.stopPropagation();
-  shell.closeEditorDocument(documentId);
-}
-
 function handleBreadcrumbSegmentClick(segment: EditorBreadcrumbSegment): void {
   if (segment.revealLine) {
     shell.revealEditorLine(segment.revealLine);
@@ -340,7 +315,10 @@ function syncTerminalHeightToContainer(): void {
   const preferredHeight = terminalHeightCustomized.value
     ? terminalHeight.value
     : resolveDefaultWorkbenchTerminalHeight(containerHeight, workbenchLayoutMode.value);
-  terminalHeight.value = clampWorkbenchTerminalHeight(preferredHeight, containerHeight);
+  const nextHeight = clampWorkbenchTerminalHeight(preferredHeight, containerHeight);
+  if (Math.abs(nextHeight - terminalHeight.value) >= 1) {
+    terminalHeight.value = nextHeight;
+  }
 }
 
 function persistTerminalHeight(): void {
@@ -420,6 +398,9 @@ const onIdeQuickGuideAction = (actionId: IdeQuickGuideActionId): void =>
   handleIdeQuickGuideAction(actionId, { shell, showAgentDock, showTerminalPanel });
 
 const onOpenWatchConnectors = (): void => openWatchConnectors(shell);
+const onOpenSourceControl = (): void => openIdeSourceControl(shell);
+const onOpenSearch = (): void => openIdeSearch(shell);
+const onOpenTeam = (): void => openIdeTeam(shell);
 
 function startTerminalResize(event: MouseEvent): void {
   if (event.button !== 0) {
@@ -462,6 +443,8 @@ function startTerminalResize(event: MouseEvent): void {
 }
 
 let resizeObserver: ResizeObserver | undefined;
+let resizeObserverFrame: number | null = null;
+let resizeObserverDebugCount = 0;
 
 function syncShellColumnHeights(): void {
   const workbench = workbenchRef.value;
@@ -489,15 +472,23 @@ function syncShellColumnHeights(): void {
       continue;
     }
 
-    const target = computeShellColumnMinHeight(columnTop, statusTop, footerGapPx);
+    const target = Math.round(computeShellColumnMinHeight(columnTop, statusTop, footerGapPx));
     const maxReasonable = window.innerHeight * 1.25;
     if (target <= 0 || target > maxReasonable) {
       continue;
     }
 
-    column.style.minHeight = `${target}px`;
-    column.style.height = `${target}px`;
-    column.style.maxHeight = `${target}px`;
+    const nextHeight = `${target}px`;
+    if (
+      column.style.minHeight === nextHeight &&
+      column.style.height === nextHeight &&
+      column.style.maxHeight === nextHeight
+    ) {
+      continue;
+    }
+    column.style.minHeight = nextHeight;
+    column.style.height = nextHeight;
+    column.style.maxHeight = nextHeight;
   }
 }
 
@@ -505,7 +496,12 @@ function syncBriefingDockHeight(bottomDock: Element | null): void {
   const dockHeight = bottomDock?.getBoundingClientRect().height ?? 0;
   const heroHeight = computeHeroDockHeight(dockHeight, shell.layoutMode);
   if (heroHeight > 0) {
-    document.documentElement.style.setProperty('--briefing-dock-height', `${heroHeight}px`);
+    const nextHeight = `${heroHeight}px`;
+    if (
+      document.documentElement.style.getPropertyValue('--briefing-dock-height') !== nextHeight
+    ) {
+      document.documentElement.style.setProperty('--briefing-dock-height', nextHeight);
+    }
   }
 }
 
@@ -516,6 +512,16 @@ function runLayoutSync(trigger: 'mount' | 'resize'): void {
   if (trigger === 'resize') {
     syncTerminalHeightToContainer();
   }
+}
+
+function scheduleResizeLayoutSync(): void {
+  if (resizeObserverFrame !== null) {
+    return;
+  }
+  resizeObserverFrame = requestAnimationFrame(() => {
+    resizeObserverFrame = null;
+    runLayoutSync('resize');
+  });
 }
 
 onMounted(() => {
@@ -533,8 +539,16 @@ onMounted(() => {
   requestAnimationFrame(() => runLayoutSync('mount'));
 
   if (workbenchRef.value) {
-    resizeObserver = new ResizeObserver(() => {
-      runLayoutSync('resize');
+    resizeObserver = new ResizeObserver((entries) => {
+      resizeObserverDebugCount += 1;
+      if (resizeObserverDebugCount <= 12 || resizeObserverDebugCount % 50 === 0) {
+        // #region agent log
+        fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'workbench-layout',hypothesisId:'H5',location:'CenterWorkbench.vue:ResizeObserver',message:'workbench resize observer fired',data:{count:resizeObserverDebugCount,framePending:resizeObserverFrame!==null,entries:entries.map((entry)=>({target:(entry.target as HTMLElement).className,width:Math.round(entry.contentRect.width),height:Math.round(entry.contentRect.height)}))},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+      }
+      // Never write observed geometry from inside the observer callback.
+      // Coalesce bursts into one frame to prevent ResizeObserver feedback loops.
+      scheduleResizeLayoutSync();
     });
     resizeObserver.observe(workbenchRef.value);
     const rightDock = document.querySelector('.region-right-dock');
@@ -546,6 +560,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
+  if (resizeObserverFrame !== null) {
+    cancelAnimationFrame(resizeObserverFrame);
+    resizeObserverFrame = null;
+  }
 });
 
 watch(
@@ -574,94 +592,22 @@ watch(
     :class="{ 'center-workbench--resizing': resizing, 'center-workbench--operator': hideOperatorEditor, 'center-workbench--terminal-collapsed': !terminalPanelVisible }"
   >
     <section v-if="!hideOperatorEditor" class="center-workbench__editor-stack center-workbench__editor-stack--surface">
-      <header class="editor-chrome editor-chrome--mockup">
-        <div class="editor-tabbar editor-tabbar--mockup">
-          <div
-            ref="editorTabsRef"
-            class="editor-tabbar__tabs"
-            role="tablist"
-            aria-label="Open editor tabs"
-            @wheel="handleEditorTabsWheel"
-          >
-            <div
-              v-for="document in editorTabDocuments"
-              :key="document.id"
-              role="tab"
-              class="editor-tabbar__tab"
-              :class="{
-                'editor-tabbar__tab--active': shell.activeEditorDocumentId === document.id,
-                'editor-tabbar__tab--dirty': document.dirty,
-              }"
-              :aria-selected="shell.activeEditorDocumentId === document.id"
-            >
-              <button
-                type="button"
-                class="editor-tabbar__tab-select"
-                @click="shell.setActiveEditorDocument(document.id)"
-              >
-                <WorkbenchIcon name="file" class="editor-tabbar__file-icon" />
-                <span class="editor-tabbar__label">{{ editorTabLabel(document.id, document) }}</span>
-              </button>
-              <button
-                type="button"
-                class="editor-tabbar__close"
-                title="Close editor tab"
-                aria-label="Close editor tab"
-                @click="handleEditorTabClose($event, document.id)"
-              >
-                <WorkbenchIcon name="close" class="editor-tabbar__close-icon" />
-              </button>
-            </div>
-          </div>
-          <div class="editor-tabbar__tools" aria-label="Editor actions">
-            <button
-              type="button"
-              class="editor-tabbar__tool-button"
-              title="New file"
-              aria-label="New file"
-              @click="shell.createWorkspaceFile()"
-            >
-              <WorkbenchIcon name="new-file" class="editor-tabbar__tool" />
-            </button>
-            <button type="button" class="editor-tabbar__tool-button" title="Split editor" aria-label="Split editor">
-              <WorkbenchIcon name="split" class="editor-tabbar__tool" />
-            </button>
-            <button
-              type="button"
-              class="editor-tabbar__tool-button"
-              title="Rename active file"
-              aria-label="Rename active file"
-              :disabled="!shell.activeWorkspaceFilePath"
-              @click="shell.renameActiveWorkspaceFile()"
-            >
-              <WorkbenchIcon name="more" class="editor-tabbar__tool" />
-            </button>
-          </div>
-        </div>
-
-        <nav class="editor-breadcrumb editor-breadcrumb--mockup" aria-label="Editor location">
-          <template v-for="(segment, index) in editorBreadcrumbSegments" :key="segment.id">
-            <span v-if="index > 0" class="editor-breadcrumb__sep" aria-hidden="true">›</span>
-            <button
-              type="button"
-              class="editor-breadcrumb__segment"
-              :class="{
-                'editor-breadcrumb__segment--symbol': segment.kind === 'symbol',
-                'editor-breadcrumb__segment--active': index === editorBreadcrumbSegments.length - 1,
-              }"
-              :disabled="!segment.revealLine"
-              @click="handleBreadcrumbSegmentClick(segment)"
-            >
-              <span>{{ segment.label }}</span>
-            </button>
-          </template>
-        </nav>
-      </header>
+      <CenterWorkbenchEditorChrome
+        :active-editor-document-id="shell.activeEditorDocumentId"
+        :editor-tab-documents="editorTabDocuments"
+        :editor-breadcrumb-segments="editorBreadcrumbSegments"
+        :active-workspace-file-path="shell.activeWorkspaceFilePath"
+        @select-document="shell.setActiveEditorDocument"
+        @close-document="shell.closeEditorDocument"
+        @create-file="shell.createWorkspaceFile()"
+        @rename-file="shell.renameActiveWorkspaceFile()"
+        @breadcrumb-click="handleBreadcrumbSegmentClick"
+      />
 
       <section class="center-workbench__editor" :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }">
         <CenterWorkbenchIdeQuickGuide
-          v-if="ideQuickGuide"
-          :guide="ideQuickGuide"
+          v-if="ideQuickGuideSticky"
+          :guide="ideQuickGuideSticky"
           :with-editor="Boolean(shell.activeEditorDocument)"
           @action="onIdeQuickGuideAction"
         />
@@ -680,7 +626,7 @@ watch(
           :content="shell.activeEditorDocument.value"
         />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument"
+          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument && !isBinaryEditorDocument"
           :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
@@ -700,63 +646,42 @@ watch(
         <div v-else-if="shell.activeEditorDocument && isImageEditorDocument" class="editor-image-preview">
           <img class="editor-image-preview__img" :src="editorImagePreviewUrl" :alt="shell.activeEditorDocument.title">
         </div>
+        <div v-else-if="shell.activeEditorDocument && isBinaryEditorDocument" class="editor-binary-preview">
+          <p class="editor-binary-preview__title">{{ shell.activeEditorDocument.title }}</p>
+          <p class="editor-binary-preview__body">{{ shell.activeEditorDocument.description }}</p>
+        </div>
         <div
           v-else-if="shell.activeEditorDocument && isMarkdownEditorDocument && editorPreviewEnabled"
           class="editor-markdown-preview conversation-seam__content conversation-seam__content--markdown"
           v-html="editorPreviewHtml"
           @click="handleEditorPreviewClick"
         />
-        <div class="editor-statusbar editor-statusbar--mockup">
-          <IdeEditorStatusBarPanels
-            v-if="isIdeMode"
-            :terminal-chip="ideEditorStatusTerminalChip"
-            :connector-chip="ideEditorStatusConnectorChip"
-            :agent-chip="ideEditorStatusAgentChip"
-            @show-terminal="showTerminalPanel"
-            @open-connectors="onOpenWatchConnectors"
-            @show-agent="showAgentDock"
-          />
-          <div class="editor-statusbar__meta">
-            <button
-              v-if="!showAgentDiffReviewViewer"
-              type="button"
-              class="editor-statusbar__toggle"
-              :class="{ 'editor-statusbar__toggle--active': editorMinimapEnabled }"
-              title="Toggle minimap"
-              aria-label="Toggle minimap"
-              @click="toggleEditorMinimap"
-            >
-              Minimap
-            </button>
-            <span>Ln {{ editorCursorLine }}, Col {{ editorCursorColumn }}</span>
-            <span>{{ editorLineCount }} line{{ editorLineCount === 1 ? '' : 's' }}</span>
-            <span>Spaces: 2</span>
-            <span>UTF-8</span>
-            <span>{{ editorEol }}</span>
-            <span>{{ editorLanguageLabel }}</span>
-            <span class="editor-statusbar__state">{{ editorAccessLabel }}</span>
-          </div>
-        </div>
-        <button
-          v-if="isIdeMode && !terminalPanelVisible"
-          type="button"
-          class="workbench-terminal-reopen"
-          :class="{
-            'workbench-terminal-reopen--alive': terminalReopenAlive,
-            'workbench-terminal-reopen--executing': shell.primaryActiveRun?.phase === 'executing',
-            'workbench-terminal-reopen--review-ready': shell.primaryActiveRun?.phase === 'review_ready',
-          }"
-          :title="terminalReopenTitle"
-          :aria-label="terminalReopenAriaLabel"
-          @click="showTerminalPanel"
-        >
-          <span class="workbench-terminal-reopen__label">TERMINAL</span>
-          <span
-            v-if="terminalReopenAlive"
-            class="workbench-terminal-reopen__pulse"
-            aria-hidden="true"
-          />
-        </button>
+        <CenterWorkbenchEditorFooter
+          :is-ide-mode="isIdeMode"
+          :terminal-panel-visible="terminalPanelVisible"
+          :show-minimap-toggle="!showAgentDiffReviewViewer"
+          :editor-minimap-enabled="editorMinimapEnabled"
+          :editor-cursor-line="editorCursorLine"
+          :editor-cursor-column="editorCursorColumn"
+          :editor-line-count="editorLineCount"
+          :editor-eol="editorEol"
+          :editor-language-label="editorLanguageLabel"
+          :editor-access-status="editorAccessStatus"
+          :run-phase="shell.primaryActiveRun?.phase ?? null"
+          :terminal-chip="ideEditorStatusTerminalChip"
+          :connector-chip="ideEditorStatusConnectorChip"
+          :git-chip="ideEditorStatusGitChip"
+          :search-chip="ideEditorStatusSearchChip"
+          :team-chip="ideEditorStatusTeamChip"
+          :agent-chip="ideEditorStatusAgentChip"
+          @show-terminal="showTerminalPanel"
+          @open-connectors="onOpenWatchConnectors"
+          @open-source-control="onOpenSourceControl"
+          @open-search="onOpenSearch"
+          @open-team="onOpenTeam"
+          @show-agent="showAgentDock"
+          @toggle-minimap="toggleEditorMinimap"
+        />
       </section>
     </section>
 

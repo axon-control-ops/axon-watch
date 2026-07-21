@@ -325,7 +325,13 @@ export function startKairoSpeechCapture(
   bargeInTriggered = false;
   kairoCaptureError.value = null;
   kairoCaptureInterim.value = '';
-  setKairoConversationPhase('listening');
+  // Ambient hands-free capture is a standing input capability, not an active
+  // conversation turn. Only explicit manual PTT owns the visible LISTENING
+  // phase; otherwise Chromium's normal no-speech end/restart cycle makes the
+  // whole IDE alternate between voice and attention profiles every second.
+  if (mode === 'manual') {
+    setKairoConversationPhase('listening');
+  }
 
   if (shouldUseCloudCapture(mode)) {
     void startCloudCapture(mode).then((started) => {

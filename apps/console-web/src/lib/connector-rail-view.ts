@@ -63,6 +63,24 @@ export function buildConnectorRailSummaryLabel(input: {
   return `${summary.ok}/${summary.configured} ok · ${requiredDown} required down`;
 }
 
+/** Body copy when watch probes are paused because the lane is disconnected. */
+export function buildConnectorRailWatchOfflineStatus(watchConnected: boolean): string | null {
+  if (watchConnected) {
+    return null;
+  }
+
+  return 'Watch offline — connector probes paused until the watch reconnects.';
+}
+
+/** Error copy when watch commands must not run while the lane is disconnected. */
+export function connectorMutationBlockedWhenWatchOffline(watchConnected: boolean): string | null {
+  if (watchConnected) {
+    return null;
+  }
+
+  return 'Watch offline — connector commands paused until the watch reconnects.';
+}
+
 /** Whether the connectors rail should show required-down emphasis styling. */
 export function connectorRailNeedsEmphasis(input: {
   summary: ConnectorRailSummary | null;

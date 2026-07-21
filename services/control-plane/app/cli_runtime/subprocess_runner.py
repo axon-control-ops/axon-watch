@@ -8,6 +8,7 @@ from collections.abc import Callable
 from typing import Any
 
 from app.cli_runtime.process_registry import register, unregister
+from app.cli_runtime.agent_process_scope import wrap_command_in_agent_scope
 
 
 class RuntimeProcessStoppedError(RuntimeError):
@@ -24,7 +25,7 @@ def communicate_registered_process(
 ) -> tuple[str, str, int]:
     env = {**(subprocess_env or os.environ), "NO_COLOR": "1"}
     proc = subprocess.Popen(
-        command,
+        wrap_command_in_agent_scope(command),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -58,7 +59,7 @@ def stream_registered_process(
 ) -> tuple[str, str, int]:
     env = {**(subprocess_env or os.environ), "NO_COLOR": "1"}
     proc = subprocess.Popen(
-        command,
+        wrap_command_in_agent_scope(command),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

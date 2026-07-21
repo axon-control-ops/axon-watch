@@ -1,0 +1,53 @@
+/*
+ * IDE stability policy
+ *
+ * Persistent decorative motion reads as flicker in the dense operator console.
+ * Keep explicit progress indicators functional, but render ambient attention,
+ * status, voice, streaming, and radar indicators as stable states.
+ */
+.console-shell--ide
+  :is(
+    [class*='attention'],
+    [class*='executing'],
+    [class*='glow'],
+    [class*='pulse'],
+    [class*='radar'],
+    [class*='ring'],
+    [class*='shimmer'],
+    [class*='streaming'],
+    [class*='working']
+  ),
+.console-shell--ide
+  :is(
+    [class*='attention'],
+    [class*='executing'],
+    [class*='glow'],
+    [class*='pulse'],
+    [class*='radar'],
+    [class*='ring'],
+    [class*='shimmer'],
+    [class*='streaming'],
+    [class*='working']
+  )::before,
+.console-shell--ide
+  :is(
+    [class*='attention'],
+    [class*='executing'],
+    [class*='glow'],
+    [class*='pulse'],
+    [class*='radar'],
+    [class*='ring'],
+    [class*='shimmer'],
+    [class*='streaming'],
+    [class*='working']
+  )::after {
+  animation: none !important;
+}
+
+/* These animations live on containers without motion-oriented class names. */
+.console-shell--ide .dock-hero-panel,
+.console-shell--ide .kairo-chip__waveform span,
+.console-shell--ide .company-roster__row--working,
+.console-shell--ide .status-bar-mockup__kairo {
+  animation: none !important;
+}

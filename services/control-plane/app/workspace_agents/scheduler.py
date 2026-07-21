@@ -21,7 +21,7 @@ from app.runs.service import (
 )
 from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
-from app.workspace_agents.failure_detail import is_usage_limit_failure
+from app.workspace_agents.failure_detail import is_runtime_auth_failure, is_usage_limit_failure
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
 
@@ -31,11 +31,11 @@ CONTINUOUS_SCHEDULES = frozenset({"always_on", "continuous"})
 SKIP_ROLES = frozenset({"lead", "overview_agent"})
 DEFAULT_TICK_SECONDS = 45.0
 # Cap new starts per tick so one restart cannot flood approvals / executing debt.
-# Keep these low: each cursor-agent is ~300MB+ and often spawns jest workers.
-DEFAULT_MAX_STARTS_PER_TICK = 2
+# Keep these low: each cursor-agent is ~300MB+ and often spawns jest / tsserver workers.
+DEFAULT_MAX_STARTS_PER_TICK = 1
 # Skip new starts when non-terminal executing runs already exceed this bound.
-# 24 concurrent agents (~7GB+) will thrash past MemoryHigh=3G and trip systemd-oomd.
-DEFAULT_MAX_ACTIVE_EXECUTING = 4
+# 3+ concurrent agents with jest/tsserver thrash past MemoryHigh and trip systemd-oomd.
+DEFAULT_MAX_ACTIVE_EXECUTING = 2
 
 _scheduler_task: asyncio.Task[None] | None = None
 
@@ -114,6 +114,15 @@ def _usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
         return False
     detail = str(outcome.get("detail") or "")
     return is_usage_limit_failure(detail)
+
+
+def _runtime_auth_blocks_auto_start(workspace_id: str, role: str) -> bool:
+    """Skip auto-schedule when the last shift failed on missing CLI/vault auth."""
+    outcome = latest_role_run_outcome(workspace_id, role)
+    if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
+        return False
+    detail = str(outcome.get("detail") or "")
+    return is_runtime_auth_failure(detail)
 
 
 def _active_role_run_exists(workspace_id: str, role: str) -> bool:
@@ -229,6 +238,13 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
             if _usage_limit_blocks_auto_start(workspace_id, role):
                 logger.info(
                     "continuous worker tick skipped role=%s workspace=%s: usage limits blocked last shift",
+                    role,
+                    workspace_id,
+                )
+                continue
+            if _runtime_auth_blocks_auto_start(workspace_id, role):
+                logger.info(
+                    "continuous worker tick skipped role=%s workspace=%s: runtime auth blocked last shift",
                     role,
                     workspace_id,
                 )

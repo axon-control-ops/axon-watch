@@ -10,6 +10,8 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 echo "Reviving Axon-X always-on stack..."
+echo "  Stopping optional :5173 Vite edit server..."
+pkill -f 'vite --host 127\.0\.0\.1 --port 5173' 2>/dev/null || true
 echo "  Force-stopping control-plane (SIGKILL) if needed..."
 systemctl --user kill -s SIGKILL control-plane.service 2>/dev/null || true
 sleep 1

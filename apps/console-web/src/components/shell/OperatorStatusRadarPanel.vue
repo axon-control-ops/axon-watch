@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { openWatchConnectors } from '../../composables/useIdeEditorStatusBar';
 import { buildOperatorQuickGuide, type OperatorQuickGuideActionId } from '../../lib/operator-quick-guide';
 import {
   effectiveRequiredConnectorsUnavailable,
@@ -141,8 +142,7 @@ const statusRail = computed(() =>
 
 function handleStatusRailAction(action: 'focus-connectors'): void {
   if (action === 'focus-connectors') {
-    void shell.loadConnectors();
-    shell.focusWatchConnectors();
+    openWatchConnectors(shell);
   }
 }
 
@@ -289,8 +289,7 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
   }
 
   if (actionId === 'open-connectors') {
-    void shell.loadConnectors();
-    shell.focusWatchConnectors();
+    openWatchConnectors(shell);
     return;
   }
 

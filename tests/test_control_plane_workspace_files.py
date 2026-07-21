@@ -172,6 +172,43 @@ class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
         response = self.client.get("/api/workspaces/workspace_alpha/files/assets/mockup.png")
         self.assertEqual(404, response.status_code)
 
+    def test_text_workspace_file_endpoint_rejects_pdf(self) -> None:
+        pdf_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "docs" / "report.pdf"
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4 binary-not-utf8\xff\xfe")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/docs/report.pdf")
+        self.assertEqual(404, response.status_code)
+
+        raw = self.client.get("/api/workspaces/workspace_alpha/files/docs/report.pdf/raw")
+        self.assertEqual(200, raw.status_code)
+        self.assertEqual(b"%PDF-1.4 binary-not-utf8\xff\xfe", raw.content)
+
+    def test_text_workspace_file_endpoint_rejects_known_binary_extensions(self) -> None:
+        pdf_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "docs" / "brief.pdf"
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4 sample")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/docs/brief.pdf")
+        self.assertEqual(404, response.status_code)
+
+    def test_text_workspace_file_endpoint_rejects_oversized_text(self) -> None:
+        large_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "big.log"
+        large_path.parent.mkdir(parents=True, exist_ok=True)
+        # Just over the 2MB editor text limit enforced by read_workspace_file.
+        large_path.write_bytes(b"x" * (2 * 1024 * 1024 + 1))
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/big.log")
+        self.assertEqual(404, response.status_code)
+
+    def test_text_workspace_file_endpoint_rejects_non_utf8_payload(self) -> None:
+        disguised = Path(self.workspace_tempdir.name) / "workspace_alpha" / "data" / "looks.txt"
+        disguised.parent.mkdir(parents=True, exist_ok=True)
+        disguised.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/data/looks.txt")
+        self.assertEqual(404, response.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()

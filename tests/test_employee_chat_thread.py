@@ -126,6 +126,90 @@ class EmployeeChatThreadRouteTests(unittest.TestCase):
         self.assertEqual("integrations", match["employee_role"])
         self.assertEqual("Quinn · Integrations", match["preview_label"])
 
+    def test_http_employee_thread_skips_vaxon_persona_fast_path(self) -> None:
+        streaming = patch.dict(os.environ, {"AXON_WATCH_LANE_B_STREAMING": "0"}, clear=False)
+        streaming.start()
+        self.addCleanup(streaming.stop)
+
+        created = self.client.post(
+            "/api/workspaces/workspace_axon_watch/chat/threads",
+            json={
+                "surface": "ide",
+                "title": "Reed · Backend",
+                "employee_id": "employee-workspace_axon_watch-backend-3",
+                "employee_role": "backend",
+            },
+        )
+        self.assertEqual(200, created.status_code)
+        thread_id = created.json()["thread_id"]
+
+        with patch(
+            "app.chat.service.generate_lane_b_result",
+            return_value={
+                "content": "Reed: continuing the backend shift.",
+                "dispatched": True,
+                "runtime_id": "cursor_local",
+                "runtime_label": "Cursor CLI (local)",
+                "reason": "",
+                "execution_tier": "executing",
+            },
+        ) as mock_runtime:
+            response = self.client.post(
+                "/api/chat/messages",
+                json={
+                    "workspace_id": "workspace_axon_watch",
+                    "thread_id": thread_id,
+                    "content": "Hey VAXON",
+                    "composer_mode": "agent",
+                    "execution_access": "full",
+                },
+            )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        mock_runtime.assert_called_once()
+        system_content = str(payload["messages"][1]["content"]).lower()
+        self.assertNotIn("local reply", system_content)
+        self.assertIn("lane b", system_content)
+        self.assertEqual("Reed: continuing the backend shift.", payload["messages"][2]["content"])
+
+    def test_http_employee_thread_skips_vaxon_persona_fast_path_when_streaming(self) -> None:
+        streaming = patch.dict(os.environ, {"AXON_WATCH_LANE_B_STREAMING": "1"}, clear=False)
+        streaming.start()
+        self.addCleanup(streaming.stop)
+
+        created = self.client.post(
+            "/api/workspaces/workspace_axon_watch/chat/threads",
+            json={
+                "surface": "ide",
+                "title": "Reed · Backend",
+                "employee_id": "employee-workspace_axon_watch-backend-3",
+                "employee_role": "backend",
+            },
+        )
+        self.assertEqual(200, created.status_code)
+        thread_id = created.json()["thread_id"]
+
+        response = self.client.post(
+            "/api/chat/messages",
+            json={
+                "workspace_id": "workspace_axon_watch",
+                "thread_id": thread_id,
+                "content": "Hey VAXON",
+                "composer_mode": "agent",
+                "execution_access": "full",
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["streaming"])
+        self.assertTrue(payload["stream_agent_message_id"])
+        system_content = str(payload["messages"][1]["content"]).lower()
+        self.assertNotIn("local reply", system_content)
+        self.assertIn("lane b", system_content)
+        self.assertEqual("", payload["messages"][2]["content"])
+
     def test_http_agent_message_on_employee_thread_builds_persona_cli_prompt(self) -> None:
         streaming = patch.dict(os.environ, {"AXON_WATCH_LANE_B_STREAMING": "0"}, clear=False)
         streaming.start()

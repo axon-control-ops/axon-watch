@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { IdeQuickGuide, IdeQuickGuideActionId } from '../../lib/ide-quick-guide';
+import {
+  ideQuickGuideActionAriaLabel,
+  ideQuickGuideActionIsSecondary,
+} from '../../lib/ide-quick-guide';
 
 defineProps<{
   guide: IdeQuickGuide;
@@ -35,6 +39,13 @@ const emit = defineEmits<{
           :key="action.id"
           type="button"
           class="center-workbench__ide-guide-action"
+          :class="{
+            'center-workbench__ide-guide-action--secondary': ideQuickGuideActionIsSecondary(
+              action.id,
+              guide.actions,
+            ),
+          }"
+          :aria-label="ideQuickGuideActionAriaLabel(action)"
           @click="emit('action', action.id)"
         >
           {{ action.label }}

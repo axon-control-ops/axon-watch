@@ -24,11 +24,55 @@ _SKIPPED_DIRECTORY_NAMES = {
 }
 _MAX_LISTED_FILES = 5000
 _IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".avif"})
+_BINARY_EXTENSIONS = frozenset(
+    {
+        ".pdf",
+        ".zip",
+        ".gz",
+        ".tgz",
+        ".bz2",
+        ".xz",
+        ".7z",
+        ".rar",
+        ".exe",
+        ".dll",
+        ".so",
+        ".dylib",
+        ".bin",
+        ".wasm",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".ico",
+        ".mp3",
+        ".mp4",
+        ".webm",
+        ".mov",
+        ".avi",
+        ".wav",
+        ".ogg",
+        ".sqlite",
+        ".sqlite3",
+        ".db",
+        ".apk",
+        ".aab",
+        ".dmg",
+        ".iso",
+    }
+)
 _MAX_RAW_FILE_BYTES = 16 * 1024 * 1024
+_MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024
 
 
 def is_image_workspace_file(file_path: str) -> bool:
     return Path(str(file_path or "").strip()).suffix.lower() in _IMAGE_EXTENSIONS
+
+
+def is_binary_workspace_file(file_path: str) -> bool:
+    suffix = Path(str(file_path or "").strip()).suffix.lower()
+    return suffix in _IMAGE_EXTENSIONS or suffix in _BINARY_EXTENSIONS
 
 
 def workspace_file_media_type(file_path: str) -> str:
@@ -118,14 +162,22 @@ def resolve_workspace_file_path(workspace_id: str, file_path: str) -> Path:
 
 def read_workspace_file(workspace_id: str, file_path: str) -> dict[str, object]:
     target = resolve_workspace_file_path(workspace_id, file_path)
-    if is_image_workspace_file(file_path):
-        raise WorkspaceFileError("binary image files must be fetched via the raw file endpoint")
-    content = target.read_text(encoding="utf-8")
+    if is_binary_workspace_file(file_path):
+        raise WorkspaceFileError("binary files must be fetched via the raw file endpoint")
+    size_bytes = target.stat().st_size
+    if size_bytes > _MAX_TEXT_FILE_BYTES:
+        raise WorkspaceFileError("text file exceeds 2MB editor limit")
+    try:
+        content = target.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise WorkspaceFileError(
+            "binary files must be fetched via the raw file endpoint"
+        ) from exc
     return {
         "workspace_id": workspace_id,
         "path": file_path,
         "content": content,
-        "size_bytes": target.stat().st_size,
+        "size_bytes": size_bytes,
     }
 
 
