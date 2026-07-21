@@ -32,6 +32,7 @@ export type {
   OperatorPresenceState,
   KairoNarrationLevel,
   SpokenAlertEligibility,
+  OperatorAlertExplanation,
   SttMode,
   VoiceRoutingMode,
 } from './presence';

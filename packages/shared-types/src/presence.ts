@@ -28,11 +28,20 @@ export interface OperatorPresenceSettings {
   narrate_tool_progress: boolean;
 }
 
+export interface OperatorAlertExplanation {
+  what: string;
+  you_do: string;
+  agent_do: string;
+  spoken: string;
+}
+
 export interface SpokenAlertEligibility {
   eligible: boolean;
   reason: string;
   signal_id: string | null;
   message: string;
+  /** Present when eligible; null when blocked / no interruptive signal. */
+  explanation?: OperatorAlertExplanation | null;
 }
 
 export interface OperatorPresenceMobile {

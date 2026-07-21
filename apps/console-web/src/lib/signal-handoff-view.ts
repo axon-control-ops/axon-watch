@@ -8,6 +8,10 @@ export type SignalHandoffInput = {
   /** When set, used as the IDE agent prompt instead of rebuilding from title/summary. */
   task?: string | null;
   meta?: Record<string, unknown> | null;
+  /** Optional control-plane explanation (spoken_alert.explanation). */
+  serverExplanation?: Record<string, unknown> | null;
+  serverSignalId?: string | null;
+  serverReason?: string | null;
 };
 
 export type WorkspaceHandoffTarget = {
