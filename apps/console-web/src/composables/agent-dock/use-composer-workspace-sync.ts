@@ -58,6 +58,7 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
   let restoringWorkspaceComposerMode = false;
   let lastSyncedWorkspaceId: string | null = null;
   let lastSyncedThreadId: string | null = null;
+  let hasSyncedContext = false;
 
   function handleDocumentClick(): void {
     closeMenus();
@@ -111,7 +112,10 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
         composerMode.value = restoredMode;
       }
       planSoftSwitchNotice.value = null;
-      teammateRouteNotice.value = null;
+      if (hasSyncedContext && workspaceChanged) {
+        teammateRouteNotice.value = null;
+      }
+      hasSyncedContext = true;
       if (workspaceChanged) {
         loadComposerHistoryForWorkspace(workspaceId);
       }

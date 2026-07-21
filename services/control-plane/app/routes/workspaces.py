@@ -19,6 +19,7 @@ from app.routes.schemas import (
     RegisterWorkspaceBindingRequest,
     RenameTerminalSessionRequest,
     RenameWorkspaceFileRequest,
+    RouteTeammateRequest,
     WriteWorkspaceFileRequest,
 )
 from app.terminal.session_handler import handle_terminal_session
@@ -129,6 +130,35 @@ def workspace_company_show(workspace_id: str) -> dict[str, object]:
     except WorkspaceAgentError as exc:
         status_code = 404 if "not found" in str(exc).lower() else 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@router.post("/api/workspaces/{workspace_id}/company/route-teammate")
+def workspace_company_route_teammate(
+    workspace_id: str,
+    body: RouteTeammateRequest,
+) -> dict[str, object]:
+    from app.workspace_agents.teammate_route import (
+        dispatch_model_tiebreak,
+        route_teammate_decision,
+    )
+
+    prompt = body.prompt.strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="prompt must not be empty")
+    try:
+        decision = route_teammate_decision(
+            workspace_id=workspace_id,
+            prompt=prompt,
+            current_employee_id=body.current_employee_id,
+            use_model_tiebreak=body.use_model_tiebreak,
+            dispatch_runtime=dispatch_model_tiebreak if body.use_model_tiebreak else None,
+        )
+    except WorkspaceAgentError as exc:
+        status_code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    except WorkspaceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return decision.as_dict()
 
 
 @router.get("/api/company-roles")

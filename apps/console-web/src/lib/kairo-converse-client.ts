@@ -18,6 +18,21 @@ export type KairoConverseAction =
       signal_id: string;
       target_workspace_id: string;
       task: string;
+      employee_id?: string | null;
+      employee_role?: string | null;
+      employee_name?: string | null;
+      routing_receipt?: string | null;
+      model_receipt?: Record<string, unknown> | null;
+    }
+  | {
+      type: 'route_employee';
+      target_workspace_id: string;
+      task: string;
+      employee_id: string;
+      employee_role: string;
+      employee_name: string;
+      routing_receipt?: string | null;
+      model_receipt?: Record<string, unknown> | null;
     }
   | {
       type: 'dispatch_command';

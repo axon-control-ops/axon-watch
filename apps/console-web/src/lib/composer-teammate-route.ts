@@ -1,6 +1,6 @@
 /**
- * Deterministic soft-routing: wrong-teammate composer submits → owning role.
- * Keywords + owns overlap only — no model call.
+ * Deterministic soft-routing: wrong-teammate / cold-start → owning role.
+ * Keywords + owns overlap only — model tie-break is a separate server step.
  */
 
 import type { CompanyEmployeeRecord } from '../contracts/canonical';
@@ -11,6 +11,8 @@ export type TeammateRouteEmployee = Pick<
   'employee_id' | 'name' | 'role' | 'role_label' | 'owns'
 >;
 
+export type TeammateRouteSource = 'deterministic' | 'model';
+
 export type TeammateRouteDecision = {
   shouldRoute: boolean;
   reason: string;
@@ -19,10 +21,20 @@ export type TeammateRouteDecision = {
   fromName?: string;
   winnerScore?: number;
   secondScore?: number;
+  source?: TeammateRouteSource;
+  ambiguous?: boolean;
+  routingReceipt?: string | null;
+  modelReceipt?: Record<string, unknown> | null;
 };
 
-const MIN_WINNER_SCORE = 2;
-const MIN_MARGIN = 2;
+export const MIN_WINNER_SCORE = 2;
+export const MIN_MARGIN = 2;
+
+const AMBIGUOUS_REASONS = new Set([
+  'margin_too_low',
+  'current_still_competitive',
+  'score_too_low',
+]);
 
 type RoleBag = {
   role: string;
@@ -122,12 +134,24 @@ const ROLE_BAGS: RoleBag[] = [
 ];
 
 const PATH_ROLE_HINTS: Array<{ role: string; pattern: RegExp; weight: number }> = [
-  { role: 'frontend', pattern: /\b(?:app|components|screens|styles)\/[\w./-]+\.(?:tsx?|jsx?|vue|css)\b/i, weight: 2 },
-  { role: 'backend', pattern: /\b(?:services|api|server|supabase)\/[\w./-]+\.(?:ts|py|sql)\b/i, weight: 2 },
-  { role: 'integrations', pattern: /\b\.github\/workflows\/[\w./-]+\.ya?ml\b/i, weight: 2 },
+  {
+    role: 'frontend',
+    pattern: /\b(?:app|components|screens|styles)\/[\w./-]+\.(?:tsx?|jsx?|vue|css)\b/i,
+    weight: 2,
+  },
+  {
+    role: 'backend',
+    pattern: /\b(?:services|api|server|supabase)\/[\w./-]+\.(?:ts|py|sql)\b/i,
+    weight: 2,
+  },
+  {
+    role: 'integrations',
+    pattern: /\b\.github\/workflows\/[\w./-]+\.ya?ml\b/i,
+    weight: 2,
+  },
 ];
 
-function normalizeRole(role: string): string {
+export function normalizeTeammateRole(role: string): string {
   const cleaned = String(role || '')
     .trim()
     .toLowerCase()
@@ -160,8 +184,8 @@ function ownsOverlapScore(text: string, owns: string): number {
   return Math.min(hits, 3);
 }
 
-function scoreRole(text: string, role: string, owns: string): number {
-  const normalized = normalizeRole(role);
+export function scoreTeammateRole(text: string, role: string, owns: string): number {
+  const normalized = normalizeTeammateRole(role);
   let score = 0;
   for (const bag of ROLE_BAGS) {
     if (bag.role !== normalized) {
@@ -182,53 +206,102 @@ function scoreRole(text: string, role: string, owns: string): number {
   return score;
 }
 
+export function isAmbiguousTeammateRoute(decision: TeammateRouteDecision): boolean {
+  if (decision.reason === 'score_too_low') {
+    return Boolean(decision.ambiguous);
+  }
+  return Boolean(decision.ambiguous) || AMBIGUOUS_REASONS.has(decision.reason);
+}
+
+type ScoredEmployee = {
+  employee: TeammateRouteEmployee;
+  score: number;
+};
+
+function scoreRoster(
+  text: string,
+  employees: readonly TeammateRouteEmployee[],
+): ScoredEmployee[] {
+  const scored = employees.map((employee) => ({
+    employee,
+    score: scoreTeammateRole(text, employee.role, employee.owns),
+  }));
+  scored.sort(
+    (left, right) =>
+      right.score - left.score || left.employee.name.localeCompare(right.employee.name),
+  );
+  return scored;
+}
+
 /**
- * Soft-route when the active teammate is clearly the wrong specialist for this prompt.
- * Requires an active employee thread; ambiguous prompts stay put.
+ * Soft-route when the prompt clearly belongs to another specialist.
+ * Cold-start (no active employee) picks a clear roster winner.
+ * Ambiguous prompts stay put and set `ambiguous` for optional model tie-break.
  */
 export function shouldSoftRouteToTeammate(
   promptText: string,
   currentEmployee: TeammateRouteEmployee | null | undefined,
   roster: readonly TeammateRouteEmployee[] | null | undefined,
 ): TeammateRouteDecision {
-  if (!currentEmployee?.employee_id?.trim()) {
-    return { shouldRoute: false, reason: 'no_active_employee' };
-  }
   const employees = (roster ?? []).filter((row) => row.employee_id?.trim());
   if (employees.length < 2) {
-    return { shouldRoute: false, reason: 'roster_too_small' };
+    return { shouldRoute: false, reason: 'roster_too_small', source: 'deterministic' };
   }
 
   const text = String(promptText || '').trim();
   if (!text) {
-    return { shouldRoute: false, reason: 'empty_prompt' };
+    return { shouldRoute: false, reason: 'empty_prompt', source: 'deterministic' };
   }
   if (isBuildPlanImplementPrompt(text)) {
-    return { shouldRoute: false, reason: 'build_plan_implement' };
+    return { shouldRoute: false, reason: 'build_plan_implement', source: 'deterministic' };
   }
 
-  const scored = employees.map((employee) => ({
-    employee,
-    score: scoreRole(text, employee.role, employee.owns),
-  }));
-  scored.sort((left, right) => right.score - left.score || left.employee.name.localeCompare(right.employee.name));
-
+  const scored = scoreRoster(text, employees);
   const winner = scored[0];
   const second = scored[1];
   if (!winner) {
-    return { shouldRoute: false, reason: 'no_match' };
+    return { shouldRoute: false, reason: 'no_match', source: 'deterministic' };
   }
 
   const winnerScore = winner.score;
   const secondScore = second?.score ?? 0;
+  const baseScores = {
+    winnerScore,
+    secondScore,
+    source: 'deterministic' as const,
+    employee: winner.employee,
+  };
+
   if (winnerScore < MIN_WINNER_SCORE) {
-    return { shouldRoute: false, reason: 'score_too_low', winnerScore, secondScore };
+    return {
+      shouldRoute: false,
+      reason: 'score_too_low',
+      ...baseScores,
+      ambiguous: winnerScore > 0,
+    };
   }
   if (winnerScore - secondScore < MIN_MARGIN) {
-    return { shouldRoute: false, reason: 'margin_too_low', winnerScore, secondScore };
+    return {
+      shouldRoute: false,
+      reason: 'margin_too_low',
+      ...baseScores,
+      ambiguous: true,
+    };
   }
 
-  const currentId = currentEmployee.employee_id.trim();
+  const currentId = currentEmployee?.employee_id?.trim() ?? '';
+  if (!currentId) {
+    return {
+      shouldRoute: true,
+      reason: `role_${normalizeTeammateRole(winner.employee.role)}`,
+      employee: winner.employee,
+      fromName: 'workspace',
+      winnerScore,
+      secondScore,
+      source: 'deterministic',
+    };
+  }
+
   if (winner.employee.employee_id.trim() === currentId) {
     return {
       shouldRoute: false,
@@ -236,28 +309,32 @@ export function shouldSoftRouteToTeammate(
       employee: winner.employee,
       winnerScore,
       secondScore,
+      source: 'deterministic',
     };
   }
 
-  // Prefer routing only when current role loses clearly to winner role.
   const currentScore =
     scored.find((row) => row.employee.employee_id.trim() === currentId)?.score ?? 0;
   if (winnerScore - currentScore < MIN_MARGIN) {
     return {
       shouldRoute: false,
       reason: 'current_still_competitive',
+      employee: winner.employee,
       winnerScore,
       secondScore: currentScore,
+      source: 'deterministic',
+      ambiguous: true,
     };
   }
 
   return {
     shouldRoute: true,
-    reason: `role_${normalizeRole(winner.employee.role)}`,
+    reason: `role_${normalizeTeammateRole(winner.employee.role)}`,
     employee: winner.employee,
     fromEmployeeId: currentId,
-    fromName: currentEmployee.name.trim() || 'teammate',
+    fromName: currentEmployee?.name.trim() || 'teammate',
     winnerScore,
     secondScore,
+    source: 'deterministic',
   };
 }

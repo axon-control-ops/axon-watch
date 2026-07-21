@@ -12,6 +12,9 @@ export async function executeKairoConverseAction(
   action: ConverseAction,
 ): Promise<void> {
   if (action.type === 'handoff_signal') {
+    const handoffOptions = action.employee_id
+      ? { autoSubmit: true, employeeId: action.employee_id }
+      : { autoSubmit: true };
     await shell.handoffSignalToIde(
       {
         signal_id: action.signal_id,
@@ -20,8 +23,16 @@ export async function executeKairoConverseAction(
         summary: action.task,
         task: action.task,
       },
-      { autoSubmit: true },
+      handoffOptions,
     );
+    return;
+  }
+  if (action.type === 'route_employee') {
+    await shell.routeTaskToEmployee({
+      targetWorkspaceId: action.target_workspace_id,
+      task: action.task,
+      employeeId: action.employee_id,
+    });
     return;
   }
   if (action.type === 'focus_briefing') {

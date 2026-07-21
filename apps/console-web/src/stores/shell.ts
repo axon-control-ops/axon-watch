@@ -11,7 +11,6 @@ import {
   fetchWorkspaceFiles,
   markRunReviewReady,
   createWorkspaceChatThread,
-  createWorkspaceHandoff,
   fetchWorkspaceChatThreads,
   uploadChatAttachment,
   postChatMessage,
@@ -34,11 +33,6 @@ import {
   type BrainGraphSnapshot,
   type OperatorCenterView,
 } from '../lib/operator-brain-graph-view';
-import { resolveSignalHandoff, type SignalHandoffInput } from '../lib/signal-handoff-view';
-import {
-  readPendingHandoffDismissSignalId,
-  writePendingHandoffDismissSignalId,
-} from '../lib/signal-handoff-dismiss';
 import type {
   ApprovalRecord,
   InboxItem,
@@ -314,6 +308,7 @@ import { createViewportCompactSlice } from './shell/slices/create-viewport-compa
 import { createKairoVoiceSlice } from './shell/slices/create-kairo-voice-slice';
 import { createChatStreamSessionSlice } from './shell/slices/create-chat-stream-session-slice';
 import { createWorkspaceStreamUiSlice } from './shell/slices/create-workspace-stream-ui-slice';
+import { createSignalHandoffSlice } from './shell/slices/create-signal-handoff-slice';
 import { createVoiceOrbPlacementController } from './shell/slices/create-voice-orb-placement-slice';
 import {
   DEFAULT_DOCK_CONTEXT,
@@ -380,10 +375,6 @@ export const useShellStore = defineStore('shell', () => {
   const runMutationError = ref<string | null>(null);
   const signalClearState = ref<'idle' | 'clearing'>('idle');
   const signalClearError = ref<string | null>(null);
-  const handoffMutationState = ref<'idle' | 'submitting' | 'error'>('idle');
-  const handoffMutationError = ref<string | null>(null);
-  const lastDiscussedSignal = ref<SignalHandoffInput | null>(null);
-  const pendingHandoffDismissSignalId = ref<string | null>(readPendingHandoffDismissSignalId());
   const runHistorySnapshot = ref<RunHistorySnapshot | null>(null);
   const runHistoryLoadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const approvals = ref<ApprovalRecord[]>([]);
@@ -1452,59 +1443,31 @@ export const useShellStore = defineStore('shell', () => {
     await submitOperatorCommand();
   }
 
-  async function handoffSignalToIde(
-    signal: SignalHandoffInput,
-    options: { autoSubmit?: boolean } = {},
-  ): Promise<void> {
-    handoffMutationState.value = 'submitting';
-    handoffMutationError.value = null;
-    lastDiscussedSignal.value = signal;
-
-    const resolved = resolveSignalHandoff(
-      signal,
-      currentWorkspace.value?.workspace_id ?? null,
-      workspaces.value.map((workspace) => ({
-        workspace_id: workspace.workspace_id,
-        display_name: workspace.display_name,
-      })),
-    );
-    if (!resolved) {
-      handoffMutationState.value = 'error';
-      handoffMutationError.value = 'This signal cannot be handed off to the IDE.';
-      return;
-    }
-
-    try {
-      if (resolved.mode === 'handoff' && resolved.sourceWorkspaceId) {
-        await createWorkspaceHandoff(resolved.sourceWorkspaceId, {
-          target_workspace_id: resolved.targetWorkspaceId,
-          task: resolved.task,
-          reason: resolved.reason,
-        });
-      }
-      setCurrentWorkspace(resolved.targetWorkspaceId);
-      setLayoutMode('ide');
-      ideComposerDraft.value = resolved.task;
-      await hydrateWorkspaceIdeChat(resolved.targetWorkspaceId);
-      if (options.autoSubmit) {
-        await submitIdeComposer('agent');
-      }
-      pendingHandoffDismissSignalId.value = resolved.reason;
-      writePendingHandoffDismissSignalId(resolved.reason);
-      handoffMutationState.value = 'idle';
-    } catch (error) {
-      handoffMutationState.value = 'error';
-      handoffMutationError.value =
-        error instanceof Error ? error.message : 'Failed to hand off signal to IDE';
-    }
-  }
-
-  async function handoffDiscussedSignalToIde(): Promise<void> {
-    if (!lastDiscussedSignal.value) {
-      return;
-    }
-    await handoffSignalToIde(lastDiscussedSignal.value);
-  }
+  const {
+    handoffDiscussedSignalToIde,
+    handoffMutationError,
+    handoffMutationState,
+    handoffSignalToIde,
+    lastDiscussedSignal,
+    pendingHandoffDismissSignalId,
+    routeTaskToEmployee,
+  } = createSignalHandoffSlice({
+    currentWorkspace,
+    workspaces,
+    operatorBriefing,
+    ideComposerDraft,
+    activeIdeThreadId,
+    activeIdeEmployeeRecord,
+    companyEmployeesForCurrentWorkspace,
+    setCurrentWorkspace,
+    setLayoutMode,
+    hydrateWorkspaceIdeChat,
+    loadCompanyEmployees,
+    openOrFocusEmployeeIdeThread,
+    selectIdeThread,
+    createIdeThread,
+    submitIdeComposer,
+  });
 
   function restoreComposerDraft(content: string): void {
     const trimmed = content.trim();
@@ -3730,6 +3693,7 @@ export const useShellStore = defineStore('shell', () => {
     handoffMutationError,
     pendingHandoffDismissSignalId,
     lastDiscussedSignal,
+    routeTaskToEmployee,
     submitIdeComposer,
     steerIdeComposer,
     steerQueuedIdeComposerMessage,

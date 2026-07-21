@@ -18,6 +18,7 @@ from app.chat.command_intent import (
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
 from app.cli_runtime.recovery import ordered_runtime_candidates
+from app.kairo.teammate_handoff import build_specialty_task_action
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_conversation_reply import (
     compose_conversation_reply,
@@ -256,6 +257,23 @@ def route_voice_turn(
             action_tier=tier.tier,
             model_receipt=receipt,
         )
+
+    if turn_kind in {"chat", "open_question"}:
+        specialty_action = build_specialty_task_action(
+            content,
+            workspace_id=workspace_id,
+        )
+        if specialty_action is not None:
+            employee_name = str(specialty_action.get("employee_name") or "the specialist")
+            employee_role = str(specialty_action.get("employee_role") or "specialist")
+            return VoiceDispatchDecision(
+                lane="ide_handoff",
+                turn_kind="action",
+                source="model" if specialty_action.get("model_receipt") else "template",
+                reply=f"Routing this to {employee_name}, your {employee_role} specialist.",
+                action_tier="reversible_auto",
+                action=specialty_action,
+            )
 
     if turn_kind == "status_question" and not should_use_vaxon_runtime(
         turn_kind=turn_kind,

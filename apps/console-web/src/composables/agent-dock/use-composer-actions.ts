@@ -14,14 +14,22 @@ import {
 } from '../../features/kairo-conversation/conversation-briefing-surface';
 import { kairoConversationReply } from '../../features/kairo-conversation/kairo-conversation-state';
 import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
+import {
+  applyEmployeeSpecialtyRoute,
+  dismissEmployeeSpecialtyRoute,
+  undoEmployeeSpecialtyRoute,
+} from '../../lib/apply-employee-specialty-route';
 import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
-import { shouldSoftRouteToTeammate } from '../../lib/composer-teammate-route';
+import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
 import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import {
   findIdeComposerQueueEntry,
   type IdeComposerMode,
 } from '../../lib/ide-composer-queue';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
+import {
+  type TeammateRouteNotice,
+} from '../../lib/teammate-route-notice';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 
@@ -32,13 +40,7 @@ export type PlanSoftSwitchNotice = {
   previousMode: 'agent';
 };
 
-export type TeammateRouteNotice = {
-  reason: string;
-  toName: string;
-  toRoleLabel: string;
-  fromName: string;
-  previousEmployeeId: string;
-};
+export type { TeammateRouteNotice };
 
 type UseComposerActionsOptions = {
   shell: ShellStore;
@@ -155,26 +157,17 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       }
     }
 
-    const routeDecision = shouldSoftRouteToTeammate(
-      submitDraft,
-      shell.activeIdeEmployeeRecord,
-      shell.companyEmployeesForCurrentWorkspace,
-    );
-    if (routeDecision.shouldRoute && routeDecision.employee) {
-      const previousEmployeeId = routeDecision.fromEmployeeId ?? '';
-      const opened = await shell.openOrFocusEmployeeIdeThread(routeDecision.employee);
-      if (opened) {
-        teammateRouteNotice.value = {
-          reason: routeDecision.reason,
-          toName: routeDecision.employee.name.trim() || 'teammate',
-          toRoleLabel:
-            routeDecision.employee.role_label?.trim() ||
-            routeDecision.employee.role.trim() ||
-            'role',
-          fromName: routeDecision.fromName ?? 'teammate',
-          previousEmployeeId,
-        };
-      }
+    dismissEmployeeSpecialtyRoute();
+    const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
+    const routeDecision = await resolveEmployeeSpecialtyRoute({
+      prompt: submitDraft,
+      workspaceId,
+      currentEmployee: shell.activeIdeEmployeeRecord,
+      roster: shell.companyEmployeesForCurrentWorkspace,
+      useModelTiebreak: true,
+    });
+    if (routeDecision.shouldRoute) {
+      await applyEmployeeSpecialtyRoute(shell, routeDecision);
     }
 
     const attachmentFiles = composerImages.value.map((image) => image.file);
@@ -199,22 +192,11 @@ export function useComposerActions(options: UseComposerActionsOptions) {
   }
 
   async function undoTeammateRoute(): Promise<void> {
-    const notice = teammateRouteNotice.value;
-    if (!notice) {
-      return;
-    }
-    const previous = shell.companyEmployeesForCurrentWorkspace.find(
-      (row) => row.employee_id === notice.previousEmployeeId,
-    );
-    teammateRouteNotice.value = null;
-    if (!previous) {
-      return;
-    }
-    await shell.openOrFocusEmployeeIdeThread(previous);
+    await undoEmployeeSpecialtyRoute(shell, teammateRouteNotice.value);
   }
 
   function dismissTeammateRoute(): void {
-    teammateRouteNotice.value = null;
+    dismissEmployeeSpecialtyRoute();
   }
 
   async function handleSteer(event?: Event): Promise<void> {

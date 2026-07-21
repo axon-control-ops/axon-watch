@@ -72,6 +72,12 @@ class CreateWorkspaceHandoffRequest(BaseModel):
     reason: str = ""
 
 
+class RouteTeammateRequest(BaseModel):
+    prompt: str
+    current_employee_id: str | None = None
+    use_model_tiebreak: bool = True
+
+
 class RegisterWorkspaceBindingRequest(BaseModel):
     workspace_id: str
     project_root: str

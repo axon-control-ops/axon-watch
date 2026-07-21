@@ -6,7 +6,6 @@ import { useShellStore } from '../../stores/shell';
 import {
   useComposerActions,
   type PlanSoftSwitchNotice,
-  type TeammateRouteNotice,
 } from './use-composer-actions';
 import { useComposerContext } from './use-composer-context';
 import { useComposerDisplayState } from './use-composer-display-state';
@@ -20,6 +19,7 @@ import { useComposerModelRuntime } from './use-composer-model-runtime';
 import { useComposerTypeahead } from './use-composer-typeahead';
 import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
 import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
+import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
 
 export function useAgentDockComposerSetup() {
@@ -36,8 +36,6 @@ export function useAgentDockComposerSetup() {
   const inputRef = ref<HTMLTextAreaElement | null>(null);
   const dismissedDebugReproduceMessageId = ref<string | null>(null);
   const planSoftSwitchNotice = ref<PlanSoftSwitchNotice | null>(null);
-  const teammateRouteNotice = ref<TeammateRouteNotice | null>(null);
-
   function setInputRef(el: HTMLTextAreaElement | null): void {
     inputRef.value = el;
   }
