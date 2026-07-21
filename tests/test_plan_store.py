@@ -19,6 +19,7 @@ from app.plans.service import (  # noqa: E402
     extract_plan_title,
     is_durable_plan_body,
     maybe_attach_plan_artifact,
+    strip_leading_process_narration,
     strip_noisy_fences,
 )
 
@@ -164,6 +165,68 @@ class PlanStoreTests(unittest.TestCase):
         self.assertIsNone(meta)
         self.assertNotIn(":::plan ", content)
         self.assertEqual(NARRATION_REPLY, content)
+
+    def test_strip_noisy_fences_drops_research_and_thinking(self) -> None:
+        polluted = (
+            "# Centre brief\n\n"
+            "I'll review the docs first.\n\n"
+            ":::thinking\nDrafting now.\n:::\n\n"
+            ":::research Web search\n@kind search\n:::\n\n"
+            "## Goal\n"
+            "Open an aftercare centre safely.\n\n"
+            "## Steps\n"
+            "1. Confirm ages and hours\n"
+            "2. Set staffing ratios\n"
+            "3. Phase the go-live\n\n"
+            "## Verification\n"
+            "- [ ] Ages documented\n"
+            "- [ ] Hours documented\n"
+            "- [ ] Ratios documented\n"
+        )
+        cleaned = strip_leading_process_narration(strip_noisy_fences(polluted))
+        self.assertNotIn(":::research", cleaned)
+        self.assertNotIn(":::thinking", cleaned)
+        self.assertNotIn("I'll review", cleaned)
+        self.assertIn("## Goal", cleaned)
+        self.assertTrue(is_durable_plan_body(polluted))
+        record, _fence = capture_plan_from_reply(
+            workspace_id="workspace_alpha",
+            thread_id="thread_1",
+            source_message_id="message_agent_4",
+            content=polluted,
+        )
+        self.assertNotIn(":::research", record.content)
+        self.assertNotIn("I'll review", record.content)
+        self.assertEqual(
+            "Centre brief",
+            extract_plan_title(record.content),
+        )
+
+    def test_capture_cleans_researched_plan_progress_and_duplicate_title(self) -> None:
+        polluted = (
+            "# School plan\n\n"
+            "Axon research is ready. Next I'll pull local pricing benchmarks.\n\n"
+            "# School plan\n\n"
+            "## Goal\n"
+            "Open an aftercare centre safely with evidence-backed fees.\n\n"
+            "## Steps\n"
+            "1. Confirm local prices\n"
+            "2. Set staffing ratios\n"
+            "3. Publish parent materials\n\n"
+            "## Verification\n"
+            "- [ ] Prices cited\n"
+            "- [ ] Ratios documented\n"
+            "- [ ] Materials reviewed\n"
+        )
+        record, _fence = capture_plan_from_reply(
+            workspace_id="workspace_alpha",
+            thread_id="thread_1",
+            source_message_id="message_agent_5",
+            content=polluted,
+        )
+        self.assertEqual(1, record.content.count("# School plan"))
+        self.assertNotIn("Axon research is ready", record.content)
+        self.assertTrue(record.content.startswith("# School plan\n\n## Goal"))
 
 
 if __name__ == "__main__":

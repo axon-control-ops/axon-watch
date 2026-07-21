@@ -43,6 +43,15 @@ export function editorDocumentResourcePath(document: WorkspaceDocumentDescriptor
     if (isAgentEditReviewDocumentId(document.id)) {
       return document.title.replace(/\s*·\s*review$/i, '').trim() || document.title;
     }
+    if (document.planId?.trim()) {
+      const planTitle = document.title.replace(/^Plan\s*·\s*/i, '').trim() || 'plan';
+      const slug = planTitle
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48);
+      return `plans/${slug || 'plan'}.md`;
+    }
     return `agent-reports/${document.id.replace(/^draft:/, '')}.md`;
   }
 

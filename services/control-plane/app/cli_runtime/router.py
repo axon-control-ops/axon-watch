@@ -42,7 +42,12 @@ from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_r
 _REPLY_STYLE = (
     "Reply in first person. Use plain language anyone can follow — "
     "avoid internal repo jargon such as lane IDs, slice names, or implementation acronyms. "
-    "Never address the listener as \"operator\", \"user\", or \"human\"."
+    "Never address the listener as \"operator\", \"user\", or \"human\". "
+    "Before tools or file edits, open a :::thinking fence that states what you will do next "
+    "in future tense (one or two short sentences), then close ::: before acting. "
+    "Do not wait until after the work to announce the action plan. "
+    "Keep the final reply free of retrospective process narration "
+    "('I'll review…', 'Drafting…', 'I looked through…')."
 )
 
 _INSTRUCTION_TAKING = (
