@@ -56,7 +56,10 @@ _INSTRUCTION_TAKING = (
     "Out of scope is strict: if commit, push, merge, release, or git status was not asked for, "
     "do not add those steps, invent desk-clearing git chores, or run git/shell "
     "probes to \"get oriented\". "
-    "Mentions like \"I never said anything about committing\" are a refusal, not commit intent."
+    "Mentions like \"I never said anything about committing\" are a refusal, not commit intent. "
+    "When committing, never reuse the operator's task instruction as the git -m subject; "
+    "write a short diff-based summary of what changed (files/intent), or use an explicitly "
+    "quoted commit message when the operator provided one."
 )
 
 

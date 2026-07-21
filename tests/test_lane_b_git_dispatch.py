@@ -116,6 +116,75 @@ class LaneBGitDispatchTests(unittest.TestCase):
             self.assertNotEqual(message, "commit these changes")
             self.assertTrue(message.startswith("Add ") or message.startswith("Update "))
 
+    def test_derive_commit_message_ignores_instructional_operator_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            (root / "src").mkdir()
+            (root / "src" / "PricingPlanCard.tsx").write_text("export {}\n", encoding="utf-8")
+            (root / "src" / "ensureAndroidPushChannels.ts").write_text("export {}\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                message = derive_commit_message(
+                    "workspace_alpha",
+                    turn_subject=(
+                        "You should make sure to run the canary:ota - commit and "
+                        "do all the things to get the OTA unblocked"
+                    ),
+                )
+
+            self.assertNotIn("You should", message)
+            self.assertNotIn("make sure", message.lower())
+            self.assertTrue(
+                "OTA canary" in message
+                or message.startswith("Add ")
+                or message.startswith("Update "),
+                message,
+            )
+            self.assertTrue(
+                "PricingPlanCard" in message
+                or "ensureAndroidPushChannels" in message
+                or "pricing" in message.lower()
+                or "push" in message.lower(),
+                message,
+            )
+
+    def test_derive_commit_message_uses_topic_and_areas_for_large_trees(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "workspace_alpha"
+            root.mkdir()
+            subprocess.run(["git", "init"], cwd=root, capture_output=True, check=False)
+            for path in (
+                "components/pricing/PricingPlanCard.tsx",
+                "components/pricing/ComparisonTable.tsx",
+                "lib/payments/canUploadPopForMonth.ts",
+                "lib/notifications/ensureAndroidPushChannels.ts",
+                ".github/workflows/ci.yml",
+            ):
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("x\n", encoding="utf-8")
+
+            with patch.dict("os.environ", {"AXON_WATCH_WORKSPACE_ROOT": tempdir}, clear=False):
+                message = derive_commit_message(
+                    "workspace_alpha",
+                    turn_subject=(
+                        "You should make sure to run the canary:ota - commit and "
+                        "finish the unblock work."
+                    ),
+                )
+
+            self.assertTrue(message.startswith("Unblock OTA canary"), message)
+            self.assertNotIn("You should", message)
+            self.assertTrue(
+                "pricing" in message.lower()
+                or "payments" in message.lower()
+                or "notifications" in message.lower()
+                or "CI" in message,
+                message,
+            )
+
     def test_skips_questions_about_commits(self) -> None:
         for prompt in (
             "Did you commit and push",
