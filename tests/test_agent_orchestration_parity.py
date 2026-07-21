@@ -117,7 +117,7 @@ class AgentOrchestrationWorkflowParityTests(unittest.TestCase):
         self.assertNotIn("runs.history", ask_ids)
 
     @patch(
-        "app.chat.service.generate_lane_b_result",
+        "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
             "content": "Bounded agent reply",
             "dispatched": True,
@@ -149,7 +149,7 @@ class AgentOrchestrationWorkflowParityTests(unittest.TestCase):
         self.assertNotIn("completed", payload["messages"][2]["content"].lower())
 
     @patch(
-        "app.chat.service.generate_lane_b_result",
+        "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
             "content": "Runtime-backed reply",
             "dispatched": True,

@@ -144,7 +144,7 @@ class EmployeeChatThreadRouteTests(unittest.TestCase):
         thread_id = created.json()["thread_id"]
 
         with patch(
-            "app.chat.service.generate_lane_b_result",
+            "app.chat.lane_b_post_message.generate_lane_b_result",
             return_value={
                 "content": "Reed: continuing the backend shift.",
                 "dispatched": True,

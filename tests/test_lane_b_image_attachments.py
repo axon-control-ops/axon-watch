@@ -147,7 +147,7 @@ class LaneBImageAttachmentTests(unittest.TestCase):
             "app.chat.lane_b_image_attachments.resolve_workspace_root",
             return_value=workspace_root,
         ), patch(
-            "app.chat.service.generate_lane_b_result",
+            "app.chat.lane_b_post_message.generate_lane_b_result",
             return_value={
                 "content": "Mockup ready.\n\n![mockup](assets/mockup.png)",
                 "dispatched": True,

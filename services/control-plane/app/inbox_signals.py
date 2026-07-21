@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.adapters.watch_client import post_watch_command
+from app.adapters.watch_client import post_watch_command, reset_watch_inbox_cache
 
 
 def acknowledge_inbox_signals(
@@ -30,6 +30,11 @@ def acknowledge_inbox_signals(
     acknowledged = result.get("acknowledged", []) if isinstance(result, dict) else []
     if not isinstance(acknowledged, list):
         acknowledged = []
+
+    # Acknowledge mutates watch inbox truth; drop CP SWR cache so the next
+    # /api/inbox and runtime summary read see the cleared set.
+    if bool(payload.get("accepted", False)):
+        reset_watch_inbox_cache()
 
     return {
         "accepted": bool(payload.get("accepted", False)),

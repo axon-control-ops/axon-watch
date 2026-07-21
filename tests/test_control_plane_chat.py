@@ -204,7 +204,7 @@ class ControlPlaneChatTests(unittest.TestCase):
             json={"workspace_id": "workspace_alpha", "content": "git status"},
         ).json()
         with patch(
-            "app.chat.service.generate_lane_b_result",
+            "app.chat.lane_b_post_message.generate_lane_b_result",
             return_value={
                 "content": "Lane B reply",
                 "dispatched": True,

@@ -37,7 +37,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
 
 
     @patch(
-        "app.chat.service.generate_lane_b_result",
+        "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
             "content": "Runtime-backed reply",
             "dispatched": True,
@@ -67,7 +67,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
         self.assertEqual("Runtime-backed reply", payload["messages"][2]["content"])
 
     @patch(
-        "app.chat.service.generate_lane_b_result",
+        "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
             "content": "Consultative agent reply",
             "dispatched": True,
@@ -100,7 +100,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
         self.assertNotIn("approval boundary", payload["messages"][1]["content"].lower())
 
     @patch(
-        "app.chat.service.generate_lane_b_result",
+        "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
             "content": "I inspected the workspace and propose the next bounded steps.",
             "dispatched": True,
@@ -135,7 +135,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
         phases = [item["to_phase"] for item in history["items"]]
         self.assertIn("completed", phases)
 
-    @patch("app.chat.service.generate_lane_b_result")
+    @patch("app.chat.lane_b_post_message.generate_lane_b_result")
     def test_post_chat_message_lane_b_agent_greeting_stays_local(self, mock_runtime) -> None:
         response = self.client.post(
             "/api/chat/messages",
@@ -161,7 +161,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
         mock_runtime.assert_not_called()
 
     @patch(
-        "app.chat.service.generate_lane_b_result",
+        "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
             "content": "Fallback reply — runtime unavailable.",
             "dispatched": False,
@@ -202,7 +202,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
 
         with patch.dict(os.environ, {"AXON_WATCH_LANE_B_STREAMING": "1"}, clear=False):
             with patch(
-                "app.chat.service.generate_lane_b_result",
+                "app.chat.lane_b_post_message.generate_lane_b_result",
                 side_effect=_streaming_lane_b_result,
             ):
                 response = self.client.post(
@@ -244,7 +244,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
         self.assertIn("workspace_dashpro", payload["messages"][2]["content"])
 
     @patch(
-        "app.chat.service.generate_lane_b_result",
+        "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
             "content": "Picking up the DashPro investigation.",
             "dispatched": True,
@@ -289,7 +289,7 @@ class ControlPlaneChatLaneBTests(unittest.TestCase):
         self.assertIn("DashPro payments degraded", context.memory_appendix or "")
 
     @patch(
-        "app.chat.service.generate_lane_b_result",
+        "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
             "content": "Continuing the teacher dashboard work.",
             "dispatched": True,
