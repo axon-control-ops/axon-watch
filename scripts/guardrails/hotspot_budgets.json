@@ -286,7 +286,7 @@
       "note": "Explorer + activity stub panels; extract per-panel components next"
     },
     "services/control-plane/app/adapters/watch_client.py": {
-      "max_lines": 553,
+      "max_lines": 408,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/adapters/watch_*",

@@ -83,35 +83,6 @@ def _start_background_inbox_refresh(timeout_seconds: float) -> None:
             payload = _fetch_watch_inbox_uncached(timeout_seconds)
             if payload is not None:
                 _store_watch_inbox_cache(payload)
-                # #region agent log
-                try:
-                    import json as _json
-
-                    with open(
-                        "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                        "a",
-                        encoding="utf-8",
-                    ) as _fh:
-                        _fh.write(
-                            _json.dumps(
-                                {
-                                    "sessionId": "fc0b35",
-                                    "runId": "post-fix",
-                                    "hypothesisId": "H2",
-                                    "location": "watch_client.py:bg-inbox-refresh",
-                                    "message": "watch inbox background refresh ok",
-                                    "data": {
-                                        "timeout_seconds": timeout_seconds,
-                                        "item_count": payload.get("count"),
-                                    },
-                                    "timestamp": int(time.time() * 1000),
-                                }
-                            )
-                            + "\n"
-                        )
-                except OSError:
-                    pass
-                # #endregion
         finally:
             with _INBOX_CACHE_LOCK:
                 _INBOX_BACKGROUND_REFRESHING = False
@@ -156,99 +127,14 @@ def fetch_watch_inbox(
     now = time.monotonic()
     fetched_at, cached = _read_watch_inbox_cache()
     if not force_refresh and _inbox_cache_fresh(fetched_at, now, cached):
-        # #region agent log
-        try:
-            with open(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                "a",
-                encoding="utf-8",
-            ) as _fh:
-                _fh.write(
-                    json.dumps(
-                        {
-                            "sessionId": "fc0b35",
-                            "runId": "post-fix",
-                            "hypothesisId": "H2",
-                            "location": "watch_client.py:fetch_watch_inbox",
-                            "message": "watch inbox cache hit",
-                            "data": {
-                                "age_ms": int((now - fetched_at) * 1000),
-                                "timeout_seconds": timeout_seconds,
-                                "allow_stale": allow_stale,
-                                "cached_only": cached_only,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # #endregion
         return cached
 
     if cached_only:
-        refresh_scheduled = _schedule_inbox_refresh_if_idle(timeout_seconds)
-        # #region agent log
-        try:
-            with open(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                "a",
-                encoding="utf-8",
-            ) as _fh:
-                _fh.write(
-                    json.dumps(
-                        {
-                            "sessionId": "fc0b35",
-                            "runId": "post-fix",
-                            "hypothesisId": "H2",
-                            "location": "watch_client.py:fetch_watch_inbox",
-                            "message": "watch inbox cached_only",
-                            "data": {
-                                "had_cache": cached is not None,
-                                "age_ms": int((now - fetched_at) * 1000) if cached else None,
-                                "refresh_scheduled": refresh_scheduled,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # #endregion
+        _schedule_inbox_refresh_if_idle(timeout_seconds)
         return cached
 
     if allow_stale and not force_refresh and cached is not None:
-        refresh_scheduled = _schedule_inbox_refresh_if_idle(timeout_seconds)
-        # #region agent log
-        try:
-            with open(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                "a",
-                encoding="utf-8",
-            ) as _fh:
-                _fh.write(
-                    json.dumps(
-                        {
-                            "sessionId": "fc0b35",
-                            "runId": "post-fix",
-                            "hypothesisId": "H2",
-                            "location": "watch_client.py:fetch_watch_inbox",
-                            "message": "watch inbox stale served",
-                            "data": {
-                                "age_ms": int((now - fetched_at) * 1000),
-                                "refresh_scheduled": refresh_scheduled,
-                                "timeout_seconds": timeout_seconds,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # #endregion
+        _schedule_inbox_refresh_if_idle(timeout_seconds)
         return cached
 
     # Cold path: single-flight so concurrent boot callers share one urlopen.
@@ -269,38 +155,7 @@ def fetch_watch_inbox(
             _schedule_inbox_refresh_if_idle(timeout_seconds)
             return cached
 
-        t0 = time.monotonic()
         payload = _fetch_watch_inbox_uncached(timeout_seconds)
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        # #region agent log
-        try:
-            with open(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                "a",
-                encoding="utf-8",
-            ) as _fh:
-                _fh.write(
-                    json.dumps(
-                        {
-                            "sessionId": "fc0b35",
-                            "runId": "post-fix",
-                            "hypothesisId": "H2",
-                            "location": "watch_client.py:fetch_watch_inbox",
-                            "message": "watch inbox live fetch",
-                            "data": {
-                                "elapsed_ms": elapsed_ms,
-                                "ok": payload is not None,
-                                "timeout_seconds": timeout_seconds,
-                                "had_stale": cached is not None,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # #endregion
         if payload is not None:
             _store_watch_inbox_cache(payload)
             return payload
