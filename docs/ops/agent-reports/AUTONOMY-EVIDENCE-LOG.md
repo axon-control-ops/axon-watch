@@ -80,7 +80,7 @@ Template:
 
 ### Gate 5 — 2026-07-22
 - owner: agent
-- commit: pending close-out commit; report `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`
+- commit: 369e5f9; report `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`
 - commands run: `tests.test_lead_task_plan`; `tests.test_lead_fan_out`; `tests.test_lead_replan`; `workspace-stream-ui.test.ts`
 - pass/fail: pass
 - exit criteria met: yes — ordered DAG, role assignment, persistent path conflicts, obsolete-task cancellation, durable replan/fan-out/synthesis receipts, and sibling stream preservation
