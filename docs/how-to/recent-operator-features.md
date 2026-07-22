@@ -203,7 +203,24 @@ runtime health after any push to `origin`.
 
 ---
 
-## 6. What is still off on purpose
+## 6. Workspace company parity (vs DashPro)
+
+DashPro is not a special UI — every bound workspace uses the same Team panel,
+Mission Control, and Task board. What differed was **staffing**:
+
+| Workspace | Company |
+| --- | --- |
+| DashPro / Axon-X / School | Named companies in `config/workspace-agents.json` |
+| TPS / Young Eagles / Axon Local | Named companies (same shape as DashPro) |
+| Other bound projects | Template staffing with **workspace-stable** names + voices (not Mira clones) |
+
+After switching to **TPS** in IDE → Team, you should see **Noor / Blair / Vera / Hugo / Tess**,
+not Mira/Rowan. Mission Control → Grid always keeps the **selected** workspace on the fleet
+board even when many projects exist.
+
+---
+
+## 7. What is still off on purpose
 
 | Control | State | Why |
 | --- | --- | --- |

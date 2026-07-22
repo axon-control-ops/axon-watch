@@ -17,6 +17,8 @@ from app.workspace_agents.catalog import (
     _DEFAULT_ROLE_NAMES,
     _ROLE_BY_ID,
     _SCHEDULE_LABELS,
+    scoped_default_owns,
+    stable_role_persona,
 )
 
 
@@ -298,13 +300,15 @@ def _default_company_name(display_name: str, *, company_name_template: str) -> s
     return template.replace("{display_name}", _title_display_name(display_name))
 
 
-def _default_employee_name(display_name: str, role: str) -> str:
+def _default_employee_name(workspace_id: str, display_name: str, role: str) -> str:
     del display_name  # Names are personal; company prefix is no longer used.
-    cleaned_role = (role or "").strip().lower()
-    if cleaned_role in _DEFAULT_ROLE_NAMES:
-        return _DEFAULT_ROLE_NAMES[cleaned_role]
-    # Last resort: short personal name, never "{Company} {Role Title}".
-    return "Alex"
+    name, _voice = stable_role_persona(workspace_id, role)
+    return name
+
+
+def _default_employee_voice(workspace_id: str, role: str) -> str | None:
+    _name, voice = stable_role_persona(workspace_id, role)
+    return voice
 
 
 def _resolve_employees(
@@ -350,12 +354,13 @@ def _resolve_employees(
         schedule = _normalize_schedule(entry.get("schedule"), role=role)
         employees.append(
             EmployeeConfig(
-                name=_default_employee_name(display_name, role),
+                name=_default_employee_name(workspace_id, display_name, role),
                 role=role,
-                owns=_DEFAULT_OWNS.get(role, f"{_title_display_name(display_name)} assigned work"),
+                owns=scoped_default_owns(display_name, role),
                 schedule=schedule,
                 enabled=True,
                 primary=index == 0 or role == "lead",
+                azure_voice_id=_default_employee_voice(workspace_id, role),
             )
         )
     if employees and not any(employee.primary for employee in employees):

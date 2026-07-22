@@ -105,9 +105,24 @@ export function buildFleetHealthGridCells(input: {
       .map((item) => item.workspace_id),
   );
   const sorted = sortFleetHealthRows(input.snapshot.items, input.workspaces);
-  const limit = input.maxRows ?? 12;
+  const limit = Math.max(input.maxRows ?? 24, boundIds.size);
+  const selectedId = input.selectedWorkspaceId?.trim() || null;
+  const limited = sorted.slice(0, limit);
+  if (selectedId && !limited.some((row) => row.workspace_id === selectedId)) {
+    const selected = sorted.find((row) => row.workspace_id === selectedId);
+    if (selected) {
+      if (limited.length === 0) {
+        limited.push(selected);
+      } else {
+        limited.unshift(selected);
+        if (limited.length > limit) {
+          limited.pop();
+        }
+      }
+    }
+  }
 
-  return sorted.slice(0, limit).map((row) => {
+  return limited.map((row) => {
     const parts: string[] = [];
     if (row.open_signals_count > 0) {
       parts.push(`${row.open_signals_count} signal${row.open_signals_count === 1 ? '' : 's'}`);
@@ -131,7 +146,7 @@ export function buildFleetHealthGridCells(input: {
       health: row.health,
       summary,
       detail,
-      isSelected: row.workspace_id === input.selectedWorkspaceId,
+      isSelected: row.workspace_id === selectedId,
       isBoundProject: boundIds.has(row.workspace_id),
     };
   });

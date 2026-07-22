@@ -7,6 +7,8 @@ const CANONICAL_WORKSPACE_LABELS: Record<string, string> = {
   workspace_axon_local: 'Axon Local',
   workspace_dashpro: 'DashPro',
   workspace_edudashpro_school: 'EduDash PRO School of Excellence',
+  workspace_tps: 'TPS',
+  workspace_young_eagles_day_care: 'Young Eagles Day Care',
 };
 
 const WORKSPACE_ID_ALIASES: Record<string, string> = {
@@ -28,6 +30,10 @@ const WORKSPACE_ID_ALIASES: Record<string, string> = {
   'edu dash pro school': 'workspace_edudashpro_school',
   aftercare: 'workspace_edudashpro_school',
   preschool: 'workspace_edudashpro_school',
+  tps: 'workspace_tps',
+  'tps workspace': 'workspace_tps',
+  'young eagles': 'workspace_young_eagles_day_care',
+  'young eagles day care': 'workspace_young_eagles_day_care',
 };
 
 const VOICE_TRANSCRIPT_REPLACEMENTS: Array<[RegExp, string]> = [
@@ -40,6 +46,8 @@ const VOICE_TRANSCRIPT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\baxon-local\b/gi, 'Axon Local'],
   [/\bschool\s+of\s+excellence\b/gi, 'EduDash PRO School of Excellence'],
   [/\bedudashpro\s+school\b/gi, 'EduDash PRO School of Excellence'],
+  [/\byoung\s+eagles(?:\s+day\s+care)?\b/gi, 'Young Eagles Day Care'],
+  [/\btps\b/gi, 'TPS'],
 ];
 
 function normalizeAliasKey(value: string): string {

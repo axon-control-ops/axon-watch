@@ -163,7 +163,8 @@ class WorkspaceAgentsModuleTests(unittest.TestCase):
             staffing_template=[{"role": "lead", "schedule": "on_demand"}],
         )
         # Default staffing uses catalog persona names, not "{display_name} Lead".
-        self.assertEqual("Mira", record["agent_name"])
+        self.assertTrue(str(record["agent_name"]).strip())
+        self.assertNotIn(" ", str(record["agent_name"]))
         self.assertEqual("workspace-agent-workspace_demo", record["agent_id"])
         self.assertEqual("lead", record["role"])
 

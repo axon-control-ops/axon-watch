@@ -135,14 +135,130 @@
           "azure_voice_id": "en-GB-HollieNeural"
         }
       ]
+    },
+    "workspace_tps": {
+      "company_name": "TPS",
+      "employees": [
+        {
+          "name": "Noor",
+          "role": "lead",
+          "owns": "TPS product priorities, handoffs, and review gates",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-US-AriaNeural"
+        },
+        {
+          "name": "Blair",
+          "role": "watcher",
+          "owns": "TPS signals, runtime health, and deploy alerts",
+          "schedule": "always_on",
+          "azure_voice_id": "en-US-DavisNeural"
+        },
+        {
+          "name": "Vera",
+          "role": "frontend",
+          "owns": "TPS UI surfaces and client-facing flows",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-JennyNeural"
+        },
+        {
+          "name": "Hugo",
+          "role": "backend",
+          "owns": "TPS APIs, services, and data integrity",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-GuyNeural"
+        },
+        {
+          "name": "Tess",
+          "role": "integrations",
+          "owns": "TPS connectors, CI wiring, and third-party hooks",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-SaraNeural"
+        }
+      ]
+    },
+    "workspace_young_eagles_day_care": {
+      "company_name": "Young Eagles Day Care",
+      "employees": [
+        {
+          "name": "Imani",
+          "role": "lead",
+          "owns": "Centre priorities, parent comms order, and handoffs",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-ZA-LeahNeural"
+        },
+        {
+          "name": "Ash",
+          "role": "watcher",
+          "owns": "Centre readiness signals and enrolment blockers",
+          "schedule": "always_on",
+          "azure_voice_id": "en-ZA-LukeNeural"
+        },
+        {
+          "name": "Lila",
+          "role": "frontend",
+          "owns": "Letters, printable packs, and parent-facing layouts",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Cole",
+          "role": "backend",
+          "owns": "Enrolment data, NPO records, and ops checklists",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Sol",
+          "role": "integrations",
+          "owns": "Document export hooks and EduDash linkage notes",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
+    },
+    "workspace_axon_local": {
+      "company_name": "Axon Local",
+      "employees": [
+        {
+          "name": "Avery",
+          "role": "lead",
+          "owns": "axon-local donor patterns, priorities, and handoffs",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-GB-SoniaNeural"
+        },
+        {
+          "name": "Remy",
+          "role": "watcher",
+          "owns": "axon-local signals and runtime health",
+          "schedule": "always_on",
+          "azure_voice_id": "en-GB-ThomasNeural"
+        },
+        {
+          "name": "Sable",
+          "role": "frontend",
+          "owns": "axon-local UI reference surfaces",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Mina",
+          "role": "backend",
+          "owns": "axon-local API and persistence donor patterns",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Drew",
+          "role": "integrations",
+          "owns": "axon-local connector and packaging wiring",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
     }
   },
-  "agents": {
-    "workspace_axon_local": {
-      "agent_name": "Avery",
-      "role": "lead",
-      "owns": "legacy axon-local reference and donor patterns",
-      "schedule": "on_demand"
-    }
-  }
+  "agents": {}
 }

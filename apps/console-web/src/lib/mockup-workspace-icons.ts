@@ -8,6 +8,9 @@ export function workspaceIconKind(workspaceId: string): string {
   if (workspaceId.includes('dashpro') || workspaceId.includes('dash_pro')) {
     return 'building';
   }
+  if (workspaceId.includes('tps') || workspaceId.includes('young_eagles')) {
+    return 'building';
+  }
   if (workspaceId.includes('smoke')) {
     return 'cube';
   }
