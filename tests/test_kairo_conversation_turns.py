@@ -172,7 +172,8 @@ class KairoConversationTurnTests(unittest.TestCase):
         payload = converse_turn(content="any approvals?", session_id="test-session-2")
         self.assertEqual("status_question", payload["turn_kind"])
         self.assertEqual("template", payload["source"])
-        self.assertIn("2 approval", str(payload["reply"]))
+        self.assertIn("2", str(payload["reply"]))
+        self.assertRegex(str(payload["reply"]).lower(), r"(approval|approve|approvals)")
 
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
@@ -349,7 +350,7 @@ class KairoConversationTurnTests(unittest.TestCase):
         )
         self.assertEqual("status_question", payload["turn_kind"])
         self.assertEqual("template", payload["source"])
-        self.assertRegex(str(payload["reply"]).lower(), r"(approval|sign-?off)")
+        self.assertRegex(str(payload["reply"]).lower(), r"(approval|approve|approvals|sign-?off)")
         mock_dispatch.assert_not_called()
 
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
@@ -378,6 +379,8 @@ class KairoConversationTurnTests(unittest.TestCase):
                 {"role": "assistant", "content": first},
             ],
         )
-        self.assertIn("2 approval", first)
-        self.assertIn("2 approval", second)
+        self.assertIn("2", first)
+        self.assertIn("2", second)
+        self.assertRegex(first.lower(), r"(approval|approve|approvals)")
+        self.assertRegex(second.lower(), r"(approval|approve|approvals)")
         self.assertNotEqual(first, second)

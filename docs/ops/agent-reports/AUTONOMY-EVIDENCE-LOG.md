@@ -50,3 +50,12 @@ Template:
 - exit criteria met: yes — two isolations without shared tree; live-root `git status` unchanged; cleanup deletes worktree + worker branch with receipts; path escape refused
 - residual risks: path forbid is resolve-time only (not full FS sandbox); scheduler still intentionally off; Gate 2 CSRF/rate-limit/step-up still open
 - next gate unlocked: Gate 4 (durable task ledger) — keep scheduler off until leases exist
+
+### Gate 2 residuals — 2026-07-22
+- owner: agent
+- commit: (pin after commit) report `docs/ops/agent-reports/gate2-residuals-2026-07-22.md`
+- commands run: `tests.test_gate2_auth_containment` (17 OK); `npm run verify:contracts`; `npm run verify:console-web`
+- pass/fail: pass for residual thin slice (forced remote local_token, rate limit, step-up headers, origin guard retained)
+- exit criteria met: yes for master-plan “CSRF/rate-limit + forced token mode on remote” before mobile mutation; mTLS still open
+- residual risks: in-process rate limiter only; step-up is header confirm not OIDC; default local auth still placeholder on loopback
+- next gate unlocked: Gate 4 (durable task ledger) — scheduler still off

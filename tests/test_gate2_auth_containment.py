@@ -200,6 +200,8 @@ class Gate2MutatingAuthMiddlewareTests(unittest.TestCase):
                 "AXON_WATCH_AUTH_MODE": "local_token",
                 "AXON_WATCH_OPERATOR_TOKEN": "gate2-secret-token",
                 "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "1",
+                "AXON_WATCH_REMOTELY_REACHABLE": "0",
+                "AXON_WATCH_PUBLIC_BASE_URL": "http://127.0.0.1:4173",
             },
             clear=False,
         ):
@@ -253,7 +255,9 @@ class Gate2VaultAutoUnlockRemoteTests(unittest.TestCase):
             {
                 "AXON_WATCH_CONTROL_PLANE_DB": str(Path(tmpdir.name) / "cp.sqlite3"),
                 "AXON_WATCH_WORKER_SCHEDULER": "0",
-                "AXON_WATCH_AUTH_MODE": "off",
+                "AXON_WATCH_AUTH_MODE": "local_token",
+                "AXON_WATCH_OPERATOR_TOKEN": "gate2-vault-token",
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "0",
                 "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.example.com",
                 "AXON_WATCH_REMOTELY_REACHABLE": "1",
                 "AXON_WATCH_STATE_DIR": tmpdir.name,
@@ -263,10 +267,98 @@ class Gate2VaultAutoUnlockRemoteTests(unittest.TestCase):
         ):
             app = load_control_plane_app()
             client = TestClient(app)
-            response = client.post("/api/vault/auto-unlock/enable")
+            response = client.post(
+                "/api/vault/auto-unlock/enable",
+                headers={"Authorization": "Bearer gate2-vault-token"},
+            )
             self.assertEqual(403, response.status_code)
             audit = Path(tmpdir.name, "audit.ndjson").read_text(encoding="utf-8")
             self.assertIn("vault_auto_unlock_enable", audit)
+
+
+class Gate2ResidualContainmentTests(unittest.TestCase):
+    def test_remote_forces_local_token_and_disables_loopback_bypass(self) -> None:
+        from app.auth.settings import allow_loopback_bypass, auth_mode, configured_auth_mode
+
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_AUTH_MODE": "placeholder",
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "1",
+                "AXON_WATCH_REMOTELY_REACHABLE": "1",
+                "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.example.com",
+            },
+            clear=False,
+        ):
+            self.assertEqual("off", configured_auth_mode())
+            self.assertEqual("local_token", auth_mode())
+            self.assertFalse(allow_loopback_bypass())
+
+    def test_step_up_required_when_remote(self) -> None:
+        from app.auth.step_up import FULL_ACCESS_ACTION, reject_missing_step_up
+        from starlette.requests import Request
+
+        def make(headers: list[tuple[bytes, bytes]]) -> Request:
+            return Request(
+                {
+                    "type": "http",
+                    "asgi": {"version": "3.0"},
+                    "http_version": "1.1",
+                    "method": "POST",
+                    "scheme": "https",
+                    "path": "/api/chat/messages",
+                    "raw_path": b"/api/chat/messages",
+                    "query_string": b"",
+                    "headers": headers,
+                    "client": ("10.0.0.2", 443),
+                    "server": ("axon.example.com", 443),
+                }
+            )
+
+        with patch.dict(
+            os.environ,
+            {"AXON_WATCH_REMOTELY_REACHABLE": "1"},
+            clear=False,
+        ):
+            self.assertIsNotNone(reject_missing_step_up(make([]), action=FULL_ACCESS_ACTION))
+            self.assertIsNone(
+                reject_missing_step_up(
+                    make([(b"x-axon-step-up", b"full-access")]),
+                    action=FULL_ACCESS_ACTION,
+                )
+            )
+
+    def test_mutating_rate_limit_trips(self) -> None:
+        from app.auth.rate_limit import reject_mutating_rate_limit, reset_rate_limit_state_for_tests
+        from starlette.requests import Request
+
+        reset_rate_limit_state_for_tests()
+        request = Request(
+            {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "POST",
+                "scheme": "http",
+                "path": "/api/runs",
+                "raw_path": b"/api/runs",
+                "query_string": b"",
+                "headers": [],
+                "client": ("10.0.0.9", 1234),
+                "server": ("127.0.0.1", 8787),
+            }
+        )
+        with patch.dict(
+            os.environ,
+            {"AXON_WATCH_MUTATING_RATE_LIMIT_PER_MINUTE": "2"},
+            clear=False,
+        ):
+            self.assertIsNone(reject_mutating_rate_limit(request, identity="operator"))
+            self.assertIsNone(reject_mutating_rate_limit(request, identity="operator"))
+            detail = reject_mutating_rate_limit(request, identity="operator")
+            self.assertIsNotNone(detail)
+            self.assertIn("rate limit", detail or "")
+        reset_rate_limit_state_for_tests()
 
 
 class Gate2WatchInternalTokenTests(unittest.TestCase):

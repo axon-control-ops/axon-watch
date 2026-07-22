@@ -7,9 +7,18 @@ import {
   spokenAlertDedupeKey,
 } from './operator-presence';
 import { speakKairoLine } from './kairo-voice-playback';
+import {
+  clearQueuedSpokenAlerts,
+  deliverSpokenOperatorAlert,
+} from './spoken-alert-delivery';
 
 vi.mock('./kairo-voice-playback', () => ({
   speakKairoLine: vi.fn(),
+}));
+
+vi.mock('./kairo-audio-unlock', () => ({
+  isKairoMediaUnlocked: () => true,
+  onKairoAudioUnlocked: () => () => undefined,
 }));
 
 describe('operator presence helpers', () => {
@@ -63,12 +72,14 @@ describe('operator presence helpers', () => {
   });
 
   it('speaks eligible alerts once', async () => {
+    clearQueuedSpokenAlerts();
+    vi.mocked(speakKairoLine).mockClear();
     vi.mocked(speakKairoLine).mockResolvedValue({ engine: 'azure', reason: null });
     const storage = {
       getItem: vi.fn().mockReturnValue(null),
       setItem: vi.fn(),
     };
-    const spoken = await maybeSpeakOperatorAlert(
+    const channel = await deliverSpokenOperatorAlert(
       {
         eligible: true,
         reason: 'high_urgency_signal',
@@ -76,9 +87,21 @@ describe('operator presence helpers', () => {
         message: 'VAXON attention: Console web connector unavailable.',
       },
       storage,
+      { queueUntilUnlock: false },
+    );
+    expect(channel).toBe('azure');
+    expect(speakKairoLine).toHaveBeenCalledOnce();
+
+    const spoken = await maybeSpeakOperatorAlert(
+      {
+        eligible: true,
+        reason: 'high_urgency_signal',
+        signal_id: 'signal_y',
+        message: 'VAXON attention: second alert.',
+      },
+      storage,
     );
     expect(spoken).toBe(true);
     expect(storage.setItem).toHaveBeenCalled();
-    expect(speakKairoLine).toHaveBeenCalledOnce();
   });
 });

@@ -12,6 +12,7 @@ from starlette.responses import JSONResponse, Response
 from app.auth.desktop_session import extract_session_token, validate_session_token
 from app.auth.identity import bind_request_identity, reset_identity_token
 from app.auth.origin_guard import reject_cross_origin_mutation
+from app.auth.rate_limit import reject_mutating_rate_limit
 from app.auth.settings import (
     allow_loopback_bypass,
     auth_mode,
@@ -99,6 +100,15 @@ class MutatingAuthMiddleware(BaseHTTPMiddleware):
                         },
                     )
                 identity = resolved
+                rate_error = reject_mutating_rate_limit(request, identity=identity)
+                if rate_error is not None:
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "detail": rate_error,
+                            "rate_limited": True,
+                        },
+                    )
             token = bind_request_identity(identity)
             return await call_next(request)
         finally:
