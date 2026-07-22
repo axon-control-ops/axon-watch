@@ -267,7 +267,7 @@ const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(convers
           class="conversation-seam__content conversation-seam__content--agent conversation-seam__content--typing"
         >
           <span class="conversation-seam__typing-dot" aria-hidden="true" />
-          Agent is thinking…
+          I am thinking…
         </p>
 
         <div
@@ -296,7 +296,7 @@ const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(convers
                   {{ isThinkingExpanded(segmentKey(item.message.message_id, segmentIndex), segment.open) ? '▾' : '▸' }}
                 </span>
                 <span v-if="segment.open && isStreamingMessage(item.message.message_id)">
-                  {{ segment.text.trim() ? thinkingPreview(segment.text, 120) : 'Thinking…' }}
+                  {{ segment.text.trim() ? thinkingPreview(segment.text, 120) : 'I am thinking…' }}
                 </span>
                 <span v-else class="agent-block__thinking-preview">
                   Thought — {{ thinkingPreview(segment.text) }}

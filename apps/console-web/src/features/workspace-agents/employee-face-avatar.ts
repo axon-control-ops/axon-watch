@@ -5,6 +5,11 @@
 
 export type FaceAvatarKind = 'employee' | 'vaxon';
 
+export type EmployeeFaceAvatarOptions = {
+  /** Lead gets a crown + gold rim so the Team strip is scannable. */
+  lead?: boolean;
+};
+
 const SKIN = ['#f2c7a4', '#e0a878', '#c68642', '#8d5524', '#f5d6c6', '#d4a574'] as const;
 const HAIR = ['#1f2430', '#3b2f2f', '#6b4423', '#c4a35a', '#2a4a6e', '#8b3a4a', '#4a5568'] as const;
 const SHIRT = ['#2a4a7a', '#1a5a42', '#1f4f6e', '#3d2f6e', '#6a4520', '#0e7490', '#9f1239'] as const;
@@ -28,15 +33,19 @@ function svgToDataUrl(svg: string): string {
 }
 
 /** Illustrated person face — stable for a given seed. */
-export function buildEmployeeFaceAvatarUrl(seed: string): string {
+export function buildEmployeeFaceAvatarUrl(
+  seed: string,
+  options: EmployeeFaceAvatarOptions = {},
+): string {
   const h = hashSeed(seed || 'agent');
+  const lead = Boolean(options.lead);
   const skin = pick(SKIN, h);
   const hair = pick(HAIR, h >>> 3);
-  const shirt = pick(SHIRT, h >>> 6);
-  const bg = pick(BG, h >>> 9);
+  const shirt = lead ? '#1e3a5f' : pick(SHIRT, h >>> 6);
+  const bg = lead ? '#0c2a45' : pick(BG, h >>> 9);
   const hairStyle = h % 4;
   const smile = h % 3;
-  const glasses = (h >>> 12) % 5 === 0;
+  const glasses = lead ? false : (h >>> 12) % 5 === 0;
   const freckles = (h >>> 14) % 4 === 0;
 
   const hairPath =
@@ -74,8 +83,15 @@ export function buildEmployeeFaceAvatarUrl(seed: string): string {
        </g>`
     : '';
 
+  const leadChrome = lead
+    ? `<circle cx="32" cy="32" r="30" fill="none" stroke="#f0c14b" stroke-width="2.2" opacity="0.9"/>
+       <path d="M18 14 L22 8 L27 13 L32 6 L37 13 L42 8 L46 14 L44 18 L20 18 Z" fill="#f0c14b" stroke="#c9a227" stroke-width="0.8"/>
+       <circle cx="32" cy="10" r="1.6" fill="#fff4c2"/>`
+    : '';
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <rect width="64" height="64" rx="32" fill="${bg}"/>
+  ${leadChrome}
   <circle cx="32" cy="54" r="18" fill="${shirt}"/>
   <circle cx="32" cy="34" r="16" fill="${skin}"/>
   ${hairPath}

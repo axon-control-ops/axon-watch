@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-22  
 **Plan:** `docs/AXON-X-AUTONOMY-MASTER-PLAN.md` Gate 3  
-**Baseline HEAD:** `feat/autonomous` at capture time (working-tree Gate 3 slice; not yet committed)  
+**Baseline HEAD:** `11e3bce` on `feat/autonomous`  
 **Depends on:** Gate 2 thin containment closed for unlocking Gate 3 engineering  
 **Scheduler:** remains **off** (`effective_enabled: false` expected until Gate 4+)
 

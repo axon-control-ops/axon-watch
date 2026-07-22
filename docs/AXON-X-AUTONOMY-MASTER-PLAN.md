@@ -282,18 +282,21 @@ Make Dana (Lead) a real manager, not only a persona.
 3. Serialize overlapping file paths.
 4. Cancel obsolete tasks when goals change.
 5. Persist replan receipts.
+6. **Lead fan-out:** when the operator (or Lead) asks to check with *all* sub-agents / teammates, Dana must be able to dispatch work to every specialist **in parallel** (not single-winner specialty route). Each sub-agent gets their own thread/run; Lead synthesizes results afterward.
 
 **Exit criteria**
 
 - One goal produces an ordered task plan.
 - Overlapping edits cannot run concurrently.
 - Replans are receipt-backed.
+- “Check with all sub-agents” opens concurrent specialist runs (or leased tasks) rather than routing to one teammate.
 
 **Evidence to record**
 
 - planner unit tests;
 - conflict-serialization proof;
-- sample goal → task DAG artifact.
+- sample goal → task DAG artifact;
+- fan-out proof: one Lead prompt → N specialist runs with receipts.
 
 ---
 

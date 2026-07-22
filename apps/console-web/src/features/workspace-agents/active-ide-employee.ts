@@ -2,7 +2,11 @@ import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import type { WorkspaceChatThreadListItem } from '../../api/chat-api';
 
 import { employeeInitials } from './employee-avatar';
-import { employeeFailureDetailTooltip, employeeFailureLine } from './company-roster-view';
+import {
+  employeeFailureDetailTooltip,
+  employeeFailureLine,
+  employeeIsActivelyBusy,
+} from './company-roster-view';
 
 export type ActiveIdeEmployeeView = {
   employee_id: string;
@@ -111,6 +115,44 @@ export function resolveIdeThreadEmployeeFailure(input: {
     return null;
   }
   return employeeFailureLine(row);
+}
+
+/** True when the teammate owning this thread is mid-shift (or live-stream busy). */
+export function resolveIdeThreadEmployeeBusy(input: {
+  thread: Pick<WorkspaceChatThreadListItem, 'employee_id'> | null;
+  employees: readonly CompanyEmployeeRecord[];
+  liveBusyEmployeeIds?: readonly string[];
+}): boolean {
+  const employeeId = input.thread?.employee_id?.trim() ?? '';
+  if (!employeeId) {
+    return false;
+  }
+  if ((input.liveBusyEmployeeIds ?? []).includes(employeeId)) {
+    return true;
+  }
+  const row = resolveActiveIdeEmployeeRecord(input);
+  return row ? employeeIsActivelyBusy(row) : false;
+}
+
+/** Map teammate thread ids that should glow as busy in the conversation tabbar. */
+export function buildIdeThreadBusySet(input: {
+  threads: readonly Pick<WorkspaceChatThreadListItem, 'thread_id' | 'employee_id'>[];
+  employees: readonly CompanyEmployeeRecord[];
+  liveBusyEmployeeIds?: readonly string[];
+}): Set<string> {
+  const busy = new Set<string>();
+  for (const thread of input.threads) {
+    if (
+      resolveIdeThreadEmployeeBusy({
+        thread,
+        employees: input.employees,
+        liveBusyEmployeeIds: input.liveBusyEmployeeIds,
+      })
+    ) {
+      busy.add(thread.thread_id);
+    }
+  }
+  return busy;
 }
 
 /** Resolve the teammate bound to the active IDE thread (roster first, thread title fallback). */

@@ -38,6 +38,26 @@ describe('employee-avatar', () => {
 
   it('maps presence tone from status / failure / pause', () => {
     expect(employeePresenceTone(employee({ status: 'executing' }))).toBe('working');
+    expect(employeePresenceTone(employee({ status: 'watching' }))).toBe('idle');
+    expect(
+      employeePresenceTone(
+        employee({
+          role: 'lead',
+          primary: true,
+          status: 'executing',
+        }),
+      ),
+    ).toBe('idle');
+    expect(
+      employeePresenceTone(
+        employee({
+          role: 'lead',
+          primary: true,
+          status: 'executing',
+        }),
+        { liveBusy: true },
+      ),
+    ).toBe('working');
     expect(
       employeePresenceTone(
         employee({
@@ -68,6 +88,35 @@ describe('employee-avatar', () => {
       ),
     ).toBe('failed');
     expect(employeePresenceTone(employee({ status: 'idle' }))).toBe('idle');
+    expect(
+      employeePresenceTone(employee({ status: 'idle' }), { liveBusy: true }),
+    ).toBe('working');
+    expect(
+      employeePresenceTone(
+        employee({
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'usage limits blocked the agent runtime',
+        }),
+        { liveBusy: true },
+      ),
+    ).toBe('working');
+  });
+
+  it('marks lead avatars distinctly', () => {
+    const lead = buildEmployeeAvatar(
+      employee({
+        employee_id: 'employee-workspace_dashpro-lead-0',
+        role: 'lead',
+        name: 'Dana',
+        primary: true,
+      }),
+    );
+    const frontend = buildEmployeeAvatar(employee({ role: 'frontend', name: 'Priya' }));
+    expect(lead.lead).toBe(true);
+    expect(frontend.lead).toBe(false);
+    expect(lead.faceUrl).not.toBe(frontend.faceUrl);
+    expect(lead.faceUrl).toContain(encodeURIComponent('#f0c14b'));
   });
 
   it('keeps role-tinted backgrounds distinct across roles', () => {

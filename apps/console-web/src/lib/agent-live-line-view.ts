@@ -157,6 +157,28 @@ export function stripAgentStreamFenceMarkers(text: string): string {
     .trim();
 }
 
+/** Operator-facing fallback when thinking has no usable body. */
+export const THINKING_SPEECH_FALLBACK = 'I am thinking…';
+
+/**
+ * Prefer first-person "I am thinking…" over bare "Thinking…" labels
+ * (milestones, model lead-ins, and OCR-prone transcript chips).
+ */
+export function normalizeThinkingSpeechLead(text: string): string {
+  const flattened = flattenLiveLineText(text);
+  if (!flattened) {
+    return '';
+  }
+  if (/^thinking(?:[.…]{1,3}|\.\.\.)?$/i.test(flattened)) {
+    return THINKING_SPEECH_FALLBACK;
+  }
+  // "Thinking I'll…" / "thinking I'll…" → "I am thinking I'll…"
+  if (/^thinking\b/i.test(flattened) && !/^i\s+am\s+thinking\b/i.test(flattened)) {
+    return flattened.replace(/^thinking(?:[.…]{1,3}|\.\.\.)?\s*/i, 'I am thinking ').trim();
+  }
+  return flattened;
+}
+
 export function sanitizeAgentThinkingForOperator(text: string): string {
   let out = collapseBackToBackThinkingEcho(text);
   if (!out) {
@@ -170,9 +192,15 @@ export function sanitizeAgentThinkingForOperator(text: string): string {
   out = out.replace(LEADING_WHETHER_RE, '');
   out = flattenLiveLineText(out).replace(/^[,.\-–—:;]+/, '').trim();
   out = stripAgentStreamFenceMarkers(out);
+  out = normalizeThinkingSpeechLead(out);
   if (!out || /^(?:the\s+)?user\b/i.test(out) || /^(?:whether|if)\s*$/i.test(out)) {
     return '';
   }
+  // #region agent log
+  if (/^i am thinking\b/i.test(out) || /^thinking\b/i.test(flattenLiveLineText(text))) {
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'thinking-phrase',hypothesisId:'H6',location:'agent-live-line-view.ts:sanitizeAgentThinkingForOperator',message:'thinking speech lead normalized',data:{rawPreview:flattenLiveLineText(text).slice(0,80),outPreview:out.slice(0,80),startsWithIAm:/^i am thinking\b/i.test(out)},timestamp:Date.now()})}).catch(()=>{});
+  }
+  // #endregion
   return out;
 }
 

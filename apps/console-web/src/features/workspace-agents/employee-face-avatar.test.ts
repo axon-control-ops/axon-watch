@@ -25,4 +25,11 @@ describe('employee-face-avatar', () => {
     expect(buildFaceAvatarUrl('vaxon', 'vaxon')).toBe(vaxon);
     expect(vaxon).not.toBe(buildEmployeeFaceAvatarUrl('vaxon'));
   });
+
+  it('adds crown chrome for lead faces', () => {
+    const lead = buildEmployeeFaceAvatarUrl('emp_dana:lead:Dana', { lead: true });
+    const peer = buildEmployeeFaceAvatarUrl('emp_dana:lead:Dana', { lead: false });
+    expect(lead).not.toBe(peer);
+    expect(decodeURIComponent(lead)).toContain('#f0c14b');
+  });
 });

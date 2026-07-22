@@ -26,8 +26,15 @@ describe('sanitizeAgentThinkingForOperator', () => {
     ).toBe('Checking the image preview path.');
   });
 
-  it('keeps technical thinking that only mentions the user incidentally', () => {
-    expect(sanitizeAgentThinkingForOperator(LONG_THINKING)).toBe(LONG_THINKING);
+  it('rewrites bare Thinking… lead-ins to I am thinking…', () => {
+    expect(sanitizeAgentThinkingForOperator('Thinking…')).toBe('I am thinking…');
+    expect(sanitizeAgentThinkingForOperator('Thinking...')).toBe('I am thinking…');
+    expect(sanitizeAgentThinkingForOperator("thinking I'll check Sentry next.")).toBe(
+      "I am thinking I'll check Sentry next.",
+    );
+    expect(sanitizeAgentThinkingForOperator('I am thinking about the next step.')).toBe(
+      'I am thinking about the next step.',
+    );
   });
 
   it('collapses exact and glued back-to-back thinking echoes', () => {

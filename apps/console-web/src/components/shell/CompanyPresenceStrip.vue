@@ -18,6 +18,8 @@ import {
 const props = defineProps<{
   employees: CompanyEmployeeRecord[];
   selectedEmployeeId: string | null;
+  /** Employee ids currently mid IDE/agent stream (client-side busy overlay). */
+  liveBusyEmployeeIds?: readonly string[];
 }>();
 
 const emit = defineEmits<{
@@ -26,19 +28,59 @@ const emit = defineEmits<{
 
 const stripRef = ref<HTMLElement | null>(null);
 
-const items = computed(() =>
-  sortEmployeesForPresenceStrip(props.employees).map((employee) => {
+const liveBusySet = computed(() => new Set(props.liveBusyEmployeeIds ?? []));
+
+const items = computed(() => {
+  const next = sortEmployeesForPresenceStrip(props.employees).map((employee) => {
     const failed = Boolean(employeeFailureLine(employee));
+    const liveBusy = liveBusySet.value.has(employee.employee_id);
+    const avatar = buildEmployeeAvatar(employee, { liveBusy });
     return {
       employee,
-      avatar: buildEmployeeAvatar(employee),
+      avatar,
       failed,
       interrupted: failed && employeeShiftNeedsContinuation(employee),
       paused: !employee.enabled && !failed,
+      working: avatar.presence === 'working',
       optionId: presenceStripOptionId(employee.employee_id),
     };
-  }),
-);
+  });
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'fc0b35',
+    },
+    body: JSON.stringify({
+      sessionId: 'fc0b35',
+      runId: 'avatar-restore',
+      hypothesisId: 'AV1',
+      location: 'CompanyPresenceStrip.vue:items',
+      message: 'presence strip lead/busy chrome',
+      data: {
+        count: next.length,
+        leads: next.filter((row) => row.avatar.lead).map((row) => row.employee.name),
+        busy: next.filter((row) => row.working).map((row) => row.employee.name),
+        liveBusyIds: [...liveBusySet.value],
+        presenceByName: Object.fromEntries(
+          next.map((row) => [
+            row.employee.name,
+            {
+              presence: row.avatar.presence,
+              working: row.working,
+              liveBusy: liveBusySet.value.has(row.employee.employee_id),
+              failed: row.failed,
+            },
+          ]),
+        ),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+  return next;
+});
 
 const activeOptionId = computed(() => presenceStripOptionId(props.selectedEmployeeId));
 
@@ -161,6 +203,8 @@ function onKeydown(event: KeyboardEvent): void {
         :class="{
           'company-presence-strip__btn--selected':
             selectedEmployeeId === item.employee.employee_id,
+          'company-presence-strip__btn--busy': item.working,
+          'company-presence-strip__btn--lead': item.avatar.lead,
         }"
         :data-presence="item.avatar.presence"
         :aria-selected="selectedEmployeeId === item.employee.employee_id ? 'true' : 'false'"
@@ -177,7 +221,13 @@ function onKeydown(event: KeyboardEvent): void {
           }"
           :data-glow="item.avatar.glow"
           :data-presence="item.avatar.presence"
+          :data-lead="item.avatar.lead ? 'true' : undefined"
         >
+          <span
+            v-if="item.working"
+            class="company-presence-strip__busy-ring"
+            aria-hidden="true"
+          />
           <img
             class="company-presence-strip__face"
             :src="item.avatar.faceUrl"
@@ -186,6 +236,14 @@ function onKeydown(event: KeyboardEvent): void {
             height="28"
           >
           <span class="company-presence-strip__initials" aria-hidden="true">{{ item.avatar.initials }}</span>
+          <span
+            v-if="item.avatar.lead"
+            class="company-presence-strip__lead-mark"
+            aria-hidden="true"
+            title="Lead"
+          >
+            ★
+          </span>
           <span
             v-if="item.interrupted"
             class="company-presence-strip__interrupt-mark"
@@ -210,8 +268,18 @@ function onKeydown(event: KeyboardEvent): void {
           >
             ⏸
           </span>
+          <span
+            v-else-if="item.working"
+            class="company-presence-strip__busy-mark"
+            aria-hidden="true"
+            title="Busy"
+          >
+            ●
+          </span>
         </span>
         <span class="company-presence-strip__name">{{ item.employee.name }}</span>
+        <span v-if="item.avatar.lead" class="company-presence-strip__role">Lead</span>
+        <span v-else-if="item.working" class="company-presence-strip__role company-presence-strip__role--busy">Busy</span>
       </button>
     </li>
   </ul>

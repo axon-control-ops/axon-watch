@@ -44,7 +44,7 @@ Template:
 
 ### Gate 3 — 2026-07-22
 - owner: agent
-- commit: working-tree Gate 3 close-out (named `worker/<run_id>` worktree + path forbid + concurrent proof); report `docs/ops/agent-reports/gate3-worker-isolation-2026-07-22.md`
+- commit: `11e3bce` (named `worker/<run_id>` worktree + path forbid + concurrent proof); report `docs/ops/agent-reports/gate3-worker-isolation-2026-07-22.md`
 - commands run: `python -m unittest tests.test_gate3_worker_isolation` (5 OK); `PYTHONPATH=services/control-plane python -m unittest tests.test_safe_improvement` (8 OK)
 - pass/fail: pass
 - exit criteria met: yes — two isolations without shared tree; live-root `git status` unchanged; cleanup deletes worktree + worker branch with receipts; path escape refused

@@ -141,7 +141,7 @@ export function createAgentStreamIncrementalState(options?: {
       currentThinkingBody = '';
       if (!thinkingMilestoneEmitted) {
         thinkingMilestoneEmitted = true;
-        milestones.push({ key: 'thinking:0', message: 'Thinking…' });
+        milestones.push({ key: 'thinking:0', message: 'I am thinking…' });
       }
       return milestones;
     }
