@@ -68,3 +68,12 @@ Template:
 - exit criteria met: yes for continuous workers — leased task required, budgets/leases enforced, Mission Control task board; scheduler remains off by default
 - residual risks: interactive IDE employee runs may omit task_id unless `require_leased_task=True`; Watch mTLS/service-identity still open as a separate residual
 - next gate unlocked: Gate 5 (Lead planner) — keep scheduler off until Lead assignment is routine
+
+### Watch mTLS / service identity — 2026-07-22
+- owner: agent
+- commit: (pin after commit)
+- commands run: `tests.test_gate2_auth_containment.Gate2WatchInternalTokenTests` (5 OK); mint script `scripts/ops/mint-watch-mtls.sh`
+- pass/fail: pass
+- exit criteria met: yes — remote forces internal token; optional/required proxy mTLS (`X-SSL-Client-Verify`) + CP client-cert context; handbook directives in `docs/how-to/autonomy-gates-and-service-identity.md`
+- residual risks: reverse proxy must forward verify headers when `AXON_WATCH_MTLS_REQUIRED=1`; keep watch port internal
+- next gate unlocked: Gate 5 (already started) — scheduler still off

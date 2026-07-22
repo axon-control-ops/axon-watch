@@ -407,6 +407,52 @@ class Gate2WatchInternalTokenTests(unittest.TestCase):
         response = self.client.get("/internal/watch/health")
         self.assertEqual(200, response.status_code)
 
+    def test_mtls_required_rejects_without_client_verify_header(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_INTERNAL_SERVICE_TOKEN": "watch-internal-secret",
+                "AXON_WATCH_MTLS_REQUIRED": "1",
+            },
+            clear=False,
+        ):
+            response = self.client.post(
+                "/internal/watch/commands",
+                json={
+                    "command_type": "reprobe_connector",
+                    "target_type": "connector",
+                    "target_id": "control_plane",
+                },
+                headers={"X-Axon-Internal-Token": "watch-internal-secret"},
+            )
+        self.assertEqual(401, response.status_code)
+        self.assertTrue(response.json().get("mtls_required"))
+
+    def test_mtls_required_allows_proxy_verified_client(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_INTERNAL_SERVICE_TOKEN": "watch-internal-secret",
+                "AXON_WATCH_MTLS_REQUIRED": "1",
+                "AXON_WATCH_MTLS_ALLOWED_CN": "axon-control-plane",
+            },
+            clear=False,
+        ):
+            response = self.client.post(
+                "/internal/watch/commands",
+                json={
+                    "command_type": "reprobe_connector",
+                    "target_type": "connector",
+                    "target_id": "control_plane",
+                },
+                headers={
+                    "X-Axon-Internal-Token": "watch-internal-secret",
+                    "X-SSL-Client-Verify": "SUCCESS",
+                    "X-SSL-Client-S-DN": "CN=axon-control-plane",
+                },
+            )
+        self.assertNotEqual(401, response.status_code)
+
 
 if __name__ == "__main__":
     unittest.main()

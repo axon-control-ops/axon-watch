@@ -8,9 +8,9 @@ import os
 import threading
 import time
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
-from app.adapters.watch_http import watch_base_url, watch_request_headers
+from app.adapters.watch_http import watch_base_url, watch_request_headers, watch_urlopen, watch_urlopen
 
 # Boot stampede protection: /api/agents, /api/workspaces, /api/inbox, fleet-health,
 # and runtime/summary all share this fetch. Without SWR + single-flight, one cold
@@ -62,7 +62,7 @@ def _fetch_watch_inbox_uncached(timeout_seconds: float) -> dict[str, object] | N
 
     try:
         request = Request(url, headers=watch_request_headers())
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -170,7 +170,7 @@ def fetch_watch_summary(timeout_seconds: float = 1.5) -> dict[str, object] | Non
 
     try:
         request = Request(url, headers=watch_request_headers())
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -185,7 +185,7 @@ def fetch_watch_monitors(timeout_seconds: float = 5.0) -> dict[str, object] | No
 
     try:
         request = Request(url, headers=watch_request_headers())
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -200,7 +200,7 @@ def fetch_watch_connectors(timeout_seconds: float = 5.0) -> dict[str, object] | 
 
     try:
         request = Request(url, headers=watch_request_headers())
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -215,7 +215,7 @@ def fetch_watch_tunnel(timeout_seconds: float = 1.0) -> dict[str, object] | None
 
     try:
         request = Request(url, headers=watch_request_headers())
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -238,7 +238,7 @@ def post_watch_tunnel_action(action: str, timeout_seconds: float = 90.0) -> dict
             method="POST",
             data=b"{}",
         )
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -259,7 +259,7 @@ def post_watch_command(body: dict[str, object], timeout_seconds: float = 2.0) ->
             headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -274,7 +274,7 @@ def get_watch_command(command_id: str, timeout_seconds: float = 1.0) -> dict[str
 
     try:
         request = Request(url, headers=watch_request_headers())
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -297,7 +297,7 @@ def fetch_watch_events(
 
     try:
         request = Request(url, headers=watch_request_headers())
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -320,7 +320,7 @@ def fetch_watch_delivery_receipts(
 
     try:
         request = Request(url, headers=watch_request_headers())
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -370,7 +370,7 @@ def post_watch_sentry_issue_resolve(
             headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError) as exc:
         error_payload = _parse_watch_error_payload(exc)
@@ -393,7 +393,7 @@ def post_watch_sentry_probe_write(timeout_seconds: float = 15.0) -> dict[str, ob
             headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError) as exc:
         error_payload = _parse_watch_error_payload(exc)
