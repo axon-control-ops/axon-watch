@@ -38,7 +38,9 @@ def isolation_receipt_summary(isolation_root: Path) -> str:
         return f"worker isolation root {isolation_root}"
     kind = str(meta.get("isolation_kind") or "unknown")
     baseline = str(meta.get("baseline_commit") or "")[:12]
-    return f"worker isolation {kind} at {baseline} → {isolation_root}"
+    branch = str(meta.get("worker_branch") or "")
+    branch_bit = f" branch={branch}" if branch else ""
+    return f"worker isolation {kind}{branch_bit} at {baseline} → {isolation_root}"
 
 
 __all__ = [

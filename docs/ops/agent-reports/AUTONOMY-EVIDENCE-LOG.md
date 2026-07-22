@@ -41,3 +41,12 @@ Template:
 - exit criteria met: partial — local_token + internal watch token + vault remote refuse + worker trust policy; **not** full CSRF/rate-limit/step-up
 - residual risks: default auth mode still `placeholder`; must set tokens for non-loopback; rate limit/CSRF/step-up outstanding
 - next gate unlocked: Gate 3 (per-task worktrees) — keep scheduler off until worktrees land
+
+### Gate 3 — 2026-07-22
+- owner: agent
+- commit: working-tree Gate 3 close-out (named `worker/<run_id>` worktree + path forbid + concurrent proof); report `docs/ops/agent-reports/gate3-worker-isolation-2026-07-22.md`
+- commands run: `python -m unittest tests.test_gate3_worker_isolation` (5 OK); `PYTHONPATH=services/control-plane python -m unittest tests.test_safe_improvement` (8 OK)
+- pass/fail: pass
+- exit criteria met: yes — two isolations without shared tree; live-root `git status` unchanged; cleanup deletes worktree + worker branch with receipts; path escape refused
+- residual risks: path forbid is resolve-time only (not full FS sandbox); scheduler still intentionally off; Gate 2 CSRF/rate-limit/step-up still open
+- next gate unlocked: Gate 4 (durable task ledger) — keep scheduler off until leases exist

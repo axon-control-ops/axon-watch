@@ -498,9 +498,13 @@ Remaining Gate 2 debt: watch-service mTLS/service identity, CSRF/rate limits,
 and step-up Full Access keyed to a real login session (not only a shared
 operator token).
 
-**Gate 3 progress:** continuous workers create a disposable git worktree/clone
-via `safe_improvement.isolated_executor` before Lane B dispatch, pass that path
-as `workspace_root` (never the live binding), and clean up with receipts.
+**Gate 3 progress:** **CLOSED** (2026-07-22). Continuous workers create a named
+`worker/<run_id>` worktree (clone fallback) via `safe_improvement.isolated_executor`
+before Lane B dispatch, pin baseline SHA, refuse paths outside the disposable root,
+pass that path as `workspace_root` (never the live binding), and clean up worktree +
+branch with receipts. Concurrent isolation proof keeps live-root `git status`
+unchanged. Scheduler remains off. Evidence:
+`docs/ops/agent-reports/gate3-worker-isolation-2026-07-22.md`.
 
 ---
 
