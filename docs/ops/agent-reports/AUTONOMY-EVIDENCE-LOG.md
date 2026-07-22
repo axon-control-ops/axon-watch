@@ -62,7 +62,7 @@ Template:
 
 ### Gate 4 — 2026-07-22
 - owner: agent
-- commit: (pin after commit); report `docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`
+- commit: `27cf9ba`; report `docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`
 - commands run: `tests.test_gate4_task_ledger`; `tests.test_workspace_agent_scheduler`; console-web vitest for task board + galaxy labels
 - pass/fail: pass
 - exit criteria met: yes for continuous workers — leased task required, budgets/leases enforced, Mission Control task board; scheduler remains off by default

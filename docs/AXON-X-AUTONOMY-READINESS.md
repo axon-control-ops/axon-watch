@@ -510,12 +510,16 @@ branch with receipts. Concurrent isolation proof keeps live-root `git status`
 unchanged. Scheduler remains off. Evidence:
 `docs/ops/agent-reports/gate3-worker-isolation-2026-07-22.md`.
 
-**Gate 4 progress:** **CLOSED** (2026-07-22). Durable `workspace_tasks` ledger with
+**Gate 4 progress:** **CLOSED** (2026-07-22, `27cf9ba`). Durable `workspace_tasks` ledger with
 lease / claim / attempt budget; continuous scheduler requires a leased `task_id`;
 worker prompts are task-scoped; Mission Control task board landed. Concurrent IDE
 streams are per-thread. Evidence:
 `docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`. Scheduler remains off.
-Next: Gate 5 (Lead planner + fan-out).
+
+**Gate 5 progress:** **IN PROGRESS** (2026-07-22). Pure Lead planner
+(`lead_task_plan.build_lead_task_plan`) turns a goal + roster into ordered plan
+items with owner roles, deps, and path serialization; fan-out mode when the
+operator asks all specialists. Persist + dispatch still open.
 
 ---
 

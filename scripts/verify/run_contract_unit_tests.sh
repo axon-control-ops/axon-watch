@@ -114,6 +114,8 @@ main_tests=(
   tests.test_critical_review_clause
   tests.test_gate2_auth_containment
   tests.test_gate3_worker_isolation
+  tests.test_gate4_task_ledger
+  tests.test_lead_task_plan
   tests.test_safe_improvement
   tests.test_safe_improvement_gate
 )
