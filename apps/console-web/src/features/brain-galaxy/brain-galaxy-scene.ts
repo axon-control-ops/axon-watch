@@ -25,6 +25,7 @@ import {
   GALAXY_BACKGROUND,
   galaxyNodeColors,
 } from './brain-galaxy-colors';
+import { shouldShowGalaxyNodeLabel } from './galaxy-node-label-policy';
 import { applyGalaxySelectionFocus } from './brain-galaxy-selection-effects';
 import {
   animateGalaxyAmbience,
@@ -392,13 +393,8 @@ export class BrainGalaxyScene {
       });
     }
 
-    // Labels: always core; workspaces only when non-nominal or every other
-    // shell slot — cuts the unreadable stacked-label pile in the center.
-    const labelWorkspace =
-      node.kind === 'workspace' &&
-      (node.tone !== 'nominal' ||
-        Math.abs(Math.round(node.x * 10) + Math.round(node.z * 7)) % 2 === 0);
-    if (node.kind === 'core' || labelWorkspace) {
+    // Labels: core + every named workspace (selected orbs must stay labeled).
+    if (shouldShowGalaxyNodeLabel(node)) {
       const label = document.createElement('span');
       label.className = 'brain-galaxy-node-label';
       if (node.tone === 'attention') {

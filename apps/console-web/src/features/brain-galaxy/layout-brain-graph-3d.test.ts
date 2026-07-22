@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   galaxyEdgeColor,
   galaxyNodeColors,
+  workspaceHueFromId,
 } from './brain-galaxy-colors';
 import { layoutBrainGraph3D } from './layout-brain-graph-3d';
 import type { BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
@@ -118,6 +119,29 @@ describe('brain-galaxy-colors', () => {
     const core = snapshot.nodes[0];
     const colors = galaxyNodeColors(core);
     expect(colors.emissiveIntensity).toBeGreaterThan(1);
+  });
+
+  it('gives nominal workspaces stable distinct hues', () => {
+    const left = galaxyNodeColors({
+      node_id: 'a',
+      kind: 'workspace',
+      label: 'DashPro',
+      tone: 'nominal',
+      workspace_id: 'workspace_dashpro',
+      detail: '',
+    });
+    const right = galaxyNodeColors({
+      node_id: 'b',
+      kind: 'workspace',
+      label: 'Axon Watch',
+      tone: 'nominal',
+      workspace_id: 'workspace_axon_watch',
+      detail: '',
+    });
+    expect(left.base).not.toBe(right.base);
+    expect(workspaceHueFromId('workspace_dashpro')).toBe(
+      workspaceHueFromId('workspace_dashpro'),
+    );
   });
 
   it('maps edge kinds to distinct hues', () => {

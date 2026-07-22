@@ -158,9 +158,34 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     _ensure_chat_thread_kind_column(connection)
     _ensure_chat_thread_persona_columns(connection)
     _ensure_runs_employee_role_column(connection)
+    _ensure_runs_task_id_column(connection)
+    _ensure_workspace_tasks_table(connection)
     _ensure_chat_attachments_table(connection)
     _ensure_operator_memory_reminder_columns(connection)
     _ensure_host_context_tables(connection)
+
+
+def _ensure_runs_task_id_column(connection: sqlite3.Connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(runs)").fetchall()
+    }
+    if "task_id" in columns:
+        return
+    connection.execute("ALTER TABLE runs ADD COLUMN task_id TEXT")
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_runs_task_id
+            ON runs(task_id)
+        """
+    )
+    connection.commit()
+
+
+def _ensure_workspace_tasks_table(connection: sqlite3.Connection) -> None:
+    from app.persistence.task_store import ensure_task_ledger_schema
+
+    ensure_task_ledger_schema(connection)
 
 
 def _ensure_runs_employee_role_column(connection: sqlite3.Connection) -> None:

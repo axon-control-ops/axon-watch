@@ -40,7 +40,7 @@ export function applyGalaxySelectionFocus(
     material.depthWrite = focusStrength >= 1;
     mesh.traverse((child) => {
       if (child instanceof CSS2DObject) {
-        child.element.style.opacity = String(Math.max(focusStrength, 0.28));
+        child.element.style.opacity = String(Math.max(focusStrength, 0.62));
         child.element.classList.toggle('brain-galaxy-node-label--selected', isSelected);
       }
     });

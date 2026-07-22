@@ -27,10 +27,64 @@ const TONE_INTENSITY: Record<BrainNodeTone | string, number> = {
   critical: 1.25,
 };
 
+/** Stable 0–360 hue from workspace id — muted family for easy spotting. */
+export function workspaceHueFromId(workspaceId: string): number {
+  const raw = workspaceId.trim() || 'workspace';
+  let hash = 2166136261;
+  for (let i = 0; i < raw.length; i += 1) {
+    hash ^= raw.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash) % 360;
+}
+
+function hslToHex(h: number, s: number, l: number): number {
+  const sat = Math.max(0, Math.min(1, s));
+  const light = Math.max(0, Math.min(1, l));
+  const chroma = (1 - Math.abs(2 * light - 1)) * sat;
+  const hp = (((h % 360) + 360) % 360) / 60;
+  const x = chroma * (1 - Math.abs((hp % 2) - 1));
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (hp >= 0 && hp < 1) {
+    r = chroma;
+    g = x;
+  } else if (hp < 2) {
+    r = x;
+    g = chroma;
+  } else if (hp < 3) {
+    g = chroma;
+    b = x;
+  } else if (hp < 4) {
+    g = x;
+    b = chroma;
+  } else if (hp < 5) {
+    r = x;
+    b = chroma;
+  } else {
+    r = chroma;
+    b = x;
+  }
+  const m = light - chroma / 2;
+  const toByte = (channel: number) => Math.round(Math.max(0, Math.min(1, channel + m)) * 255);
+  return (toByte(r) << 16) | (toByte(g) << 8) | toByte(b);
+}
+
 export function galaxyNodeColors(node: BrainGraphNode): GalaxyNodeColors {
   if (node.kind === 'workspace' && node.tone === 'nominal') {
-    // Bright cyan-white orbs — matches the older “nebula cluster” look.
-    return { base: 0xd7f6ff, emissive: 0xa8eaff, emissiveIntensity: 1.15 };
+    const hue = workspaceHueFromId(node.workspace_id || node.node_id);
+    return {
+      base: hslToHex(hue, 0.42, 0.72),
+      emissive: hslToHex(hue, 0.55, 0.55),
+      emissiveIntensity: 1.05,
+    };
+  }
+  if (node.kind === 'workspace' && node.tone === 'attention') {
+    return { base: 0xffc078, emissive: 0xffa040, emissiveIntensity: 1.15 };
+  }
+  if (node.kind === 'workspace' && node.tone === 'critical') {
+    return { base: 0xff8a8a, emissive: 0xff5050, emissiveIntensity: 1.3 };
   }
   if (node.kind === 'signal') {
     return { base: 0xff7eb6, emissive: 0xff4d8d, emissiveIntensity: 1.35 };

@@ -19,6 +19,7 @@ from app.routes import (
     runtime,
     safe_improvement,
     skills,
+    tasks,
     vault_http,
     worker_scheduler,
     workspaces,
@@ -40,6 +41,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(runs.router)
     app.include_router(workspaces.router)
     app.include_router(worker_scheduler.router)
+    app.include_router(tasks.router)
     app.include_router(skills.router)
     # Session toggle is always mounted; proposal routes stay 404 until enabled.
     app.include_router(safe_improvement.router)

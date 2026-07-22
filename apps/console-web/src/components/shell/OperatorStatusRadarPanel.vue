@@ -39,6 +39,7 @@ import OperatorBrainGraphPanel from './OperatorBrainGraphPanel.vue';
 import OperatorFleetHealthGrid from './OperatorFleetHealthGrid.vue';
 import OperatorIncidentFeedPanel from './OperatorIncidentFeedPanel.vue';
 import OperatorRunStripPanel from './OperatorRunStripPanel.vue';
+import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
 
 const props = defineProps<{
   terminalVisible: boolean;
@@ -392,6 +393,8 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
       </div>
 
       <OperatorFleetHealthGrid />
+
+      <OperatorTaskBoardPanel />
 
       <OperatorIncidentFeedPanel />
 

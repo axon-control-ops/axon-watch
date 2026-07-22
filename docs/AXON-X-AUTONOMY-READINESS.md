@@ -494,11 +494,13 @@ workers dispatch Cursor with `trust_policy=worker` (keeps `--trust`, omits
 the deployment is marked remotely reachable. Always-on install now forces
 `local_token` + `AUTH_ALLOW_LOOPBACK=0` and mints `AXON_WATCH_OPERATOR_TOKEN`;
 console vite `/api` proxy injects the bearer so the SPA keeps working.
-Remaining Gate 2 debt after 2026-07-22 residuals: watch-service mTLS/service
-identity (shared internal token remains the thin equivalent). CSRF/origin,
-mutating rate limits, remote-forced `local_token`, and remote step-up headers for
-Full Access / exact-effect are closed — see
-`docs/ops/agent-reports/gate2-residuals-2026-07-22.md`.
+Remaining Gate 2 debt after 2026-07-22: none for the residual checklist
+(CSRF/origin, rate limits, remote-forced `local_token`, step-up headers, watch
+internal token + optional/required mTLS). Keep shared internal token set on any
+non-loopback host; enable `AXON_WATCH_MTLS_REQUIRED=1` with
+`./scripts/ops/mint-watch-mtls.sh` for production remote. See
+`docs/how-to/autonomy-gates-and-service-identity.md` and
+`docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md` (Gate 4 + mTLS close).
 
 **Gate 3 progress:** **CLOSED** (2026-07-22). Continuous workers create a named
 `worker/<run_id>` worktree (clone fallback) via `safe_improvement.isolated_executor`
@@ -508,17 +510,12 @@ branch with receipts. Concurrent isolation proof keeps live-root `git status`
 unchanged. Scheduler remains off. Evidence:
 `docs/ops/agent-reports/gate3-worker-isolation-2026-07-22.md`.
 
-**Gate 4 progress:** **IN PROGRESS** (2026-07-22). SQLite `workspace_tasks` ledger
-landed with create / lease / complete / fail / cancel APIs (`task_store` +
-`/api/workspaces/{id}/tasks`, `/api/tasks/{id}/…`). Continuous scheduler now
-**claims an open task before `create_run`** (`claim_open_task_for_role` +
-`require_leased_task=True`); ticks with no open tasks start nothing. Worker
-prompts execute the leased goal (no self-select). `runs.task_id` persisted.
-Lease contention, attempt budget, claim, and “no shift without lease” proofs in
-`tests/test_gate4_task_ledger.py` + `tests/test_workspace_agent_scheduler.py`.
-Still open: Gate 4 evidence report close-out (API snapshot / screenshot of
-Mission Control task board). Task board UI landed in operator Mission Control
-(`OperatorTaskBoardPanel`).
+**Gate 4 progress:** **CLOSED** (2026-07-22). Durable `workspace_tasks` ledger with
+lease / claim / attempt budget; continuous scheduler requires a leased `task_id`;
+worker prompts are task-scoped; Mission Control task board landed. Concurrent IDE
+streams are per-thread. Evidence:
+`docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`. Scheduler remains off.
+Next: Gate 5 (Lead planner + fan-out).
 
 ---
 

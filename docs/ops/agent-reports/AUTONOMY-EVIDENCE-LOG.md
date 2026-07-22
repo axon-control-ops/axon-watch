@@ -59,3 +59,12 @@ Template:
 - exit criteria met: yes for master-plan “CSRF/rate-limit + forced token mode on remote” before mobile mutation; mTLS still open
 - residual risks: in-process rate limiter only; step-up is header confirm not OIDC; default local auth still placeholder on loopback
 - next gate unlocked: Gate 4 (durable task ledger) — scheduler still off
+
+### Gate 4 — 2026-07-22
+- owner: agent
+- commit: (pin after commit); report `docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`
+- commands run: `tests.test_gate4_task_ledger`; `tests.test_workspace_agent_scheduler`; console-web vitest for task board + galaxy labels
+- pass/fail: pass
+- exit criteria met: yes for continuous workers — leased task required, budgets/leases enforced, Mission Control task board; scheduler remains off by default
+- residual risks: interactive IDE employee runs may omit task_id unless `require_leased_task=True`; Watch mTLS/service-identity still open as a separate residual
+- next gate unlocked: Gate 5 (Lead planner) — keep scheduler off until Lead assignment is routine

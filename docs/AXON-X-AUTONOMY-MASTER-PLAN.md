@@ -666,10 +666,10 @@ Gate exit receipts are appended in [`docs/ops/agent-reports/AUTONOMY-EVIDENCE-LO
 
 ## Immediate next actions (start now)
 
-1. Confirm Fast Gate green on the pinned commit after evidence-log extraction.
-2. **Start Gate 3** — per-task disposable checkout / worktrees (scheduler stays off until ready).
-3. **Do not** re-enable continuous live-checkout editing.
-4. **Do not** build mobile mutation features until Gate 2 residuals (CSRF/rate-limit + forced token mode on remote) are closed.
+1. **Start Gate 5** — Lead planner + conflict policy + specialist fan-out (uses Gate 4 leases).
+2. **Do not** re-enable continuous live-checkout editing.
+3. **Do not** re-enable the continuous scheduler by default until Lead assignment is routine.
+4. **Do not** build mobile mutation features until Gate 2 mTLS/service-identity residual is closed on remote.
 5. On any remote deploy: set `AXON_WATCH_AUTH_MODE=local_token`, operator token, and `AXON_WATCH_INTERNAL_SERVICE_TOKEN`.
 
 ---

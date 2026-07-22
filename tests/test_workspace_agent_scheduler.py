@@ -13,16 +13,27 @@ from tests.support.control_plane_db import isolate_control_plane_db
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.persistence import run_store, worker_scheduler_settings_store  # noqa: E402
+from app.persistence import run_store, task_store, worker_scheduler_settings_store  # noqa: E402
 from app.runs.service import create_run, fail_run, get_run, stop_run  # noqa: E402
 from app.workspace_agents import build_company_roster  # noqa: E402
 from app.workspace_agents.scheduler import run_continuous_worker_tick  # noqa: E402
 from app.workspace_agents.status import active_role_run_id, active_role_run_status  # noqa: E402
 
 
+def _seed_open_task(*, workspace_id: str, owner_role: str, goal: str = "Seeded leased work") -> dict:
+    return task_store.create_task(
+        workspace_id=workspace_id,
+        goal=goal,
+        owner_role=owner_role,
+        acceptance_criteria="receipts prove the goal",
+    )
+
+
 class WorkspaceAgentSchedulerTests(unittest.TestCase):
     def setUp(self) -> None:
         isolate_control_plane_db(self, run_store)
+        task_store.reset_store()
+        self.addCleanup(task_store.reset_store)
 
     def test_default_agents_file_resolves_to_repo_config_not_services(self) -> None:
         from app.workspace_agents.config_loader import default_agents_file, load_workspace_agent_configs
@@ -148,6 +159,16 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            _seed_open_task(
+                workspace_id="workspace_sched_demo",
+                owner_role="frontend",
+                goal="Frontend continuous task",
+            )
+            _seed_open_task(
+                workspace_id="workspace_sched_demo",
+                owner_role="watcher",
+                goal="Watcher continuous task",
+            )
             with patch.dict(
                 os.environ,
                 {
@@ -169,18 +190,66 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         self.assertEqual(["frontend", "watcher"], roles)
         self.assertEqual([], second)
         self.assertTrue(all(run.get("employee_role") for run in first))
+        self.assertTrue(all(run.get("task_id") for run in first))
         self.assertEqual("executing", active_role_run_status("workspace_sched_demo", "frontend"))
         self.assertEqual("executing", active_role_run_status("workspace_sched_demo", "watcher"))
+
+    def test_continuous_worker_tick_skips_when_no_open_tasks(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            agents_file = Path(tempdir) / "agents.json"
+            agents_file.write_text(
+                json.dumps(
+                    {
+                        "companies": {
+                            "workspace_sched_empty": {
+                                "company_name": "Empty Co",
+                                "employees": [
+                                    {
+                                        "name": "Empty UI",
+                                        "role": "frontend",
+                                        "schedule": "continuous",
+                                    },
+                                ],
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "AXON_WATCH_WORKSPACE_AGENTS_FILE": str(agents_file),
+                    "AXON_WATCH_WORKER_SCHEDULER": "1",
+                    "AXON_WATCH_WORKER_SCHEDULER_DISPATCH": "0",
+                },
+                clear=False,
+            ):
+                worker_scheduler_settings_store.patch_settings({"scheduler_enabled": True})
+                started = run_continuous_worker_tick()
+
+        self.assertEqual([], started)
 
     def test_dispatch_crash_fails_run_instead_of_leaving_executing(self) -> None:
         from app.workspace_agents.config_loader import EmployeeConfig
         from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
 
+        opened = _seed_open_task(
+            workspace_id="workspace_worker_fail",
+            owner_role="backend",
+            goal="Dispatch crash task",
+        )
+        leased = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_worker_fail-backend",
+        )
         created = create_run(
             workspace_id="workspace_worker_fail",
             mode="agent",
             summary="Backend continuous shift",
             employee_role="backend",
+            task_id=leased["task_id"],
+            require_leased_task=True,
         )
         run_id = str(created["run_id"])
         with patch(
@@ -211,11 +280,22 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
         from app.workspace_agents.config_loader import EmployeeConfig
         from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
 
+        opened = _seed_open_task(
+            workspace_id="workspace_worker_heartbeat",
+            owner_role="backend",
+            goal="Heartbeat task",
+        )
+        leased = task_store.lease_task(
+            opened["task_id"],
+            lease_holder="employee-workspace_worker_heartbeat-backend",
+        )
         created = create_run(
             workspace_id="workspace_worker_heartbeat",
             mode="agent",
             summary="Backend continuous shift",
             employee_role="backend",
+            task_id=leased["task_id"],
+            require_leased_task=True,
         )
         run_id = str(created["run_id"])
         with patch(
@@ -379,10 +459,16 @@ class WorkspaceAgentSchedulerTests(unittest.TestCase):
                     failed["run_id"],
                     receipt_summary="Cursor CLI exited with status 143.",
                 )
+                _seed_open_task(
+                    workspace_id="workspace_axon_watch",
+                    owner_role="backend",
+                    goal="Retry after interrupt",
+                )
                 started = run_continuous_worker_tick()
 
         roles = [str(run.get("employee_role") or "") for run in started]
         self.assertEqual(["backend"], roles)
+        self.assertTrue(all(run.get("task_id") for run in started))
 
 
 if __name__ == "__main__":

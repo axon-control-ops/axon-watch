@@ -29,6 +29,7 @@ _RUN_COLUMNS = (
     "current_step",
     "history_ref",
     "employee_role",
+    "task_id",
 )
 
 
@@ -52,6 +53,7 @@ def _managed_connection():
 def _row_to_record(row: Any) -> dict[str, Any]:
     keys = set(row.keys())
     employee_role = row["employee_role"] if "employee_role" in keys else None
+    task_id = row["task_id"] if "task_id" in keys else None
     return {
         "run_id": row["run_id"],
         "workspace_id": row["workspace_id"],
@@ -71,12 +73,15 @@ def _row_to_record(row: Any) -> dict[str, Any]:
         "current_step": row["current_step"],
         "history_ref": row["history_ref"],
         "employee_role": (str(employee_role).strip() if employee_role else None) or None,
+        "task_id": (str(task_id).strip() if task_id else None) or None,
     }
 
 
 def _record_values(record: dict[str, Any]) -> tuple[Any, ...]:
     employee_role = record.get("employee_role")
     cleaned_role = str(employee_role).strip() if employee_role else None
+    task_id = record.get("task_id")
+    cleaned_task = str(task_id).strip() if task_id else None
     return (
         record["run_id"],
         record["workspace_id"],
@@ -96,6 +101,7 @@ def _record_values(record: dict[str, Any]) -> tuple[Any, ...]:
         record.get("current_step"),
         record["history_ref"],
         cleaned_role or None,
+        cleaned_task or None,
     )
 
 

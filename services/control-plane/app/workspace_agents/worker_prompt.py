@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.workspace_agents.catalog import _DEFAULT_OWNS
 from app.workspace_agents.config_loader import EmployeeConfig
 from app.workspace_agents.critical_review_clause import append_critical_review_clause
@@ -25,7 +27,12 @@ def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
     )
 
 
-def build_continuous_worker_prompt(*, workspace_id: str, employee: EmployeeConfig) -> str:
+def build_continuous_worker_prompt(
+    *,
+    workspace_id: str,
+    employee: EmployeeConfig,
+    task: dict[str, Any],
+) -> str:
     role = str(employee.role or "").strip().lower() or "workspace_agent"
     owns = str(employee.owns or "").strip() or _DEFAULT_OWNS.get(role, "assigned workspace work")
     name = str(employee.name or role).strip() or role
@@ -35,6 +42,14 @@ def build_continuous_worker_prompt(*, workspace_id: str, employee: EmployeeConfi
         name=name,
         role=role,
         owns=owns,
+    )
+    task_id = str(task.get("task_id") or "").strip() or "unknown-task"
+    goal = str(task.get("goal") or "").strip() or "Complete the leased task"
+    acceptance = str(task.get("acceptance_criteria") or "").strip()
+    acceptance_clause = (
+        f" Acceptance criteria: {acceptance}."
+        if acceptance
+        else " Use receipts to prove the goal is met."
     )
     ci_clause = ""
     if role in {"watcher", "backend", "integrations"}:
@@ -54,10 +69,11 @@ def build_continuous_worker_prompt(*, workspace_id: str, employee: EmployeeConfi
     prior_failure = _prior_failure_clause(workspace_id=workspace_id, role=role)
     return append_critical_review_clause(
         f"{identity} "
-        f"This is a bounded continuous shift ({schedule}). "
+        f"This is a bounded continuous shift ({schedule}) for leased task {task_id}. "
         f"{prior_failure}"
-        "Inspect the workspace, pick the highest-value in-scope task, do it with receipts, "
-        "and summarize what changed. Stay inside your role boundary."
+        f"Execute only this leased task — do not invent or self-select other work. "
+        f"Goal: {goal}.{acceptance_clause} "
+        "Do it with receipts and summarize what changed. Stay inside your role boundary."
         f"{ci_clause}"
         f"{memory_clause}"
         " If a step fails, say what failed and why (command, assertion, import, CI step) — "

@@ -11,6 +11,7 @@
 .operator-fleet-grid,
 .operator-brain-graph,
 .operator-incident-feed,
+.operator-task-board,
 .operator-run-strip {
   flex-shrink: 1;
   min-height: 0;
