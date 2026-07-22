@@ -53,7 +53,7 @@ Template:
 
 ### Gate 2 residuals — 2026-07-22
 - owner: agent
-- commit: (pin after commit) report `docs/ops/agent-reports/gate2-residuals-2026-07-22.md`
+- commit: 0052350 report `docs/ops/agent-reports/gate2-residuals-2026-07-22.md`
 - commands run: `tests.test_gate2_auth_containment` (17 OK); `npm run verify:contracts`; `npm run verify:console-web`
 - pass/fail: pass for residual thin slice (forced remote local_token, rate limit, step-up headers, origin guard retained)
 - exit criteria met: yes for master-plan “CSRF/rate-limit + forced token mode on remote” before mobile mutation; mTLS still open
