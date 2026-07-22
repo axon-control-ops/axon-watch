@@ -973,6 +973,7 @@ export const useShellStore = defineStore('shell', () => {
     activeIdeEmployeeRecord,
     activeIdeEmployeeFailureLine,
     activeIdeEmployeeShiftInterrupted,
+    companyEmployeesByWorkspaceId,
     companyEmployeesForCurrentWorkspace,
     loadCompanyEmployees,
   } = createCompanyRosterSlice({
@@ -980,6 +981,17 @@ export const useShellStore = defineStore('shell', () => {
     activeIdeThreadId,
     ideThreadsForCurrentWorkspace,
     agentStreamActive,
+  });
+
+  /** Fleet-wide roster for cross-workspace speaker avatar resolution. */
+  const companyEmployeesFleet = computed(() => {
+    const byId = new Map<string, (typeof companyEmployeesForCurrentWorkspace.value)[number]>();
+    for (const rows of Object.values(companyEmployeesByWorkspaceId.value)) {
+      for (const row of rows) {
+        byId.set(row.employee_id, row);
+      }
+    }
+    return [...byId.values()];
   });
 
   const openIdeThreadTabsForCurrentWorkspace = computed(() => {
@@ -3515,7 +3527,9 @@ export const useShellStore = defineStore('shell', () => {
     activeIdeEmployeeRecord,
     activeIdeEmployeeFailureLine,
     activeIdeEmployeeShiftInterrupted,
+    companyEmployeesByWorkspaceId,
     companyEmployeesForCurrentWorkspace,
+    companyEmployeesFleet,
     loadCompanyEmployees,
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,

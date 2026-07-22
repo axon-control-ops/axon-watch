@@ -4,8 +4,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch, Transition } from 'vu
 import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import GalaxyWorkspacesRail from '../../features/brain-galaxy/GalaxyWorkspacesRail.vue';
 import GalaxyIntelligencePanel from '../../features/brain-galaxy/GalaxyIntelligencePanel.vue';
-import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
-import GalaxyAmbientHud from '../../features/brain-galaxy/GalaxyAmbientHud.vue';
 import GalaxyPanelResizeHandle from '../../features/brain-galaxy/GalaxyPanelResizeHandle.vue';
 import GalaxyStatusBarActions from '../../features/brain-galaxy/GalaxyStatusBarActions.vue';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
@@ -21,20 +19,16 @@ import {
   galaxyLegendItems,
   galaxyNodeCounts,
   galaxyTopHubs,
+  resolveGalaxyWorkspaceNavigation,
 } from '../../features/brain-galaxy/brain-galaxy-hud-view';
 import type { GalaxyMockupRailItem } from '../../features/brain-galaxy/galaxy-mockup-rail-view';
 import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
 import { resolveBrainGalaxyNodeSelection } from '../../features/brain-galaxy/brain-galaxy-node-selection';
 import {
-  focusGalaxyEvidenceSignal,
-  handoffGalaxyEvidenceSignal,
-  openGalaxyEvidenceWorkspace,
-} from '../../features/brain-galaxy/galaxy-evidence-actions';
-import {
   brainGraphHeadline,
-  layoutBrainGraph,
   type BrainGraphNode,
 } from '../../lib/operator-brain-graph-view';
+import { projectBrainGraph3DToSvg } from '../../features/brain-galaxy/project-brain-graph-3d-to-svg';
 import { useShellStore } from '../../stores/shell';
 import {
   workbenchTerminalPanelAlive,
@@ -43,8 +37,14 @@ import {
 } from '../../lib/workbench-terminal-panel-view';
 import { useGalaxyPanelResize } from '../../composables/useGalaxyPanelResize';
 
-const props = defineProps<{ terminalVisible: boolean }>();
-const emit = defineEmits<{ toggleTerminal: []; switchGrid: [] }>();
+const props = defineProps<{
+  terminalVisible: boolean;
+}>();
+
+const emit = defineEmits<{
+  toggleTerminal: [];
+  switchGrid: [];
+}>();
 
 const shell = useShellStore();
 const galaxyHost = ref<HTMLElement | null>(null);
@@ -73,7 +73,7 @@ function syncGalaxyBottomReserve(): void {
 
 const snapshot = computed(() => shell.operatorBrainGraph);
 const layout = computed(() =>
-  layoutBrainGraph(snapshot.value, { width: 640, height: 400 }),
+  projectBrainGraph3DToSvg(snapshot.value, { width: 720, height: 460 }),
 );
 const headline = computed(() => brainGraphHeadline(snapshot.value));
 const legend = computed(() => galaxyLegendItems());
@@ -84,12 +84,6 @@ const graphStats = computed(() => ({
   links: snapshot.value?.edge_count ?? 0,
   sources: shell.workspaces.length,
 }));
-const utcClock = ref('');
-let clockTimer: number | null = null;
-
-function tickClock(): void {
-  utcClock.value = new Date().toISOString().slice(11, 19) + ' UTC';
-}
 
 /** Focus a workspace on the map and load its company team — stay on the map. */
 function selectWorkspaceCompany(workspaceId: string, nodeId: string, label: string): void {
@@ -184,6 +178,21 @@ const showSvgFallback = computed(() => webglFailed.value);
 const vaxonBusy = computed(() => isKairoConversationBusy() || presence.value.busy);
 const stagePresenceClass = computed(() => presence.value.stageClass);
 
+watch(
+  [showSvgFallback, layout],
+  ([svg, next]) => {
+    if (!svg || next.nodes.length === 0) {
+      return;
+    }
+    const ys = next.nodes.map((node) => node.y);
+    const ySpan = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H9',location:'OperatorBrainGraphPanel.vue:svg-nebula',message:'SVG nebula fallback layout',data:{nodeCount:next.nodes.length,labeled:next.nodes.filter((n)=>n.showLabel).length,ySpan:Number(ySpan.toFixed(1)),nebulaRx:Number(next.nebula.rx.toFixed(1)),nebulaRy:Number(next.nebula.ry.toFixed(1)),stars:next.stars.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  },
+  { immediate: true },
+);
+
 function onEscapeClear(event: KeyboardEvent): void {
   if (event.key !== 'Escape' || !selectedNode.value) {
     return;
@@ -207,8 +216,6 @@ onMounted(() => {
   if (shell.briefingLoadState === 'idle') {
     void shell.loadOperatorBriefing();
   }
-  tickClock();
-  clockTimer = window.setInterval(tickClock, 1000);
   syncGalaxyBottomReserve();
   if (typeof ResizeObserver !== 'undefined' && bottomHud.value) {
     bottomHudObserver = new ResizeObserver(() => {
@@ -223,10 +230,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onEscapeClear);
   bottomHudObserver?.disconnect();
   bottomHudObserver = null;
-  if (clockTimer !== null) {
-    window.clearInterval(clockTimer);
-    clockTimer = null;
-  }
 });
 
 watch(
@@ -267,17 +270,19 @@ function handleSvgNodeClick(node: BrainGraphNode): void {
 }
 
 function handleEvidenceWorkspace(workspaceId: string): void {
-  openGalaxyEvidenceWorkspace({
-    workspaceId,
-    selectedNode: selectedNode.value,
-    fallbackLabel:
-      topHubs.value.find((hub) => hub.workspace_id === workspaceId)?.label ?? workspaceId,
-    enterWorkspace,
-  });
+  const nav = resolveGalaxyWorkspaceNavigation(workspaceId);
+  if (!nav) {
+    return;
+  }
+  const label =
+    selectedNode.value?.label ??
+    topHubs.value.find((hub) => hub.workspace_id === workspaceId)?.label ??
+    workspaceId;
+  enterWorkspace(nav.workspaceId, `ws_${workspaceId}`, label);
 }
 
 function handleEvidenceSignal(signalId: string): void {
-  focusGalaxyEvidenceSignal(shell, signalId);
+  shell.focusAttentionSidebar(signalId);
 }
 
 function handleEvidenceHandoff(signal: {
@@ -287,7 +292,7 @@ function handleEvidenceHandoff(signal: {
   summary?: string | null;
   meta?: Record<string, unknown> | null;
 }): void {
-  handoffGalaxyEvidenceSignal(shell, signal);
+  void shell.handoffSignalToIde(signal, { autoSubmit: true });
 }
 </script>
 
@@ -313,15 +318,61 @@ function handleEvidenceHandoff(signal: {
 
       <svg
         v-if="showSvgFallback"
-        class="brain-galaxy-stage__fallback"
+        class="brain-galaxy-stage__fallback brain-galaxy-stage__fallback--nebula"
         :viewBox="`0 0 ${layout.width} ${layout.height}`"
         preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
       >
+        <defs>
+          <radialGradient id="galaxy-nebula-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="rgba(210, 240, 255, 0.55)" />
+            <stop offset="42%" stop-color="rgba(120, 200, 255, 0.22)" />
+            <stop offset="100%" stop-color="rgba(4, 10, 18, 0)" />
+          </radialGradient>
+          <radialGradient id="galaxy-node-core" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="rgba(230, 248, 255, 0.95)" />
+            <stop offset="55%" stop-color="rgba(72, 196, 255, 0.55)" />
+            <stop offset="100%" stop-color="rgba(20, 60, 90, 0.85)" />
+          </radialGradient>
+          <radialGradient id="galaxy-node-signal" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="rgba(255, 210, 230, 0.95)" />
+            <stop offset="60%" stop-color="rgba(255, 90, 150, 0.7)" />
+            <stop offset="100%" stop-color="rgba(80, 20, 40, 0.9)" />
+          </radialGradient>
+          <radialGradient id="galaxy-node-connector" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="rgba(200, 230, 255, 0.95)" />
+            <stop offset="60%" stop-color="rgba(70, 140, 255, 0.75)" />
+            <stop offset="100%" stop-color="rgba(20, 40, 90, 0.9)" />
+          </radialGradient>
+          <filter id="galaxy-soft-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <circle
+          v-for="(star, index) in layout.stars"
+          :key="`star-${index}`"
+          class="brain-galaxy-stage__fallback-star"
+          :cx="star.x"
+          :cy="star.y"
+          :r="star.r"
+          :opacity="star.o"
+        />
+        <ellipse
+          class="brain-galaxy-stage__fallback-nebula"
+          :cx="layout.nebula.cx"
+          :cy="layout.nebula.cy"
+          :rx="layout.nebula.rx"
+          :ry="layout.nebula.ry"
+          fill="url(#galaxy-nebula-glow)"
+        />
         <line
           v-for="edge in layout.edges"
           :key="edge.edge_id"
-          class="operator-brain-graph__edge"
+          class="operator-brain-graph__edge operator-brain-graph__edge--nebula"
           :class="`operator-brain-graph__edge--${edge.kind}`"
           :x1="edge.x1"
           :y1="edge.y1"
@@ -331,7 +382,7 @@ function handleEvidenceHandoff(signal: {
         <g
           v-for="node in layout.nodes"
           :key="node.node_id"
-          class="operator-brain-graph__node"
+          class="operator-brain-graph__node operator-brain-graph__node--nebula"
           :class="[
             `operator-brain-graph__node--${node.kind}`,
             `operator-brain-graph__node--${node.tone}`,
@@ -339,7 +390,34 @@ function handleEvidenceHandoff(signal: {
           :transform="`translate(${node.x}, ${node.y})`"
           @click="handleSvgNodeClick(node)"
         >
-          <circle :r="node.radius" />
+          <circle
+            class="operator-brain-graph__node-glow"
+            :r="node.radius * 1.85"
+            filter="url(#galaxy-soft-glow)"
+          />
+          <circle
+            class="operator-brain-graph__node-body"
+            :r="node.radius"
+            :fill="
+              node.kind === 'signal'
+                ? 'url(#galaxy-node-signal)'
+                : node.kind === 'connector'
+                  ? 'url(#galaxy-node-connector)'
+                  : 'url(#galaxy-node-core)'
+            "
+          />
+          <g v-if="node.showLabel" class="operator-brain-graph__node-label-chip">
+            <rect
+              :x="-(Math.min(node.label.length, 16) * 3.1 + 8) / 2"
+              :y="-node.radius - 18"
+              :width="Math.min(node.label.length, 16) * 3.1 + 8"
+              height="12"
+              rx="3"
+            />
+            <text :y="-node.radius - 9" text-anchor="middle">
+              {{ node.label.slice(0, 16) }}
+            </text>
+          </g>
         </g>
       </svg>
 
@@ -347,8 +425,6 @@ function handleEvidenceHandoff(signal: {
         {{ shell.operatorBrainGraphError }}
       </p>
     </div>
-
-    <GalaxySpeechCaptions />
 
     <header class="brain-galaxy-stage__hud brain-galaxy-stage__hud--top">
       <div class="brain-galaxy-stage__title-row">
@@ -367,7 +443,6 @@ function handleEvidenceHandoff(signal: {
         @keydown="onGalaxyResizeKeydown('left', 'left', $event)"
         @dblclick="resetGalaxyWidth('left')"
       />
-      <GalaxyAmbientHud :presence-phase="presence.phase" />
       <GalaxyWorkspacesRail
         :snapshot="snapshot"
         :workspaces="shell.workspaces"
@@ -474,7 +549,6 @@ function handleEvidenceHandoff(signal: {
             <span>SOURCES</span>
             <strong>{{ graphStats.sources.toLocaleString() }}</strong>
           </div>
-          <time>{{ utcClock }}</time>
         </div>
       </div>
     </footer>

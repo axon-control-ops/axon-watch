@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import TerminalHost from './TerminalHost.vue';
 import WorkbenchIcon from './WorkbenchIcon.vue';
+import OperatorJarvisOpsPanel from './shell/OperatorJarvisOpsPanel.vue';
 import TerminalSessionRail from './shell/TerminalSessionRail.vue';
 import { useAgentTerminalMirror } from '../composables/useAgentTerminalMirror';
 import {
@@ -38,22 +39,32 @@ const emit = defineEmits<{
   'start-resize': [event: MouseEvent];
 }>();
 
-type BottomTabId = 'terminal' | 'problems' | 'output' | 'logs';
+type BottomTabId = 'ops' | 'terminal' | 'problems' | 'output' | 'logs';
 type TerminalHostInstance = InstanceType<typeof TerminalHost>;
 
 const shell = useShellStore();
-const bottomTab = ref<BottomTabId>('terminal');
+const bottomTab = ref<BottomTabId>(props.hideOperatorEditor ? 'ops' : 'terminal');
 const showNewTerminalMenu = ref(false);
 const terminalHostRefs = ref<Record<string, TerminalHostInstance | null>>({});
 const visibleTerminalSessionIds = ref<string[]>([]);
 
 const activeTerminalSession = computed(() => shell.activeTerminalSession);
 const bottomTabs = computed(() => [
+  { id: 'ops' as const, label: 'OPS' },
   { id: 'terminal' as const, label: 'TERMINAL' },
   { id: 'problems' as const, label: `PROBLEMS ${props.problemItems.length}` },
   { id: 'output' as const, label: 'OUTPUT' },
   { id: 'logs' as const, label: 'LOGS' },
 ]);
+
+watch(
+  () => props.hideOperatorEditor,
+  (operatorMode) => {
+    if (operatorMode && bottomTab.value === 'terminal') {
+      bottomTab.value = 'ops';
+    }
+  },
+);
 
 const visibleTerminalSessions = computed(() => {
   const orderedIds = visibleTerminalSessionIds.value.length
@@ -415,7 +426,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="bottomTab === 'terminal'" class="center-workbench__terminal-body center-workbench__terminal-body--with-rail">
+      <div v-if="bottomTab === 'ops'" class="center-workbench__panel-surface center-workbench__panel-surface--ops">
+        <OperatorJarvisOpsPanel />
+      </div>
+      <div v-else-if="bottomTab === 'terminal'" class="center-workbench__terminal-body center-workbench__terminal-body--with-rail">
         <div class="center-workbench__terminal-main">
           <div class="center-workbench__terminal-stack">
             <div

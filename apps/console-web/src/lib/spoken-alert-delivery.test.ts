@@ -147,7 +147,10 @@ describe('spoken alert delivery', () => {
     expect(speakKairoLine).toHaveBeenCalledOnce();
     expect(speakKairoLine).toHaveBeenCalledWith(
       'VAXON attention: Watch summary degraded.',
-      { priority: 'alert' },
+      expect.objectContaining({
+        priority: 'alert',
+        speaker: expect.objectContaining({ kind: 'vaxon', id: 'vaxon' }),
+      }),
     );
   });
 

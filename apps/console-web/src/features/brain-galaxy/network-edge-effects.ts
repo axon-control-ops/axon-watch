@@ -108,8 +108,7 @@ export function animateLiveEdge(line: Line, clock: number, presenceAmp: number):
     return;
   }
   const beadMaterial = bead.material as MeshBasicMaterial;
-  // Keep packet flow alive even in quiet ambient modes.
-  const flowActive = amp >= 0.2 && (data.focusStrength ?? 1) > 0.15;
+  const flowActive = amp >= 0.35 && (data.focusStrength ?? 1) > 0.2;
   if (!flowActive) {
     beadMaterial.opacity = 0;
     return;
@@ -117,6 +116,6 @@ export function animateLiveEdge(line: Line, clock: number, presenceAmp: number):
   const speed = data.edgeKind === 'executes' ? 0.55 : 0.32;
   const t = (clock * speed + (data.phase ?? 0)) % 1;
   bead.position.lerpVectors(data.sourcePos, data.targetPos, t);
-  beadMaterial.opacity = Math.min(1, 0.28 + amp * 0.7) * (data.focusStrength ?? 1);
+  beadMaterial.opacity = Math.min(1, 0.35 + amp * 0.65) * (data.focusStrength ?? 1);
   bead.scale.setScalar(0.85 + amp * 0.45);
 }

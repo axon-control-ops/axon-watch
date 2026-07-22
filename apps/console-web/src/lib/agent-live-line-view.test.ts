@@ -4,6 +4,7 @@ import {
   collapseBackToBackThinkingEcho,
   firstSpeakableAgentLiveBlock,
   isAgentLiveLineTruncated,
+  isWaitProgressThinking,
   sanitizeAgentThinkingForOperator,
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
@@ -44,6 +45,25 @@ describe('sanitizeAgentThinkingForOperator', () => {
       "got the current README and the local setup docs open. I'm going to turn the root guide into a cleaner day-to-day entry point so it matches the actual workflow in this repo.";
     const echoed = `'ve ${body}I've ${body}`;
     expect(sanitizeAgentThinkingForOperator(echoed)).toBe(`I've ${body}`);
+  });
+
+  it('strips trailing stream fence markers glued onto thinking', () => {
+    expect(
+      sanitizeAgentThinkingForOperator(
+        'The Metro cache is active and the build is still progressing. :::',
+      ),
+    ).toBe('The Metro cache is active and the build is still progressing.');
+  });
+});
+
+describe('isWaitProgressThinking', () => {
+  it('detects wait/poll status chatter', () => {
+    expect(
+      isWaitProgressThinking(
+        'The Metro cache is active and the build is still progressing.',
+      ),
+    ).toBe(true);
+    expect(isWaitProgressThinking("I'm patching the dashboard tests now.")).toBe(false);
   });
 });
 

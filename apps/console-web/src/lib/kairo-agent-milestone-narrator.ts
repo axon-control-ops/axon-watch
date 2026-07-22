@@ -61,6 +61,7 @@ export function createKairoAgentMilestoneNarrator(
       edit_path: editPath,
       edit_count: milestone.editCount ?? 0,
       file_name: editPath ? editPath.split('/').pop() ?? editPath : '',
+      speaker_kind: options.azureVoiceId?.()?.trim() ? 'agent' : 'vaxon',
     };
     if (milestone.key === 'failed') {
       context.failure_summary = milestone.message;
@@ -112,6 +113,10 @@ export function createKairoAgentMilestoneNarrator(
         }
 
         if (!message || requestId !== currentRequestId) {
+          return;
+        }
+        // Ambient tool reads (OPERATIONS.md, README, …) resolve to empty — stay silent.
+        if (!message.trim()) {
           return;
         }
 

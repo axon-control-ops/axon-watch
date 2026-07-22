@@ -8,26 +8,36 @@ export type GalaxyNodeColors = {
 
 const KIND_BASE: Record<BrainNodeKind | string, number> = {
   core: 0x7aebff,
-  workspace: 0x3a9fd4,
+  workspace: 0xb8ecff,
   run: 0x6b8fa8,
-  signal: 0xffa040,
-  connector: 0x5a8cff,
+  signal: 0xff6aa8,
+  connector: 0x5a9fff,
   mailbox: 0x7ee0a8,
 };
 
 const TONE_EMISSIVE: Record<BrainNodeTone | string, number> = {
-  nominal: 0x224466,
+  nominal: 0x7ad8ff,
   attention: 0xffa040,
   critical: 0xff5050,
 };
 
 const TONE_INTENSITY: Record<BrainNodeTone | string, number> = {
-  nominal: 0.35,
-  attention: 0.75,
-  critical: 1.1,
+  nominal: 0.85,
+  attention: 1.05,
+  critical: 1.25,
 };
 
 export function galaxyNodeColors(node: BrainGraphNode): GalaxyNodeColors {
+  if (node.kind === 'workspace' && node.tone === 'nominal') {
+    // Bright cyan-white orbs — matches the older “nebula cluster” look.
+    return { base: 0xd7f6ff, emissive: 0xa8eaff, emissiveIntensity: 1.15 };
+  }
+  if (node.kind === 'signal') {
+    return { base: 0xff7eb6, emissive: 0xff4d8d, emissiveIntensity: 1.35 };
+  }
+  if (node.kind === 'connector') {
+    return { base: 0x7ab6ff, emissive: 0x4d8cff, emissiveIntensity: 1.2 };
+  }
   const base = KIND_BASE[node.kind] ?? 0x6688aa;
   const emissive = TONE_EMISSIVE[node.tone] ?? TONE_EMISSIVE.nominal;
   const emissiveIntensity =

@@ -84,7 +84,12 @@ export function agentMilestoneFallbackLine(input: {
   const context = input.context ?? {};
   if (input.milestoneKey.startsWith('tool:')) {
     const toolLabel = String(context.tool_label ?? '').trim();
-    return toolLabel ? toolMilestoneSpeakLine(toolLabel) : '';
+    return toolLabel
+      ? toolMilestoneSpeakLine(toolLabel, {
+          operatorPrompt: String(context.operator_prompt ?? ''),
+          taskSummary: String(context.task_summary ?? ''),
+        })
+      : '';
   }
   if (input.milestoneKey.startsWith('edit:')) {
     const fileName = String(context.file_name ?? context.edit_path ?? '').trim();

@@ -17,7 +17,8 @@ import {
   buildVaxonCoreHolograms,
 } from './vaxon-core-holograms';
 
-export const VAXON_CORE_ORB_RADIUS = 0.92;
+/** Sized so the hub reads clearly without swallowing the workspace shell. */
+export const VAXON_CORE_ORB_RADIUS = 0.7;
 
 type CoreMotionProfile = {
   waveFreq: number;

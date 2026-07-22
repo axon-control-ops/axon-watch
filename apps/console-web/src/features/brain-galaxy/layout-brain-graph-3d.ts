@@ -24,24 +24,21 @@ export type BrainGraphLayout3D = {
 
 const NODE_RADIUS: Record<string, number> = {
   core: VAXON_CORE_ORB_RADIUS,
-  workspace: 0.3,
-  connector: 0.15,
-  signal: 0.17,
-  mailbox: 0.18,
-  run: 0.13,
+  workspace: 0.24,
+  connector: 0.2,
+  signal: 0.22,
+  mailbox: 0.15,
+  run: 0.11,
 };
 
-/** Inner workspace shell radius. */
-const INNER_RADIUS = 1.55;
-/** Active-run shell just outside workspaces. */
-const RUN_RADIUS = 2.25;
-/** Satellites (signals / connectors / mailboxes). */
-const OUTER_RADIUS = 2.85;
-
 /**
- * Place a node on a sphere shell with latitude + longitude so the galaxy
- * reads as volumetric 3D — not a flat radar ring.
+ * Dense-but-readable shells: tight enough for the nebula look, wide enough
+ * that ~17 workspaces don't collapse onto the core.
  */
+const INNER_RADIUS = 2.35;
+const RUN_RADIUS = 3.25;
+const OUTER_RADIUS = 4.05;
+
 function placeOnShell(
   radius: number,
   azimuth: number,
@@ -86,12 +83,14 @@ export function layoutBrainGraph3D(snapshot: BrainGraphSnapshot | null): BrainGr
   const workspaceAngle = new Map<string, number>();
   workspaces.forEach((node, index) => {
     const count = Math.max(workspaces.length, 1);
-    const azimuth = (index / count) * Math.PI * 2 - Math.PI / 2;
-    // Stagger latitudes so the inner ring becomes a true spherical shell.
+    // Slight golden-angle jitter so equal counts don't form a perfect radar disc.
+    const azimuth = (index / count) * Math.PI * 2 - Math.PI / 2 + (index % 3) * 0.04;
     const band = ((index % 5) - 2) / 2;
-    const elevation = band * 0.55 + Math.sin(azimuth * 2.1) * 0.18;
+    const elevation = band * 0.62 + Math.sin(azimuth * 2.1) * 0.22;
     workspaceAngle.set(node.workspace_id ?? node.node_id, azimuth);
-    const pos = placeOnShell(INNER_RADIUS, azimuth, elevation);
+    // Alternate shell depth so neighbors don't stack in screen space.
+    const radius = INNER_RADIUS + (index % 2) * 0.28;
+    const pos = placeOnShell(radius, azimuth, elevation);
     place(node, pos.x, pos.y, pos.z);
   });
 
@@ -108,9 +107,9 @@ export function layoutBrainGraph3D(snapshot: BrainGraphSnapshot | null): BrainGr
   for (const [workspaceId, runNodes] of runsByWorkspace) {
     const baseAngle = workspaceAngle.get(workspaceId) ?? -Math.PI / 2;
     runNodes.forEach((node, index) => {
-      const spread = (index - (runNodes.length - 1) / 2) * 0.28;
+      const spread = (index - (runNodes.length - 1) / 2) * 0.32;
       const azimuth = baseAngle + spread;
-      const elevation = 0.35 + Math.cos(azimuth * 2.4) * 0.4 + index * 0.08;
+      const elevation = 0.4 + Math.cos(azimuth * 2.4) * 0.35 + index * 0.1;
       const pos = placeOnShell(RUN_RADIUS, azimuth, elevation);
       place(node, pos.x, pos.y, pos.z);
     });
@@ -128,8 +127,8 @@ export function layoutBrainGraph3D(snapshot: BrainGraphSnapshot | null): BrainGr
         ? boundAngle + kindOffset
         : (index / Math.max(satellites.length, 1)) * Math.PI * 2 + Math.PI / 4;
     const kindLift =
-      node.kind === 'signal' ? -0.55 : node.kind === 'mailbox' ? 0.65 : 0.15;
-    const elevation = kindLift + Math.sin(azimuth * 1.7 + index) * 0.45;
+      node.kind === 'signal' ? -0.7 : node.kind === 'mailbox' ? 0.75 : 0.2;
+    const elevation = kindLift + Math.sin(azimuth * 1.7 + index) * 0.4;
     const pos = placeOnShell(OUTER_RADIUS, azimuth, elevation);
     place(node, pos.x, pos.y, pos.z);
   });
@@ -137,7 +136,7 @@ export function layoutBrainGraph3D(snapshot: BrainGraphSnapshot | null): BrainGr
   snapshot.nodes.forEach((node, index) => {
     if (!positioned.has(node.node_id)) {
       const azimuth = (index / snapshot.nodes.length) * Math.PI * 2;
-      const elevation = Math.sin(index * 1.7) * 0.5;
+      const elevation = Math.sin(index * 1.7) * 0.55;
       const pos = placeOnShell(OUTER_RADIUS, azimuth, elevation);
       place(node, pos.x, pos.y, pos.z);
     }

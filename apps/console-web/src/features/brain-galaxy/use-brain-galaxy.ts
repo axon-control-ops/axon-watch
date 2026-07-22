@@ -1,7 +1,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue';
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
-import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { subscribeKairoVoiceChunk } from '../../lib/kairo-voice-playback';
 import {
   motionIntensityFromStorage,
@@ -14,7 +13,7 @@ import {
   type GalaxyPresencePhase,
   type GalaxyPresenceResolved,
 } from './galaxy-presence-state';
-import { formatSpecialtyRouteChip } from './specialty-dispatch-filament';
+import { probeWebGlAvailability } from './webgl-availability';
 
 export type UseBrainGalaxyOptions = {
   container: Ref<HTMLElement | null>;
@@ -142,7 +141,11 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       return;
     }
 
-    if (!BrainGalaxyScene.isWebGLAvailable()) {
+    const probe = probeWebGlAvailability();
+    if (!probe.ok) {
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy WebGL unavailable — SVG flat ring',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight,nodeCount:options.snapshot.value?.nodes.length??0},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       webglFailed.value = true;
       return;
     }
@@ -159,6 +162,9 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     );
     const ok = scene.init();
     if (!ok) {
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy scene.init failed — SVG flat ring',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       webglFailed.value = true;
       scene.dispose();
       return;
@@ -171,6 +177,9 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       scene.setSelectedNode(selectedNode.value.node_id);
     }
     webglReady.value = true;
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy WebGL ready — original 3D path',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight,nodeCount:options.snapshot.value?.nodes.length??0,hasCanvas:Boolean(container.querySelector('canvas')),labelsHiddenByInspectorCss:false},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   }
 
   onMounted(() => {
@@ -207,25 +216,6 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     [() => options.agentStreamActive?.value, () => options.streamWorkspaceId?.value],
     () => {
       syncPresenceToScene();
-    },
-  );
-
-  watch(
-    teammateRouteNotice,
-    (notice) => {
-      const scene = sceneRef.value;
-      if (!scene) {
-        return;
-      }
-      if (!notice) {
-        scene.clearSpecialtyDispatch();
-        return;
-      }
-      const workspaceId = options.streamWorkspaceId?.value?.trim() ?? '';
-      if (!workspaceId) {
-        return;
-      }
-      scene.playSpecialtyDispatch(workspaceId, formatSpecialtyRouteChip(notice));
     },
   );
 

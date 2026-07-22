@@ -178,7 +178,14 @@ function onKeydown(event: KeyboardEvent): void {
           :data-glow="item.avatar.glow"
           :data-presence="item.avatar.presence"
         >
-          {{ item.avatar.initials }}
+          <img
+            class="company-presence-strip__face"
+            :src="item.avatar.faceUrl"
+            :alt="item.employee.name"
+            width="28"
+            height="28"
+          >
+          <span class="company-presence-strip__initials" aria-hidden="true">{{ item.avatar.initials }}</span>
           <span
             v-if="item.interrupted"
             class="company-presence-strip__interrupt-mark"

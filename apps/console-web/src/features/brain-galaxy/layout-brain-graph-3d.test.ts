@@ -92,6 +92,20 @@ describe('layout-brain-graph-3d', () => {
     expect(span).toBeGreaterThan(1.2);
   });
 
+  it('keeps workspaces clear of the core hub', () => {
+    const layout = layoutBrainGraph3D(snapshot);
+    const core = layout.nodes.find((node) => node.kind === 'core');
+    const workspaces = layout.nodes.filter((node) => node.kind === 'workspace');
+    expect(core).toBeTruthy();
+    for (const workspace of workspaces) {
+      const gap =
+        Math.hypot(workspace.x - core!.x, workspace.y - core!.y, workspace.z - core!.z) -
+        core!.radius -
+        workspace.radius;
+      expect(gap).toBeGreaterThan(1.2);
+    }
+  });
+
   it('returns empty layout for null snapshot', () => {
     const layout = layoutBrainGraph3D(null);
     expect(layout.nodes).toHaveLength(0);

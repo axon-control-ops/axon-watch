@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 
+import {
+  resetKairoAudioUnlockState,
+  unlockKairoAudioPlayback,
+} from '../../lib/kairo-audio-unlock';
 import { speakKairoLine } from '../../lib/kairo-voice-playback';
 import { deliverSpokenOperatorAlert, registerVoiceDeckSpokenAlertHandler } from '../../lib/spoken-alert-delivery';
 
@@ -9,10 +13,40 @@ vi.mock('../../lib/kairo-voice-playback', () => ({
   speakKairoLine: vi.fn(),
 }));
 
+async function unlockMediaForTests(): Promise<void> {
+  class FakeAudioContext {
+    state = 'running';
+    resume = vi.fn(async () => undefined);
+    createBuffer = vi.fn(() => ({}));
+    createBufferSource = vi.fn(() => ({
+      buffer: null as unknown,
+      connect: vi.fn(),
+      start: vi.fn(),
+    }));
+    destination = {};
+    close = vi.fn(async () => undefined);
+  }
+  class FakeAudio {
+    volume = 1;
+    src = '';
+    setAttribute = vi.fn();
+    play = vi.fn(async () => undefined);
+    pause = vi.fn();
+    constructor(src: string) {
+      this.src = src;
+    }
+  }
+  vi.stubGlobal('AudioContext', FakeAudioContext);
+  vi.stubGlobal('Audio', FakeAudio);
+  await unlockKairoAudioPlayback();
+}
+
 describe('voice deck', () => {
   afterEach(() => {
     registerVoiceDeckSpokenAlertHandler(null);
+    resetKairoAudioUnlockState();
     vi.mocked(speakKairoLine).mockReset();
+    vi.unstubAllGlobals();
   });
 
   it('speaks eligible alerts through the deck handler', async () => {
@@ -29,7 +63,10 @@ describe('voice deck', () => {
     expect(speakKairoLine).toHaveBeenCalledOnce();
     expect(speakKairoLine).toHaveBeenCalledWith(
       'VAXON: 1 approval waiting for your review.',
-      { priority: 'alert' },
+      expect.objectContaining({
+        priority: 'alert',
+        speaker: expect.objectContaining({ kind: 'vaxon', id: 'vaxon' }),
+      }),
     );
   });
 
@@ -46,6 +83,7 @@ describe('voice deck', () => {
   });
 
   it('registers boot handler that routes spoken alerts to voice deck channel', async () => {
+    await unlockMediaForTests();
     vi.mocked(speakKairoLine).mockResolvedValue({ engine: 'azure', reason: null });
     const storage = {
       getItem: vi.fn().mockReturnValue(null),

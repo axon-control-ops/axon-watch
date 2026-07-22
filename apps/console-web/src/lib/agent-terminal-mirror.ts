@@ -50,12 +50,15 @@ export function buildAgentTerminalMirrorScrollback(
   content: string,
   options?: { maxSegments?: number },
 ): string | null {
-  const maxSegments = options?.maxSegments ?? 8;
   const segments = listAgentTerminalMirrorSegments(content);
   if (!segments.length) {
     return null;
   }
-  const slice = segments.slice(-maxSegments);
-  const blocks = slice.map((segment) => buildAgentTerminalMirrorText(segment).replace(/\n$/, ''));
+  const maxSegments = options?.maxSegments;
+  const visibleSegments =
+    maxSegments && maxSegments > 0 ? segments.slice(-maxSegments) : segments;
+  const blocks = visibleSegments.map((segment) =>
+    buildAgentTerminalMirrorText(segment).replace(/\n$/, ''),
+  );
   return `${blocks.join('\n\n')}\n`;
 }

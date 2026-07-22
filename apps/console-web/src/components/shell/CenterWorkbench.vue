@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import WorkbenchTerminalDock from '../WorkbenchTerminalDock.vue';
 import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
+import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
 import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
 import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
@@ -46,7 +47,7 @@ import {
   readEditorMinimapEnabled,
 } from '../../lib/editor-surface-prefs';
 import { isAgentEditReviewDocumentId } from '../../lib/ide-agent-edit-review';
-import { type IdeQuickGuide, type IdeQuickGuideActionId } from '../../lib/ide-quick-guide';
+import { type IdeQuickGuideActionId } from '../../lib/ide-quick-guide';
 import {
   handleIdeQuickGuideAction,
   openIdeSearch,
@@ -55,6 +56,7 @@ import {
   openWatchConnectors,
   useIdeEditorStatusBar,
 } from '../../composables/useIdeEditorStatusBar';
+import { useIdeQuickGuideSticky } from '../../composables/useIdeQuickGuideSticky';
 import { useWorkbenchPanelAutoPeek } from '../../composables/useWorkbenchPanelAutoPeek';
 import { useWorkbenchTerminalAutoClose } from '../../composables/useWorkbenchTerminalAutoClose';
 import { buildWorkbenchProblemItems } from '../../lib/workbench-problem-items';
@@ -93,48 +95,7 @@ const {
   agentDockReopenState,
 });
 
-/** Hold the last guide briefly and skip no-op identity updates so attention chrome does not remount. */
-const ideQuickGuideSticky = ref<IdeQuickGuide | null>(null);
-let ideQuickGuideClearTimer: ReturnType<typeof setTimeout> | null = null;
-const IDE_QUICK_GUIDE_HOLD_MS = 800;
-
-function ideQuickGuideIdentity(guide: IdeQuickGuide): string {
-  return [guide.tone, guide.title, ...guide.steps, ...guide.actions.map((action) => action.id)].join(
-    '\x1f',
-  );
-}
-
-watch(
-  ideQuickGuide,
-  (next) => {
-    if (next) {
-      if (ideQuickGuideClearTimer !== null) {
-        clearTimeout(ideQuickGuideClearTimer);
-        ideQuickGuideClearTimer = null;
-      }
-      const previous = ideQuickGuideSticky.value;
-      if (!previous || ideQuickGuideIdentity(previous) !== ideQuickGuideIdentity(next)) {
-        ideQuickGuideSticky.value = next;
-      }
-      return;
-    }
-    if (!ideQuickGuideSticky.value || ideQuickGuideClearTimer !== null) {
-      return;
-    }
-    ideQuickGuideClearTimer = setTimeout(() => {
-      ideQuickGuideSticky.value = null;
-      ideQuickGuideClearTimer = null;
-    }, IDE_QUICK_GUIDE_HOLD_MS);
-  },
-  { immediate: true },
-);
-
-onBeforeUnmount(() => {
-  if (ideQuickGuideClearTimer !== null) {
-    clearTimeout(ideQuickGuideClearTimer);
-    ideQuickGuideClearTimer = null;
-  }
-});
+const { ideQuickGuideSticky, dismissIdeQuickGuide } = useIdeQuickGuideSticky(ideQuickGuide);
 const workbenchRef = ref<HTMLElement | null>(null);
 const terminalHeight = ref(240);
 const resizing = ref(false);
@@ -584,6 +545,7 @@ watch(
           :guide="ideQuickGuideSticky"
           :with-editor="Boolean(shell.activeEditorDocument)"
           @action="onIdeQuickGuideAction"
+          @dismiss="dismissIdeQuickGuide"
         />
         <EditorMarkdownToolbar
           v-if="isMarkdownEditorDocument && shell.activeEditorDocument"
@@ -665,6 +627,8 @@ watch(
     </section>
 
     <OperatorStatusRadarPanel v-if="hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
+    <!-- Speaker face + captions: OPERATOR galaxy and IDE — who is talking (VAXON / any agent). -->
+    <GalaxySpeechCaptions />
     <WorkbenchTerminalDock v-if="showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
   </main>
 </template>

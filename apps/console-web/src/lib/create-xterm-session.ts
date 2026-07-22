@@ -88,6 +88,10 @@ export async function createXtermSession(
     cursorBlink: !readOnly,
     convertEol: true,
     disableStdin: readOnly,
+    // Agent mirrors can contain complete build/test logs. Keep enough browser
+    // scrollback that full server output remains reviewable instead of silently
+    // falling back to xterm's 1,000-line default.
+    scrollback: 100_000,
   });
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);

@@ -2,11 +2,44 @@
 
 from __future__ import annotations
 
+import json
 import re
+import time
 from pathlib import Path
 from typing import Any
 
-_TERMINAL_OUTPUT_LIMIT = 4000
+
+def _log_terminal_output_length(location: str, output: str) -> None:
+    """Debug output completeness without recording command content."""
+    if len(output) <= 4000 and "(output truncated)" not in output:
+        return
+    # region agent log
+    try:
+        with open(
+            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
+            "a",
+            encoding="utf-8",
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "fc0b35",
+                        "runId": "post-fix",
+                        "hypothesisId": "OUT1",
+                        "location": location,
+                        "message": "terminal output emitted in full",
+                        "data": {
+                            "outputLength": len(output),
+                            "containsLegacyTruncationMarker": "(output truncated)" in output,
+                        },
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    # endregion
 
 
 def _relative_path(path: str, workspace_root: str) -> str:
@@ -111,8 +144,10 @@ def shell_call_from_tool_call(tool_call: dict[str, Any]) -> dict[str, Any] | Non
 
 def terminal_block(command: str, output: str) -> str:
     trimmed = output.strip()
-    if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
-        trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
+    _log_terminal_output_length(
+        "stream_blocks/terminal_blocks.py:terminal_block",
+        trimmed,
+    )
     body = f"\n{trimmed}\n" if trimmed else "\n"
     return f"\n:::terminal {command}{body}:::\n"
 
@@ -129,8 +164,10 @@ def terminal_started_block(command: str, description: str = "") -> str:
 
 def terminal_close_body(output: str) -> str:
     trimmed = output.strip()
-    if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
-        trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
+    _log_terminal_output_length(
+        "stream_blocks/terminal_blocks.py:terminal_close_body",
+        trimmed,
+    )
     if trimmed:
         return f"{trimmed}\n:::\n"
     return ":::\n"

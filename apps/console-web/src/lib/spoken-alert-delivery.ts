@@ -9,6 +9,10 @@ import {
 import { scheduleKairoVoiceFollowupWindowAfterSpeech } from './kairo-voice-followup-window';
 import { speakKairoLine } from './kairo-voice-playback';
 import type { KairoVoicePriority } from './kairo-voice-queue';
+import {
+  type KairoVoiceSpeaker,
+  vaxonVoiceSpeaker,
+} from './kairo-voice-utterance';
 import { shouldSpeakAlert, spokenAlertDedupeKey } from './operator-presence';
 
 export type SpokenAlertDeliveryChannel =
@@ -29,6 +33,8 @@ export type DeliverSpokenAlertOptions = {
   dedupe?: boolean;
   /** Prefer employee neural voice when narrating an employee IDE thread. */
   azureVoiceId?: string | null;
+  /** Who is speaking for Galaxy avatar popup. Defaults to VAXON (or employee stub when only azureVoiceId is set). */
+  speaker?: KairoVoiceSpeaker | null;
   /**
    * When true (default for `alert` priority), hold delivery until media unlock
    * so we do not drop the line or surprise with unlabeled robotic TTS.
@@ -37,6 +43,25 @@ export type DeliverSpokenAlertOptions = {
   /** Open the post-speech follow-up listen window (default true for alerts). */
   openFollowupWindow?: boolean;
 };
+
+function resolveSpokenAlertSpeaker(
+  options: DeliverSpokenAlertOptions,
+): KairoVoiceSpeaker {
+  if (options.speaker) {
+    return options.speaker;
+  }
+  const voiceId = options.azureVoiceId?.trim();
+  if (voiceId) {
+    return {
+      kind: 'employee',
+      id: `voice:${voiceId}`,
+      name: 'Teammate',
+      roleLabel: 'Agent',
+      azureVoiceId: voiceId,
+    };
+  }
+  return vaxonVoiceSpeaker();
+}
 
 type QueuedSpokenAlert = {
   alert: SpokenAlertEligibility;
@@ -164,9 +189,14 @@ export async function deliverSpokenOperatorAlert(
     }
   }
 
+  const speaker = resolveSpokenAlertSpeaker(options);
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'speaker-avatar',hypothesisId:'A',location:'spoken-alert-delivery.ts:deliverSpokenOperatorAlert',message:'spoken alert speaker resolved',data:{priority:options.priority??'alert',speakerKind:speaker.kind,speakerId:speaker.id,hasAzureVoice:Boolean(options.azureVoiceId?.trim()),messagePreview:alert.message.slice(0,80)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const result = await speakKairoLine(alert.message, {
     priority: options.priority ?? 'alert',
     azureVoiceId: options.azureVoiceId?.trim() || undefined,
+    speaker,
   });
   if (result.engine === 'azure') {
     markFollowupIfNeeded(options);

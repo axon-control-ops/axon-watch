@@ -78,6 +78,24 @@
   box-shadow: 0 0 0 2px rgba(20, 30, 40, 0.9), 0 0 0 3px rgba(140, 170, 200, 0.35);
 }
 
+.company-presence-strip__face {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+
+.company-presence-strip__initials {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+}
+
 .company-presence-strip__fail-mark,
 .company-presence-strip__interrupt-mark,
 .company-presence-strip__pause-mark {
@@ -254,6 +272,7 @@
 }
 
 .agent-persona-dock__avatar {
+  position: relative;
   display: grid;
   place-items: center;
   width: 3.4rem;
@@ -262,7 +281,26 @@
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.06em;
+  overflow: hidden;
   box-shadow: 0 0 0 2px rgba(12, 20, 30, 0.95), 0 0 0 3px rgba(0, 242, 255, 0.35);
+}
+
+.agent-persona-dock__face {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+
+.agent-persona-dock__initials {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
 }
 
 .agent-persona-dock__avatar[data-presence='working'] {

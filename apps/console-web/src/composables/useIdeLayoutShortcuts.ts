@@ -4,7 +4,7 @@ import { resolveIdeLayoutShortcut } from '../lib/ide-layout-shortcuts';
 import { handleIdeLayoutShortcutAction } from './useIdeEditorStatusBar';
 import { useShellStore } from '../stores/shell';
 
-function isEditableTarget(target: EventTarget | null): boolean {
+function isFormOrTerminalEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
   }
@@ -13,8 +13,19 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return (
     tag === 'INPUT' ||
     tag === 'TEXTAREA' ||
+    Boolean(target.closest('.command-seam__input, .xterm-helper-textarea, .xterm'))
+  );
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    isFormOrTerminalEditable(target) ||
     target.isContentEditable ||
-    Boolean(target.closest('.command-seam__input, .xterm-helper-textarea'))
+    Boolean(target.closest('[contenteditable="true"]'))
   );
 }
 
@@ -27,6 +38,7 @@ export function useIdeLayoutShortcuts(): void {
       modKey: event.metaKey || event.ctrlKey,
       shiftKey: event.shiftKey,
       key: event.key,
+      formOrTerminalEditable: isFormOrTerminalEditable(event.target),
       editableTarget: isEditableTarget(event.target),
     });
 
@@ -35,14 +47,16 @@ export function useIdeLayoutShortcuts(): void {
     }
 
     event.preventDefault();
+    event.stopPropagation();
     handleIdeLayoutShortcutAction(action, shell);
   }
 
   onMounted(() => {
-    window.addEventListener('keydown', onKeyDown);
+    // Capture so Mod+J wins over TipTap/AI bubble menus in the editor.
+    window.addEventListener('keydown', onKeyDown, true);
   });
 
   onUnmounted(() => {
-    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('keydown', onKeyDown, true);
   });
 }

@@ -32,6 +32,7 @@ import { stopRun } from '../../api/runs-api';
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
+import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
 import { useShellStore } from '../../stores/shell';
 
@@ -187,6 +188,7 @@ function speakEmployeeLine(employee: CompanyEmployeeRecord, kind: TeamMemberChat
       operatorPrompt: `Teammate ${employee.name}`,
       skipSpeakApi: true,
       azureVoiceId: employee.azure_voice_id,
+      speaker: employeeVoiceSpeaker(employee),
     });
     return;
   }
@@ -203,6 +205,7 @@ function speakEmployeeLine(employee: CompanyEmployeeRecord, kind: TeamMemberChat
     operatorPrompt: `Teammate ${employee.name}`,
     skipSpeakApi: true,
     azureVoiceId: employee.azure_voice_id,
+    speaker: employeeVoiceSpeaker(employee),
   });
 }
 

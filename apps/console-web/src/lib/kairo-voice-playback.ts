@@ -25,7 +25,10 @@ import {
   waitForSpeechQueueIdle,
   type SpeechPort,
 } from './speech-queue';
-import { notifyKairoVoiceUtterance } from './kairo-voice-utterance';
+import {
+  notifyKairoVoiceUtterance,
+  type KairoVoiceSpeaker,
+} from './kairo-voice-utterance';
 
 export type KairoVoiceEngine = 'azure' | 'browser' | 'skipped' | 'idle';
 
@@ -47,6 +50,8 @@ export type SpeakKairoLineOptions = {
   speechPitch?: number;
   /** Azure neural voice id (falls back to presence settings / server default). */
   azureVoiceId?: string;
+  /** Who is speaking — drives Galaxy speaker avatar popup. */
+  speaker?: KairoVoiceSpeaker | null;
 };
 
 const speakingListeners = new Set<(active: boolean) => void>();
@@ -274,6 +279,7 @@ async function speakWithBrowser(
   text: string,
   reason: string | null = 'azure_unavailable',
   tuning: VoiceTuning = { rate: 1.0, pitch: 1.04, voice: 'en-GB-RyanNeural' },
+  speaker: KairoVoiceSpeaker | null = null,
 ): Promise<KairoVoicePlaybackResult> {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -293,7 +299,7 @@ async function speakWithBrowser(
 
   // Ensure Azure HTMLAudioElement is fully released before browser TTS starts.
   stopSharedPlayback();
-  notifyKairoVoiceUtterance(trimmed);
+  notifyKairoVoiceUtterance(trimmed, speaker);
   notifySpeaking(true);
   markKairoVoicePlaybackActive('browser', reason);
   await delay(AUDIO_PREROLL_MS);
@@ -329,19 +335,21 @@ export async function playKairoUtteranceNow(
     speechRate?: number;
     speechPitch?: number;
     azureVoiceId?: string;
+    speaker?: KairoVoiceSpeaker | null;
   } = {},
 ): Promise<KairoVoicePlaybackResult> {
   const trimmed = sanitizeSpokenReply(text);
   const tuning = resolveSpeechTuning(options);
+  const speaker = options.speaker ?? null;
   if (!trimmed) {
     return finishPlayback({ engine: 'skipped', reason: 'empty_text' }, text);
   }
 
   if (options.preferBrowser) {
-    return speakWithBrowser(trimmed, 'preferred_browser', tuning);
+    return speakWithBrowser(trimmed, 'preferred_browser', tuning, speaker);
   }
 
-  notifyKairoVoiceUtterance(trimmed);
+  notifyKairoVoiceUtterance(trimmed, speaker);
   notifySpeaking(true);
   markKairoVoicePlaybackActive('azure', null);
   const chunks = splitSpokenReplyChunks(trimmed);
@@ -373,20 +381,20 @@ export async function playKairoUtteranceNow(
             error instanceof Error && error.message.startsWith('audio_playback_failed')
               ? error.message
               : playbackErrorReason(error);
-          return speakWithBrowser(trimmed, reason, tuning);
+          return speakWithBrowser(trimmed, reason, tuning, speaker);
         } finally {
           registerKairoAudioElement(null);
           handle.revoke();
         }
       }
-      return speakWithBrowser(trimmed, resolveAzureFallbackReason(response), tuning);
+      return speakWithBrowser(trimmed, resolveAzureFallbackReason(response), tuning, speaker);
     }
     return await speakAzureChunks(chunks, tuning);
   } catch (error) {
     logKairoVoice('tts_error', {
       message: error instanceof Error ? error.message : String(error),
     });
-    return speakWithBrowser(trimmed, 'fetch_error', tuning);
+    return speakWithBrowser(trimmed, 'fetch_error', tuning, speaker);
   }
 }
 
@@ -404,6 +412,7 @@ export async function speakKairoLine(
       speechRate: options.speechRate,
       speechPitch: options.speechPitch,
       azureVoiceId: options.azureVoiceId,
+      speaker: options.speaker,
     });
   }
   const { enqueueKairoSpeech } = await import('./kairo-voice-queue');
@@ -413,6 +422,7 @@ export async function speakKairoLine(
     speechRate: options.speechRate,
     speechPitch: options.speechPitch,
     azureVoiceId: options.azureVoiceId,
+    speaker: options.speaker ?? undefined,
   });
 }
 

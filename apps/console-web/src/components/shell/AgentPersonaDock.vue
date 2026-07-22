@@ -79,7 +79,14 @@ const displayActions = computed(() =>
           :data-glow="avatar.glow"
           :data-presence="avatar.presence"
         >
-          {{ avatar.initials }}
+          <img
+            class="agent-persona-dock__face"
+            :src="avatar.faceUrl"
+            :alt="employee.name"
+            width="44"
+            height="44"
+          >
+          <span class="agent-persona-dock__initials" aria-hidden="true">{{ avatar.initials }}</span>
         </span>
       </button>
       <div class="agent-persona-dock__identity">

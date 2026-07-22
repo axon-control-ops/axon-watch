@@ -1,12 +1,12 @@
 /**
  * Camera offset for overview + node focus.
- * Lower elevation + nearer orbit so the spherical shell reads as 3D
- * (the old high/far offset flattened the galaxy into a radar ring).
+ * Slightly farther than the tight shell so ~17 labeled workspaces read as
+ * a constellation instead of a glowing clump.
  */
 export const GALAXY_FOCUS_CAMERA_OFFSET = {
-  x: 4.6,
-  y: 1.85,
-  z: 5.4,
+  x: 5.4,
+  y: 2.35,
+  z: 6.8,
 } as const;
 
 export function galaxyFocusCameraPosition(node: {

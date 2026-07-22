@@ -148,21 +148,45 @@ export function collapseBackToBackThinkingEcho(text: string, minLength = THINKIN
  * Strip Cursor thinking that narrates the operator as "the user".
  * Returns operator-facing copy, or empty when nothing usable remains.
  */
+/** Strip leaked stream fence markers (e.g. trailing `:::` glued onto a sentence). */
+export function stripAgentStreamFenceMarkers(text: string): string {
+  return flattenLiveLineText(text)
+    .replace(/^:::(?:thinking|tool|edit|terminal|research|debug-reproduce)?\b\s*/i, '')
+    .replace(/(?:^|\s):::\s*$/g, '')
+    .replace(/\s+:::(?=\s|$)/g, ' ')
+    .trim();
+}
+
 export function sanitizeAgentThinkingForOperator(text: string): string {
   let out = collapseBackToBackThinkingEcho(text);
   if (!out) {
     return '';
   }
+  out = stripAgentStreamFenceMarkers(out);
   out = out.replace(/^\*+|\*+$/g, '').trim();
   out = out.replace(USER_META_SENTENCE_RE, ' ');
   out = out.replace(USER_META_ASKED_RE, ' ');
   out = out.replace(USER_META_PREFIX_RE, '');
   out = out.replace(LEADING_WHETHER_RE, '');
   out = flattenLiveLineText(out).replace(/^[,.\-–—:;]+/, '').trim();
+  out = stripAgentStreamFenceMarkers(out);
   if (!out || /^(?:the\s+)?user\b/i.test(out) || /^(?:whether|if)\s*$/i.test(out)) {
     return '';
   }
   return out;
+}
+
+/** Wait/poll status chatter — speak once per turn, not on every Await cycle. */
+const WAIT_PROGRESS_RE =
+  /\b(?:still\s+(?:running|progressing|waiting|building|bundling|active)|build\s+is\s+still|cache\s+is\s+active|waiting\s+for|polling|no\s+new\s+output|checking\s+the\s+terminal)\b/i;
+
+export function isWaitProgressThinking(text: string): boolean {
+  return WAIT_PROGRESS_RE.test(stripAgentStreamFenceMarkers(text));
+}
+
+/** Token Jaccard similarity for near-duplicate spoken thinking lines. */
+export function thinkingSpeechSimilarity(left: string, right: string): number {
+  return thinkingEchoTokenSimilarity(left, right);
 }
 
 

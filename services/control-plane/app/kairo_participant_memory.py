@@ -119,13 +119,20 @@ def update_participant_from_utterance(session_id: str, content: str) -> str | No
     return get_active_participant(session_id)
 
 
-def apply_participant_address(text: str, guest_name: str | None) -> str:
-    """When a guest is active, replace default 'sir' address with their name."""
-    cleaned = str(text or "")
-    name = _normalize_name(guest_name or "")
-    if not cleaned or not name:
-        return cleaned
-    return re.sub(r"\bsir\b", name, cleaned, flags=re.IGNORECASE)
+def apply_participant_address(
+    text: str,
+    guest_name: str | None,
+    *,
+    speaker_kind: str = "vaxon",
+) -> str:
+    """Apply guest-name / Sir / Sir King addressing for the active speaker."""
+    from app.kairo_operator_address import apply_operator_address
+
+    return apply_operator_address(
+        text,
+        _normalize_name(guest_name or "") if guest_name else None,
+        speaker_kind=speaker_kind,
+    )
 
 
 def reset_participant_memory_for_tests() -> None:

@@ -75,6 +75,17 @@ describe('agent terminal mirror', () => {
     );
   });
 
+  it('keeps every terminal segment unless a caller explicitly limits history', () => {
+    const transcript = Array.from(
+      { length: 12 },
+      (_, index) => `:::terminal command-${index}\noutput-${index}\n:::`,
+    ).join('\n');
+
+    const scrollback = buildAgentTerminalMirrorScrollback(transcript);
+    expect(scrollback).toContain('$ command-0\noutput-0');
+    expect(scrollback).toContain('$ command-11\noutput-11');
+  });
+
   it('tracks terminal output length even when prose follows the shell block', () => {
     const before = [':::terminal npm run ota', 'line 1', ':::', 'Done.'].join('\n');
     const after = [':::terminal npm run ota', 'line 1', 'line 2', ':::', 'Done.'].join('\n');

@@ -70,7 +70,14 @@ export function handleAgentStreamVoiceDelta(input: {
     return;
   }
   for (const milestone of milestones) {
-    if (spokeThinking && milestone.key.startsWith('thinking:')) {
+    if (milestone.key.startsWith('thinking:')) {
+      continue;
+    }
+    // Live thinking already said what the agent is doing — skip canned tool/edit lines.
+    if (
+      spokeThinking &&
+      (milestone.key.startsWith('tool:') || milestone.key.startsWith('edit:'))
+    ) {
       continue;
     }
     input.voiceNarration.narrateAgentMilestone(milestone, {

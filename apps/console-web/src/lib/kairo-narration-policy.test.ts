@@ -87,6 +87,15 @@ describe('kairo-narration-policy', () => {
     ).toBe(true);
 
     expect(
+      shouldNarrateAgentEvent({
+        eventKey: 'tool:0',
+        narration: 'conversational',
+        narrateToolProgress: true,
+        thinkingCarriesUpdate: true,
+      }),
+    ).toBe(false);
+
+    expect(
       shouldNarrateAgentEvent({ eventKey: 'thinking:1', narration: 'minimal' }),
     ).toBe(true);
 
@@ -133,6 +142,35 @@ describe('kairo-narration-policy', () => {
       shouldSpeakLiveThinkingBlock({
         narration: 'minimal',
         spokenBlock: 'They want table rendering to',
+      }),
+    ).toBe(false);
+  });
+
+  it('suppresses repeat wait-progress and near-duplicate thinking speech', () => {
+    const waitLine =
+      'The Metro cache is active and the build is still progressing.';
+    expect(
+      shouldSpeakLiveThinkingBlock({
+        narration: 'conversational',
+        spokenBlock: waitLine,
+        isWaitProgress: true,
+        alreadySpokeWaitProgress: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSpeakLiveThinkingBlock({
+        narration: 'conversational',
+        spokenBlock: waitLine,
+        isWaitProgress: true,
+        alreadySpokeWaitProgress: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSpeakLiveThinkingBlock({
+        narration: 'conversational',
+        spokenBlock: waitLine,
+        lastSpokenBlock: waitLine,
+        similarityToLast: 0.95,
       }),
     ).toBe(false);
   });

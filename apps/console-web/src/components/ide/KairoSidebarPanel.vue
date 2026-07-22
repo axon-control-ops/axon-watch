@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { useSpokenUtteranceText } from '../../composables/useSpokenUtteranceText';
 import {
   briefingAdvise,
   briefingNotice,
@@ -16,6 +17,7 @@ import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 
 const shell = useShellStore();
+const { spokenText } = useSpokenUtteranceText();
 const debugModeActive = computed(() => shell.ideDebugModeSelected);
 const activePersonaName = computed(
   () => shell.activeIdeEmployee?.name?.trim() || OPERATOR_PERSONA_NAME,
@@ -80,6 +82,9 @@ const signalBadge = computed(
   () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
 );
 const showStopSpeech = computed(() => shell.kairoSpeechActive);
+const runTranscriptText = computed(
+  () => spokenText.value || shell.ideComposerActivity?.liveBodyFull?.trim() || null,
+);
 
 function handleExpand(): void {
   if (showStopSpeech.value) {
@@ -191,12 +196,12 @@ function handleStopSpeech(event: Event): void {
         </button>
       </div>
       <section
-        v-if="shell.ideComposerActivity?.liveBodyFull"
+        v-if="runTranscriptText"
         class="kairo-sidebar-panel__transcript"
         aria-label="Current run transcript"
       >
         <span class="kairo-sidebar-panel__transcript-label">Run transcript</span>
-        <p>{{ shell.ideComposerActivity.liveBodyFull }}</p>
+        <p>{{ runTranscriptText }}</p>
       </section>
       <BriefingSurfaceFollowupPrompt />
     </div>

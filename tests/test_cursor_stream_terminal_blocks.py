@@ -58,9 +58,11 @@ class CursorStreamTerminalBlockTests(unittest.TestCase):
         self.assertIn(":::terminal mkdir -p build", block)
         self.assertTrue(block.rstrip().endswith(":::"))
 
-    def test_long_output_is_truncated(self) -> None:
-        block = tool_block_from_event(_shell_event("cat big.log", "x" * 9000), "")
-        self.assertIn("(output truncated)", block)
+    def test_long_output_is_preserved_in_full(self) -> None:
+        output = "x" * 9000
+        block = tool_block_from_event(_shell_event("cat big.log", output), "")
+        self.assertIn(output, block)
+        self.assertNotIn("(output truncated)", block)
 
     def test_read_tool_call_keeps_tool_block(self) -> None:
         event = {

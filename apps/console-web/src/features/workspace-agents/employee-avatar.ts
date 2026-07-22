@@ -7,6 +7,7 @@ import {
   employeeShiftNeedsContinuation,
   type EmployeeGlowTone,
 } from './company-roster-view';
+import { buildEmployeeFaceAvatarUrl } from './employee-face-avatar';
 
 export type EmployeePresenceTone = 'idle' | 'working' | 'failed' | 'interrupted' | 'paused';
 
@@ -16,6 +17,8 @@ export type EmployeeAvatarModel = {
   foreground: string;
   glow: EmployeeGlowTone;
   presence: EmployeePresenceTone;
+  /** Monday-style illustrated face (SVG data URL). */
+  faceUrl: string;
 };
 
 /** Role-tinted palette — stable, no external images. */
@@ -89,5 +92,6 @@ export function buildEmployeeAvatar(employee: CompanyEmployeeRecord): EmployeeAv
     foreground: base.foreground,
     glow,
     presence: employeePresenceTone(employee),
+    faceUrl: buildEmployeeFaceAvatarUrl(seed),
   };
 }

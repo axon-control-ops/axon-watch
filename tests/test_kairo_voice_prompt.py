@@ -43,11 +43,13 @@ class KairoVoicePromptTests(unittest.TestCase):
 
     def test_voice_system_requires_sir_and_blocks_symbol_speech(self) -> None:
         self.assertIn('Address the primary listener as "sir"', KAIRO_VOICE_SYSTEM)
+        self.assertIn("Sir King", KAIRO_VOICE_SYSTEM)
         self.assertIn("introduced someone else by name", KAIRO_VOICE_SYSTEM)
         self.assertIn("colon", KAIRO_VOICE_SYSTEM.lower())
         self.assertIn("smiley face", KAIRO_VOICE_SYSTEM.lower())
         self.assertNotIn("Do NOT use", KAIRO_VOICE_SYSTEM)
         self.assertIn('Address the primary listener as "sir"', KAIRO_CONVERSATION_VOICE_SYSTEM)
+        self.assertIn("Sir King", KAIRO_CONVERSATION_VOICE_SYSTEM)
 
     def test_guest_name_appears_in_speak_prompt(self) -> None:
         prompt = build_speak_user_prompt(

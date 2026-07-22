@@ -8,11 +8,21 @@ import SupportedCommandsFooter from './SupportedCommandsFooter.vue';
 import PersonaTitle from '../PersonaTitle.vue';
 
 const shell = useShellStore();
-const clockLabel = ref('00:00:00 UTC');
+const clockLabel = ref('00:00:00');
 
 function updateClock(): void {
   const now = new Date();
-  clockLabel.value = `${now.toISOString().slice(11, 19)} UTC`;
+  clockLabel.value = now.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  // #region agent log
+  if (now.getSeconds() === 0) {
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'H5',location:'StatusBar.vue:updateClock',message:'status bar local clock tick',data:{label:clockLabel.value,utcHours:now.getUTCHours(),localHours:now.getHours(),clockNodeCount:typeof document!=='undefined'?document.querySelectorAll('.status-bar-mockup__clock').length:-1},timestamp:Date.now()})}).catch(()=>{});
+  }
+  // #endregion
 }
 
 function onCenterChipClick(id: string): void {

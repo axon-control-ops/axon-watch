@@ -1,10 +1,18 @@
 import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
+  Color,
   Group,
   Line,
+  Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
+  Points,
+  PointsMaterial,
   Raycaster,
   Scene,
+  SphereGeometry,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -13,7 +21,10 @@ import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
-import { GALAXY_BACKGROUND } from './brain-galaxy-colors';
+import {
+  GALAXY_BACKGROUND,
+  galaxyNodeColors,
+} from './brain-galaxy-colors';
 import { applyGalaxySelectionFocus } from './brain-galaxy-selection-effects';
 import {
   animateGalaxyAmbience,
@@ -24,25 +35,27 @@ import {
 import {
   layoutBrainGraph3D,
   type BrainGraphLayout3D,
+  type PositionedBrainNode3D,
 } from './layout-brain-graph-3d';
 import { animateLiveEdge, buildLiveEdge } from './network-edge-effects';
-import {
-  animateSpecialtyDispatchFilament,
-  buildSpecialtyDispatchFilament,
-  disposeSpecialtyDispatchFilament,
-  type SpecialtyDispatchFilament,
-} from './specialty-dispatch-filament';
-import { animateVaxonCoreOrb } from './vaxon-core-orb-3d';
-import { animateWorkspaceNode } from './workspace-node-effects';
+import { animateVaxonCoreOrb, decorateVaxonCoreOrb } from './vaxon-core-orb-3d';
+import { animateWorkspaceNode, decorateWorkspaceNode } from './workspace-node-effects';
 import type { GalaxyCoreOrbMode } from './galaxy-presence-state';
 import { presenceAmpForCoreMode } from './galaxy-presence-state';
 import { GALAXY_FOCUS_CAMERA_OFFSET, galaxyFocusCameraPosition } from './brain-galaxy-focus-camera';
-import { buildGalaxyNodeMesh, type GalaxyNodeMesh } from './brain-galaxy-node-mesh';
+import { probeWebGlAvailability } from './webgl-availability';
 
 export type BrainGalaxyNodeClickHandler = (node: BrainGraphNode) => void;
 export type BrainGalaxyClearSelectionHandler = () => void;
 
-type NodeMesh = GalaxyNodeMesh;
+type GalaxyNodeUserData = {
+  node: BrainGraphNode;
+  originY: number;
+};
+
+type NodeMesh = Mesh<SphereGeometry, MeshStandardMaterial> & {
+  userData: GalaxyNodeUserData;
+};
 
 export class BrainGalaxyScene {
   private readonly container: HTMLElement;
@@ -72,7 +85,6 @@ export class BrainGalaxyScene {
   private agentStreamActive = false;
   private streamWorkspaceId: string | null = null;
   private vaxonCoreMode: GalaxyCoreOrbMode = 'idle';
-  private specialtyFx: SpecialtyDispatchFilament | null = null;
   private readonly defaultCameraPosition = new Vector3(
     GALAXY_FOCUS_CAMERA_OFFSET.x,
     GALAXY_FOCUS_CAMERA_OFFSET.y,
@@ -91,25 +103,30 @@ export class BrainGalaxyScene {
   }
 
   static isWebGLAvailable(): boolean {
-    try {
-      const canvas = document.createElement('canvas');
-      return Boolean(
-        canvas.getContext('webgl2') ?? canvas.getContext('webgl'),
-      );
-    } catch {
-      return false;
-    }
+    return probeWebGlAvailability().ok;
   }
 
   init(): boolean {
-    if (this.disposed || !BrainGalaxyScene.isWebGLAvailable()) {
+    if (this.disposed) {
+      return false;
+    }
+    const probe = probeWebGlAvailability();
+    if (!probe.ok) {
       return false;
     }
 
     const width = this.container.clientWidth || 640;
     const height = this.container.clientHeight || 420;
 
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
+    try {
+      this.renderer = new WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch {
+      return false;
+    }
     configureGalaxyRenderer(this.renderer);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(width, height, false);
@@ -137,8 +154,8 @@ export class BrainGalaxyScene {
     this.controls.dampingFactor = 0.06;
     this.controls.autoRotate = true;
     this.controls.autoRotateSpeed = 0.38;
-    this.controls.minDistance = 2.8;
-    this.controls.maxDistance = 11;
+    this.controls.minDistance = 3.4;
+    this.controls.maxDistance = 14;
     this.controls.enablePan = false;
 
     this.scene.add(buildGalaxyLighting());
@@ -163,6 +180,24 @@ export class BrainGalaxyScene {
       return;
     }
     this.layout = layoutBrainGraph3D(snapshot);
+    // #region agent log
+    {
+      const ys = this.layout.nodes.map((n) => n.y);
+      const ySpan = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+      const cam = this.camera?.position;
+      const workspaces = this.layout.nodes.filter((n) => n.kind === 'workspace');
+      const core = this.layout.nodes.find((n) => n.kind === 'core');
+      const minGap = core
+        ? Math.min(
+            ...workspaces.map(
+              (w) =>
+                Math.hypot(w.x - core.x, w.y - core.y, w.z - core.z) - core.radius - w.radius,
+            ),
+          )
+        : null;
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-nebula-dust',hypothesisId:'H13',location:'brain-galaxy-scene.ts:setSnapshot',message:'nebula dust galaxy layout applied',data:{nodeCount:this.layout.nodes.length,workspaceCount:workspaces.length,ySpan:Number(ySpan.toFixed(3)),minCoreGap:minGap==null?null:Number(minGap.toFixed(3)),haze:'points-dust',camera:cam?{x:+cam.x.toFixed(2),y:+cam.y.toFixed(2),z:+cam.z.toFixed(2)}:null,sample:workspaces.slice(0,4).map((n)=>({id:n.label,x:+n.x.toFixed(2),y:+n.y.toFixed(2),z:+n.z.toFixed(2)}))},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
     this.rebuildGraph();
     if (this.selectedNodeId) {
       this.applySelectionHighlight(this.selectedNodeId);
@@ -203,8 +238,8 @@ export class BrainGalaxyScene {
   setVaxonBusy(busy: boolean): void {
     if (busy && this.presenceAmp < 1) {
       this.presenceAmp = 1;
-    } else if (!busy) {
-      this.presenceAmp = presenceAmpForCoreMode(this.vaxonCoreMode);
+    } else if (!busy && this.vaxonCoreMode === 'idle') {
+      this.presenceAmp = 0;
     }
   }
 
@@ -222,37 +257,6 @@ export class BrainGalaxyScene {
     this.streamWorkspaceId = workspaceId;
   }
 
-  playSpecialtyDispatch(workspaceId: string, label: string): void {
-    if (!this.scene || this.disposed) {
-      return;
-    }
-    const target = this.nodeMeshes.find(
-      (mesh) =>
-        mesh.userData.node.kind === 'workspace' &&
-        mesh.userData.node.workspace_id === workspaceId,
-    );
-    if (!target) {
-      return;
-    }
-    const core = this.nodeMeshes.find((mesh) => mesh.userData.node.kind === 'core');
-    this.clearSpecialtyDispatch();
-    this.specialtyFx = buildSpecialtyDispatchFilament({
-      from: core?.position ?? new Vector3(0, 0, 0),
-      to: target.position,
-      label,
-    });
-    this.scene.add(this.specialtyFx.group);
-    this.focusNode(target.userData.node.node_id);
-  }
-
-  clearSpecialtyDispatch(): void {
-    if (!this.specialtyFx) {
-      return;
-    }
-    disposeSpecialtyDispatchFilament(this.specialtyFx);
-    this.specialtyFx = null;
-  }
-
   private applySelectionHighlight(nodeId: string | null): void {
     const focus = applyGalaxySelectionFocus(
       this.nodeMeshes,
@@ -267,7 +271,6 @@ export class BrainGalaxyScene {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.animationId);
-    this.clearSpecialtyDispatch();
 
     if (this.renderer) {
       this.renderer.domElement.removeEventListener('click', this.handleClick);
@@ -315,6 +318,9 @@ export class BrainGalaxyScene {
     this.nodeMeshes = [];
     this.liveEdges = [];
 
+    // Soft dust cloud (points) — not hard sphere shells that read as radar rings.
+    this.graphGroup.add(this.buildNebulaDust());
+
     for (const [index, edge] of this.layout.edges.entries()) {
       const line = buildLiveEdge(edge, index);
       this.liveEdges.push(line);
@@ -322,10 +328,101 @@ export class BrainGalaxyScene {
     }
 
     for (const node of this.layout.nodes) {
-      const mesh = buildGalaxyNodeMesh(node);
+      const mesh = this.buildNodeMesh(node);
       this.nodeMeshes.push(mesh);
       this.graphGroup.add(mesh);
     }
+  }
+
+  private buildNebulaDust(): Points {
+    const count = 420;
+    const positions = new Float32Array(count * 3);
+    let seed = 0x9e3779b9;
+    const rand = (): number => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    for (let i = 0; i < count; i += 1) {
+      // Gaussian-ish ball so the glow is a cloud, not a wire ring.
+      const u = rand();
+      const v = rand();
+      const theta = u * Math.PI * 2;
+      const phi = Math.acos(2 * v - 1);
+      const radius = Math.pow(rand(), 0.55) * 2.6;
+      positions[i * 3] = Math.sin(phi) * Math.cos(theta) * radius;
+      positions[i * 3 + 1] = Math.cos(phi) * radius * 0.72;
+      positions[i * 3 + 2] = Math.sin(phi) * Math.sin(theta) * radius;
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(positions, 3));
+    const material = new PointsMaterial({
+      color: 0xc8f4ff,
+      size: 0.055,
+      transparent: true,
+      opacity: 0.45,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      sizeAttenuation: true,
+    });
+    const points = new Points(geometry, material);
+    points.name = 'nebula-dust';
+    return points;
+  }
+
+  private buildNodeMesh(node: PositionedBrainNode3D): NodeMesh {
+    const colors = galaxyNodeColors(node);
+    const geometry = new SphereGeometry(node.radius, node.kind === 'core' ? 48 : 24, node.kind === 'core' ? 48 : 24);
+    const material = new MeshStandardMaterial({
+      color: colors.base,
+      emissive: new Color(colors.emissive),
+      emissiveIntensity: colors.emissiveIntensity,
+      metalness: 0.35,
+      roughness: 0.4,
+    });
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(node.x, node.y, node.z);
+    (mesh.userData as GalaxyNodeUserData) = { node, originY: node.y };
+
+    if (node.kind === 'core') {
+      decorateVaxonCoreOrb(mesh, node.radius, colors);
+    } else if (node.kind === 'workspace') {
+      // Rings only on non-nominal workspaces — otherwise ~17 torii wash the graph.
+      decorateWorkspaceNode(mesh, node.radius, colors, node.x * 1.7 + node.z * 1.3, {
+        showRing: node.tone !== 'nominal',
+      });
+    }
+
+    // Labels: always core; workspaces only when non-nominal or every other
+    // shell slot — cuts the unreadable stacked-label pile in the center.
+    const labelWorkspace =
+      node.kind === 'workspace' &&
+      (node.tone !== 'nominal' ||
+        Math.abs(Math.round(node.x * 10) + Math.round(node.z * 7)) % 2 === 0);
+    if (node.kind === 'core' || labelWorkspace) {
+      const label = document.createElement('span');
+      label.className = 'brain-galaxy-node-label';
+      if (node.tone === 'attention') {
+        label.classList.add('brain-galaxy-node-label--attention');
+      }
+      if (node.tone === 'critical') {
+        label.classList.add('brain-galaxy-node-label--critical');
+      }
+      if (node.kind === 'core') {
+        label.classList.add('brain-galaxy-node-label--core');
+        label.textContent = 'VAXON Core';
+      } else {
+        label.textContent = node.label;
+      }
+      const labelObject = new CSS2DObject(label);
+      const lift =
+        node.kind === 'core'
+          ? 0.48
+          : 0.32 + Math.abs(Math.sin(node.x * 2.3 + node.z * 1.7)) * 0.28;
+      labelObject.position.set(0, node.radius + lift, 0);
+      mesh.add(labelObject);
+    }
+
+    return mesh as NodeMesh;
   }
 
   private disposeObjectTree(object: Group['children'][number]): void {
@@ -405,9 +502,6 @@ export class BrainGalaxyScene {
     }
 
     this.liveEdges.forEach((edge) => animateLiveEdge(edge, this.clock, this.presenceAmp));
-    if (this.specialtyFx && !animateSpecialtyDispatchFilament(this.specialtyFx, performance.now())) {
-      this.clearSpecialtyDispatch();
-    }
     if (this.scene) {
       animateGalaxyAmbience(this.scene, this.starfield, this.clock, this.presenceAmp);
     }
