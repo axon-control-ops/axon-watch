@@ -81,34 +81,55 @@ workspaces.
 
 ---
 
-## 4. Lead planner (Gate 5 — started)
+## 4. Lead planner + fan-out (Gate 5)
 
 ### What it is
 
-A pure planner (`build_lead_task_plan`) that turns one goal + company roster into
-ordered plan items (owner role, deps, acceptance). **Not yet** auto-persisted to
-the ledger or auto-dispatched.
+Dana (Lead) turns one goal + company roster into ordered plan items, **persists**
+them as leased `workspace_tasks`, and for fan-out opens **one run per ready
+specialist** (not a single specialty-route winner).
+
+| Piece | Module / API |
+| --- | --- |
+| Pure plan | `build_lead_task_plan` |
+| Persist | `persist_lead_task_plan` → Gate 4 ledger |
+| Materialize | `materialize_lead_fan_out` → tasks + ready runs |
+| HTTP | `POST /api/workspaces/{id}/lead/plan` · `.../lead/fan-out` |
+
+Continuous **dispatch** (Lane B) is still separate — fan-out creates leased tasks
+and runs with `lead_fan_out_assigned` receipts; the scheduler stays off.
 
 ### Examples
 
-**Fan-out** (all specialists in parallel, path conflicts serialized):
+**Fan-out** (all specialists in parallel; path conflicts serialize / defer):
 
 ```text
 Goal: "Check with all sub-agents whether DashPro quality-gate heap calc is safe"
-→ plan items for watcher, frontend, backend, integrations (no Lead item)
+→ tasks for watcher, frontend, backend, integrations
+→ N ready runs with receipts (deferred if exclusive_paths overlap)
 ```
 
-**Sequential** (then-chains):
+```bash
+curl -sS -X POST "http://127.0.0.1:8787/api/workspaces/workspace_axon_watch/lead/fan-out" \
+  -H 'content-type: application/json' \
+  -d '{"goal":"Check with all sub-agents whether Gate 5 fan-out is wired"}' \
+  | jq '{mode, run_count:(.runs|length), deferred:(.deferred|length), receipt}'
+```
+
+**Sequential** (then-chains → dependency task ids):
 
 ```text
 Goal: "Fix the API quality-gate heap calc then update the Expo confirmation screen"
-→ backend item, then frontend item that depends on the backend plan_key
+→ backend task, then frontend task that depends on the backend task_id
 ```
+
+**Specialty route stays single-winner** for normal prompts; fan-out phrases return
+`reason=lead_fan_out` instead of picking one teammate.
 
 Proof:
 
 ```bash
-./scripts/dev/python.sh -m unittest tests.test_lead_task_plan -q
+./scripts/dev/python.sh -m unittest tests.test_lead_task_plan tests.test_lead_fan_out -q
 ```
 
 ---
@@ -154,7 +175,7 @@ runtime health after any push to `origin`.
 | --- | --- | --- |
 | Continuous worker scheduler | **Off** by default | Needs leased tasks + Lead/fan-out before unattended shifts |
 | Live-checkout continuous edits | **Forbidden** | Gate 3 isolation — workers use disposable worktrees |
-| Gate 5 full fan-out dispatch | **In progress** | Planner exists; persist + N-run dispatch next |
+| Gate 5 full fan-out dispatch | **Partial** | Persist + ready runs land; Lane B auto-dispatch still manual / scheduler off |
 
 Check scheduler:
 

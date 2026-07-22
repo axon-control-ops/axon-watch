@@ -516,10 +516,12 @@ worker prompts are task-scoped; Mission Control task board landed. Concurrent ID
 streams are per-thread. Evidence:
 `docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`. Scheduler remains off.
 
-**Gate 5 progress:** **IN PROGRESS** (2026-07-22). Pure Lead planner
-(`lead_task_plan.build_lead_task_plan`) turns a goal + roster into ordered plan
-items with owner roles, deps, and path serialization; fan-out mode when the
-operator asks all specialists. Persist + dispatch still open.
+**Gate 5 progress:** **IN PROGRESS** (2026-07-22). Lead planner persists tasks and
+materializes fan-out into concurrent ready specialist runs with
+`lead_fan_out_assigned` receipts (`lead_fan_out`, `/lead/fan-out`). Specialty route
+no longer collapses “check with all” to one winner. Lane B auto-dispatch and Lead
+synthesis still open. Evidence:
+`docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`. Scheduler remains off.
 
 ---
 

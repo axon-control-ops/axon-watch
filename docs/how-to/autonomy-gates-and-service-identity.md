@@ -18,7 +18,7 @@ It tells you **what to turn on**, **what to leave off**, and **how to prove it**
 | **2 thin + residuals** | Closed | Use `local_token` on any non-loopback surface; set operator + internal tokens |
 | **3** | Closed | Continuous workers use disposable `worker/<run_id>` worktrees only |
 | **4** | Closed | Continuous workers only run from a **leased task**; scheduler stays **off** until you intentionally enable it |
-| **5** | In progress | Lead planner exists (`lead_task_plan`); do **not** enable continuous fan-out until persist + dispatch land |
+| **5** | In progress | Persist + ready fan-out runs land; do **not** enable continuous scheduler / Lane B auto-dispatch yet |
 
 **Scheduler rule (non-negotiable for now):** keep continuous workers
 `effective_enabled: false` unless you are deliberately testing Gate 4 with a

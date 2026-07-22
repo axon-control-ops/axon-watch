@@ -15,7 +15,10 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-22 — Gate 4 closed (`27cf9ba`); Gate 5 Lead planner started (`166bb52`); concurrent IDE tabs; galaxy workspace labels; Mission Control task board. Scheduler still **off** by default. Production operator at `:4173`; after every push run `./scripts/ops/watch-fast-gate.sh`.
+**Last verified:** 2026-07-22 — Gate 5 fan-out materialize (persist + N ready runs);
+Gate 4 closed; concurrent IDE tabs; galaxy workspace labels; Mission Control task
+board. Scheduler still **off** by default. After every push run
+`./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`

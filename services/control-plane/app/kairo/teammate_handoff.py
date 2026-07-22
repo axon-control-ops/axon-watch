@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
+from app.workspace_agents.lead_task_plan import detect_fan_out_intent
 from app.workspace_agents.teammate_route import (
     dispatch_model_tiebreak,
     route_teammate_decision,
@@ -25,7 +27,30 @@ def build_specialty_task_action(
     """Return a specialist dispatch action only for actionable, non-command turns."""
     task = str(content or "").strip()
     target_workspace_id = str(workspace_id or "").strip()
-    if not task or not target_workspace_id or not _TASK_REQUEST_RE.search(task):
+    if not task or not target_workspace_id:
+        return None
+    if detect_fan_out_intent(task):
+        try:
+            materialize = materialize_lead_fan_out(
+                workspace_id=target_workspace_id,
+                goal=task,
+                mode="auto",
+                create_runs=True,
+            )
+        except (LeadFanOutError, Exception):
+            return None
+        return {
+            "type": "lead_fan_out",
+            "target_workspace_id": target_workspace_id,
+            "task": task,
+            "mode": materialize.get("mode"),
+            "tasks": materialize.get("tasks") or [],
+            "runs": materialize.get("runs") or [],
+            "deferred": materialize.get("deferred") or [],
+            "receipt": materialize.get("receipt"),
+            "plan": materialize.get("plan"),
+        }
+    if not _TASK_REQUEST_RE.search(task):
         return None
     try:
         decision = route_teammate_decision(

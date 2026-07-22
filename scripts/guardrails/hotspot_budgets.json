@@ -354,11 +354,11 @@
       "note": "CLI runtime router; extract next"
     },
     "services/control-plane/app/workspace_agents/teammate_route.py": {
-      "max_lines": 553,
+      "max_lines": 524,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/*",
-      "note": "Teammate route after specialty routing"
+      "note": "Teammate route after specialty routing; fan-out short-circuits to Lead"
     },
     "services/control-plane/app/runs/service.py": {
       "max_lines": 527,

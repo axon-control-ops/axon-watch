@@ -77,3 +77,12 @@ Template:
 - exit criteria met: yes — remote forces internal token; optional/required proxy mTLS (`X-SSL-Client-Verify`) + CP client-cert context; handbook directives in `docs/how-to/autonomy-gates-and-service-identity.md`
 - residual risks: reverse proxy must forward verify headers when `AXON_WATCH_MTLS_REQUIRED=1`; keep watch port internal
 - next gate unlocked: Gate 5 (already started) — scheduler still off
+
+### Gate 5 slice (fan-out materialize) — 2026-07-22
+- owner: agent
+- commit: pending this push; report `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`
+- commands run: `tests.test_lead_task_plan`; `tests.test_lead_fan_out`
+- pass/fail: pass
+- exit criteria met: partial — plan + persist + N ready specialist runs/receipts; no Lane B auto-dispatch; replan-cancel still open
+- residual risks: scheduler still off; console does not yet open all specialist tabs from fan-out action
+- next gate unlocked: Gate 5 remainder (synthesis + optional dispatch) or Gate 6 verifier in parallel

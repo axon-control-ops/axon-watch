@@ -13,6 +13,7 @@ from app.routes import (
     health,
     host,
     inbox_watch,
+    lead_planner,
     operator,
     plans,
     runs,
@@ -42,6 +43,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(workspaces.router)
     app.include_router(worker_scheduler.router)
     app.include_router(tasks.router)
+    app.include_router(lead_planner.router)
     app.include_router(skills.router)
     # Session toggle is always mounted; proposal routes stay 404 until enabled.
     app.include_router(safe_improvement.router)

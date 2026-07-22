@@ -472,52 +472,23 @@ def route_teammate_decision(
     if cleaned_current:
         current = next((row for row in roster if row.employee_id == cleaned_current), None)
 
-    decision = should_soft_route_to_teammate(prompt, current, roster)
-    # #region agent log
-    try:
-        import time as _agent_time
-        _prompt_l = str(prompt or "").lower()
-        _fan_out = bool(
-            __import__("re").search(r"\b(all|every|each)\b", _prompt_l)
-            and __import__("re").search(
-                r"\b(sub[- ]?agents?|teammates?|employees?|agents?|team)\b",
-                _prompt_l,
-            )
+    from app.workspace_agents.lead_task_plan import detect_fan_out_intent
+
+    # Fan-out is Lead planner territory — never collapse to a single specialty winner.
+    if detect_fan_out_intent(prompt):
+        return TeammateRouteDecision(
+            should_route=False,
+            reason="lead_fan_out",
+            from_employee_id=current.employee_id if current else None,
+            from_name=current.name if current else None,
+            source="lead_planner",
+            routing_receipt=(
+                "Lead fan-out intent detected — use /api/workspaces/{id}/lead/fan-out "
+                "to open concurrent specialist tasks/runs"
+            ),
         )
-        with open(
-            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-            "a",
-            encoding="utf-8",
-        ) as _dbg:
-            _dbg.write(
-                __import__("json").dumps(
-                    {
-                        "sessionId": "fc0b35",
-                        "runId": "dana-fanout",
-                        "hypothesisId": "H1",
-                        "location": "teammate_route.py:route_teammate_decision",
-                        "message": "server specialty route single winner",
-                        "data": {
-                            "fanOutIntent": _fan_out,
-                            "rosterSize": len(roster or []),
-                            "shouldRoute": decision.should_route,
-                            "reason": decision.reason,
-                            "winnerId": (
-                                decision.employee.employee_id if decision.employee else None
-                            ),
-                            "winnerName": (
-                                decision.employee.name if decision.employee else None
-                            ),
-                            "promptPreview": str(prompt or "")[:120],
-                        },
-                        "timestamp": int(_agent_time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-    # #endregion
+
+    decision = should_soft_route_to_teammate(prompt, current, roster)
     if decision.should_route or not use_model_tiebreak:
         return decision
     if not decision.ambiguous or decision.reason not in _AMBIGUOUS_REASONS:
