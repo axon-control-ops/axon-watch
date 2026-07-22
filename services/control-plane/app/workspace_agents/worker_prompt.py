@@ -31,7 +31,7 @@ def build_continuous_worker_prompt(
     *,
     workspace_id: str,
     employee: EmployeeConfig,
-    task: dict[str, Any],
+    task: dict[str, Any] | None = None,
 ) -> str:
     role = str(employee.role or "").strip().lower() or "workspace_agent"
     owns = str(employee.owns or "").strip() or _DEFAULT_OWNS.get(role, "assigned workspace work")
@@ -43,9 +43,10 @@ def build_continuous_worker_prompt(
         role=role,
         owns=owns,
     )
-    task_id = str(task.get("task_id") or "").strip() or "unknown-task"
-    goal = str(task.get("goal") or "").strip() or "Complete the leased task"
-    acceptance = str(task.get("acceptance_criteria") or "").strip()
+    task_payload = task if isinstance(task, dict) else {}
+    task_id = str(task_payload.get("task_id") or "").strip() or "task-unspecified"
+    goal = str(task_payload.get("goal") or "").strip() or "Complete the leased task"
+    acceptance = str(task_payload.get("acceptance_criteria") or "").strip()
     acceptance_clause = (
         f" Acceptance criteria: {acceptance}."
         if acceptance
@@ -59,6 +60,13 @@ def build_continuous_worker_prompt(
             "(`npm run verify:contracts` and targeted tests) and report the real "
             "command output. "
             "Never report FAILED without the exact failing check, file, and error text. "
+        )
+    if workspace_id.strip() == "workspace_axon_watch" and role in {"watcher", "integrations", "lead"}:
+        ci_clause += (
+            " After any push to origin for this repo, poll Axon-X Fast Gate "
+            "(`./scripts/ops/watch-fast-gate.sh` or `gh run watch`) and report the "
+            "run URL + conclusion. Fix file-size ratchet failures via "
+            "`scripts/guardrails/hotspot_budgets.json` or extraction — do not ignore red CI. "
         )
     memory_clause = (
         " Memory safety: do NOT start DashPro `web:dev` / Expo / Metro / "

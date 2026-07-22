@@ -19,7 +19,7 @@
         {
           "name": "Mira",
           "role": "lead",
-          "owns": "priorities, handoffs, and product direction",
+          "owns": "priorities, handoffs, product direction, and Fast Gate triage for axon-watch",
           "schedule": "on_demand",
           "primary": true,
           "azure_voice_id": "en-GB-SoniaNeural"
@@ -27,7 +27,7 @@
         {
           "name": "Rowan",
           "role": "watcher",
-          "owns": "signals, connectors, and runtime health",
+          "owns": "signals, connectors, runtime health, and Axon-X Fast Gate after every push to origin",
           "schedule": "always_on",
           "azure_voice_id": "en-GB-ThomasNeural"
         },
@@ -48,7 +48,7 @@
         {
           "name": "Quinn",
           "role": "integrations",
-          "owns": "connectors, watch service, and cross-repo wiring",
+          "owns": "connectors, watch service, cross-repo wiring, and axon-watch GitHub Actions / Fast Gate",
           "schedule": "continuous",
           "azure_voice_id": "en-GB-HollieNeural"
         }

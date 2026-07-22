@@ -15,7 +15,7 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-20 — production operator at `:4173`; one-word stack commands `axonhealth` / `axonrestart` / `axonrevive`.
+**Last verified:** 2026-07-22 — Gate 4 closed (`27cf9ba`); Gate 5 Lead planner started (`166bb52`); concurrent IDE tabs; galaxy workspace labels; Mission Control task board. Scheduler still **off** by default. Production operator at `:4173`; after every push run `./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
@@ -33,6 +33,8 @@ Use it to:
 3. [Operator manual](#operator-manual) — daily rituals
 3.5. [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools) — Pro vs API key, native vs Cursor
 3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, company roster
+3.65. [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) — Gate 4 tasks, scheduler off, watch token + mTLS
+3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -60,7 +62,8 @@ Use it to:
 | **Operator (daily use)** | [Quick Start](#quick-start) | [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [VAXON Desktop](#vaxon-desktop), [Operator manual](#operator-manual) |
 | **Teacher / reviewer** | [Teaching Axon-X](#teaching-axon-x-to-someone-else) | [Verification](#verification-commands), `docs/FINAL_PARITY_VERIFICATION.md` |
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
-| **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), GitHub Actions → Axon-X Fast Gate |
+| **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), `./scripts/ops/watch-fast-gate.sh` |
+| **Autonomy / remote host** | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) | [Recent operator features](how-to/recent-operator-features.md) |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
 

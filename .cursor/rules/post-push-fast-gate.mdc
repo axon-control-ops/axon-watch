@@ -1,0 +1,15 @@
+---
+description: After pushing to origin, poll Axon-X Fast Gate until green or failed
+alwaysApply: true
+---
+
+# Post-push CI watch (Axon-X)
+
+Whenever you **`git push`** (or `-u origin HEAD`) for this repo:
+
+1. Immediately start watching **Axon-X Fast Gate** for the current branch — do not wait for the operator to ask.
+2. Prefer: `./scripts/ops/watch-fast-gate.sh` (or `gh run list` + `gh run watch`).
+3. If the run fails, fetch `gh run view <id> --log-failed`, fix the root cause (often file-size ratchets), commit, push, and watch again.
+4. Report the run URL and conclusion to the operator.
+
+VAXON / Axon-X watcher agents (`Rowan`, Lead Mira) own Fast Gate health for `workspace_axon_watch`. Child workspaces own their own CI surfaces via their watcher/integrations roles.

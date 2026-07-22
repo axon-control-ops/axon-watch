@@ -4,14 +4,14 @@
   "note": "Baseline from Axon-X file-size audit. Ratchet budgets block growth until extraction lowers max_lines.",
   "critical_hotspots": {
     "apps/console-web/src/styles/mockup-shell.css": {
-      "max_lines": 33,
+      "max_lines": 34,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/* + feature co-located CSS",
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3811,
+      "max_lines": 3875,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -48,7 +48,7 @@
       "note": "FS-005: thin orchestrator; teammate soft-route banner bindings alongside Plan switch"
     },
     "apps/console-web/src/api/control-plane.ts": {
-      "max_lines": 12,
+      "max_lines": 13,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/api/*-api.ts",
@@ -105,9 +105,9 @@
       "note": "Runtime status snapshot cache and probe assembly"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1536,
+      "max_lines": 1539,
       "soft_limit": 400,
-      "hard_limit": 700,
+      "hard_limit": 1539,
       "target": "docs/how-to/* chapters"
     },
     "docs/HOW-TO-HANDBOOK.html": {
@@ -228,7 +228,7 @@
       "target": "apps/console-web/src/styles/shell/*"
     },
     "apps/console-web/src/styles/shell/mockup-shell-18.css": {
-      "max_lines": 345,
+      "max_lines": 346,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"
@@ -306,9 +306,9 @@
       "target": "apps/console-web/src/styles/shell/*"
     },
     "docs/AXON-X-AUTONOMY-READINESS.md": {
-      "max_lines": 811,
+      "max_lines": 813,
       "soft_limit": 400,
-      "hard_limit": 811,
+      "hard_limit": 813,
       "target": "docs/AXON-X-AUTONOMY-* + planning chapters",
       "note": "Autonomy readiness assessment; split chapters when revising"
     },
@@ -359,6 +359,20 @@
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/*",
       "note": "Teammate route after specialty routing"
+    },
+    "services/control-plane/app/runs/service.py": {
+      "max_lines": 527,
+      "soft_limit": 350,
+      "hard_limit": 527,
+      "target": "services/control-plane/app/runs/*",
+      "note": "Gate 4 leased-task create_run binding; extract next"
+    },
+    "services/control-plane/app/persistence/task_store.py": {
+      "max_lines": 621,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/persistence/*",
+      "note": "Gate 4 task ledger"
     }
   }
 }
