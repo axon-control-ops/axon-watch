@@ -183,9 +183,73 @@ def _ensure_runs_task_id_column(connection: sqlite3.Connection) -> None:
 
 
 def _ensure_workspace_tasks_table(connection: sqlite3.Connection) -> None:
-    from app.persistence.task_store import ensure_task_ledger_schema
+    # Inline DDL — do not import task_store here. Watch/CP dual-app tests swap
+    # ``app.persistence`` in sys.modules; an absolute import can resolve the watch
+    # package (no task_store) and break schema ensure mid setUp.
+    # #region agent log
+    try:
+        import json as _json
+        import time as _time
+        import sys as _sys
+        from pathlib import Path as _Path
 
-    ensure_task_ledger_schema(connection)
+        _pers = _sys.modules.get("app.persistence")
+        _payload = {
+            "sessionId": "fc0b35",
+            "runId": "pre-fix",
+            "hypothesisId": "H1",
+            "location": "run_store_sqlite.py:_ensure_workspace_tasks_table",
+            "message": "schema ensure without task_store import",
+            "data": {
+                "persistence_file": getattr(_pers, "__file__", None),
+                "persistence_path": list(getattr(_pers, "__path__", [])),
+                "task_store_cached": "app.persistence.task_store" in _sys.modules,
+                "sqlite_file": __file__,
+            },
+            "timestamp": int(_time.time() * 1000),
+        }
+        with _Path(
+            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log"
+        ).open("a", encoding="utf-8") as _fh:
+            _fh.write(_json.dumps(_payload) + "\n")
+    except Exception:
+        pass
+    # #endregion
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workspace_tasks (
+            task_id TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            goal TEXT NOT NULL,
+            acceptance_criteria TEXT NOT NULL DEFAULT '',
+            risk TEXT NOT NULL DEFAULT 'normal',
+            owner_role TEXT NOT NULL DEFAULT '',
+            dependencies_json TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL,
+            lease_holder TEXT,
+            lease_expires_at TEXT,
+            attempt_budget INTEGER NOT NULL DEFAULT 3,
+            attempts_used INTEGER NOT NULL DEFAULT 0,
+            terminal_outcome TEXT,
+            run_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_workspace_tasks_workspace_status
+            ON workspace_tasks(workspace_id, status, updated_at DESC)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_workspace_tasks_lease
+            ON workspace_tasks(status, lease_expires_at)
+        """
+    )
+    connection.commit()
 
 
 def _ensure_runs_employee_role_column(connection: sqlite3.Connection) -> None:
