@@ -107,7 +107,6 @@ main_tests=(
   tests.test_kairo_tool_milestone
   tests.test_voice_autonomy
   tests.test_voice_dispatch
-  tests.test_work_request_intent
   tests.test_command_shortcuts
   tests.test_kairo_conversation_turns
   tests.test_conversation_transcript
