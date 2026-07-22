@@ -2253,9 +2253,8 @@ curl -sS http://127.0.0.1:8787/api/workspaces/workspace_demo/tasks | jq .
 <li>Lead assigns only company-roster specialist roles.</li>
 <li>Exact and parent/child path overlaps cannot lease concurrently.</li>
 <li>Explicit replans stop/cancel obsolete active work and persist receipts.</li>
-<li>“Check with all teammates” creates one task/run per specialist; it never picks
-  one winner.</li>
-<li>Switching IDE tabs changes focus only; sibling thread streams remain alive.</li>
+<li>“Check with all teammates” creates one leased task/run per specialist; it never
+  picks one winner. It does not automatically open IDE tabs.</li>
 <li>Keep the continuous scheduler <strong>off</strong>. Gate 5 creates ready runs but does not
   authorize unattended verification.</li>
 </ul>
@@ -2264,7 +2263,6 @@ curl -sS http://127.0.0.1:8787/api/workspaces/workspace_demo/tasks | jq .
   tests.test_lead_task_plan \
   tests.test_lead_fan_out \
   tests.test_lead_replan -q
-npm test -w @axon-watch/console-web -- --run src/lib/workspace-stream-ui.test.ts
 </code></pre>
 <hr>
 <h3>4. Watch service identity (token + proxy mTLS)</h3>

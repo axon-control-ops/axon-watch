@@ -18,6 +18,8 @@
 - Auto Lane B dispatch / enabling continuous scheduler
 - Model-authored prose synthesis (the current synthesis is deterministic and receipt-backed)
 - Automatically opening every specialist tab in the console
+- Approved-backlog / goal-id ingestion (planner still takes a raw goal string)
+- Creating IDE chat threads for each specialist (materialize creates leased tasks + runs)
 
 ## Proof
 
@@ -26,10 +28,9 @@
   tests.test_lead_task_plan \
   tests.test_lead_fan_out \
   tests.test_lead_replan -q
-npm test -w @axon-watch/console-web -- --run src/lib/workspace-stream-ui.test.ts
 ```
 
-Exit criteria:
+Master-plan exit criteria:
 
 | Criterion | Status |
 | --- | --- |
@@ -39,8 +40,14 @@ Exit criteria:
 | Obsolete tasks cancelled on replan | **Met** — explicit `/lead/replan` |
 | Replans receipt-backed | **Met** — durable `lead_plan_receipts` |
 | Check with all → N specialist runs/tasks | **Met** — materialize + run receipts |
-| Lead synthesizes terminal specialist outcomes | **Met** — deterministic receipt-backed synthesis |
-| Switching IDE tabs preserves sibling streams | **Met** — per-thread stream state + tab-focus proof |
+| Lead synthesizes terminal specialist outcomes | **Partial** — deterministic terminal-status receipt, not model prose |
+
+Related UX (Gate 4 infrastructure; not a Gate 5 exit criterion):
+
+| Item | Status |
+| --- | --- |
+| Per-thread stream UI state helpers | Covered by `workspace-stream-ui.test.ts` |
+| `selectIdeThread` leaves sibling SSE connected | Implemented in `shell.ts` (Gate 4); **no automated EventSource assertion in Gate 5** |
 
 ## Evidence artifacts
 
@@ -49,7 +56,7 @@ Exit criteria:
 - Planner/fan-out/replan tests:
   `tests/test_lead_task_plan.py`, `tests/test_lead_fan_out.py`,
   `tests/test_lead_replan.py`
-- Tab-switch state proof:
+- Stream-UI helper coverage (not SSE lifecycle):
   `apps/console-web/src/lib/workspace-stream-ui.test.ts`
 
 ## Result
@@ -57,4 +64,7 @@ Exit criteria:
 Scheduler remains **off**. Fan-out creates runs; operators or a later Gate 5/10
 slice start Lane B work intentionally.
 
-**Gate 5 CLOSED. Gate 6 (mandatory verifier contract) is unlocked.**
+**Gate 5 CLOSED against master-plan exit criteria** (goal→DAG, role assignment,
+path serialization, receipt-backed replan, multi-specialist fan-out). Gate 6
+(mandatory verifier contract) is unlocked. Residual product gaps above remain
+documented, not hidden.

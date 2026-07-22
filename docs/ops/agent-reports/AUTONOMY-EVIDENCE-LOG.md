@@ -80,9 +80,9 @@ Template:
 
 ### Gate 5 — 2026-07-22
 - owner: agent
-- commit: 369e5f9; report `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`
-- commands run: `tests.test_lead_task_plan`; `tests.test_lead_fan_out`; `tests.test_lead_replan`; `workspace-stream-ui.test.ts`
-- pass/fail: pass
-- exit criteria met: yes — ordered DAG, role assignment, persistent path conflicts, obsolete-task cancellation, durable replan/fan-out/synthesis receipts, and sibling stream preservation
-- residual risks: synthesis is deterministic rather than model-authored; fan-out does not auto-open every tab; scheduler remains off
+- commit: 369e5f9 (close-out); CI fix `a71dbd6`; report `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`
+- commands run: `tests.test_lead_task_plan`; `tests.test_lead_fan_out`; `tests.test_lead_replan`
+- pass/fail: pass on HEAD Fast Gate `a71dbd6` (run 29937141365)
+- exit criteria met: yes for master-plan Gate 5 exits — ordered DAG, role assignment, path conflict serialization (deps + lease), receipt-backed explicit replan, multi-specialist fan-out runs/receipts
+- residual risks: synthesis is deterministic terminal-status aggregation (not model prose); no approved-backlog entity; fan-out does not create/open IDE threads/tabs; sibling SSE preservation is Gate 4 code with helper-unit coverage only (no EventSource assertion); scheduler remains off
 - next gate unlocked: Gate 6 (mandatory verifier contract)

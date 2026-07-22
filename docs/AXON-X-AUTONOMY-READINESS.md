@@ -518,11 +518,13 @@ worker prompts are task-scoped; Mission Control task board landed. Concurrent ID
 streams are per-thread. Evidence:
 `docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`. Scheduler remains off.
 
-**Gate 5 progress:** **CLOSED** (2026-07-22). Lead turns goals into persisted
-dependency DAGs, assigns company roles, enforces exclusive-path conflicts across
-active plans, materializes “check with all” fan-out runs, cancels obsolete work
-through receipt-backed replans, and synthesizes terminal specialist outcomes.
-Per-thread stream state preserves sibling runs during IDE tab switches. Evidence:
+**Gate 5 progress:** **CLOSED** against master-plan exit criteria (2026-07-22,
+`369e5f9` / CI `a71dbd6`). Lead turns raw goals into persisted dependency DAGs,
+assigns company roles, enforces exclusive-path conflicts across leased plans,
+materializes “check with all” into N specialist leased tasks/runs, and cancels
+obsolete work through receipt-backed `/lead/replan`. Synthesis is deterministic
+terminal-status aggregation. Not included: backlog/goal-id ingestion, auto IDE
+tab open, Lane B auto-dispatch, EventSource sibling-stream e2e proof. Evidence:
 `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`. Scheduler remains off.
 
 ---
