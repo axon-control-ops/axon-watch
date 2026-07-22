@@ -71,7 +71,7 @@ Template:
 
 ### Watch mTLS / service identity — 2026-07-22
 - owner: agent
-- commit: (pin after commit)
+- commit: 69f43af
 - commands run: `tests.test_gate2_auth_containment.Gate2WatchInternalTokenTests` (5 OK); mint script `scripts/ops/mint-watch-mtls.sh`
 - pass/fail: pass
 - exit criteria met: yes — remote forces internal token; optional/required proxy mTLS (`X-SSL-Client-Verify`) + CP client-cert context; handbook directives in `docs/how-to/autonomy-gates-and-service-identity.md`
