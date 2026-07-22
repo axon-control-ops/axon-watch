@@ -42,6 +42,10 @@ const view = computed(() =>
   }),
 );
 
+function openMissionControlGrid(): void {
+  shell.setOperatorCenterView('grid');
+}
+
 async function onActivateAction(action: BriefingAction): Promise<void> {
   if (actionPendingId.value || shell.handoffMutationState === 'submitting') {
     return;
@@ -204,6 +208,17 @@ function dismissSpecialtyRoute(): void {
     <p v-if="view.routingReceipt" class="galaxy-intelligence-panel__receipt">
       {{ view.routingReceipt }}
     </p>
+
+    <section class="galaxy-intelligence-panel__section">
+      <button
+        type="button"
+        class="galaxy-intelligence-panel__host-toggle"
+        title="Fleet health, Connectors, and the durable Task board"
+        @click="openMissionControlGrid"
+      >
+        Mission Control · Task board
+      </button>
+    </section>
 
     <section class="galaxy-intelligence-panel__section">
       <button

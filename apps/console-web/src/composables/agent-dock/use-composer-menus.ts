@@ -26,16 +26,31 @@ export const MODE_OPTIONS: Array<{
   icon: string;
   hint: string;
 }> = [
-  { key: 'ask', label: 'Ask', icon: '◯', hint: 'Read-only answers, no tool execution' },
-  { key: 'plan', label: 'Plan', icon: '◈', hint: 'Map steps before executing' },
+  {
+    key: 'ask',
+    label: 'Ask',
+    icon: '◯',
+    hint: 'Simple conversation — answers only, no edits or tools',
+  },
+  { key: 'plan', label: 'Plan', icon: '◈', hint: 'Map steps before executing a task' },
   {
     key: 'debug',
     label: 'Debug',
     icon: '⌖',
     hint: 'Hypothesize, instrument, reproduce, then fix with evidence',
   },
-  { key: 'agent', label: 'Agent', icon: '◎', hint: 'Agent loop with tools and approvals' },
-  { key: 'kairo', label: OPERATOR_PERSONA_NAME, icon: '◉', hint: `Talk to ${OPERATOR_PERSONA_NAME} — spoken replies` },
+  {
+    key: 'agent',
+    label: 'Agent',
+    icon: '◎',
+    hint: 'Do the task — tools, edits, and approvals',
+  },
+  {
+    key: 'kairo',
+    label: OPERATOR_PERSONA_NAME,
+    icon: '◉',
+    hint: `Talk to ${OPERATOR_PERSONA_NAME} — spoken replies`,
+  },
 ];
 
 type ShellStore = ReturnType<typeof useShellStore>;

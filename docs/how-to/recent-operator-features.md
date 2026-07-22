@@ -10,18 +10,52 @@ Companion to [`docs/HOW-TO-HANDBOOK.md`](../HOW-TO-HANDBOOK.md) and
 
 ## 1. Mission Control task board (Gate 4)
 
-### What it is
+### Where it is (easy to miss)
+
+**Mission Control** is the Operator **center panel** — but only in **Grid** view.
+
+Your Brain Graph starfield (VAXON CORE / DashPro orbs) is Operator too; it **replaces**
+the Mission Control title, Fleet health, and Task board until you leave Graph.
+
+| You are here | How to open Task board |
+| --- | --- |
+| Top nav **OPERATOR** + Brain Graph | Click **Mission Control** in the bottom status chips, **or** **Mission Control · Task board** in the right Intelligence panel |
+| Operator Grid already | Scroll under **Fleet health** → section **Task board** |
+| Top nav **IDE** | Click **OPERATOR** first, then use Grid / Mission Control as above |
+
+On Grid you should see the heading **Mission Control**, then **GRID | BRAIN**, then
+**Fleet health**, then **Task board**.
+
+### What the task board is
 
 A durable **task ledger**. Continuous workers may only start when they **lease** an
-open task. The board lives on Operator → **Grid** (not the Brain Graph starfield).
+open task. Chat in the IDE is separate (see “Talk vs do work” below).
 
 ### How to use it
 
-1. Switch layout to **OPERATOR**.
-2. In Mission Control, choose **Grid** (not Brain Graph).
-3. Under **Fleet health**, open **Task board**.
+1. Top nav → **OPERATOR**.
+2. Leave Brain Graph: **Mission Control** chip (or Intelligence → **Mission Control · Task board**).
+3. Under **Fleet health**, use **Task board**.
 4. Create a goal + owner role (e.g. `integrations`).
 5. Leave the worker scheduler **off** unless you intentionally want continuous shifts.
+
+### Talk vs do work (IDE teammate modes)
+
+In the IDE agent dock, open the mode chip (bottom-right, often **Agent FULL ACCESS**):
+
+| Mode | Use when |
+| --- | --- |
+| **Ask** | Simple conversation — “thanks”, questions, status — **no** edits/tools |
+| **Plan** | Map steps before changing code |
+| **Agent** | Do the task — tools, edits, approvals |
+| **Debug** | Reproduce and fix with evidence |
+| Task board / Lead fan-out | Durable assigned work across specialists (Gate 4–5) |
+
+**Examples**
+
+- “Thank you Dana!” / “I am thinking…” → stay on **Ask** (conversation).
+- “Ok proceed with that.” / “Fix the payments race” → **Agent** (task).
+- “Check with all sub-agents…” → Lead fan-out (N tasks/runs), not one specialty winner.
 
 ### Example — seed work for Soren
 

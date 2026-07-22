@@ -5,7 +5,7 @@ import { agentExecutionAccessHint } from '../../../lib/agent-execution-access-pr
 import { composerAccessMenuStatus } from '../../../lib/sandbox-session-view';
 import PersonaTitle from '../../PersonaTitle.vue';
 import { useShellStore } from '../../../stores/shell';
-import { computed, watch } from 'vue';
+import { computed } from 'vue';
 
 const props = defineProps<{
   showModeMenu: boolean;
@@ -40,22 +40,6 @@ const menuStatus = computed(() =>
     sandboxEnabled: props.sandboxSessionEnabled,
   }),
 );
-
-// #region agent log
-watch(
-  () =>
-    [
-      props.composerMode,
-      props.activeMode.label,
-      props.modeButtonLabel,
-      props.isFullAccessAgent,
-    ] as const,
-  ([mode, modeLabel, buttonLabel, fullAccess]) => {
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'H4',location:'AgentDockComposerModeMenu.vue:watch',message:'mode chip labels',data:{mode,modeLabel,buttonLabel,fullAccess,pill:fullAccess?'Full access':null},timestamp:Date.now()})}).catch(()=>{});
-  },
-  { immediate: true },
-);
-// #endregion
 </script>
 
 <template>
@@ -74,7 +58,7 @@ watch(
       }"
       :data-mode="composerMode"
       :title="modeButtonTitle"
-      :aria-label="`Conversation mode: ${modeButtonLabel}`"
+      :aria-label="`Teammate mode: ${modeButtonLabel}`"
       @click="emit('toggle-section')"
     >
       <span class="agent-dock-composer__tool-icon" aria-hidden="true">{{ activeMode.icon }}</span>
@@ -95,7 +79,7 @@ watch(
       <span class="agent-dock-composer__tool-chevron" aria-hidden="true">▾</span>
     </button>
     <div v-if="showModeMenu" class="agent-dock-composer__menu">
-      <p class="agent-dock-composer__menu-caption">Conversation mode</p>
+      <p class="agent-dock-composer__menu-caption">Talk vs do work</p>
       <button
         v-for="option in modeOptions"
         :key="option.key"
