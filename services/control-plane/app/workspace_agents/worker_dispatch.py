@@ -106,33 +106,6 @@ def dispatch_continuous_worker_run(
     task_id = str(run_record.get("task_id") or "").strip()
     task = task_store.get_task(task_id) if task_id else None
     if task is None or str(task.get("status") or "").strip().lower() != "leased":
-        # #region agent log
-        try:
-            import json as _json
-            import time as _time
-            from pathlib import Path as _Path
-
-            _payload = {
-                "sessionId": "fc0b35",
-                "runId": "pre-fix",
-                "hypothesisId": "H2",
-                "location": "worker_dispatch.py:dispatch_continuous_worker_run",
-                "message": "dispatch refused missing leased task",
-                "data": {
-                    "run_id": run_id,
-                    "task_id": task_id or None,
-                    "task_status": (task or {}).get("status") if task else None,
-                    "task_store_file": getattr(task_store, "__file__", None),
-                },
-                "timestamp": int(_time.time() * 1000),
-            }
-            with _Path(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log"
-            ).open("a", encoding="utf-8") as _fh:
-                _fh.write(_json.dumps(_payload) + "\n")
-        except Exception:
-            pass
-        # #endregion
         failed = _fail_worker_run(
             run_id,
             receipt_summary=(
