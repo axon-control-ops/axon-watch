@@ -18,7 +18,7 @@ It tells you **what to turn on**, **what to leave off**, and **how to prove it**
 | **2 thin + residuals** | Closed | Use `local_token` on any non-loopback surface; set operator + internal tokens |
 | **3** | Closed | Continuous workers use disposable `worker/<run_id>` worktrees only |
 | **4** | Closed | Continuous workers only run from a **leased task**; scheduler stays **off** until you intentionally enable it |
-| **5** | In progress | Persist + ready fan-out runs land; do **not** enable continuous scheduler / Lane B auto-dispatch yet |
+| **5** | Closed | Use Lead plan/fan-out/replan APIs; keep scheduler off until Gate 6 verification lands |
 
 **Scheduler rule (non-negotiable for now):** keep continuous workers
 `effective_enabled: false` unless you are deliberately testing Gate 4 with a
@@ -77,7 +77,44 @@ curl -sS http://127.0.0.1:8787/api/workspaces/workspace_demo/tasks | jq .
 
 ---
 
-## 3. Watch service identity (token + mTLS)
+## 3. Gate 5 — Lead planner (how to use it)
+
+### Operator actions
+
+1. Preview a goal as an ordered DAG:
+   `POST /api/workspaces/{workspace_id}/lead/plan`
+2. Materialize tasks and dependency-ready specialist runs:
+   `POST /api/workspaces/{workspace_id}/lead/fan-out`
+3. When the goal changes, use:
+   `POST /api/workspaces/{workspace_id}/lead/replan`
+   — do not manually leave obsolete tasks open.
+4. After all specialist tasks are terminal, call:
+   `POST /api/lead/plans/{plan_id}/synthesize`
+
+### Safety rules
+
+- Lead assigns only company-roster specialist roles.
+- Exact and parent/child path overlaps cannot lease concurrently.
+- Explicit replans stop/cancel obsolete active work and persist receipts.
+- “Check with all teammates” creates one task/run per specialist; it never picks
+  one winner.
+- Switching IDE tabs changes focus only; sibling thread streams remain alive.
+- Keep the continuous scheduler **off**. Gate 5 creates ready runs but does not
+  authorize unattended verification.
+
+Proof:
+
+```bash
+./scripts/dev/python.sh -m unittest \
+  tests.test_lead_task_plan \
+  tests.test_lead_fan_out \
+  tests.test_lead_replan -q
+npm test -w @axon-watch/console-web -- --run src/lib/workspace-stream-ui.test.ts
+```
+
+---
+
+## 4. Watch service identity (token + proxy mTLS)
 
 Control-plane talks to watch on `/internal/watch/*`. That path must never be
 anonymous on a reachable host.
@@ -99,9 +136,12 @@ AXON_WATCH_REMOTELY_REACHABLE=1   # or a non-loopback AXON_WATCH_PUBLIC_BASE_URL
 When remotely reachable, watch **refuses** mutating internal routes if the token
 is missing (HTTP 503) or wrong (HTTP 401).
 
-### mTLS (required for production remote)
+### Proxy mTLS capability (deployment proof required)
 
 Axon-X supports proxy-verified client certificates **plus** the shared token.
+This is not end-to-end proof by itself: the proxy must strip incoming
+verification headers, verify the certificate, and be the only network path to
+watch.
 
 1. Mint certs once:
 
@@ -141,7 +181,7 @@ Proof:
 
 ---
 
-## 4. Control-plane operator auth (reminder)
+## 5. Control-plane operator auth (reminder)
 
 On any remotely reachable console:
 
@@ -157,7 +197,7 @@ Full Access / exact-effect on remote also require step-up header
 
 ---
 
-## 5. Verify before you claim a gate closed
+## 6. Verify before you claim a gate closed
 
 ```bash
 npm run verify:contracts
@@ -170,8 +210,8 @@ Evidence lives under `docs/ops/agent-reports/` and the roll-up log
 
 ---
 
-## 6. What to build next
+## 7. What to build next
 
-1. Gate 5 — Lead planner / conflict policy / fan-out  
-2. Keep scheduler off until leases + Lead assignment are routine  
+1. Gate 6 — mandatory verifier contract  
+2. Keep scheduler off until failed verification blocks completion  
 3. Do not expand mobile mutation until this page’s remote auth + mTLS steps are live on that host

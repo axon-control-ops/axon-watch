@@ -494,13 +494,15 @@ workers dispatch Cursor with `trust_policy=worker` (keeps `--trust`, omits
 the deployment is marked remotely reachable. Always-on install now forces
 `local_token` + `AUTH_ALLOW_LOOPBACK=0` and mints `AXON_WATCH_OPERATOR_TOKEN`;
 console vite `/api` proxy injects the bearer so the SPA keeps working.
-Remaining Gate 2 debt after 2026-07-22: none for the residual checklist
-(CSRF/origin, rate limits, remote-forced `local_token`, step-up headers, watch
-internal token + optional/required mTLS). Keep shared internal token set on any
-non-loopback host; enable `AXON_WATCH_MTLS_REQUIRED=1` with
-`./scripts/ops/mint-watch-mtls.sh` for production remote. See
+Remaining Gate 2 deployment debt after 2026-07-22: prove a real trusted-proxy
+mTLS handshake. The code has CSRF/origin checks, process-local rate limits,
+remote-forced `local_token`, thin step-up headers, an internal token, CP client
+cert support, and proxy verification-header checks. Those headers are not a
+trust boundary unless the proxy strips incoming copies and is the only path to
+watch. Keep the token set on every non-loopback host; use
+`./scripts/ops/mint-watch-mtls.sh` and record a deployment smoke. See
 `docs/how-to/autonomy-gates-and-service-identity.md` and
-`docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md` (Gate 4 + mTLS close).
+`docs/ops/agent-reports/gate2-watch-mtls-2026-07-22.md`.
 
 **Gate 3 progress:** **CLOSED** (2026-07-22). Continuous workers create a named
 `worker/<run_id>` worktree (clone fallback) via `safe_improvement.isolated_executor`
@@ -516,11 +518,11 @@ worker prompts are task-scoped; Mission Control task board landed. Concurrent ID
 streams are per-thread. Evidence:
 `docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`. Scheduler remains off.
 
-**Gate 5 progress:** **IN PROGRESS** (2026-07-22). Lead planner persists tasks and
-materializes fan-out into concurrent ready specialist runs with
-`lead_fan_out_assigned` receipts (`lead_fan_out`, `/lead/fan-out`). Specialty route
-no longer collapses “check with all” to one winner. Lane B auto-dispatch and Lead
-synthesis still open. Evidence:
+**Gate 5 progress:** **CLOSED** (2026-07-22). Lead turns goals into persisted
+dependency DAGs, assigns company roles, enforces exclusive-path conflicts across
+active plans, materializes “check with all” fan-out runs, cancels obsolete work
+through receipt-backed replans, and synthesizes terminal specialist outcomes.
+Per-thread stream state preserves sibling runs during IDE tab switches. Evidence:
 `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`. Scheduler remains off.
 
 ---

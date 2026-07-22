@@ -1,0 +1,36 @@
+{
+  "goal": "Check with all teammates about apps/console-web/src/stores/shell.ts",
+  "items": [
+    {
+      "dependencies": [],
+      "exclusive_paths": ["apps/console-web/src/stores/shell.ts"],
+      "owner_role": "frontend",
+      "plan_key": "plan-01-frontend"
+    },
+    {
+      "dependencies": ["plan-01-frontend"],
+      "exclusive_paths": ["apps/console-web/src/stores/shell.ts"],
+      "owner_role": "backend",
+      "plan_key": "plan-02-backend"
+    },
+    {
+      "dependencies": ["plan-02-backend"],
+      "exclusive_paths": ["apps/console-web/src/stores/shell.ts"],
+      "owner_role": "integrations",
+      "plan_key": "plan-03-integrations"
+    },
+    {
+      "dependencies": ["plan-03-integrations"],
+      "exclusive_paths": ["apps/console-web/src/stores/shell.ts"],
+      "owner_role": "watcher",
+      "plan_key": "plan-04-watcher"
+    }
+  ],
+  "mode": "fan_out",
+  "ordered_keys": [
+    "plan-01-frontend",
+    "plan-02-backend",
+    "plan-03-integrations",
+    "plan-04-watcher"
+  ]
+}

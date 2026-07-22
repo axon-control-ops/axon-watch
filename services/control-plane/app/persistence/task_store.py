@@ -24,6 +24,7 @@ _TASK_COLUMNS = (
     "risk",
     "owner_role",
     "dependencies_json",
+    "exclusive_paths_json",
     "status",
     "lease_holder",
     "lease_expires_at",
@@ -91,6 +92,7 @@ def ensure_task_ledger_schema(connection: Any) -> None:
             risk TEXT NOT NULL DEFAULT 'normal',
             owner_role TEXT NOT NULL DEFAULT '',
             dependencies_json TEXT NOT NULL DEFAULT '[]',
+            exclusive_paths_json TEXT NOT NULL DEFAULT '[]',
             status TEXT NOT NULL,
             lease_holder TEXT,
             lease_expires_at TEXT,
@@ -103,6 +105,15 @@ def ensure_task_ledger_schema(connection: Any) -> None:
         )
         """
     )
+    columns = {
+        str(row["name"])
+        for row in connection.execute("PRAGMA table_info(workspace_tasks)").fetchall()
+    }
+    if "exclusive_paths_json" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_tasks "
+            "ADD COLUMN exclusive_paths_json TEXT NOT NULL DEFAULT '[]'"
+        )
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_workspace_tasks_workspace_status
@@ -120,12 +131,21 @@ def ensure_task_ledger_schema(connection: Any) -> None:
 
 def _row_to_record(row: Any) -> dict[str, Any]:
     dependencies_raw = row["dependencies_json"] if "dependencies_json" in row.keys() else "[]"
+    exclusive_paths_raw = (
+        row["exclusive_paths_json"] if "exclusive_paths_json" in row.keys() else "[]"
+    )
     try:
         dependencies = json.loads(dependencies_raw or "[]")
     except json.JSONDecodeError:
         dependencies = []
+    try:
+        exclusive_paths = json.loads(exclusive_paths_raw or "[]")
+    except json.JSONDecodeError:
+        exclusive_paths = []
     if not isinstance(dependencies, list):
         dependencies = []
+    if not isinstance(exclusive_paths, list):
+        exclusive_paths = []
     return {
         "task_id": row["task_id"],
         "workspace_id": row["workspace_id"],
@@ -134,6 +154,9 @@ def _row_to_record(row: Any) -> dict[str, Any]:
         "risk": row["risk"] or "normal",
         "owner_role": row["owner_role"] or "",
         "dependencies": [str(item).strip() for item in dependencies if str(item).strip()],
+        "exclusive_paths": [
+            str(item).strip() for item in exclusive_paths if str(item).strip()
+        ],
         "status": row["status"],
         "lease_holder": row["lease_holder"],
         "lease_expires_at": row["lease_expires_at"],
@@ -210,6 +233,7 @@ def create_task(
     risk: str = "normal",
     owner_role: str = "",
     dependencies: list[str] | None = None,
+    exclusive_paths: list[str] | None = None,
     attempt_budget: int = DEFAULT_ATTEMPT_BUDGET,
 ) -> dict[str, Any]:
     workspace = workspace_id.strip()
@@ -220,6 +244,7 @@ def create_task(
         raise TaskLedgerError("goal is required")
     budget = max(1, min(int(attempt_budget), 32))
     deps = [str(item).strip() for item in (dependencies or []) if str(item).strip()]
+    paths = [str(item).strip() for item in (exclusive_paths or []) if str(item).strip()]
     timestamp = _utc_now_iso()
     record = {
         "task_id": f"task-{uuid.uuid4().hex[:16]}",
@@ -229,6 +254,7 @@ def create_task(
         "risk": (risk or "normal").strip() or "normal",
         "owner_role": owner_role.strip().lower(),
         "dependencies_json": json.dumps(deps),
+        "exclusive_paths_json": json.dumps(paths),
         "status": "open",
         "lease_holder": None,
         "lease_expires_at": None,
@@ -311,6 +337,48 @@ def _assert_dependencies_satisfied(connection: Any, record: dict[str, Any]) -> N
             raise TaskLedgerError(f"dependency not completed: {dep_id} ({status or 'unknown'})")
 
 
+def _normalized_exclusive_paths(record: dict[str, Any]) -> list[str]:
+    raw = record.get("exclusive_paths")
+    if not isinstance(raw, list):
+        return []
+    return [
+        str(path).strip().strip("/").lower()
+        for path in raw
+        if str(path).strip().strip("/")
+    ]
+
+
+def _paths_overlap(left: str, right: str) -> bool:
+    return left == right or left.startswith(f"{right}/") or right.startswith(f"{left}/")
+
+
+def _assert_no_exclusive_path_conflict(
+    connection: Any,
+    record: dict[str, Any],
+) -> None:
+    requested = _normalized_exclusive_paths(record)
+    if not requested:
+        return
+    rows = connection.execute(
+        """
+        SELECT *
+        FROM workspace_tasks
+        WHERE workspace_id = ?
+          AND status = 'leased'
+          AND task_id != ?
+        """,
+        (record["workspace_id"], record["task_id"]),
+    ).fetchall()
+    for row in rows:
+        active = _row_to_record(row)
+        active_paths = _normalized_exclusive_paths(active)
+        if any(_paths_overlap(left, right) for left in requested for right in active_paths):
+            raise TaskLedgerError(
+                "exclusive path conflict with leased task "
+                f"{active['task_id']}"
+            )
+
+
 def lease_task(
     task_id: str,
     *,
@@ -346,6 +414,7 @@ def lease_task(
         if record["status"] == "leased":
             raise TaskLedgerError("task already leased")
         _assert_dependencies_satisfied(connection, record)
+        _assert_no_exclusive_path_conflict(connection, record)
 
         next_attempts = int(record["attempts_used"]) + 1
         connection.execute(

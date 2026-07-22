@@ -15,9 +15,9 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-22 — Gate 5 fan-out materialize (persist + N ready runs);
-Gate 4 closed; concurrent IDE tabs; galaxy workspace labels; Mission Control task
-board. Scheduler still **off** by default. After every push run
+**Last verified:** 2026-07-22 — Gate 5 closed (DAG, conflict serialization,
+fan-out, replans, synthesis, sibling stream preservation); Gate 4 closed;
+Mission Control task board. Scheduler still **off** by default. After every push run
 `./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:

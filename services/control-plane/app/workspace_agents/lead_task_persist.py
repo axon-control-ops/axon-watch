@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.persistence import task_store
+from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_task_plan import LeadTaskPlan
 
 
@@ -12,6 +13,7 @@ def persist_lead_task_plan(
     *,
     workspace_id: str,
     plan: LeadTaskPlan,
+    supersedes_plan_id: str | None = None,
 ) -> dict[str, Any]:
     """Create ledger tasks for each plan item; map plan_key deps → task_id deps.
 
@@ -40,6 +42,7 @@ def persist_lead_task_plan(
             risk=item.risk,
             owner_role=item.owner_role,
             dependencies=dep_task_ids,
+            exclusive_paths=item.exclusive_paths,
         )
         plan_key_to_task_id[plan_key] = str(created["task_id"])
         tasks.append(
@@ -50,9 +53,17 @@ def persist_lead_task_plan(
             }
         )
 
+    serialized_plan = plan.to_dict()
+    stored_plan = lead_plan_store.persist_plan(
+        workspace_id=workspace,
+        plan=serialized_plan,
+        plan_key_to_task_id=plan_key_to_task_id,
+        supersedes_plan_id=supersedes_plan_id,
+    )
     return {
+        "plan_id": stored_plan["plan_id"],
         "workspace_id": workspace,
-        "plan": plan.to_dict(),
+        "plan": serialized_plan,
         "plan_key_to_task_id": plan_key_to_task_id,
         "tasks": tasks,
     }

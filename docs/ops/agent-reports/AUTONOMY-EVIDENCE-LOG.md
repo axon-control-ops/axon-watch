@@ -73,16 +73,16 @@ Template:
 - owner: agent
 - commit: 69f43af
 - commands run: `tests.test_gate2_auth_containment.Gate2WatchInternalTokenTests` (5 OK); mint script `scripts/ops/mint-watch-mtls.sh`
-- pass/fail: pass
-- exit criteria met: yes — remote forces internal token; optional/required proxy mTLS (`X-SSL-Client-Verify`) + CP client-cert context; handbook directives in `docs/how-to/autonomy-gates-and-service-identity.md`
-- residual risks: reverse proxy must forward verify headers when `AXON_WATCH_MTLS_REQUIRED=1`; keep watch port internal
+- pass/fail: pass for unit-level token + proxy-header contract
+- exit criteria met: partial — CP client-cert context and proxy assertion checks exist, but no deployed proxy certificate-handshake proof
+- residual risks: verify headers are only trustworthy when an isolated proxy strips incoming copies; keep watch port internal and require a real deployment smoke before claiming end-to-end mTLS
 - next gate unlocked: Gate 5 (already started) — scheduler still off
 
-### Gate 5 slice (fan-out materialize) — 2026-07-22
+### Gate 5 — 2026-07-22
 - owner: agent
-- commit: pending this push; report `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`
-- commands run: `tests.test_lead_task_plan`; `tests.test_lead_fan_out`
+- commit: pending close-out commit; report `docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`
+- commands run: `tests.test_lead_task_plan`; `tests.test_lead_fan_out`; `tests.test_lead_replan`; `workspace-stream-ui.test.ts`
 - pass/fail: pass
-- exit criteria met: partial — plan + persist + N ready specialist runs/receipts; no Lane B auto-dispatch; replan-cancel still open
-- residual risks: scheduler still off; console does not yet open all specialist tabs from fan-out action
-- next gate unlocked: Gate 5 remainder (synthesis + optional dispatch) or Gate 6 verifier in parallel
+- exit criteria met: yes — ordered DAG, role assignment, persistent path conflicts, obsolete-task cancellation, durable replan/fan-out/synthesis receipts, and sibling stream preservation
+- residual risks: synthesis is deterministic rather than model-authored; fan-out does not auto-open every tab; scheduler remains off
+- next gate unlocked: Gate 6 (mandatory verifier contract)

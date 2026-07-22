@@ -106,6 +106,8 @@ main_tests=(
   tests.test_kairo_stt
   tests.test_kairo_tool_milestone
   tests.test_voice_autonomy
+  tests.test_voice_dispatch
+  tests.test_work_request_intent
   tests.test_command_shortcuts
   tests.test_kairo_conversation_turns
   tests.test_conversation_transcript
@@ -116,6 +118,8 @@ main_tests=(
   tests.test_gate3_worker_isolation
   tests.test_gate4_task_ledger
   tests.test_lead_task_plan
+  tests.test_lead_fan_out
+  tests.test_lead_replan
   tests.test_safe_improvement
   tests.test_safe_improvement_gate
 )
@@ -173,8 +177,8 @@ run_modules() {
   done
 }
 
-# Each service uses the top-level package name `app`. Running modules in
-# separate interpreter processes prevents a watch test's import/module state
+# Each service uses the top-level package name app. Running modules in
+# separate interpreter processes prevents a watch test import/module state
 # from contaminating a later control-plane test (and vice versa).
 run_modules "control-plane + shared suite" "" "${main_tests[@]}"
 run_modules "axon-watch vault (isolated PYTHONPATH)" \

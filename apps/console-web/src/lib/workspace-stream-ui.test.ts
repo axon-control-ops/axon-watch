@@ -30,6 +30,31 @@ describe('workspace-stream-ui', () => {
     ).toEqual(['thread_a', 'thread_c']);
   });
 
+  it('focuses another thread without clearing a sibling live stream', () => {
+    const streams = {
+      thread_a: {
+        ...defaultWorkspaceStreamUi(),
+        active: true,
+        messageId: 'msg_a',
+        ideAgentRunId: 'run_a',
+      },
+      thread_b: {
+        ...defaultWorkspaceStreamUi(),
+        active: true,
+        messageId: 'msg_b',
+        ideAgentRunId: 'run_b',
+      },
+    };
+    const before = structuredClone(streams);
+
+    const focused = workspaceStreamGlobalsFromState(streams.thread_b);
+
+    expect(focused.ideAgentRunId).toBe('run_b');
+    expect(streams).toEqual(before);
+    expect(streams.thread_a.active).toBe(true);
+    expect(streamingThreadIdsFromUiMap(streams)).toEqual(['thread_a', 'thread_b']);
+  });
+
   it('maps stream ui state to global fields', () => {
     const state = {
       ...defaultWorkspaceStreamUi(),

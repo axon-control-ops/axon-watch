@@ -1,7 +1,7 @@
 # Watch mTLS / service identity evidence
 
 **Date:** 2026-07-22  
-**Closes:** Gate 2 residual “mTLS watch exposure”  
+**Status:** code/config slice complete; deployed trusted-proxy handshake proof pending  
 **Handbook:** `docs/how-to/autonomy-gates-and-service-identity.md`
 
 ---
@@ -14,6 +14,10 @@
 4. **Mint script** — `./scripts/ops/mint-watch-mtls.sh`
 5. **Tests** — `Gate2WatchInternalTokenTests` covers deny without verify header and allow with SUCCESS + CN.
 
+These are unit-level proxy-header contracts, not proof that a real TLS
+terminator validated a client certificate. Verification headers are forgeable
+if watch is directly reachable or the proxy does not strip incoming copies.
+
 ---
 
 ## Operator directive (short)
@@ -25,4 +29,6 @@
 axonrestart
 ```
 
-**Do not** expose `:8788` publicly. **Do** keep token + mTLS together on remote hosts.
+**Do not** expose `:8788` publicly. **Do** keep token + mTLS together on remote
+hosts. Before claiming end-to-end mTLS, record a real proxy handshake smoke
+showing an untrusted client denied and the CP client certificate accepted.

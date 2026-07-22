@@ -666,10 +666,10 @@ Gate exit receipts are appended in [`docs/ops/agent-reports/AUTONOMY-EVIDENCE-LO
 
 ## Immediate next actions (start now)
 
-1. **Start Gate 5** — Lead planner + conflict policy + specialist fan-out (uses Gate 4 leases).
+1. **Start Gate 6** — mandatory verifier contract; failed checks must block completion.
 2. **Do not** re-enable continuous live-checkout editing.
-3. **Do not** re-enable the continuous scheduler by default until Lead assignment is routine.
-4. **Do not** build mobile mutation features until Gate 2 mTLS/service-identity residual is closed on remote.
+3. **Do not** re-enable the continuous scheduler by default until verifier blocking is proven.
+4. **Do not** build mobile mutation features until a real proxy mTLS handshake is proven on remote.
 5. On any remote deploy: set `AXON_WATCH_AUTH_MODE=local_token`, operator token, and `AXON_WATCH_INTERNAL_SERVICE_TOKEN`.
 
 ---

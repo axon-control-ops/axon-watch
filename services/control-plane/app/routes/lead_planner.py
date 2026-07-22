@@ -10,6 +10,11 @@ from pydantic import BaseModel, Field
 from app.persistence import task_store
 from app.workspace_agents import build_company_roster
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
+from app.workspace_agents.lead_replan import (
+    LeadReplanError,
+    replan_lead_goal,
+    synthesize_lead_plan,
+)
 from app.workspace_agents.lead_task_persist import persist_lead_task_plan
 from app.workspace_agents.lead_task_plan import LeadPlanRosterMember, build_lead_task_plan
 
@@ -23,6 +28,12 @@ class LeadPlanRequest(BaseModel):
 
 
 class LeadFanOutRequest(BaseModel):
+    goal: str = Field(min_length=1)
+    mode: Literal["auto", "fan_out", "sequential"] = "auto"
+    create_runs: bool = True
+
+
+class LeadReplanRequest(BaseModel):
     goal: str = Field(min_length=1)
     mode: Literal["auto", "fan_out", "sequential"] = "auto"
     create_runs: bool = True
@@ -85,3 +96,26 @@ def workspace_lead_fan_out(workspace_id: str, body: LeadFanOutRequest) -> dict[s
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except task_store.TaskLedgerError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/api/workspaces/{workspace_id}/lead/replan")
+def workspace_lead_replan(workspace_id: str, body: LeadReplanRequest) -> dict[str, Any]:
+    try:
+        return replan_lead_goal(
+            workspace_id=workspace_id,
+            goal=body.goal,
+            mode=body.mode,  # type: ignore[arg-type]
+            create_runs=body.create_runs,
+        )
+    except LeadReplanError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except task_store.TaskLedgerError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/api/lead/plans/{plan_id}/synthesize")
+def lead_plan_synthesize(plan_id: str) -> dict[str, Any]:
+    try:
+        return synthesize_lead_plan(plan_id)
+    except LeadReplanError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

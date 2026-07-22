@@ -7,6 +7,7 @@ from typing import Any
 from app.persistence import task_store
 from app.runs.service import append_run_execution_receipt, create_run
 from app.workspace_agents import build_company_roster
+from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_task_persist import persist_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
     LeadPlanRosterMember,
@@ -61,6 +62,7 @@ def materialize_lead_fan_out(
     goal: str,
     mode: PlanMode = "auto",
     create_runs: bool = True,
+    supersedes_plan_id: str | None = None,
 ) -> dict[str, Any]:
     """Build plan, persist tasks, and open leased runs for dependency-ready items.
 
@@ -83,7 +85,12 @@ def materialize_lead_fan_out(
     except ValueError as exc:
         raise LeadFanOutError(str(exc)) from exc
 
-    persisted = persist_lead_task_plan(workspace_id=workspace, plan=plan)
+    persisted = persist_lead_task_plan(
+        workspace_id=workspace,
+        plan=plan,
+        supersedes_plan_id=supersedes_plan_id,
+    )
+    plan_id = str(persisted["plan_id"])
     tasks_by_id = {str(row["task_id"]): row for row in persisted["tasks"]}
     runs: list[dict[str, Any]] = []
     deferred: list[dict[str, Any]] = []
@@ -149,7 +156,19 @@ def materialize_lead_fan_out(
             )
             tasks_by_id[task_id] = task_store.get_task(task_id) or leased
 
+    receipt = lead_plan_store.append_receipt(
+        plan_id=plan_id,
+        workspace_id=workspace,
+        kind="lead_fan_out_materialized",
+        payload={
+            "mode": plan.mode,
+            "task_count": len(persisted["tasks"]),
+            "run_ids": [str(run["run_id"]) for run in runs],
+            "deferred_task_ids": [str(row["task_id"]) for row in deferred],
+        },
+    )
     return {
+        "plan_id": plan_id,
         "workspace_id": workspace,
         "goal": cleaned_goal,
         "fan_out_intent": detect_fan_out_intent(cleaned_goal) or plan.mode == "fan_out",
@@ -160,7 +179,8 @@ def materialize_lead_fan_out(
         "runs": runs,
         "deferred": deferred,
         "receipt": {
-            "type": "lead_fan_out_materialized",
+            "receipt_id": receipt["receipt_id"],
+            "type": receipt["kind"],
             "summary": (
                 f"Lead materialized {len(persisted['tasks'])} tasks; "
                 f"started {len(runs)} ready runs; deferred {len(deferred)}"
