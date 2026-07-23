@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from app.runs.service import (  # noqa: E402
     mark_review_ready,
 )
 from app.workspace_agents.verifier_contract import (  # noqa: E402
+    ensure_acceptance_before_publish,
     has_passing_acceptance_evidence,
     record_acceptance_evidence,
 )
@@ -92,6 +94,37 @@ class Gate6VerifierContractTests(unittest.TestCase):
         )
         reviewed = mark_review_ready(str(created["run_id"]))
         self.assertEqual("review_ready", reviewed["phase"])
+
+    def test_ensure_acceptance_records_inspect_fallback_for_empty_root(self) -> None:
+        created = self._leased_executing_run()
+        run_id = str(created["run_id"])
+        with tempfile.TemporaryDirectory() as tmp:
+            ensure_acceptance_before_publish(run_id, workspace_root=tmp)
+        self.assertTrue(has_passing_acceptance_evidence(run_id))
+        completed = complete_run(run_id)
+        self.assertEqual("completed", completed["phase"])
+
+    def test_ensure_acceptance_fails_closed_on_secrets(self) -> None:
+        created = self._leased_executing_run()
+        run_id = str(created["run_id"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            secret = root / "notes.txt"
+            secret.write_text(
+                "token = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789'\n",
+                encoding="utf-8",
+            )
+            # Pretend git reported the dirty path.
+            ensure_acceptance_before_publish(
+                run_id,
+                workspace_root=root,
+                changed_paths=["notes.txt"],
+            )
+        self.assertFalse(has_passing_acceptance_evidence(run_id))
+        with self.assertRaises(RunLifecycleError) as ctx:
+            complete_run(run_id)
+        self.assertIn("did not pass", str(ctx.exception))
+        self.assertIn("acceptance=", str(ctx.exception))
 
 
 if __name__ == "__main__":

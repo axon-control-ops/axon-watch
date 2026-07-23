@@ -118,6 +118,7 @@ def finalize_lane_b_agent_run(
     dispatch_run_id: str,
     lane_b_result: dict[str, object],
     reply_text: str = "",
+    workspace_root: str | None = None,
 ) -> tuple[bool, dict[str, object] | None]:
     dispatched = bool(lane_b_result.get("dispatched"))
     runtime_label = str(lane_b_result.get("runtime_label") or "runtime fallback")
@@ -159,6 +160,14 @@ def finalize_lane_b_agent_run(
                 actor="critical_review",
                 success=True,
                 intent="lane_b_agent",
+            )
+            from app.workspace_agents.verifier_contract import (
+                ensure_acceptance_before_publish,
+            )
+
+            ensure_acceptance_before_publish(
+                dispatch_run_id,
+                workspace_root=workspace_root,
             )
             run_record = complete_run(dispatch_run_id)
         else:

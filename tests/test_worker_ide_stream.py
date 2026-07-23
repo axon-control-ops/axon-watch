@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -57,6 +58,7 @@ class WorkerIdeStreamTests(unittest.TestCase):
             goal="Ship IDE mirror for continuous workers",
         )
         run_id = str(created["run_id"])
+        isolation = Path(tempfile.mkdtemp(prefix="axon-worker-ide-"))
 
         def fake_lane_b(**kwargs: object) -> dict[str, object]:
             on_chunk = kwargs.get("on_chunk")
@@ -77,17 +79,13 @@ class WorkerIdeStreamTests(unittest.TestCase):
             side_effect=fake_lane_b,
         ), patch(
             "app.workspace_agents.worker_dispatch.create_worker_isolation",
-            return_value=__import__("pathlib").Path("/tmp/axon-worker-ide/checkout"),
+            return_value=isolation,
         ), patch(
             "app.workspace_agents.worker_dispatch.worker_agent_workspace",
-            return_value=__import__("pathlib").Path("/tmp/axon-worker-ide/checkout"),
+            return_value=isolation,
         ), patch(
             "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
             return_value={"cleaned": True, "removed": True},
-        ), patch(
-            # Gate 6 acceptance is orthogonal to IDE transcript mirroring.
-            "app.workspace_agents.verifier_contract.run_requires_acceptance_evidence",
-            return_value=False,
         ):
             dispatched, finalized = dispatch_continuous_worker_run(
                 workspace_id=workspace_id,

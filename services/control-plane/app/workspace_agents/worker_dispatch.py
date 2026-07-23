@@ -221,6 +221,7 @@ def dispatch_continuous_worker_run(
             dispatch_run_id=run_id,
             lane_b_result=lane_b_result,
             reply_text=reply_text,
+            workspace_root=str(agent_root),
         )
         if ide_stream is not None:
             try:
