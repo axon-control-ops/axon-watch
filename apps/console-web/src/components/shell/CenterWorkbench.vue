@@ -29,8 +29,8 @@ import {
 import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
-import { isBinaryFilePath, isImageFilePath, isPdfFilePath, isTabularFilePath } from '../../lib/workspace-file-language';
-import { csvTablePreviewFromRaw } from '../../lib/editor-csv-table-view';
+import { isBinaryFilePath, isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
+import { useEditorCsvPreview } from '../../lib/use-editor-csv-preview';
 import { resolveThreadImageUrl } from '../../lib/thread-image-url';
 import { useEditorPdfPreview } from '../../lib/use-editor-pdf-preview';
 import { useEditorBreadcrumbSegments } from '../../lib/use-editor-breadcrumb-segments';
@@ -119,16 +119,14 @@ const editorBreadcrumbSegments = useEditorBreadcrumbSegments({
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
 );
-const isCsvEditorDocument = computed(() => {
-  const document = shell.activeEditorDocument;
-  if (!document) {
-    return false;
-  }
-  if (document.language === 'csv') {
-    return true;
-  }
-  const path = document.filePath ?? document.title;
-  return document.source === 'file' && isTabularFilePath(path);
+const {
+  isCsvEditorDocument,
+  csvTablePreviewEnabled,
+  editorCsvTableHtml,
+  setCsvTablePreviewMode,
+} = useEditorCsvPreview({
+  activeDocument: computed(() => shell.activeEditorDocument),
+  activeEditorValue,
 });
 const isImageEditorDocument = computed(() => {
   const document = shell.activeEditorDocument;
@@ -169,14 +167,12 @@ const { editorLineCount, editorEol, editorLanguageLabel, editorAccessStatus } =
     isImageEditorDocument,
   });
 const editorPreviewEnabled = ref(false);
-const csvTablePreviewEnabled = ref(true);
 
 watch(
   () => shell.activeEditorDocument?.id,
   (documentId) => {
     if (!documentId) {
       editorPreviewEnabled.value = false;
-      csvTablePreviewEnabled.value = true;
       return;
     }
     editorPreviewEnabled.value = resolveEditorMarkdownPreviewEnabled(
@@ -184,7 +180,6 @@ watch(
       shell.activeEditorDocument?.language === 'markdown',
       shell.activeEditorDocument?.source === 'draft',
     );
-    csvTablePreviewEnabled.value = true;
   },
   { immediate: true },
 );
@@ -196,17 +191,6 @@ const editorPreviewHtml = computed(() => {
   return renderAgentMessageMarkdown(activeEditorValue.value, {
     workspaceId: shell.currentWorkspace?.workspace_id ?? null,
   });
-});
-
-const editorCsvTableHtml = computed(() => {
-  if (!isCsvEditorDocument.value) {
-    return '';
-  }
-  const path =
-    shell.activeEditorDocument?.source === 'file'
-      ? shell.activeEditorDocument.filePath ?? shell.activeEditorDocument.title
-      : shell.activeEditorDocument?.title ?? null;
-  return csvTablePreviewFromRaw(activeEditorValue.value, path);
 });
 
 const editorImagePreviewUrl = computed(() => {
@@ -237,13 +221,6 @@ function setEditorPreviewMode(enabled: boolean): void {
   }
   editorPreviewEnabled.value = enabled;
   persistEditorMarkdownPreviewEnabled(documentId, enabled);
-}
-
-function setCsvTablePreviewMode(enabled: boolean): void {
-  if (!isCsvEditorDocument.value) {
-    return;
-  }
-  csvTablePreviewEnabled.value = enabled;
 }
 
 const editorTabDocuments = computed(() =>

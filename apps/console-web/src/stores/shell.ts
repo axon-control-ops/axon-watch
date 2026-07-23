@@ -330,11 +330,8 @@ import {
   type WorkspacesLoadState,
 } from './shell/types';
 export type { LayoutMode, RuntimeSummaryLoadState, RuntimeStatusLoadState, InboxLoadState, RunsLoadState, WorkspacesLoadState, BriefingLoadState, WorkspaceFilesLoadState, RunMutationState } from './shell/types';
-
 export const useShellStore = defineStore('shell', () => {
   const layoutMode = ref<LayoutMode>(readStoredLayoutMode() ?? 'operator');
-
-  // Backend-owned state stays on shared canonical DTO seams.
   const workspaces = ref<WorkspaceRecord[]>([]);
   const currentWorkspace = ref<WorkspaceRecord | null>(null);
   const operatorPinnedWorkspaceId = ref<string | null>(readStoredOperatorWorkspaceId());

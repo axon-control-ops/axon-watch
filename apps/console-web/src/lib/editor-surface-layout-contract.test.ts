@@ -305,6 +305,7 @@ describe('IDE editor surface layout contract', () => {
 
     const tail = readCss('shell/mockup-shell-tail.css');
     expect(tail).toMatch(/@import\s+['"]\.\/mockup-shell-32\.css['"]/);
+    expect(tail).toMatch(/@import\s+['"]\.\/mockup-shell-33\.css['"]/);
 
     const shell32 = readCss('shell/mockup-shell-32.css');
     expect(shell32).toMatch(/@import\s+['"]\.\/company-roster-alert\.css['"]/);

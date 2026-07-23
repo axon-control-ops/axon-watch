@@ -79,7 +79,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 672,
+      "max_lines": 660,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
@@ -209,7 +209,7 @@
       "note": "Mission control panel; extract quick-guide rail when shrinking"
     },
     "apps/console-web/src/styles/ide/ide-layout-01.css": {
-      "max_lines": 436,
+      "max_lines": 424,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
@@ -222,7 +222,7 @@
       "target": "apps/console-web/src/styles/ide/*"
     },
     "apps/console-web/src/styles/shell/mockup-shell-07.css": {
-      "max_lines": 213,
+      "max_lines": 182,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"
@@ -300,7 +300,7 @@
       "note": "Persona dock after speech/presence"
     },
     "apps/console-web/src/styles/shell/mockup-shell-32.css": {
-      "max_lines": 586,
+      "max_lines": 544,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"

@@ -1,4 +1,3 @@
-/* IDE chrome — split into bounded chunks under styles/ide/ */
 @import './ide/ide-layout-01.css';
 @import './ide/ide-panel-shared.css';
 @import './ide/ide-layout-01-connector-attention.css';
