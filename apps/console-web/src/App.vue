@@ -15,6 +15,7 @@ import OperatorSettingsSurface from './components/settings/OperatorSettingsSurfa
 import ScanHierarchyPreview from './dev/ScanHierarchyPreview.vue';
 import { useAppSurface } from './composables/useAppSurface';
 import { startLiveEventsSession } from './lib/live-events-session';
+import { runEngagementSurfaceRefresh } from './stores/shell/refresh-engagement-surfaces';
 import { useIdeLayoutShortcuts } from './composables/useIdeLayoutShortcuts';
 import { useIdeKairoInterrupt } from './composables/useIdeKairoInterrupt';
 import { useVoiceDeckOnBoot } from './features/voice-deck/use-voice-deck';
@@ -109,7 +110,14 @@ watch(
         if (shell.layoutMode === 'ide') {
           return;
         }
-        return shell.refreshEngagementSurfaces();
+        return runEngagementSurfaceRefresh({
+          workspaceId: shell.currentWorkspace?.workspace_id ?? null,
+          briefingLoaded: shell.briefingLoadState === 'loaded',
+          loadRuns: (options) => shell.loadRuns(options),
+          loadOperatorBriefing: (options) => shell.loadOperatorBriefing(options),
+          refreshOperatorThreadMessages: (workspaceId) =>
+            shell.refreshOperatorThreadMessages(workspaceId),
+        });
       },
       onSpokenBriefing: () => shell.speakOperatorBriefing(),
     });
