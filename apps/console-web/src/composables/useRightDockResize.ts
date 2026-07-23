@@ -23,14 +23,28 @@ export function useRightDockResize(options: UseRightDockResizeOptions) {
   const viewportWidth = ref(window.innerWidth);
 
   const ariaValueMin = MIN_AGENT_DOCK_WIDTH;
-  const ariaValueMax = computed(() => maxAgentDockWidth(viewportWidth.value));
+  const ariaValueMax = computed(() => layoutMaxDockWidth(viewportWidth.value));
 
   function shellRoot(): HTMLElement | null {
     return options.dockRef.value?.closest('.console-shell--mockup') as HTMLElement | null;
   }
 
+  function layoutMaxDockWidth(width: number): number {
+    const leftSidebarWidth =
+      shellRoot()?.querySelector('.region-left-sidebar')?.getBoundingClientRect().width ?? 0;
+    const centerMinimum = Math.min(320, Math.max(220, width * 0.28));
+    const maximumWithCenter = width - leftSidebarWidth - centerMinimum - 32;
+    return Math.max(
+      MIN_AGENT_DOCK_WIDTH,
+      Math.min(maxAgentDockWidth(width), maximumWithCenter),
+    );
+  }
+
   function applyDockWidth(width: number): void {
-    const clamped = clampAgentDockWidth(width, window.innerWidth);
+    const clamped = Math.min(
+      clampAgentDockWidth(width, window.innerWidth),
+      layoutMaxDockWidth(window.innerWidth),
+    );
     dockWidth.value = clamped;
     shellRoot()?.style.setProperty('--shell-agent-dock-width', `${clamped}px`);
   }

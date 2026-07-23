@@ -279,7 +279,7 @@
 
 .left-sidebar-mockup--galaxy .left-sidebar-mockup__workspaces-panel {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: min(58vh, 34rem);
 }
 
 .left-sidebar-mockup__status-anchor--galaxy {

@@ -380,7 +380,30 @@
 }
 
 .briefing-panel--hero .briefing-open-loops {
-  display: grid;
+  margin-top: 0.45rem;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid rgba(0, 242, 255, 0.16);
+  background: rgba(0, 18, 28, 0.45);
 }
 
+.briefing-panel--hero .briefing-open-loops__label {
+  color: rgba(0, 242, 255, 0.72);
+  letter-spacing: 0.14em;
+}
+
+.briefing-panel--hero .briefing-open-loops__button {
+  border-color: rgba(0, 242, 255, 0.2);
+  background: rgba(0, 30, 42, 0.55);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.briefing-panel--hero .briefing-open-loops__button:hover,
+.briefing-panel--hero .briefing-open-loops__button:focus-visible {
+  border-color: rgba(0, 242, 255, 0.45);
+  background: rgba(0, 42, 58, 0.72);
+  box-shadow: 0 0 12px rgba(0, 180, 220, 0.18);
+}
 

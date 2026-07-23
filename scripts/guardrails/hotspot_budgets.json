@@ -4,14 +4,14 @@
   "note": "Baseline from Axon-X file-size audit. Ratchet budgets block growth until extraction lowers max_lines.",
   "critical_hotspots": {
     "apps/console-web/src/styles/mockup-shell.css": {
-      "max_lines": 34,
+      "max_lines": 33,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/* + feature co-located CSS",
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3875,
+      "max_lines": 3859,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -202,7 +202,7 @@
       "target": "apps/console-web/src/styles/shell/mockup-shell-13a.css + mockup-shell-13b.css"
     },
     "apps/console-web/src/components/shell/OperatorStatusRadarPanel.vue": {
-      "max_lines": 700,
+      "max_lines": 670,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-status-radar/*",
@@ -228,7 +228,7 @@
       "target": "apps/console-web/src/styles/shell/*"
     },
     "apps/console-web/src/styles/shell/mockup-shell-18.css": {
-      "max_lines": 346,
+      "max_lines": 344,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/*"

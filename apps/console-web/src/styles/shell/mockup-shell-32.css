@@ -16,7 +16,7 @@
 
 .company-roster--persona-dock .company-roster__dock-host {
   flex: 1 1 auto;
-  min-height: 6rem;
+  min-height: 12rem;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -493,8 +493,10 @@
 
 .ide-team-panel {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  min-height: 0;
+  min-height: min(58vh, 34rem);
+  margin: 0.35rem 0.35rem 0 0.2rem;
 }
 
 .ide-team-panel__body {
@@ -503,6 +505,11 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.ide-team-panel__body > .company-roster {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 @keyframes company-roster-glow-pulse {

@@ -22,6 +22,7 @@ import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit
 import { useKairoAppVoice } from './features/kairo-conversation/use-kairo-app-voice';
 import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
 import VoiceOrbHost from './features/brain-galaxy/VoiceOrbHost.vue';
+import HudHoloAtmosphere from './features/hud-holo/HudHoloAtmosphere.vue';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
@@ -89,6 +90,40 @@ watch(
 
     shell.bindViewportCompactListener();
 
+    // #region agent log
+    requestAnimationFrame(() => {
+      const root = document.querySelector('.console-shell--mockup');
+      if (!(root instanceof HTMLElement)) {
+        return;
+      }
+      const style = getComputedStyle(root);
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': 'fc0b35',
+        },
+        body: JSON.stringify({
+          sessionId: 'fc0b35',
+          runId: 'post-fix',
+          hypothesisId: 'H-holo-hud',
+          location: 'App.vue:bootComplete',
+          message: 'holographic glass3d shell armed',
+          data: {
+            hasGlass3d: root.classList.contains('console-shell--glass3d'),
+            dataHud: root.getAttribute('data-hud'),
+            perspective: style.perspective,
+            layoutMode: shell.layoutMode,
+            accentSample: getComputedStyle(root).getPropertyValue('--accent-brand').trim(),
+            textHud: getComputedStyle(root).getPropertyValue('--text-hud').trim(),
+            surfaceShell: getComputedStyle(root).getPropertyValue('--surface-shell').trim(),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    });
+    // #endregion
+
     liveEventsSession?.disconnect();
     liveEventsSession = startLiveEventsSession({
       onRefresh: () => {
@@ -143,6 +178,7 @@ onUnmounted(() => {
         'console-shell--operator': shell.layoutMode === 'operator',
         'console-shell--brain-galaxy':
           shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
+        'console-shell--glass3d': !isFoundationSurface,
         'console-shell--vault': isVaultSurface,
         'console-shell--data': isDataSurface,
         'console-shell--skills': isSkillsSurface,
@@ -150,7 +186,9 @@ onUnmounted(() => {
         'console-shell--settings': isSettingsSurface,
       }"
       :data-layout-mode="shell.layoutMode"
+      data-hud="holographic"
     >
+      <HudHoloAtmosphere v-if="!isFoundationSurface" />
       <TopBar />
       <template v-if="!isFoundationSurface">
         <MobileVoiceCockpitStrip />

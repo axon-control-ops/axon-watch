@@ -44,6 +44,8 @@ function closePanel(): void {
 .ide-briefing-panel {
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
+  container-name: briefing-card;
   min-height: 0;
   height: 100%;
   overflow: hidden;

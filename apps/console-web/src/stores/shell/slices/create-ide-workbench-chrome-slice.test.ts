@@ -137,9 +137,9 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     expect(ideTerminalRevealToken.value).toBe(1);
   });
 
-  it('setIdeActivityView agent opens the sidebar stub and expands the dock', () => {
-    const ideActivityView = ref<'explorer' | 'agent'>('explorer');
-    const ideExplorerCollapsed = ref(true);
+  it('setIdeActivityView agent expands the dock without replacing the left sidebar', () => {
+    const ideActivityView = ref<'explorer' | 'agent' | 'team'>('team');
+    const ideExplorerCollapsed = ref(false);
     const agentDockCollapsed = ref(true);
     const slice = createSlice({
       ideActivityView,
@@ -149,14 +149,14 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
 
     slice.setIdeActivityView('agent');
 
-    expect(ideActivityView.value).toBe('agent');
+    expect(ideActivityView.value).toBe('team');
     expect(ideExplorerCollapsed.value).toBe(false);
     expect(agentDockCollapsed.value).toBe(false);
   });
 
-  it('focusIdeSidebarView shows stub guidance without changing dock or terminal state', () => {
-    const ideActivityView = ref<'explorer' | 'agent' | 'terminal'>('explorer');
-    const ideExplorerCollapsed = ref(true);
+  it('focusIdeSidebarView agent expands the dock and leaves Team/Explorer alone', () => {
+    const ideActivityView = ref<'explorer' | 'agent' | 'terminal' | 'team'>('team');
+    const ideExplorerCollapsed = ref(false);
     const agentDockCollapsed = ref(true);
     const ideTerminalRevealToken = ref(0);
     const slice = createSlice({
@@ -167,9 +167,9 @@ describe('createIdeWorkbenchChromeSlice sidebar focus', () => {
     });
 
     slice.focusIdeSidebarView('agent');
-    expect(ideActivityView.value).toBe('agent');
+    expect(ideActivityView.value).toBe('team');
     expect(ideExplorerCollapsed.value).toBe(false);
-    expect(agentDockCollapsed.value).toBe(true);
+    expect(agentDockCollapsed.value).toBe(false);
     expect(ideTerminalRevealToken.value).toBe(0);
 
     slice.focusIdeSidebarView('terminal');

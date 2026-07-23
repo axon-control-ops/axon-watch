@@ -271,9 +271,6 @@ import {
   shouldShowBriefingAttentionInCommandMode,
 } from '../lib/kairo-briefing-attention';
 import {
-  buildStatusBarSegments,
-} from '../lib/runtime-strip';
-import {
   persistOperatorWorkspaceId,
   readStoredOperatorWorkspaceId,
 } from '../lib/operator-workspace-selection';
@@ -294,6 +291,7 @@ import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
 import { createCursorCatalogSlice } from './shell/slices/create-cursor-catalog-slice';
 import { createDockLayoutSlice } from './shell/slices/create-dock-layout-slice';
 import { createIdeWorkbenchChromeSlice } from './shell/slices/create-ide-workbench-chrome-slice';
+import { hydrateWorkspaceIdeChatImpl as runHydrateWorkspaceIdeChatImpl } from './shell/ensure-company-employee-ide-tabs';
 import { createOperatorBriefingSlice } from './shell/slices/create-operator-briefing-slice';
 import { createOperatorFocusSlice } from './shell/slices/create-operator-focus-slice';
 import { createOperatorPresenceSettingsSlice } from './shell/slices/create-operator-presence-settings-slice';
@@ -520,11 +518,6 @@ export const useShellStore = defineStore('shell', () => {
   const workbenchTerminalPanelVisible = ref(false);
   const teamRosterRevealToken = ref(0);
 
-
-  const layoutModeLabel = computed(() =>
-    layoutMode.value === 'operator' ? 'Mission Control' : 'IDE mode',
-  );
-
   const workspaceRuns = computed(() =>
     currentWorkspace.value
       ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
@@ -546,6 +539,9 @@ export const useShellStore = defineStore('shell', () => {
     attentionSignals,
     workspaceAttentionSignalCount,
     statusBarZones,
+    statusBarSegments,
+    statusBarItems,
+    layoutModeLabel,
     workspaceStatusCardRows,
     briefingSummaryLine,
     runtimeStateLabel,
@@ -809,17 +805,6 @@ export const useShellStore = defineStore('shell', () => {
       idePresenceProfile: idePresenceProfile.value,
     }),
   );
-
-  const statusBarSegments = computed(() =>
-    buildStatusBarSegments({
-      layoutModeLabel: layoutModeLabel.value,
-      workspaceId: currentWorkspace.value?.workspace_id ?? null,
-      runtimeSummary: runtimeSummary.value,
-      pendingApprovals: pendingApprovalsCount.value,
-    }),
-  );
-
-  const statusBarItems = computed(() => statusBarSegments.value.map((segment) => segment.label));
 
   const dockSeamLayout = computed(() =>
     buildDockSeamLayout({
@@ -1210,21 +1195,6 @@ export const useShellStore = defineStore('shell', () => {
     return promise;
   }
 
-  async function hydrateWorkspaceIdeChatImpl(workspaceId: string): Promise<void> {
-    // Restore cached transcript immediately so the dock does not flash empty while
-    // thread list + history requests are in flight.
-    applyIdeThreadMessagesToView(workspaceId);
-    await loadIdeThreads(workspaceId);
-    bootstrapIdeActiveThreadId(workspaceId);
-    applyIdeThreadMessagesToView(workspaceId);
-    const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
-    if (!threadId) {
-      return;
-    }
-    await loadWorkspaceThread(workspaceId, 'ide', threadId);
-    applyIdeThreadMessagesToView(workspaceId);
-  }
-
   async function hydrateWorkspaceIdeChat(workspaceId: string): Promise<void> {
     const cleaned = workspaceId.trim();
     if (!cleaned) {
@@ -1236,7 +1206,19 @@ export const useShellStore = defineStore('shell', () => {
       return inflight;
     }
 
-    const promise = hydrateWorkspaceIdeChatImpl(cleaned).finally(() => {
+    const promise = runHydrateWorkspaceIdeChatImpl({
+      workspaceId: cleaned,
+      companyEmployeesByWorkspaceId,
+      ideThreadsByWorkspaceId,
+      loadCompanyEmployees,
+      loadIdeThreads,
+      getWorkspaceSurfaceThreadId,
+      persistOpenIdeThreadTabs,
+      selectIdeThread,
+      applyIdeThreadMessagesToView,
+      bootstrapIdeActiveThreadId,
+      loadWorkspaceThread,
+    }).finally(() => {
       ideChatHydratePromises.delete(cleaned);
     });
     ideChatHydratePromises.set(cleaned, promise);
@@ -1809,7 +1791,7 @@ export const useShellStore = defineStore('shell', () => {
     ideDebugModeSelected.value = selected;
   }
 
-  /** Open the IDE chat dock without changing the draft. Keep Team (or other) left panel when requested. */
+  /** Open the IDE chat dock without changing the draft. Left sidebar (Team/Explorer) stays put. */
   function openIdeComposer(options: { keepActivityView?: boolean } = {}): void {
     commandMutationError.value = null;
     if (layoutMode.value !== 'ide') {
@@ -1817,9 +1799,7 @@ export const useShellStore = defineStore('shell', () => {
     }
     agentDockCollapsed.value = false;
     persistAgentDockCollapsed(false);
-    if (!options.keepActivityView) {
-      ideActivityView.value = 'agent';
-    }
+    void options.keepActivityView;
     commandFocusToken.value += 1;
   }
 

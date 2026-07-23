@@ -319,8 +319,8 @@ function showAgentDock(): void {
   if (!shell.agentDockCollapsed) {
     return;
   }
-
-  shell.setIdeActivityView('agent');
+  // Expand the right dock only — do not swap the left sidebar off Team/Explorer.
+  shell.toggleAgentDock();
 }
 
 useWorkbenchPanelAutoPeek({
