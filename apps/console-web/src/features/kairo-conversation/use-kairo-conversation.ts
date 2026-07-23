@@ -1,18 +1,6 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
 
-import {
-  converseTimeoutFallbackReply,
-  KairoConverseTimeoutError,
-  postKairoConverse,
-  resolveKairoConverseTimeoutMs,
-} from '../../lib/kairo-converse-client';
-import { parseChatUiAction } from '../../lib/chat-ui-action';
-import { normalizeKairoCopy, normalizeVoiceTranscript } from '../../lib/kairo-entity-labels';
-import { recordOperatorArtifacts } from '../../lib/operator-artifact-view';
-import {
-  formatConversationDisplayReply,
-  sanitizeSpokenReply,
-} from '../../lib/sanitize-spoken-reply';
+import { normalizeVoiceTranscript } from '../../lib/kairo-entity-labels';
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
 import { recordVoiceLoopDiagnostic } from '../../lib/kairo-voice-loop-diagnostics';
 import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
@@ -22,27 +10,19 @@ import {
   applyKairoConversationNavigationIntent,
   resolveKairoConversationNavigationIntent,
 } from './conversation-navigation-handler';
-import { dispatchKairoConverseOutcome } from './kairo-conversation-dispatch';
-import {
-  mentionsBriefingSurfaceOffer,
-  scheduleBriefingSurfaceOffer,
-} from './conversation-briefing-surface';
 import {
   kairoConversationError,
   kairoConversationPhase,
-  kairoConversationReply,
   setKairoConversationPhase,
 } from './kairo-conversation-state';
 import { brainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
 import { useKairoSpeechCapture } from './use-kairo-speech-capture';
-import {
-  createKairoConversationTurnHandlers,
-  HANDOFF_CLIENT_RE,
-} from './kairo-conversation-turn-handlers';
+import { createKairoConversationTurnHandlers } from './kairo-conversation-turn-handlers';
 import {
   createKairoRuntimeAssistantCue,
   createKairoVoiceDelivery,
 } from './kairo-conversation-voice-runtime';
+import { runKairoConverseSubmit } from './run-kairo-converse-submit';
 
 export function useKairoConversation() {
   const shell = useShellStore();
@@ -203,91 +183,30 @@ export function useKairoConversation() {
       return;
     }
 
-    try {
-      const response = await postKairoConverse(
-        {
-          content,
-          session_id: kairoSpeechSessionId(),
-          workspace_id: workspaceId.value,
-          use_runtime: answerTier === 'deep',
-          answer_tier: answerTier,
-          context_workspace_id: brainGalaxyConversationFocus.value?.workspaceId ?? workspaceId.value,
-          context_signal_id: brainGalaxyConversationFocus.value?.signalId ?? '',
-          context_node_id: brainGalaxyConversationFocus.value?.nodeId ?? '',
-        },
-        { signal: abortSignal },
-      );
-      clearRuntimeAssistantCue();
-      recordVoiceLoopDiagnostic({
-        kind: 'converse_done',
-        latencyMs: Date.now() - converseStartedAt,
-        phase: 'thinking',
-      });
-      if (response.artifacts.length) {
-        recordOperatorArtifacts(response.artifacts, parseChatUiAction);
-      }
-      if (!response.action && HANDOFF_CLIENT_RE.test(content)) {
-        if (await tryClientHandoff(content)) {
-          closeTurnSurface();
-          return;
-        }
-      }
-      kairoConversationReply.value = normalizeKairoCopy(
-        formatConversationDisplayReply(response.reply) || sanitizeSpokenReply(response.reply),
-      );
-      closeTurnSurface({ keepPhase: true });
-      await dispatchKairoConverseOutcome(shell, response, executeConverseAction);
-      if (mentionsBriefingSurfaceOffer(response.reply)) {
-        scheduleBriefingSurfaceOffer();
-      }
-      await deliverVoiceReply(response.reply, options?.voiceCaptureMode);
-      if (kairoConversationPhase.value === 'thinking') {
-        setKairoConversationPhase('idle');
-      }
-    } catch (error) {
-      clearRuntimeAssistantCue();
-      const timedOut = error instanceof KairoConverseTimeoutError;
-      const timeoutMs = timedOut
-        ? error.timeoutMs
-        : resolveKairoConverseTimeoutMs(answerTier);
-      if (timedOut) {
-        recordVoiceLoopDiagnostic({
-          kind: 'converse_timeout',
-          latencyMs: Date.now() - converseStartedAt,
-          delayMs: timeoutMs,
-        });
-        const fallback = converseTimeoutFallbackReply(timeoutMs);
-        kairoConversationError.value = fallback;
-        kairoConversationReply.value = fallback;
-        closeTurnSurface({ keepPhase: true });
-        await deliverVoiceReply(fallback, options?.voiceCaptureMode);
-        if (kairoConversationPhase.value === 'thinking') {
-          setKairoConversationPhase('idle');
-        }
-      } else {
-        recordVoiceLoopDiagnostic({
-          kind: 'converse_error',
-          reason: error instanceof Error ? error.message : 'unknown',
-          latencyMs: Date.now() - converseStartedAt,
-        });
-        kairoConversationError.value =
-          error instanceof Error ? error.message : 'KAIRO conversation failed';
-        setKairoConversationPhase('idle');
-        closeTurnSurface();
-      }
-    } finally {
-      clearRuntimeAssistantCue();
-      if (pending.value) {
-        pending.value = false;
-      }
-      thinkingLine.value = '';
-      if (kairoConversationPhase.value === 'thinking') {
-        setKairoConversationPhase('idle');
-      }
-      if (activeConverseAbort?.signal === abortSignal) {
-        activeConverseAbort = null;
-      }
+    await runKairoConverseSubmit({
+      shell,
+      content,
+      answerTier,
+      converseStartedAt,
+      abortSignal,
+      sessionId: kairoSpeechSessionId(),
+      workspaceId: workspaceId.value,
+      contextWorkspaceId: brainGalaxyConversationFocus.value?.workspaceId ?? workspaceId.value,
+      contextSignalId: brainGalaxyConversationFocus.value?.signalId ?? '',
+      contextNodeId: brainGalaxyConversationFocus.value?.nodeId ?? '',
+      voiceCaptureMode: options?.voiceCaptureMode,
+      deliverVoiceReply,
+      executeConverseAction,
+      tryClientHandoff,
+      closeTurnSurface,
+      clearRuntimeAssistantCue,
+      pending,
+    });
+
+    if (activeConverseAbort?.signal === abortSignal) {
+      activeConverseAbort = null;
     }
+    thinkingLine.value = '';
   }
 
   function handleFocus(): void {

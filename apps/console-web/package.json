@@ -11,6 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tresjs/core": "^5.8.3",
+    "@tresjs/post-processing": "^3.7.4",
     "@xterm/addon-fit": "latest",
     "@xterm/xterm": "latest",
     "marked": "^18.0.5",

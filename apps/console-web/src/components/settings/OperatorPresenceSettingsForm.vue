@@ -2,15 +2,14 @@
 import { computed, ref, watch } from 'vue';
 
 import type { OperatorPresenceSettings } from '../../contracts/canonical';
-import { kairoVoiceLastReason } from '../../lib/kairo-voice-diagnostics';
 import {
-  applyJarvisDuplexPreset,
   defaultOperatorPresenceSettings,
-  formatVoiceTuningValue,
   normalizeOperatorPresenceSettings,
 } from '../../lib/operator-presence-settings';
+import OperatorPresenceHandsFreeFields from './OperatorPresenceHandsFreeFields.vue';
 import OperatorPresenceVoiceRoutingFields from './OperatorPresenceVoiceRoutingFields.vue';
 import OperatorPresenceSettingsFooter from './OperatorPresenceSettingsFooter.vue';
+import OperatorPresenceVoiceTuningFields from './OperatorPresenceVoiceTuningFields.vue';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
@@ -27,7 +26,6 @@ const shell = useShellStore();
 
 const draft = ref<OperatorPresenceSettings>(normalizeOperatorPresenceSettings(props.settings));
 const dirty = ref(false);
-const voiceTesting = ref(false);
 const voiceTestResult = ref<string | null>(null);
 
 watch(
@@ -57,6 +55,11 @@ function patchDraft(patch: Partial<OperatorPresenceSettings>): void {
   markDirty();
 }
 
+function applyDuplexPreset(settings: OperatorPresenceSettings): void {
+  draft.value = settings;
+  markDirty();
+}
+
 const configuredNarration = computed(() => draft.value.kairo_narration ?? 'minimal');
 const effectiveNarration = computed(() => shell.effectiveKairoNarrationLevel);
 const narrationOverridden = computed(
@@ -68,16 +71,6 @@ const personaEnabled = computed({
   set: (value: boolean) => patchDraft({ operator_persona_enabled: value }),
 });
 
-const spokenAlertsEnabled = computed({
-  get: () => draft.value.spoken_alerts_enabled,
-  set: (value: boolean) => patchDraft({ spoken_alerts_enabled: value }),
-});
-
-const ideVoiceStripEnabled = computed({
-  get: () => draft.value.ide_voice_strip_enabled,
-  set: (value: boolean) => patchDraft({ ide_voice_strip_enabled: value }),
-});
-
 const privacyMode = computed({
   get: () => draft.value.privacy_mode,
   set: (value: boolean) => patchDraft({ privacy_mode: value }),
@@ -86,37 +79,6 @@ const privacyMode = computed({
 const mobileCompactPreferred = computed({
   get: () => draft.value.mobile_compact_preferred,
   set: (value: boolean) => patchDraft({ mobile_compact_preferred: value }),
-});
-
-const handsFreeEnabled = computed({
-  get: () => draft.value.hands_free_enabled,
-  set: (value: boolean) => patchDraft({ hands_free_enabled: value }),
-});
-
-const wakeWordConsent = computed({
-  get: () => draft.value.wake_word_listening_consent,
-  set: (value: boolean) =>
-    patchDraft({
-      wake_word_listening_consent: value,
-      wake_word_listening_enabled: value ? draft.value.wake_word_listening_enabled : false,
-    }),
-});
-
-const wakeWordEnabled = computed({
-  get: () => draft.value.wake_word_listening_enabled,
-  set: (value: boolean) =>
-    patchDraft({
-      wake_word_listening_enabled: value,
-      wake_word_listening_consent: value ? true : draft.value.wake_word_listening_consent,
-    }),
-});
-
-const proactiveDuplexEnabled = computed({
-  get: () => draft.value.proactive_duplex_enabled,
-  set: (value: boolean) => {
-    draft.value = applyJarvisDuplexPreset(draft.value, value);
-    markDirty();
-  },
 });
 
 const narrateToolProgress = computed({
@@ -142,40 +104,11 @@ const narrationOptions = [
   },
 ] as const;
 
-const speechRateDisplay = computed(() => formatVoiceTuningValue(draft.value.speech_rate ?? 1));
-const speechPitchDisplay = computed(() =>
-  formatVoiceTuningValue(draft.value.speech_pitch ?? 1.04),
-);
-
 function onNarrationChange(event: Event): void {
   const value = (event.target as HTMLSelectElement).value;
   if (value === 'off' || value === 'minimal' || value === 'conversational') {
     patchDraft({ kairo_narration: value });
   }
-}
-
-function onSpeechRateInput(event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value);
-  if (!Number.isFinite(value)) {
-    return;
-  }
-  patchDraft({ speech_rate: Math.round(value * 100) / 100 });
-}
-
-function onSpeechPitchInput(event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value);
-  if (!Number.isFinite(value)) {
-    return;
-  }
-  patchDraft({ speech_pitch: Math.round(value * 100) / 100 });
-}
-
-function resetVoiceTuning(): void {
-  patchDraft({
-    speech_rate: 1.0,
-    speech_pitch: 1.04,
-    azure_voice_id: 'en-GB-RyanNeural',
-  });
 }
 
 async function commitSave(): Promise<void> {
@@ -216,42 +149,6 @@ function requestReset(): void {
   markDirty();
 }
 
-async function testVoiceSample(): Promise<void> {
-  if (draft.value.privacy_mode || draft.value.kairo_narration === 'off') {
-    voiceTestResult.value = 'Enable narration and disable privacy mode to test voice.';
-    return;
-  }
-  voiceTesting.value = true;
-  voiceTestResult.value = null;
-  try {
-    const engine = await shell.testKairoVoiceFromSettings({
-      speechRate: draft.value.speech_rate,
-      speechPitch: draft.value.speech_pitch,
-    });
-    if (engine === 'azure') {
-      voiceTestResult.value = 'Azure neural voice played successfully.';
-    } else if (engine === 'browser') {
-      const reason = kairoVoiceLastReason.value;
-      if (reason === 'vault_locked') {
-        voiceTestResult.value =
-          'Browser fallback — unlock Vault (AZURE_SPEECH_KEY) for neural TTS.';
-      } else if (reason === 'missing_key') {
-        voiceTestResult.value =
-          'Browser fallback — add AZURE_SPEECH_KEY to Vault for neural TTS.';
-      } else {
-        voiceTestResult.value = `Browser fallback voice played (${reason || 'Azure unavailable'}).`;
-      }
-    } else {
-      voiceTestResult.value = 'Voice skipped — check privacy mode and narration level.';
-    }
-  } catch (error) {
-    voiceTestResult.value =
-      error instanceof Error ? error.message : 'Voice test failed — is the control plane running?';
-  } finally {
-    voiceTesting.value = false;
-  }
-}
-
 defineExpose({
   dirty,
   flushIfDirty,
@@ -287,13 +184,13 @@ defineExpose({
         <div>
           <dt>Speech rate</dt>
           <dd>
-            <span class="operator-settings-form__pill">{{ speechRateDisplay }}</span>
+            <span class="operator-settings-form__pill">{{ draft.speech_rate }}</span>
           </dd>
         </div>
         <div>
           <dt>Speech pitch</dt>
           <dd>
-            <span class="operator-settings-form__pill">{{ speechPitchDisplay }}</span>
+            <span class="operator-settings-form__pill">{{ draft.speech_pitch }}</span>
           </dd>
         </div>
       </dl>
@@ -353,81 +250,21 @@ defineExpose({
             </small>
           </span>
         </label>
-        <div class="operator-settings-form__voice-tuning">
-          <header class="operator-settings-form__copy">
-            <strong>Voice tuning</strong>
-            <small>
-              Same controls as Axon Signal — continuous rate/pitch for Azure neural and browser
-              fallback. Drag freely, then Save (or leave Settings to auto-save).
-            </small>
-          </header>
-          <div class="operator-settings-form__slider-grid">
-            <label class="operator-settings-form__slider">
-              <span class="operator-settings-form__slider-head">
-                <span>Speech rate</span>
-                <span class="operator-settings-form__slider-value">{{ speechRateDisplay }}</span>
-              </span>
-              <input
-                type="range"
-                min="0.5"
-                max="1.3"
-                step="0.02"
-                :value="draft.speech_rate"
-                :disabled="saving || privacyMode || draft.kairo_narration === 'off'"
-                @input="onSpeechRateInput"
-              />
-              <span class="operator-settings-form__slider-ends">
-                <span>0.50 slow</span><span>1.00 default</span><span>1.30 fast</span>
-              </span>
-            </label>
-            <label class="operator-settings-form__slider">
-              <span class="operator-settings-form__slider-head">
-                <span>Speech pitch</span>
-                <span class="operator-settings-form__slider-value">{{ speechPitchDisplay }}</span>
-              </span>
-              <input
-                type="range"
-                min="0.5"
-                max="1.5"
-                step="0.02"
-                :value="draft.speech_pitch"
-                :disabled="saving || privacyMode || draft.kairo_narration === 'off'"
-                @input="onSpeechPitchInput"
-              />
-              <span class="operator-settings-form__slider-ends">
-                <span>0.50 deep</span><span>1.04 default</span><span>1.50 high</span>
-              </span>
-            </label>
-          </div>
-          <div class="operator-settings-form__actions operator-settings-form__actions--inline">
-            <button
-              type="button"
-              class="operator-settings-form__button operator-settings-form__button--ghost"
-              :disabled="saving || privacyMode || draft.kairo_narration === 'off'"
-              @click="resetVoiceTuning"
-            >
-              Reset voice defaults
-            </button>
-          </div>
-        </div>
-        <div class="operator-settings-form__actions">
-          <button
-            type="button"
-            class="operator-settings-form__button"
-            :disabled="saving || voiceTesting || draft.privacy_mode || draft.kairo_narration === 'off'"
-            @click="testVoiceSample"
-          >
-            {{ voiceTesting ? 'Testing voice…' : 'Test voice sample' }}
-          </button>
-          <p
-            v-if="voiceTestResult"
-            class="operator-settings-form__voice-result"
-            role="status"
-            aria-live="polite"
-          >
-            {{ voiceTestResult }}
-          </p>
-        </div>
+        <OperatorPresenceVoiceTuningFields
+          :draft="draft"
+          :saving="Boolean(saving)"
+          :privacy-mode="privacyMode"
+          @patch="patchDraft"
+          @test-result="voiceTestResult = $event"
+        />
+        <p
+          v-if="voiceTestResult"
+          class="operator-settings-form__voice-result"
+          role="status"
+          aria-live="polite"
+        >
+          {{ voiceTestResult }}
+        </p>
       </section>
 
       <section class="operator-settings-form__section">
@@ -441,122 +278,13 @@ defineExpose({
           :privacy-mode="privacyMode"
           @patch="patchDraft"
         />
-        <label class="operator-settings-form__row">
-          <input
-            v-model="proactiveDuplexEnabled"
-            type="checkbox"
-            :disabled="saving || privacyMode"
-          />
-          <span class="operator-settings-form__copy">
-            <strong>JARVIS duplex (proactive speak → listen)</strong>
-            <small>
-              After VAXON speaks an alert, stay listening for ~30s so you can answer without the wake
-              word. Turns on hands-free + spoken alerts. Cold ambient still needs “VAXON”.
-            </small>
-          </span>
-        </label>
-        <label class="operator-settings-form__row">
-          <input v-model="handsFreeEnabled" type="checkbox" :disabled="saving || privacyMode" />
-          <span class="operator-settings-form__copy">
-            <strong>Hands-free voice (galaxy orb)</strong>
-            <small>
-              Listens continuously but only responds when you say "VAXON" or a direct command
-              (e.g. git status). Ignores side conversation. Say "stop" to interrupt speech.
-            </small>
-          </span>
-        </label>
-        <label class="operator-settings-form__row">
-          <input v-model="wakeWordConsent" type="checkbox" :disabled="saving || privacyMode" />
-          <span class="operator-settings-form__copy">
-            <strong>Local wake-word consent</strong>
-            <small>
-              Explicit consent for on-device always-listening. Pre-wake audio stays in a local ring
-              buffer and is never uploaded. Cloud STT starts only after wake or follow-up.
-            </small>
-          </span>
-        </label>
-        <label class="operator-settings-form__row">
-          <input
-            v-model="wakeWordEnabled"
-            type="checkbox"
-            :disabled="saving || privacyMode || !draft.wake_word_listening_consent"
-          />
-          <span class="operator-settings-form__copy">
-            <strong>Arm local wake-word engine</strong>
-            <small>
-              Interim energy gate until open-source WASM keyword evidence passes. Privacy mode is the
-              hardware kill switch.
-            </small>
-          </span>
-        </label>
-        <label class="operator-settings-form__row operator-settings-form__row--select">
-          <span class="operator-settings-form__copy">
-            <strong>Wake sensitivity</strong>
-            <small>Lower reduces false wakes; higher catches quieter “VAXON”.</small>
-          </span>
-          <select
-            class="operator-settings-form__select"
-            :value="draft.wake_word_sensitivity"
-            :disabled="saving || privacyMode || !draft.wake_word_listening_enabled"
-            @change="
-              patchDraft({
-                wake_word_sensitivity: ($event.target as HTMLSelectElement).value as
-                  | 'low'
-                  | 'medium'
-                  | 'high',
-              })
-            "
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label class="operator-settings-form__row operator-settings-form__row--select">
-          <span class="operator-settings-form__copy">
-            <strong>Quiet hours (proactive alerts)</strong>
-            <small>Local clock HH:MM. Empty disables. Approvals/critical can still escalate once.</small>
-          </span>
-          <div class="operator-settings-form__slider-grid">
-            <input
-              type="time"
-              :value="draft.quiet_hours_start"
-              :disabled="saving"
-              @change="
-                patchDraft({ quiet_hours_start: ($event.target as HTMLInputElement).value || '' })
-              "
-            />
-            <input
-              type="time"
-              :value="draft.quiet_hours_end"
-              :disabled="saving"
-              @change="
-                patchDraft({ quiet_hours_end: ($event.target as HTMLInputElement).value || '' })
-              "
-            />
-          </div>
-        </label>
-        <label class="operator-settings-form__row">
-          <input v-model="spokenAlertsEnabled" type="checkbox" :disabled="saving || privacyMode" />
-          <span class="operator-settings-form__copy">
-            <strong>Spoken high-value alerts</strong>
-            <small>Interrupt with approvals, degraded runtime, or critical signals.</small>
-          </span>
-        </label>
-        <label class="operator-settings-form__row">
-          <input v-model="ideVoiceStripEnabled" type="checkbox" :disabled="saving || privacyMode" />
-          <span class="operator-settings-form__copy">
-            <strong>IDE voice strip (opt-in)</strong>
-            <small>Show the compact voice strip above the IDE editor.</small>
-          </span>
-        </label>
-        <label class="operator-settings-form__row operator-settings-form__row--danger">
-          <input v-model="privacyMode" type="checkbox" :disabled="saving" />
-          <span class="operator-settings-form__copy">
-            <strong>Privacy mode</strong>
-            <small>Master mute — disables mic capture, TTS, and spoken alerts.</small>
-          </span>
-        </label>
+        <OperatorPresenceHandsFreeFields
+          :draft="draft"
+          :saving="Boolean(saving)"
+          :privacy-mode="privacyMode"
+          @patch="patchDraft"
+          @apply-duplex="applyDuplexPreset"
+        />
       </section>
 
       <OperatorPresenceSettingsFooter
