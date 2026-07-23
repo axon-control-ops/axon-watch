@@ -25,17 +25,48 @@ def record_acceptance_evidence(
 ) -> dict[str, Any]:
     """Persist a machine-checkable acceptance receipt on the run history."""
     from app.runs.service import append_run_execution_receipt
+    from app.workspace_agents.verifier_checks import assert_verifier_identity
 
+    assert_verifier_identity(actor)
     marker = ACCEPTANCE_PASS_MARKER if passed else ACCEPTANCE_FAIL_MARKER
     cleaned = " ".join(str(summary or "").split()) or "acceptance evidence"
     return append_run_execution_receipt(
         run_id,
         receipt_type=ACCEPTANCE_RECEIPT_TYPE,
-        receipt_summary=f"{marker} · {cleaned}",
+        receipt_summary=f"{marker} · {cleaned}" if marker not in cleaned else cleaned,
         actor=actor,
         success=passed,
         intent="gate6_acceptance",
     )
+
+
+def record_acceptance_evaluation(run_id: str, evaluation: dict[str, Any]) -> dict[str, Any]:
+    """Persist structured check outputs from the immutable verifier role."""
+    from app.runs.service import append_run_execution_receipt
+    from app.workspace_agents.verifier_checks import VERIFIER_IDENTITY, assert_verifier_identity
+
+    actor = str(evaluation.get("actor") or VERIFIER_IDENTITY)
+    assert_verifier_identity(actor)
+    passed = bool(evaluation.get("passed"))
+    summary = str(evaluation.get("summary") or "")
+    receipt = record_acceptance_evidence(
+        run_id,
+        passed=passed,
+        summary=summary,
+        actor=actor,
+    )
+    checks = evaluation.get("checks") or []
+    if checks:
+        names = ",".join(str(item.get("name") or "?") for item in checks)
+        append_run_execution_receipt(
+            run_id,
+            receipt_type="acceptance_check_outputs",
+            receipt_summary=f"checks={names} count={len(checks)} passed={passed}",
+            actor=actor,
+            success=passed,
+            intent="gate6_check_outputs",
+        )
+    return receipt
 
 
 def latest_acceptance_evidence(run_id: str) -> dict[str, Any] | None:
