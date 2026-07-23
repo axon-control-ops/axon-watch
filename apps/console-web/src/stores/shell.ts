@@ -278,13 +278,17 @@ import {
   defaultOperatorWorkspaceId,
 } from '../lib/operator-workspace-catalog';
 import {
-  type IdeActivityView,
+  DEFAULT_IDE_ACTIVITY_VIEW,
   persistAgentDockCollapsed,
   persistLayoutMode,
   readStoredAgentDockCollapsed,
   readStoredIdeExplorerCollapsed,
   readStoredLayoutMode,
 } from '../lib/ide-layout-prefs';
+import {
+  openIdeComposerSurface,
+  openIdeComposerSurfaceWithDraft,
+} from './shell/open-ide-composer';
 import { createCatalogLoadersSlice } from './shell/slices/create-catalog-loaders-slice';
 import { createComposerRuntimePrefsSlice } from './shell/slices/create-composer-runtime-prefs-slice';
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
@@ -507,7 +511,7 @@ export const useShellStore = defineStore('shell', () => {
   const commandFocusToken = ref(0);
   const leftSidebarMode = ref<LeftSidebarMode>(readStoredLeftSidebarMode() ?? 'workspaces');
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
-  const ideActivityView = ref<IdeActivityView>('team');
+  const ideActivityView = ref(DEFAULT_IDE_ACTIVITY_VIEW);
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
   const ideAttentionPanelOpen = ref(false);
   const ideBriefingPanelOpen = ref(false);
@@ -1792,27 +1796,20 @@ export const useShellStore = defineStore('shell', () => {
     ideDebugModeSelected.value = selected;
   }
 
-  /** Open the IDE chat dock without changing the draft. Keep Team (or other) left panel when requested. */
   function openIdeComposer(options: { keepActivityView?: boolean } = {}): void {
-    commandMutationError.value = null;
-    if (layoutMode.value !== 'ide') {
-      setLayoutMode('ide');
-    }
-    agentDockCollapsed.value = false;
-    persistAgentDockCollapsed(false);
-    if (!options.keepActivityView) {
-      ideActivityView.value = 'agent';
-    }
-    commandFocusToken.value += 1;
+    openIdeComposerSurface({
+      layoutMode: layoutMode.value, setLayoutMode, agentDockCollapsed,
+      persistAgentDockCollapsed, ideActivityView, commandFocusToken, commandMutationError,
+      keepActivityView: options.keepActivityView,
+    });
   }
 
-  /** Open the IDE chat dock with a draft. Keep Team (or other) left panel when requested. */
-  function openIdeComposerWithDraft(
-    content: string,
-    options: { keepActivityView?: boolean } = {},
-  ): void {
-    ideComposerDraft.value = content.trim();
-    openIdeComposer(options);
+  function openIdeComposerWithDraft(content: string, options: { keepActivityView?: boolean } = {}): void {
+    openIdeComposerSurfaceWithDraft({
+      content, ideComposerDraft, layoutMode: layoutMode.value, setLayoutMode,
+      agentDockCollapsed, persistAgentDockCollapsed, ideActivityView, commandFocusToken,
+      commandMutationError, keepActivityView: options.keepActivityView,
+    });
   }
 
   function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {

@@ -29,6 +29,9 @@ export type IdeActivityView =
   | 'terminal'
   | 'agent';
 
+/** Boot default for the IDE left activity panel (Team, not Explorer). */
+export const DEFAULT_IDE_ACTIVITY_VIEW: IdeActivityView = 'team';
+
 export function readStoredLayoutMode(): LayoutMode | null {
   if (typeof window === 'undefined') {
     return null;
