@@ -12,7 +12,6 @@ from app.domain.run_transitions import can_transition
 from app.chat.command_intent import humanize_run_summary, is_auto_complete_run_summary
 from app.persistence import run_store
 
-
 def _actor_or_operator() -> str:
     identity = get_request_identity()
     return identity if identity and identity != "anonymous" else "operator"
@@ -25,7 +24,6 @@ _RESUME_TARGETS = {
     "awaiting_input": ("planning", "Run resumed after operator input"),
     "review_ready": ("executing", "Run resumed for follow-up work"),
 }
-
 
 class RunLifecycleError(ValueError):
     pass
@@ -214,8 +212,6 @@ def create_run(
         except task_store.TaskLedgerError as exc:
             raise RunLifecycleError(str(exc)) from exc
 
-    # Lead fan-out (and similar assigners) create ready runs without Lane B.
-    # Stay queued so roster does not fake BUSY and the scheduler can dispatch.
     if not enter_execution:
         return _apply_capabilities(record)
 
@@ -254,43 +250,6 @@ def create_run(
         receipt_summary="Run entered execution",
     )
     return record
-
-
-def begin_execution(
-    run_id: str,
-    *,
-    actor: str = "control-plane",
-    receipt_summary: str = "Queued run entered execution",
-) -> dict[str, Any]:
-    """Advance a queued/starting run into executing (scheduler / fan-out dispatch)."""
-    record = run_store.get_run(run_id)
-    if record is None:
-        raise RunNotFoundError(f"run not found: {run_id}")
-    phase = str(record.get("phase") or "").strip()
-    if phase == "executing":
-        return _apply_capabilities(record)
-    if phase == "queued":
-        record = _transition_record(
-            record,
-            to_phase="starting",
-            current_step="Preparing run resources",
-            actor=actor,
-            receipt_type="system_transition",
-            receipt_summary="Queued run accepted for dispatch",
-        )
-        phase = "starting"
-    if phase != "starting":
-        raise RunLifecycleError(
-            f"begin_execution requires queued or starting phase, found {phase}",
-        )
-    return _transition_record(
-        record,
-        to_phase="executing",
-        current_step="Executing thin-slice work",
-        actor=actor,
-        receipt_type="system_transition",
-        receipt_summary=receipt_summary,
-    )
 
 
 def complete_run(run_id: str) -> dict[str, Any]:
@@ -533,8 +492,6 @@ def append_run_execution_receipt(
     )
     record["updated_at"] = now
     return run_store.save_run(record)
-
-
 
 from app.runs.acceptance_transitions import mark_review_ready
 from app.runs.queries import (

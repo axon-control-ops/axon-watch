@@ -10,9 +10,9 @@ from typing import Any
 
 from app.domain.run_state import is_terminal_phase
 from app.persistence import task_store, worker_scheduler_settings_store
+from app.runs.begin_execution import begin_execution
 from app.runs.service import (
     RunLifecycleError,
-    begin_execution,
     create_run,
     fail_run,
     list_runs,
