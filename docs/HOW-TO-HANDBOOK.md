@@ -37,7 +37,7 @@ Mission Control task board. Scheduler still **off** by default. After every push
 3.5. [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools) — Pro vs API key, native vs Cursor
 3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, company roster
 3.65. [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) — Gate 4 tasks, scheduler off, watch token + mTLS
-3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
+3.66. [Recent operator features](how-to/recent-operator-features.md) — Mission Control plane, `:7734` vs `:4173`/`:5173`, task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -482,16 +482,19 @@ Use this glossary when reading plans, ADRs, code, or agent summaries.
 | **xterm host** | In-browser terminal surface (`TerminalHost.vue`) attached to a **backend PTY session** via `WS /api/workspaces/{workspace_id}/terminal`. Runs real shell commands in a workspace-scoped directory under `.local/workspaces/` (override with `AXON_WATCH_WORKSPACE_ROOT`). |
 | **Workspace** | Logical operator context keyed by `workspace_id`. Today the API returns IDs only; rich catalog metadata is deferred. |
 
-### Two repos, two apps
+### Two repos, two apps (ports)
 
 Do not confuse these:
 
-| | **axon-local** (current Axon) | **axon-watch** (Axon-X) |
+| | **axon-local** (classic Axon) | **axon-watch** (Axon-X) |
 | --- | --- | --- |
-| Default URL | `http://127.0.0.1:7734` (fallback) | `http://127.0.0.1:4173` (**production operator**) |
-| Start command | `./start.sh` from axon-local | `./scripts/dev/up.sh` from axon-watch |
-| Status | Legacy daily-driver / fallback | Primary operator console (v1) |
-| Relationship | Source of parity targets and frozen plans | Implementation target for modernization |
+| URLs | `http://127.0.0.1:7734` (fallback) | `:4173` production · `:5173` Vite dev |
+| Start | `./start.sh` from axon-local | `./scripts/dev/up.sh` from axon-watch |
+| Role | Legacy daily-driver / fallback | Primary operator console (v1) |
+
+**:7734 is classic axon-local, not a second Axon-X.** Use Axon-X for day-to-day work;
+open `:7734` only for deferred legacy gaps. Mission Control plane + ports walkthrough:
+[`how-to/recent-operator-features.md`](how-to/recent-operator-features.md).
 
 ## What Axon-X Is
 
