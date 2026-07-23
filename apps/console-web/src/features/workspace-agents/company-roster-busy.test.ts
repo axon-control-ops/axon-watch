@@ -10,12 +10,14 @@ import { employeeIsWorking } from './company-roster-status';
 function employee(overrides: Partial<CompanyEmployeeRecord> = {}): CompanyEmployeeRecord {
   return {
     employee_id: 'e1',
+    workspace_id: 'workspace_dashpro',
     name: 'Alex',
     role: 'backend',
-    title: 'Builder',
-    owns: 'APIs',
+    role_label: 'Backend',
     schedule: 'continuous',
+    schedule_label: 'Continuous',
     status: 'idle',
+    owns: 'APIs',
     enabled: true,
     primary: false,
     ...overrides,

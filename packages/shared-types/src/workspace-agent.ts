@@ -12,6 +12,7 @@ export type WorkspaceAgentRole = (typeof WORKSPACE_AGENT_ROLES)[number];
 export const WORKSPACE_AGENT_STATUSES = [
   'idle',
   'watching',
+  'assigned',
   'planning',
   'executing',
   'verifying',
