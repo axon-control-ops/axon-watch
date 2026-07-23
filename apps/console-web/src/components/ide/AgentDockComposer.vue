@@ -43,18 +43,12 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     @reject-run="composer.handleRejectRun()"
     @undo-plan-soft-switch="composer.undoPlanSoftSwitch()"
     @dismiss-plan-soft-switch="composer.dismissPlanSoftSwitch()"
-    @accept-plan-soft-switch-offer="composer.acceptPlanSoftSwitchOffer()"
-    @decline-plan-soft-switch-offer="composer.declinePlanSoftSwitchOffer()"
+    @accept-plan-soft-switch-offer="void composer.acceptPlanSoftSwitchOffer()"
+    @decline-plan-soft-switch-offer="void composer.declinePlanSoftSwitchOffer()"
     @undo-teammate-route="composer.undoTeammateRoute()"
     @dismiss-teammate-route="composer.dismissTeammateRoute()"
   />
-  <form
-    class="agent-dock-composer"
-    @submit="composer.handleSubmit"
-    @dragover="composer.handleComposerDragOver"
-    @dragleave="composer.handleComposerDragLeave"
-    @drop="composer.handleComposerDrop"
-  >
+  <form class="agent-dock-composer" @submit="composer.handleSubmit" @dragover="composer.handleComposerDragOver" @dragleave="composer.handleComposerDragLeave" @drop="composer.handleComposerDrop">
     <BriefingSurfaceFollowupPrompt />
     <div class="agent-dock-composer__shell" :class="composer.composerShellClasses.value">
       <div class="agent-dock-composer__card">
