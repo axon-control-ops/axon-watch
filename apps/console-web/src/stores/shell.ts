@@ -507,7 +507,7 @@ export const useShellStore = defineStore('shell', () => {
   const commandFocusToken = ref(0);
   const leftSidebarMode = ref<LeftSidebarMode>(readStoredLeftSidebarMode() ?? 'workspaces');
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
-  const ideActivityView = ref<IdeActivityView>('explorer');
+  const ideActivityView = ref<IdeActivityView>('team');
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
   const ideAttentionPanelOpen = ref(false);
   const ideBriefingPanelOpen = ref(false);

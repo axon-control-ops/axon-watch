@@ -9,6 +9,7 @@ from app.workspace_agents.config_loader import EmployeeConfig
 from app.workspace_agents.critical_review_clause import append_critical_review_clause
 from app.workspace_agents.employee_persona_prompt import build_employee_identity_line
 from app.workspace_agents.run_outcome import latest_role_run_outcome
+from app.workspace_agents.team_roster_context import build_team_roster_context
 
 
 def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
@@ -75,6 +76,15 @@ def build_continuous_worker_prompt(
         "already listening. Axon-X operator UI is :4173 — do not start legacy :7734. "
     )
     prior_failure = _prior_failure_clause(workspace_id=workspace_id, role=role)
+    roster_block = build_team_roster_context(workspace_id, viewer_role=role)
+    roster_clause = f"\n\n{roster_block}" if roster_block else ""
+    lead_clause = ""
+    if role == "lead":
+        lead_clause = (
+            " As Lead, treat the company team roster block as authoritative for "
+            "teammates, roles, and owns — do not Glob/Grep/Read the tree to discover "
+            "staffing before planning or delegating."
+        )
     return append_critical_review_clause(
         f"{identity} "
         f"This is a bounded continuous shift ({schedule}) for leased task {task_id}. "
@@ -82,8 +92,10 @@ def build_continuous_worker_prompt(
         f"Execute only this leased task — do not invent or self-select other work. "
         f"Goal: {goal}.{acceptance_clause} "
         "Do it with receipts and summarize what changed. Stay inside your role boundary."
+        f"{lead_clause}"
         f"{ci_clause}"
         f"{memory_clause}"
         " If a step fails, say what failed and why (command, assertion, import, CI step) — "
         "never a bare FAILED."
+        f"{roster_clause}"
     )
