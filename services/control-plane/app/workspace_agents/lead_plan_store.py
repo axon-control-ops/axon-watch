@@ -169,9 +169,46 @@ def plan_task_links(plan_id: str) -> list[dict[str, str]]:
     return [{"plan_key": row["plan_key"], "task_id": row["task_id"]} for row in rows]
 
 
+def list_plans_by_status(
+    status: str,
+    *,
+    workspace_id: str | None = None,
+) -> list[dict[str, Any]]:
+    cleaned = str(status or "").strip().lower()
+    scoped = str(workspace_id or "").strip()
+    with _connection() as connection:
+        if scoped:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM lead_plans
+                WHERE status = ? AND workspace_id = ?
+                ORDER BY updated_at DESC, rowid DESC
+                """,
+                (cleaned, scoped),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM lead_plans
+                WHERE status = ?
+                ORDER BY updated_at DESC, rowid DESC
+                """,
+                (cleaned,),
+            ).fetchall()
+    return [_decode_plan(row) for row in rows]
+
+
 def set_plan_status(plan_id: str, status: str) -> dict[str, Any]:
     cleaned = status.strip().lower()
-    if cleaned not in {"active", "superseded", "completed", "cancelled"}:
+    if cleaned not in {
+        "active",
+        "superseded",
+        "completed",
+        "cancelled",
+        "awaiting_engagement",
+    }:
         raise ValueError(f"invalid lead plan status: {status}")
     with _connection() as connection:
         connection.execute(
@@ -256,6 +293,7 @@ __all__ = [
     "append_receipt",
     "get_plan",
     "latest_active_plan",
+    "list_plans_by_status",
     "list_receipts",
     "persist_plan",
     "plan_task_links",

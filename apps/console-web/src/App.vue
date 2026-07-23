@@ -105,6 +105,12 @@ watch(
         }
         return shell.refreshOperatorPresence();
       },
+      onMaterialChange: () => {
+        if (shell.layoutMode === 'ide') {
+          return;
+        }
+        return shell.refreshEngagementSurfaces();
+      },
       onSpokenBriefing: () => shell.speakOperatorBriefing(),
     });
   },

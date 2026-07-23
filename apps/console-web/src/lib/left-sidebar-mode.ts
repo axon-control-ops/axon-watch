@@ -29,6 +29,8 @@ export function leftSidebarAttentionBadgeCount(input: {
   briefing: OperatorBriefing | null;
   inboxItems?: OperatorSignalCountItem[];
   inboxLoadState?: 'idle' | 'loading' | 'loaded' | 'error';
+  /** Fallback when briefing.awaiting_engagement_count is absent. */
+  reviewReadyCount?: number;
 }): number {
   let interruptiveSignals = 0;
 
@@ -44,7 +46,12 @@ export function leftSidebarAttentionBadgeCount(input: {
       ).length ?? 0;
   }
 
-  return input.pendingApprovals + interruptiveSignals;
+  const awaitingEngagement =
+    typeof input.briefing?.awaiting_engagement_count === 'number'
+      ? Math.max(0, input.briefing.awaiting_engagement_count)
+      : Math.max(0, input.reviewReadyCount ?? 0);
+
+  return input.pendingApprovals + interruptiveSignals + awaitingEngagement;
 }
 
 export function leftSidebarModeLabel(mode: LeftSidebarMode): string {

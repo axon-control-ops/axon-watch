@@ -3172,6 +3172,16 @@ export const useShellStore = defineStore('shell', () => {
     await flushIdeComposerQueueIfIdle();
   }
 
+  async function refreshEngagementSurfaces(): Promise<void> {
+    /** Lead rollups / review_ready: refresh runs, briefing badge, and VAXON thread. */
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    await Promise.all([
+      loadRuns({ sync: false }),
+      loadOperatorBriefing({ background: briefingLoadState.value === 'loaded' }),
+      workspaceId ? refreshOperatorThreadMessages(workspaceId) : Promise.resolve(),
+    ]);
+  }
+
   async function completeAllReviewReadyRuns(): Promise<void> {
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
     const targets = runs.value.filter(
@@ -3707,6 +3717,7 @@ export const useShellStore = defineStore('shell', () => {
     primaryApprovalRun,
     primaryInboxItem,
     refreshRunSurfaces,
+    refreshEngagementSurfaces,
     refreshOperatorPresence,
     refreshWatchSummary,
     rejectIdeAgentRun,

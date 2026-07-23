@@ -28,17 +28,11 @@ def build_briefing_notice(
     degraded: dict[str, object],
     watch_connected: bool,
     cli_runtime: dict[str, object] | None = None,
+    lead_awaiting_engagement_count: int = 0,
 ) -> str:
     if pending_approvals_count > 0:
         noun = "run" if pending_approvals_count == 1 else "runs"
         return f"{pending_approvals_count} {noun} awaiting explicit approval."
-
-    cli = cli_runtime if isinstance(cli_runtime, dict) else {}
-    if not bool(cli.get("dispatch_ready", True)):
-        blockers = cli.get("blockers")
-        if isinstance(blockers, list) and blockers:
-            return f"CLI runtime blocked — {blockers[0]}."
-        return "CLI runtime blocked — no local CLI runtime is dispatch-ready."
 
     review_ready = _review_ready_runs(active_runs)
     if review_ready:
@@ -48,6 +42,17 @@ def build_briefing_notice(
             )
             return f"{title} is ready for your review."
         return f"{len(review_ready)} runs are ready for your review."
+
+    if lead_awaiting_engagement_count > 0:
+        noun = "Lead plan" if lead_awaiting_engagement_count == 1 else "Lead plans"
+        return f"{lead_awaiting_engagement_count} {noun} awaiting engagement in VAXON."
+
+    cli = cli_runtime if isinstance(cli_runtime, dict) else {}
+    if not bool(cli.get("dispatch_ready", True)):
+        blockers = cli.get("blockers")
+        if isinstance(blockers, list) and blockers:
+            return f"CLI runtime blocked — {blockers[0]}."
+        return "CLI runtime blocked — no local CLI runtime is dispatch-ready."
 
     if top_signals:
         signal = top_signals[0]
@@ -83,6 +88,7 @@ def build_briefing_advise(
     active_runs: list[dict[str, object]],
     fleet_advice_pack: dict[str, object] | None = None,
     display_names: Mapping[str, str] | None = None,
+    lead_awaiting_engagement_count: int = 0,
 ) -> str:
     coach = resolve_fleet_briefing_advise(
         pack=fleet_advice_pack,
@@ -103,6 +109,9 @@ def build_briefing_advise(
 
     if _review_ready_runs(active_runs):
         return "Review execution evidence in Command or Active Run when ready."
+
+    if lead_awaiting_engagement_count > 0:
+        return "Open VAXON for the Lead rollup, then decide the next handoff."
 
     return ""
 
@@ -229,6 +238,7 @@ def build_operator_briefing_rhythm(
     cli_runtime: dict[str, object] | None = None,
     fleet_advice_pack: dict[str, object] | None = None,
     display_names: Mapping[str, str] | None = None,
+    lead_awaiting_engagement_count: int = 0,
 ) -> dict[str, str]:
     notice = build_briefing_notice(
         active_runs=active_runs,
@@ -237,12 +247,14 @@ def build_operator_briefing_rhythm(
         degraded=degraded,
         watch_connected=watch_connected,
         cli_runtime=cli_runtime,
+        lead_awaiting_engagement_count=lead_awaiting_engagement_count,
     )
     advise = build_briefing_advise(
         next_safe_actions=next_safe_actions,
         active_runs=active_runs,
         fleet_advice_pack=fleet_advice_pack,
         display_names=display_names,
+        lead_awaiting_engagement_count=lead_awaiting_engagement_count,
     )
     return {
         "notice": notice,
