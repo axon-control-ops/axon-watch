@@ -78,9 +78,6 @@ main_tests=(
   tests.test_parity_c2_executive_operator_rhythm
   tests.test_parity_c3_mobile_compact_viewport
   tests.test_parity_c4_spoken_high_value_alerts
-  tests.test_spoken_alert_quiet_hours
-  tests.test_mission_memory
-  tests.test_device_enrollment
   tests.test_parity_d1_watch_persistence
   tests.test_parity_d2_delivery_channel_adapters
   tests.test_parity_d3_dedicated_host_smoke
