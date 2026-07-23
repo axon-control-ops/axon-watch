@@ -22,6 +22,7 @@ import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit
 import { useKairoAppVoice } from './features/kairo-conversation/use-kairo-app-voice';
 import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
 import VoiceOrbHost from './features/brain-galaxy/VoiceOrbHost.vue';
+import HudHoloAtmosphere from './features/hud-holo/HudHoloAtmosphere.vue';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
@@ -143,6 +144,7 @@ onUnmounted(() => {
         'console-shell--operator': shell.layoutMode === 'operator',
         'console-shell--brain-galaxy':
           shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
+        'console-shell--glass3d': !isFoundationSurface,
         'console-shell--vault': isVaultSurface,
         'console-shell--data': isDataSurface,
         'console-shell--skills': isSkillsSurface,
@@ -150,7 +152,9 @@ onUnmounted(() => {
         'console-shell--settings': isSettingsSurface,
       }"
       :data-layout-mode="shell.layoutMode"
+      data-hud="holographic"
     >
+      <HudHoloAtmosphere v-if="!isFoundationSurface" />
       <TopBar />
       <template v-if="!isFoundationSurface">
         <MobileVoiceCockpitStrip />

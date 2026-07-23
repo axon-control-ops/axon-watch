@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { openWatchConnectors } from '../../composables/useIdeEditorStatusBar';
 import { buildOperatorQuickGuide, type OperatorQuickGuideActionId } from '../../lib/operator-quick-guide';
@@ -28,7 +28,6 @@ import {
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 import {
-  operatorTerminalChipLabel,
   operatorTerminalDockActionLabel,
   workbenchTerminalPanelAlive,
   workbenchTerminalPanelAriaLabel,
@@ -39,6 +38,7 @@ import OperatorBrainGraphPanel from './OperatorBrainGraphPanel.vue';
 import OperatorFleetHealthGrid from './OperatorFleetHealthGrid.vue';
 import OperatorIncidentFeedPanel from './OperatorIncidentFeedPanel.vue';
 import OperatorRunStripPanel from './OperatorRunStripPanel.vue';
+import OperatorStatusRadarPanelHeader from './OperatorStatusRadarPanelHeader.vue';
 import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
 
 const props = defineProps<{
@@ -198,7 +198,14 @@ const showLiveFeed = computed(
       shell.runHistoryRows.length > 0),
 );
 
-const showMissionStage = computed(() => !onlyAutoCompleteReviewBacklog.value);
+const showMissionStage = computed(
+  () =>
+    !onlyAutoCompleteReviewBacklog.value &&
+    (executionStage.value.hasActiveRun ||
+      pendingApprovals.value > 0 ||
+      shell.canResumePrimaryRun ||
+      shell.canCompletePrimaryRun),
+);
 
 const showRunActions = computed(
   () =>
@@ -231,9 +238,25 @@ const quickGuide = computed(() =>
   }),
 );
 
+// Idle Grid stays readable: only attention guides overlay as standalone cards.
 const showStandaloneQuickGuide = computed(
-  () => !showMissionStage.value && Boolean(quickGuide.value),
+  () =>
+    !showMissionStage.value &&
+    Boolean(quickGuide.value) &&
+    quickGuide.value?.tone === 'attention',
 );
+
+onMounted(() => {
+  if (
+    shell.operatorFleetHealthLoadState === 'idle' ||
+    shell.operatorFleetHealthLoadState === 'error'
+  ) {
+    void shell.loadOperatorFleetHealth();
+  }
+  if (shell.currentWorkspace?.workspace_id) {
+    void shell.loadWorkspaceTasks(shell.currentWorkspace.workspace_id);
+  }
+});
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 
@@ -329,68 +352,19 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
       <span class="hud-panel-frame__corner hud-panel-frame__corner--bl" aria-hidden="true" />
       <span class="hud-panel-frame__corner hud-panel-frame__corner--br" aria-hidden="true" />
 
-      <header class="operator-status-radar-panel__header">
-        <div class="operator-status-radar-panel__header-copy">
-          <p class="operator-status-radar-panel__eyebrow">Operator center</p>
-          <h2 class="operator-status-radar-panel__title">Mission Control</h2>
-        </div>
-        <div class="operator-status-radar-panel__header-actions">
-          <button
-            type="button"
-            class="operator-status-radar-panel__terminal-chip"
-            :class="{
-              'operator-status-radar-panel__terminal-chip--collapsed': !props.terminalVisible,
-              'operator-status-radar-panel__terminal-chip--alive': terminalDockAlive,
-              'operator-status-radar-panel__terminal-chip--executing':
-                !props.terminalVisible && terminalRunPhase === 'executing',
-              'operator-status-radar-panel__terminal-chip--review-ready':
-                !props.terminalVisible && terminalRunPhase === 'review_ready',
-            }"
-            :title="terminalPanelTitle"
-            :aria-label="terminalPanelAriaLabel"
-            @click="toggleTerminal"
-          >
-            {{ operatorTerminalChipLabel(props.terminalVisible) }}
-            <span
-              v-if="terminalDockAlive"
-              class="operator-status-radar-panel__terminal-chip-pulse"
-              aria-hidden="true"
-            />
-          </button>
-          <div class="operator-status-radar-panel__presence">
-            <span
-              class="operator-status-radar-panel__status-dot"
-              :class="`operator-status-radar-panel__status-dot--${radarTone}`"
-              aria-hidden="true"
-            />
-            <div class="operator-status-radar-panel__presence-copy">
-              <span class="operator-status-radar-panel__presence-title">{{ kairoParts.title }}</span>
-              <span class="operator-status-radar-panel__presence-subtitle">{{ kairoParts.subtitle }}</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div class="operator-center-view-switch" role="group" aria-label="Center view">
-        <button
-          type="button"
-          class="operator-center-view-switch__button"
-          :class="{ 'operator-center-view-switch__button--active': centerView === 'grid' }"
-          :aria-pressed="centerView === 'grid'"
-          @click="setCenterView('grid')"
-        >
-          GRID
-        </button>
-        <button
-          type="button"
-          class="operator-center-view-switch__button"
-          :class="{ 'operator-center-view-switch__button--active': centerView === 'graph' }"
-          :aria-pressed="centerView === 'graph'"
-          @click="setCenterView('graph')"
-        >
-          BRAIN
-        </button>
-      </div>
+      <OperatorStatusRadarPanelHeader
+        :center-view="centerView"
+        :radar-tone="radarTone"
+        :terminal-visible="props.terminalVisible"
+        :terminal-dock-alive="terminalDockAlive"
+        :terminal-run-phase="terminalRunPhase"
+        :terminal-panel-title="terminalPanelTitle"
+        :terminal-panel-aria-label="terminalPanelAriaLabel"
+        :kairo-title="kairoParts.title"
+        :kairo-subtitle="kairoParts.subtitle"
+        @set-center-view="setCenterView"
+        @toggle-terminal="toggleTerminal"
+      />
 
       <OperatorFleetHealthGrid />
 

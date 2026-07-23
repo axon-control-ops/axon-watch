@@ -174,38 +174,15 @@ const liveBusyEmployeeIds = computed(() => {
   if (shell.agentStreamActive) {
     const threadEmployeeId = shell.activeIdeThread?.employee_id?.trim();
     const recordEmployeeId = shell.activeIdeEmployeeRecord?.employee_id?.trim();
-    const streamOwnerId = threadEmployeeId || recordEmployeeId;
+    const primaryId =
+      employees.value.find((row) => row.primary)?.employee_id?.trim() ||
+      employees.value.find((row) => row.role === 'lead')?.employee_id?.trim() ||
+      null;
+    const streamOwnerId = threadEmployeeId || recordEmployeeId || primaryId;
     if (streamOwnerId) {
       ids.add(streamOwnerId);
     }
   }
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'fc0b35',
-    },
-    body: JSON.stringify({
-      sessionId: 'fc0b35',
-      runId: 'busy-owner',
-      hypothesisId: 'H9',
-      location: 'CompanyRosterPanel.vue:liveBusyEmployeeIds',
-      message: 'team busy owners resolved',
-      data: {
-        busyIds: [...ids],
-        streamActive: Boolean(shell.agentStreamActive),
-        threadEmployeeId: shell.activeIdeThread?.employee_id ?? null,
-        recordEmployeeId: shell.activeIdeEmployeeRecord?.employee_id ?? null,
-        rosterBusy: employees.value
-          .filter((row) => employeeIsActivelyBusy(row))
-          .map((row) => ({ id: row.employee_id, name: row.name, status: row.status })),
-        leadStatus: employees.value.find((row) => row.role === 'lead')?.status ?? null,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   return [...ids];
 });
 

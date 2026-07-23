@@ -152,6 +152,15 @@
 .center-workbench__editor .surface-host__body--editor {
   position: relative;
   isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.center-workbench__editor .editor-markdown-preview {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .center-workbench__editor .agent-edit-review-viewer {
@@ -172,6 +181,10 @@
 
 .center-workbench__editor .surface-host__frame--editor {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-self: stretch;
   box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.06);
 }
 
