@@ -258,6 +258,13 @@ def complete_run(run_id: str) -> dict[str, Any]:
             f"complete requires executing, review_ready, or paused phase, found {record['phase']}",
         )
 
+    # Gate 6: leased workers cannot skip review_ready by completing from executing
+    # without acceptance evidence.
+    if record["phase"] == "executing":
+        from app.workspace_agents.verifier_contract import enforce_acceptance_for_publish
+
+        enforce_acceptance_for_publish(run_id)
+
     receipt_summary = (
         "Run completed after operator review"
         if record["phase"] == "review_ready"
@@ -265,7 +272,7 @@ def complete_run(run_id: str) -> dict[str, Any]:
         if record["phase"] == "paused"
         else "Run completed"
     )
-    return _transition_record(
+    completed = _transition_record(
         record,
         to_phase="completed",
         current_step="Run completed",
@@ -273,6 +280,13 @@ def complete_run(run_id: str) -> dict[str, Any]:
         receipt_type="operator_complete",
         receipt_summary=receipt_summary,
     )
+    try:
+        from app.live_events import broadcast_material_change
+
+        broadcast_material_change(receipt_id=str(completed.get("run_id") or run_id))
+    except Exception:
+        pass
+    return completed
 
 
 def fail_run(
@@ -295,7 +309,7 @@ def fail_run(
     if len(step) > 180:
         step = step[:179].rstrip() + "…"
 
-    return _transition_record(
+    failed = _transition_record(
         record,
         to_phase="failed",
         current_step=step,
@@ -303,6 +317,13 @@ def fail_run(
         receipt_type="run_failed",
         receipt_summary=receipt_summary,
     )
+    try:
+        from app.live_events import broadcast_material_change
+
+        broadcast_material_change(receipt_id=str(failed.get("run_id") or run_id))
+    except Exception:
+        pass
+    return failed
 
 
 def mark_review_ready(run_id: str) -> dict[str, Any]:
@@ -314,6 +335,10 @@ def mark_review_ready(run_id: str) -> dict[str, Any]:
         raise RunLifecycleError(
             f"review_ready requires executing phase, found {record['phase']}",
         )
+
+    from app.workspace_agents.verifier_contract import enforce_acceptance_for_publish
+
+    enforce_acceptance_for_publish(run_id)
 
     return _transition_record(
         record,
@@ -401,7 +426,7 @@ def approve_run(run_id: str) -> dict[str, Any]:
             f"approve requires awaiting_approval phase, found {record['phase']}",
         )
 
-    return _transition_record(
+    approved = _transition_record(
         record,
         to_phase="executing",
         current_step="Run approved by operator",
@@ -409,6 +434,13 @@ def approve_run(run_id: str) -> dict[str, Any]:
         receipt_type="operator_approve",
         receipt_summary="Operator approved the run to continue execution",
     )
+    try:
+        from app.live_events import broadcast_material_change
+
+        broadcast_material_change(receipt_id=str(approved.get("run_id") or run_id))
+    except Exception:
+        pass
+    return approved
 
 
 def reject_run(run_id: str) -> dict[str, Any]:
