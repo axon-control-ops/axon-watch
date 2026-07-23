@@ -1,3 +1,4 @@
+@import './agent-dock-reopen.css';
 .agent-dock-composer__access-banner {
   display: flex;
   align-items: center;

@@ -1,5 +1,4 @@
 """Minimal FastAPI shell for the control-plane bootstrap slice."""
-
 from __future__ import annotations
 
 from fastapi import FastAPI
