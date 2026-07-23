@@ -258,12 +258,9 @@ def complete_run(run_id: str) -> dict[str, Any]:
             f"complete requires executing, review_ready, or paused phase, found {record['phase']}",
         )
 
-    # Gate 6: leased workers cannot skip review_ready by completing from executing
-    # without acceptance evidence.
-    if record["phase"] == "executing":
-        from app.workspace_agents.verifier_contract import enforce_acceptance_for_publish
+    from app.runs.acceptance_transitions import enforce_acceptance_for_executing_complete
 
-        enforce_acceptance_for_publish(run_id)
+    enforce_acceptance_for_executing_complete(record, run_id)
 
     receipt_summary = (
         "Run completed after operator review"
@@ -280,12 +277,9 @@ def complete_run(run_id: str) -> dict[str, Any]:
         receipt_type="operator_complete",
         receipt_summary=receipt_summary,
     )
-    try:
-        from app.live_events import broadcast_material_change
+    from app.runs.run_material_change import notify_run_material_change
 
-        broadcast_material_change(receipt_id=str(completed.get("run_id") or run_id))
-    except Exception:
-        pass
+    notify_run_material_change(run_id, completed)
     return completed
 
 
@@ -317,37 +311,10 @@ def fail_run(
         receipt_type="run_failed",
         receipt_summary=receipt_summary,
     )
-    try:
-        from app.live_events import broadcast_material_change
+    from app.runs.run_material_change import notify_run_material_change
 
-        broadcast_material_change(receipt_id=str(failed.get("run_id") or run_id))
-    except Exception:
-        pass
+    notify_run_material_change(run_id, failed)
     return failed
-
-
-def mark_review_ready(run_id: str) -> dict[str, Any]:
-    record = run_store.get_run(run_id)
-    if record is None:
-        raise RunNotFoundError(f"run not found: {run_id}")
-
-    if record["phase"] != "executing":
-        raise RunLifecycleError(
-            f"review_ready requires executing phase, found {record['phase']}",
-        )
-
-    from app.workspace_agents.verifier_contract import enforce_acceptance_for_publish
-
-    enforce_acceptance_for_publish(run_id)
-
-    return _transition_record(
-        record,
-        to_phase="review_ready",
-        current_step="Awaiting operator review",
-        actor="control-plane",
-        receipt_type="review_ready",
-        receipt_summary="Active execution stopped; run awaiting operator review",
-    )
 
 
 def stop_run(run_id: str) -> dict[str, Any]:
@@ -434,12 +401,9 @@ def approve_run(run_id: str) -> dict[str, Any]:
         receipt_type="operator_approve",
         receipt_summary="Operator approved the run to continue execution",
     )
-    try:
-        from app.live_events import broadcast_material_change
+    from app.runs.run_material_change import notify_run_material_change
 
-        broadcast_material_change(receipt_id=str(approved.get("run_id") or run_id))
-    except Exception:
-        pass
+    notify_run_material_change(run_id, approved)
     return approved
 
 
@@ -527,6 +491,7 @@ def append_run_execution_receipt(
 
 
 
+from app.runs.acceptance_transitions import mark_review_ready
 from app.runs.queries import (
     approval_summary,
     is_background_employee_run,
