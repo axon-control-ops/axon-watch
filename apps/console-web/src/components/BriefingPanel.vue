@@ -222,18 +222,21 @@ function transcriptTimeLabel(value: string): string {
 
       <div v-if="briefing && briefing.pending_approvals.count > 0" class="briefing-panel__section">
         <p class="briefing-panel__section-label">
-          Pending approvals · act in Mission Control
+          Jobs waiting for your yes or no · act in Approvals / Mission Control
         </p>
         <ul class="briefing-panel__list">
           <li
-            v-for="item in briefing.pending_approvals.items"
+            v-for="(item, index) in briefing.pending_approvals.items"
             :key="item.approval_id"
             class="briefing-panel__item"
           >
-            <span class="briefing-panel__item-title">{{ item.approval_id }}</span>
+            <span class="briefing-panel__item-title">
+              Job waiting for your yes or no{{ index === 0 ? ' (primary)' : '' }}
+            </span>
             <span class="region-copy">
               run {{ item.run_id }} · workspace {{ item.workspace_id }}
             </span>
+            <span class="region-copy briefing-panel__tech-note">ID {{ item.approval_id }}</span>
           </li>
         </ul>
       </div>

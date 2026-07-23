@@ -9,6 +9,7 @@ import {
   stopKairoPlayback,
   type KairoVoicePlaybackResult,
 } from './kairo-voice-playback';
+import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
 
 export type KairoVoicePriority =
   | 'interrupt'
@@ -22,6 +23,7 @@ export type EnqueueKairoSpeechOptions = {
   speechRate?: number;
   speechPitch?: number;
   azureVoiceId?: string;
+  speaker?: KairoVoiceSpeaker;
 };
 
 type VoiceJob = {
@@ -32,6 +34,7 @@ type VoiceJob = {
   speechRate?: number;
   speechPitch?: number;
   azureVoiceId?: string;
+  speaker?: KairoVoiceSpeaker;
   resolve: (result: KairoVoicePlaybackResult) => void;
   reject: (error: unknown) => void;
 };
@@ -99,6 +102,7 @@ async function pump(): Promise<void> {
           speechRate: job.speechRate,
           speechPitch: job.speechPitch,
           azureVoiceId: job.azureVoiceId,
+          speaker: job.speaker,
         });
         await settleAfterUtterance();
         job.resolve(result);
@@ -163,6 +167,7 @@ export function enqueueKairoSpeech(
       speechRate: options.speechRate,
       speechPitch: options.speechPitch,
       azureVoiceId: options.azureVoiceId,
+      speaker: options.speaker,
       resolve,
       reject,
     };

@@ -1,0 +1,105 @@
+{
+  "roster": [
+    {
+      "employee_id": "employee-workspace_dashpro-lead-0",
+      "name": "Dana",
+      "role": "lead",
+      "role_label": "Lead",
+      "owns": "DashPro product priorities, CI triage decisions, and handoffs"
+    },
+    {
+      "employee_id": "employee-workspace_dashpro-watcher-1",
+      "name": "Cass",
+      "role": "watcher",
+      "role_label": "Watcher",
+      "owns": "DashPro signals, runtime health, and CI red-build alerts"
+    },
+    {
+      "employee_id": "employee-workspace_dashpro-frontend-2",
+      "name": "Priya",
+      "role": "frontend",
+      "role_label": "Frontend",
+      "owns": "DashPro UI/UX and Expo/Android app-config CI breaks"
+    },
+    {
+      "employee_id": "employee-workspace_dashpro-backend-3",
+      "name": "Marco",
+      "role": "backend",
+      "role_label": "Backend",
+      "owns": "DashPro APIs, services, and quality-gate CI failures"
+    },
+    {
+      "employee_id": "employee-workspace_dashpro-integrations-4",
+      "name": "Soren",
+      "role": "integrations",
+      "role_label": "Integrations",
+      "owns": "DashPro connectors, GitHub Actions, runner/SDK/secrets CI wiring"
+    }
+  ],
+  "cases": [
+    {
+      "id": "frontend_from_backend",
+      "prompt": "Child enrollment confirmation is missing on the canary build; no popup or card.",
+      "current_employee_id": "employee-workspace_dashpro-backend-3",
+      "should_route": true,
+      "employee_id": "employee-workspace_dashpro-frontend-2",
+      "reason": "role_frontend"
+    },
+    {
+      "id": "backend_from_frontend",
+      "prompt": "Fix the quality-gate failure on /api/enrollment and the supabase rpc.",
+      "current_employee_id": "employee-workspace_dashpro-frontend-2",
+      "should_route": true,
+      "employee_id": "employee-workspace_dashpro-backend-3",
+      "reason": "role_backend"
+    },
+    {
+      "id": "cold_start_frontend",
+      "prompt": "Fix the enrollment confirmation UI card.",
+      "current_employee_id": null,
+      "should_route": true,
+      "employee_id": "employee-workspace_dashpro-frontend-2",
+      "reason": "role_frontend"
+    },
+    {
+      "id": "already_owning",
+      "prompt": "The enrollment confirmation popup is missing on the Expo screen.",
+      "current_employee_id": "employee-workspace_dashpro-frontend-2",
+      "should_route": false,
+      "employee_id": "employee-workspace_dashpro-frontend-2",
+      "reason": "already_owning"
+    },
+    {
+      "id": "ambiguous_canary",
+      "prompt": "check canary",
+      "current_employee_id": "employee-workspace_dashpro-backend-3",
+      "should_route": false,
+      "employee_id": null,
+      "reason": "score_too_low"
+    },
+    {
+      "id": "near_threshold_workflow",
+      "prompt": "Fix the workflow",
+      "current_employee_id": "employee-workspace_dashpro-backend-3",
+      "should_route": false,
+      "employee_id": null,
+      "reason": "score_too_low"
+    },
+    {
+      "id": "frontend_path_hint",
+      "prompt": "Fix components/EnrollmentCard.tsx",
+      "current_employee_id": "employee-workspace_dashpro-backend-3",
+      "should_route": true,
+      "employee_id": "employee-workspace_dashpro-frontend-2",
+      "reason": "role_frontend"
+    },
+    {
+      "id": "build_plan_exemption",
+      "prompt": "Build this plan (plan_123): Fix enrollment UI popup",
+      "current_employee_id": "employee-workspace_dashpro-backend-3",
+      "should_route": false,
+      "employee_id": null,
+      "reason": "build_plan_implement"
+    }
+  ]
+}

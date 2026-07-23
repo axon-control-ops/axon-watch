@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 
+import { linkifyWorkspacePathsInMarkdown } from './agent-markdown-file-links';
 import { agentContentHasTranscriptBlocks } from './agent-transcript-blocks';
 import { rewriteMarkdownImageSources } from './thread-image-url';
 
@@ -115,7 +116,8 @@ export function renderAgentMessageMarkdown(
   options: { workspaceId?: string | null } = {},
 ): string {
   const parts = splitAgentMessageForPreview(content);
-  const html = marked.parse(parts.markdownSource, { async: false }) as string;
+  const linked = linkifyWorkspacePathsInMarkdown(parts.markdownSource);
+  const html = marked.parse(linked, { async: false }) as string;
   return rewriteMarkdownImageSources(html, options);
 }
 

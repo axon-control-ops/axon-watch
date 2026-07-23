@@ -73,6 +73,22 @@ describe('editor-tab-labels', () => {
     expect(editorTabLabelForDocument(documents[1], labels)).toBe('Cursor vs EduDash Pro: Imag…');
   });
 
+  it('uses plans/ paths for plan drafts instead of agent-reports slug ids', () => {
+    const planDoc: WorkspaceDocumentDescriptor = {
+      id: 'draft:agent-plan-edudash-pro-sch-abc',
+      title: 'Plan · EduDash PRO School of Excellence — Aftercare',
+      language: 'markdown',
+      value: '# Plan',
+      description: 'plan',
+      source: 'draft',
+      readOnly: true,
+      planId: 'plan_7b4955d1b4c5',
+    };
+    expect(editorDocumentResourcePath(planDoc)).toBe(
+      'plans/edudash-pro-school-of-excellence-aftercare.md',
+    );
+  });
+
   it('prefixes agent draft titles', () => {
     expect(formatAgentDraftTitle('Web search report')).toBe('Agent · Web search report');
     expect(formatAgentDraftTitle('Agent · Already prefixed')).toBe('Agent · Already prefixed');

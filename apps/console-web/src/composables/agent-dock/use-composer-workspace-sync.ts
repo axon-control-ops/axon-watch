@@ -6,7 +6,7 @@ import {
 } from '../../lib/composer-mode-prefs';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
-import type { PlanSoftSwitchNotice } from './use-composer-actions';
+import type { PlanSoftSwitchNotice, TeammateRouteNotice } from './use-composer-actions';
 import { useComposerRestoreModeFocus } from './use-composer-restore-mode-focus';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -20,6 +20,7 @@ type UseComposerWorkspaceSyncOptions = {
   composerHistoryIndex: Ref<number>;
   composerHistoryScratch: Ref<string>;
   planSoftSwitchNotice: Ref<PlanSoftSwitchNotice | null>;
+  teammateRouteNotice: Ref<TeammateRouteNotice | null>;
   closeMenus: () => void;
   syncComposerHeight: () => void;
   syncContextFromDraft: () => void;
@@ -43,6 +44,7 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
     composerHistoryIndex,
     composerHistoryScratch,
     planSoftSwitchNotice,
+    teammateRouteNotice,
     closeMenus,
     syncComposerHeight,
     syncContextFromDraft,
@@ -56,6 +58,7 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
   let restoringWorkspaceComposerMode = false;
   let lastSyncedWorkspaceId: string | null = null;
   let lastSyncedThreadId: string | null = null;
+  let hasSyncedContext = false;
 
   function handleDocumentClick(): void {
     closeMenus();
@@ -109,6 +112,10 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
         composerMode.value = restoredMode;
       }
       planSoftSwitchNotice.value = null;
+      if (hasSyncedContext && workspaceChanged) {
+        teammateRouteNotice.value = null;
+      }
+      hasSyncedContext = true;
       if (workspaceChanged) {
         loadComposerHistoryForWorkspace(workspaceId);
       }

@@ -82,6 +82,40 @@ class LaneBAgentTests(unittest.TestCase):
         self.assertIn("hypotheses", debug.lower())
         self.assertIn("Reply in first person", debug)
 
+    def test_sentry_requests_receive_secret_free_watch_monitor_evidence(self) -> None:
+        from app.cli_runtime.router import _build_prompt
+
+        monitors = {
+            "items": [
+                {
+                    "check_type": "sentry_recent_issues",
+                    "status": "critical",
+                    "detail": "Sentry returned 1 unresolved issue(s), 58 event(s)",
+                    "issues": [
+                        {
+                            "short_id": "EDUDASHPRO-5Z",
+                            "title": "Realtime callback error",
+                            "count": 58,
+                            "permalink": "https://example.invalid/issues/5Z/",
+                        }
+                    ],
+                }
+            ]
+        }
+        with patch("app.cli_runtime.router.fetch_watch_monitors", return_value=monitors):
+            prompt = _build_prompt(
+                composer_mode="agent",
+                user_prompt="Check VAXON's Sentry reports",
+                context_block="ctx",
+                execution_tier="executing",
+            )
+
+        self.assertIn("trusted Axon Watch monitor evidence", prompt)
+        self.assertIn("EDUDASHPRO-5Z", prompt)
+        self.assertIn("Realtime callback error", prompt)
+        self.assertIn("Do not inspect .env", prompt)
+        self.assertNotIn("SENTRY_AUTH_TOKEN=", prompt)
+
     def test_ide_modes_keep_lane_b_even_when_prompt_matches_command_keywords(self) -> None:
         # "Add a comment to README.md" must not become an operator read_file run.
         self.assertTrue(should_use_lane_b(composer_mode="ask", command_intent="git_status"))

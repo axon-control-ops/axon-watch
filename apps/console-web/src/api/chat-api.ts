@@ -124,11 +124,16 @@ export function hasWorkspaceChatThread(
 }
 
 export async function postChatMessage(body: PostChatMessageRequest): Promise<PostChatMessageResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (String(body.execution_access ?? '').trim().toLowerCase() === 'full') {
+    // Gate 2 residual: remote surfaces require this step-up header with Full Access.
+    headers['X-Axon-Step-Up'] = 'full-access';
+  }
   return fetchJson<PostChatMessageResponse>(
     '/api/chat/messages',
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     },
     'chat message submit failed',

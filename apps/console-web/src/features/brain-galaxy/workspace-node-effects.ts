@@ -24,7 +24,9 @@ export function decorateWorkspaceNode(
   radius: number,
   colors: GalaxyNodeColors,
   phase: number,
+  options?: { showRing?: boolean },
 ): void {
+  const showRing = options?.showRing !== false;
   const material = mesh.material as MeshStandardMaterial;
   material.emissive = new Color(colors.base);
   material.emissiveIntensity = Math.max(colors.emissiveIntensity, 0.8);
@@ -51,32 +53,35 @@ export function decorateWorkspaceNode(
   };
   mesh.add(halo);
 
-  const ring = new Mesh(
-    new TorusGeometry(radius * 1.34, 0.012, 10, 48),
-    new MeshStandardMaterial({
-      color: 0xa9f4ff,
-      emissive: new Color(colors.base),
-      emissiveIntensity: 1.4,
-      transparent: true,
-      opacity: 0.62,
-      depthWrite: false,
-      side: DoubleSide,
-      blending: AdditiveBlending,
-    }),
-  );
-  ring.rotation.x = Math.PI / 2 + Math.sin(phase) * 0.5;
-  (ring.userData as WorkspaceEffectData) = {
-    workspaceEffect: 'ring',
-    baseOpacity: 0.62,
-    phase,
-    spin: 0.004 + (phase % 0.006),
-  };
-  mesh.add(ring);
+  if (showRing) {
+    const ring = new Mesh(
+      new TorusGeometry(radius * 1.34, 0.01, 8, 40),
+      new MeshStandardMaterial({
+        color: 0xa9f4ff,
+        emissive: new Color(colors.base),
+        emissiveIntensity: 1.1,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false,
+        side: DoubleSide,
+        blending: AdditiveBlending,
+      }),
+    );
+    ring.rotation.x = Math.PI / 2 + Math.sin(phase) * 0.5;
+    (ring.userData as WorkspaceEffectData) = {
+      workspaceEffect: 'ring',
+      baseOpacity: 0.28,
+      phase,
+      spin: 0.004 + (phase % 0.006),
+    };
+    mesh.add(ring);
+  }
 
-  const light = new PointLight(colors.base, 0.7, radius * 7, 2);
+  // One soft light per workspace floods the scene — keep it subtle.
+  const light = new PointLight(colors.base, 0.28, radius * 5, 2);
   (light.userData as WorkspaceEffectData) = {
     workspaceEffect: 'light',
-    baseIntensity: 0.7,
+    baseIntensity: 0.28,
     phase,
   };
   mesh.add(light);

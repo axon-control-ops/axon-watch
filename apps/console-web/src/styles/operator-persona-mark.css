@@ -56,7 +56,7 @@
 .topbar-mockup__logo {
   display: inline-flex;
   align-items: baseline;
-  gap: 0;
+  gap: 0.02rem;
 }
 
 .topbar-mockup__backronym {
@@ -77,8 +77,32 @@
   color: #ffffff;
 }
 
-.topbar-mockup__logo-mark {
-  transform: translateY(1px);
+/*
+ * Product "X" mark: SVG stroke + glow (no text background-clip box).
+ * WebKitGTK (Tauri) often paints clipped-text gradients as a filled rectangle.
+ */
+.topbar-mockup__logo-mark,
+.axon-product-logo .topbar-mockup__logo-mark.persona-glyph,
+.axon-product-logo__x {
+  display: inline-block;
+  transform: translateY(0.08rem);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: #7ae8ff;
+  width: 1.72rem;
+  height: 1.72rem;
+  overflow: visible;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 6px rgba(0, 210, 255, 0.45));
+}
+
+.axon-product-logo__x {
+  font-size: 0;
+  text-shadow: none;
 }
 
 .kairo-presence-module__title.persona-title {
@@ -118,6 +142,21 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.brain-galaxy-specialty-mote-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 28, 36, 0.88);
+  border: 1px solid rgba(125, 255, 200, 0.55);
+  box-shadow: 0 0 0.9rem rgba(0, 255, 200, 0.28);
+  color: rgba(210, 255, 240, 0.98);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .conversation-seam__thread-status-label .persona-title {

@@ -70,6 +70,8 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "degraded",
                 "connectivity",
                 "memory_highlights",
+                "due_reminders",
+                "host_artifacts",
                 "operator_presence",
                 "cli_runtime",
             },

@@ -78,8 +78,29 @@ const displayActions = computed(() =>
           :style="{ background: avatar.background, color: avatar.foreground }"
           :data-glow="avatar.glow"
           :data-presence="avatar.presence"
+          :data-lead="avatar.lead ? 'true' : undefined"
         >
-          {{ avatar.initials }}
+          <span
+            v-if="avatar.presence === 'working'"
+            class="agent-persona-dock__busy-ring"
+            aria-hidden="true"
+          />
+          <img
+            class="agent-persona-dock__face"
+            :src="avatar.faceUrl"
+            :alt="employee.name"
+            width="44"
+            height="44"
+          >
+          <span class="agent-persona-dock__initials" aria-hidden="true">{{ avatar.initials }}</span>
+          <span
+            v-if="avatar.lead"
+            class="agent-persona-dock__lead-mark"
+            aria-hidden="true"
+            title="Lead"
+          >
+            ★
+          </span>
         </span>
       </button>
       <div class="agent-persona-dock__identity">

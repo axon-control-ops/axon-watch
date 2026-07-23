@@ -1,7 +1,10 @@
 # Axon-X Autonomy Readiness
 
-**Plain-language assessment for DashPro and the Axon-X mobile control plane**  
-**Assessment date:** 20 July 2026  
+**Plain-language assessment focused on DashPro as the first proving ground, plus
+the Axon-X mobile control plane. The autonomy target is multi-workspace: any
+bound workspace working in its own project/app under the same safety rules.**  
+**Assessment date:** 20 July 2026 (live evidence below is a snapshot; re-check
+before acting)  
 **Repository:** `axon-watch`  
 **Current branch during assessment:** `dev`
 
@@ -268,8 +271,10 @@ yet an installable PWA or native phone application.
 
 ## What the live inspection found
 
-The following results came from the running system and current project folders,
-not only from documentation.
+The following results came from the running system and current project folders
+on **20 July 2026**, not only from documentation. They are **time-stamped
+evidence**, not permanent facts. Re-verify before using them as current state
+(for example, scheduler enablement and DashPro dirty-tree size can change).
 
 | Finding | What it means |
 | --- | --- |
@@ -489,13 +494,38 @@ workers dispatch Cursor with `trust_policy=worker` (keeps `--trust`, omits
 the deployment is marked remotely reachable. Always-on install now forces
 `local_token` + `AUTH_ALLOW_LOOPBACK=0` and mints `AXON_WATCH_OPERATOR_TOKEN`;
 console vite `/api` proxy injects the bearer so the SPA keeps working.
-Remaining Gate 2 debt: watch-service mTLS/service identity, CSRF/rate limits,
-and step-up Full Access keyed to a real login session (not only a shared
-operator token).
+Remaining Gate 2 deployment debt after 2026-07-22: prove a real trusted-proxy
+mTLS handshake. The code has CSRF/origin checks, process-local rate limits,
+remote-forced `local_token`, thin step-up headers, an internal token, CP client
+cert support, and proxy verification-header checks. Those headers are not a
+trust boundary unless the proxy strips incoming copies and is the only path to
+watch. Keep the token set on every non-loopback host; use
+`./scripts/ops/mint-watch-mtls.sh` and record a deployment smoke. See
+`docs/how-to/autonomy-gates-and-service-identity.md` and
+`docs/ops/agent-reports/gate2-watch-mtls-2026-07-22.md`.
 
-**Gate 3 progress:** continuous workers create a disposable git worktree/clone
-via `safe_improvement.isolated_executor` before Lane B dispatch, pass that path
-as `workspace_root` (never the live binding), and clean up with receipts.
+**Gate 3 progress:** **CLOSED** (2026-07-22). Continuous workers create a named
+`worker/<run_id>` worktree (clone fallback) via `safe_improvement.isolated_executor`
+before Lane B dispatch, pin baseline SHA, refuse paths outside the disposable root,
+pass that path as `workspace_root` (never the live binding), and clean up worktree +
+branch with receipts. Concurrent isolation proof keeps live-root `git status`
+unchanged. Scheduler remains off. Evidence:
+`docs/ops/agent-reports/gate3-worker-isolation-2026-07-22.md`.
+
+**Gate 4 progress:** **CLOSED** (2026-07-22, `27cf9ba`). Durable `workspace_tasks` ledger with
+lease / claim / attempt budget; continuous scheduler requires a leased `task_id`;
+worker prompts are task-scoped; Mission Control task board landed. Concurrent IDE
+streams are per-thread. Evidence:
+`docs/ops/agent-reports/gate4-task-ledger-2026-07-22.md`. Scheduler remains off.
+
+**Gate 5 progress:** **CLOSED** against master-plan exit criteria (2026-07-22,
+`369e5f9` / CI `a71dbd6`). Lead turns raw goals into persisted dependency DAGs,
+assigns company roles, enforces exclusive-path conflicts across leased plans,
+materializes “check with all” into N specialist leased tasks/runs, and cancels
+obsolete work through receipt-backed `/lead/replan`. Synthesis is deterministic
+terminal-status aggregation. Not included: backlog/goal-id ingestion, auto IDE
+tab open, Lane B auto-dispatch, EventSource sibling-stream e2e proof. Evidence:
+`docs/ops/agent-reports/gate5-lead-fan-out-2026-07-22.md`. Scheduler remains off.
 
 ---
 

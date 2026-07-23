@@ -4,11 +4,13 @@ import { computed, ref, watch } from 'vue';
 import type { OperatorPresenceSettings } from '../../contracts/canonical';
 import { kairoVoiceLastReason } from '../../lib/kairo-voice-diagnostics';
 import {
+  applyJarvisDuplexPreset,
   defaultOperatorPresenceSettings,
   formatVoiceTuningValue,
   normalizeOperatorPresenceSettings,
 } from '../../lib/operator-presence-settings';
 import OperatorPresenceVoiceRoutingFields from './OperatorPresenceVoiceRoutingFields.vue';
+import OperatorPresenceSettingsFooter from './OperatorPresenceSettingsFooter.vue';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
@@ -89,6 +91,14 @@ const mobileCompactPreferred = computed({
 const handsFreeEnabled = computed({
   get: () => draft.value.hands_free_enabled,
   set: (value: boolean) => patchDraft({ hands_free_enabled: value }),
+});
+
+const proactiveDuplexEnabled = computed({
+  get: () => draft.value.proactive_duplex_enabled,
+  set: (value: boolean) => {
+    draft.value = applyJarvisDuplexPreset(draft.value, value);
+    markDirty();
+  },
 });
 
 const narrateToolProgress = computed({
@@ -414,6 +424,20 @@ defineExpose({
           @patch="patchDraft"
         />
         <label class="operator-settings-form__row">
+          <input
+            v-model="proactiveDuplexEnabled"
+            type="checkbox"
+            :disabled="saving || privacyMode"
+          />
+          <span class="operator-settings-form__copy">
+            <strong>JARVIS duplex (proactive speak → listen)</strong>
+            <small>
+              After VAXON speaks an alert, stay listening for ~30s so you can answer without the wake
+              word. Turns on hands-free + spoken alerts. Cold ambient still needs “VAXON”.
+            </small>
+          </span>
+        </label>
+        <label class="operator-settings-form__row">
           <input v-model="handsFreeEnabled" type="checkbox" :disabled="saving || privacyMode" />
           <span class="operator-settings-form__copy">
             <strong>Hands-free voice (galaxy orb)</strong>
@@ -446,46 +470,23 @@ defineExpose({
         </label>
       </section>
 
-      <section class="operator-settings-form__section">
-        <header class="operator-settings-form__section-header">
-          <h2>Mobile &amp; layout</h2>
-          <p>Compact operator surfaces over tunnel or small viewports.</p>
-        </header>
-        <label class="operator-settings-form__row">
-          <input v-model="mobileCompactPreferred" type="checkbox" :disabled="saving" />
-          <span class="operator-settings-form__copy">
-            <strong>Prefer compact mobile layout</strong>
-            <small>Use the field-unit cockpit when the viewport is narrow.</small>
-          </span>
-        </label>
-      </section>
-
-      <div class="operator-settings-form__actions operator-settings-form__actions--footer">
-        <button
-          type="button"
-          class="operator-settings-form__button"
-          :disabled="saving || !dirty"
-          @click="commitSave"
-        >
-          {{ saving ? 'Saving…' : 'Save' }}
-        </button>
-        <button
-          type="button"
-          class="operator-settings-form__button operator-settings-form__button--ghost"
-          :disabled="saving || !dirty"
-          @click="discardDraft"
-        >
-          Discard
-        </button>
-        <button
-          type="button"
-          class="operator-settings-form__button operator-settings-form__button--ghost"
-          :disabled="saving"
-          @click="requestReset"
-        >
-          Reset to defaults
-        </button>
-      </div>
+      <OperatorPresenceSettingsFooter
+        :saving="Boolean(saving)"
+        :dirty="dirty"
+        @save="commitSave"
+        @discard="discardDraft"
+        @reset="requestReset"
+      >
+        <template #mobile>
+          <label class="operator-settings-form__row">
+            <input v-model="mobileCompactPreferred" type="checkbox" :disabled="saving" />
+            <span class="operator-settings-form__copy">
+              <strong>Prefer compact mobile layout</strong>
+              <small>Use the field-unit cockpit when the viewport is narrow.</small>
+            </span>
+          </label>
+        </template>
+      </OperatorPresenceSettingsFooter>
     </div>
   </div>
 </template>

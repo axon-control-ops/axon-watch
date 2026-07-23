@@ -90,8 +90,48 @@ describe('operator-fleet-health-view', () => {
     );
   });
 
-  it('summarizes fleet headline when attention exists', () => {
-    expect(fleetHealthHeadline(snapshot)).toContain('need attention');
-    expect(fleetHealthHeadline(null)).toContain('Loading');
+  it('always keeps the selected workspace on the grid even past the cap', () => {
+    const many: FleetHealthSnapshot = {
+      ...snapshot,
+      count: 14,
+      items: Array.from({ length: 14 }, (_, index) => ({
+        workspace_id: `workspace_bound_${index}`,
+        display_name: `Bound ${index}`,
+        connection_kind: 'project_path',
+        health: 'nominal' as const,
+        active_runs: 0,
+        review_ready_count: 0,
+        executing_count: 0,
+        pending_approvals_count: 0,
+        open_signals_count: 0,
+        critical_signals_count: 0,
+        top_signal_title: null,
+      })),
+    };
+    many.items.push({
+      workspace_id: 'workspace_tps',
+      display_name: 'TPS',
+      connection_kind: 'project_path',
+      health: 'nominal',
+      active_runs: 0,
+      review_ready_count: 0,
+      executing_count: 0,
+      pending_approvals_count: 0,
+      open_signals_count: 0,
+      critical_signals_count: 0,
+      top_signal_title: null,
+    });
+    const workspaces = many.items.map((item) => ({
+      workspace_id: item.workspace_id,
+      connection_kind: 'project_path' as const,
+    }));
+    const cells = buildFleetHealthGridCells({
+      snapshot: many,
+      workspaces,
+      selectedWorkspaceId: 'workspace_tps',
+      maxRows: 4,
+    });
+    expect(cells.some((cell) => cell.workspaceId === 'workspace_tps')).toBe(true);
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_tps')?.isSelected).toBe(true);
   });
 });

@@ -1,10 +1,15 @@
 import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
   Color,
   Group,
   Line,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
+  Points,
+  PointsMaterial,
   Raycaster,
   Scene,
   SphereGeometry,
@@ -20,6 +25,7 @@ import {
   GALAXY_BACKGROUND,
   galaxyNodeColors,
 } from './brain-galaxy-colors';
+import { shouldShowGalaxyNodeLabel } from './galaxy-node-label-policy';
 import { applyGalaxySelectionFocus } from './brain-galaxy-selection-effects';
 import {
   animateGalaxyAmbience,
@@ -38,6 +44,7 @@ import { animateWorkspaceNode, decorateWorkspaceNode } from './workspace-node-ef
 import type { GalaxyCoreOrbMode } from './galaxy-presence-state';
 import { presenceAmpForCoreMode } from './galaxy-presence-state';
 import { GALAXY_FOCUS_CAMERA_OFFSET, galaxyFocusCameraPosition } from './brain-galaxy-focus-camera';
+import { probeWebGlAvailability } from './webgl-availability';
 
 export type BrainGalaxyNodeClickHandler = (node: BrainGraphNode) => void;
 export type BrainGalaxyClearSelectionHandler = () => void;
@@ -97,25 +104,30 @@ export class BrainGalaxyScene {
   }
 
   static isWebGLAvailable(): boolean {
-    try {
-      const canvas = document.createElement('canvas');
-      return Boolean(
-        canvas.getContext('webgl2') ?? canvas.getContext('webgl'),
-      );
-    } catch {
-      return false;
-    }
+    return probeWebGlAvailability().ok;
   }
 
   init(): boolean {
-    if (this.disposed || !BrainGalaxyScene.isWebGLAvailable()) {
+    if (this.disposed) {
+      return false;
+    }
+    const probe = probeWebGlAvailability();
+    if (!probe.ok) {
       return false;
     }
 
     const width = this.container.clientWidth || 640;
     const height = this.container.clientHeight || 420;
 
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
+    try {
+      this.renderer = new WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch {
+      return false;
+    }
     configureGalaxyRenderer(this.renderer);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(width, height, false);
@@ -129,18 +141,22 @@ export class BrainGalaxyScene {
 
     this.labelRenderer = new CSS2DRenderer();
     this.labelRenderer.setSize(width, height);
-    this.labelRenderer.domElement.style.position = 'absolute';
-    this.labelRenderer.domElement.style.inset = '0';
-    this.labelRenderer.domElement.style.pointerEvents = 'none';
-    this.container.appendChild(this.labelRenderer.domElement);
+    const labelRoot = this.labelRenderer.domElement;
+    labelRoot.className = 'brain-galaxy-stage__labels';
+    labelRoot.style.position = 'absolute';
+    labelRoot.style.inset = '0';
+    labelRoot.style.zIndex = '2';
+    labelRoot.style.pointerEvents = 'none';
+    labelRoot.style.overflow = 'hidden';
+    this.container.appendChild(labelRoot);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.06;
     this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 0.22;
-    this.controls.minDistance = 3.2;
-    this.controls.maxDistance = 12;
+    this.controls.autoRotateSpeed = 0.38;
+    this.controls.minDistance = 3.4;
+    this.controls.maxDistance = 14;
     this.controls.enablePan = false;
 
     this.scene.add(buildGalaxyLighting());
@@ -165,6 +181,24 @@ export class BrainGalaxyScene {
       return;
     }
     this.layout = layoutBrainGraph3D(snapshot);
+    // #region agent log
+    {
+      const ys = this.layout.nodes.map((n) => n.y);
+      const ySpan = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+      const cam = this.camera?.position;
+      const workspaces = this.layout.nodes.filter((n) => n.kind === 'workspace');
+      const core = this.layout.nodes.find((n) => n.kind === 'core');
+      const minGap = core
+        ? Math.min(
+            ...workspaces.map(
+              (w) =>
+                Math.hypot(w.x - core.x, w.y - core.y, w.z - core.z) - core.radius - w.radius,
+            ),
+          )
+        : null;
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-nebula-dust',hypothesisId:'H13',location:'brain-galaxy-scene.ts:setSnapshot',message:'nebula dust galaxy layout applied',data:{nodeCount:this.layout.nodes.length,workspaceCount:workspaces.length,ySpan:Number(ySpan.toFixed(3)),minCoreGap:minGap==null?null:Number(minGap.toFixed(3)),haze:'points-dust',camera:cam?{x:+cam.x.toFixed(2),y:+cam.y.toFixed(2),z:+cam.z.toFixed(2)}:null,sample:workspaces.slice(0,4).map((n)=>({id:n.label,x:+n.x.toFixed(2),y:+n.y.toFixed(2),z:+n.z.toFixed(2)}))},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
     this.rebuildGraph();
     if (this.selectedNodeId) {
       this.applySelectionHighlight(this.selectedNodeId);
@@ -285,6 +319,9 @@ export class BrainGalaxyScene {
     this.nodeMeshes = [];
     this.liveEdges = [];
 
+    // Soft dust cloud (points) — not hard sphere shells that read as radar rings.
+    this.graphGroup.add(this.buildNebulaDust());
+
     for (const [index, edge] of this.layout.edges.entries()) {
       const line = buildLiveEdge(edge, index);
       this.liveEdges.push(line);
@@ -296,6 +333,41 @@ export class BrainGalaxyScene {
       this.nodeMeshes.push(mesh);
       this.graphGroup.add(mesh);
     }
+  }
+
+  private buildNebulaDust(): Points {
+    const count = 420;
+    const positions = new Float32Array(count * 3);
+    let seed = 0x9e3779b9;
+    const rand = (): number => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    for (let i = 0; i < count; i += 1) {
+      // Gaussian-ish ball so the glow is a cloud, not a wire ring.
+      const u = rand();
+      const v = rand();
+      const theta = u * Math.PI * 2;
+      const phi = Math.acos(2 * v - 1);
+      const radius = Math.pow(rand(), 0.55) * 2.6;
+      positions[i * 3] = Math.sin(phi) * Math.cos(theta) * radius;
+      positions[i * 3 + 1] = Math.cos(phi) * radius * 0.72;
+      positions[i * 3 + 2] = Math.sin(phi) * Math.sin(theta) * radius;
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(positions, 3));
+    const material = new PointsMaterial({
+      color: 0xc8f4ff,
+      size: 0.055,
+      transparent: true,
+      opacity: 0.45,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      sizeAttenuation: true,
+    });
+    const points = new Points(geometry, material);
+    points.name = 'nebula-dust';
+    return points;
   }
 
   private buildNodeMesh(node: PositionedBrainNode3D): NodeMesh {
@@ -315,10 +387,14 @@ export class BrainGalaxyScene {
     if (node.kind === 'core') {
       decorateVaxonCoreOrb(mesh, node.radius, colors);
     } else if (node.kind === 'workspace') {
-      decorateWorkspaceNode(mesh, node.radius, colors, node.x * 1.7 + node.z * 1.3);
+      // Rings only on non-nominal workspaces — otherwise ~17 torii wash the graph.
+      decorateWorkspaceNode(mesh, node.radius, colors, node.x * 1.7 + node.z * 1.3, {
+        showRing: node.tone !== 'nominal',
+      });
     }
 
-    if (node.kind === 'core' || node.kind === 'workspace') {
+    // Labels: core + every named workspace (selected orbs must stay labeled).
+    if (shouldShowGalaxyNodeLabel(node)) {
       const label = document.createElement('span');
       label.className = 'brain-galaxy-node-label';
       if (node.tone === 'attention') {
@@ -334,7 +410,11 @@ export class BrainGalaxyScene {
         label.textContent = node.label;
       }
       const labelObject = new CSS2DObject(label);
-      labelObject.position.set(0, node.radius + (node.kind === 'core' ? 0.42 : 0.18), 0);
+      const lift =
+        node.kind === 'core'
+          ? 0.48
+          : 0.32 + Math.abs(Math.sin(node.x * 2.3 + node.z * 1.7)) * 0.28;
+      labelObject.position.set(0, node.radius + lift, 0);
       mesh.add(labelObject);
     }
 

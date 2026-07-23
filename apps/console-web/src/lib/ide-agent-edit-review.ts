@@ -106,21 +106,16 @@ export function agentEditReviewDocumentTitle(path: string): string {
 }
 
 /**
- * Prefer the real workspace file when:
- * - there is no diff yet (legacy), or
- * - this is a completed markdown edit (file is already saved; show Preview, not green + lines).
+ * Prefer the real workspace file when the edit is finished (Cursor-style open).
+ * Streaming edits still use the ephemeral review draft so operators can watch
+ * in-progress diffs; completed files (including SVG/images) open on disk so
+ * the editor canvas / preview surfaces work.
  */
 export function shouldOpenWorkspaceFileForEditReview(
   edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'open'>,
 ): boolean {
-  if (edit.open) {
-    return false;
-  }
-  if (!edit.diff.trim()) {
-    return true;
-  }
-  // Completed markdown writes are already on disk — open the real file for Preview.
-  return isMarkdownAgentEditPath(edit.path);
+  // Still streaming — keep the review draft so green + lines stay visible.
+  return !edit.open;
 }
 
 const DOCK_MARKDOWN_PREVIEW_CHARS = 1200;

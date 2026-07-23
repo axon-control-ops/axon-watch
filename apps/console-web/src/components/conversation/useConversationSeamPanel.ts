@@ -62,7 +62,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
       );
     }
     if (shell.agentStreamActive) {
-      return 'Agent is thinking…';
+      return 'I am thinking…';
     }
     return shell.ideComposerActivity?.label ?? 'Agent is working…';
   });
@@ -159,7 +159,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   }
 
   function thinkingBodyText(text: string): string {
-    return sanitizeAgentThinkingForOperator(text) || 'Thinking…';
+    return sanitizeAgentThinkingForOperator(text) || 'I am thinking…';
   }
 
   async function copyTerminalOutput(output: string): Promise<void> {

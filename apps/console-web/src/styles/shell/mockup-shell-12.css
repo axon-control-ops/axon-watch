@@ -199,10 +199,24 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  isolation: isolate;
+  overflow: hidden;
   background:
     radial-gradient(circle at 50% 42%, rgba(72, 196, 255, 0.1), transparent 55%),
     radial-gradient(circle at 78% 22%, rgba(255, 128, 64, 0.05), transparent 42%),
     rgba(2, 6, 12, 0.98);
+}
+
+.brain-galaxy-stage__labels {
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+/* WebKitGTK/Tauri: CSS2D chips were painting over the inspector glass. */
+/* Keep node labels visible with the inspector open — matches the original
+   labeled nebula cluster (hiding them made the graph read as an empty ring). */
+.brain-galaxy-stage:has(.brain-galaxy-stage__hud--inspector) .brain-galaxy-node-label {
+  opacity: 0.92;
 }
 
 .brain-galaxy-stage__viewport::after {
@@ -246,16 +260,19 @@
 }
 
 .brain-galaxy-node-label {
+  max-width: 11rem;
   padding: 0.12rem 0.38rem;
   border-radius: 999px;
   border: 1px solid rgba(72, 196, 255, 0.28);
-  background: rgba(0, 8, 14, 0.72);
-  color: rgba(220, 240, 255, 0.92);
+  background: rgba(0, 8, 14, 0.82);
+  color: rgba(230, 245, 255, 0.96);
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transform: translate(-50%, -100%);
 }
 
@@ -285,6 +302,55 @@
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.brain-galaxy-stage__fallback--nebula {
+  background:
+    radial-gradient(ellipse 55% 40% at 50% 48%, rgba(90, 170, 220, 0.08), transparent 70%),
+    radial-gradient(circle at 20% 30%, rgba(40, 90, 140, 0.12), transparent 45%),
+    #040810;
+}
+
+.brain-galaxy-stage__fallback-star {
+  fill: rgba(180, 230, 255, 0.85);
+}
+
+.brain-galaxy-stage__fallback-nebula {
+  pointer-events: none;
+}
+
+.operator-brain-graph__edge--nebula {
+  stroke: rgba(180, 230, 255, 0.22);
+  stroke-width: 0.9;
+}
+
+.operator-brain-graph__node--nebula .operator-brain-graph__node-glow {
+  fill: rgba(180, 230, 255, 0.18);
+  stroke: none;
+}
+
+.operator-brain-graph__node--nebula.operator-brain-graph__node--critical .operator-brain-graph__node-glow {
+  fill: rgba(255, 90, 120, 0.28);
+}
+
+.operator-brain-graph__node--nebula .operator-brain-graph__node-body {
+  stroke: rgba(220, 245, 255, 0.55);
+  stroke-width: 0.8;
+}
+
+.operator-brain-graph__node-label-chip rect {
+  fill: rgba(4, 12, 20, 0.78);
+  stroke: rgba(120, 200, 255, 0.35);
+  stroke-width: 0.6;
+}
+
+.operator-brain-graph__node-label-chip text {
+  fill: rgba(230, 245, 255, 0.95);
+  font-size: 7.5px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
 }
 
 .brain-galaxy-stage__loading {

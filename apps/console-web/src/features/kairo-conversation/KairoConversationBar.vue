@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue';
 
+import AgentDockTeammateRouteBanner from '../../components/ide/agent-dock/AgentDockTeammateRouteBanner.vue';
 import {
   kairoConversationError,
   kairoConversationPhase,
@@ -16,6 +17,11 @@ import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
 import { operatorExecutionStage } from '../../lib/operator-status-radar-view';
 import { formatRunShortId } from '../../lib/run-display';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
+import {
+  dismissEmployeeSpecialtyRoute,
+  undoEmployeeSpecialtyRoute,
+} from '../../lib/apply-employee-specialty-route';
+import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -85,6 +91,14 @@ const inputDisabled = computed(
     kairoConversationPhase.value === 'thinking' ||
     (speechCapture.capturing.value && speechCapture.captureMode.value === 'manual'),
 );
+
+async function undoTeammateRoute(): Promise<void> {
+  await undoEmployeeSpecialtyRoute(shell, teammateRouteNotice.value);
+}
+
+function dismissTeammateRoute(): void {
+  dismissEmployeeSpecialtyRoute();
+}
 
 function handleInputFocus(): void {
   handleFocus();
@@ -282,6 +296,14 @@ onUnmounted(() => {
     class="kairo-conversation-bar"
     :class="{ 'kairo-conversation-bar--busy': pending || kairoConversationPhase === 'thinking' }"
   >
+    <AgentDockTeammateRouteBanner
+      :show="Boolean(teammateRouteNotice)"
+      :to-name="teammateRouteNotice?.toName ?? ''"
+      :role-label="teammateRouteNotice?.toRoleLabel"
+      :from-name="teammateRouteNotice?.fromName"
+      @undo="undoTeammateRoute"
+      @dismiss="dismissTeammateRoute"
+    />
     <div class="kairo-conversation-bar__command-row">
       <form class="kairo-conversation-bar__form" @submit.prevent="handleSubmit">
         <span class="kairo-conversation-bar__glyph-slot" aria-hidden="true">
@@ -312,7 +334,10 @@ onUnmounted(() => {
         <button
           type="button"
           class="kairo-conversation-bar__mic"
-          :class="{ 'kairo-conversation-bar__mic--active': speechCapture.capturing.value }"
+          :class="{
+            'kairo-conversation-bar__mic--active':
+              speechCapture.capturing.value && speechCapture.captureMode.value === 'manual',
+          }"
           :disabled="micDisabled"
           :title="micTitle"
           aria-label="Hold to talk"
@@ -321,7 +346,13 @@ onUnmounted(() => {
           @pointercancel.prevent="handleMicPointerUp"
           @pointerleave="handleMicPointerUp"
         >
-          {{ speechCapture.capturing.value ? 'Listening…' : 'Mic' }}
+          {{
+            speechCapture.capturing.value && speechCapture.captureMode.value === 'manual'
+              ? 'Listening…'
+              : speechCapture.capturing.value
+                ? 'Armed'
+                : 'Mic'
+          }}
         </button>
         <button type="submit" class="kairo-conversation-bar__send" :disabled="!canSubmit">
           Send

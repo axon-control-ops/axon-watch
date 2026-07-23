@@ -1,0 +1,186 @@
+/* Ambient HUD — docked inside the left rail (not floating over the galaxy core). */
+
+.brain-galaxy-stage__hud--left .galaxy-ambient-hud {
+  position: relative;
+  left: auto;
+  top: auto;
+  z-index: 1;
+  display: grid;
+  gap: 0.4rem;
+  width: 100%;
+  max-width: none;
+  margin: 0 0 0.45rem;
+  padding: 0 0.15rem;
+  pointer-events: none;
+  flex: 0 0 auto;
+}
+
+.galaxy-ambient-hud__voice {
+  position: relative;
+  margin: 0;
+  padding: 0.42rem 0.55rem 0.42rem 0.7rem;
+  clip-path: polygon(
+    0 0.35rem,
+    0.35rem 0,
+    calc(100% - 0.35rem) 0,
+    100% 0.35rem,
+    100% calc(100% - 0.35rem),
+    calc(100% - 0.35rem) 100%,
+    0.35rem 100%,
+    0 calc(100% - 0.35rem)
+  );
+  border: 1px solid rgba(94, 240, 255, 0.55);
+  background:
+    linear-gradient(90deg, rgba(0, 70, 95, 0.55), transparent 40%),
+    linear-gradient(180deg, rgba(0, 28, 42, 0.92), rgba(0, 10, 18, 0.88));
+  color: rgba(200, 250, 255, 0.98);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  box-shadow:
+    0 0 0 1px rgba(0, 220, 255, 0.12) inset,
+    0 0 1.4rem rgba(0, 210, 255, 0.28);
+  animation: galaxy-ambient-voice-pulse 2.4s ease-in-out infinite;
+}
+
+.galaxy-ambient-hud__voice::before,
+.galaxy-ambient-hud__panel::before {
+  content: '';
+  position: absolute;
+  inset: 0.2rem;
+  border: 1px solid rgba(120, 230, 255, 0.18);
+  clip-path: inherit;
+  pointer-events: none;
+}
+
+.galaxy-ambient-hud__panels {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.galaxy-ambient-hud__panel {
+  position: relative;
+  padding: 0.45rem 0.55rem 0.45rem 0.65rem;
+  clip-path: polygon(
+    0 0.3rem,
+    0.3rem 0,
+    calc(100% - 0.3rem) 0,
+    100% 0.3rem,
+    100% calc(100% - 0.3rem),
+    calc(100% - 0.3rem) 100%,
+    0.3rem 100%,
+    0 calc(100% - 0.3rem)
+  );
+  border: 1px solid rgba(72, 210, 255, 0.5);
+  background:
+    radial-gradient(ellipse 90% 50% at 0% 0%, rgba(0, 200, 255, 0.18), transparent 55%),
+    linear-gradient(135deg, rgba(0, 40, 58, 0.92), rgba(2, 8, 14, 0.94));
+  box-shadow:
+    0 0 0 1px rgba(0, 210, 255, 0.1) inset,
+    0 0 1.35rem rgba(0, 180, 255, 0.28),
+    0 0.35rem 1.2rem rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px) saturate(1.15);
+  transform-origin: left center;
+}
+
+.galaxy-ambient-hud__panel::after {
+  content: '';
+  position: absolute;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  left: 0.2rem;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(120, 240, 255, 0.85),
+    transparent
+  );
+  box-shadow: 0 0 0.55rem rgba(0, 220, 255, 0.55);
+  pointer-events: none;
+}
+
+.galaxy-ambient-hud__panel header {
+  margin: 0 0 0.18rem;
+  color: rgba(120, 230, 255, 0.95);
+  font-size: 0.48rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow: 0 0 0.55rem rgba(0, 210, 255, 0.45);
+}
+
+.galaxy-ambient-hud__panel p {
+  margin: 0;
+  color: rgba(235, 250, 255, 0.96);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.galaxy-ambient-hud__panel[data-tone='critical'] {
+  border-color: rgba(255, 110, 110, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(255, 90, 90, 0.12) inset,
+    0 0 1.45rem rgba(255, 70, 70, 0.35);
+}
+
+.galaxy-ambient-hud__panel[data-tone='critical']::after {
+  background: linear-gradient(180deg, transparent, rgba(255, 120, 120, 0.9), transparent);
+  box-shadow: 0 0 0.55rem rgba(255, 80, 80, 0.55);
+}
+
+.galaxy-ambient-hud__panel[data-tone='attention'] {
+  border-color: rgba(255, 180, 90, 0.7);
+}
+
+.galaxy-ambient-hud__panel[data-tone='nominal'] {
+  border-color: rgba(90, 255, 190, 0.6);
+}
+
+.galaxy-ambient-panel-enter-active,
+.galaxy-ambient-panel-leave-active {
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s ease;
+}
+
+.galaxy-ambient-panel-enter-from {
+  opacity: 0;
+  transform: translateY(-0.55rem) scale(0.96);
+}
+
+.galaxy-ambient-panel-leave-to {
+  opacity: 0;
+  transform: translateY(0.4rem) scale(0.95);
+}
+
+@keyframes galaxy-ambient-voice-pulse {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1100px) {
+  .brain-galaxy-stage__hud--left .galaxy-ambient-hud {
+    margin-bottom: 0.35rem;
+  }
+}
+
+@media (max-height: 720px) {
+  .brain-galaxy-stage__hud--left .galaxy-ambient-hud__panels {
+    max-height: 5.5rem;
+    overflow: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .galaxy-ambient-hud__voice,
+  .galaxy-ambient-panel-enter-active,
+  .galaxy-ambient-panel-leave-active {
+    animation: none !important;
+    transition: none !important;
+  }
+}

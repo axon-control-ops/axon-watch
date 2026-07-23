@@ -387,39 +387,32 @@ export function buildIdeQuickGuide(input: {
   if (!input.terminalVisible && !input.agentDockCollapsed) {
     if (input.runPhase === 'executing') {
       return {
-        title: 'Run in progress — show the terminal to follow shell output',
+        title: 'Terminal hidden — shell output is in the bottom panel',
         tone: 'attention',
         actions: [{ id: 'show-terminal', label: 'Show terminal' }],
         steps: [
-          'Ctrl/Cmd+J toggles the terminal panel in the workbench.',
-          'Click TERMINAL in the editor status bar, the bottom reopen strip, or the terminal icon in the left activity bar.',
-          'Watch live command output while the agent dock stays open for conversation.',
+          'This tip opens the workbench terminal (not the top ATTENTION chip — that is for signals).',
+          'Ctrl/Cmd+J toggles the terminal panel.',
+          'Editor status bar TERMINAL chip and the left activity bar also reopen it.',
         ],
       };
     }
 
     if (input.runPhase === 'review_ready') {
       return {
-        title: 'Review ready — show the terminal to read command output',
+        title: 'Terminal hidden — review command output below',
         tone: 'attention',
         actions: [{ id: 'show-terminal', label: 'Show terminal' }],
         steps: [
-          'Ctrl/Cmd+J toggles the terminal panel in the workbench.',
-          'Click TERMINAL in the editor status bar, the bottom reopen strip, or the terminal icon in the left activity bar.',
-          'Read shell output here; complete the run from the agent dock when ready.',
+          'This tip opens the workbench terminal (not the top ATTENTION chip — that is for signals).',
+          'Ctrl/Cmd+J toggles the terminal panel.',
+          'Complete the run from the agent dock when ready.',
         ],
       };
     }
 
-    return {
-      title: 'Terminal hidden — reopen when you need shell output',
-      tone: 'neutral',
-      actions: [{ id: 'show-terminal', label: 'Show terminal' }],
-      steps: [
-        'Ctrl/Cmd+J toggles the terminal panel in the workbench.',
-        'Click TERMINAL in the editor status bar, the bottom reopen strip, or the terminal icon in the left activity bar.',
-      ],
-    };
+    // Idle + dock open + terminal closed: status-bar chip is enough — no banner.
+    return null;
   }
 
   if (input.agentDockCollapsed && !input.terminalVisible) {

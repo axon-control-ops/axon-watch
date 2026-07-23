@@ -61,6 +61,24 @@ class ParticipantMemoryTests(unittest.TestCase):
         self.assertIn("Sarah", line)
         self.assertNotIn("sir", line.lower())
 
+    def test_agents_use_sir_king_when_no_guest(self) -> None:
+        line = apply_participant_address(
+            "All set, sir — ready for review.",
+            None,
+            speaker_kind="agent",
+        )
+        self.assertIn("Sir King", line)
+        self.assertNotRegex(line, r"(?i)\bsir\b(?!\s+king)")
+
+    def test_vaxon_keeps_short_sir_when_alone(self) -> None:
+        line = apply_participant_address(
+            "All set, sir — ready for review.",
+            None,
+            speaker_kind="vaxon",
+        )
+        self.assertRegex(line, r"(?i)\bsir\b")
+        self.assertNotIn("Sir King", line)
+
 
 if __name__ == "__main__":
     unittest.main()

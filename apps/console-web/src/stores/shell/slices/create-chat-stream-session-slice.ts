@@ -1,12 +1,13 @@
 import type { Ref } from 'vue';
 
 import type { OperatorThreadEntry } from '../../../lib/operator-thread';
-import type { WorkspaceRecord } from '../../../contracts/canonical';
 
 interface CreateChatStreamSessionSliceInput {
-  currentWorkspace: Ref<WorkspaceRecord | null>;
+  activeIdeThreadId: Ref<string | null>;
   threadMessages: Ref<OperatorThreadEntry[]>;
+  /** Message cache keyed by thread_id. */
   workspaceIdeThreadMessagesById: Ref<Record<string, OperatorThreadEntry[]>>;
+  /** Live SSE sessions keyed by thread_id. */
   chatStreamSessionsByWorkspace: Map<string, { disconnect: () => void }>;
 }
 
@@ -18,12 +19,13 @@ export function createChatStreamSessionSlice(input: CreateChatStreamSessionSlice
     input.chatStreamSessionsByWorkspace.clear();
   }
 
-  function disconnectChatStreamSession(workspaceId?: string): void {
-    if (workspaceId) {
-      const session = input.chatStreamSessionsByWorkspace.get(workspaceId);
+  /** Disconnect one thread's stream, or every stream when threadId is omitted. */
+  function disconnectChatStreamSession(threadId?: string): void {
+    if (threadId) {
+      const session = input.chatStreamSessionsByWorkspace.get(threadId);
       if (session) {
         session.disconnect();
-        input.chatStreamSessionsByWorkspace.delete(workspaceId);
+        input.chatStreamSessionsByWorkspace.delete(threadId);
       }
       return;
     }
@@ -31,7 +33,7 @@ export function createChatStreamSessionSlice(input: CreateChatStreamSessionSlice
   }
 
   function patchThreadMessageContent(
-    workspaceId: string,
+    threadId: string,
     messageId: string,
     content: string,
     attachments?: OperatorThreadEntry['attachments'],
@@ -48,16 +50,17 @@ export function createChatStreamSessionSlice(input: CreateChatStreamSessionSlice
         return next;
       });
 
-    if (input.currentWorkspace.value?.workspace_id === workspaceId) {
-      input.threadMessages.value = updateMessages(input.threadMessages.value);
-    }
-
-    const cached = input.workspaceIdeThreadMessagesById.value[workspaceId];
+    const cached = input.workspaceIdeThreadMessagesById.value[threadId];
     if (cached) {
       input.workspaceIdeThreadMessagesById.value = {
         ...input.workspaceIdeThreadMessagesById.value,
-        [workspaceId]: updateMessages(cached),
+        [threadId]: updateMessages(cached),
       };
+    }
+
+    // Only paint into the visible transcript when this thread is focused.
+    if (input.activeIdeThreadId.value === threadId) {
+      input.threadMessages.value = updateMessages(input.threadMessages.value);
     }
   }
 

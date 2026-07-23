@@ -1,4 +1,8 @@
-import { isBootstrapSummarySignal } from './operator-signal-hints';
+import {
+  explainOperatorAlert,
+  isBootstrapSummarySignal,
+  resolveOperatorAlertExplanation,
+} from './operator-signal-hints';
 
 export type SignalHandoffInput = {
   signal_id: string;
@@ -8,6 +12,10 @@ export type SignalHandoffInput = {
   /** When set, used as the IDE agent prompt instead of rebuilding from title/summary. */
   task?: string | null;
   meta?: Record<string, unknown> | null;
+  /** Optional control-plane explanation (spoken_alert.explanation). */
+  serverExplanation?: Record<string, unknown> | null;
+  serverSignalId?: string | null;
+  serverReason?: string | null;
 };
 
 export type WorkspaceHandoffTarget = {
@@ -23,7 +31,7 @@ export type ResolvedSignalHandoff = {
   reason: string;
 };
 
-function buildEmailHandoffTask(signal: SignalHandoffInput): string | null {
+function buildEmailHandoffContext(signal: SignalHandoffInput): string | null {
   const family = String(signal.meta?.signal_family ?? '').trim();
   if (family !== 'email_triage') {
     return null;
@@ -36,14 +44,10 @@ function buildEmailHandoffTask(signal: SignalHandoffInput): string | null {
     signal.title;
   const detail =
     String(signal.meta?.recommended_detail ?? '').trim() || signal.summary?.trim() || '';
-  const action = String(signal.meta?.recommended_action ?? '').trim();
 
-  const parts = [`Triage email from ${sender}: "${subject}".`];
+  const parts = [`Email from ${sender}: "${subject}".`];
   if (detail) {
     parts.push(detail);
-  }
-  if (action) {
-    parts.push(`Recommended action: ${action}.`);
   }
   return parts.join(' ');
 }
@@ -54,16 +58,29 @@ export function buildSignalHandoffTask(signal: SignalHandoffInput): string {
     return providedTask;
   }
 
-  const emailTask = buildEmailHandoffTask(signal);
-  if (emailTask) {
-    return emailTask;
-  }
+  const explained = resolveOperatorAlertExplanation({
+    signalId: signal.signal_id,
+    title: signal.title,
+    summary: signal.summary,
+    meta: signal.meta,
+    serverExplanation: signal.serverExplanation,
+    serverSignalId: signal.serverSignalId ?? signal.signal_id,
+    serverReason: signal.serverReason,
+  });
 
-  const summary = signal.summary?.trim();
-  if (summary) {
-    return `Investigate signal "${signal.title}": ${summary}`;
-  }
-  return `Investigate signal "${signal.title}" (${signal.signal_id}).`;
+  const emailContext = buildEmailHandoffContext(signal);
+  const context =
+    emailContext ||
+    (signal.summary?.trim()
+      ? `${signal.title}: ${signal.summary.trim()}`
+      : signal.title);
+
+  return [
+    context,
+    `Operator summary: ${explained.what}`,
+    `Your job: ${explained.agentDo}`,
+    'When done, explain the outcome in plain English for a non-technical operator.',
+  ].join(' ');
 }
 
 export function canHandoffSignalToIde(signal: SignalHandoffInput): boolean {
@@ -114,3 +131,5 @@ export function resolveSignalHandoff(
     reason,
   };
 }
+
+export { explainOperatorAlert };

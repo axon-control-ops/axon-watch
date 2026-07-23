@@ -37,7 +37,8 @@ Approved goal
   → Receipt for every step
 ```
 
-Until that loop is proven, continuous workers must not freely edit the live DashPro checkout.
+Until that loop is proven, continuous workers must not freely edit any live
+bound workspace checkout (DashPro is the highest-risk example today).
 
 ---
 
@@ -281,18 +282,21 @@ Make Dana (Lead) a real manager, not only a persona.
 3. Serialize overlapping file paths.
 4. Cancel obsolete tasks when goals change.
 5. Persist replan receipts.
+6. **Lead fan-out:** when the operator (or Lead) asks to check with *all* sub-agents / teammates, Dana must be able to dispatch work to every specialist **in parallel** (not single-winner specialty route). Each sub-agent gets their own thread/run; Lead synthesizes results afterward.
 
 **Exit criteria**
 
 - One goal produces an ordered task plan.
 - Overlapping edits cannot run concurrently.
 - Replans are receipt-backed.
+- “Check with all sub-agents” opens concurrent specialist runs (or leased tasks) rather than routing to one teammate.
 
 **Evidence to record**
 
 - planner unit tests;
 - conflict-serialization proof;
-- sample goal → task DAG artifact.
+- sample goal → task DAG artifact;
+- fan-out proof: one Lead prompt → N specialist runs with receipts.
 
 ---
 
@@ -605,18 +609,26 @@ Allow only reversible, pre-approved production classes.
 
 ---
 
-## Definition of done for “DashPro autonomous”
+## Definition of done for “workspace autonomy”
 
-DashPro autonomy is **done** only when all of the following are true:
+A **bound workspace** (any project-path workspace, not only DashPro) is
+autonomous enough only when all of the following are true for that workspace:
 
 1. Continuous workers never write the live operator checkout.
 2. Every run is tied to a leased task with acceptance checks.
-3. Lead can turn one approved goal into a conflict-safe task plan.
+3. Lead (or equivalent planner) can turn one approved goal into a conflict-safe task plan.
 4. Draft PRs are the normal delivery unit.
 5. CI failures create repair tasks automatically, with attempt budgets.
 6. Staging rollback works without a human present.
-7. The 20-task canary meets the success bar.
-8. Merge to `main`, Play promotion, secrets, and destructive ops remain human-gated.
+7. A bounded canary (for example 20 tasks) meets the success bar for that workspace.
+8. Merge to protected branches, store promotion, secrets, and destructive ops remain human-gated.
+
+### DashPro proving-ground note
+
+DashPro is the first workspace used to prove the loop above. Passing the
+DashPro canary unlocks the pattern; it does **not** automatically declare every
+other bound workspace done until the same controls are enabled and measured
+there.
 
 ---
 
@@ -646,37 +658,30 @@ Mobile autonomy / control is **done** only when:
 
 ---
 
-## Evidence log template
+## Evidence log
 
-Append one block per completed gate:
-
-```text
-### Gate N — YYYY-MM-DD
-- owner:
-- commit:
-- commands run:
-- pass/fail:
-- exit criteria met: yes/no
-- residual risks:
-- next gate unlocked:
-```
+Gate exit receipts are appended in [`docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md`](./ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md) (kept out of this file to stay under the markdown hard limit).
 
 ---
 
 ## Immediate next actions (start now)
 
-1. **Pause** continuous mutation affecting the shared DashPro checkout.
-2. **Inventory** the current DashPro dirty tree and map files to runs/roles.
-3. **Fix** the failing autonomy tests and record a green baseline SHA.
-4. **Do not** build mobile mutation features until Gate 2 is green.
-5. **Do not** re-enable continuous live-checkout editing after Gate 0.
+1. **Start Gate 6** — mandatory verifier contract; failed checks must block completion.
+2. **Do not** re-enable continuous live-checkout editing.
+3. **Do not** re-enable the continuous scheduler by default until verifier blocking is proven.
+4. **Do not** build mobile mutation features until a real proxy mTLS handshake is proven on remote.
+5. On any remote deploy: set `AXON_WATCH_AUTH_MODE=local_token`, operator token, and `AXON_WATCH_INTERNAL_SERVICE_TOKEN`.
 
 ---
 
 ## Related documents
 
 - Assessment: `docs/AXON-X-AUTONOMY-READINESS.md`
+- Evidence log: `docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md`
 - Interactive canvas: workspace canvases `axon-x-autonomy-readiness.canvas.tsx`
 - Self-improvement contract: `docs/SELF_IMPROVEMENT_CONTRACT.md`
 - DashPro CI playbook: `docs/planning/DASHPRO_CI_AGENT_PLAYBOOK.md`
 - Child project binding: `docs/CHILD_PROJECT_WORKSPACE.md`
+- Gate 0 evidence: `docs/ops/agent-reports/gate0-pause-preserve-2026-07-21.md`
+- Gate 1 evidence: `docs/ops/agent-reports/gate1-trustworthy-baseline-2026-07-21.md`
+- Gate 2 evidence: `docs/ops/agent-reports/gate2-auth-containment-2026-07-21.md`

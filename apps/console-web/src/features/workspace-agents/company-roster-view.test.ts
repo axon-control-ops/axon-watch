@@ -6,6 +6,7 @@ import {
   employeeDockReceiptRunId,
   employeeDockReceiptRunLabel,
   employeeGlowTone,
+  employeeIsActivelyBusy,
   employeeIsWorking,
   employeeMetaLine,
   adjacentPresenceStripEmployee,
@@ -260,5 +261,31 @@ describe('company-roster-view', () => {
         employee({ employee_id: 'e2', status: 'watching' }),
       ]),
     ).toBe(true);
+  });
+
+  it('does not treat Lead mirrored workspace executing as personal busy', () => {
+    const lead = employee({
+      employee_id: 'employee-workspace_dashpro-lead-0',
+      name: 'Dana',
+      role: 'lead',
+      primary: true,
+      status: 'executing',
+      active_run_id: undefined,
+    });
+    const specialist = employee({
+      employee_id: 'employee-workspace_dashpro-integrations-4',
+      name: 'Soren',
+      role: 'integrations',
+      status: 'executing',
+      active_run_id: 'run_soren',
+    });
+    expect(employeeIsActivelyBusy(lead)).toBe(false);
+    expect(
+      employeeIsActivelyBusy({
+        ...lead,
+        active_run_id: 'run_lead',
+      }),
+    ).toBe(true);
+    expect(employeeIsActivelyBusy(specialist)).toBe(true);
   });
 });

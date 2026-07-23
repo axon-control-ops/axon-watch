@@ -1,8 +1,10 @@
 import { watch, type Ref } from 'vue';
 
 import {
-  buildAgentTerminalMirrorText,
+  buildAgentTerminalMirrorScrollback,
   findAgentTerminalMirrorSegment,
+  listAgentTerminalMirrorSegments,
+  terminalMirrorSignature,
 } from '../lib/agent-terminal-mirror';
 import { agentShellMirrorForcedText } from '../lib/agent-shell-mirror-state';
 
@@ -29,15 +31,18 @@ export function useAgentTerminalMirror(input: {
   const forcedText = input.forcedText ?? agentShellMirrorForcedText;
 
   function resolveSnapshot(): string | null {
+    const content = input.getTranscriptContent();
+    const segment = findAgentTerminalMirrorSegment(content);
+    // Live open shells must win over a pinned snapshot from a prior turn/card,
+    // otherwise OTA/`npm run …` mirrors stay stuck on stale output.
+    if (segment?.open) {
+      return buildAgentTerminalMirrorScrollback(content);
+    }
     const forced = forcedText.value?.trim();
     if (forced) {
       return forced.endsWith('\n') ? forced : `${forced}\n`;
     }
-    const segment = findAgentTerminalMirrorSegment(input.getTranscriptContent());
-    if (!segment) {
-      return null;
-    }
-    return buildAgentTerminalMirrorText(segment);
+    return buildAgentTerminalMirrorScrollback(content);
   }
 
   function syncNow(): void {
@@ -88,20 +93,25 @@ export function useAgentTerminalMirror(input: {
           forced: forcedText.value,
         };
       }
-      if (forcedText.value) {
+      const content = input.getTranscriptContent();
+      const hasOpenTerminal = listAgentTerminalMirrorSegments(content).some(
+        (segment) => segment.open,
+      );
+      if (forcedText.value && !hasOpenTerminal) {
         return {
           active: true as const,
           sessionId: input.agentSessionId.value,
           contentLen: -1,
+          terminalSig: '',
           forced: forcedText.value,
         };
       }
-      const content = input.getTranscriptContent();
       return {
         active: true as const,
         sessionId: input.agentSessionId.value,
         contentLen: content.length,
         contentTail: content.slice(-240),
+        terminalSig: terminalMirrorSignature(content),
         forced: null as string | null,
       };
     },

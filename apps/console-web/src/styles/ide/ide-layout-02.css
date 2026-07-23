@@ -420,6 +420,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.35rem;
+  position: relative;
+  z-index: 40;
 }
 
 .agent-dock__head-main {
@@ -440,7 +442,7 @@
   /* Keep visible so the chat-history panel is not clipped under the transcript. */
   overflow: visible;
   position: relative;
-  z-index: 30;
+  z-index: 20;
   margin: 0.35rem -0.65rem -0.4rem;
   border-top: 1px solid rgba(0, 242, 255, 0.14);
   background: #031622;
@@ -462,7 +464,7 @@
 
 .agent-dock-workspace-menu {
   position: relative;
-  z-index: 24;
+  z-index: 50;
   flex: 0 1 auto;
   min-width: 0;
   max-width: 13rem;

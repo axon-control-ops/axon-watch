@@ -77,6 +77,12 @@
     "verify:phase-d": "./scripts/verify/phase-d-platform-retirement.sh",
     "verify:production-operator": "./scripts/verify/production-operator-smoke.sh",
     "verify:console-web": "npm run verify:css-imports && npm run typecheck -w @axon-watch/console-web && npm run test -w @axon-watch/console-web && npm run build -w @axon-watch/console-web",
+    "dev:console-desktop": "npm run tauri -w @axon-watch/console-desktop -- dev",
+    "build:desktop:linux": "./scripts/desktop/build-portable-deb.sh",
+    "verify:desktop": "./scripts/desktop/verify-desktop.sh",
+    "prove:desktop:clean-install": "./scripts/desktop/clean-install-prove.sh",
+    "prove:desktop:voice": "./scripts/desktop/prove-packaged-voice.sh",
+    "verify:host-context": "./scripts/dev/python.sh -m unittest tests.test_host_context tests.test_host_reminders tests.test_host_policy_parity",
     "docs:handbook-pdf": "./scripts/docs/build-howto-handbook-pdf.sh",
     "verify": "npm run verify:contracts && npm run verify:console-web && ./scripts/dev/python.sh scripts/verify/all.py --runtime-payload packages/shared-types/fixtures/runtime-summary.example.json --watch-payload packages/shared-types/fixtures/watch-summary.example.json --shell-boot-report scripts/verify/fixtures/shell-boot-report.dev.json --runtime-latency-samples scripts/verify/fixtures/runtime-summary-latency.ci.json --watch-latency-samples scripts/verify/fixtures/watch-summary-latency.ci.json"
   }

@@ -82,6 +82,17 @@ describe('createAgentStreamIncrementalState', () => {
     expect(state.takeCompletedThinkingSpeech()).toBeNull();
   });
 
+  it('closes thinking when the fence is glued onto the last sentence', () => {
+    const state = createAgentStreamIncrementalState();
+    state.consumeFullContent(
+      ':::thinking\nThe Metro cache is active and the build is still progressing. :::\n',
+    );
+    expect(state.takeCompletedThinkingSpeech()).toBe(
+      'The Metro cache is active and the build is still progressing.',
+    );
+    expect(state.toStreamingActivityView().liveBodyFull).toBeNull();
+  });
+
   it('tracks header counts without re-scanning prior transcript', () => {
     const state = feedIncrementalDeltas(buildLargeEditTranscript(141));
     expect(state.toCounts()).toEqual({

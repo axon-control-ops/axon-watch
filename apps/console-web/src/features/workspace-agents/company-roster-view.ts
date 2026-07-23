@@ -1,7 +1,7 @@
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 
 import { employeeFailureDetailTooltip, employeeFailureLine } from './company-roster-failure-view';
-import { employeeIsWorking } from './company-roster-status';
+import { employeeIsWorking, employeeStatusIsActivelyBusy } from './company-roster-status';
 
 export {
   employeeResolvedFailureDetail,
@@ -16,7 +16,44 @@ export {
   normalizeOperatorFailureDetail,
 } from './employee-failure-detail';
 
-export { employeeIsWorking } from './company-roster-status';
+export { employeeIsWorking, employeeStatusIsActivelyBusy } from './company-roster-status';
+
+/** True when the teammate is mid-shift (or has an active run), not merely on-duty watching. */
+export function employeeIsLeadLikeRole(employee: CompanyEmployeeRecord): boolean {
+  const role = (employee.role ?? '').trim().toLowerCase();
+  return role === 'lead' || role === 'workspace_agent' || role === 'overview_agent';
+}
+
+export function employeeIsActivelyBusy(employee: CompanyEmployeeRecord): boolean {
+  if (employeeFailureLine(employee)) {
+    return false;
+  }
+  if (!employee.enabled) {
+    return false;
+  }
+  // Own role-tagged run is always personal busy.
+  if (employee.active_run_id?.trim()) {
+    return true;
+  }
+  // Lead status mirrors *any* workspace run for management UX — that must not
+  // light Lead's avatar while a specialist (e.g. Soren) is the one working.
+  if (employeeIsLeadLikeRole(employee)) {
+    return false;
+  }
+  return employeeStatusIsActivelyBusy(employee.status);
+}
+
+export function companyBusyEmployees(
+  employees: readonly CompanyEmployeeRecord[] | null | undefined,
+): CompanyEmployeeRecord[] {
+  return (employees ?? []).filter((row) => employeeIsActivelyBusy(row));
+}
+
+export function companyBusyEmployeesCount(
+  employees: readonly CompanyEmployeeRecord[] | null | undefined,
+): number {
+  return companyBusyEmployees(employees).length;
+}
 
 export {
   employeeSpeakLine,

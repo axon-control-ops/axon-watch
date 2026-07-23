@@ -26,6 +26,7 @@ export type {
 } from './briefing';
 export { BRIEFING_ACTION_KINDS } from './briefing';
 export type {
+  OperatorAlertExplanation,
   OperatorPresence,
   OperatorPresenceMobile,
   OperatorPresenceSettings,
@@ -89,3 +90,14 @@ export type {
   WatchInboxSnapshot,
   WatchSummary,
 } from './watch';
+export type {
+  DesktopRuntime,
+  HostActionReceipt,
+  HostActionTier,
+  HostArtifactRecord,
+  HostCapabilitiesSnapshot,
+  HostDeviceRecord,
+  HostEventRecord,
+  OperatorReminderRecord,
+} from './host-context';
+export { DESKTOP_RUNTIMES, HOST_ACTION_TIERS } from './host-context';

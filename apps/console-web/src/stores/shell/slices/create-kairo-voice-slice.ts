@@ -14,6 +14,10 @@ import {
 } from '../../../lib/briefing-voice-transcript';
 import type { KairoPresenceState } from '../../../lib/kairo-presence';
 import { deliverSpokenOperatorAlert } from '../../../lib/spoken-alert-delivery';
+import {
+  type KairoVoiceSpeaker,
+  vaxonVoiceSpeaker,
+} from '../../../lib/kairo-voice-utterance';
 import { buildKairoSpeechSessionId } from '../../../lib/kairo-speech-session';
 import { ideVoiceSpeechAllowed } from '../../../lib/ide-voice-strip';
 import { postKairoSpeak } from '../../../lib/kairo-speak-client';
@@ -122,6 +126,7 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       operatorPrompt?: string;
       skipSpeakApi?: boolean;
       azureVoiceId?: string | null;
+      speaker?: KairoVoiceSpeaker | null;
     },
   ): Promise<void> {
     const trimmed = line.trim();
@@ -157,6 +162,7 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
             top_signal_title: input.operatorBriefing.value?.top_signals[0]?.title ?? '',
             active_run_count: input.operatorBriefing.value?.active_runs.length ?? 0,
             degraded_active: input.operatorBriefing.value?.degraded.active ?? false,
+            speaker_kind: options?.speaker?.kind === 'employee' || options?.azureVoiceId ? 'agent' : 'vaxon',
           },
           session_id: kairoSpeechSessionId(),
           workspace_id: input.currentWorkspace.value?.workspace_id ?? '',
@@ -171,11 +177,23 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       }
     }
 
-    await speakKairoLine(message, {
+    const speaker =
+      options?.speaker ??
+      (options?.azureVoiceId?.trim()
+        ? {
+            kind: 'employee' as const,
+            id: `voice:${options.azureVoiceId.trim()}`,
+            name: options.operatorPrompt?.replace(/^Teammate\s+/i, '').trim() || 'Teammate',
+            roleLabel: 'Agent',
+            azureVoiceId: options.azureVoiceId.trim(),
+          }
+        : vaxonVoiceSpeaker());
+    const playback = await speakKairoLine(message, {
       priority: 'conversation',
       speechRate: input.operatorPresenceSettings.value.speech_rate,
       speechPitch: input.operatorPresenceSettings.value.speech_pitch,
       azureVoiceId: options?.azureVoiceId?.trim() || undefined,
+      speaker,
     });
   }
 
@@ -259,12 +277,16 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       return;
     }
 
-    void deliverSpokenOperatorAlert({
-      eligible: true,
-      reason: alert.reason,
-      signal_id: alert.signal_id,
-      message,
-    });
+    void deliverSpokenOperatorAlert(
+      {
+        eligible: true,
+        reason: alert.reason,
+        signal_id: alert.signal_id,
+        message,
+      },
+      sessionStorage,
+      { speaker: vaxonVoiceSpeaker() },
+    );
   }
 
   async function speakOperatorBriefing(): Promise<void> {
@@ -304,7 +326,7 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
         reason: 'operator_briefing_spoken',
         signal_id: null,
         message: response.line.trim(),
-      }, sessionStorage, { dedupe: false });
+      }, sessionStorage, { dedupe: false, speaker: vaxonVoiceSpeaker() });
       if (channel !== 'skipped') {
         input.briefingVoiceTranscript.value = appendBriefingVoiceTranscriptEntry({
           message: response.line.trim(),
@@ -353,12 +375,16 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       sessionStorage.setItem(greetingKey, '1');
     }
 
-    void deliverSpokenOperatorAlert({
-      eligible: true,
-      reason: 'boot_greeting',
-      signal_id: null,
-      message,
-    });
+    void deliverSpokenOperatorAlert(
+      {
+        eligible: true,
+        reason: 'boot_greeting',
+        signal_id: null,
+        message,
+      },
+      sessionStorage,
+      { speaker: vaxonVoiceSpeaker() },
+    );
   }
 
   function kairoVoiceContext(): {

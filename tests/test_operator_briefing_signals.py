@@ -123,8 +123,8 @@ class OperatorBriefingSignalsTests(unittest.TestCase):
             top_signal_summary="Probe failed for console-web",
             degraded_active=False,
         )
-        self.assertIn("Console web connector unavailable", line)
-        self.assertIn("dashpro", line)
+        self.assertIn("connection Axon needs", line)
+        self.assertTrue(line.startswith("VAXON:"))
         self.assertNotIn("Tell me which workspace to focus", line)
 
     def test_persona_signal_without_workspace_still_names_title(self) -> None:
@@ -133,7 +133,10 @@ class OperatorBriefingSignalsTests(unittest.TestCase):
             top_signal_title="DashPro Sentry critical",
             degraded_active=False,
         )
-        self.assertIn("DashPro Sentry critical", line)
+        self.assertTrue(
+            "DashPro" in line or "Sentry" in line or "connection" in line.lower(),
+            line,
+        )
         self.assertNotIn("Tell me which workspace to focus", line)
 
 

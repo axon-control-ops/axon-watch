@@ -40,7 +40,8 @@ function seededRandom(seed: number): () => number {
 export function configureGalaxyRenderer(renderer: WebGLRenderer): void {
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.35;
+  // Slightly hotter exposure so the workspace shell reads as a glowing nebula.
+  renderer.toneMappingExposure = 1.55;
 }
 
 export function buildGalaxyLighting(): Group {

@@ -2,11 +2,44 @@
 
 from __future__ import annotations
 
+import json
 import re
+import time
 from pathlib import Path
 from typing import Any
 
-_TERMINAL_OUTPUT_LIMIT = 4000
+
+def _log_terminal_output_length(location: str, output: str) -> None:
+    """Debug output completeness without recording command content."""
+    if len(output) <= 4000 and "(output truncated)" not in output:
+        return
+    # region agent log
+    try:
+        with open(
+            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
+            "a",
+            encoding="utf-8",
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "fc0b35",
+                        "runId": "post-fix",
+                        "hypothesisId": "OUT1",
+                        "location": location,
+                        "message": "terminal output emitted in full",
+                        "data": {
+                            "outputLength": len(output),
+                            "containsLegacyTruncationMarker": "(output truncated)" in output,
+                        },
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    # endregion
 
 
 def _relative_path(path: str, workspace_root: str) -> str:
@@ -53,11 +86,22 @@ def shell_output_from_result(result: Any) -> str:
     for container in (result.get("success"), result):
         if not isinstance(container, dict):
             continue
+        # Cursor's interleaved output is the complete ordered stream. Prefer it
+        # outright so separately populated stdout/stderr are not repeated.
+        interleaved = container.get("interleavedOutput")
+        if isinstance(interleaved, str) and interleaved.strip():
+            return interleaved.rstrip()
         parts: list[str] = []
+        seen: set[str] = set()
         for key in ("stdout", "output", "stderr"):
             value = container.get(key)
-            if isinstance(value, str) and value.strip():
-                parts.append(value.rstrip())
+            if not isinstance(value, str):
+                continue
+            trimmed = value.rstrip()
+            if not trimmed or trimmed in seen:
+                continue
+            seen.add(trimmed)
+            parts.append(trimmed)
         if parts:
             return "\n".join(parts)
     return ""
@@ -78,6 +122,18 @@ def shell_command_from_tool_call(tool_call: dict[str, Any]) -> str:
     return ""
 
 
+def shell_description_from_tool_call(tool_call: dict[str, Any]) -> str:
+    for shell_key in _SHELL_TOOL_KEYS:
+        shell_call = tool_call.get(shell_key)
+        if not isinstance(shell_call, dict):
+            continue
+        args = shell_call.get("args") if isinstance(shell_call.get("args"), dict) else {}
+        description = str(args.get("description") or shell_call.get("description") or "").strip()
+        if description:
+            return description
+    return ""
+
+
 def shell_call_from_tool_call(tool_call: dict[str, Any]) -> dict[str, Any] | None:
     for shell_key in _SHELL_TOOL_KEYS:
         shell_call = tool_call.get(shell_key)
@@ -88,23 +144,30 @@ def shell_call_from_tool_call(tool_call: dict[str, Any]) -> dict[str, Any] | Non
 
 def terminal_block(command: str, output: str) -> str:
     trimmed = output.strip()
-    if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
-        trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
+    _log_terminal_output_length(
+        "stream_blocks/terminal_blocks.py:terminal_block",
+        trimmed,
+    )
     body = f"\n{trimmed}\n" if trimmed else "\n"
     return f"\n:::terminal {command}{body}:::\n"
 
 
-def terminal_started_block(command: str) -> str:
+def terminal_started_block(command: str, description: str = "") -> str:
     trimmed = command.strip()
     if not trimmed:
         return ""
+    detail = description.strip()
+    if detail:
+        return f"\n:::terminal {trimmed}\n# {detail}\n"
     return f"\n:::terminal {trimmed}\n"
 
 
 def terminal_close_body(output: str) -> str:
     trimmed = output.strip()
-    if len(trimmed) > _TERMINAL_OUTPUT_LIMIT:
-        trimmed = f"{trimmed[:_TERMINAL_OUTPUT_LIMIT].rstrip()}\n… (output truncated)"
+    _log_terminal_output_length(
+        "stream_blocks/terminal_blocks.py:terminal_close_body",
+        trimmed,
+    )
     if trimmed:
         return f"{trimmed}\n:::\n"
     return ":::\n"
@@ -117,7 +180,10 @@ def terminal_started_block_from_event(event: dict[str, Any]) -> str:
     tool_call = event.get("tool_call")
     if not isinstance(tool_call, dict):
         return ""
-    return terminal_started_block(shell_command_from_tool_call(tool_call))
+    return terminal_started_block(
+        shell_command_from_tool_call(tool_call),
+        shell_description_from_tool_call(tool_call),
+    )
 
 
 def shell_completion_from_event(event: dict[str, Any]) -> tuple[str, str] | None:

@@ -8,5 +8,6 @@ export * from './runs-api';
 export * from './runtime-api';
 export * from './sentry-api';
 export * from './skills-api';
+export * from './tasks-api';
 export * from './vault-api';
 export * from './workspace-api';

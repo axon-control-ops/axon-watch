@@ -16,7 +16,7 @@ describe('safe action surface truth', () => {
 
     expect(source).toContain('Suggested actions · guidance only');
     expect(source).toContain('Open Mission Control to approve, reject, or resume a run.');
-    expect(source).toContain('Pending approvals · act in Mission Control');
+    expect(source).toContain('Jobs waiting for your yes or no · act in Approvals / Mission Control');
   });
 
   it('wires galaxy safe actions to briefing action executor', () => {

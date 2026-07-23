@@ -104,11 +104,13 @@ def _new_run_record(
     summary: str,
     detail: str,
     employee_role: str | None = None,
+    task_id: str | None = None,
 ) -> dict[str, Any]:
     now = _utc_now_iso()
     run_id = f"run_{uuid.uuid4().hex[:12]}"
     history_ref = f"history/{run_id}"
     cleaned_role = str(employee_role or "").strip() or None
+    cleaned_task = str(task_id or "").strip() or None
     record = {
         "run_id": run_id,
         "workspace_id": workspace_id,
@@ -123,8 +125,31 @@ def _new_run_record(
         "current_step": "Run queued",
         "history_ref": history_ref,
         "employee_role": cleaned_role,
+        "task_id": cleaned_task,
     }
     return _apply_capabilities(record)
+
+
+def _require_leased_task_for_worker(
+    *,
+    workspace_id: str,
+    employee_role: str,
+    task_id: str,
+) -> dict[str, Any]:
+    from app.persistence import task_store
+
+    task = task_store.get_task(task_id)
+    if task is None:
+        raise RunLifecycleError(f"task not found: {task_id}")
+    if str(task.get("workspace_id") or "").strip() != workspace_id.strip():
+        raise RunLifecycleError("task workspace mismatch")
+    owner = str(task.get("owner_role") or "").strip().lower()
+    role = employee_role.strip().lower()
+    if owner and owner != role:
+        raise RunLifecycleError(f"task owner_role={owner} does not match employee_role={role}")
+    if str(task.get("status") or "").strip().lower() != "leased":
+        raise RunLifecycleError("employee worker runs require a leased task")
+    return task
 
 
 def create_run(
@@ -135,13 +160,32 @@ def create_run(
     detail: str = "",
     requires_approval: bool = False,
     employee_role: str | None = None,
+    task_id: str | None = None,
+    require_leased_task: bool = False,
 ) -> dict[str, Any]:
+    cleaned_role = str(employee_role or "").strip() or None
+    cleaned_task = str(task_id or "").strip() or None
+    if require_leased_task:
+        if not cleaned_role:
+            raise RunLifecycleError("continuous worker runs require an employee_role")
+        if not cleaned_task:
+            raise RunLifecycleError("continuous worker runs require a leased task_id")
+    if cleaned_role and cleaned_task:
+        _require_leased_task_for_worker(
+            workspace_id=workspace_id,
+            employee_role=cleaned_role,
+            task_id=cleaned_task,
+        )
+    elif cleaned_task and not cleaned_role:
+        raise RunLifecycleError("task_id requires employee_role for worker runs")
+
     record = _new_run_record(
         workspace_id=workspace_id,
         mode=mode,
         summary=summary,
         detail=detail,
-        employee_role=employee_role,
+        employee_role=cleaned_role,
+        task_id=cleaned_task,
     )
     run_store.save_run(record)
     run_store.append_transition(
@@ -158,6 +202,14 @@ def create_run(
             },
         },
     )
+
+    if cleaned_task:
+        from app.persistence import task_store
+
+        try:
+            task_store.bind_task_run(cleaned_task, record["run_id"])
+        except task_store.TaskLedgerError as exc:
+            raise RunLifecycleError(str(exc)) from exc
 
     record = _transition_record(
         record,

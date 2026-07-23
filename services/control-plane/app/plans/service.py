@@ -18,7 +18,12 @@ from app.terminal.workspace_roots import WorkspaceRootError
 # Tool chips are single-line headers (no body). Do not swallow following prose.
 _TOOL_FENCE_RE = re.compile(r"^:::tool\b.*$", re.MULTILINE)
 _THINKING_FENCE_RE = re.compile(r"^:::thinking\n.*?^:::\s*$", re.MULTILINE | re.DOTALL)
+_RESEARCH_FENCE_RE = re.compile(
+    r"^:::research\b.*?(?:^:::\s*$|\Z)",
+    re.MULTILINE | re.DOTALL,
+)
 _PLAN_FENCE_RE = re.compile(r"^:::plan\b.*(?:\n:::)?\s*$", re.MULTILINE)
+_ASK_FENCE_RE = re.compile(r"^:::ask\b.*?(?:^:::\s*$|\Z)", re.MULTILINE | re.DOTALL)
 _HEADING_RE = re.compile(r"^#{1,3}\s+(.+)$", re.MULTILINE)
 _NUMBERED_STEP_RE = re.compile(r"(?m)^\s*(?:\d+[\.\)]|\-\s+\[[ xX]\])\s+\S+")
 _BULLET_RE = re.compile(r"(?m)^\s*[-*]\s+\S.{8,}")
@@ -50,10 +55,73 @@ def new_plan_id() -> str:
 def strip_noisy_fences(content: str) -> str:
     text = str(content or "")
     text = _THINKING_FENCE_RE.sub("", text)
+    text = _RESEARCH_FENCE_RE.sub("", text)
+    text = _ASK_FENCE_RE.sub("", text)
     text = _TOOL_FENCE_RE.sub("", text)
     text = _PLAN_FENCE_RE.sub("", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
+
+
+def strip_leading_process_narration(content: str) -> str:
+    """Drop leading 'I'll review…' / 'Drafting…' prose before durable plan sections."""
+
+    lines = str(content or "").splitlines()
+    if not lines:
+        return ""
+
+    out: list[str] = []
+    index = 0
+    opening_heading = ""
+    # Keep an opening # title when present.
+    if lines and re.match(r"^#{1,3}\s+\S", lines[0].strip()):
+        out.append(lines[0])
+        opening_heading = lines[0].strip()
+        index = 1
+        while index < len(lines) and not lines[index].strip():
+            index += 1
+
+    while index < len(lines):
+        raw = lines[index]
+        stripped = raw.strip()
+        if not stripped:
+            index += 1
+            continue
+        # Cursor can repeat the title after an initial progress sentence. Keep one.
+        if opening_heading and stripped == opening_heading:
+            index += 1
+            while index < len(lines) and not lines[index].strip():
+                index += 1
+            continue
+        if stripped.startswith("##"):
+            break
+        if _NUMBERED_STEP_RE.match(stripped) or _TODO_RE.match(stripped):
+            break
+        lower = stripped.lower()
+        if (
+            _PROCESS_LINE_RE.match(stripped)
+            or lower.startswith(
+                (
+                    "axon research is ready",
+                    "research is ready",
+                    "next i'll",
+                    "next i will",
+                )
+            )
+            or _is_weak_title(stripped)
+        ):
+            index += 1
+            # Skip blank lines that followed narration.
+            while index < len(lines) and not lines[index].strip():
+                index += 1
+            continue
+        break
+
+    remaining = lines[index:]
+    if out and remaining and remaining[0].strip():
+        out.append("")
+    out.extend(remaining)
+    return "\n".join(out).strip()
 
 
 def _is_weak_title(title: str) -> bool:
@@ -139,7 +207,7 @@ def looks_like_process_narration(text: str) -> bool:
 def is_durable_plan_body(content: str) -> bool:
     """Fail closed: only persist replies that look like a finished plan artifact."""
 
-    body = strip_noisy_fences(content)
+    body = strip_leading_process_narration(strip_noisy_fences(content))
     if len(body) < 180:
         return False
     if looks_like_clarifying_choice_prompt(body):
@@ -174,7 +242,7 @@ def capture_plan_from_reply(
     content: str,
     created_at: str | None = None,
 ) -> tuple[PlanRecord, str]:
-    body = strip_noisy_fences(content)
+    body = strip_leading_process_narration(strip_noisy_fences(content))
     if not body:
         raise PlanCaptureError("plan content is empty")
     if not is_durable_plan_body(body):

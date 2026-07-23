@@ -20,8 +20,21 @@ export function shouldNarrateAgentEvent(input: {
   eventKey: string;
   narration: KairoNarrationLevel;
   narrateToolProgress?: boolean;
+  /** When true, live thinking already carries conversational updates — skip canned tools. */
+  thinkingCarriesUpdate?: boolean;
 }): boolean {
   if (input.narration === 'off') {
+    return false;
+  }
+  if (input.eventKey.startsWith('thinking:')) {
+    return true;
+  }
+  // Conversational mode: prefer live thinking over canned tool/edit chatter.
+  if (
+    input.thinkingCarriesUpdate &&
+    input.narration === 'conversational' &&
+    (input.eventKey.startsWith('tool:') || input.eventKey.startsWith('edit:'))
+  ) {
     return false;
   }
   if (
@@ -29,9 +42,6 @@ export function shouldNarrateAgentEvent(input: {
     input.narration === 'conversational' &&
     input.eventKey.startsWith('tool:')
   ) {
-    return true;
-  }
-  if (input.eventKey.startsWith('thinking:')) {
     return true;
   }
   // Bookends only for both minimal and conversational. Tool/edit milestones stay
@@ -48,12 +58,33 @@ export function shouldNarrateAgentEvent(input: {
 export function shouldSpeakLiveThinkingBlock(input: {
   narration: KairoNarrationLevel;
   spokenBlock: string;
+  /** Prior spoken thinking this turn (for wait/near-dup gates). */
+  lastSpokenBlock?: string | null;
+  /** True after a wait/poll progress line already spoke this turn. */
+  alreadySpokeWaitProgress?: boolean;
+  isWaitProgress?: boolean;
+  similarityToLast?: number;
 }): boolean {
   if (input.narration === 'off' || !input.spokenBlock.trim()) {
     return false;
   }
   // Speak the first complete thinking sentence as the run-start intent.
-  return /[.!?]$/.test(input.spokenBlock.trim());
+  if (!/[.!?]$/.test(input.spokenBlock.trim())) {
+    return false;
+  }
+  // One wait/poll status line per turn — further Await loops stay silent.
+  if (input.isWaitProgress && input.alreadySpokeWaitProgress) {
+    return false;
+  }
+  // Near-duplicate of the last spoken thinking (same Metro/OTA status again).
+  if (
+    input.lastSpokenBlock &&
+    typeof input.similarityToLast === 'number' &&
+    input.similarityToLast >= 0.72
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /** Progress milestones (run/research/verify) — not the same as agent bookends. */

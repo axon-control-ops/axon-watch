@@ -25,6 +25,7 @@ const presence: OperatorPresence = {
     stt_mode: 'browser' as const,
     voice_routing_mode: 'template_first' as const,
     narrate_tool_progress: false,
+    proactive_duplex_enabled: false,
   },
   spoken_alert: {
     eligible: false,

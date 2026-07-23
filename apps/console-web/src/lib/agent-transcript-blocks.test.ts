@@ -318,8 +318,8 @@ describe('thinkingPreview', () => {
     expect(thinkingPreview(long).endsWith('…')).toBe(true);
   });
 
-  it('replaces pure user-meta thinking with Thinking…', () => {
-    expect(thinkingPreview('The user is asking whether')).toBe('Thinking…');
+  it('replaces pure user-meta thinking with I am thinking…', () => {
+    expect(thinkingPreview('The user is asking whether')).toBe('I am thinking…');
   });
 });
 

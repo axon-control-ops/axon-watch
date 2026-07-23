@@ -6,12 +6,14 @@ import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
 import { resolveRosterSelectionForIdeThread } from '../../features/workspace-agents/active-ide-employee';
 import {
   buildCompanyRosterAlertBadge,
+  companyBusyEmployeesCount,
   companyHeadline,
   companyFailedEmployeesHint,
   companyFailedEmployeesHintTooltip,
   companyHasFailedEmployees,
   COMPANY_ROSTER_DOCK_ID,
   employeeFailureLine,
+  employeeIsActivelyBusy,
   employeeSpeakLine,
   firstFailedRosterEmployee,
   pickDefaultRosterEmployee,
@@ -32,6 +34,7 @@ import { stopRun } from '../../api/runs-api';
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
+import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
 import { useShellStore } from '../../stores/shell';
 
@@ -159,6 +162,69 @@ const hasFailedEmployees = computed(() => companyHasFailedEmployees(employees.va
 
 const rosterAlertBadge = computed(() => buildCompanyRosterAlertBadge(employees.value));
 
+const liveBusyEmployeeIds = computed(() => {
+  const ids = new Set<string>();
+  for (const row of employees.value) {
+    if (employeeIsActivelyBusy(row)) {
+      ids.add(row.employee_id);
+    }
+  }
+  // Prefer the open IDE thread's owner — Lead can be "delegating" in chrome while
+  // a specialist thread is the one actually streaming.
+  if (shell.agentStreamActive) {
+    const threadEmployeeId = shell.activeIdeThread?.employee_id?.trim();
+    const recordEmployeeId = shell.activeIdeEmployeeRecord?.employee_id?.trim();
+    const streamOwnerId = threadEmployeeId || recordEmployeeId;
+    if (streamOwnerId) {
+      ids.add(streamOwnerId);
+    }
+  }
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'fc0b35',
+    },
+    body: JSON.stringify({
+      sessionId: 'fc0b35',
+      runId: 'busy-owner',
+      hypothesisId: 'H9',
+      location: 'CompanyRosterPanel.vue:liveBusyEmployeeIds',
+      message: 'team busy owners resolved',
+      data: {
+        busyIds: [...ids],
+        streamActive: Boolean(shell.agentStreamActive),
+        threadEmployeeId: shell.activeIdeThread?.employee_id ?? null,
+        recordEmployeeId: shell.activeIdeEmployeeRecord?.employee_id ?? null,
+        rosterBusy: employees.value
+          .filter((row) => employeeIsActivelyBusy(row))
+          .map((row) => ({ id: row.employee_id, name: row.name, status: row.status })),
+        leadStatus: employees.value.find((row) => row.role === 'lead')?.status ?? null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+  return [...ids];
+});
+
+const busyCount = computed(() => {
+  const rosterBusy = companyBusyEmployeesCount(employees.value);
+  const liveExtra = liveBusyEmployeeIds.value.filter(
+    (id) => !employees.value.some((row) => row.employee_id === id && employeeIsActivelyBusy(row)),
+  ).length;
+  return rosterBusy + liveExtra;
+});
+
+const busyBadgeLabel = computed(() => {
+  const count = busyCount.value;
+  if (count <= 0) {
+    return null;
+  }
+  return `${count} BUSY`;
+});
+
 const failedEmployeesHint = computed(() => companyFailedEmployeesHint(employees.value));
 
 const failedEmployeesHintTooltip = computed(() =>
@@ -187,6 +253,7 @@ function speakEmployeeLine(employee: CompanyEmployeeRecord, kind: TeamMemberChat
       operatorPrompt: `Teammate ${employee.name}`,
       skipSpeakApi: true,
       azureVoiceId: employee.azure_voice_id,
+      speaker: employeeVoiceSpeaker(employee),
     });
     return;
   }
@@ -203,6 +270,7 @@ function speakEmployeeLine(employee: CompanyEmployeeRecord, kind: TeamMemberChat
     operatorPrompt: `Teammate ${employee.name}`,
     skipSpeakApi: true,
     azureVoiceId: employee.azure_voice_id,
+    speaker: employeeVoiceSpeaker(employee),
   });
 }
 
@@ -338,6 +406,14 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
             >
               {{ rosterAlertBadge.label }}
             </button>
+            <span
+              v-if="busyBadgeLabel"
+              class="company-roster__busy-badge"
+              :title="`${busyCount} teammate${busyCount === 1 ? '' : 's'} currently busy`"
+              :aria-label="`${busyCount} teammate${busyCount === 1 ? '' : 's'} currently busy`"
+            >
+              {{ busyBadgeLabel }}
+            </span>
           </h3>
         </div>
         <button
@@ -383,6 +459,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
         ref="presenceStripRef"
         :employees="employees"
         :selected-employee-id="selectedEmployeeId"
+        :live-busy-employee-ids="liveBusyEmployeeIds"
         @select="onPresenceSelect"
       />
 

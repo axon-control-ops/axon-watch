@@ -16,6 +16,7 @@ from app.data.snapshot import operator_data_snapshot
 from app.delivery.store import delivery_summary, list_receipts
 from app.events.store import list_events
 from app.events.stream import watch_events_stream_response
+from app.internal_auth import InternalServiceTokenMiddleware
 from app.signals.inbox_assembly import include_summary_degraded_signal
 from app.signals.store import get_inbox_snapshot
 from app.tunnel.tunnel_control import (
@@ -96,6 +97,7 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+app.add_middleware(InternalServiceTokenMiddleware)
 
 
 @app.on_event("startup")

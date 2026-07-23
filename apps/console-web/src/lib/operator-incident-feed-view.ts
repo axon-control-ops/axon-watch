@@ -1,12 +1,17 @@
-import type { InboxItem } from '../contracts/canonical';
+import type { InboxItem, OperatorAlertExplanation as ServerAlertExplanation } from '../contracts/canonical';
 
 import type { FleetHealthSnapshot } from '../api/control-plane';
-import { isBootstrapSummarySignal } from './operator-signal-hints';
+import {
+  isBootstrapSummarySignal,
+  resolveOperatorAlertExplanation,
+} from './operator-signal-hints';
 
 export type OperatorIncidentFeedItem = {
   id: string;
   title: string;
   summary: string;
+  /** One-line layman "what happened" for the operator. */
+  plainWhat: string;
   severity: 'info' | 'high' | 'critical' | string;
   source: 'signal' | 'fleet';
   workspaceId: string | null;
@@ -49,6 +54,9 @@ export function buildOperatorIncidentFeed(input: {
   workspaceId: string | null;
   fleetHealth: FleetHealthSnapshot | null;
   limit?: number;
+  serverExplanation?: ServerAlertExplanation | Record<string, unknown> | null;
+  serverSignalId?: string | null;
+  serverReason?: string | null;
 }): OperatorIncidentFeedView {
   const limit = input.limit ?? 5;
   const items: OperatorIncidentFeedItem[] = [];
@@ -66,10 +74,20 @@ export function buildOperatorIncidentFeed(input: {
       continue;
     }
     seen.add(signal.signal_id);
+    const explained = resolveOperatorAlertExplanation({
+      signalId: signal.signal_id,
+      title: signal.title,
+      summary: signal.summary,
+      meta: signal.meta ?? null,
+      serverExplanation: input.serverExplanation,
+      serverSignalId: input.serverSignalId,
+      serverReason: input.serverReason,
+    });
     items.push({
       id: signal.signal_id,
       title: signal.title,
       summary: signal.summary?.trim() || 'Open signal needs review.',
+      plainWhat: explained.what,
       severity: signal.severity,
       source: 'signal',
       workspaceId: signal.workspace_id ?? null,
@@ -87,10 +105,18 @@ export function buildOperatorIncidentFeed(input: {
       row.open_signals_count > 0 &&
       !items.some((item) => item.title === row.top_signal_title)
     ) {
+      const explained = resolveOperatorAlertExplanation({
+        title: row.top_signal_title,
+        summary: `${row.open_signals_count} open signal(s) on ${row.display_name}.`,
+        serverExplanation: input.serverExplanation,
+        serverSignalId: input.serverSignalId,
+        serverReason: input.serverReason,
+      });
       items.push({
         id: `fleet-${row.workspace_id}`,
         title: row.top_signal_title,
         summary: `${row.open_signals_count} open signal(s) on ${row.display_name}.`,
+        plainWhat: explained.what,
         severity: row.critical_signals_count > 0 ? 'critical' : 'high',
         source: 'fleet',
         workspaceId: row.workspace_id,

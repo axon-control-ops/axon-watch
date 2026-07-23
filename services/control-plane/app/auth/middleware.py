@@ -9,7 +9,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from app.auth.desktop_session import extract_session_token, validate_session_token
 from app.auth.identity import bind_request_identity, reset_identity_token
+from app.auth.origin_guard import reject_cross_origin_mutation
+from app.auth.rate_limit import reject_mutating_rate_limit
 from app.auth.settings import (
     allow_loopback_bypass,
     auth_mode,
@@ -20,6 +23,9 @@ from app.auth.settings import (
 _MUTATING = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _EXEMPT_PREFIXES = (
     "/api/health",
+    "/api/desktop/bootstrap",
+    "/api/desktop/bootstrap-code",
+    "/api/desktop/status",
     "/docs",
     "/openapi.json",
     "/redoc",
@@ -50,6 +56,10 @@ def resolve_mutating_identity(request: Request) -> tuple[str | None, str | None]
     if token and presented and secrets.compare_digest(presented, token):
         return "operator", None
 
+    session = extract_session_token(request.cookies, request.headers)
+    if validate_session_token(session):
+        return "desktop_session", None
+
     client_host = request.client.host if request.client else None
     if allow_loopback_bypass() and client_is_loopback(client_host):
         return "loopback", None
@@ -70,6 +80,16 @@ class MutatingAuthMiddleware(BaseHTTPMiddleware):
         token = None
         try:
             if method in _MUTATING and not _is_exempt(path):
+                origin_error = reject_cross_origin_mutation(request)
+                if origin_error is not None:
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "detail": origin_error,
+                            "auth_required": True,
+                            "csrf_blocked": True,
+                        },
+                    )
                 resolved, error = resolve_mutating_identity(request)
                 if resolved is None:
                     return JSONResponse(
@@ -80,6 +100,15 @@ class MutatingAuthMiddleware(BaseHTTPMiddleware):
                         },
                     )
                 identity = resolved
+                rate_error = reject_mutating_rate_limit(request, identity=identity)
+                if rate_error is not None:
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "detail": rate_error,
+                            "rate_limited": True,
+                        },
+                    )
             token = bind_request_identity(identity)
             return await call_next(request)
         finally:

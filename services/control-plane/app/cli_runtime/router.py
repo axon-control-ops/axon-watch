@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
+import re
+import time
 from collections.abc import Callable
 from pathlib import Path
 
+from app.adapters.watch_client import fetch_watch_monitors
 from app.cli_runtime.approval_gate import (
     consultative_only_notice,
     resolve_runtime_execution_tier,
@@ -42,7 +46,12 @@ from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_r
 _REPLY_STYLE = (
     "Reply in first person. Use plain language anyone can follow — "
     "avoid internal repo jargon such as lane IDs, slice names, or implementation acronyms. "
-    "Never address the listener as \"operator\", \"user\", or \"human\"."
+    "Never address the listener as \"operator\", \"user\", or \"human\". "
+    "Before tools or file edits, open a :::thinking fence that states what you will do next "
+    "in future tense (one or two short sentences), then close ::: before acting. "
+    "Do not wait until after the work to announce the action plan. "
+    "Keep the final reply free of retrospective process narration "
+    "('I'll review…', 'Drafting…', 'I looked through…')."
 )
 
 _INSTRUCTION_TAKING = (
@@ -51,8 +60,93 @@ _INSTRUCTION_TAKING = (
     "Out of scope is strict: if commit, push, merge, release, or git status was not asked for, "
     "do not add those steps, invent desk-clearing git chores, or run git/shell "
     "probes to \"get oriented\". "
-    "Mentions like \"I never said anything about committing\" are a refusal, not commit intent."
+    "Mentions like \"I never said anything about committing\" are a refusal, not commit intent. "
+    "When committing, never reuse the operator's task instruction as the git -m subject; "
+    "write a short diff-based summary of what changed (files/intent), or use an explicitly "
+    "quoted commit message when the operator provided one."
 )
+
+_SENTRY_REQUEST_RE = re.compile(r"\bsentry\b", re.IGNORECASE)
+
+
+def _sentry_monitor_context(user_prompt: str) -> str:
+    """Attach bounded, secret-free Watch evidence to Sentry agent requests."""
+    if not _SENTRY_REQUEST_RE.search(user_prompt):
+        return ""
+
+    payload = fetch_watch_monitors(timeout_seconds=2.0)
+    items = payload.get("items") if isinstance(payload, dict) else None
+    record = next(
+        (
+            item
+            for item in (items if isinstance(items, list) else [])
+            if isinstance(item, dict)
+            and str(item.get("check_type") or "") == "sentry_recent_issues"
+        ),
+        None,
+    )
+    lines = [
+        "Sentry operating rule: credentials are held by Axon Watch and intentionally "
+        "excluded from workspace subprocess environment variables. Do not inspect .env, "
+        "print tokens, or infer that Sentry access is missing from process.env. Use the "
+        "trusted Axon Watch monitor evidence below.",
+    ]
+    issue_count = 0
+    status = "unavailable"
+    if record:
+        status = str(record.get("status") or "unknown")
+        detail = str(record.get("detail") or "").strip()
+        lines.append(f"Monitor status: {status}. {detail}".strip())
+        issues = record.get("issues")
+        if isinstance(issues, list):
+            issue_count = len(issues)
+            for issue in issues[:5]:
+                if not isinstance(issue, dict):
+                    continue
+                short_id = str(issue.get("short_id") or issue.get("id") or "issue")
+                title = str(issue.get("title") or "Untitled Sentry issue").strip()
+                count = int(issue.get("count") or 0)
+                permalink = str(issue.get("permalink") or "").strip()
+                lines.append(
+                    f"- {short_id}: {title} ({count} events)"
+                    + (f" — {permalink}" if permalink else "")
+                )
+    else:
+        lines.append(
+            "Live monitor evidence is temporarily unavailable. Report that limitation; "
+            "do not claim the Sentry token is absent."
+        )
+
+    # region agent log
+    try:
+        with open(
+            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
+            "a",
+            encoding="utf-8",
+        ) as debug_log:
+            debug_log.write(
+                json.dumps(
+                    {
+                        "sessionId": "fc0b35",
+                        "runId": "post-fix",
+                        "hypothesisId": "SENTRY1",
+                        "location": "cli_runtime/router.py:_sentry_monitor_context",
+                        "message": "Sentry request received trusted monitor context",
+                        "data": {
+                            "monitorAvailable": bool(record),
+                            "status": status,
+                            "issueCount": issue_count,
+                        },
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    # endregion
+
+    return "\n".join(lines)
 
 
 def _operator_persona_enabled() -> bool:
@@ -140,11 +234,14 @@ def _build_prompt(
     persona_block, remainder_context = split_employee_persona_from_context(context_block)
     persona_section = f"\n\n{persona_block}" if persona_block else ""
     workspace_body = remainder_context if persona_block else context_block
+    sentry_context = _sentry_monitor_context(user_prompt)
+    sentry_section = f"\n\n{sentry_context}" if sentry_context else ""
     return (
         f"{system}"
         f"{policy_block}"
         f"{persona_section}\n\n"
         f"Workspace context:\n{workspace_body}\n\n"
+        f"{sentry_section}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
     )
 

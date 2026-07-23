@@ -36,7 +36,7 @@ describe('buildIdeQuickGuide', () => {
       pendingApprovals: 1,
     });
 
-    expect(guide?.title).not.toContain('Approval waiting');
+    expect(guide == null || !guide.title.includes('Approval waiting')).toBe(true);
   });
 
   it('guides reopen when the agent is streaming with the dock collapsed', () => {
@@ -168,19 +168,14 @@ describe('buildIdeQuickGuide', () => {
     ]);
   });
 
-  it('guides terminal reopen when the agent dock is open but the terminal is hidden', () => {
-    const guide = buildIdeQuickGuide({
-      ...base,
-      agentDockCollapsed: false,
-      terminalVisible: false,
-    });
-
-    expect(guide?.title).toContain('Terminal hidden');
-    expect(guide?.tone).toBe('neutral');
-    expect(guide?.steps.join(' ')).toContain('Ctrl/Cmd+J');
-    expect(guide?.steps.join(' ')).toContain('bottom reopen strip');
-    expect(guide?.steps.join(' ')).toContain('activity bar');
-    expect(guide?.actions).toEqual([{ id: 'show-terminal', label: 'Show terminal' }]);
+  it('skips idle terminal-reopen banner when the agent dock is already open', () => {
+    expect(
+      buildIdeQuickGuide({
+        ...base,
+        agentDockCollapsed: false,
+        terminalVisible: false,
+      }),
+    ).toBeNull();
   });
 
   it('guides agent dock reopen when a run is active with the dock collapsed', () => {
@@ -222,7 +217,7 @@ describe('buildIdeQuickGuide', () => {
       terminalVisible: false,
       runPhase: 'executing',
     });
-    expect(executing?.title).toContain('Run in progress');
+    expect(executing?.title).toContain('Terminal hidden');
     expect(executing?.tone).toBe('attention');
     expect(executing?.actions).toEqual([{ id: 'show-terminal', label: 'Show terminal' }]);
 
@@ -232,7 +227,7 @@ describe('buildIdeQuickGuide', () => {
       terminalVisible: false,
       runPhase: 'review_ready',
     });
-    expect(reviewReady?.title).toContain('Review ready');
+    expect(reviewReady?.title).toContain('Terminal hidden');
     expect(reviewReady?.tone).toBe('attention');
   });
 

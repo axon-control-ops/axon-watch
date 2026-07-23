@@ -14,57 +14,27 @@ describe('shouldAutoPeekWorkbenchTerminal', () => {
     alreadyPeekedRunIds: new Set<string>(),
   };
 
-  it('peeks once per run when the terminal is hidden', () => {
-    expect(shouldAutoPeekWorkbenchTerminal(base)).toBe(true);
+  it('never auto-opens the terminal (operator must reveal it)', () => {
+    expect(shouldAutoPeekWorkbenchTerminal(base)).toBe(false);
     expect(
       shouldAutoPeekWorkbenchTerminal({
         ...base,
         layoutMode: 'ide',
-      }),
-    ).toBe(true);
-    expect(
-      shouldAutoPeekWorkbenchTerminal({
-        ...base,
-        alreadyPeekedRunIds: new Set(['run_abc']),
-      }),
-    ).toBe(false);
-  });
-
-  it('also peeks for review_ready output', () => {
-    expect(
-      shouldAutoPeekWorkbenchTerminal({
-        ...base,
         runPhase: 'review_ready',
       }),
-    ).toBe(true);
-  });
-
-  it('does not peek when the terminal is already open', () => {
+    ).toBe(false);
     expect(
       shouldAutoPeekWorkbenchTerminal({
         ...base,
         terminalVisible: true,
       }),
     ).toBe(false);
-  });
-
-  it('does not peek outside shell layout modes or idle phases', () => {
     expect(
       shouldAutoPeekWorkbenchTerminal({
         ...base,
         layoutMode: 'landing' as unknown as WorkbenchTerminalAutoPeekInput['layoutMode'],
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoPeekWorkbenchTerminal({
-        ...base,
-        runPhase: 'paused',
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoPeekWorkbenchTerminal({
-        ...base,
         runId: null,
+        runPhase: 'paused',
       }),
     ).toBe(false);
   });

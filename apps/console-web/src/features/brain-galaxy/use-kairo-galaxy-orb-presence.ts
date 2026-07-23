@@ -1,5 +1,7 @@
 import { computed, type ComputedRef } from 'vue';
 
+import { kairoAudioUnlockSnapshot } from '../../lib/kairo-audio-unlock';
+import { isKairoHandsFreeArmed } from '../../lib/kairo-hands-free-armed';
 import { resolveKairoPresenceState, type KairoPresenceState } from '../../lib/kairo-presence';
 import { formatVoiceGateFeedback } from '../../lib/kairo-voice-gate';
 import { useKairoSpeechCapture } from '../kairo-conversation/use-kairo-speech-capture';
@@ -17,6 +19,7 @@ type PresenceShell = {
   runtimeSummaryLoadState: string;
   operatorPresenceSettings: {
     hands_free_enabled?: boolean;
+    proactive_duplex_enabled?: boolean;
     privacy_mode: boolean;
     stt_mode?: string;
   };
@@ -30,8 +33,23 @@ export function useKairoGalaxyOrbPresence(shell: PresenceShell) {
       shell.runtimeSummary?.approvals.pending_count ??
       0,
   );
+  /** Setting intent (may be on before audio unlock). */
   const handsFreeEnabled = computed(
-    () => shell.operatorPresenceSettings.hands_free_enabled === true,
+    () =>
+      shell.operatorPresenceSettings.hands_free_enabled === true ||
+      shell.operatorPresenceSettings.proactive_duplex_enabled === true,
+  );
+  /** Truthful HUD: unlocked + hands-free/duplex path actually armed. */
+  const handsFreeArmed = computed(() =>
+    isKairoHandsFreeArmed(
+      {
+        hands_free_enabled: shell.operatorPresenceSettings.hands_free_enabled === true,
+        proactive_duplex_enabled:
+          shell.operatorPresenceSettings.proactive_duplex_enabled === true,
+        privacy_mode: shell.operatorPresenceSettings.privacy_mode,
+      },
+      kairoAudioUnlockSnapshot.value.mediaUnlocked,
+    ),
   );
   const presenceState: ComputedRef<KairoPresenceState> = computed(() => {
     const high =
@@ -50,7 +68,7 @@ export function useKairoGalaxyOrbPresence(shell: PresenceShell) {
 
   const speechCapture = useKairoSpeechCapture({
     privacyBlocked: () => shell.operatorPresenceSettings.privacy_mode,
-    sttMode: () => shell.operatorPresenceSettings.stt_mode ?? 'browser',
+    sttMode: () => shell.operatorPresenceSettings.stt_mode ?? 'cloud',
     captureMode: 'manual',
     stopOnUnmount: 'manual_only',
   });
@@ -68,6 +86,7 @@ export function useKairoGalaxyOrbPresence(shell: PresenceShell) {
 
   return {
     handsFreeEnabled,
+    handsFreeArmed,
     presenceState,
     speechCapture,
     gateFeedback,

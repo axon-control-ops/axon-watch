@@ -14,13 +14,22 @@ import {
 } from '../../features/kairo-conversation/conversation-briefing-surface';
 import { kairoConversationReply } from '../../features/kairo-conversation/kairo-conversation-state';
 import type { ComposerClipboardImage } from '../../lib/composer-clipboard-paste';
+import {
+  applyEmployeeSpecialtyRoute,
+  dismissEmployeeSpecialtyRoute,
+  undoEmployeeSpecialtyRoute,
+} from '../../lib/apply-employee-specialty-route';
 import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
+import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
 import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import {
   findIdeComposerQueueEntry,
   type IdeComposerMode,
 } from '../../lib/ide-composer-queue';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
+import {
+  type TeammateRouteNotice,
+} from '../../lib/teammate-route-notice';
 import { useShellStore } from '../../stores/shell';
 import type { ComposerMode } from './use-composer-menus';
 
@@ -30,6 +39,8 @@ export type PlanSoftSwitchNotice = {
   reason: string;
   previousMode: 'agent';
 };
+
+export type { TeammateRouteNotice };
 
 type UseComposerActionsOptions = {
   shell: ShellStore;
@@ -47,6 +58,7 @@ type UseComposerActionsOptions = {
   stopVoiceCapture: () => void;
   onDebugReproduceProceed?: (messageId: string) => void;
   planSoftSwitchNotice: Ref<PlanSoftSwitchNotice | null>;
+  teammateRouteNotice: Ref<TeammateRouteNotice | null>;
   /** Return true when `/` or `@` typeahead consumed the key. */
   handleTypeaheadKeydown?: (event: KeyboardEvent) => boolean;
   /** Merge Cursor-style skill chips into the draft right before submit/steer. */
@@ -71,6 +83,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     stopVoiceCapture,
     onDebugReproduceProceed,
     planSoftSwitchNotice,
+    teammateRouteNotice,
     handleTypeaheadKeydown,
     withSkillTokensForSubmit,
     clearSkillAttachments,
@@ -143,9 +156,74 @@ export function useComposerActions(options: UseComposerActionsOptions) {
         modeForSubmit = 'plan';
       }
     }
+
+    dismissEmployeeSpecialtyRoute();
+    const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
+    const submitStartedAt = Date.now();
+    // Deterministic specialty route only on the send path. Model tie-break runs a
+    // full ask-mode composer call (up to 45s) and was blocking Enter/send before
+    // the real agent run started.
+    const routeDecision = await resolveEmployeeSpecialtyRoute({
+      prompt: submitDraft,
+      workspaceId,
+      currentEmployee: shell.activeIdeEmployeeRecord,
+      roster: shell.companyEmployeesForCurrentWorkspace,
+      useModelTiebreak: false,
+    });
+    const routeMs = Date.now() - submitStartedAt;
+    if (routeDecision.shouldRoute) {
+      await applyEmployeeSpecialtyRoute(shell, routeDecision);
+    }
+    const applyMs = Date.now() - submitStartedAt;
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'fc0b35',
+      },
+      body: JSON.stringify({
+        sessionId: 'fc0b35',
+        runId: 'send-delay',
+        hypothesisId: 'H8a-H8b',
+        location: 'use-composer-actions.ts:handleSubmit',
+        message: 'pre-submit route timing',
+        data: {
+          routeMs,
+          applyMs,
+          shouldRoute: routeDecision.shouldRoute,
+          reason: routeDecision.reason,
+          source: routeDecision.source,
+          winnerName: routeDecision.employee?.name ?? null,
+          modeForSubmit,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     const attachmentFiles = composerImages.value.map((image) => image.file);
+    // openOrFocusEmployeeIdeThread may clear/restore drafts — keep the routed prompt.
     shell.ideComposerDraft = submitDraft;
     await shell.submitIdeComposer(modeForSubmit, { attachmentFiles });
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'fc0b35',
+      },
+      body: JSON.stringify({
+        sessionId: 'fc0b35',
+        runId: 'send-delay',
+        hypothesisId: 'H8c',
+        location: 'use-composer-actions.ts:handleSubmit',
+        message: 'submitIdeComposer returned',
+        data: { totalMs: Date.now() - submitStartedAt, modeForSubmit },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);
   }
@@ -161,6 +239,14 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   function dismissPlanSoftSwitch(): void {
     planSoftSwitchNotice.value = null;
+  }
+
+  async function undoTeammateRoute(): Promise<void> {
+    await undoEmployeeSpecialtyRoute(shell, teammateRouteNotice.value);
+  }
+
+  function dismissTeammateRoute(): void {
+    dismissEmployeeSpecialtyRoute();
   }
 
   async function handleSteer(event?: Event): Promise<void> {
@@ -263,6 +349,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
 
   return {
     dismissPlanSoftSwitch,
+    dismissTeammateRoute,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
@@ -277,5 +364,6 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     revealComposerTerminalPanel,
     toggleVoiceCapture,
     undoPlanSoftSwitch,
+    undoTeammateRoute,
   };
 }

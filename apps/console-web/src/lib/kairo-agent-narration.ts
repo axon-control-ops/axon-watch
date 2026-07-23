@@ -123,7 +123,7 @@ export function narrationMilestonesForDelta(
   if (thinking > previousThinking && previousThinking === 0) {
     milestones.push({
       key: 'thinking:0',
-      message: 'Thinking…',
+      message: 'I am thinking…',
     });
   }
 

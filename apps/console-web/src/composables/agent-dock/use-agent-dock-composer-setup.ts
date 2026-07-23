@@ -19,6 +19,7 @@ import { useComposerModelRuntime } from './use-composer-model-runtime';
 import { useComposerTypeahead } from './use-composer-typeahead';
 import { useComposerWorkspaceSync } from './use-composer-workspace-sync';
 import { readWorkspaceComposerMode } from '../../lib/composer-mode-prefs';
+import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { buildAgentDockComposerApi } from './build-agent-dock-composer-api';
 
 export function useAgentDockComposerSetup() {
@@ -35,7 +36,6 @@ export function useAgentDockComposerSetup() {
   const inputRef = ref<HTMLTextAreaElement | null>(null);
   const dismissedDebugReproduceMessageId = ref<string | null>(null);
   const planSoftSwitchNotice = ref<PlanSoftSwitchNotice | null>(null);
-
   function setInputRef(el: HTMLTextAreaElement | null): void {
     inputRef.value = el;
   }
@@ -229,6 +229,7 @@ export function useAgentDockComposerSetup() {
 
   const {
     dismissPlanSoftSwitch,
+    dismissTeammateRoute,
     handleApproveRun,
     handleComposerKeydown,
     handleDebugReproduceProceed,
@@ -243,6 +244,7 @@ export function useAgentDockComposerSetup() {
     revealComposerTerminalPanel,
     toggleVoiceCapture,
     undoPlanSoftSwitch,
+    undoTeammateRoute,
   } = useComposerActions({
     shell,
     composerMode,
@@ -258,6 +260,7 @@ export function useAgentDockComposerSetup() {
     startVoiceCapture,
     stopVoiceCapture,
     planSoftSwitchNotice,
+    teammateRouteNotice,
     handleTypeaheadKeydown,
     withSkillTokensForSubmit,
     clearSkillAttachments,
@@ -314,6 +317,7 @@ export function useAgentDockComposerSetup() {
     composerHistoryIndex,
     composerHistoryScratch,
     planSoftSwitchNotice,
+    teammateRouteNotice,
     closeMenus: () => {
       closeMenus();
       closeTypeahead();
@@ -367,6 +371,7 @@ export function useAgentDockComposerSetup() {
     cursorStaleWarning,
     debugReproduceRequest,
     dismissPlanSoftSwitch,
+    dismissTeammateRoute,
     enlargedComposerImage,
     executionAccessHint,
     extraPinnedRows,
@@ -398,6 +403,7 @@ export function useAgentDockComposerSetup() {
     openComposerImage,
     openVaultSurface,
     planSoftSwitchNotice,
+    teammateRouteNotice,
     removeChip,
     removeComposerImage,
     editQueuedMessage,
@@ -459,6 +465,7 @@ export function useAgentDockComposerSetup() {
     typeaheadRows,
     typeaheadSelectedIndex,
     undoPlanSoftSwitch,
+    undoTeammateRoute,
     updateComposerDraft,
     cancelFullAccessConsent,
   });

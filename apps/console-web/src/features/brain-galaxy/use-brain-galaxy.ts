@@ -2,6 +2,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch,
 
 import type { BrainGraphNode, BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
 import { subscribeKairoVoiceChunk } from '../../lib/kairo-voice-playback';
+import {
+  motionIntensityFromStorage,
+  planMotionTransition,
+} from '../host-context/motion-orchestrator';
 import { kairoConversationPhase } from '../kairo-conversation/kairo-conversation-state';
 import { BrainGalaxyScene } from './brain-galaxy-scene';
 import {
@@ -9,6 +13,7 @@ import {
   type GalaxyPresencePhase,
   type GalaxyPresenceResolved,
 } from './galaxy-presence-state';
+import { probeWebGlAvailability } from './webgl-availability';
 
 export type UseBrainGalaxyOptions = {
   container: Ref<HTMLElement | null>;
@@ -68,6 +73,21 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   }
 
   function selectNode(node: BrainGraphNode): void {
+    const reducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const intensity =
+      typeof window !== 'undefined'
+        ? motionIntensityFromStorage(window.localStorage.getItem('axon-motion-intensity'))
+        : 'subtle';
+    const plan = planMotionTransition('node_select', {
+      intensity,
+      reducedMotion,
+      presencePhase: presence.value.phase,
+    });
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--motion-emphasis', `${plan.durationMs}ms`);
+    }
     selectedNode.value = node;
     sceneRef.value?.setSelectedNode(node.node_id);
     options.onNodeClick(node);
@@ -121,7 +141,11 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       return;
     }
 
-    if (!BrainGalaxyScene.isWebGLAvailable()) {
+    const probe = probeWebGlAvailability();
+    if (!probe.ok) {
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy WebGL unavailable — SVG flat ring',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight,nodeCount:options.snapshot.value?.nodes.length??0},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       webglFailed.value = true;
       return;
     }
@@ -138,6 +162,9 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     );
     const ok = scene.init();
     if (!ok) {
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy scene.init failed — SVG flat ring',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       webglFailed.value = true;
       scene.dispose();
       return;
@@ -150,6 +177,9 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       scene.setSelectedNode(selectedNode.value.node_id);
     }
     webglReady.value = true;
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy WebGL ready — original 3D path',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight,nodeCount:options.snapshot.value?.nodes.length??0,hasCanvas:Boolean(container.querySelector('canvas')),labelsHiddenByInspectorCss:false},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   }
 
   onMounted(() => {

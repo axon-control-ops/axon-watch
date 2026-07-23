@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import IdeInterruptPanel from '../ide/IdeInterruptPanel.vue';
 import KairoPresenceBar from './KairoPresenceBar.vue';
+import VoiceUnlockBanner from './VoiceUnlockBanner.vue';
 import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
@@ -170,6 +171,7 @@ function openSettings(): void {
         </div>
       </div>
     </div>
+    <VoiceUnlockBanner />
   </header>
 </template>
 

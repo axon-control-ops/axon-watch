@@ -10,8 +10,10 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.cursor_stream_events import (  # noqa: E402
     CursorStreamAssembler,
-    _tool_block_from_event,
     assistant_text_delta,
+    tool_block_from_event,
+)
+from app.cli_runtime.stream_blocks.terminal_blocks import (  # noqa: E402
     terminal_started_block_from_event,
 )
 
@@ -29,33 +31,38 @@ def _shell_event(command: str, stdout: str = "") -> dict:
     }
 
 
-def _shell_started_event(command: str) -> dict:
+def _shell_started_event(command: str, description: str = "") -> dict:
+    args: dict = {"command": command}
+    shell: dict = {"args": args}
+    if description:
+        args["description"] = description
+        shell["description"] = description
     return {
         "type": "tool_call",
         "subtype": "started",
         "tool_call": {
-            "shellToolCall": {
-                "args": {"command": command},
-            }
+            "shellToolCall": shell,
         },
     }
 
 
 class CursorStreamTerminalBlockTests(unittest.TestCase):
     def test_shell_tool_call_renders_terminal_block(self) -> None:
-        block = _tool_block_from_event(_shell_event("git status", "On branch dev"), "")
+        block = tool_block_from_event(_shell_event("git status", "On branch dev"), "")
         self.assertIn(":::terminal git status", block)
         self.assertIn("On branch dev", block)
         self.assertTrue(block.rstrip().endswith(":::"))
 
     def test_shell_tool_call_without_output_still_renders(self) -> None:
-        block = _tool_block_from_event(_shell_event("mkdir -p build"), "")
+        block = tool_block_from_event(_shell_event("mkdir -p build"), "")
         self.assertIn(":::terminal mkdir -p build", block)
         self.assertTrue(block.rstrip().endswith(":::"))
 
-    def test_long_output_is_truncated(self) -> None:
-        block = _tool_block_from_event(_shell_event("cat big.log", "x" * 9000), "")
-        self.assertIn("(output truncated)", block)
+    def test_long_output_is_preserved_in_full(self) -> None:
+        output = "x" * 9000
+        block = tool_block_from_event(_shell_event("cat big.log", output), "")
+        self.assertIn(output, block)
+        self.assertNotIn("(output truncated)", block)
 
     def test_read_tool_call_keeps_tool_block(self) -> None:
         event = {
@@ -63,13 +70,47 @@ class CursorStreamTerminalBlockTests(unittest.TestCase):
             "subtype": "completed",
             "tool_call": {"readToolCall": {"args": {"path": "README.md"}}},
         }
-        block = _tool_block_from_event(event, "")
+        block = tool_block_from_event(event, "")
         self.assertIn(":::tool Read README.md", block)
 
     def test_shell_started_opens_live_terminal_block(self) -> None:
         block = terminal_started_block_from_event(_shell_started_event("npm test"))
         self.assertEqual("\n:::terminal npm test\n", block)
         self.assertFalse(block.rstrip().endswith(":::"))
+
+    def test_shell_started_includes_description(self) -> None:
+        block = terminal_started_block_from_event(
+            _shell_started_event("npm run ota", "Publish OTA update")
+        )
+        self.assertEqual("\n:::terminal npm run ota\n# Publish OTA update\n", block)
+
+    def test_shell_completion_reads_interleaved_output(self) -> None:
+        from app.cli_runtime.stream_blocks.terminal_blocks import shell_completion_from_event
+
+        event = {
+            "type": "tool_call",
+            "subtype": "completed",
+            "tool_call": {
+                "shellToolCall": {
+                    "args": {"command": "npm run ota"},
+                    "result": {
+                        "success": {
+                            "stdout": "publishing…\n",
+                            "stderr": "done\n",
+                            "interleavedOutput": "publishing…\ndone\n",
+                        }
+                    },
+                }
+            },
+        }
+        completion = shell_completion_from_event(event)
+        self.assertIsNotNone(completion)
+        assert completion is not None
+        command, output = completion
+        self.assertEqual("npm run ota", command)
+        self.assertIn("publishing…", output)
+        self.assertIn("done", output)
+        self.assertEqual("publishing…\ndone", output)
 
     def test_assembler_opens_then_closes_terminal_without_duplicate(self) -> None:
         assembler = CursorStreamAssembler()

@@ -176,6 +176,55 @@
   cursor: pointer;
 }
 
+.agent-block__edit-open-action {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 2px;
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(150, 231, 255, 0.98);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.agent-block__edit-open-action:hover {
+  border-color: rgba(0, 242, 255, 0.5);
+  background: rgba(0, 242, 255, 0.14);
+}
+
+.agent-block__edit-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.35rem 0.15rem 0.15rem;
+}
+
+.agent-block__edit-canvas-thumb {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid rgba(138, 154, 173, 0.22);
+  border-radius: 6px;
+  background: rgba(4, 10, 16, 0.72);
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.agent-block__edit-canvas-img {
+  display: block;
+  width: 100%;
+  max-height: 10rem;
+  object-fit: contain;
+  background: rgba(4, 10, 16, 0.55);
+}
+
+.agent-block__edit-canvas--pdf {
+  padding: 0.25rem 0.35rem 0.15rem;
+}
+
 .agent-block__edit-path--link:hover {
   text-decoration: underline;
 }
@@ -225,29 +274,29 @@
   box-sizing: border-box;
 }
 
-.agent-block__edit-markdown :deep(table) {
+.agent-block__edit-markdown table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.66rem;
 }
 
-.agent-block__edit-markdown :deep(th),
-.agent-block__edit-markdown :deep(td) {
+.agent-block__edit-markdown th,
+.agent-block__edit-markdown td {
   border: 1px solid rgba(120, 150, 180, 0.28);
   padding: 0.28rem 0.4rem;
   text-align: left;
   vertical-align: top;
 }
 
-.agent-block__edit-markdown :deep(h1),
-.agent-block__edit-markdown :deep(h2),
-.agent-block__edit-markdown :deep(h3) {
+.agent-block__edit-markdown h1,
+.agent-block__edit-markdown h2,
+.agent-block__edit-markdown h3 {
   margin: 0.55rem 0 0.35rem;
   font-size: 0.82rem;
   color: rgba(230, 242, 255, 0.96);
 }
 
-.agent-block__edit-markdown :deep(p) {
+.agent-block__edit-markdown p {
   margin: 0.35rem 0;
 }
 

@@ -3,10 +3,12 @@ import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import {
   employeeFailureLine,
   employeeGlowTone,
+  employeeIsActivelyBusy,
   employeeIsWorking,
   employeeShiftNeedsContinuation,
   type EmployeeGlowTone,
 } from './company-roster-view';
+import { buildEmployeeFaceAvatarUrl } from './employee-face-avatar';
 
 export type EmployeePresenceTone = 'idle' | 'working' | 'failed' | 'interrupted' | 'paused';
 
@@ -16,6 +18,10 @@ export type EmployeeAvatarModel = {
   foreground: string;
   glow: EmployeeGlowTone;
   presence: EmployeePresenceTone;
+  /** Lead / primary operator of the company roster. */
+  lead: boolean;
+  /** Monday-style illustrated face (SVG data URL). */
+  faceUrl: string;
 };
 
 /** Role-tinted palette — stable, no external images. */
@@ -65,29 +71,55 @@ export function employeeInitials(name: string | null | undefined): string {
   return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
 }
 
-export function employeePresenceTone(employee: CompanyEmployeeRecord): EmployeePresenceTone {
+export function employeeIsLead(employee: CompanyEmployeeRecord): boolean {
+  return Boolean(employee.primary) || (employee.role ?? '').trim().toLowerCase() === 'lead';
+}
+
+export function employeePresenceTone(
+  employee: CompanyEmployeeRecord,
+  options?: { liveBusy?: boolean },
+): EmployeePresenceTone {
+  // Live IDE/stream ownership wins over a stale last-shift failure — otherwise a
+  // teammate mid-run keeps a red ring and never shows the busy border.
+  if (options?.liveBusy) {
+    return 'working';
+  }
   if (employeeFailureLine(employee)) {
     return employeeShiftNeedsContinuation(employee) ? 'interrupted' : 'failed';
   }
   if (!employee.enabled) {
     return 'paused';
   }
-  if (employeeIsWorking(employee.status)) {
+  if (employeeIsActivelyBusy(employee)) {
+    return 'working';
+  }
+  // Lead mirrors workspace executing — ignore that for personal presence unless liveBusy.
+  if (employeeIsLead(employee)) {
+    return 'idle';
+  }
+  // Always-on "watching" is on-duty, not mid-shift busy — keep idle ring.
+  if (employeeIsWorking(employee.status) && (employee.status ?? '').trim() !== 'watching') {
     return 'working';
   }
   return 'idle';
 }
 
-export function buildEmployeeAvatar(employee: CompanyEmployeeRecord): EmployeeAvatarModel {
+export function buildEmployeeAvatar(
+  employee: CompanyEmployeeRecord,
+  options?: { liveBusy?: boolean },
+): EmployeeAvatarModel {
   const glow = employeeGlowTone(employee);
   const base = ROLE_PALETTE[glow] ?? ROLE_PALETTE.default;
   const seed = `${employee.employee_id}:${employee.role}:${employee.name}`;
   const nudge = (hashSeed(seed) % 25) - 12;
+  const lead = employeeIsLead(employee);
   return {
     initials: employeeInitials(employee.name),
-    background: nudgeHex(base.background, nudge),
-    foreground: base.foreground,
+    background: lead ? '#1e3a5f' : nudgeHex(base.background, nudge),
+    foreground: lead ? '#ffe9a8' : base.foreground,
     glow,
-    presence: employeePresenceTone(employee),
+    presence: employeePresenceTone(employee, options),
+    lead,
+    faceUrl: buildEmployeeFaceAvatarUrl(seed, { lead }),
   };
 }

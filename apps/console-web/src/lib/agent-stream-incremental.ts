@@ -85,7 +85,27 @@ export function createAgentStreamIncrementalState(options?: {
     const milestones: NarrationMilestone[] = [];
 
     if (inBlock === 'thinking' && inThinkingBlock) {
-      if (BLOCK_CLOSE_RE.test(line.trimEnd())) {
+      const trimmedEnd = line.trimEnd();
+      if (BLOCK_CLOSE_RE.test(trimmedEnd)) {
+        const complete = sanitizeAgentThinkingForOperator(currentThinkingBody);
+        if (complete) {
+          completedThinkingSpeechQueue.push(complete);
+        }
+        inBlock = null;
+        inThinkingBlock = false;
+        currentThinkingBody = '';
+        return milestones;
+      }
+      // Model sometimes glues the close fence onto the last sentence:
+      // "…still progressing. :::" — treat as block close, keep the prose.
+      if (/(?:^|\s):::\s*$/.test(trimmedEnd)) {
+        const withoutClose = trimmedEnd.replace(/\s*:::\s*$/, '');
+        if (withoutClose.trim()) {
+          if (currentThinkingBody) {
+            currentThinkingBody += '\n';
+          }
+          currentThinkingBody += withoutClose;
+        }
         const complete = sanitizeAgentThinkingForOperator(currentThinkingBody);
         if (complete) {
           completedThinkingSpeechQueue.push(complete);
@@ -121,7 +141,7 @@ export function createAgentStreamIncrementalState(options?: {
       currentThinkingBody = '';
       if (!thinkingMilestoneEmitted) {
         thinkingMilestoneEmitted = true;
-        milestones.push({ key: 'thinking:0', message: 'Thinking…' });
+        milestones.push({ key: 'thinking:0', message: 'I am thinking…' });
       }
       return milestones;
     }
@@ -217,6 +237,11 @@ export function createAgentStreamIncrementalState(options?: {
     const thinking = liveThinkingTextFromState();
     if (thinking) {
       const sanitized = sanitizeAgentThinkingForOperator(thinking);
+      // #region agent log
+      if (/:::/.test(thinking) || /:::/.test(sanitized)) {
+        fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'H1',location:'agent-stream-incremental.ts:toStreamingActivityView',message:'thinking fence in activity path',data:{rawHasFence:/:::/.test(thinking),sanitizedHasFence:/:::/.test(sanitized),rawPreview:thinking.slice(-80),sanitizedPreview:sanitized.slice(-80)},timestamp:Date.now()})}).catch(()=>{});
+      }
+      // #endregion
       if (sanitized) {
         const displayBody = truncateAgentLiveLineForDisplay(sanitized, AGENT_LIVE_LINE_DISPLAY_MAX);
         return {

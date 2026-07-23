@@ -12,6 +12,7 @@ from app.runs.service import (
     to_runtime_summary_active_run,
 )
 from app.persistence import operator_presence_settings_store
+from app.host_context.reminders import due_reminders
 from app.persistence.operator_memory_store import search_memories
 from app.operator_briefing_rhythm import build_operator_briefing_rhythm
 from app.operator_presence import build_operator_presence
@@ -117,6 +118,11 @@ def _memory_highlights(
     top_signals: list[dict[str, object]],
     rhythm: dict[str, str],
 ) -> list[dict[str, object]]:
+    """Prefer due reminders; fall back to lexical memory matches."""
+    due = due_reminders(workspace_id=workspace_id, limit=3)
+    if due:
+        return [dict(item) for item in due[:3]]
+
     candidate_text = " ".join(
         [
             rhythm.get("notice", ""),
@@ -259,6 +265,16 @@ def build_operator_briefing(
         else {"mode": "fleet"}
     )
 
+    due = [] if light else due_reminders(workspace_id=scoped_workspace_id, limit=5)
+    host_artifacts: list[dict[str, object]] = []
+    if not light:
+        try:
+            from app.host_context.service import list_artifacts as list_host_artifacts
+
+            host_artifacts = list(list_host_artifacts(limit=5).get("items") or [])
+        except Exception:  # noqa: BLE001 — briefing must stay available
+            host_artifacts = []
+
     return {
         "generated_at": runtime_summary["generated_at"],
         "scope": scope,
@@ -287,6 +303,8 @@ def build_operator_briefing(
                 rhythm=rhythm,
             )
         ),
+        "due_reminders": due,
+        "host_artifacts": host_artifacts,
         "operator_presence": build_operator_presence(
             {
                 "top_signals": top_signals,

@@ -1,13 +1,14 @@
 # CI, merge workflow, and worker agents
 
-**Updated:** 2026-07-17
+**Updated:** 2026-07-22
 
 This chapter explains how Axon-X lands code through GitHub CI, how that relates
 to the `dev` branch, and how **company employee agents** (the roster in IDE /
 Mission Control) work — including how to tell whether they are actually running
 and how good the automation is today.
 
-**Related:** [`docs/CI_GATES.md`](../CI_GATES.md), [`docs/planning/EXECUTION_PLAN.md`](../planning/EXECUTION_PLAN.md)
+**Related:** [`docs/CI_GATES.md`](../CI_GATES.md), [`docs/planning/EXECUTION_PLAN.md`](../planning/EXECUTION_PLAN.md),
+[`recent-operator-features.md`](recent-operator-features.md)
 
 ---
 
@@ -47,6 +48,26 @@ Runs on:
 
 In the GitHub UI: **Actions** → workflow runs show green ✓ or red ✗. A PR also
 shows the same check on the PR page.
+
+### Poll Fast Gate from the terminal (required after every push)
+
+Agents and operators should **not** wait for someone to notice a red run:
+
+```bash
+./scripts/ops/watch-fast-gate.sh
+# or follow a known run id:
+./scripts/ops/watch-fast-gate.sh 29925529734
+```
+
+On failure:
+
+```bash
+gh run view --log-failed
+# Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json
+```
+
+**Axon-X company ownership:** Rowan (watcher) + Mira (Lead) own Fast Gate for
+`workspace_axon_watch`. Quinn (integrations) supports Actions wiring.
 
 ### What Fast Gate runs (~2–3 minutes)
 

@@ -1,13 +1,5 @@
 import { OPERATOR_PERSONA_NAME } from './operator-persona-name';
-
-function workspaceFocusLabel(workspaceId: string | null | undefined): string {
-  const clean = String(workspaceId || '').trim();
-  if (!clean) {
-    return '';
-  }
-  const withoutPrefix = clean.startsWith('workspace_') ? clean.slice('workspace_'.length) : clean;
-  return withoutPrefix.replace(/_/g, ' ').trim() || clean;
-}
+import { explainOperatorAlert } from './operator-signal-hints';
 
 /** Client-side mirror of control-plane `build_persona_voice_line` when briefing omits presence. */
 export function buildPersonaVoiceLineFallback(input: {
@@ -15,6 +7,8 @@ export function buildPersonaVoiceLineFallback(input: {
   topSignalTitle?: string | null;
   topSignalWorkspaceId?: string | null;
   topSignalSummary?: string | null;
+  topSignalId?: string | null;
+  topSignalMeta?: Record<string, unknown> | null;
   degradedActive?: boolean;
   loadState?: 'idle' | 'loading' | 'loaded' | 'error';
   personaEnabled?: boolean;
@@ -24,35 +18,42 @@ export function buildPersonaVoiceLineFallback(input: {
   const loadState = input.loadState ?? 'loaded';
 
   if (loadState === 'loading') {
-    return `${prefix}Standing by while briefing loads.`;
+    return `${prefix}Hang on — I'm still getting your status ready.`;
   }
   if (loadState === 'error') {
-    return `${prefix}Briefing unavailable. Check control-plane connectivity.`;
+    return `${prefix}I can't reach the status service right now. Check that Axon is running.`;
   }
 
   if (input.pendingApprovals > 0) {
-    const suffix = input.pendingApprovals === 1 ? '' : 's';
-    return personaEnabled
-      ? `${prefix}${input.pendingApprovals} approval${suffix} need your review before I can continue.`
-      : `${input.pendingApprovals} approval${suffix} need your review before execution can continue.`;
+    const spoken = explainOperatorAlert({
+      pendingApprovals: input.pendingApprovals,
+      reason: 'operator_approval_required',
+    }).spoken;
+    return `${prefix}${spoken}`;
   }
 
   const title = String(input.topSignalTitle || '').trim();
   if (title) {
-    const workspace = workspaceFocusLabel(input.topSignalWorkspaceId);
-    const summary = String(input.topSignalSummary || '').trim();
-    const detail =
-      summary && !title.toLowerCase().includes(summary.toLowerCase())
-        ? `${title} — ${summary}`
-        : title;
-    if (workspace) {
-      return `${prefix}Top signal on ${workspace}: ${detail}.`;
+    const meta = { ...(input.topSignalMeta ?? {}) };
+    if (input.topSignalWorkspaceId && !meta.workspace_id) {
+      meta.workspace_id = input.topSignalWorkspaceId;
     }
-    return `${prefix}Top signal needs review: ${detail}.`;
+    const spoken = explainOperatorAlert({
+      signalId: input.topSignalId ?? undefined,
+      title,
+      summary: input.topSignalSummary,
+      meta,
+    }).spoken;
+    return `${prefix}${spoken}`;
   }
 
   if (input.degradedActive) {
-    return `${prefix}Runtime is degraded. Review the status strip before continuing.`;
+    const spoken = explainOperatorAlert({
+      title: 'Runtime degraded',
+      summary: 'Runtime is degraded',
+      signalId: 'signal_runtime_degraded',
+    }).spoken;
+    return `${prefix}${spoken}`;
   }
 
   return personaEnabled

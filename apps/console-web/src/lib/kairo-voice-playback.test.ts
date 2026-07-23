@@ -294,4 +294,72 @@ describe('kairo voice playback', () => {
 
     vi.useRealTimers();
   });
+
+  it('falls back with NotAllowedError reason when azure play is blocked', async () => {
+    vi.useFakeTimers();
+    const speech = stubBrowserSpeech();
+
+    class BlockedAudio {
+      src = '';
+      preload = '';
+      currentTime = 0;
+      readyState = 3;
+      paused = true;
+      ended = false;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(src: string) {
+        this.src = src;
+      }
+
+      addEventListener(): void {}
+      removeEventListener(): void {}
+      load(): void {}
+      pause(): void {
+        this.paused = true;
+      }
+      play(): Promise<void> {
+        return Promise.reject(new DOMException('Not allowed', 'NotAllowedError'));
+      }
+    }
+
+    vi.stubGlobal('Audio', BlockedAudio as unknown as typeof Audio);
+    vi.stubGlobal('HTMLMediaElement', {
+      HAVE_CURRENT_DATA: 2,
+      HAVE_FUTURE_DATA: 3,
+      HAVE_ENOUGH_DATA: 4,
+      NETWORK_EMPTY: 0,
+    });
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:blocked-azure'),
+      revokeObjectURL: vi.fn(),
+    });
+    vi.stubGlobal('window', {
+      __AXON_DESKTOP__: { runtime: 'desktop' },
+      Audio: BlockedAudio,
+    });
+    // Ensure desktop detection sees the bootstrap even if window stub is partial.
+    (globalThis as { __AXON_DESKTOP__?: unknown }).__AXON_DESKTOP__ = {
+      runtime: 'desktop',
+    };
+
+    vi.mocked(postKairoTts).mockResolvedValue({
+      available: true,
+      provider: 'azure',
+      audio_base64: 'YQ==',
+      content_type: 'audio/mpeg',
+    });
+
+    const promise = speakKairoLine('Blocked playback path.', { immediate: true });
+    await vi.advanceTimersByTimeAsync(1200);
+    const result = await promise;
+
+    expect(result.engine).toBe('browser');
+    expect(result.reason).toMatch(/audio_playback_failed/);
+    expect(speech.speak).toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
 });

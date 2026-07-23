@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
+from app.auth.step_up import FULL_ACCESS_ACTION, reject_missing_step_up
 from app.chat.service import (
     ChatValidationError,
     LaneBStreamJob,
@@ -16,6 +17,7 @@ from app.chat.service import (
     post_chat_message,
 )
 from app.chat.stream_events import chat_thread_stream_response
+from app.cli_runtime.approval_gate import full_access_requested
 from app.persistence import attachment_store, chat_store
 from app.routes.schemas import PostChatMessageRequest
 
@@ -26,7 +28,16 @@ router = APIRouter()
 def chat_messages_create(
     body: PostChatMessageRequest,
     background_tasks: BackgroundTasks,
+    request: Request,
 ) -> dict[str, object]:
+    if full_access_requested(body.execution_access):
+        step_up_error = reject_missing_step_up(request, action=FULL_ACCESS_ACTION)
+        if step_up_error is not None:
+            raise HTTPException(
+                status_code=403,
+                detail=step_up_error,
+                headers={"X-Axon-Step-Up-Required": FULL_ACCESS_ACTION},
+            )
     try:
         payload = post_chat_message(
             workspace_id=body.workspace_id,

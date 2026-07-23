@@ -1,17 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 
-import {
-  galaxyOrbHint,
-  galaxyOrbModeClass,
-  galaxyOrbModeLabel,
-  galaxyOrbModelLabel,
-  galaxyOrbStateClass,
-  galaxyOrbStatusLabel,
-} from './kairo-galaxy-orb-view';
 import KairoGalaxyOrbChrome from './KairoGalaxyOrbChrome.vue';
+import KairoGalaxyOrbDragHandle from './KairoGalaxyOrbDragHandle.vue';
+import KairoGalaxyOrbFrame from './KairoGalaxyOrbFrame.vue';
 import KairoGalaxyOrbSvg from './KairoGalaxyOrbSvg.vue';
+import KairoGalaxyOrbRadialMenu from './KairoGalaxyOrbRadialMenu.vue';
 import { useKairoGalaxyOrbDrag } from './use-kairo-galaxy-orb-drag';
 import { useKairoGalaxyOrbPresence } from './use-kairo-galaxy-orb-presence';
 import { useKairoGalaxyOrbVoice } from './use-kairo-galaxy-orb-voice';
@@ -20,6 +15,8 @@ import { resolveVoiceOrbPlacementApi } from './resolve-voice-orb-placement-api';
 import { handleKairoGalaxyOrbInterrupt } from './kairo-galaxy-orb-interrupt';
 import { useKairoGalaxyOrbChromeFlags } from './use-kairo-galaxy-orb-chrome-flags';
 import { useKairoGalaxyOrbTtsBadge } from './use-kairo-galaxy-orb-tts-badge';
+import { useGalaxyOrbRadialMenu } from './use-galaxy-orb-radial-menu';
+import { useKairoGalaxyOrbViewModel } from './use-kairo-galaxy-orb-view-model';
 import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_ORB_LABEL } from '../../lib/operator-persona-name';
 import {
   kairoConversationPhase,
@@ -42,9 +39,16 @@ const {
   voiceOrbAnchorStyle,
 } = storeToRefs(shell);
 const orbAnchor = ref<HTMLElement | null>(null);
+const orbFrameRef = ref<{ rootEl: HTMLElement | null } | null>(null);
+watch(
+  () => orbFrameRef.value?.rootEl ?? null,
+  (el) => { orbAnchor.value = el; },
+  { immediate: true },
+);
 
 const {
   handsFreeEnabled,
+  handsFreeArmed,
   presenceState,
   speechCapture,
   gateFeedback,
@@ -52,20 +56,16 @@ const {
   voiceBlocked,
 } = useKairoGalaxyOrbPresence(shell);
 
-const {
-  kairoSpeaking,
-  voiceBeat,
-  handleOrbClick,
-  handleOrbPointerDown,
-  handleOrbPointerUp,
-  cancelOrbPointerGesture,
-} = useKairoGalaxyOrbVoice({
+let toggleHandsFree: ((source: string) => Promise<void>) | null = null;
+const radialMenu = useGalaxyOrbRadialMenu({
   shell,
-  speechCapture,
-  voiceBlocked,
-  orbBusy,
-  handsFreeEnabled,
+  onTalk: () => { void toggleHandsFree?.('radial-talk'); },
 });
+const {
+  kairoSpeaking, voiceBeat, modeFlash, handleOrbClick,
+  handleOrbPointerDown, handleOrbPointerUp, cancelOrbPointerGesture, toggleHandsFreeMode,
+} = useKairoGalaxyOrbVoice({ shell, speechCapture, voiceBlocked, orbBusy, handsFreeEnabled });
+toggleHandsFree = toggleHandsFreeMode;
 
 const replySignal = computed(
   () => `${kairoConversationReply.value ?? ''}|${kairoConversationPhase.value}`,
@@ -73,6 +73,7 @@ const replySignal = computed(
 const {
   orbDragging,
   orbAnchorStyle,
+  handleDragHandlePointerDown,
   handleLongPressPointerDown,
   handleOrbDragMove,
   finishOrbDrag,
@@ -103,106 +104,97 @@ const { onTriggerPointerDown, onTriggerPointerMove, onTriggerPointerUp } =
   );
 
 const speaking = computed(() => kairoSpeaking.value || shell.kairoSpeechActive);
-const orbStateClass = computed(() =>
-  galaxyOrbStateClass(
-    presenceState.value,
-    speaking.value,
-    kairoConversationPhase.value,
-    speechCapture.capturing.value,
-    shell.agentStreamActive,
-  ),
-);
-const orbModeClass = computed(() => galaxyOrbModeClass(handsFreeEnabled.value));
-const modelLabel = computed(() => galaxyOrbModelLabel(shell.selectedComposerModel));
-const hint = computed(() =>
-  galaxyOrbHint(
-    presenceState.value,
-    speaking.value,
-    kairoConversationPhase.value,
-    handsFreeEnabled.value,
-    gateFeedback.value,
-  ),
-);
-const modeLabel = computed(() =>
-  galaxyOrbModeLabel(handsFreeEnabled.value, kairoConversationPhase.value),
-);
-const orbStatusLabel = computed(() =>
-  galaxyOrbStatusLabel(
-    kairoConversationPhase.value,
-    speaking.value,
-    speechCapture.capturing.value,
-  ),
-);
+const {
+  captureMode,
+  orbStateClass,
+  orbModeClass,
+  modelLabel,
+  hint,
+  modeLabel,
+  orbStatusLabel,
+  triggerAriaLabel,
+} = useKairoGalaxyOrbViewModel({
+  personaName,
+  presenceState,
+  speaking,
+  speechCapture,
+  agentStreamActive: computed(() => shell.agentStreamActive),
+  handsFreeEnabled,
+  handsFreeArmed,
+  gateFeedback,
+  voiceBlocked,
+  selectedComposerModel: computed(() => shell.selectedComposerModel),
+});
 const { showInterrupt, showIdeClose } = useKairoGalaxyOrbChromeFlags({
   shell,
   placementMode: props.placementMode,
 });
 const ttsBadge = useKairoGalaxyOrbTtsBadge(speaking);
 
-function handleInterrupt(): void {
-  handleKairoGalaxyOrbInterrupt(shell);
+function handleOrbContextMenu(event: MouseEvent): void {
+  event.preventDefault();
+  radialMenu.toggleMenu();
 }
 </script>
 
 <template>
-  <div
-    ref="orbAnchor"
-    class="brain-galaxy-stage__jarvis-float brain-galaxy-stage__jarvis-float--mockup"
-    :class="{
-      'brain-galaxy-stage__jarvis-float--dragging': orbDragging,
-      'brain-galaxy-stage__jarvis-float--viewport': placementMode === 'viewport',
-      'brain-galaxy-stage__jarvis-float--embedded': placementMode === 'embedded',
-      'brain-galaxy-stage__jarvis-float--chrome-live': showInterrupt,
-      'brain-galaxy-stage__jarvis-float--ide': showIdeClose,
-    }"
-    :style="placementMode === 'viewport' ? orbAnchorStyle : undefined"
+  <KairoGalaxyOrbFrame
+    ref="orbFrameRef"
+    :dragging="orbDragging"
+    :placement-mode="placementMode"
+    :chrome-live="showInterrupt"
+    :ide-close="showIdeClose"
+    :anchor-style="orbAnchorStyle"
+    :persona-name="personaName"
+    @hide="shell.hideVoiceOrb()"
   >
-    <button
-      v-if="showIdeClose"
-      type="button"
-      class="kairo-galaxy-orb__close"
-      :aria-label="`Hide ${personaName} voice orb`"
-      title="Hide voice orb"
-      @click.stop="shell.hideVoiceOrb()"
-    >
-      ×
-    </button>
-
     <div
       class="kairo-galaxy-orb"
       :class="[
         orbStateClass,
         orbModeClass,
         {
-          'kairo-galaxy-orb--ptt': speechCapture.capturing.value,
+          'kairo-galaxy-orb--ptt':
+            speechCapture.capturing.value && captureMode === 'manual',
           'kairo-galaxy-orb--voice-live': speaking,
           'kairo-galaxy-orb--voice-beat': voiceBeat,
+          'kairo-galaxy-orb--mode-flash': modeFlash,
           'kairo-galaxy-orb--busy': orbBusy,
+          'kairo-galaxy-orb--radial-open': radialMenu.open.value,
         },
       ]"
       :aria-label="`${personaName} voice orb`"
     >
+      <KairoGalaxyOrbDragHandle
+        v-if="placementMode === 'viewport'"
+        @pointerdown="handleDragHandlePointerDown"
+        @pointermove="handleOrbDragMove"
+        @pointerup="finishOrbDrag"
+        @pointercancel="finishOrbDrag"
+      />
+
       <button
         type="button"
         class="kairo-galaxy-orb__trigger"
-        :disabled="voiceBlocked || !speechCapture.supported"
-        :title="`Tap for hands-free · hold to talk · long-press to move · double-click to reset`"
-        :aria-label="
-          voiceBlocked
-            ? `${personaName} voice muted`
-            : handsFreeEnabled
-              ? `${personaName} hands-free — tap to switch to manual mode`
-              : `${personaName} manual — tap for hands-free, hold to talk, long-press to move`
-        "
+        :aria-disabled="voiceBlocked"
+        :title="`Tap to toggle hands-free · hold to talk · right-click for command ring · long-press to move · double-click to reset`"
+        :aria-label="triggerAriaLabel"
         @click.stop="handleOrbClick"
         @dblclick.stop="resetOrbPosition"
-        @pointerdown.prevent="onTriggerPointerDown"
+        @contextmenu.prevent="handleOrbContextMenu"
+        @pointerdown="onTriggerPointerDown"
         @pointermove="onTriggerPointerMove"
-        @pointerup.prevent="onTriggerPointerUp"
-        @pointercancel.prevent="onTriggerPointerUp"
+        @pointerup="onTriggerPointerUp"
+        @pointercancel="onTriggerPointerUp"
       >
         <KairoGalaxyOrbSvg :persona-orb-label="personaOrbLabel" />
       </button>
+
+      <KairoGalaxyOrbRadialMenu
+        :open="radialMenu.open.value"
+        @select="radialMenu.dispatchAction"
+        @close="radialMenu.closeMenu"
+      />
 
       <KairoGalaxyOrbChrome
         :persona-name="personaName"
@@ -212,9 +204,9 @@ function handleInterrupt(): void {
         :show-interrupt="showInterrupt"
         :hint="hint"
         :model-label="modelLabel"
-        @interrupt="handleInterrupt"
+        @interrupt="handleKairoGalaxyOrbInterrupt(shell)"
         @focus-briefing="shell.focusKairoBriefing()"
       />
     </div>
-  </div>
+  </KairoGalaxyOrbFrame>
 </template>

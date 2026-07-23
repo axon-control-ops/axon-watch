@@ -65,4 +65,53 @@ describe('useAgentTerminalMirror', () => {
     expect(mirrorActive.value).toBe(false);
     expect(forcedText.value).toContain('$ cd /tmp && ls');
   });
+
+  it('prefers a live open terminal over a stale forced snapshot', () => {
+    const mirrorActive = ref(true);
+    const agentSessionId = ref<string | null>('term-agent');
+    const streamActive = ref(true);
+    const forcedText = ref<string | null>('$ old ota\nprevious log\n');
+    const writeMirrorSnapshot = vi.fn();
+    const transcript = ref(
+      [':::terminal RELEASE_GUARD_ALLOW_DIRTY=1 npm run ota', '# Publish OTA'].join('\n'),
+    );
+
+    const { syncNow } = useAgentTerminalMirror({
+      mirrorActive,
+      agentSessionId,
+      getTranscriptContent: () => transcript.value,
+      streamActive,
+      clearMirror: () => {
+        mirrorActive.value = false;
+      },
+      forcedText,
+      getHost: () => ({ writeMirrorSnapshot }),
+    });
+
+    syncNow();
+
+    expect(writeMirrorSnapshot).toHaveBeenCalledWith(
+      '$ RELEASE_GUARD_ALLOW_DIRTY=1 npm run ota\n# Publish OTA\nrunning…\n',
+    );
+  });
+
+  it('keeps a deliberate forced snapshot when transcript terminals are closed', () => {
+    const forcedText = ref<string | null>('$ selected command\nselected output\n');
+    const writeMirrorSnapshot = vi.fn();
+    const transcript = [':::terminal npm test', 'historical output', ':::'].join('\n');
+
+    const { syncNow } = useAgentTerminalMirror({
+      mirrorActive: ref(true),
+      agentSessionId: ref<string | null>('term-agent'),
+      getTranscriptContent: () => transcript,
+      streamActive: ref(false),
+      clearMirror: vi.fn(),
+      forcedText,
+      getHost: () => ({ writeMirrorSnapshot }),
+    });
+
+    syncNow();
+
+    expect(writeMirrorSnapshot).toHaveBeenCalledWith('$ selected command\nselected output\n');
+  });
 });

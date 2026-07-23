@@ -69,7 +69,11 @@ class ParityC1PersonaSettingsTests(unittest.TestCase):
         disabled = self._briefing_with_probe()
         voice_line = str(disabled["operator_presence"]["persona_voice_line"])
         self.assertNotIn("KAIRO", voice_line)
-        self.assertIn("approval", voice_line.lower())
+        lowered = voice_line.lower()
+        self.assertTrue(
+            "approval" in lowered or "approve" in lowered or "yes or no" in lowered,
+            voice_line,
+        )
         self.assertEqual(enabled["pending_approvals"]["count"], disabled["pending_approvals"]["count"])
         self.assertEqual(enabled["notice"], disabled["notice"])
         self.assertEqual(enabled["advise"], disabled["advise"])

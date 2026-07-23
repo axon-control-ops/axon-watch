@@ -161,6 +161,24 @@ export function useKairoGalaxyOrbDrag(options: UseKairoGalaxyOrbDragOptions) {
     options.onDragEngaged?.();
   }
 
+  function handleDragHandlePointerDown(event: PointerEvent): void {
+    if (mode === 'embedded' || !placement) {
+      return;
+    }
+    if (event.button !== 0 && event.pointerType === 'mouse') {
+      return;
+    }
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    clearLongPressTimer();
+    engageDragFromLongPress(event.pointerId, target, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
   function handleLongPressPointerDown(event: PointerEvent): void {
     if (mode === 'embedded' || !placement) {
       return;
@@ -309,6 +327,7 @@ export function useKairoGalaxyOrbDrag(options: UseKairoGalaxyOrbDragOptions) {
     orbDragging,
     orbAnchorStyle,
     resolveOrbOverlap: scheduleSmartDodge,
+    handleDragHandlePointerDown,
     handleLongPressPointerDown,
     handleOrbDragMove,
     finishOrbDrag,

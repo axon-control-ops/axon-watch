@@ -9,15 +9,15 @@ def approval_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     prefix = "Still " if followup else ""
     if pending <= 0:
         return [
-            f"{prefix}No approvals are waiting — you're clear to proceed.".strip(),
-            f"{prefix}Nothing needs a sign-off right now.".strip(),
+            f"{prefix}Nothing is waiting for your yes or no — you're clear.".strip(),
+            f"{prefix}No jobs need a sign-off right now.".strip(),
             f"{prefix}Approval queue is empty on my side.".strip(),
         ]
-    suffix = "" if pending == 1 else "s"
+    noun = "job" if pending == 1 else "jobs"
     return [
-        f"{prefix}{pending} approval{suffix} waiting — I'd open Attention first.".strip(),
-        f"{prefix}You have {pending} guarded run{suffix} waiting for sign-off.".strip(),
-        f"{prefix}{pending} approval{suffix} on the board — Attention has the detail.".strip(),
+        f"{prefix}{pending} {noun} waiting for your yes or no — open Approvals first.".strip(),
+        f"{prefix}You have {pending} paused {noun} that need Approve or Reject.".strip(),
+        f"{prefix}{pending} {noun} on the board — Approvals has the simple next step.".strip(),
     ]
 
 
@@ -26,13 +26,13 @@ def attention_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     parts: list[str] = []
     pending = int(facts["pending_approvals"])
     if pending > 0:
-        suffix = "" if pending == 1 else "s"
-        parts.append(f"{pending} approval{suffix}")
+        noun = "job" if pending == 1 else "jobs"
+        parts.append(f"{pending} {noun} waiting for your yes or no")
     if facts["top_signal_title"]:
         detail = facts["top_signal_title"]
         if facts["top_signal_summary"]:
             detail = f"{detail} — {facts['top_signal_summary']}"
-        parts.append(f"top signal is {detail}")
+        parts.append(f"attention item is {detail}")
     elif int(facts["active_run_count"]) > 0:
         run_label = facts["primary_run_summary"] or "an active run"
         phase = facts["primary_run_phase"]
@@ -42,14 +42,14 @@ def attention_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
             parts.append(run_label)
     if not parts:
         return [
-            f"{prefix}Nothing urgent — fleet looks nominal from here.".strip(),
-            f"{prefix}All quiet — no fires I would interrupt you for.".strip(),
+            f"{prefix}Nothing urgent — things look calm from here.".strip(),
+            f"{prefix}All quiet — nothing I'd interrupt you for.".strip(),
         ]
     joined = "; ".join(parts)
     return [
         f"{prefix}Here's what needs you: {joined}.".strip(),
-        f"{prefix}Priority stack: {joined}.".strip(),
         f"{prefix}I'd start with {parts[0]}.".strip(),
+        f"{prefix}Open Attention for the plain-English next step on: {joined}.".strip(),
     ]
 
 
@@ -57,7 +57,7 @@ def signal_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     prefix = "Still " if followup else ""
     if not facts["top_signal_title"]:
         return [
-            f"{prefix}Inbox is quiet — no open signals worth interrupting you for.".strip(),
+            f"{prefix}Inbox is quiet — nothing worth interrupting you for.".strip(),
             f"{prefix}No monitor or inbox fires right now.".strip(),
         ]
     title = facts["top_signal_title"]
@@ -65,14 +65,17 @@ def signal_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     severity = facts["top_signal_severity"]
     if summary:
         lines = [
-            f"{prefix}Top signal: {title} — {summary}".strip(),
-            f"{prefix}Lead signal is {title}: {summary}".strip(),
+            f"{prefix}Heads up — {title}: {summary}. Open Attention for what to do.".strip(),
+            f"{prefix}I'd look at {title} next: {summary}".strip(),
         ]
         if severity:
-            lines.append(f"{prefix}{severity.title()} signal {title} — {summary}".strip())
+            lines.append(
+                f"{prefix}{severity.title()} alert: {title} — {summary}. "
+                "I can explain the fix in plain English.".strip()
+            )
         return lines
     return [
-        f"{prefix}Top signal is {title}.".strip(),
+        f"{prefix}Heads up — {title}. Open Attention for what you and the agent should do.".strip(),
         f"{prefix}I'd review {title} first.".strip(),
     ]
 
@@ -160,14 +163,14 @@ def health_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
         ]
     pending = int(facts["pending_approvals"])
     if pending > 0:
-        suffix = "" if pending == 1 else "s"
+        noun = "job" if pending == 1 else "jobs"
         return [
-            f"{prefix}Not fully nominal — {pending} approval{suffix} waiting.".strip(),
+            f"{prefix}Not fully clear — {pending} {noun} waiting for your yes or no.".strip(),
         ]
     severity = facts["top_signal_severity"]
     if facts["top_signal_title"] and severity in {"high", "critical"}:
         return [
-            f"{prefix}Mostly operational, but top signal is {facts['top_signal_title']}.".strip(),
+            f"{prefix}Mostly fine, but heads up on {facts['top_signal_title']}.".strip(),
         ]
     review_ready = int(facts.get("review_ready_count") or 0)
     if review_ready > 0:

@@ -10,7 +10,7 @@ export const OPERATOR_PRESENCE_SETTINGS_KEY = 'axon-x:operator-presence-settings
 export const DEFAULT_SPEECH_RATE = 1.0;
 export const DEFAULT_SPEECH_PITCH = 1.04;
 export const DEFAULT_AZURE_VOICE_ID = 'en-GB-RyanNeural';
-export const DEFAULT_STT_MODE: SttMode = 'browser';
+export const DEFAULT_STT_MODE: SttMode = 'cloud';
 export const DEFAULT_VOICE_ROUTING_MODE: VoiceRoutingMode = 'template_first';
 
 export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
@@ -22,6 +22,7 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     kairo_narration: 'conversational',
     ide_voice_strip_enabled: false,
     hands_free_enabled: false,
+    proactive_duplex_enabled: false,
     speech_rate: DEFAULT_SPEECH_RATE,
     speech_pitch: DEFAULT_SPEECH_PITCH,
     azure_voice_id: DEFAULT_AZURE_VOICE_ID,
@@ -92,6 +93,8 @@ export function normalizeOperatorPresenceSettings(
         : defaults.kairo_narration,
     ide_voice_strip_enabled: raw.ide_voice_strip_enabled ?? defaults.ide_voice_strip_enabled,
     hands_free_enabled: raw.hands_free_enabled ?? defaults.hands_free_enabled,
+    proactive_duplex_enabled:
+      raw.proactive_duplex_enabled ?? defaults.proactive_duplex_enabled,
     speech_rate: normalizeSpeechRate(raw.speech_rate ?? defaults.speech_rate),
     speech_pitch: normalizeSpeechPitch(raw.speech_pitch ?? defaults.speech_pitch),
     azure_voice_id: normalizeAzureVoiceId(raw.azure_voice_id ?? defaults.azure_voice_id),
@@ -122,6 +125,28 @@ export function persistOperatorPresenceSettings(
   storage: Pick<Storage, 'setItem'> = localStorage,
 ): void {
   storage.setItem(OPERATOR_PRESENCE_SETTINGS_KEY, JSON.stringify(settings));
+}
+
+export function applyJarvisDuplexPreset(
+  settings: OperatorPresenceSettings,
+  enabled: boolean,
+): OperatorPresenceSettings {
+  if (!enabled) {
+    return normalizeOperatorPresenceSettings({
+      ...settings,
+      proactive_duplex_enabled: false,
+    });
+  }
+  return normalizeOperatorPresenceSettings({
+    ...settings,
+    proactive_duplex_enabled: true,
+    hands_free_enabled: true,
+    spoken_alerts_enabled: true,
+    privacy_mode: false,
+    stt_mode: 'cloud',
+    kairo_narration:
+      settings.kairo_narration === 'off' ? 'conversational' : settings.kairo_narration,
+  });
 }
 
 /** Format like axon-local mono readout (`1.00`). */

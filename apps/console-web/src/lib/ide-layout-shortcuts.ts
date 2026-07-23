@@ -10,6 +10,9 @@ export type IdeLayoutShortcutContext = {
   modKey: boolean;
   shiftKey: boolean;
   key: string;
+  /** True for inputs, textareas, xterm, command seam — never steal keys there. */
+  formOrTerminalEditable: boolean;
+  /** True for any editable surface including contenteditable editors. */
   editableTarget: boolean;
 };
 
@@ -21,14 +24,23 @@ function isShellLayoutMode(layoutMode: string): boolean {
 export function resolveIdeLayoutShortcut(
   context: IdeLayoutShortcutContext,
 ): IdeLayoutShortcutAction | null {
-  if (!isShellLayoutMode(context.layoutMode) || context.editableTarget || !context.modKey) {
+  if (!isShellLayoutMode(context.layoutMode) || !context.modKey) {
     return null;
   }
 
   const normalizedKey = context.key.toLowerCase();
 
-  if (normalizedKey === 'j') {
+  // Mod+J always toggles the workbench terminal, including inside the markdown
+  // editor (TipTap AI otherwise steals it). Skip only real form/xterm fields.
+  if (normalizedKey === 'j' && !context.shiftKey) {
+    if (context.formOrTerminalEditable) {
+      return null;
+    }
     return 'toggle-terminal';
+  }
+
+  if (context.editableTarget) {
+    return null;
   }
 
   if (context.layoutMode !== 'ide') {

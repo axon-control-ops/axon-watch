@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
-import { resolveActiveIdeEmployee, resolveActiveIdeEmployeeRecord, buildIdeThreadFailureDetailTooltipMap, buildIdeThreadFailureHintMap, resolveIdeThreadEmployeeFailure, resolveIdeThreadEmployeeFailureDetailTooltip, resolveRosterSelectionForIdeThread } from './active-ide-employee';
+import { resolveActiveIdeEmployee, resolveActiveIdeEmployeeRecord, buildIdeThreadBusySet, buildIdeThreadFailureDetailTooltipMap, buildIdeThreadFailureHintMap, resolveIdeThreadEmployeeFailure, resolveIdeThreadEmployeeFailureDetailTooltip, resolveRosterSelectionForIdeThread } from './active-ide-employee';
 
 function employee(overrides: Partial<CompanyEmployeeRecord> = {}): CompanyEmployeeRecord {
   return {
@@ -155,6 +155,32 @@ describe('buildIdeThreadFailureHintMap', () => {
     expect(hints.get('thread_jules')).toContain('assertion failed');
     expect(hints.has('thread_operator')).toBe(false);
     expect(hints.has('thread_quinn')).toBe(false);
+  });
+});
+
+describe('buildIdeThreadBusySet', () => {
+  it('marks teammate tabs busy from roster status or live stream overlay', () => {
+    const executing = employee({
+      employee_id: 'employee-workspace_axon_watch-frontend-2',
+      status: 'executing',
+    });
+    const watching = employee({
+      employee_id: 'employee-workspace_axon_watch-watcher-1',
+      role: 'watcher',
+      status: 'watching',
+    });
+    const busy = buildIdeThreadBusySet({
+      threads: [
+        { thread_id: 'thread_jules', employee_id: executing.employee_id },
+        { thread_id: 'thread_cass', employee_id: watching.employee_id },
+        { thread_id: 'thread_operator', employee_id: null },
+      ],
+      employees: [executing, watching],
+      liveBusyEmployeeIds: [watching.employee_id],
+    });
+    expect(busy.has('thread_jules')).toBe(true);
+    expect(busy.has('thread_cass')).toBe(true);
+    expect(busy.has('thread_operator')).toBe(false);
   });
 });
 

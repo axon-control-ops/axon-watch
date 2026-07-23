@@ -148,21 +148,73 @@ export function collapseBackToBackThinkingEcho(text: string, minLength = THINKIN
  * Strip Cursor thinking that narrates the operator as "the user".
  * Returns operator-facing copy, or empty when nothing usable remains.
  */
+/** Strip leaked stream fence markers (e.g. trailing `:::` glued onto a sentence). */
+export function stripAgentStreamFenceMarkers(text: string): string {
+  return flattenLiveLineText(text)
+    .replace(/^:::(?:thinking|tool|edit|terminal|research|debug-reproduce)?\b\s*/i, '')
+    .replace(/(?:^|\s):::\s*$/g, '')
+    .replace(/\s+:::(?=\s|$)/g, ' ')
+    .trim();
+}
+
+/** Operator-facing fallback when thinking has no usable body. */
+export const THINKING_SPEECH_FALLBACK = 'I am thinking…';
+
+/**
+ * Prefer first-person "I am thinking…" over bare "Thinking…" labels
+ * (milestones, model lead-ins, and OCR-prone transcript chips).
+ */
+export function normalizeThinkingSpeechLead(text: string): string {
+  const flattened = flattenLiveLineText(text);
+  if (!flattened) {
+    return '';
+  }
+  if (/^thinking(?:[.…]{1,3}|\.\.\.)?$/i.test(flattened)) {
+    return THINKING_SPEECH_FALLBACK;
+  }
+  // "Thinking I'll…" / "thinking I'll…" → "I am thinking I'll…"
+  if (/^thinking\b/i.test(flattened) && !/^i\s+am\s+thinking\b/i.test(flattened)) {
+    return flattened.replace(/^thinking(?:[.…]{1,3}|\.\.\.)?\s*/i, 'I am thinking ').trim();
+  }
+  return flattened;
+}
+
 export function sanitizeAgentThinkingForOperator(text: string): string {
   let out = collapseBackToBackThinkingEcho(text);
   if (!out) {
     return '';
   }
+  out = stripAgentStreamFenceMarkers(out);
   out = out.replace(/^\*+|\*+$/g, '').trim();
   out = out.replace(USER_META_SENTENCE_RE, ' ');
   out = out.replace(USER_META_ASKED_RE, ' ');
   out = out.replace(USER_META_PREFIX_RE, '');
   out = out.replace(LEADING_WHETHER_RE, '');
   out = flattenLiveLineText(out).replace(/^[,.\-–—:;]+/, '').trim();
+  out = stripAgentStreamFenceMarkers(out);
+  out = normalizeThinkingSpeechLead(out);
   if (!out || /^(?:the\s+)?user\b/i.test(out) || /^(?:whether|if)\s*$/i.test(out)) {
     return '';
   }
+  // #region agent log
+  if (/^i am thinking\b/i.test(out) || /^thinking\b/i.test(flattenLiveLineText(text))) {
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'thinking-phrase',hypothesisId:'H6',location:'agent-live-line-view.ts:sanitizeAgentThinkingForOperator',message:'thinking speech lead normalized',data:{rawPreview:flattenLiveLineText(text).slice(0,80),outPreview:out.slice(0,80),startsWithIAm:/^i am thinking\b/i.test(out)},timestamp:Date.now()})}).catch(()=>{});
+  }
+  // #endregion
   return out;
+}
+
+/** Wait/poll status chatter — speak once per turn, not on every Await cycle. */
+const WAIT_PROGRESS_RE =
+  /\b(?:still\s+(?:running|progressing|waiting|building|bundling|active)|build\s+is\s+still|cache\s+is\s+active|waiting\s+for|polling|no\s+new\s+output|checking\s+the\s+terminal)\b/i;
+
+export function isWaitProgressThinking(text: string): boolean {
+  return WAIT_PROGRESS_RE.test(stripAgentStreamFenceMarkers(text));
+}
+
+/** Token Jaccard similarity for near-duplicate spoken thinking lines. */
+export function thinkingSpeechSimilarity(left: string, right: string): number {
+  return thinkingEchoTokenSimilarity(left, right);
 }
 
 

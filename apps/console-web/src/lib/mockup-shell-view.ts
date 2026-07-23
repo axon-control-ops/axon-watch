@@ -146,11 +146,11 @@ export function buildBriefingHeroSubtitle(
   loadState: 'idle' | 'loading' | 'loaded' | 'error',
 ): string {
   if (loadState === 'loading' && !briefing) {
-    return 'Standing by while briefing loads.';
+    return "Hang on — I'm still getting your status ready.";
   }
 
   if (loadState === 'error' && !briefing) {
-    return 'Briefing unavailable. Check control-plane connectivity.';
+    return "I can't reach the status service right now. Check that Axon is running.";
   }
 
   if (briefing?.notice) {
@@ -158,24 +158,17 @@ export function buildBriefingHeroSubtitle(
   }
 
   if (briefing?.pending_approvals.count) {
-    return 'Approvals need your review before I can continue.';
+    return 'A job is waiting for your yes or no before I can continue.';
   }
 
   if (briefing?.top_signals.length) {
     const signal = briefing.top_signals[0];
-    const title = String(signal?.title || '').trim() || 'Top signal';
-    const workspace = String(signal?.workspace_id || '')
-      .replace(/^workspace_/, '')
-      .replace(/_/g, ' ')
-      .trim();
-    if (workspace) {
-      return `Top signal on ${workspace}: ${title}.`;
-    }
-    return `Top signal needs review: ${title}.`;
+    const title = String(signal?.title || '').trim() || 'Attention item';
+    return `Heads up — ${title}. Open Attention for what to do next.`;
   }
 
   if (briefing?.degraded.active) {
-    return 'Runtime is degraded. Review the status strip before continuing.';
+    return 'Something is running in a weaker mode — worth a quick look, not a panic.';
   }
 
   return "I'm listening. Tell me what to focus on.";

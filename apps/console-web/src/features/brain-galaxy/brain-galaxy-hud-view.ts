@@ -32,6 +32,10 @@ const LEGEND: GalaxyLegendItem[] = [
   { kind: 'signal', label: 'Signals', color: '#ffa040' },
   { kind: 'connector', label: 'Connectors', color: '#5a8cff' },
   { kind: 'mailbox', label: 'Mailboxes', color: '#7ee0a8' },
+  { kind: 'device', label: 'Devices', color: '#9ad7ff' },
+  { kind: 'artifact', label: 'Artifacts', color: '#c5b0ff' },
+  { kind: 'media', label: 'Media', color: '#ff9ad4' },
+  { kind: 'open_loop', label: 'Open loops', color: '#ffd27a' },
 ];
 
 export function galaxyLegendItems(): GalaxyLegendItem[] {

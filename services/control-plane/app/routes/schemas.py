@@ -72,6 +72,12 @@ class CreateWorkspaceHandoffRequest(BaseModel):
     reason: str = ""
 
 
+class RouteTeammateRequest(BaseModel):
+    prompt: str
+    current_employee_id: str | None = None
+    use_model_tiebreak: bool = True
+
+
 class RegisterWorkspaceBindingRequest(BaseModel):
     workspace_id: str
     project_root: str
@@ -133,6 +139,7 @@ class OperatorPresenceSettingsRequest(BaseModel):
     kairo_narration: str | None = None
     ide_voice_strip_enabled: bool | None = None
     hands_free_enabled: bool | None = None
+    proactive_duplex_enabled: bool | None = None
     speech_rate: float | None = None
     speech_pitch: float | None = None
     azure_voice_id: str | None = None

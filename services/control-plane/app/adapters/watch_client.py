@@ -8,7 +8,9 @@ import os
 import threading
 import time
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
+
+from app.adapters.watch_http import watch_base_url, watch_request_headers, watch_urlopen, watch_urlopen
 
 # Boot stampede protection: /api/agents, /api/workspaces, /api/inbox, fleet-health,
 # and runtime/summary all share this fetch. Without SWR + single-flight, one cold
@@ -19,12 +21,8 @@ _INBOX_CACHE_LOCK = threading.Lock()
 _INBOX_BUILD_LOCK = threading.Lock()
 _INBOX_BACKGROUND_REFRESHING = False
 
-
-def watch_base_url() -> str:
-    return os.environ.get(
-        "AXON_WATCH_WATCH_SERVICE_BASE_URL",
-        "http://127.0.0.1:8788",
-    ).rstrip("/")
+# Re-export for callers that import watch_base_url from this module.
+__all__ = ("watch_base_url", "reset_watch_inbox_cache")
 
 
 def reset_watch_inbox_cache() -> None:
@@ -63,8 +61,8 @@ def _fetch_watch_inbox_uncached(timeout_seconds: float) -> dict[str, object] | N
     url = f"{watch_base_url()}/internal/watch/inbox"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=timeout_seconds) as response:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -83,35 +81,6 @@ def _start_background_inbox_refresh(timeout_seconds: float) -> None:
             payload = _fetch_watch_inbox_uncached(timeout_seconds)
             if payload is not None:
                 _store_watch_inbox_cache(payload)
-                # #region agent log
-                try:
-                    import json as _json
-
-                    with open(
-                        "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                        "a",
-                        encoding="utf-8",
-                    ) as _fh:
-                        _fh.write(
-                            _json.dumps(
-                                {
-                                    "sessionId": "fc0b35",
-                                    "runId": "post-fix",
-                                    "hypothesisId": "H2",
-                                    "location": "watch_client.py:bg-inbox-refresh",
-                                    "message": "watch inbox background refresh ok",
-                                    "data": {
-                                        "timeout_seconds": timeout_seconds,
-                                        "item_count": payload.get("count"),
-                                    },
-                                    "timestamp": int(time.time() * 1000),
-                                }
-                            )
-                            + "\n"
-                        )
-                except OSError:
-                    pass
-                # #endregion
         finally:
             with _INBOX_CACHE_LOCK:
                 _INBOX_BACKGROUND_REFRESHING = False
@@ -156,99 +125,14 @@ def fetch_watch_inbox(
     now = time.monotonic()
     fetched_at, cached = _read_watch_inbox_cache()
     if not force_refresh and _inbox_cache_fresh(fetched_at, now, cached):
-        # #region agent log
-        try:
-            with open(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                "a",
-                encoding="utf-8",
-            ) as _fh:
-                _fh.write(
-                    json.dumps(
-                        {
-                            "sessionId": "fc0b35",
-                            "runId": "post-fix",
-                            "hypothesisId": "H2",
-                            "location": "watch_client.py:fetch_watch_inbox",
-                            "message": "watch inbox cache hit",
-                            "data": {
-                                "age_ms": int((now - fetched_at) * 1000),
-                                "timeout_seconds": timeout_seconds,
-                                "allow_stale": allow_stale,
-                                "cached_only": cached_only,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # #endregion
         return cached
 
     if cached_only:
-        refresh_scheduled = _schedule_inbox_refresh_if_idle(timeout_seconds)
-        # #region agent log
-        try:
-            with open(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                "a",
-                encoding="utf-8",
-            ) as _fh:
-                _fh.write(
-                    json.dumps(
-                        {
-                            "sessionId": "fc0b35",
-                            "runId": "post-fix",
-                            "hypothesisId": "H2",
-                            "location": "watch_client.py:fetch_watch_inbox",
-                            "message": "watch inbox cached_only",
-                            "data": {
-                                "had_cache": cached is not None,
-                                "age_ms": int((now - fetched_at) * 1000) if cached else None,
-                                "refresh_scheduled": refresh_scheduled,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # #endregion
+        _schedule_inbox_refresh_if_idle(timeout_seconds)
         return cached
 
     if allow_stale and not force_refresh and cached is not None:
-        refresh_scheduled = _schedule_inbox_refresh_if_idle(timeout_seconds)
-        # #region agent log
-        try:
-            with open(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                "a",
-                encoding="utf-8",
-            ) as _fh:
-                _fh.write(
-                    json.dumps(
-                        {
-                            "sessionId": "fc0b35",
-                            "runId": "post-fix",
-                            "hypothesisId": "H2",
-                            "location": "watch_client.py:fetch_watch_inbox",
-                            "message": "watch inbox stale served",
-                            "data": {
-                                "age_ms": int((now - fetched_at) * 1000),
-                                "refresh_scheduled": refresh_scheduled,
-                                "timeout_seconds": timeout_seconds,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # #endregion
+        _schedule_inbox_refresh_if_idle(timeout_seconds)
         return cached
 
     # Cold path: single-flight so concurrent boot callers share one urlopen.
@@ -269,38 +153,7 @@ def fetch_watch_inbox(
             _schedule_inbox_refresh_if_idle(timeout_seconds)
             return cached
 
-        t0 = time.monotonic()
         payload = _fetch_watch_inbox_uncached(timeout_seconds)
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        # #region agent log
-        try:
-            with open(
-                "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-                "a",
-                encoding="utf-8",
-            ) as _fh:
-                _fh.write(
-                    json.dumps(
-                        {
-                            "sessionId": "fc0b35",
-                            "runId": "post-fix",
-                            "hypothesisId": "H2",
-                            "location": "watch_client.py:fetch_watch_inbox",
-                            "message": "watch inbox live fetch",
-                            "data": {
-                                "elapsed_ms": elapsed_ms,
-                                "ok": payload is not None,
-                                "timeout_seconds": timeout_seconds,
-                                "had_stale": cached is not None,
-                            },
-                            "timestamp": int(time.time() * 1000),
-                        }
-                    )
-                    + "\n"
-                )
-        except OSError:
-            pass
-        # #endregion
         if payload is not None:
             _store_watch_inbox_cache(payload)
             return payload
@@ -316,8 +169,8 @@ def fetch_watch_summary(timeout_seconds: float = 1.5) -> dict[str, object] | Non
     url = f"{watch_base_url()}/internal/watch/summary"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=timeout_seconds) as response:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -331,8 +184,8 @@ def fetch_watch_monitors(timeout_seconds: float = 5.0) -> dict[str, object] | No
     url = f"{watch_base_url()}/internal/watch/monitors"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=timeout_seconds) as response:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -346,8 +199,8 @@ def fetch_watch_connectors(timeout_seconds: float = 5.0) -> dict[str, object] | 
     url = f"{watch_base_url()}/internal/watch/connectors"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=timeout_seconds) as response:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -361,8 +214,8 @@ def fetch_watch_tunnel(timeout_seconds: float = 1.0) -> dict[str, object] | None
     url = f"{watch_base_url()}/internal/watch/tunnel"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=timeout_seconds) as response:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -381,11 +234,11 @@ def post_watch_tunnel_action(action: str, timeout_seconds: float = 90.0) -> dict
     try:
         request = Request(
             url,
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=watch_request_headers(content_type="application/json"),
             method="POST",
             data=b"{}",
         )
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -403,10 +256,10 @@ def post_watch_command(body: dict[str, object], timeout_seconds: float = 2.0) ->
         request = Request(
             url,
             data=encoded,
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -420,8 +273,8 @@ def get_watch_command(command_id: str, timeout_seconds: float = 1.0) -> dict[str
     url = f"{watch_base_url()}/internal/watch/commands/{command_id.strip()}"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=timeout_seconds) as response:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -443,8 +296,8 @@ def fetch_watch_events(
     url = f"{watch_base_url()}/internal/watch/events?{query}"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=timeout_seconds) as response:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -466,8 +319,8 @@ def fetch_watch_delivery_receipts(
     url = f"{watch_base_url()}/internal/watch/delivery/receipts?{query}"
 
     try:
-        request = Request(url, headers={"Accept": "application/json"})
-        with urlopen(request, timeout=timeout_seconds) as response:
+        request = Request(url, headers=watch_request_headers())
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
@@ -514,10 +367,10 @@ def post_watch_sentry_issue_resolve(
         request = Request(
             url,
             data=encoded,
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError) as exc:
         error_payload = _parse_watch_error_payload(exc)
@@ -537,10 +390,10 @@ def post_watch_sentry_probe_write(timeout_seconds: float = 15.0) -> dict[str, ob
         request = Request(
             url,
             data=b"{}",
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers=watch_request_headers(content_type="application/json"),
             method="POST",
         )
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError) as exc:
         error_payload = _parse_watch_error_payload(exc)

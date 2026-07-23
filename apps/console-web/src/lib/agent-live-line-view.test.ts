@@ -4,6 +4,7 @@ import {
   collapseBackToBackThinkingEcho,
   firstSpeakableAgentLiveBlock,
   isAgentLiveLineTruncated,
+  isWaitProgressThinking,
   sanitizeAgentThinkingForOperator,
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
@@ -25,8 +26,15 @@ describe('sanitizeAgentThinkingForOperator', () => {
     ).toBe('Checking the image preview path.');
   });
 
-  it('keeps technical thinking that only mentions the user incidentally', () => {
-    expect(sanitizeAgentThinkingForOperator(LONG_THINKING)).toBe(LONG_THINKING);
+  it('rewrites bare Thinking… lead-ins to I am thinking…', () => {
+    expect(sanitizeAgentThinkingForOperator('Thinking…')).toBe('I am thinking…');
+    expect(sanitizeAgentThinkingForOperator('Thinking...')).toBe('I am thinking…');
+    expect(sanitizeAgentThinkingForOperator("thinking I'll check Sentry next.")).toBe(
+      "I am thinking I'll check Sentry next.",
+    );
+    expect(sanitizeAgentThinkingForOperator('I am thinking about the next step.')).toBe(
+      'I am thinking about the next step.',
+    );
   });
 
   it('collapses exact and glued back-to-back thinking echoes', () => {
@@ -44,6 +52,25 @@ describe('sanitizeAgentThinkingForOperator', () => {
       "got the current README and the local setup docs open. I'm going to turn the root guide into a cleaner day-to-day entry point so it matches the actual workflow in this repo.";
     const echoed = `'ve ${body}I've ${body}`;
     expect(sanitizeAgentThinkingForOperator(echoed)).toBe(`I've ${body}`);
+  });
+
+  it('strips trailing stream fence markers glued onto thinking', () => {
+    expect(
+      sanitizeAgentThinkingForOperator(
+        'The Metro cache is active and the build is still progressing. :::',
+      ),
+    ).toBe('The Metro cache is active and the build is still progressing.');
+  });
+});
+
+describe('isWaitProgressThinking', () => {
+  it('detects wait/poll status chatter', () => {
+    expect(
+      isWaitProgressThinking(
+        'The Metro cache is active and the build is still progressing.',
+      ),
+    ).toBe(true);
+    expect(isWaitProgressThinking("I'm patching the dashboard tests now.")).toBe(false);
   });
 });
 

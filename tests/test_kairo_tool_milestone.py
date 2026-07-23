@@ -15,9 +15,15 @@ class ToolMilestoneTests(unittest.TestCase):
     def test_contextual_read_line_uses_short_file_name(self) -> None:
         line = contextual_tool_fallback(
             "Read services/control-plane/app/research/availability.py",
+            operator_prompt="check enrollment availability",
         )
         self.assertIn("availability.py", line or "")
-        self.assertIn("opening", (line or "").lower())
+        self.assertIn("Checking", line or "")
+        self.assertIn("enrollment", (line or "").lower())
+
+    def test_skips_ambient_orientation_docs(self) -> None:
+        self.assertIsNone(contextual_tool_fallback("Read OPERATIONS.md"))
+        self.assertIsNone(contextual_tool_fallback("Read README.md"))
 
     def test_contextual_edit_line(self) -> None:
         line = contextual_tool_fallback("Edit ui/js/auth-bootstrap.js")
@@ -26,11 +32,15 @@ class ToolMilestoneTests(unittest.TestCase):
     def test_fallback_for_tool_event_uses_contextual_line(self) -> None:
         line = fallback_for_event(
             "tool",
-            {"tool_label": "Read README.md"},
+            {
+                "tool_label": "Read app/enroll.tsx",
+                "operator_prompt": "fix enroll UI",
+            },
             [],
             persona_enabled=False,
         )
-        self.assertIn("README.md", line)
+        self.assertIn("enroll.tsx", line)
+        self.assertIn("fix enroll UI", line)
         self.assertNotIn("sir", line.lower())
 
 

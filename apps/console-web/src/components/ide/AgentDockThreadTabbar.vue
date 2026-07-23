@@ -4,9 +4,11 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import {
+  buildIdeThreadBusySet,
   buildIdeThreadFailureDetailTooltipMap,
   buildIdeThreadFailureHintMap,
 } from '../../features/workspace-agents/active-ide-employee';
+import { employeeIsActivelyBusy } from '../../features/workspace-agents/company-roster-view';
 import {
   ideThreadMenuLabel,
   ideThreadMenuMeta,
@@ -26,6 +28,23 @@ const openTabs = computed(() => shell.openIdeThreadTabsForCurrentWorkspace);
 const allThreads = computed(() =>
   sortIdeThreadsNewestFirst(shell.ideThreadsForCurrentWorkspace),
 );
+const liveBusyEmployeeIds = computed(() => {
+  const ids = new Set<string>();
+  for (const row of shell.companyEmployeesForCurrentWorkspace) {
+    if (employeeIsActivelyBusy(row)) {
+      ids.add(row.employee_id);
+    }
+  }
+  if (shell.agentStreamActive) {
+    const threadEmployeeId = shell.activeIdeThread?.employee_id?.trim();
+    const recordEmployeeId = shell.activeIdeEmployeeRecord?.employee_id?.trim();
+    const streamOwnerId = threadEmployeeId || recordEmployeeId;
+    if (streamOwnerId) {
+      ids.add(streamOwnerId);
+    }
+  }
+  return [...ids];
+});
 const threadFailureHintById = computed(() =>
   buildIdeThreadFailureHintMap({
     threads: allThreads.value,
@@ -37,6 +56,43 @@ const threadFailureDetailById = computed(() =>
     threads: allThreads.value,
     employees: shell.companyEmployeesForCurrentWorkspace,
   }),
+);
+const busyThreadIds = computed(() =>
+  buildIdeThreadBusySet({
+    threads: openTabs.value,
+    employees: shell.companyEmployeesForCurrentWorkspace,
+    liveBusyEmployeeIds: liveBusyEmployeeIds.value,
+  }),
+);
+
+watch(
+  busyThreadIds,
+  (ids) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'fc0b35',
+      },
+      body: JSON.stringify({
+        sessionId: 'fc0b35',
+        runId: 'tab-busy-glow',
+        hypothesisId: 'H7',
+        location: 'AgentDockThreadTabbar.vue:busyThreadIds',
+        message: 'conversation tabs busy glow set',
+        data: {
+          busyCount: ids.size,
+          busyThreadIds: [...ids].slice(0, 8),
+          liveBusyEmployeeIds: liveBusyEmployeeIds.value.slice(0, 8),
+          openTabCount: openTabs.value.length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  },
+  { immediate: true },
 );
 
 function threadFailureHoverTitle(threadId: string, fallbackTitle: string): string {
@@ -212,25 +268,38 @@ onUnmounted(() => {
           'editor-tabbar__tab--active hud-active-chip--active agent-dock-thread-tabbar__tab--active':
             activeThreadId === thread.thread_id,
           'agent-dock-thread-tabbar__tab--failed': threadFailureHintById.has(thread.thread_id),
+          'agent-dock-thread-tabbar__tab--busy': busyThreadIds.has(thread.thread_id),
         }"
         :data-thread-id="thread.thread_id"
         :aria-selected="activeThreadId === thread.thread_id"
         :aria-label="
-          threadFailureHintById.get(thread.thread_id)
-            ? `Last shift failed — ${ideThreadTabTitle(thread.preview_label)}`
-            : ideThreadTabTitle(thread.preview_label)
+          busyThreadIds.has(thread.thread_id)
+            ? `Busy — ${ideThreadTabTitle(thread.preview_label)}`
+            : threadFailureHintById.get(thread.thread_id)
+              ? `Last shift failed — ${ideThreadTabTitle(thread.preview_label)}`
+              : ideThreadTabTitle(thread.preview_label)
         "
         :title="
           threadFailureHoverTitle(
             thread.thread_id,
-            ideThreadTabTitle(thread.preview_label),
+            busyThreadIds.has(thread.thread_id)
+              ? `Busy — ${ideThreadTabTitle(thread.preview_label)}`
+              : ideThreadTabTitle(thread.preview_label),
           )
         "
         @click="selectThread(thread.thread_id)"
       >
         <WorkspaceIcon class="agent-dock-thread-tabbar__tab-icon" kind="chat" :size="12" />
         <span
-          v-if="threadFailureHintById.has(thread.thread_id)"
+          v-if="busyThreadIds.has(thread.thread_id)"
+          class="agent-dock-thread-tabbar__tab-busy-mark"
+          aria-hidden="true"
+          title="Busy"
+        >
+          ●
+        </span>
+        <span
+          v-else-if="threadFailureHintById.has(thread.thread_id)"
           class="agent-dock-thread-tabbar__tab-fail-mark"
           aria-hidden="true"
           title="Last shift failed"
@@ -304,12 +373,17 @@ onUnmounted(() => {
                 activeThreadId === thread.thread_id,
               'agent-dock-thread-tabbar__history-item--failed':
                 threadFailureHintById.has(thread.thread_id),
+              'agent-dock-thread-tabbar__history-item--busy': busyThreadIds.has(
+                thread.thread_id,
+              ),
             }"
             :aria-selected="activeThreadId === thread.thread_id"
             :aria-label="
               threadFailureHintById.get(thread.thread_id)
                 ? `Last shift failed — ${ideThreadMenuLabel(thread)}`
-                : ideThreadMenuLabel(thread)
+                : busyThreadIds.has(thread.thread_id)
+                  ? `Busy — ${ideThreadMenuLabel(thread)}`
+                  : ideThreadMenuLabel(thread)
             "
             :title="
               threadFailureHoverTitle(thread.thread_id, ideThreadMenuLabel(thread))

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   galaxyEdgeColor,
   galaxyNodeColors,
+  workspaceHueFromId,
 } from './brain-galaxy-colors';
 import { layoutBrainGraph3D } from './layout-brain-graph-3d';
 import type { BrainGraphSnapshot } from '../../lib/operator-brain-graph-view';
@@ -85,6 +86,27 @@ describe('layout-brain-graph-3d', () => {
     expect(layoutBrainGraph3D(snapshot)).toEqual(layoutBrainGraph3D(snapshot));
   });
 
+  it('spreads nodes in true 3D depth (not a flat radar ring)', () => {
+    const layout = layoutBrainGraph3D(snapshot);
+    const ys = layout.nodes.map((node) => node.y);
+    const span = Math.max(...ys) - Math.min(...ys);
+    expect(span).toBeGreaterThan(1.2);
+  });
+
+  it('keeps workspaces clear of the core hub', () => {
+    const layout = layoutBrainGraph3D(snapshot);
+    const core = layout.nodes.find((node) => node.kind === 'core');
+    const workspaces = layout.nodes.filter((node) => node.kind === 'workspace');
+    expect(core).toBeTruthy();
+    for (const workspace of workspaces) {
+      const gap =
+        Math.hypot(workspace.x - core!.x, workspace.y - core!.y, workspace.z - core!.z) -
+        core!.radius -
+        workspace.radius;
+      expect(gap).toBeGreaterThan(1.2);
+    }
+  });
+
   it('returns empty layout for null snapshot', () => {
     const layout = layoutBrainGraph3D(null);
     expect(layout.nodes).toHaveLength(0);
@@ -97,6 +119,29 @@ describe('brain-galaxy-colors', () => {
     const core = snapshot.nodes[0];
     const colors = galaxyNodeColors(core);
     expect(colors.emissiveIntensity).toBeGreaterThan(1);
+  });
+
+  it('gives nominal workspaces stable distinct hues', () => {
+    const left = galaxyNodeColors({
+      node_id: 'a',
+      kind: 'workspace',
+      label: 'DashPro',
+      tone: 'nominal',
+      workspace_id: 'workspace_dashpro',
+      detail: '',
+    });
+    const right = galaxyNodeColors({
+      node_id: 'b',
+      kind: 'workspace',
+      label: 'Axon Watch',
+      tone: 'nominal',
+      workspace_id: 'workspace_axon_watch',
+      detail: '',
+    });
+    expect(left.base).not.toBe(right.base);
+    expect(workspaceHueFromId('workspace_dashpro')).toBe(
+      workspaceHueFromId('workspace_dashpro'),
+    );
   });
 
   it('maps edge kinds to distinct hues', () => {

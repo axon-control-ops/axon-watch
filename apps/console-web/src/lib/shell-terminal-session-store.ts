@@ -7,7 +7,11 @@ import {
   renameWorkspaceTerminalSession,
   type TerminalSessionRecord,
 } from '../api/control-plane';
-import { armAgentShellMirror, queueOperatorTerminalCommand } from './agent-shell-mirror-state';
+import {
+  armAgentShellMirror,
+  clearAgentShellMirrorForcedText,
+  queueOperatorTerminalCommand,
+} from './agent-shell-mirror-state';
 import {
   DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
   upsertTerminalSession,
@@ -137,6 +141,8 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
   }
 
   async function backgroundIdeAgentRun(): Promise<void> {
+    // Drop any pinned snapshot so the live open `:::terminal` card can stream in.
+    clearAgentShellMirrorForcedText();
     armAgentShellMirror();
     input.revealIdeTerminalPanel();
     const agentSession = input.terminalSessions.value.find((session) => session.role === 'agent');

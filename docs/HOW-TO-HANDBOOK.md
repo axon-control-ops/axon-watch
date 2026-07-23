@@ -15,7 +15,10 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-20 — production operator at `:4173`; one-word stack commands `axonhealth` / `axonrestart` / `axonrevive`.
+**Last verified:** 2026-07-22 — Gate 5 closed (DAG, conflict serialization,
+fan-out, replans, synthesis, sibling stream preservation); Gate 4 closed;
+Mission Control task board. Scheduler still **off** by default. After every push run
+`./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
@@ -33,6 +36,9 @@ Use it to:
 3. [Operator manual](#operator-manual) — daily rituals
 3.5. [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools) — Pro vs API key, native vs Cursor
 3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, company roster
+3.65. [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) — Gate 4 tasks, scheduler off, watch token + mTLS
+3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
+3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
 6. [Source index](#source-index) — where truth lives
@@ -56,10 +62,11 @@ Use it to:
 
 | Audience | Start here | Then read |
 |---|---|---|
-| **Operator (daily use)** | [Quick Start](#quick-start) | [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [Operator manual](#operator-manual) |
+| **Operator (daily use)** | [Quick Start](#quick-start) | [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [VAXON Desktop](#vaxon-desktop), [Operator manual](#operator-manual) |
 | **Teacher / reviewer** | [Teaching Axon-X](#teaching-axon-x-to-someone-else) | [Verification](#verification-commands), `docs/FINAL_PARITY_VERIFICATION.md` |
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
-| **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), GitHub Actions → Axon-X Fast Gate |
+| **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), `./scripts/ops/watch-fast-gate.sh` |
+| **Autonomy / remote host** | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) | [Recent operator features](how-to/recent-operator-features.md) |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
 
@@ -147,7 +154,7 @@ Still thin or deferred (use axon-local `:7734` fallback if needed):
 - General conversational chat (“Hi”, “explain this repo”)
 - Full agent tool loop parity with classic Axon
 - Child-project connectors and legacy integration surfaces
-- Packaged desktop app / native notifications
+- Native tray notifications beyond hide-on-close packaging
 
 ### Supported commands (Operator mode)
 
@@ -438,6 +445,10 @@ cursor agent status          # expect: Logged in as …
 echo "${CURSOR_API_KEY:+set}" # empty = good for Pro path
 curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
 ```
+
+## VAXON Desktop
+
+See [`docs/how-to/vaxon-desktop.md`](how-to/vaxon-desktop.md).
 
 ## Terminology And Abbreviations
 
@@ -1475,14 +1486,7 @@ That distinction matters during review.
 
 ## Tip 7: Do not overreact to incomplete polish
 
-At this stage, review should focus on:
-
-- boundaries
-- ownership
-- contracts
-- verification
-
-Not whether the shell is already pretty or feature-rich.
+Prefer contracts and verify harness first; cosmetic cleanup can wait.
 
 ## What A Good Next Slice Looks Like
 

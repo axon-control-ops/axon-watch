@@ -58,7 +58,7 @@ const menuStatus = computed(() =>
       }"
       :data-mode="composerMode"
       :title="modeButtonTitle"
-      :aria-label="`Conversation mode: ${modeButtonLabel}`"
+      :aria-label="`Teammate mode: ${modeButtonLabel}`"
       @click="emit('toggle-section')"
     >
       <span class="agent-dock-composer__tool-icon" aria-hidden="true">{{ activeMode.icon }}</span>
@@ -74,12 +74,12 @@ const menuStatus = computed(() =>
         <span
           v-if="isFullAccessAgent"
           class="agent-dock-composer__mode-pill agent-dock-composer__mode-pill--full"
-        >Full</span>
+        >Full access</span>
       </span>
       <span class="agent-dock-composer__tool-chevron" aria-hidden="true">▾</span>
     </button>
     <div v-if="showModeMenu" class="agent-dock-composer__menu">
-      <p class="agent-dock-composer__menu-caption">Conversation mode</p>
+      <p class="agent-dock-composer__menu-caption">Talk vs do work</p>
       <button
         v-for="option in modeOptions"
         :key="option.key"

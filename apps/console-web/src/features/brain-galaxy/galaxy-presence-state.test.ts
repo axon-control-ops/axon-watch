@@ -43,13 +43,21 @@ describe('resolveGalaxyPresence', () => {
     expect(resolved.phase).toBe('speaking');
   });
 
-  it('maps listening and thinking', () => {
+  it('maps listening from manual PTT phase only — not ambient speechCapturing', () => {
+    expect(resolveGalaxyPresence({ ...base, speechCapturing: true }).phase).toBe('idle');
     expect(
-      resolveGalaxyPresence({ ...base, speechCapturing: true }).phase,
+      resolveGalaxyPresence({
+        ...base,
+        speechCapturing: true,
+        criticalSignals: 1,
+      }).phase,
+    ).toBe('alerting');
+    expect(
+      resolveGalaxyPresence({ ...base, conversationPhase: 'listening' }).phase,
     ).toBe('listening');
     expect(
-      resolveGalaxyPresence({ ...base, speechCapturing: true }).presenceAmp,
-    ).toBe(0.45);
+      resolveGalaxyPresence({ ...base, conversationPhase: 'listening' }).presenceAmp,
+    ).toBe(0.55);
     expect(
       resolveGalaxyPresence({ ...base, conversationPhase: 'thinking' }).phase,
     ).toBe('thinking');
@@ -64,7 +72,7 @@ describe('resolveGalaxyPresence', () => {
     ).toBe('alerting');
     expect(
       resolveGalaxyPresence({ ...base, pendingApprovals: 1 }).presenceAmp,
-    ).toBe(0.45);
+    ).toBe(0.55);
     expect(
       resolveGalaxyPresence({
         ...base,
@@ -72,6 +80,10 @@ describe('resolveGalaxyPresence', () => {
         conversationPhase: 'thinking',
       }).phase,
     ).toBe('thinking');
+  });
+
+  it('keeps ambient energy while idle', () => {
+    expect(resolveGalaxyPresence(base).presenceAmp).toBe(0.32);
   });
 
   it('maps workspace selection when idle', () => {
@@ -82,5 +94,6 @@ describe('resolveGalaxyPresence', () => {
     });
     expect(resolved.phase).toBe('workspace_selected');
     expect(resolved.coreOrbMode).toBe('idle');
+    expect(resolved.presenceAmp).toBe(0.28);
   });
 });

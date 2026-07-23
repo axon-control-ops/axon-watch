@@ -9,7 +9,7 @@ import threading
 from typing import Any
 
 from app.domain.run_state import is_terminal_phase
-from app.persistence import worker_scheduler_settings_store
+from app.persistence import task_store, worker_scheduler_settings_store
 from app.runs.service import (
     RunLifecycleError,
     create_run,
@@ -251,17 +251,51 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
                 continue
 
             name = str(employee.name or role).strip() or role
-            record = create_run(
+            lease_holder = f"employee-{workspace_id}-{role}"
+            claimed = task_store.claim_open_task_for_role(
                 workspace_id=workspace_id,
-                mode="agent",
-                summary=f"{name}: continuous worker shift",
-                detail=(
-                    f"Bounded scheduled work for role={role} schedule={schedule} "
-                    f"workspace={workspace_id}"
-                ),
-                employee_role=role,
-                requires_approval=False,
+                owner_role=role,
+                lease_holder=lease_holder,
             )
+            if claimed is None:
+                logger.info(
+                    "continuous worker tick skipped role=%s workspace=%s: no open leased task",
+                    role,
+                    workspace_id,
+                )
+                continue
+            task_id = str(claimed.get("task_id") or "").strip()
+            goal = str(claimed.get("goal") or "").strip() or "leased task"
+            try:
+                record = create_run(
+                    workspace_id=workspace_id,
+                    mode="agent",
+                    summary=f"{name}: {goal[:80]}",
+                    detail=(
+                        f"Bounded scheduled work for role={role} schedule={schedule} "
+                        f"workspace={workspace_id} task={task_id}"
+                    ),
+                    employee_role=role,
+                    task_id=task_id,
+                    require_leased_task=True,
+                    requires_approval=False,
+                )
+            except RunLifecycleError as exc:
+                logger.warning(
+                    "continuous worker tick could not start role=%s task=%s: %s",
+                    role,
+                    task_id,
+                    exc,
+                )
+                try:
+                    task_store.fail_task(
+                        task_id,
+                        terminal_outcome=f"create_run refused: {exc}",
+                        reopen_if_budget_remaining=True,
+                    )
+                except task_store.TaskLedgerError:
+                    logger.exception("could not reopen task after create_run refuse: %s", task_id)
+                continue
             started.append(record)
             if worker_dispatch_enabled():
                 threading.Thread(

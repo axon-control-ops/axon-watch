@@ -52,4 +52,40 @@ describe('composer-plan-auto-switch', () => {
     expect(decision.shouldSwitch).toBe(false);
     expect(decision.reason).toBe('build_plan_implement');
   });
+
+  it('does not soft-switch on a bare "plan" mention in a long Agent prompt', () => {
+    const decision = shouldSoftSwitchAgentToPlan(
+      'agent',
+      'Please expand docs/planning/00-centre-brief.md using the saved plan we already drafted for aftercare staffing and hours.',
+    );
+    expect(decision.shouldSwitch).toBe(false);
+    expect(decision.reason).toBe('execution_plan_mention');
+  });
+
+  it('still soft-switches on explicit write-a-plan intent', () => {
+    const decision = shouldSoftSwitchAgentToPlan(
+      'agent',
+      'Write a plan for the aftercare centre brief covering ages, hours, and staffing ratios.',
+    );
+    expect(decision.shouldSwitch).toBe(true);
+    expect(decision.reason).toBe('planning_phrase');
+  });
+
+  it('lets an explicit planning request win over implementation vocabulary', () => {
+    const decision = shouldSoftSwitchAgentToPlan(
+      'agent',
+      'Write a plan to implement the aftercare enrolment flow.',
+    );
+    expect(decision.shouldSwitch).toBe(true);
+    expect(decision.reason).toBe('planning_phrase');
+  });
+
+  it('keeps implementing an existing plan in Agent mode', () => {
+    const decision = shouldSoftSwitchAgentToPlan(
+      'agent',
+      'Implement the plan for the aftercare enrolment flow.',
+    );
+    expect(decision.shouldSwitch).toBe(false);
+    expect(decision.reason).toBe('execution_plan_mention');
+  });
 });

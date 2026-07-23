@@ -140,7 +140,7 @@ export function diffLineTone(line: string): DiffLineTone {
 
 export function thinkingPreview(text: string, maxLength = 90): string {
   const sanitized = sanitizeAgentThinkingForOperator(text);
-  const flattened = (sanitized || 'Thinking…').replace(/\s+/g, ' ').trim();
+  const flattened = (sanitized || 'I am thinking…').replace(/\s+/g, ' ').trim();
   if (flattened.length <= maxLength) {
     return flattened;
   }

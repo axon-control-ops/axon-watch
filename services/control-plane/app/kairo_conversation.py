@@ -37,6 +37,7 @@ from app.kairo.conversation_artifacts import (
 )
 from app.kairo.conversation_command_ack import command_ack_line, workspace_short_label
 from app.kairo.conversation_context_pack import build_conversation_context_pack
+from app.kairo.teammate_handoff import enrich_handoff_with_teammate
 from app.kairo.conversation_transcript import log_voice_turn as _log_voice_turn
 from app.kairo_conversation_reply import (
     build_conversation_facts,
@@ -62,10 +63,8 @@ from app.operator_fleet_health import build_operator_fleet_health
 from app.operator_persona_stt_aliases import normalize_persona_stt_aliases
 from app.persistence import chat_store
 from app.workspace_project_bindings import get_workspace_project_binding, load_workspace_project_bindings
-
 ConversationTurnKind = Literal["status_question", "open_question", "command", "chat", "action"]
 ConversationSource = Literal["template", "model", "fallback"]; ConversationAnswerTier = Literal["fast", "deep"]
-
 _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
 
 _STATUS_HINT_RE = re.compile(
@@ -135,10 +134,6 @@ def answer_status_question(content: str, pack: dict[str, Any]) -> str:
         session_id="static",
         recent_turns=[],
     )
-
-
-
-
 def converse_turn(
     *,
     content: str,
@@ -185,6 +180,11 @@ def converse_turn(
     if followup:
         action_type = str(followup.get("type", ""))
         if action_type == "handoff_signal":
+            followup = enrich_handoff_with_teammate(
+                followup,
+                resolved_workspace_id=resolved_workspace_id,
+                fallback_prompt=trimmed,
+            )
             reply = apply_participant_address(
                 "Handing this off to the IDE now.",
                 guest_name,

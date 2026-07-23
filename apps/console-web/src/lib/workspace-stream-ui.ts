@@ -16,12 +16,20 @@ export function defaultWorkspaceStreamUi(): WorkspaceStreamUiState {
   };
 }
 
-/** Apply per-workspace stream UI to global refs only when that workspace is visible. */
+/** @deprecated Prefer shouldSyncThreadStreamGlobals — kept for older call sites. */
 export function shouldSyncWorkspaceStreamGlobals(
   currentWorkspaceId: string | null | undefined,
   eventWorkspaceId: string,
 ): boolean {
   return Boolean(currentWorkspaceId && currentWorkspaceId === eventWorkspaceId);
+}
+
+/** Sync composer/stop globals only for the IDE thread the operator is viewing. */
+export function shouldSyncThreadStreamGlobals(
+  currentThreadId: string | null | undefined,
+  eventThreadId: string,
+): boolean {
+  return Boolean(currentThreadId && currentThreadId === eventThreadId);
 }
 
 export function workspaceStreamGlobalsFromState(
@@ -38,4 +46,16 @@ export function workspaceStreamGlobalsFromState(
     ideComposerActivity: state.activity,
     ideAgentRunId: state.ideAgentRunId,
   };
+}
+
+/** Thread ids with an active IDE chat stream (for busy chrome on background tabs). */
+export function streamingThreadIdsFromUiMap(
+  streamUiByThreadId: Record<string, WorkspaceStreamUiState> | null | undefined,
+): string[] {
+  if (!streamUiByThreadId) {
+    return [];
+  }
+  return Object.entries(streamUiByThreadId)
+    .filter(([, state]) => state.active)
+    .map(([threadId]) => threadId);
 }

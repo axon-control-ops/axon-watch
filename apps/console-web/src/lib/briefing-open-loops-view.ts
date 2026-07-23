@@ -77,6 +77,19 @@ export function buildBriefingOpenLoopRows(
   const primaryLive = primary && isLiveRunPhase(primary.phase) ? primary : null;
 
   if (briefing) {
+    const dueReminder = briefing.due_reminders?.[0] ?? briefing.memory_highlights?.find(
+      (item) => item.kind === 'reminder' || Boolean(item.due_at),
+    );
+    if (dueReminder) {
+      rows.push({
+        id: `reminder:${dueReminder.memory_id}`,
+        label: dueReminder.title,
+        meta: dueReminder.why_now || dueReminder.due_at || 'Due reminder',
+        focusKind: 'attention',
+        signalId: null,
+      });
+    }
+
     const topSignal = briefing.top_signals[0];
     if (topSignal) {
       rows.push({

@@ -16,6 +16,7 @@ class KairoAskPromptTests(unittest.TestCase):
         self.assertIn("You are VAXON", prompt)
         self.assertIn("read-only", prompt)
         self.assertIn('Address the primary listener as "sir"', prompt)
+        self.assertIn("Sir King", prompt)
         self.assertNotIn("Lane B", prompt)
         self.assertNotIn("Do NOT use", prompt)
 

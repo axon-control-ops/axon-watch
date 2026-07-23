@@ -163,10 +163,11 @@ def generate_spoken_line(
     guest_name = get_active_participant(session_id)
     if guest_name and not str(payload.get("guest_name") or "").strip():
         payload["guest_name"] = guest_name
+    speaker_kind = str(payload.get("speaker_kind") or "vaxon").strip().lower()
 
     if event_type == "approval_literal":
         line = _normalize_spoken_line(str(payload.get("literal_line") or ""))
-        line = apply_participant_address(line, guest_name)
+        line = apply_participant_address(line, guest_name, speaker_kind=speaker_kind)
         if line:
             _remember_line(session_id, line)
         return {"line": line, "source": "literal"}
@@ -194,7 +195,7 @@ def generate_spoken_line(
         source = "fallback"
 
     line = _normalize_spoken_line(line)
-    line = apply_participant_address(line, guest_name)
+    line = apply_participant_address(line, guest_name, speaker_kind=speaker_kind)
     if line:
         _remember_line(session_id, line)
     return {"line": line, "source": source}

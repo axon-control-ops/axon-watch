@@ -280,10 +280,41 @@
   color: var(--text-primary);
 }
 
+.dock-signal-row__explain {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 0.45rem;
+}
+
+.dock-signal-row__explain-block {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.dock-signal-row__explain-label {
+  display: block;
+  margin-bottom: 0.12rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(0, 210, 255, 0.78);
+}
+
 .dock-signal-row__receipt {
   margin-top: 0.35rem;
   font-family: var(--font-mono);
   font-size: 0.68rem;
+}
+
+.dock-list__tech-note {
+  display: block;
+  width: 100%;
+  margin-top: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  opacity: 0.72;
 }
 
 .dock-signal-row--expanded {

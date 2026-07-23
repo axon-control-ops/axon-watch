@@ -86,7 +86,7 @@
   position: absolute;
   top: calc(100% + 0.35rem);
   left: 0;
-  z-index: 12;
+  z-index: 60;
   display: flex;
   flex-direction: column;
   gap: 0.14rem;
@@ -262,6 +262,56 @@
   box-shadow: 0 0 0 1px rgba(255, 110, 90, 0.18);
 }
 
+.agent-dock-thread-tabbar__tab-busy-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  font-size: 0.42rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(20, 40, 35, 0.98);
+  background: rgba(70, 230, 180, 0.95);
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95);
+  animation: agent-dock-tab-busy-dot 1.1s ease-in-out infinite;
+}
+
+/* Busy glow wins over a stale last-shift failure while the thread is streaming.
+   `.hud-active-chip` nulls background/box-shadow with !important — override that so
+   the whole tab fill pulses, not just the busy dot. */
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy {
+  border: 1px solid rgba(70, 230, 180, 0.72) !important;
+  background: rgba(12, 78, 58, 0.72) !important;
+  box-shadow:
+    0 0 0 1px rgba(70, 230, 180, 0.35),
+    0 0 14px rgba(50, 210, 160, 0.45),
+    inset 0 0 18px rgba(40, 190, 140, 0.22) !important;
+  animation: agent-dock-tab-busy-glow 1.35s ease-in-out infinite;
+}
+
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy.agent-dock-thread-tabbar__tab--active,
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy.hud-active-chip--active {
+  border-color: rgba(110, 255, 210, 0.92) !important;
+  background: rgba(14, 96, 72, 0.88) !important;
+  box-shadow:
+    0 0 0 1px rgba(90, 240, 190, 0.45),
+    0 0 18px rgba(60, 230, 170, 0.55),
+    inset 0 0 22px rgba(50, 210, 150, 0.28) !important;
+}
+
+.agent-dock-thread-tabbar__tab--busy .agent-dock-thread-tabbar__tab-icon,
+.agent-dock-thread-tabbar__tab--busy .agent-dock-thread-tabbar__tab-label {
+  color: rgba(190, 255, 230, 0.98);
+}
+
+/* Keep the thin cyan “active” hairline from fighting the busy fill. */
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy.hud-active-chip--active::before {
+  background: rgba(90, 240, 190, 0.55);
+  box-shadow: 0 0 8px rgba(70, 230, 180, 0.45);
+}
+
 .agent-dock-thread-tabbar__tab-label {
   overflow: hidden;
   min-width: 0;
@@ -390,6 +440,15 @@
   color: rgba(255, 210, 200, 0.95);
 }
 
+.agent-dock-thread-tabbar__history-item--busy {
+  border-color: rgba(70, 230, 180, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(70, 230, 180, 0.12);
+}
+
+.agent-dock-thread-tabbar__history-item--busy .agent-dock-thread-tabbar__history-label {
+  color: rgba(160, 255, 215, 0.96);
+}
+
 .agent-dock-thread-tabbar__history-meta {
   color: rgba(138, 154, 173, 0.82);
   font-family: var(--font-mono);
@@ -404,6 +463,12 @@
   background: rgba(56, 189, 248, 0.92);
 }
 
+.agent-dock-thread-tabbar__history-item--busy .agent-dock-thread-tabbar__history-dot {
+  background: rgba(70, 230, 180, 0.95);
+  box-shadow: 0 0 8px rgba(60, 200, 160, 0.55);
+  animation: agent-dock-tab-busy-dot 1.1s ease-in-out infinite;
+}
+
 .agent-dock-thread-tabbar__history-new:hover,
 .agent-dock-thread-tabbar__history-item:hover,
 .agent-dock-thread-tabbar__history-item--active {
@@ -413,6 +478,44 @@
 .agent-dock-thread-tabbar__history-item--failed:hover,
 .agent-dock-thread-tabbar__history-item--failed.agent-dock-thread-tabbar__history-item--active {
   background: rgba(120, 40, 32, 0.22);
+}
+
+.agent-dock-thread-tabbar__history-item--busy:hover:not(.agent-dock-thread-tabbar__history-item--failed),
+.agent-dock-thread-tabbar__history-item--busy.agent-dock-thread-tabbar__history-item--active:not(
+    .agent-dock-thread-tabbar__history-item--failed
+  ) {
+  background: rgba(30, 90, 70, 0.28);
+}
+
+@keyframes agent-dock-tab-busy-glow {
+  0%,
+  100% {
+    filter: brightness(0.94) saturate(1);
+  }
+  50% {
+    filter: brightness(1.22) saturate(1.3);
+  }
+}
+
+@keyframes agent-dock-tab-busy-dot {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-dock-thread-tabbar__tab--busy,
+  .agent-dock-thread-tabbar__tab-busy-mark,
+  .agent-dock-thread-tabbar__history-item--busy .agent-dock-thread-tabbar__history-dot {
+    animation: none;
+    filter: none;
+  }
 }
 
 .agent-dock-workspace-menu__item:hover,

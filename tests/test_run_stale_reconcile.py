@@ -37,6 +37,33 @@ def _age_run(run_id: str, *, seconds: int) -> None:
     run_store.backdate_last_transition(str(stored["history_ref"]), stamp)
 
 
+def _leased_worker_run(
+    *,
+    workspace_id: str,
+    employee_role: str,
+    summary: str,
+) -> dict[str, Any]:
+    from app.persistence import task_store
+
+    opened = task_store.create_task(
+        workspace_id=workspace_id,
+        goal=summary,
+        owner_role=employee_role,
+    )
+    leased = task_store.lease_task(
+        opened["task_id"],
+        lease_holder=f"employee-{workspace_id}-{employee_role}",
+    )
+    return create_run(
+        workspace_id=workspace_id,
+        mode="agent",
+        summary=summary,
+        employee_role=employee_role,
+        task_id=leased["task_id"],
+        require_leased_task=True,
+    )
+
+
 class RunStaleReconcileTests(unittest.TestCase):
     def setUp(self) -> None:
         self._saved_modules = prepare_control_plane_imports()
@@ -356,11 +383,10 @@ class RunStaleReconcileTests(unittest.TestCase):
             release.wait(timeout=3.0)
             return {"dispatched": True, "runtime_label": "test", "content": "done"}
 
-        created = create_run(
+        created = _leased_worker_run(
             workspace_id="workspace_axon_watch",
-            mode="agent",
-            summary="Control Plane: live heartbeat shift",
             employee_role="backend",
+            summary="Control Plane: live heartbeat shift",
         )
         run_id = str(created["run_id"])
         _age_run(run_id, seconds=900)
@@ -371,6 +397,15 @@ class RunStaleReconcileTests(unittest.TestCase):
         ), patch(
             "app.workspace_agents.worker_dispatch._HEARTBEAT_SECONDS",
             0.05,
+        ), patch(
+            "app.workspace_agents.worker_dispatch.create_worker_isolation",
+            return_value=__import__("pathlib").Path("/tmp/axon-si-test/checkout"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.worker_agent_workspace",
+            return_value=__import__("pathlib").Path("/tmp/axon-si-test/checkout"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
+            return_value={"cleaned": True},
         ):
             worker = threading.Thread(
                 target=dispatch_continuous_worker_run,
@@ -414,11 +449,10 @@ class RunStaleReconcileTests(unittest.TestCase):
             release.wait(timeout=3.0)
             return {"dispatched": True, "runtime_label": "test", "content": "done"}
 
-        created = create_run(
+        created = _leased_worker_run(
             workspace_id="workspace_axon_watch",
-            mode="agent",
-            summary="Control Plane: streaming progress shift",
             employee_role="backend",
+            summary="Control Plane: streaming progress shift",
         )
         run_id = str(created["run_id"])
         _age_run(run_id, seconds=900)
@@ -426,6 +460,15 @@ class RunStaleReconcileTests(unittest.TestCase):
         with patch(
             "app.workspace_agents.worker_dispatch.generate_lane_b_result",
             side_effect=streaming_lane_b,
+        ), patch(
+            "app.workspace_agents.worker_dispatch.create_worker_isolation",
+            return_value=__import__("pathlib").Path("/tmp/axon-si-test/checkout"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.worker_agent_workspace",
+            return_value=__import__("pathlib").Path("/tmp/axon-si-test/checkout"),
+        ), patch(
+            "app.workspace_agents.worker_dispatch.cleanup_worker_isolation",
+            return_value={"cleaned": True},
         ):
             worker = threading.Thread(
                 target=dispatch_continuous_worker_run,

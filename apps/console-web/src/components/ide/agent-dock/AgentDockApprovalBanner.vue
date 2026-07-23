@@ -18,7 +18,7 @@ const emit = defineEmits<{
     role="status"
   >
     <p class="agent-dock-composer__approval-copy">
-      Full Access is waiting for approval before tools can edit files or run commands.
+      Full Access is paused — tap Approve to let tools continue, or Reject to stop.
     </p>
     <div class="agent-dock-composer__approval-actions">
       <button

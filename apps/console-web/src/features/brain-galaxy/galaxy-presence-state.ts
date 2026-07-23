@@ -33,6 +33,11 @@ export type GalaxyPresenceResolved = {
 
 /**
  * Highest wins: autonomous > speaking > listening > thinking > alerting > workspace_selected > idle.
+ *
+ * Ambient hands-free / barge-in capture must NOT map to `listening`. Chromium Web Speech
+ * ends and restarts about once a second on silence; treating `speechCapturing` as listening
+ * made the galaxy HUD / Intelligence panel / ambient cards thrash between Listening and
+ * Alerting whenever signals were present.
  */
 export function resolveGalaxyPresence(input: GalaxyPresenceInput): GalaxyPresenceResolved {
   let phase: GalaxyPresencePhase = 'idle';
@@ -41,7 +46,8 @@ export function resolveGalaxyPresence(input: GalaxyPresenceInput): GalaxyPresenc
     phase = 'autonomous';
   } else if (input.kairoSpeechActive || input.conversationPhase === 'speaking') {
     phase = 'speaking';
-  } else if (input.speechCapturing || input.conversationPhase === 'listening') {
+  } else if (input.conversationPhase === 'listening') {
+    // Manual PTT only — shared capture sets this phase exclusively for mode=manual.
     phase = 'listening';
   } else if (input.conversationPhase === 'thinking') {
     phase = 'thinking';
@@ -86,15 +92,16 @@ export function presenceAmpForPhase(phase: GalaxyPresencePhase): number {
   switch (phase) {
     case 'listening':
     case 'alerting':
-      return 0.45;
+      return 0.55;
     case 'thinking':
     case 'speaking':
     case 'autonomous':
       return 1;
     case 'workspace_selected':
-      return 0.12;
+      return 0.28;
     default:
-      return 0;
+      // Never fully dead — continuous JARVIS-like ambient energy.
+      return 0.32;
   }
 }
 
@@ -102,12 +109,12 @@ export function presenceAmpForCoreMode(mode: GalaxyCoreOrbMode): number {
   switch (mode) {
     case 'listening':
     case 'alerting':
-      return 0.45;
+      return 0.55;
     case 'busy':
     case 'speaking':
     case 'autonomous':
       return 1;
     default:
-      return 0;
+      return 0.32;
   }
 }

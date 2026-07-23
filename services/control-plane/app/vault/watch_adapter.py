@@ -7,7 +7,9 @@ import mimetypes
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import Request
+
+from app.adapters.watch_http import watch_request_headers, watch_urlopen
 
 from app.adapters.watch_client import watch_base_url
 
@@ -33,13 +35,14 @@ def request_json(
 ) -> Any:
     url = f"{watch_base_url()}{path}"
     data = None
-    headers = {"Accept": "application/json"}
+    headers = watch_request_headers(
+        content_type="application/json" if payload is not None else None
+    )
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
-        headers["Content-Type"] = "application/json"
     request = Request(url, data=data, method=method, headers=headers)
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             body = response.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
         _raise_watch_error(exc)
@@ -69,7 +72,7 @@ def request_bytes(
         headers["Content-Type"] = "application/json"
     request = Request(url, data=data, method=method, headers=headers)
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             body = response.read()
             response_headers = {key.lower(): value for key, value in response.headers.items()}
             return body, response_headers
@@ -121,7 +124,7 @@ def request_multipart(
         },
     )
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
             payload = response.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
         _raise_watch_error(exc)

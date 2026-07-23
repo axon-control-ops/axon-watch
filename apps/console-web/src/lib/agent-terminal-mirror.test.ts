@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildAgentTerminalMirrorScrollback,
   buildAgentTerminalMirrorText,
   findAgentTerminalMirrorSegment,
+  terminalMirrorSignature,
 } from './agent-terminal-mirror';
 
 describe('agent terminal mirror', () => {
@@ -52,5 +54,41 @@ describe('agent terminal mirror', () => {
         open: false,
       }),
     ).toBe('$ npm test\nok\n');
+  });
+
+  it('builds scrollback for OTA retries so prior output stays in the dock', () => {
+    const transcript = [
+      ':::terminal npm run ota',
+      'Release guard: dirty tree',
+      ':::',
+      ':::terminal RELEASE_GUARD_ALLOW_DIRTY=1 npm run ota',
+    ].join('\n');
+
+    expect(buildAgentTerminalMirrorScrollback(transcript)).toBe(
+      [
+        '$ npm run ota',
+        'Release guard: dirty tree',
+        '',
+        '$ RELEASE_GUARD_ALLOW_DIRTY=1 npm run ota',
+        'running…',
+      ].join('\n') + '\n',
+    );
+  });
+
+  it('keeps every terminal segment unless a caller explicitly limits history', () => {
+    const transcript = Array.from(
+      { length: 12 },
+      (_, index) => `:::terminal command-${index}\noutput-${index}\n:::`,
+    ).join('\n');
+
+    const scrollback = buildAgentTerminalMirrorScrollback(transcript);
+    expect(scrollback).toContain('$ command-0\noutput-0');
+    expect(scrollback).toContain('$ command-11\noutput-11');
+  });
+
+  it('tracks terminal output length even when prose follows the shell block', () => {
+    const before = [':::terminal npm run ota', 'line 1', ':::', 'Done.'].join('\n');
+    const after = [':::terminal npm run ota', 'line 1', 'line 2', ':::', 'Done.'].join('\n');
+    expect(terminalMirrorSignature(before)).not.toBe(terminalMirrorSignature(after));
   });
 });

@@ -1,0 +1,169 @@
+/* JARVIS command ring — radial menu around the living VAXON orb. */
+
+.kairo-galaxy-orb-radial-menu {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 0;
+  height: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.kairo-galaxy-orb-radial-menu__ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 13.5rem;
+  height: 13.5rem;
+  margin: -6.75rem 0 0 -6.75rem;
+  border-radius: 50%;
+  border: 1px solid rgba(94, 240, 255, 0.34);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 40, 58, 0.18), transparent 62%),
+    conic-gradient(
+      from 210deg,
+      rgba(94, 240, 255, 0.08),
+      rgba(255, 179, 71, 0.06),
+      rgba(94, 240, 255, 0.08)
+    );
+  box-shadow:
+    0 0 28px rgba(72, 196, 255, 0.16),
+    inset 0 0 24px rgba(0, 24, 36, 0.55);
+  animation: kairo-orb-radial-ring-in 220ms ease-out;
+}
+
+.kairo-galaxy-orb-radial-menu__core-glow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 7rem;
+  height: 7rem;
+  margin: -3.5rem 0 0 -3.5rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(72, 196, 255, 0.22), transparent 68%);
+  filter: blur(8px);
+  animation: kairo-orb-radial-pulse 2.4s ease-in-out infinite;
+}
+
+.kairo-galaxy-orb-radial-menu__segment {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.12rem;
+  min-width: 3.4rem;
+  padding: 0.38rem 0.45rem 0.32rem;
+  border: 1px solid rgba(94, 240, 255, 0.42);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(0, 34, 48, 0.94), rgba(0, 12, 20, 0.92));
+  color: rgba(210, 248, 255, 0.96);
+  font: 600 0.58rem/1.1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: auto;
+  transform: translate(calc(-50% + var(--orb-radial-x)), calc(-50% + var(--orb-radial-y)));
+  box-shadow:
+    0 0 16px rgba(72, 196, 255, 0.18),
+    inset 0 0 12px rgba(72, 196, 255, 0.08);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+  animation: kairo-orb-radial-segment-in 260ms ease-out backwards;
+}
+
+.kairo-galaxy-orb-radial-menu__segment:nth-child(3) {
+  animation-delay: 30ms;
+}
+
+.kairo-galaxy-orb-radial-menu__segment:nth-child(4) {
+  animation-delay: 60ms;
+}
+
+.kairo-galaxy-orb-radial-menu__segment:nth-child(5) {
+  animation-delay: 90ms;
+}
+
+.kairo-galaxy-orb-radial-menu__segment:nth-child(6) {
+  animation-delay: 120ms;
+}
+
+.kairo-galaxy-orb-radial-menu__segment:nth-child(7) {
+  animation-delay: 150ms;
+}
+
+.kairo-galaxy-orb-radial-menu__segment:hover,
+.kairo-galaxy-orb-radial-menu__segment:focus-visible {
+  border-color: rgba(158, 240, 255, 0.82);
+  background:
+    linear-gradient(180deg, rgba(0, 56, 72, 0.96), rgba(0, 18, 28, 0.94));
+  box-shadow:
+    0 0 22px rgba(72, 196, 255, 0.32),
+    inset 0 0 14px rgba(72, 196, 255, 0.14);
+  outline: none;
+}
+
+.kairo-galaxy-orb-radial-menu__segment-glyph {
+  font-size: 0.62rem;
+  color: rgba(158, 240, 255, 0.92);
+}
+
+.kairo-galaxy-orb-radial-menu__segment-label {
+  font-size: 0.52rem;
+  letter-spacing: 0.18em;
+  color: rgba(180, 230, 245, 0.88);
+}
+
+.kairo-galaxy-orb--radial-open .kairo-galaxy-orb__trigger {
+  box-shadow:
+    0 0 28px rgba(72, 196, 255, 0.35),
+    inset 0 0 18px rgba(72, 196, 255, 0.12);
+}
+
+@keyframes kairo-orb-radial-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes kairo-orb-radial-segment-in {
+  from {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--orb-radial-x)), calc(-50% + var(--orb-radial-y))) scale(0.7);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--orb-radial-x)), calc(-50% + var(--orb-radial-y))) scale(1);
+  }
+}
+
+@keyframes kairo-orb-radial-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kairo-galaxy-orb-radial-menu__ring,
+  .kairo-galaxy-orb-radial-menu__segment,
+  .kairo-galaxy-orb-radial-menu__core-glow {
+    animation: none;
+  }
+}

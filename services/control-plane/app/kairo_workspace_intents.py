@@ -26,6 +26,16 @@ def workspace_aliases(workspace_id: str, display_name: str | None) -> set[str]:
                 "dashpro workspace",
             }
         )
+    if workspace_id == "workspace_tps":
+        aliases.update({"tps", "tps workspace", "tee pee ess"})
+    if workspace_id == "workspace_young_eagles_day_care":
+        aliases.update(
+            {
+                "young eagles",
+                "young eagles day care",
+                "young eagles daycare",
+            }
+        )
     return {alias for alias in aliases if alias}
 
 

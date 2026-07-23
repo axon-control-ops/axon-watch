@@ -8,7 +8,8 @@ from urllib.parse import urlparse
 from app.config import _public_base_url
 
 
-def auth_mode() -> str:
+def configured_auth_mode() -> str:
+    """Raw configured mode before remote-force rules."""
     raw = os.environ.get("AXON_WATCH_AUTH_MODE", "placeholder").strip().lower()
     if raw in {"", "placeholder", "off", "disabled", "none"}:
         return "off"
@@ -17,11 +18,27 @@ def auth_mode() -> str:
     return raw
 
 
+def auth_mode() -> str:
+    """
+    Effective auth mode.
+
+    Remotely reachable deployments always enforce ``local_token`` even when the
+    env still says placeholder/off (Gate 2 residual: forced token mode on remote).
+    """
+    mode = configured_auth_mode()
+    if mode == "off" and is_remotely_reachable():
+        return "local_token"
+    return mode
+
+
 def operator_token() -> str:
     return os.environ.get("AXON_WATCH_OPERATOR_TOKEN", "").strip()
 
 
 def allow_loopback_bypass() -> bool:
+    # Remote surfaces must not accept anonymous loopback clients.
+    if is_remotely_reachable():
+        return False
     raw = os.environ.get("AXON_WATCH_AUTH_ALLOW_LOOPBACK", "1").strip().lower()
     return raw not in {"0", "false", "no", "off"}
 

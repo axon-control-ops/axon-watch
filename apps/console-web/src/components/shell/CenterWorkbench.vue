@@ -4,10 +4,12 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import WorkbenchTerminalDock from '../WorkbenchTerminalDock.vue';
 import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
+import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
 import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
 import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
 import CenterWorkbenchEditorFooter from './CenterWorkbenchEditorFooter.vue';
+import EditorPdfPreview from './EditorPdfPreview.vue';
 import OperatorStatusRadarPanel from './OperatorStatusRadarPanel.vue';
 import {
   clampWorkbenchTerminalHeight,
@@ -26,8 +28,10 @@ import {
 import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
-import { isBinaryFilePath, isImageFilePath } from '../../lib/workspace-file-language';
+import { isBinaryFilePath, isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
 import { resolveThreadImageUrl } from '../../lib/thread-image-url';
+import { useEditorPdfPreview } from '../../lib/use-editor-pdf-preview';
+import { useEditorBreadcrumbSegments } from '../../lib/use-editor-breadcrumb-segments';
 import {
   persistEditorMarkdownPreviewEnabled,
   resolveEditorMarkdownPreviewEnabled,
@@ -43,7 +47,7 @@ import {
   readEditorMinimapEnabled,
 } from '../../lib/editor-surface-prefs';
 import { isAgentEditReviewDocumentId } from '../../lib/ide-agent-edit-review';
-import { type IdeQuickGuide, type IdeQuickGuideActionId } from '../../lib/ide-quick-guide';
+import { type IdeQuickGuideActionId } from '../../lib/ide-quick-guide';
 import {
   handleIdeQuickGuideAction,
   openIdeSearch,
@@ -52,7 +56,9 @@ import {
   openWatchConnectors,
   useIdeEditorStatusBar,
 } from '../../composables/useIdeEditorStatusBar';
+import { useIdeQuickGuideSticky } from '../../composables/useIdeQuickGuideSticky';
 import { useWorkbenchPanelAutoPeek } from '../../composables/useWorkbenchPanelAutoPeek';
+import { useWorkbenchTerminalAutoClose } from '../../composables/useWorkbenchTerminalAutoClose';
 import { buildWorkbenchProblemItems } from '../../lib/workbench-problem-items';
 import { useEditorPlanBuild } from '../../composables/use-editor-plan-build';
 import { useEditorStatusBarMeta } from '../../composables/useEditorStatusBarMeta';
@@ -89,48 +95,7 @@ const {
   agentDockReopenState,
 });
 
-/** Hold the last guide briefly and skip no-op identity updates so attention chrome does not remount. */
-const ideQuickGuideSticky = ref<IdeQuickGuide | null>(null);
-let ideQuickGuideClearTimer: ReturnType<typeof setTimeout> | null = null;
-const IDE_QUICK_GUIDE_HOLD_MS = 800;
-
-function ideQuickGuideIdentity(guide: IdeQuickGuide): string {
-  return [guide.tone, guide.title, ...guide.steps, ...guide.actions.map((action) => action.id)].join(
-    '\x1f',
-  );
-}
-
-watch(
-  ideQuickGuide,
-  (next) => {
-    if (next) {
-      if (ideQuickGuideClearTimer !== null) {
-        clearTimeout(ideQuickGuideClearTimer);
-        ideQuickGuideClearTimer = null;
-      }
-      const previous = ideQuickGuideSticky.value;
-      if (!previous || ideQuickGuideIdentity(previous) !== ideQuickGuideIdentity(next)) {
-        ideQuickGuideSticky.value = next;
-      }
-      return;
-    }
-    if (!ideQuickGuideSticky.value || ideQuickGuideClearTimer !== null) {
-      return;
-    }
-    ideQuickGuideClearTimer = setTimeout(() => {
-      ideQuickGuideSticky.value = null;
-      ideQuickGuideClearTimer = null;
-    }, IDE_QUICK_GUIDE_HOLD_MS);
-  },
-  { immediate: true },
-);
-
-onBeforeUnmount(() => {
-  if (ideQuickGuideClearTimer !== null) {
-    clearTimeout(ideQuickGuideClearTimer);
-    ideQuickGuideClearTimer = null;
-  }
-});
+const { ideQuickGuideSticky, dismissIdeQuickGuide } = useIdeQuickGuideSticky(ideQuickGuide);
 const workbenchRef = ref<HTMLElement | null>(null);
 const terminalHeight = ref(240);
 const resizing = ref(false);
@@ -141,38 +106,14 @@ const editorMinimapEnabled = ref(readEditorMinimapEnabled());
 
 const problemItems = computed(() => buildWorkbenchProblemItems(shell));
 
-const editorBreadcrumbSegments = computed((): EditorBreadcrumbSegment[] => {
-  const workspace = shell.currentWorkspace?.workspace_id ?? 'workspace_smoke';
-  const document = shell.activeEditorDocument;
-  if (!document) {
-    return buildEditorBreadcrumbTrail({
-      workspaceId: workspace,
-      filePath: 'README.md',
-      content: '',
-      cursorLine: editorCursorLine.value,
-      language: 'markdown',
-    });
-  }
-
-  const filePath = resolveEditorBreadcrumbFilePath({
-    source: document.source,
-    filePath: document.filePath,
-    id: document.id,
-    title: document.title,
-    value: activeEditorValue.value,
-    resourcePath: editorDocumentResourcePath(document),
-  });
-
-  return buildEditorBreadcrumbTrail({
-    workspaceId: workspace,
-    filePath,
-    content: activeEditorValue.value,
-    cursorLine: editorCursorLine.value,
-    language: document.language,
-  });
+const activeEditorValue = computed(() => shell.activeEditorDocument?.value ?? '');
+const editorBreadcrumbSegments = useEditorBreadcrumbSegments({
+  activeDocument: computed(() => shell.activeEditorDocument),
+  activeEditorValue,
+  workspaceId: computed(() => shell.currentWorkspace?.workspace_id),
+  cursorLine: editorCursorLine,
 });
 
-const activeEditorValue = computed(() => shell.activeEditorDocument?.value ?? '');
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
 );
@@ -186,13 +127,17 @@ const isImageEditorDocument = computed(() => {
   }
   return document.source === 'file' && isImageFilePath(document.filePath ?? document.title);
 });
+const { isPdfEditorDocument, editorPdfPreviewUrl } = useEditorPdfPreview({
+  activeDocument: computed(() => shell.activeEditorDocument),
+  workspace: computed(() => shell.currentWorkspace),
+});
 const isBinaryEditorDocument = computed(() => {
   const document = shell.activeEditorDocument;
   if (!document || document.source !== 'file') {
     return false;
   }
   const path = document.filePath ?? document.title;
-  return isBinaryFilePath(path) && !isImageFilePath(path);
+  return isBinaryFilePath(path) && !isImageFilePath(path) && !isPdfFilePath(path);
 });
 const isAgentEditReviewDocument = computed(() =>
   isAgentEditReviewDocumentId(shell.activeEditorDocument?.id),
@@ -385,13 +330,10 @@ useWorkbenchPanelAutoPeek({
   onShowTerminal: showTerminalPanel,
   onShowAgentDock: showAgentDock,
 });
+useWorkbenchTerminalAutoClose({ terminalPanelVisible, onHideTerminal: hideTerminalPanel });
 
 function toggleTerminalPanel(): void {
-  if (terminalPanelVisible.value) {
-    hideTerminalPanel();
-    return;
-  }
-  showTerminalPanel();
+  terminalPanelVisible.value ? hideTerminalPanel() : showTerminalPanel();
 }
 
 const onIdeQuickGuideAction = (actionId: IdeQuickGuideActionId): void =>
@@ -603,6 +545,7 @@ watch(
           :guide="ideQuickGuideSticky"
           :with-editor="Boolean(shell.activeEditorDocument)"
           @action="onIdeQuickGuideAction"
+          @dismiss="dismissIdeQuickGuide"
         />
         <EditorMarkdownToolbar
           v-if="isMarkdownEditorDocument && shell.activeEditorDocument"
@@ -619,7 +562,7 @@ watch(
           :content="shell.activeEditorDocument.value"
         />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument && !isBinaryEditorDocument"
+          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
           :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
@@ -639,6 +582,11 @@ watch(
         <div v-else-if="shell.activeEditorDocument && isImageEditorDocument" class="editor-image-preview">
           <img class="editor-image-preview__img" :src="editorImagePreviewUrl" :alt="shell.activeEditorDocument.title">
         </div>
+        <EditorPdfPreview
+          v-else-if="shell.activeEditorDocument && isPdfEditorDocument"
+          :title="shell.activeEditorDocument.title"
+          :preview-url="editorPdfPreviewUrl"
+        />
         <div v-else-if="shell.activeEditorDocument && isBinaryEditorDocument" class="editor-binary-preview">
           <p class="editor-binary-preview__title">{{ shell.activeEditorDocument.title }}</p>
           <p class="editor-binary-preview__body">{{ shell.activeEditorDocument.description }}</p>
@@ -679,6 +627,8 @@ watch(
     </section>
 
     <OperatorStatusRadarPanel v-if="hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
+    <!-- Speaker face + captions: OPERATOR galaxy and IDE — who is talking (VAXON / any agent). -->
+    <GalaxySpeechCaptions />
     <WorkbenchTerminalDock v-if="showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
   </main>
 </template>

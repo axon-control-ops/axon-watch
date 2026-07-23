@@ -1,5 +1,6 @@
 import { fetchPlan } from '../api/plans-api';
 import { displayPlanTitle } from './plan-display-title';
+import { sanitizePlanMarkdownForDisplay } from './plan-markdown-display';
 
 export type OpenPlanViewerShell = {
   openAgentContentInEditor: (options: {
@@ -23,7 +24,7 @@ export async function openPlanInEditor(input: {
     plan.title.trim() || input.fallbackTitle?.trim() || '',
     'Plan',
   );
-  const body = plan.content.trim();
+  const body = sanitizePlanMarkdownForDisplay(plan.content);
   if (!body) {
     return null;
   }

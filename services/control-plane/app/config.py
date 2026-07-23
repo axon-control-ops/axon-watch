@@ -34,4 +34,8 @@ def _cors_origins() -> list[str]:
     return [
         "http://127.0.0.1:4173",
         "http://localhost:4173",
+        "http://127.0.0.1:8787",
+        "http://localhost:8787",
+        "tauri://localhost",
+        "https://tauri.localhost",
     ]

@@ -73,6 +73,39 @@
   outline-offset: 2px;
 }
 
+.company-roster__busy-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0 0.35rem;
+  padding: 0.06rem 0.38rem;
+  border: 1px solid rgba(60, 180, 140, 0.45);
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(150, 255, 210, 0.96);
+  background: rgba(18, 70, 55, 0.62);
+  white-space: nowrap;
+  animation: company-roster-busy-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes company-roster-busy-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(60, 200, 160, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(60, 200, 160, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-roster__busy-badge {
+    animation: none;
+  }
+}
+
 .company-roster__hint--alert {
   margin-top: 0.4rem;
   padding: 0.45rem 0.55rem;

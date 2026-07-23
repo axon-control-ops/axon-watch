@@ -68,10 +68,22 @@
   display: grid;
   grid-template-columns: 1.4rem minmax(0, 1fr);
   gap: 0.45rem;
-  padding: 0.42rem 0.4rem;
-  border-radius: 0.35rem;
-  border: 1px solid rgba(0, 210, 255, 0.1);
-  background: rgba(0, 14, 22, 0.45);
+  padding: 0.45rem 0.45rem 0.45rem 0.5rem;
+  clip-path: polygon(
+    0 0.28rem,
+    0.28rem 0,
+    calc(100% - 0.28rem) 0,
+    100% 0.28rem,
+    100% calc(100% - 0.28rem),
+    calc(100% - 0.28rem) 100%,
+    0.28rem 100%,
+    0 calc(100% - 0.28rem)
+  );
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  background:
+    linear-gradient(90deg, rgba(0, 180, 255, 0.12), transparent 40%),
+    rgba(0, 14, 22, 0.72);
+  box-shadow: 0 0 0.85rem rgba(0, 170, 255, 0.12);
 }
 
 .brain-galaxy-stage--mockup .galaxy-inspector__evidence-icon {

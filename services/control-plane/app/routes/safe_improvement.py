@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.auth.step_up import EXACT_EFFECT_ACTION, reject_missing_step_up
 from app.safe_improvement import proposal_service, store
 from app.safe_improvement import session as sandbox_session
 
@@ -162,8 +163,15 @@ def request_approval(proposal_id: str, body: RequestApprovalBody) -> dict[str, A
 
 
 @router.post("/proposals/{proposal_id}/approve")
-def approve_proposal(proposal_id: str, body: ApproveBody) -> dict[str, Any]:
+def approve_proposal(proposal_id: str, body: ApproveBody, request: Request) -> dict[str, Any]:
     _require_sandbox_enabled()
+    step_up_error = reject_missing_step_up(request, action=EXACT_EFFECT_ACTION)
+    if step_up_error is not None:
+        raise HTTPException(
+            status_code=403,
+            detail=step_up_error,
+            headers={"X-Axon-Step-Up-Required": EXACT_EFFECT_ACTION},
+        )
     try:
         proposal = proposal_service.approve_exact_effect(
             proposal_id,
@@ -176,14 +184,20 @@ def approve_proposal(proposal_id: str, body: ApproveBody) -> dict[str, Any]:
 
 
 @router.post("/proposals/{proposal_id}/execute")
-def execute_proposal(proposal_id: str) -> dict[str, Any]:
+def execute_proposal(proposal_id: str, request: Request) -> dict[str, Any]:
     _require_sandbox_enabled()
+    step_up_error = reject_missing_step_up(request, action=EXACT_EFFECT_ACTION)
+    if step_up_error is not None:
+        raise HTTPException(
+            status_code=403,
+            detail=step_up_error,
+            headers={"X-Axon-Step-Up-Required": EXACT_EFFECT_ACTION},
+        )
     try:
         proposal = proposal_service.execute_approved_proposal(proposal_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return proposal.to_dict()
-
 
 @router.post("/proposals/{proposal_id}/rollback")
 def rollback_proposal(proposal_id: str) -> dict[str, Any]:

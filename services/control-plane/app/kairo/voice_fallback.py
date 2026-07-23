@@ -175,12 +175,16 @@ def _pick_pool_line(
     *,
     persona_enabled: bool,
     guest_name: str | None = None,
+    speaker_kind: str = "vaxon",
 ) -> str:
     pool = list(_FALLBACK_POOLS.get(pool_key, _FALLBACK_POOLS["done"]))
     if not persona_enabled:
         pool = [_strip_sir_address(line) for line in pool]
-    elif guest_name:
-        pool = [apply_participant_address(line, guest_name) for line in pool]
+    else:
+        pool = [
+            apply_participant_address(line, guest_name, speaker_kind=speaker_kind)
+            for line in pool
+        ]
     recent_lower = {item.lower() for item in recent}
     for candidate in pool:
         if candidate.lower() not in recent_lower:
@@ -196,6 +200,7 @@ def fallback_for_event(
     persona_enabled: bool,
 ) -> str:
     guest_name = str(context.get("guest_name") or "").strip() or None
+    speaker_kind = str(context.get("speaker_kind") or "vaxon").strip().lower() or "vaxon"
     if event_type == "approval_literal":
         return str(context.get("literal_line") or "Approval required before I can continue.")
 
@@ -209,7 +214,7 @@ def fallback_for_event(
             load_state=str(context.get("load_state") or "loaded"),
             persona_enabled=persona_enabled,
         )
-        return apply_participant_address(line, guest_name)
+        return apply_participant_address(line, guest_name, speaker_kind=speaker_kind)
 
     if event_type == "greeting":
         workspace_count = int(context.get("workspace_count") or 0)
@@ -227,6 +232,7 @@ def fallback_for_event(
             recent,
             persona_enabled=persona_enabled,
             guest_name=guest_name,
+            speaker_kind=speaker_kind,
         )
         return f"{line} {tail.capitalize()}."
 
@@ -244,14 +250,18 @@ def fallback_for_event(
     if event_type == "conversation_reply":
         literal = str(context.get("fallback") or context.get("reply") or "").strip()
         if literal:
-            return apply_participant_address(literal, guest_name)
+            return apply_participant_address(literal, guest_name, speaker_kind=speaker_kind)
         return ""
 
     if event_type == "tool":
         tool_label = str(context.get("tool_label") or "").strip()
-        contextual = contextual_tool_fallback(tool_label)
+        contextual = contextual_tool_fallback(
+            tool_label,
+            operator_prompt=str(context.get("operator_prompt") or "").strip() or None,
+            task_summary=str(context.get("task_summary") or "").strip() or None,
+        )
         if contextual:
-            return apply_participant_address(contextual, guest_name)
+            return apply_participant_address(contextual, guest_name, speaker_kind=speaker_kind)
         lowered = tool_label.lower()
         if lowered.startswith("read"):
             pool_key = "tool_read"
@@ -266,6 +276,7 @@ def fallback_for_event(
             recent,
             persona_enabled=persona_enabled,
             guest_name=guest_name,
+            speaker_kind=speaker_kind,
         )
 
     if event_type == "edit":
@@ -275,37 +286,44 @@ def fallback_for_event(
             recent,
             persona_enabled=persona_enabled,
             guest_name=guest_name,
+            speaker_kind=speaker_kind,
         )
         return line.replace("that file", file_name).replace("the file", file_name)
 
     if event_type in {"agent_start", "run_started"}:
         contextual = _contextual_agent_start_fallback(context)
         if contextual:
-            return apply_participant_address(contextual, guest_name)
+            return apply_participant_address(contextual, guest_name, speaker_kind=speaker_kind)
         return _pick_pool_line(
             "run_started",
             recent,
             persona_enabled=persona_enabled,
             guest_name=guest_name,
+            speaker_kind=speaker_kind,
         )
 
     if event_type == "failed":
-        return apply_participant_address(_contextual_failed_fallback(context), guest_name)
+        return apply_participant_address(
+            _contextual_failed_fallback(context),
+            guest_name,
+            speaker_kind=speaker_kind,
+        )
 
     if event_type == "done":
         contextual = _contextual_done_fallback(context)
         if contextual:
-            return apply_participant_address(contextual, guest_name)
+            return apply_participant_address(contextual, guest_name, speaker_kind=speaker_kind)
         return _pick_pool_line(
             "done",
             recent,
             persona_enabled=persona_enabled,
             guest_name=guest_name,
+            speaker_kind=speaker_kind,
         )
 
     progress = contextual_progress_fallback(event_type, context)
     if progress:
-        return apply_participant_address(progress, guest_name)
+        return apply_participant_address(progress, guest_name, speaker_kind=speaker_kind)
 
     pool_key = event_type if event_type in _FALLBACK_POOLS else "done"
     return _pick_pool_line(
@@ -313,6 +331,7 @@ def fallback_for_event(
         recent,
         persona_enabled=persona_enabled,
         guest_name=guest_name,
+        speaker_kind=speaker_kind,
     )
 
 

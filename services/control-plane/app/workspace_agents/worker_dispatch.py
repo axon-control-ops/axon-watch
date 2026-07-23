@@ -28,6 +28,7 @@ from app.workspace_agents.worker_isolation import (
     worker_agent_workspace,
 )
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
+from app.persistence import task_store
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,18 @@ def dispatch_continuous_worker_run(
     if not run_id:
         return False, None
 
+    task_id = str(run_record.get("task_id") or "").strip()
+    task = task_store.get_task(task_id) if task_id else None
+    if task is None or str(task.get("status") or "").strip().lower() != "leased":
+        failed = _fail_worker_run(
+            run_id,
+            receipt_summary=(
+                "Continuous worker dispatch refused: missing leased task_id "
+                f"(task_id={task_id or 'none'})"
+            ),
+        )
+        return False, failed
+
     stop_heartbeat = threading.Event()
     heartbeat = threading.Thread(
         target=_run_dispatch_heartbeat,
@@ -113,10 +126,25 @@ def dispatch_continuous_worker_run(
     lane_b_result: dict[str, Any] = {}
     try:
         touch_run_activity(run_id)
+        try:
+            task_store.renew_lease(
+                task_id,
+                lease_holder=str(task.get("lease_holder") or "").strip()
+                or f"employee-{workspace_id}-{employee.role}",
+            )
+        except task_store.TaskLedgerError as exc:
+            failed = _fail_worker_run(
+                run_id,
+                receipt_summary=f"Continuous worker lease renew failed: {exc}",
+            )
+            return False, failed
         append_run_execution_receipt(
             run_id,
             receipt_type="worker_dispatch_started",
-            receipt_summary=f"Continuous worker dispatch started for role={employee.role}",
+            receipt_summary=(
+                f"Continuous worker dispatch started for role={employee.role} "
+                f"task={task_id}"
+            ),
             actor="workspace_scheduler",
         )
         heartbeat.start()
@@ -130,7 +158,11 @@ def dispatch_continuous_worker_run(
             success=True,
             intent="worker_isolation",
         )
-        prompt = build_continuous_worker_prompt(workspace_id=workspace_id, employee=employee)
+        prompt = build_continuous_worker_prompt(
+            workspace_id=workspace_id,
+            employee=employee,
+            task=task,
+        )
         ensure_agent_session(workspace_id=workspace_id, run_id=run_id)
         context = LaneBContext(workspace_id=workspace_id, composer_mode="agent")
         lane_b_result = generate_lane_b_result(
@@ -147,6 +179,15 @@ def dispatch_continuous_worker_run(
             lane_b_result=lane_b_result,
             reply_text=str(lane_b_result.get("content") or ""),
         )
+        if dispatched and finalized is not None:
+            phase = str(finalized.get("phase") or "").strip().lower()
+            try:
+                if phase == "completed":
+                    task_store.complete_task(task_id, run_id=run_id)
+                elif phase == "failed":
+                    task_store.fail_task(task_id, run_id=run_id)
+            except task_store.TaskLedgerError:
+                logger.exception("task ledger finalize failed for %s task=%s", run_id, task_id)
     except IsolationError as exc:
         logger.exception(
             "continuous worker isolation failed for %s role=%s",
@@ -157,6 +198,10 @@ def dispatch_continuous_worker_run(
             run_id,
             receipt_summary=f"Continuous worker isolation failed: {exc}",
         )
+        try:
+            task_store.fail_task(task_id, run_id=run_id)
+        except task_store.TaskLedgerError:
+            logger.exception("task fail after isolation error for %s", task_id)
         return False, failed
     except Exception as exc:  # noqa: BLE001 — never leave role-tagged runs stuck executing
         logger.exception(
@@ -168,6 +213,10 @@ def dispatch_continuous_worker_run(
             run_id,
             receipt_summary=f"Continuous worker dispatch failed: {exc}",
         )
+        try:
+            task_store.fail_task(task_id, run_id=run_id)
+        except task_store.TaskLedgerError:
+            logger.exception("task fail after dispatch crash for %s", task_id)
         return False, failed
     finally:
         stop_heartbeat.set()

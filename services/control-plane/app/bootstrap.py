@@ -44,6 +44,12 @@ async def control_plane_lifespan(_app: FastAPI):
             "startup employee run retention drained %s terminal run(s)",
             len(pruned),
         )
+    try:
+        from app.host_context.reminders import migrate_whatsapp_g42_reminder
+
+        migrate_whatsapp_g42_reminder(due_hours=24)
+    except Exception:  # noqa: BLE001 — reminder migration must not block boot
+        logger.exception("whatsapp g42 reminder migration failed")
     scheduler_task = await start_continuous_worker_scheduler()
     try:
         yield

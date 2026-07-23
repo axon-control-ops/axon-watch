@@ -6,6 +6,15 @@ import re
 import subprocess
 from dataclasses import dataclass
 
+from app.chat.workspace_git_message import (
+    INSTRUCTIONAL_TURN_RE,
+    compose_intent_subject,
+    compose_topic_and_diff,
+    extract_work_intent,
+    extract_work_topic,
+    looks_like_commit_subject,
+    summarize_change_areas,
+)
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 MAX_OUTPUT_CHARS = 1500
@@ -148,6 +157,8 @@ def _normalize_turn_subject(turn_subject: str | None) -> str | None:
         return None
     if _COMMIT_INTENT_ONLY_RE.match(text):
         return None
+    if INSTRUCTIONAL_TURN_RE.match(text):
+        return None
     # Drop leading "commit first and then …" scaffolding so the plan title wins.
     text = re.sub(
         r"^\s*(?:please\s+)?commit(?:\s+first)?(?:\s+(?:these|my|the|all))?(?:\s+changes?)?"
@@ -173,6 +184,11 @@ def _normalize_turn_subject(turn_subject: str | None) -> str | None:
     ).strip(" ,.-")
     if not text or _COMMIT_INTENT_ONLY_RE.match(text):
         return None
+    text = re.sub(r"^(?:please\s+)+", "", text, flags=re.IGNORECASE).strip(" :,-")
+    if not looks_like_commit_subject(text, intent_only_re=_COMMIT_INTENT_ONLY_RE):
+        return None
+    if text[0].islower():
+        text = text[0].upper() + text[1:]
     if len(text) > 72:
         cut = text[:71].rsplit(" ", 1)[0].rstrip(" ,.-")
         text = f"{cut}…" if cut else f"{text[:71]}…"
@@ -264,17 +280,36 @@ def derive_commit_message(workspace_id: str, turn_subject: str | None = None) ->
     """Build a commit subject from the turn text and/or ``git diff --stat``.
 
     Preference order:
-    1. Descriptive operator/agent turn subject (not bare "commit these changes")
-    2. Diff-stat summary of pending paths
-    3. Generic fallback
+    1. Descriptive operator/agent turn subject (plan title / change summary —
+       never raw task instructions like "you should make sure to…")
+    2. Intent + topic from the turn (e.g. Unblock OTA canary) + path areas
+    3. Work topic + path-area / diff summary
+    4. Multi-file path-area summary
+    5. Diff-stat basename summary
+    6. Generic fallback
     """
     from_turn = _normalize_turn_subject(turn_subject)
+    topic = extract_work_topic(turn_subject)
+    intent = extract_work_intent(turn_subject)
     files = _collect_changed_paths(workspace_id)
+    from_areas = summarize_change_areas(files)
     from_diff = _summarize_diff_stat(workspace_id, files)
+    from_intent = compose_intent_subject(
+        topic=topic,
+        intent=intent,
+        diff_subject=from_diff,
+        area_subject=from_areas,
+        files=files,
+    )
 
-    # Prefer a real human/plan subject over a filename dump.
     if from_turn:
         return from_turn
+    if from_intent:
+        return from_intent
+    if topic and (from_areas or from_diff):
+        return compose_topic_and_diff(topic, from_diff, from_areas)
+    if from_areas and len(files) >= 3:
+        return from_areas
     if from_diff:
         return from_diff
     if files:

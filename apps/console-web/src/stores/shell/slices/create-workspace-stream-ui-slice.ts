@@ -3,13 +3,15 @@ import type { Ref } from 'vue';
 import type { IdeComposerActivity } from '../../../lib/agent-dock-activity-view';
 import {
   defaultWorkspaceStreamUi,
-  shouldSyncWorkspaceStreamGlobals,
+  shouldSyncThreadStreamGlobals,
   workspaceStreamGlobalsFromState,
   type WorkspaceStreamUiState,
 } from '../../../lib/workspace-stream-ui';
 
 interface CreateWorkspaceStreamUiSliceInput {
-  currentWorkspace: Ref<{ workspace_id: string } | null>;
+  /** Active IDE conversation thread — globals follow this thread only. */
+  activeIdeThreadId: Ref<string | null>;
+  /** Stream UI keyed by thread_id (not workspace_id). */
   workspaceStreamUiById: Ref<Record<string, WorkspaceStreamUiState>>;
   agentStreamActive: Ref<boolean>;
   agentStreamMessageId: Ref<string | null>;
@@ -18,15 +20,15 @@ interface CreateWorkspaceStreamUiSliceInput {
 }
 
 export function createWorkspaceStreamUiSlice(input: CreateWorkspaceStreamUiSliceInput) {
-  function getWorkspaceStreamUi(workspaceId: string): WorkspaceStreamUiState {
-    return input.workspaceStreamUiById.value[workspaceId] ?? defaultWorkspaceStreamUi();
+  function getWorkspaceStreamUi(threadId: string): WorkspaceStreamUiState {
+    return input.workspaceStreamUiById.value[threadId] ?? defaultWorkspaceStreamUi();
   }
 
-  function applyWorkspaceStreamUiToGlobals(workspaceId: string): void {
-    if (!shouldSyncWorkspaceStreamGlobals(input.currentWorkspace.value?.workspace_id, workspaceId)) {
+  function applyWorkspaceStreamUiToGlobals(threadId: string): void {
+    if (!shouldSyncThreadStreamGlobals(input.activeIdeThreadId.value, threadId)) {
       return;
     }
-    const next = getWorkspaceStreamUi(workspaceId);
+    const next = getWorkspaceStreamUi(threadId);
     const globals = workspaceStreamGlobalsFromState(next);
     input.agentStreamActive.value = globals.agentStreamActive;
     input.agentStreamMessageId.value = globals.agentStreamMessageId;
@@ -35,17 +37,17 @@ export function createWorkspaceStreamUiSlice(input: CreateWorkspaceStreamUiSlice
   }
 
   function setWorkspaceStreamUi(
-    workspaceId: string,
+    threadId: string,
     partial: Partial<WorkspaceStreamUiState>,
   ): void {
     input.workspaceStreamUiById.value = {
       ...input.workspaceStreamUiById.value,
-      [workspaceId]: {
-        ...getWorkspaceStreamUi(workspaceId),
+      [threadId]: {
+        ...getWorkspaceStreamUi(threadId),
         ...partial,
       },
     };
-    applyWorkspaceStreamUiToGlobals(workspaceId);
+    applyWorkspaceStreamUiToGlobals(threadId);
   }
 
   return {

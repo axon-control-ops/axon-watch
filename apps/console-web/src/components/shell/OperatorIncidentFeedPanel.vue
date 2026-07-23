@@ -7,13 +7,17 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 
-const feedView = computed(() =>
-  buildOperatorIncidentFeed({
+const feedView = computed(() => {
+  const spoken = shell.operatorBriefing?.operator_presence?.spoken_alert;
+  return buildOperatorIncidentFeed({
     topSignals: shell.operatorBriefing?.top_signals ?? [],
     workspaceId: shell.currentWorkspace?.workspace_id ?? null,
     fleetHealth: shell.operatorFleetHealth,
-  }),
-);
+    serverExplanation: spoken?.explanation ?? null,
+    serverSignalId: spoken?.signal_id ?? null,
+    serverReason: spoken?.reason ?? null,
+  });
+});
 
 function focusSignal(signalId: string): void {
   shell.focusAttentionSidebar(signalId);
@@ -43,7 +47,7 @@ function focusSignal(signalId: string): void {
               {{ item.title }}
               <span v-if="item.monitorSignal" class="operator-incident-feed__monitor-tag">Monitor</span>
             </span>
-            <span class="operator-incident-feed__item-summary">{{ item.summary }}</span>
+            <span class="operator-incident-feed__item-summary">{{ item.plainWhat || item.summary }}</span>
             <span class="operator-incident-feed__item-meta">
               {{ item.source === 'fleet' ? 'Fleet rollup' : 'Signal inbox' }}
             </span>

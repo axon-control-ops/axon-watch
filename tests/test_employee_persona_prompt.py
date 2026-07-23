@@ -69,6 +69,8 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("You are Quinn", appendix)
         self.assertIn("Role label: Integrations", appendix)
         self.assertIn("not as VAXON", appendix)
+        self.assertIn("say which role should own it", appendix)
+        self.assertIn("frontend, backend, integrations, watcher, or lead", appendix)
 
     def test_appendix_fallback_when_roster_misses(self) -> None:
         with patch(

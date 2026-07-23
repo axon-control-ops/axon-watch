@@ -78,6 +78,11 @@ export function isImageFilePath(path: string): boolean {
   return IMAGE_EXTENSIONS.has(extension);
 }
 
+export function isPdfFilePath(path: string): boolean {
+  const extension = path.split('.').pop()?.toLowerCase() ?? '';
+  return extension === 'pdf';
+}
+
 export function isBinaryFilePath(path: string): boolean {
   const extension = path.split('.').pop()?.toLowerCase() ?? '';
   return BINARY_EXTENSIONS.has(extension);

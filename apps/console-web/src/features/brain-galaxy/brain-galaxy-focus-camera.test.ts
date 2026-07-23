@@ -18,7 +18,10 @@ describe('galaxyFocusCameraPosition', () => {
       GALAXY_FOCUS_CAMERA_OFFSET.y,
       GALAXY_FOCUS_CAMERA_OFFSET.z,
     );
-    // Old focus used ~3.2 units and filled the viewport; overview is ~8.5.
-    expect(distance).toBeGreaterThan(7);
+    // Overview distance ~7.3 — close enough to read depth, not fill the viewport.
+    expect(distance).toBeGreaterThan(6);
+    expect(distance).toBeLessThan(9);
+    // Prefer a lower camera elevation so the shell isn't a flat radar disc.
+    expect(GALAXY_FOCUS_CAMERA_OFFSET.y).toBeLessThan(GALAXY_FOCUS_CAMERA_OFFSET.z);
   });
 });
