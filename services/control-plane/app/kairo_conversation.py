@@ -20,6 +20,7 @@ from app.kairo.context_pack_cache import get_cached_context_pack
 from app.kairo.voice_dispatch import VoiceModelReceipt, normalize_voice_routing_mode, route_voice_turn
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_memory_intents import maybe_handle_memory_intent
+from app.kairo.reminder_intents import maybe_handle_reminder_intent
 from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
@@ -260,6 +261,32 @@ def converse_turn(
                 },
                 duration_ms=round((time.perf_counter() - started_at) * 1000),
             )
+
+    reminder_intent = maybe_handle_reminder_intent(
+        content=trimmed,
+        session_id=session_id,
+        workspace_id=resolved_workspace_id,
+    )
+    if reminder_intent is not None:
+        reply = str(reminder_intent.get("reply") or "")
+        _remember_turn(session_id, "user", trimmed)
+        _remember_turn(session_id, "assistant", reply)
+        return _log_voice_turn(
+            session_id=session_id,
+            workspace_id=workspace_id,
+            raw_content=raw_content,
+            normalized_content=trimmed,
+            payload={
+                "turn_kind": str(reminder_intent.get("turn_kind") or "action"),
+                "reply": reply,
+                "source": str(reminder_intent.get("source") or "template"),
+                "command_content": None,
+                "action": reminder_intent.get("action"),
+                "artifacts": list(reminder_intent.get("artifacts") or []),
+                "active_participant": guest_name,
+            },
+            duration_ms=round((time.perf_counter() - started_at) * 1000),
+        )
 
     memory_intent = maybe_handle_memory_intent(
         content=trimmed,
