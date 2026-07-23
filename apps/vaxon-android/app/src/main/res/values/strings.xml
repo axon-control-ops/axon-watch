@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VAXON</string>
+    <string name="wake_notification_channel">Background wake</string>
+    <string name="wake_notification_title">VAXON listening</string>
+    <string name="wake_notification_body">Local wake armed. Pre-wake audio stays on-device.</string>
+    <string name="wake_notification_muted">VAXON muted</string>
+</resources>

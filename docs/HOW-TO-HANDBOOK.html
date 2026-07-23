@@ -66,7 +66,7 @@
 3.5. <a href="#runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a> — Pro vs API key, native vs Cursor
 3.6. <a href="how-to/ci-merge-and-worker-agents.md">CI, merge, and worker agents</a> — Fast Gate, <code>dev</code>, company roster
 3.65. <a href="how-to/autonomy-gates-and-service-identity.md">Autonomy gates &amp; service identity</a> — Gate 4 tasks, scheduler off, watch token + mTLS
-3.66. <a href="how-to/recent-operator-features.md">Recent operator features</a> — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
+3.66. <a href="how-to/recent-operator-features.md">Recent operator features</a> — Mission Control plane, <code>:7734</code> vs <code>:4173</code>/<code>:5173</code>, task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.7. <a href="#vaxon-desktop">VAXON Desktop</a> — packaged Linux install</li>
 <li><a href="#teaching-axon-x-to-someone-else">Teaching Axon-X</a> — explain it to others</li>
 <li><a href="#codebase-in-plain-english">Codebase in plain English</a> — what happens under the hood</li>
@@ -851,13 +851,13 @@ curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
 </tr>
 </tbody>
 </table>
-<h3>Two repos, two apps</h3>
+<h3>Two repos, two apps (and three common ports)</h3>
 <p>Do not confuse these:</p>
 <table>
 <thead>
 <tr>
 <th></th>
-<th><strong>axon-local</strong> (current Axon)</th>
+<th><strong>axon-local</strong> (classic Axon)</th>
 <th><strong>axon-watch</strong> (Axon-X)</th>
 </tr>
 </thead>
@@ -866,6 +866,11 @@ curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
 <td>Default URL</td>
 <td><code>http://127.0.0.1:7734</code> (fallback)</td>
 <td><code>http://127.0.0.1:4173</code> (<strong>production operator</strong>)</td>
+</tr>
+<tr>
+<td>Dev hot-reload</td>
+<td>—</td>
+<td><code>http://127.0.0.1:5173</code> (Vite only while hacking UI)</td>
 </tr>
 <tr>
 <td>Start command</td>
@@ -884,6 +889,11 @@ curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
 </tr>
 </tbody>
 </table>
+<p><strong>Why you still see Axon on :7734:</strong> that tab is classic <strong>axon-local</strong>, not a second
+Axon-X. Keep it for deferred legacy gaps; use Axon-X (<code>:4173</code>, or <code>:5173</code> in Vite)
+for day-to-day operator work. Full walkthrough:
+<a href="how-to/recent-operator-features.md"><code>how-to/recent-operator-features.md</code></a>
+(sections <strong>Mission Control plane</strong> and <strong>Why Axon-X also appears on port 7734</strong>).</p>
 </div></section><section class="chapter" id="chapter-what-axon-x-is"><div class="chapter-header"><span class="chapter-num">07</span><h2 id="what-axon-x-is">What Axon-X Is</h2></div><div class="chapter-body">
 <p><strong>Axon-X</strong> is the next-generation Axon console and operator environment.</p>
 <p>The code lives in the <code>axon-watch</code> repo folder for now. That folder name is
@@ -2349,11 +2359,55 @@ npm run verify:console-web
 <p>Companion to <a href="../HOW-TO-HANDBOOK.md"><code>docs/HOW-TO-HANDBOOK.md</code></a> and
 <a href="autonomy-gates-and-service-identity.md"><code>autonomy-gates-and-service-identity.md</code></a>.</p>
 <hr>
-<h3>1. Mission Control task board (Gate 4)</h3>
-<h4>Where it is (easy to miss)</h4>
-<p><strong>Mission Control</strong> is the Operator <strong>center panel</strong> — but only in <strong>Grid</strong> view.</p>
-<p>Your Brain Graph starfield (VAXON CORE / DashPro orbs) is Operator too; it <strong>replaces</strong>
-the Mission Control title, Fleet health, and Task board until you leave Graph.</p>
+<h3>1. Mission Control plane (how to use it)</h3>
+<p><strong>Mission Control</strong> is the Operator <strong>center column</strong> — your day-to-day oversight board.
+It is <strong>not</strong> the Brain Graph starfield. Use the <strong>GRID | BRAIN</strong> toggle in the Mission
+Control header (or the footer / Intelligence <strong>Mission Control</strong> chips) to switch.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What you see</th>
+<th>Use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GRID</strong></td>
+<td>Mission Control plane (fleet → tasks → inbox → connectors)</td>
+<td>Runs, tasks, incidents, connector health</td>
+</tr>
+<tr>
+<td><strong>BRAIN</strong></td>
+<td>Starfield / VAXON CORE graph</td>
+<td>Spatial map of workspaces + presence</td>
+</tr>
+</tbody>
+</table>
+<h4>Map of the GRID plane (top → bottom)</h4>
+<ol>
+<li><strong>Header</strong> — title <strong>Mission Control</strong>, <strong>GRID | BRAIN</strong>, terminal chip, presence line.</li>
+<li><strong>Fleet health</strong> — compact cards for workspaces. Click a card to select that workspace
+   (same as the left sidebar). Selected card glows cyan.</li>
+<li><strong>Task board</strong> — durable goals for specialist roles (open / leased / done / failed).</li>
+<li><strong>Unified Inbox / Incidents</strong> — open signals for the <strong>selected</strong> workspace.</li>
+<li><strong>Live execution / agent summary</strong> — recent run history when there is activity.</li>
+<li><strong>Watch Lane / Connectors</strong> — control-plane, console-web, watch, optional axon-local.
+   Use <strong>REPROBE</strong> or <strong>Open :7734 fallback</strong> only when you still need classic Axon.</li>
+</ol>
+<h4>Typical operator loop</h4>
+<ol>
+<li>Top nav → <strong>OPERATOR</strong>.</li>
+<li>Ensure <strong>GRID</strong> (not BRAIN).</li>
+<li>Left sidebar → pick a workspace (or click its Fleet card).</li>
+<li>Scan Fleet → Task board → Inbox → Connectors.</li>
+<li>When something needs hands-on edits, switch top nav → <strong>IDE</strong>.</li>
+<li>When you want the spatial map, switch <strong>BRAIN</strong>, then return via <strong>GRID</strong> or
+   <strong>Mission Control</strong>.</li>
+</ol>
+<h4>Where Task board is (easy to miss)</h4>
+<p>Your Brain Graph starfield <strong>replaces</strong> the Mission Control title, Fleet health, and
+Task board until you leave Graph.</p>
 <table>
 <thead>
 <tr>
@@ -2376,12 +2430,12 @@ the Mission Control title, Fleet health, and Task board until you leave Graph.</
 </tr>
 </tbody>
 </table>
-<p>On Grid you should see the heading <strong>Mission Control</strong>, then <strong>GRID | BRAIN</strong>, then
-<strong>Fleet health</strong>, then <strong>Task board</strong>.</p>
+<p>On Grid you should see <strong>Mission Control</strong>, then <strong>GRID | BRAIN</strong>, then <strong>Fleet health</strong>,
+then <strong>Task board</strong>.</p>
 <h4>What the task board is</h4>
 <p>A durable <strong>task ledger</strong>. Continuous workers may only start when they <strong>lease</strong> an
 open task. Chat in the IDE is separate (see “Talk vs do work” below).</p>
-<h4>How to use it</h4>
+<h4>How to seed a task</h4>
 <ol>
 <li>Top nav → <strong>OPERATOR</strong>.</li>
 <li>Leave Brain Graph: <strong>Mission Control</strong> chip (or Intelligence → <strong>Mission Control · Task board</strong>).</li>
@@ -2389,6 +2443,41 @@ open task. Chat in the IDE is separate (see “Talk vs do work” below).</p>
 <li>Create a goal + owner role (e.g. <code>integrations</code>).</li>
 <li>Leave the worker scheduler <strong>off</strong> unless you intentionally want continuous shifts.</li>
 </ol>
+<hr>
+<h3>1b. Why Axon-X also appears on port <strong>7734</strong></h3>
+<p>You may see <strong>two</strong> browser tabs that both look like “Axon”:</p>
+<table>
+<thead>
+<tr>
+<th>URL</th>
+<th>What it actually is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>http://127.0.0.1:5173</code></td>
+<td><strong>Vite dev</strong> console-web (hot reload while hacking Axon-X)</td>
+</tr>
+<tr>
+<td><code>http://127.0.0.1:4173</code></td>
+<td><strong>Production-packaged</strong> Axon-X operator surface (<code>./scripts/dev/up.sh</code>)</td>
+</tr>
+<tr>
+<td><code>http://127.0.0.1:7734</code></td>
+<td><strong>Classic axon-local</strong> (legacy Axon Signal / daily-driver fallback)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>7734 is not a second copy of Axon-X.</strong> It is the older Axon app (<code>axon-local</code>). Axon-X
+(<code>axon-watch</code>) is the modernization target. Until full parity retirement, operators keep
+<strong>:7734</strong> as an explicit fallback for capabilities that are still deferred (for example
+some DashPro WhatsApp paths). Mission Control → <strong>Connectors</strong> can open that fallback
+when the optional <code>axon_local</code> connector is needed.</p>
+<p><strong>Rule of thumb</strong></p>
+<ul>
+<li>Day-to-day Axon-X work → <strong><code>:4173</code></strong> (or <strong><code>:5173</code></strong> only while developing UI).</li>
+<li>Open <strong><code>:7734</code></strong> only when a known legacy gap forces it — then return to Axon-X.</li>
+</ul>
 <h4>Talk vs do work (IDE teammate modes)</h4>
 <p>In the IDE agent dock, open the mode chip (bottom-right, often <strong>Agent FULL ACCESS</strong>):</p>
 <table>

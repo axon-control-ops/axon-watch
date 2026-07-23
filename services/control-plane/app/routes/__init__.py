@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from app.devices import routes as devices
 from app.routes import (
     chat,
     data,
@@ -34,6 +35,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(data.router)
     app.include_router(inbox_watch.router)
     app.include_router(host.router)
+    app.include_router(devices.router)
     app.include_router(operator.router)
     app.include_router(email_settings.router)
     app.include_router(email_reply.router)
