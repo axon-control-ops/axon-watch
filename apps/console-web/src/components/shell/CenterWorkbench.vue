@@ -6,6 +6,7 @@ import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
 import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
 import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
+import EditorCsvToolbar from './EditorCsvToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
 import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
 import CenterWorkbenchEditorFooter from './CenterWorkbenchEditorFooter.vue';
@@ -28,7 +29,8 @@ import {
 import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
-import { isBinaryFilePath, isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
+import { isBinaryFilePath, isImageFilePath, isPdfFilePath, isTabularFilePath } from '../../lib/workspace-file-language';
+import { csvTablePreviewFromRaw } from '../../lib/editor-csv-table-view';
 import { resolveThreadImageUrl } from '../../lib/thread-image-url';
 import { useEditorPdfPreview } from '../../lib/use-editor-pdf-preview';
 import { useEditorBreadcrumbSegments } from '../../lib/use-editor-breadcrumb-segments';
@@ -117,6 +119,17 @@ const editorBreadcrumbSegments = useEditorBreadcrumbSegments({
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
 );
+const isCsvEditorDocument = computed(() => {
+  const document = shell.activeEditorDocument;
+  if (!document) {
+    return false;
+  }
+  if (document.language === 'csv') {
+    return true;
+  }
+  const path = document.filePath ?? document.title;
+  return document.source === 'file' && isTabularFilePath(path);
+});
 const isImageEditorDocument = computed(() => {
   const document = shell.activeEditorDocument;
   if (!document) {
@@ -156,12 +169,14 @@ const { editorLineCount, editorEol, editorLanguageLabel, editorAccessStatus } =
     isImageEditorDocument,
   });
 const editorPreviewEnabled = ref(false);
+const csvTablePreviewEnabled = ref(true);
 
 watch(
   () => shell.activeEditorDocument?.id,
   (documentId) => {
     if (!documentId) {
       editorPreviewEnabled.value = false;
+      csvTablePreviewEnabled.value = true;
       return;
     }
     editorPreviewEnabled.value = resolveEditorMarkdownPreviewEnabled(
@@ -169,6 +184,7 @@ watch(
       shell.activeEditorDocument?.language === 'markdown',
       shell.activeEditorDocument?.source === 'draft',
     );
+    csvTablePreviewEnabled.value = true;
   },
   { immediate: true },
 );
@@ -180,6 +196,17 @@ const editorPreviewHtml = computed(() => {
   return renderAgentMessageMarkdown(activeEditorValue.value, {
     workspaceId: shell.currentWorkspace?.workspace_id ?? null,
   });
+});
+
+const editorCsvTableHtml = computed(() => {
+  if (!isCsvEditorDocument.value) {
+    return '';
+  }
+  const path =
+    shell.activeEditorDocument?.source === 'file'
+      ? shell.activeEditorDocument.filePath ?? shell.activeEditorDocument.title
+      : shell.activeEditorDocument?.title ?? null;
+  return csvTablePreviewFromRaw(activeEditorValue.value, path);
 });
 
 const editorImagePreviewUrl = computed(() => {
@@ -210,6 +237,13 @@ function setEditorPreviewMode(enabled: boolean): void {
   }
   editorPreviewEnabled.value = enabled;
   persistEditorMarkdownPreviewEnabled(documentId, enabled);
+}
+
+function setCsvTablePreviewMode(enabled: boolean): void {
+  if (!isCsvEditorDocument.value) {
+    return;
+  }
+  csvTablePreviewEnabled.value = enabled;
 }
 
 const editorTabDocuments = computed(() =>
@@ -539,7 +573,13 @@ watch(
         @breadcrumb-click="handleBreadcrumbSegmentClick"
       />
 
-      <section class="center-workbench__editor" :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }">
+      <section
+        class="center-workbench__editor"
+        :class="{
+          'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled,
+          'center-workbench__editor--csv-table-preview': isCsvEditorDocument && csvTablePreviewEnabled,
+        }"
+      >
         <CenterWorkbenchIdeQuickGuide
           v-if="ideQuickGuideSticky"
           :guide="ideQuickGuideSticky"
@@ -557,15 +597,21 @@ watch(
           @set-preview="setEditorPreviewMode"
           @build-plan="buildActivePlan"
         />
+        <EditorCsvToolbar
+          v-if="isCsvEditorDocument && shell.activeEditorDocument"
+          :table-enabled="csvTablePreviewEnabled"
+          @set-table="setCsvTablePreviewMode"
+        />
         <AgentEditReviewViewer
           v-if="shell.activeEditorDocument && showAgentDiffReviewViewer"
           :content="shell.activeEditorDocument.value"
         />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
+          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && (!isCsvEditorDocument || !csvTablePreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
           :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
+          :theme-profile="isIdeMode ? 'cursor' : 'mockup'"
           :title="shell.activeEditorDocument.title"
           :value="shell.activeEditorDocument.value"
           :language="shell.activeEditorDocument.language"
@@ -597,9 +643,13 @@ watch(
           v-html="editorPreviewHtml"
           @click="handleEditorPreviewClick"
         />
+        <div
+          v-else-if="shell.activeEditorDocument && isCsvEditorDocument && csvTablePreviewEnabled"
+          class="editor-csv-preview conversation-seam__content conversation-seam__content--markdown"
+          v-html="editorCsvTableHtml"
+        />
         <CenterWorkbenchEditorFooter
           :is-ide-mode="isIdeMode"
-          :terminal-panel-visible="terminalPanelVisible"
           :show-minimap-toggle="!showAgentDiffReviewViewer"
           :editor-minimap-enabled="editorMinimapEnabled"
           :editor-cursor-line="editorCursorLine"
@@ -608,7 +658,6 @@ watch(
           :editor-eol="editorEol"
           :editor-language-label="editorLanguageLabel"
           :editor-access-status="editorAccessStatus"
-          :run-phase="shell.primaryActiveRun?.phase ?? null"
           :terminal-chip="ideEditorStatusTerminalChip"
           :connector-chip="ideEditorStatusConnectorChip"
           :git-chip="ideEditorStatusGitChip"

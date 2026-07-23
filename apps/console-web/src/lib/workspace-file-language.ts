@@ -1,6 +1,8 @@
 const EXTENSION_LANGUAGE: Record<string, string> = {
   md: 'markdown',
+  mdx: 'markdown',
   json: 'json',
+  jsonc: 'json',
   ts: 'typescript',
   tsx: 'typescript',
   js: 'javascript',
@@ -12,6 +14,20 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
   bash: 'shell',
   zsh: 'shell',
   txt: 'plaintext',
+  csv: 'csv',
+  tsv: 'csv',
+  yaml: 'yaml',
+  yml: 'yaml',
+  xml: 'xml',
+  sql: 'sql',
+  toml: 'ini',
+  ini: 'ini',
+  env: 'ini',
+  rs: 'rust',
+  go: 'go',
+  graphql: 'graphql',
+  gql: 'graphql',
+  dockerfile: 'dockerfile',
   // Vue SFCs: html highlighting only — do not map to typescript (ts.worker hang risk).
   vue: 'html',
   html: 'html',
@@ -81,6 +97,15 @@ export function isImageFilePath(path: string): boolean {
 export function isPdfFilePath(path: string): boolean {
   const extension = path.split('.').pop()?.toLowerCase() ?? '';
   return extension === 'pdf';
+}
+
+export function isTabularFilePath(path: string): boolean {
+  const extension = path.split('.').pop()?.toLowerCase() ?? '';
+  return extension === 'csv' || extension === 'tsv';
+}
+
+export function isCsvFilePath(path: string): boolean {
+  return isTabularFilePath(path);
 }
 
 export function isBinaryFilePath(path: string): boolean {

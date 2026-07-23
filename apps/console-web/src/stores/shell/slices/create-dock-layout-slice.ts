@@ -121,7 +121,8 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
     input.dockHeroModeTouched.value = true;
     input.dockHeroMode.value = mode;
     persistDockHeroMode(mode);
-    if (mode === 'briefing') {
+    // Clear stale emphasis when leaving briefing; focusKairoBriefing re-arms it on open.
+    if (mode !== 'briefing') {
       input.briefingSeamEmphasized.value = false;
     }
   }

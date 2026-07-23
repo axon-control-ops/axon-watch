@@ -106,6 +106,7 @@ export function useVerticalPanelResize(options: UseVerticalPanelResizeOptions) {
     }
 
     event.preventDefault();
+    userSized.value = true;
     resizing.value = true;
     const startY = event.clientY;
     const startSize = panelSize.value;
@@ -172,6 +173,7 @@ export function useVerticalPanelResize(options: UseVerticalPanelResizeOptions) {
 
   return {
     panelSize,
+    userSized,
     resizing,
     ariaValueMin,
     ariaValueMax,

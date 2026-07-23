@@ -1561,6 +1561,8 @@ export const useShellStore = defineStore('shell', () => {
     briefingSeamEmphasized,
     operatorCenterView,
     dockHeroMode,
+    expandedDockSeams,
+    dockThreadSeamTouched,
     setLeftSidebarMode,
     setDockHeroMode,
     restoreComposerDraft,

@@ -299,6 +299,7 @@
 /* Keep scrollable editor bodies above hud-panel-frame ::after fill (same as radar sections). */
 .center-workbench__editor .surface-host--mockup,
 .center-workbench__editor .editor-markdown-preview,
+.center-workbench__editor .editor-csv-preview,
 .center-workbench__editor .agent-edit-review-viewer,
 .center-workbench__editor .editor-image-preview,
 .center-workbench__editor .editor-pdf-preview,

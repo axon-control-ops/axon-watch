@@ -30,6 +30,7 @@
   background:
     linear-gradient(180deg, rgba(10, 12, 20, 0.98), rgba(6, 8, 14, 0.99)),
     radial-gradient(circle at top left, rgba(99, 102, 241, 0.06), transparent 50%);
+  transform: none !important;
 }
 
 .console-shell--ide .ide-explorer-panel,

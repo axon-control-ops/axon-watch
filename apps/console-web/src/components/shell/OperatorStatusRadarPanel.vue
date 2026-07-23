@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { openWatchConnectors } from '../../composables/useIdeEditorStatusBar';
+import { useOrbFieldReactiveHost } from '../../composables/useOrbFieldReactiveHost';
 import { buildOperatorQuickGuide, type OperatorQuickGuideActionId } from '../../lib/operator-quick-guide';
 import {
   effectiveRequiredConnectorsUnavailable,
@@ -50,6 +51,7 @@ const emit = defineEmits<{
 }>();
 
 const shell = useShellStore();
+const missionControlRoot = ref<HTMLElement | null>(null);
 
 const continueActionLabel = computed(() =>
   runContinueActionLabel({
@@ -64,6 +66,11 @@ const continueActionLabel = computed(() =>
 
 const centerView = computed(() => shell.operatorCenterView);
 const brainHeroMode = computed(() => shell.operatorBrainGalaxyActive);
+
+useOrbFieldReactiveHost({
+  root: missionControlRoot,
+  enabled: () => !brainHeroMode.value && shell.layoutMode === 'operator',
+});
 
 function setCenterView(view: OperatorCenterView): void {
   shell.setOperatorCenterView(view);
@@ -256,6 +263,12 @@ onMounted(() => {
   if (shell.currentWorkspace?.workspace_id) {
     void shell.loadWorkspaceTasks(shell.currentWorkspace.workspace_id);
   }
+  // Park the floating orb off fleet/task after mosaic obstacles exist in the DOM.
+  window.setTimeout(() => {
+    if (shell.layoutMode === 'operator' && shell.voiceOrbVisible) {
+      shell.requestVoiceOrbSmartDodge({ force: true });
+    }
+  }, 80);
 });
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
@@ -326,6 +339,7 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
 <template>
   <section
     id="operator-mission-control"
+    ref="missionControlRoot"
     class="center-workbench__operator-status operator-status-radar-panel hud-panel-frame"
     :class="[
       `operator-status-radar-panel--${radarTone}`,
@@ -334,6 +348,7 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
         'operator-status-radar-panel--terminal-collapsed': !props.terminalVisible,
         'operator-status-radar-panel--emphasized': shell.missionControlEmphasized,
         'operator-status-radar-panel--galaxy-only': brainHeroMode,
+        'operator-status-radar-panel--orb-live': shell.voiceOrbDragging,
       },
     ]"
     aria-label="Operator mission control"

@@ -366,3 +366,103 @@
   background: rgba(146, 64, 14, 0.7);
 }
 
+/* Keep composer controls on one responsive row as AgentDock is resized. */
+.agent-dock-composer__footer {
+  container-name: composer-footer;
+  container-type: inline-size;
+  grid-template-columns: minmax(0, 1fr) auto;
+  flex-wrap: nowrap;
+}
+
+.agent-dock-composer__tools {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  gap: clamp(0.16rem, 1cqi, 0.35rem);
+  flex-wrap: nowrap;
+}
+
+.agent-dock-composer__tools > .agent-dock-composer__tool-group {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.agent-dock-composer__tools > .agent-dock-composer__tool-group:nth-child(4),
+.agent-dock-composer__tools > .agent-dock-composer__tool-group:nth-child(5) {
+  flex-grow: 1.55;
+}
+
+.agent-dock-composer__tools .agent-dock-composer__tool {
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: clamp(0.2rem, 1.4cqi, 0.55rem);
+}
+
+.agent-dock-composer__tools
+  .agent-dock-composer__tool
+  > span:not(.agent-dock-composer__tool-icon):not(.agent-dock-composer__tool-plus):not(
+    .agent-dock-composer__tool-count
+  ):not(.agent-dock-composer__tool-chevron) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-composer__tools
+  .agent-dock-composer__tool--mode
+  .agent-dock-composer__tool-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container composer-footer (max-width: 21rem) {
+  .agent-dock-composer__tools > .agent-dock-composer__tool-group,
+  .agent-dock-composer__tools > .agent-dock-composer__tool-group:nth-child(4),
+  .agent-dock-composer__tools > .agent-dock-composer__tool-group:nth-child(5) {
+    flex: 1 1 0;
+  }
+
+  .agent-dock-composer__tools .agent-dock-composer__tool {
+    gap: 0;
+    min-height: 1.65rem;
+    padding-inline: 0.2rem;
+    font-size: 0.56rem;
+  }
+
+  .agent-dock-composer__tools
+    .agent-dock-composer__tool
+    > span:not(.agent-dock-composer__tool-icon):not(.agent-dock-composer__tool-plus):not(
+      .agent-dock-composer__tool-count
+    ) {
+    display: none;
+  }
+
+  .agent-dock-composer__tools .agent-dock-composer__tool-chevron,
+  .agent-dock-composer__tools
+    .agent-dock-composer__tool--mode
+    .agent-dock-composer__tool-label {
+    display: none;
+  }
+
+  .agent-dock-composer__tools .agent-dock-composer__tool-icon,
+  .agent-dock-composer__tools .agent-dock-composer__tool-plus {
+    flex: 0 0 auto;
+    font-size: 0.78rem;
+  }
+
+  .agent-dock-composer__tools .agent-dock-composer__mode-pill {
+    display: none;
+  }
+}
+
+@container composer-footer (max-width: 18rem) {
+  .agent-dock-composer__tools .agent-dock-composer__tool-count {
+    display: none;
+  }
+}
+

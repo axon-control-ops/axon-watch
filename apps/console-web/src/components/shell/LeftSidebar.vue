@@ -12,7 +12,6 @@ import KairoVoiceDeckPanel from './KairoVoiceDeckPanel.vue';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
-import HudHoloPanelShell from '../../features/hud-holo/HudHoloPanelShell.vue';
 import type { HudHoloTone } from '../../features/hud-holo/hud-holo-tones';
 import {
   workspaceDisplayLabel,
@@ -42,6 +41,7 @@ const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? 280);
 const resizing = ref(false);
 const {
   panelSize: voiceCardHeight,
+  userSized: voiceCardUserSized,
   resizing: voiceCardResizing,
   ariaValueMin: voiceCardHeightMin,
   ariaValueMax: voiceCardHeightMax,
@@ -52,9 +52,10 @@ const {
   rootRef: sidebarRef,
   cssVariable: '--voice-card-height',
   storageKey: 'axon-shell-voice-card-height',
-  defaultSize: (height) => Math.min(212, Math.max(152, height * 0.21)),
-  minSize: 132,
-  maxSize: (height) => height * 0.45,
+  // Auto-height until the operator drags; this is the initial resize target.
+  defaultSize: (height) => Math.min(Math.round(height * 0.38), 280),
+  minSize: 152,
+  maxSize: (height) => Math.round(height * 0.55),
 });
 
 const catalogWorkspaces = computed(() => shell.workspaces);
@@ -194,6 +195,7 @@ onBeforeUnmount(() => {
     :class="{
       'left-sidebar-mockup--resizing': resizing,
       'left-sidebar-mockup--voice-resizing': voiceCardResizing,
+      'left-sidebar-mockup--voice-user-sized': voiceCardUserSized,
       'left-sidebar-mockup--ide': isIdeMode,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
       'left-sidebar-mockup--galaxy': shell.operatorBrainGalaxyActive,
@@ -210,15 +212,33 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
+        <div
+          class="voice-card-resize-handle"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize Agent card"
+          title="Drag or use arrow keys to resize. Enter or double-click to reset."
+          tabindex="0"
+          :aria-valuemin="voiceCardHeightMin"
+          :aria-valuemax="voiceCardHeightMax"
+          :aria-valuenow="voiceCardHeight"
+          @mousedown="startVoiceCardResize"
+          @keydown="onVoiceCardResizeKeydown"
+          @dblclick="resetVoiceCardHeight"
+        >
+          <span class="voice-card-resize-grip" aria-hidden="true" />
+        </div>
         <KairoSidebarPanel />
       </div>
     </template>
 
     <template v-else>
-      <HudHoloPanelShell
-        class="left-sidebar-mockup__workspaces-panel"
-        label="workspaces"
-        :tone="workspacesHoloTone"
+      <section
+        class="left-sidebar-mockup__workspaces-panel hud-panel-frame"
+        :class="{
+          'left-sidebar-mockup__workspaces-panel--attention': workspacesHoloTone === 'attention',
+        }"
+        aria-label="Workspaces"
       >
         <div
           v-if="showSidebarModeToggle"
@@ -337,7 +357,7 @@ onBeforeUnmount(() => {
           v-show="shell.leftSidebarMode === 'attention'"
           variant="sidebar"
         />
-      </HudHoloPanelShell>
+      </section>
     </template>
 
     <div

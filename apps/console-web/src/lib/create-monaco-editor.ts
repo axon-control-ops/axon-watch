@@ -11,6 +11,14 @@ import {
   MOCKUP_MONACO_THEME_ID,
   mockupEditorFontOptions,
 } from './mockup-workbench-theme';
+import {
+  CURSOR_MONACO_THEME_ID,
+  cursorEditorFontOptions,
+  cursorMinimapOptions,
+  defineCursorMonacoTheme,
+  mockupMinimapOptions,
+} from './cursor-editor-theme';
+import { registerCsvLanguage } from './register-csv-language';
 
 export interface MonacoEditorOptions {
   value: string;
@@ -21,6 +29,7 @@ export interface MonacoEditorOptions {
   onCursorChange?: (position: { line: number; column: number }) => void;
   onSelectionChange?: (selection: EditorSelectionSnapshot | null) => void;
   variant?: 'default' | 'mockup';
+  themeProfile?: 'mockup' | 'cursor';
 }
 
 export interface EditorSelectionSnapshot {
@@ -139,6 +148,7 @@ function loadMonaco(): Promise<typeof Monaco> {
     monacoPromise = import('monaco-editor').then((monaco) => {
       installMonacoEnvironment();
       configureLanguageDefaults(monaco);
+      registerCsvLanguage(monaco);
       return monaco;
     });
   }
@@ -151,15 +161,20 @@ export async function createMonacoEditor(
 ): Promise<MonacoEditorController> {
   const monaco = await loadMonaco();
   const useMockupTheme = options.variant === 'mockup';
-  if (useMockupTheme) {
+  const useCursorTheme = useMockupTheme && options.themeProfile === 'cursor';
+  if (useCursorTheme) {
+    defineCursorMonacoTheme(monaco);
+  } else if (useMockupTheme) {
     defineMockupMonacoTheme(monaco);
   }
 
   const minimapEnabled = options.minimapEnabled ?? useMockupTheme;
+  const fontOptions = useCursorTheme ? cursorEditorFontOptions : mockupEditorFontOptions;
+  const minimapLayout = useCursorTheme ? cursorMinimapOptions : mockupMinimapOptions;
   const model = monaco.editor.createModel(options.value, options.language);
   const editor = monaco.editor.create(container, {
     model,
-    theme: useMockupTheme ? MOCKUP_MONACO_THEME_ID : 'vs-dark',
+    theme: useCursorTheme ? CURSOR_MONACO_THEME_ID : useMockupTheme ? MOCKUP_MONACO_THEME_ID : 'vs-dark',
     automaticLayout: true,
     // Monaco 0.55 defaults editContext to true; with our shell CSS it can leave
     // a blank pane while the model still has content (status bar line count OK).
@@ -172,10 +187,7 @@ export async function createMonacoEditor(
     hover: { enabled: true },
     minimap: {
       enabled: minimapEnabled,
-      scale: 2,
-      showSlider: 'mouseover',
-      renderCharacters: false,
-      maxColumn: 80,
+      ...minimapLayout,
     },
     stickyScroll: {
       enabled: useMockupTheme,
@@ -196,15 +208,15 @@ export async function createMonacoEditor(
     cursorSmoothCaretAnimation: 'on',
     renderLineHighlight: useMockupTheme ? 'all' : 'line',
     renderWhitespace: useMockupTheme ? 'selection' : 'none',
-    fontSize: useMockupTheme ? mockupEditorFontOptions.fontSize : 15,
-    lineHeight: useMockupTheme ? mockupEditorFontOptions.lineHeight : 22,
+    fontSize: useMockupTheme ? fontOptions.fontSize : 15,
+    lineHeight: useMockupTheme ? fontOptions.lineHeight : 22,
     fontFamily: useMockupTheme
-      ? mockupEditorFontOptions.fontFamily
+      ? fontOptions.fontFamily
       : 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    fontLigatures: useMockupTheme ? false : undefined,
+    fontLigatures: useMockupTheme ? fontOptions.fontLigatures : undefined,
     scrollBeyondLastLine: false,
     readOnly: options.readOnly ?? false,
-    padding: { top: 16, bottom: 16 },
+    padding: useCursorTheme ? { top: 8, bottom: 8 } : { top: 16, bottom: 16 },
     overviewRulerBorder: false,
     scrollbar: {
       verticalScrollbarSize: 6,
@@ -300,7 +312,7 @@ export async function createMonacoEditor(
       editor.updateOptions({ readOnly });
     },
     setMinimapEnabled(enabled: boolean) {
-      editor.updateOptions({ minimap: { enabled } });
+      editor.updateOptions({ minimap: { enabled, ...minimapLayout } });
     },
     setValue(value: string) {
       activeModel.setValue(value);

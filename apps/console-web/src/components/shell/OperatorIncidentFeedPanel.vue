@@ -25,8 +25,8 @@ function focusSignal(signalId: string): void {
 </script>
 
 <template>
-  <section class="operator-incident-feed" aria-label="Incident feed">
-    <header class="operator-incident-feed__header">
+  <section class="operator-incident-feed" data-orb-obstacle="mission" aria-label="Incident feed">
+    <header class="operator-incident-feed__header" data-orb-field>
       <div>
         <p class="operator-incident-feed__eyebrow">Unified inbox</p>
         <h3 class="operator-incident-feed__title">Incidents</h3>
@@ -39,6 +39,7 @@ function focusSignal(signalId: string): void {
         v-for="item in feedView.items"
         :key="item.id"
         class="operator-incident-feed__item"
+        data-orb-field
         :class="`operator-incident-feed__item--${item.severity}`"
       >
         <div class="operator-incident-feed__row">

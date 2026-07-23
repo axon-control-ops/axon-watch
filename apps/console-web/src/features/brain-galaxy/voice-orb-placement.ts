@@ -47,6 +47,10 @@ export const VOICE_ORB_OBSTACLE_SELECTORS = [
   '.brain-galaxy-stage__hud--top',
   '.galaxy-ambient-hud',
   '.mobile-voice-cockpit-strip',
+  /* Keep the floating orb off Fleet / Task mosaic content. */
+  '[data-orb-obstacle="mission"]',
+  '.operator-fleet-grid-host',
+  '.operator-task-board-host',
 ] as const;
 
 export function normalizeVoiceOrbDock(value: unknown): VoiceOrbDock | null {

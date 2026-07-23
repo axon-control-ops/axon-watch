@@ -8,6 +8,7 @@ import {
   resolveDefaultHighlightedSignalId,
 } from '../../../lib/ide-attention-focus';
 import { persistIdeExplorerCollapsed } from '../../../lib/ide-layout-prefs';
+import type { DockSeamId } from '../../../lib/dock-seam-layout';
 import type { DockHeroMode } from '../../../lib/dock-hero-mode';
 import type { LeftSidebarMode } from '../../../lib/left-sidebar-mode';
 import type { LayoutMode } from '../types';
@@ -25,6 +26,8 @@ interface CreateOperatorFocusSliceInput {
   briefingSeamEmphasized: Ref<boolean>;
   operatorCenterView: Ref<OperatorCenterView>;
   dockHeroMode: Ref<DockHeroMode>;
+  expandedDockSeams: Ref<Set<DockSeamId>>;
+  dockThreadSeamTouched: Ref<boolean>;
   setLeftSidebarMode: (mode: LeftSidebarMode) => void;
   setDockHeroMode: (mode: DockHeroMode) => void;
   restoreComposerDraft: (content: string) => void;
@@ -140,25 +143,52 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     }
   }
 
+  function collapseOperatorThreadForBriefing(): void {
+    if (input.layoutMode.value === 'ide') {
+      return;
+    }
+    // Thread expanded = in the set. Collapse it so briefing owns the right dock.
+    if (input.expandedDockSeams.value.has('thread')) {
+      input.dockThreadSeamTouched.value = true;
+      const next = new Set(input.expandedDockSeams.value);
+      next.delete('thread');
+      input.expandedDockSeams.value = next;
+    }
+  }
+
   function focusKairoBriefing(): void {
     if (input.layoutMode.value === 'ide') {
       openIdeBriefingPanel();
     } else {
       input.setDockHeroMode('briefing');
+      collapseOperatorThreadForBriefing();
     }
-    input.briefingSeamEmphasized.value = true;
+    // Retrigger emphasis even when already on briefing (class toggle).
+    input.briefingSeamEmphasized.value = false;
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
+        input.briefingSeamEmphasized.value = true;
         const targetId =
           input.layoutMode.value === 'ide' ? 'ide-briefing-panel' : 'dock-seam-briefing';
-        document.getElementById(targetId)?.scrollIntoView({
+        const target = document.getElementById(targetId);
+        target?.classList.add('dock-hero-panel--focus-reveal');
+        target?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'end',
+          inline: 'nearest',
+        });
+        document.querySelector('.region-right-dock')?.scrollIntoView({
           behavior: 'smooth',
           block: 'nearest',
+          inline: 'nearest',
         });
         window.setTimeout(() => {
           input.briefingSeamEmphasized.value = false;
-        }, 1200);
+          target?.classList.remove('dock-hero-panel--focus-reveal');
+        }, 2200);
       });
+    } else {
+      input.briefingSeamEmphasized.value = true;
     }
   }
 

@@ -8,11 +8,6 @@
   background: rgba(0, 10, 16, 0.72);
 }
 
-.operator-task-board.hud-holo-shell {
-  border-color: transparent;
-  background: transparent;
-}
-
 .operator-task-board__header {
   display: flex;
   align-items: flex-start;

@@ -302,10 +302,13 @@
   display: flex;
   gap: 0.65rem;
   align-items: center;
+  min-height: 0;
 }
 
 .kairo-voice-deck__body--text {
-  align-items: flex-start;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .kairo-voice-deck__head {

@@ -8,10 +8,17 @@ const EDITOR_LANGUAGE_LABELS: Record<string, string> = {
   shell: 'Shell',
   html: 'HTML',
   css: 'CSS',
+  csv: 'CSV',
   image: 'Image',
   yaml: 'YAML',
   toml: 'TOML',
   sql: 'SQL',
+  xml: 'XML',
+  rust: 'Rust',
+  go: 'Go',
+  ini: 'Ini',
+  graphql: 'GraphQL',
+  dockerfile: 'Dockerfile',
 };
 
 function pathLanguageLabel(filePath: string | null | undefined): string | null {
@@ -43,6 +50,12 @@ function pathLanguageLabel(filePath: string | null | undefined): string | null {
   }
   if (path.endsWith('.sql')) {
     return 'SQL';
+  }
+  if (path.endsWith('.csv')) {
+    return 'CSV';
+  }
+  if (path.endsWith('.tsv')) {
+    return 'TSV';
   }
 
   return null;

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import IdeEditorStatusBarPanels from './IdeEditorStatusBarPanels.vue';
 import EditorStatusBarMeta from './EditorStatusBarMeta.vue';
-import WorkbenchTerminalReopenButton from './WorkbenchTerminalReopenButton.vue';
 import type {
   IdeEditorStatusAgentChip,
   IdeEditorStatusConnectorChip,
@@ -14,7 +13,6 @@ import type { EditorAccessStatus } from '../../lib/editor-access-status-view';
 
 defineProps<{
   isIdeMode: boolean;
-  terminalPanelVisible: boolean;
   showMinimapToggle: boolean;
   editorMinimapEnabled: boolean;
   editorCursorLine: number;
@@ -23,7 +21,6 @@ defineProps<{
   editorEol: 'CRLF' | 'LF';
   editorLanguageLabel: string;
   editorAccessStatus: EditorAccessStatus;
-  runPhase: string | null;
   terminalChip: IdeEditorStatusTerminalChip | null;
   connectorChip: IdeEditorStatusConnectorChip | null;
   gitChip: IdeEditorStatusGitChip | null;
@@ -73,10 +70,4 @@ const emit = defineEmits<{
       @open-source-control="emit('openSourceControl')"
     />
   </div>
-  <WorkbenchTerminalReopenButton
-    v-if="isIdeMode && !terminalPanelVisible"
-    :run-phase="runPhase"
-    :terminal-panel-visible="terminalPanelVisible"
-    @show="emit('showTerminal')"
-  />
 </template>

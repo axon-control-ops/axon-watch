@@ -9,15 +9,21 @@ import { briefingNotice, briefingAdvise } from '../../lib/briefing-panel-view';
 import PersonaTitle from '../../components/PersonaTitle.vue';
 import {
   kairoVoiceDiagnosticsLabel,
+  kairoVoiceLastEngine,
   kairoVoiceLastPreview,
+  kairoVoiceLastReason,
 } from '../../lib/kairo-voice-diagnostics';
 import { fetchKairoVoiceLog, type KairoVoiceLogEntry } from '../../lib/kairo-voice-log-client';
 import { isKairoVoiceSpeaking, subscribeKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
+import { deliverSpokenOperatorAlert } from '../../lib/spoken-alert-delivery';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const speaking = ref(false);
+const speakingBriefing = ref(false);
 const voiceLog = ref<KairoVoiceLogEntry[]>([]);
+const voiceDraft = ref('');
+const speakingDraft = ref(false);
 let unsubscribeSpeaking: (() => void) | null = null;
 const showDevVoiceDiagnostics = import.meta.env.DEV;
 
@@ -48,7 +54,13 @@ const presenceLabel = computed(() => {
   if (presenceState.value === 'alerting') {
     return 'Alert';
   }
-  return 'Listening via orb';
+  return 'Ready';
+});
+
+const diagnosticsLabel = computed(() => {
+  void kairoVoiceLastEngine.value;
+  void kairoVoiceLastReason.value;
+  return kairoVoiceDiagnosticsLabel();
 });
 
 function refreshSpeakingState(): void {
@@ -60,9 +72,52 @@ async function refreshVoiceLog(): Promise<void> {
     return;
   }
   try {
-    voiceLog.value = await fetchKairoVoiceLog(5);
+    voiceLog.value = await fetchKairoVoiceLog(12);
   } catch {
     voiceLog.value = [];
+  }
+}
+
+async function onSpeakBriefing(): Promise<void> {
+  if (speakingBriefing.value || voiceBlocked.value) {
+    return;
+  }
+  speakingBriefing.value = true;
+  try {
+    await shell.speakOperatorBriefing();
+    await refreshVoiceLog();
+  } finally {
+    speakingBriefing.value = false;
+  }
+}
+
+async function speakVoiceDraft(): Promise<void> {
+  const message = voiceDraft.value.trim();
+  if (!message || voiceBlocked.value || speakingDraft.value) {
+    return;
+  }
+  speakingDraft.value = true;
+  try {
+    await deliverSpokenOperatorAlert(
+      {
+        eligible: true,
+        reason: 'operator_voice_deck_draft',
+        signal_id: null,
+        message,
+      },
+      sessionStorage,
+      { dedupe: false },
+    );
+    await refreshVoiceLog();
+  } finally {
+    speakingDraft.value = false;
+  }
+}
+
+function onVoiceDraftKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    void speakVoiceDraft();
   }
 }
 
@@ -93,7 +148,11 @@ onBeforeUnmount(() => {
       <p class="kairo-voice-deck__title">
         <PersonaTitle suffix="Voice" mark-size="xs" />
       </p>
-      <span class="kairo-voice-deck__presence-pill" :data-state="presenceState">
+      <span
+        v-if="presenceLabel !== 'Ready'"
+        class="kairo-voice-deck__presence-pill"
+        :data-state="presenceState"
+      >
         {{ presenceLabel }}
       </span>
     </header>
@@ -104,11 +163,8 @@ onBeforeUnmount(() => {
         <template v-if="!shell.operatorBrainGalaxyActive">
           <p v-if="notice" class="kairo-voice-deck__notice">{{ notice }}</p>
           <p v-if="advise" class="kairo-voice-deck__advise">{{ advise }}</p>
-          <p class="kairo-voice-deck__hint">
-            Use the floating orb to talk · this card is status only
-          </p>
           <div v-if="showDevVoiceDiagnostics" class="kairo-voice-deck__dev-diagnostics">
-            <p class="kairo-voice-deck__dev-line">{{ kairoVoiceDiagnosticsLabel() }}</p>
+            <p class="kairo-voice-deck__dev-line">{{ diagnosticsLabel }}</p>
             <p v-if="kairoVoiceLastPreview" class="kairo-voice-deck__dev-line">
               Last: {{ kairoVoiceLastPreview }}
             </p>
@@ -118,6 +174,17 @@ onBeforeUnmount(() => {
                 <span> → {{ entry.reply }}</span>
               </li>
             </ul>
+            <label class="kairo-voice-deck__draft">
+              <textarea
+                v-model="voiceDraft"
+                class="kairo-voice-deck__draft-input"
+                rows="2"
+                placeholder="Type a voice line…"
+                aria-label="Voice line"
+                :disabled="voiceBlocked || speakingDraft"
+                @keydown="onVoiceDraftKeydown"
+              />
+            </label>
           </div>
         </template>
       </div>
@@ -127,10 +194,11 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="kairo-voice-deck__action kairo-voice-deck__action--primary"
-        :disabled="voiceBlocked"
-        @click="shell.speakOperatorBriefing().then(() => refreshVoiceLog())"
+        :disabled="voiceBlocked || speakingBriefing"
+        :aria-busy="speakingBriefing"
+        @click="onSpeakBriefing"
       >
-        Speak briefing
+        {{ speakingBriefing ? 'Speaking…' : 'Speak briefing' }}
       </button>
       <button
         v-if="!shell.operatorBrainGalaxyActive"

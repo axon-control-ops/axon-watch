@@ -149,14 +149,14 @@
 
 .kairo-sidebar-panel__transcript {
   grid-column: 1 / -1;
-  max-height: 5.5rem;
+  max-height: min(9rem, 22vh);
   margin-top: 0.15rem;
   padding: 0.4rem 0.45rem;
   overflow-y: auto;
   border-left: 2px solid rgba(0, 242, 255, 0.38);
   background: rgba(0, 242, 255, 0.045);
   color: var(--text-primary);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -181,14 +181,15 @@
 .kairo-sidebar-panel__notice,
 .kairo-sidebar-panel__advise {
   margin: 0;
-  font-size: 0.62rem;
-  line-height: 1.35;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  text-shadow: none;
 }
 
 .kairo-sidebar-panel__state {
   color: var(--text-muted);
   font-family: var(--font-mono);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -200,8 +201,9 @@
 .kairo-sidebar-panel__summary {
   margin: 0.25rem 0 0;
   color: var(--text-hud);
-  font-size: 0.62rem;
-  text-shadow: var(--glow-text-cyan);
+  font-size: 0.68rem;
+  line-height: 1.4;
+  text-shadow: none;
 }
 
 .kairo-sidebar-panel__notice {
@@ -403,6 +405,9 @@
 }
 
 .agent-dock__header {
+  /* Above .agent-dock__thread so the workspace picker can overhang the transcript. */
+  position: relative;
+  z-index: 30;
   flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
@@ -468,5 +473,22 @@
   flex: 0 1 auto;
   min-width: 0;
   max-width: 13rem;
+}
+
+.agent-dock-workspace-menu:has(.agent-dock-workspace-menu__panel) {
+  z-index: 80;
+}
+
+/* glass3d flattens dock children to z-index:1 — restore chrome above transcript. */
+.console-shell--mockup.console-shell--glass3d
+  .region-right-dock.agent-dock
+  > .agent-dock__header {
+  z-index: 30;
+}
+
+.console-shell--mockup.console-shell--glass3d
+  .region-right-dock.agent-dock
+  > .agent-dock__composer {
+  z-index: 40;
 }
 
