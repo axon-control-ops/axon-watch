@@ -162,6 +162,7 @@ def create_run(
     employee_role: str | None = None,
     task_id: str | None = None,
     require_leased_task: bool = False,
+    enter_execution: bool = True,
 ) -> dict[str, Any]:
     cleaned_role = str(employee_role or "").strip() or None
     cleaned_task = str(task_id or "").strip() or None
@@ -187,6 +188,8 @@ def create_run(
         employee_role=cleaned_role,
         task_id=cleaned_task,
     )
+    if not enter_execution:
+        record["current_step"] = "Assigned — waiting for worker dispatch"
     run_store.save_run(record)
     run_store.append_transition(
         record["history_ref"],
@@ -210,6 +213,11 @@ def create_run(
             task_store.bind_task_run(cleaned_task, record["run_id"])
         except task_store.TaskLedgerError as exc:
             raise RunLifecycleError(str(exc)) from exc
+
+    # Lead fan-out (and similar assigners) create ready runs without Lane B.
+    # Stay queued so roster does not fake BUSY and the scheduler can dispatch.
+    if not enter_execution:
+        return _apply_capabilities(record)
 
     record = _transition_record(
         record,
@@ -246,6 +254,43 @@ def create_run(
         receipt_summary="Run entered execution",
     )
     return record
+
+
+def begin_execution(
+    run_id: str,
+    *,
+    actor: str = "control-plane",
+    receipt_summary: str = "Queued run entered execution",
+) -> dict[str, Any]:
+    """Advance a queued/starting run into executing (scheduler / fan-out dispatch)."""
+    record = run_store.get_run(run_id)
+    if record is None:
+        raise RunNotFoundError(f"run not found: {run_id}")
+    phase = str(record.get("phase") or "").strip()
+    if phase == "executing":
+        return _apply_capabilities(record)
+    if phase == "queued":
+        record = _transition_record(
+            record,
+            to_phase="starting",
+            current_step="Preparing run resources",
+            actor=actor,
+            receipt_type="system_transition",
+            receipt_summary="Queued run accepted for dispatch",
+        )
+        phase = "starting"
+    if phase != "starting":
+        raise RunLifecycleError(
+            f"begin_execution requires queued or starting phase, found {phase}",
+        )
+    return _transition_record(
+        record,
+        to_phase="executing",
+        current_step="Executing thin-slice work",
+        actor=actor,
+        receipt_type="system_transition",
+        receipt_summary=receipt_summary,
+    )
 
 
 def complete_run(run_id: str) -> dict[str, Any]:

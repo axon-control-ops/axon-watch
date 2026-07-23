@@ -288,4 +288,16 @@ describe('company-roster-view', () => {
     ).toBe(true);
     expect(employeeIsActivelyBusy(specialist)).toBe(true);
   });
+
+  it('does not treat assigned fan-out runs as busy chrome', () => {
+    const assigned = employee({
+      employee_id: 'employee-workspace_dashpro-backend-3',
+      name: 'Marco',
+      role: 'backend',
+      status: 'assigned',
+      active_run_id: 'run_queued_fanout',
+    });
+    expect(employeeIsActivelyBusy(assigned)).toBe(false);
+    expect(employeeIsWorking(assigned.status)).toBe(true);
+  });
 });

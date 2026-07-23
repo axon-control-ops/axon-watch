@@ -1,5 +1,6 @@
 const WORKING_STATUSES = new Set([
   'watching',
+  'assigned',
   'planning',
   'executing',
   'verifying',
@@ -8,7 +9,7 @@ const WORKING_STATUSES = new Set([
   'handoff_ready',
 ]);
 
-/** Mid-shift / in-flight work — excludes always-on "watching". */
+/** Mid-shift / in-flight work — excludes always-on "watching" and assigned-not-dispatched. */
 const ACTIVE_BUSY_STATUSES = new Set([
   'planning',
   'executing',
