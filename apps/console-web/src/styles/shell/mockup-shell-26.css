@@ -1,3 +1,5 @@
+@import './briefing-hud-cinematic.css';
+
 .command-seam__empty {
   margin: 0;
   color: var(--text-muted);
@@ -319,5 +321,3 @@
 .briefing-panel--mockup .briefing-panel__section {
   margin-top: 0;
 }
-
-@import './briefing-hud-cinematic.css';
