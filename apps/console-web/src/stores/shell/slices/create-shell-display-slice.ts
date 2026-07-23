@@ -31,7 +31,7 @@ import {
   isOperatorCompletablePhase,
   shouldOfferRunContinue,
 } from '../../../lib/run-lifecycle-ui';
-import { buildTopbarChips } from '../../../lib/runtime-strip';
+import { buildStatusBarSegments, buildTopbarChips } from '../../../lib/runtime-strip';
 import { selectPrimaryApprovalRun } from '../../shell-run-selection';
 import type {
   InboxLoadState,
@@ -170,6 +170,21 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
 
     return zones;
   });
+
+  const layoutModeLabel = computed(() =>
+    input.layoutMode.value === 'operator' ? 'Mission Control' : 'IDE mode',
+  );
+
+  const statusBarSegments = computed(() =>
+    buildStatusBarSegments({
+      layoutModeLabel: layoutModeLabel.value,
+      workspaceId: input.currentWorkspace.value?.workspace_id ?? null,
+      runtimeSummary: input.runtimeSummary.value,
+      pendingApprovals: pendingApprovalsCount.value,
+    }),
+  );
+
+  const statusBarItems = computed(() => statusBarSegments.value.map((segment) => segment.label));
 
   const workspaceStatusCardRows = computed(() =>
     buildWorkspaceStatusCardRows({
@@ -343,6 +358,9 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     attentionSignals,
     workspaceAttentionSignalCount,
     statusBarZones,
+    statusBarSegments,
+    statusBarItems,
+    layoutModeLabel,
     workspaceStatusCardRows,
     briefingSummaryLine,
     runtimeStateLabel,
