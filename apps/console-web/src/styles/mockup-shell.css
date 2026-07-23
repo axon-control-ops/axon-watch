@@ -16,7 +16,6 @@
 @import './shell/mockup-shell-16.css';
 @import './shell/mockup-shell-17.css';
 @import './shell/mockup-shell-18.css';
-@import './shell/operator-task-board.css';
 @import './shell/mockup-shell-connectors-rail.css';
 @import './shell/mockup-shell-19.css';
 @import './shell/mockup-shell-20.css';
@@ -27,11 +26,7 @@
 @import './shell/mockup-shell-24.css';
 @import './shell/mockup-shell-25.css';
 @import './shell/mockup-shell-26.css';
-@import './shell/briefing-hud-cinematic.css';
 @import './shell/mockup-shell-27.css';
 @import './shell/mockup-shell-28.css';
 @import './shell/mockup-shell-29.css';
-@import './shell/mockup-shell-30.css';
-@import './shell/operator-hud-holographic.css';
-@import '../features/hud-holo/hud-holo-panel-shell.css';
 @import './shell/mockup-shell-tail.css';

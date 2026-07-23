@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { openWatchConnectors } from '../../composables/useIdeEditorStatusBar';
 import { buildOperatorQuickGuide, type OperatorQuickGuideActionId } from '../../lib/operator-quick-guide';
@@ -28,7 +28,6 @@ import {
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 import {
-  operatorTerminalChipLabel,
   operatorTerminalDockActionLabel,
   workbenchTerminalPanelAlive,
   workbenchTerminalPanelAriaLabel,
@@ -39,6 +38,7 @@ import OperatorBrainGraphPanel from './OperatorBrainGraphPanel.vue';
 import OperatorFleetHealthGrid from './OperatorFleetHealthGrid.vue';
 import OperatorIncidentFeedPanel from './OperatorIncidentFeedPanel.vue';
 import OperatorRunStripPanel from './OperatorRunStripPanel.vue';
+import OperatorStatusRadarPanelHeader from './OperatorStatusRadarPanelHeader.vue';
 import OperatorTaskBoardPanel from './OperatorTaskBoardPanel.vue';
 
 const props = defineProps<{
@@ -246,143 +246,6 @@ const showStandaloneQuickGuide = computed(
     quickGuide.value?.tone === 'attention',
 );
 
-// #region agent log
-watch(
-  () =>
-    ({
-      centerView: centerView.value,
-      brainHero: brainHeroMode.value,
-      showMissionStage: showMissionStage.value,
-      showStandaloneQuickGuide: showStandaloneQuickGuide.value,
-      guideTone: quickGuide.value?.tone ?? null,
-      guideTitle: quickGuide.value?.title ?? null,
-      voiceOrb: shell.voiceOrbVisible,
-      galaxyOrbGate: shell.operatorBrainGalaxyActive,
-    }) as const,
-  (state) => {
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'fc0b35',
-      },
-      body: JSON.stringify({
-        sessionId: 'fc0b35',
-        runId: 'mc-chaos',
-        hypothesisId: 'H-mc',
-        location: 'OperatorStatusRadarPanel.vue:overlay-state',
-        message: 'mission control overlay gates',
-        data: state,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  },
-  { immediate: true },
-);
-
-function measureMissionControlStack(): void {
-  if (typeof document === 'undefined' || brainHeroMode.value) {
-    return;
-  }
-  const root = document.getElementById('operator-mission-control');
-  if (!root) {
-    return;
-  }
-  const selectors = [
-    '.operator-fleet-grid',
-    '.operator-task-board',
-    '.operator-incident-feed',
-    '.operator-run-strip',
-    '.connectors-rail-panel',
-  ];
-  const boxes = selectors
-    .map((selector) => {
-      const el = root.querySelector(selector);
-      if (!(el instanceof HTMLElement)) {
-        return null;
-      }
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-      return {
-        selector,
-        top: Math.round(rect.top),
-        bottom: Math.round(rect.bottom),
-        height: Math.round(rect.height),
-        zIndex: style.zIndex,
-        opacity: style.opacity,
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => Boolean(row));
-  const overlaps: string[] = [];
-  for (let i = 0; i < boxes.length - 1; i += 1) {
-    const current = boxes[i];
-    const next = boxes[i + 1];
-    if (!current || !next) {
-      continue;
-    }
-    if (current.bottom > next.top + 2) {
-      overlaps.push(`${current.selector}>${next.selector}`);
-    }
-  }
-  const fleet = root.querySelector('.operator-fleet-grid');
-  let fleetHit: {
-    x: number;
-    y: number;
-    inFleet: boolean;
-    className: string | null;
-  } | null = null;
-  let fleetCellCount = 0;
-  let fleetLabels: string[] = [];
-  if (fleet instanceof HTMLElement) {
-    const rect = fleet.getBoundingClientRect();
-    const x = Math.round(rect.left + Math.max(rect.width / 2, 8));
-    const y = Math.round(rect.top + Math.min(72, Math.max(rect.height / 2, 12)));
-    const hit = document.elementFromPoint(x, y);
-    fleetHit = {
-      x,
-      y,
-      inFleet: Boolean(hit && fleet.contains(hit)),
-      className:
-        hit && typeof (hit as HTMLElement).className === 'string'
-          ? String((hit as HTMLElement).className).slice(0, 120)
-          : hit?.tagName ?? null,
-    };
-    fleetCellCount = fleet.querySelectorAll('.operator-fleet-grid__item').length;
-    fleetLabels = [...fleet.querySelectorAll('.operator-fleet-grid__label')]
-      .slice(0, 4)
-      .map((node) => (node.textContent || '').trim())
-      .filter(Boolean);
-  }
-  const header = root.querySelector('.operator-status-radar-panel__header');
-  const headerZ =
-    header instanceof HTMLElement ? getComputedStyle(header).zIndex : null;
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'fc0b35',
-    },
-    body: JSON.stringify({
-      sessionId: 'fc0b35',
-      runId: 'post-fix',
-      hypothesisId: 'H-mc-cover',
-      location: 'OperatorStatusRadarPanel.vue:measureMissionControlStack',
-      message: 'mission control section stack geometry',
-      data: {
-        centerView: centerView.value,
-        overlapCount: overlaps.length,
-        overlaps,
-        boxes,
-        headerZ,
-        fleetHit,
-        fleetCellCount,
-        fleetLabels,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-}
-
 onMounted(() => {
   if (
     shell.operatorFleetHealthLoadState === 'idle' ||
@@ -391,18 +254,9 @@ onMounted(() => {
     void shell.loadOperatorFleetHealth();
   }
   if (shell.currentWorkspace?.workspace_id) {
-    void shell.loadWorkspaceTasks();
+    void shell.loadWorkspaceTasks(shell.currentWorkspace.workspace_id);
   }
-  void nextTick(() => measureMissionControlStack());
 });
-
-watch(
-  () => [centerView.value, brainHeroMode.value, shell.layoutMode] as const,
-  () => {
-    void nextTick(() => measureMissionControlStack());
-  },
-);
-// #endregion
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 
@@ -498,67 +352,19 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
       <span class="hud-panel-frame__corner hud-panel-frame__corner--bl" aria-hidden="true" />
       <span class="hud-panel-frame__corner hud-panel-frame__corner--br" aria-hidden="true" />
 
-      <header class="operator-status-radar-panel__header">
-        <div class="operator-status-radar-panel__header-copy">
-          <p class="operator-status-radar-panel__eyebrow">Operator center</p>
-          <h2 class="operator-status-radar-panel__title">Mission Control</h2>
-        </div>
-        <div class="operator-status-radar-panel__header-actions">
-          <div class="operator-center-view-switch" role="group" aria-label="Center view">
-            <button
-              type="button"
-              class="operator-center-view-switch__button"
-              :class="{ 'operator-center-view-switch__button--active': centerView === 'grid' }"
-              :aria-pressed="centerView === 'grid'"
-              @click="setCenterView('grid')"
-            >
-              GRID
-            </button>
-            <button
-              type="button"
-              class="operator-center-view-switch__button"
-              :class="{ 'operator-center-view-switch__button--active': centerView === 'graph' }"
-              :aria-pressed="centerView === 'graph'"
-              @click="setCenterView('graph')"
-            >
-              BRAIN
-            </button>
-          </div>
-          <button
-            type="button"
-            class="operator-status-radar-panel__terminal-chip"
-            :class="{
-              'operator-status-radar-panel__terminal-chip--collapsed': !props.terminalVisible,
-              'operator-status-radar-panel__terminal-chip--alive': terminalDockAlive,
-              'operator-status-radar-panel__terminal-chip--executing':
-                !props.terminalVisible && terminalRunPhase === 'executing',
-              'operator-status-radar-panel__terminal-chip--review-ready':
-                !props.terminalVisible && terminalRunPhase === 'review_ready',
-            }"
-            :title="terminalPanelTitle"
-            :aria-label="terminalPanelAriaLabel"
-            @click="toggleTerminal"
-          >
-            {{ operatorTerminalChipLabel(props.terminalVisible) }}
-            <span
-              v-if="terminalDockAlive"
-              class="operator-status-radar-panel__terminal-chip-pulse"
-              aria-hidden="true"
-            />
-          </button>
-          <div class="operator-status-radar-panel__presence">
-            <span
-              class="operator-status-radar-panel__status-dot"
-              :class="`operator-status-radar-panel__status-dot--${radarTone}`"
-              aria-hidden="true"
-            />
-            <div class="operator-status-radar-panel__presence-copy">
-              <span class="operator-status-radar-panel__presence-title">{{ kairoParts.title }}</span>
-              <span class="operator-status-radar-panel__presence-subtitle">{{ kairoParts.subtitle }}</span>
-            </div>
-          </div>
-        </div>
-      </header>
+      <OperatorStatusRadarPanelHeader
+        :center-view="centerView"
+        :radar-tone="radarTone"
+        :terminal-visible="props.terminalVisible"
+        :terminal-dock-alive="terminalDockAlive"
+        :terminal-run-phase="terminalRunPhase"
+        :terminal-panel-title="terminalPanelTitle"
+        :terminal-panel-aria-label="terminalPanelAriaLabel"
+        :kairo-title="kairoParts.title"
+        :kairo-subtitle="kairoParts.subtitle"
+        @set-center-view="setCenterView"
+        @toggle-terminal="toggleTerminal"
+      />
 
       <OperatorFleetHealthGrid />
 

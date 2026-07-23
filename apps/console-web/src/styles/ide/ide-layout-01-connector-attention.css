@@ -118,3 +118,5 @@
 .ide-explorer-panel--search-attention .panel-heading__title {
   color: rgba(255, 200, 150, 0.96);
 }
+
+@import './ide-layout-01-hud-sidebar.css';

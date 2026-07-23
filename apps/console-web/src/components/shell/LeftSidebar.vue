@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import IdeActivityBar from '../ide/IdeActivityBar.vue';
 import IdeAttentionPanel from '../ide/IdeAttentionPanel.vue';
@@ -91,37 +91,6 @@ function isActiveWorkspace(workspaceId: string): boolean {
   return shell.currentWorkspace?.workspace_id === workspaceId;
 }
 
-// #region agent log
-watch(
-  () => shell.currentWorkspace?.workspace_id ?? null,
-  (workspaceId) => {
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'fc0b35',
-      },
-      body: JSON.stringify({
-        sessionId: 'fc0b35',
-        runId: 'ws-glow',
-        hypothesisId: 'H-ws-glow',
-        location: 'LeftSidebar.vue:currentWorkspace',
-        message: 'workspace selection for glow chrome',
-        data: {
-          workspaceId,
-          listed: catalogWorkspaces.value.slice(0, 12).map((row) => ({
-            id: row.workspace_id,
-            active: row.workspace_id === workspaceId,
-          })),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  },
-  { immediate: true },
-);
-// #endregion
-
 function workspaceSubtext(workspaceId: string): string {
   return workspaceStatusLine(
     workspaceId,
@@ -193,113 +162,8 @@ function startSidebarResize(event: MouseEvent): void {
   document.addEventListener('mouseup', onUp);
 }
 
-// #region agent log
-function measureLeftSidebarPanels(runId: string): void {
-  const root = sidebarRef.value;
-  if (!root) return;
-  const team =
-    (root.querySelector('.ide-team-panel') as HTMLElement | null) ||
-    (root.querySelector('.ide-explorer-panel') as HTMLElement | null);
-  const ideBody = root.querySelector('.left-sidebar-mockup__ide-body') as HTMLElement | null;
-  const ideMain = root.querySelector('.left-sidebar-mockup__ide-main') as HTMLElement | null;
-  const kairoAnchor = root.querySelector(
-    '.left-sidebar-mockup__status-anchor--ide',
-  ) as HTMLElement | null;
-  const workspaces = root.querySelector(
-    '.left-sidebar-mockup__workspaces-panel',
-  ) as HTMLElement | null;
-  const voiceAnchor = root.querySelector(
-    '.left-sidebar-mockup__status-anchor:not(.left-sidebar-mockup__status-anchor--ide):not(.left-sidebar-mockup__status-anchor--galaxy)',
-  ) as HTMLElement | null;
-  const voiceDeck = root.querySelector('.kairo-voice-deck') as HTMLElement | null;
-  const roster = root.querySelector('.company-roster') as HTMLElement | null;
-  const holoShells = Array.from(root.querySelectorAll('.hud-holo-shell')).map((el) => ({
-    label: el.getAttribute('data-holo-label'),
-    webgl: el.getAttribute('data-holo-webgl'),
-    h: Math.round(el.getBoundingClientRect().height),
-  }));
-  const frame =
-    (root.querySelector('.left-sidebar-mockup__workspaces-panel.hud-panel-frame') as HTMLElement | null) ||
-    (root.querySelector('.ide-team-panel') as HTMLElement | null) ||
-    root;
-  const cs = getComputedStyle(frame);
-  const rootCs = getComputedStyle(root);
-  const teamFlex = team ? getComputedStyle(team).flexGrow : null;
-  const teamH = team?.getBoundingClientRect().height ?? 0;
-  const bodyH = ideBody?.getBoundingClientRect().height ?? 0;
-  const mainH = ideMain?.getBoundingClientRect().height ?? 0;
-  const kairoH = kairoAnchor?.getBoundingClientRect().height ?? 0;
-  const wsH = workspaces?.getBoundingClientRect().height ?? 0;
-  const voiceH = voiceDeck?.getBoundingClientRect().height ?? voiceAnchor?.getBoundingClientRect().height ?? 0;
-  const sideH = root.getBoundingClientRect().height;
-  const gapAboveVoice = voiceAnchor
-    ? Math.round(voiceAnchor.getBoundingClientRect().top - (workspaces?.getBoundingClientRect().bottom ?? 0))
-    : null;
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'fc0b35',
-    },
-    body: JSON.stringify({
-      sessionId: 'fc0b35',
-      runId,
-      hypothesisId: 'H-team-flex',
-      location: 'LeftSidebar.vue:measureLeftSidebarPanels',
-      message: 'left sidebar panel geometry + color tokens',
-      data: {
-        layoutMode: shell.layoutMode,
-        activityView: shell.ideActivityView,
-        sideH: Math.round(sideH),
-        ideBodyH: Math.round(bodyH),
-        teamH: Math.round(teamH),
-        ideMainH: Math.round(mainH),
-        kairoH: Math.round(kairoH),
-        rosterH: Math.round(roster?.getBoundingClientRect().height ?? 0),
-        teamFillRatio: mainH > 0 ? Number((teamH / mainH).toFixed(3)) : null,
-        teamOfSidebar: sideH > 0 ? Number((teamH / sideH).toFixed(3)) : null,
-        teamFlexGrow: teamFlex,
-        wsH: Math.round(wsH),
-        voiceH: Math.round(voiceH),
-        gapAboveVoice,
-        wsOfSidebar: sideH > 0 ? Number((wsH / sideH).toFixed(3)) : null,
-        voiceOfSidebar: sideH > 0 ? Number((voiceH / sideH).toFixed(3)) : null,
-        wsDisplay: workspaces ? getComputedStyle(workspaces).display : null,
-        wsOverflow: workspaces ? getComputedStyle(workspaces).overflow : null,
-        wsMinHeight: workspaces ? getComputedStyle(workspaces).minHeight : null,
-        ideBodyDisplay: ideBody ? getComputedStyle(ideBody).display : null,
-        ideBodyMinHeight: ideBody ? getComputedStyle(ideBody).minHeight : null,
-        hudBorder: cs.getPropertyValue('--hud-surface-border').trim(),
-        hudFill: cs.getPropertyValue('--hud-surface-fill').trim(),
-        accentBrand: rootCs.getPropertyValue('--accent-brand').trim() ||
-          getComputedStyle(document.documentElement).getPropertyValue('--accent-brand').trim(),
-        statusAnchorBorderTop: kairoAnchor
-          ? getComputedStyle(kairoAnchor).borderTopColor
-          : voiceAnchor
-            ? getComputedStyle(voiceAnchor).borderTopColor
-            : null,
-        glass3d: Boolean(root.closest('.console-shell--glass3d')),
-        holoShells,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-}
-
-function schedulePanelMeasure(runId: string): void {
-  void nextTick(() => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => measureLeftSidebarPanels(runId));
-    });
-  });
-}
-// #endregion
-
 onMounted(() => {
   syncShellSidebarWidth();
-  // #region agent log
-  schedulePanelMeasure('post-fix-2');
-  // #endregion
 });
 
 watch(
@@ -312,9 +176,6 @@ watch(
     ] as const,
   () => {
     syncShellSidebarWidth();
-    // #region agent log
-    schedulePanelMeasure('post-fix-2-layout');
-    // #endregion
   },
 );
 
