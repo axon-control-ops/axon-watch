@@ -38,6 +38,10 @@ type ShellStore = ReturnType<typeof useShellStore>;
 export type PlanSoftSwitchNotice = {
   reason: string;
   previousMode: 'agent';
+  /** Cursor-like: 'switched' already flipped mode; 'offer' pauses until user chooses. */
+  kind?: 'switched' | 'offer';
+  /** Draft held while an offer is pending (not yet submitted). */
+  pendingDraft?: string;
 };
 
 export type { TeammateRouteNotice };
@@ -147,8 +151,19 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     const submitDraft = withSkillTokensForSubmit?.(shell.ideComposerDraft) ?? shell.ideComposerDraft;
     if (modeForSubmit === 'agent') {
       const decision = shouldSoftSwitchAgentToPlan(modeForSubmit, submitDraft);
-      if (decision.shouldSwitch) {
+      if (decision.action === 'offer') {
+        // Cursor suggests Plan for complex asks — pause for explicit choice.
         planSoftSwitchNotice.value = {
+          kind: 'offer',
+          reason: decision.reason,
+          previousMode: 'agent',
+          pendingDraft: submitDraft,
+        };
+        return;
+      }
+      if (decision.action === 'switch') {
+        planSoftSwitchNotice.value = {
+          kind: 'switched',
           reason: decision.reason,
           previousMode: 'agent',
         };
@@ -233,12 +248,65 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     if (!notice) {
       return;
     }
+    if (notice.kind === 'offer') {
+      planSoftSwitchNotice.value = null;
+      return;
+    }
     composerMode.value = notice.previousMode;
     planSoftSwitchNotice.value = null;
   }
 
   function dismissPlanSoftSwitch(): void {
     planSoftSwitchNotice.value = null;
+  }
+
+  async function acceptPlanSoftSwitchOffer(): Promise<void> {
+    const notice = planSoftSwitchNotice.value;
+    if (!notice || notice.kind !== 'offer') {
+      return;
+    }
+    const pending = (notice.pendingDraft ?? shell.ideComposerDraft).trim();
+    planSoftSwitchNotice.value = null;
+    if (!pending) {
+      return;
+    }
+    composerMode.value = 'plan';
+    shell.ideComposerDraft = pending;
+    const attachmentFiles = composerImages.value.map((image) => image.file);
+    await shell.submitIdeComposer('plan', { attachmentFiles });
+    clearSkillAttachments?.();
+    recordComposerHistoryIfSent(pending);
+  }
+
+  async function declinePlanSoftSwitchOffer(): Promise<void> {
+    const notice = planSoftSwitchNotice.value;
+    if (!notice || notice.kind !== 'offer') {
+      return;
+    }
+    const pending = (notice.pendingDraft ?? shell.ideComposerDraft).trim();
+    planSoftSwitchNotice.value = null;
+    if (!pending) {
+      return;
+    }
+    composerMode.value = 'agent';
+    shell.ideComposerDraft = pending;
+    dismissEmployeeSpecialtyRoute();
+    const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
+    const routeDecision = await resolveEmployeeSpecialtyRoute({
+      prompt: pending,
+      workspaceId,
+      currentEmployee: shell.activeIdeEmployeeRecord,
+      roster: shell.companyEmployeesForCurrentWorkspace,
+      useModelTiebreak: false,
+    });
+    if (routeDecision.shouldRoute) {
+      await applyEmployeeSpecialtyRoute(shell, routeDecision);
+    }
+    const attachmentFiles = composerImages.value.map((image) => image.file);
+    shell.ideComposerDraft = pending;
+    await shell.submitIdeComposer('agent', { attachmentFiles });
+    clearSkillAttachments?.();
+    recordComposerHistoryIfSent(pending);
   }
 
   async function undoTeammateRoute(): Promise<void> {
@@ -348,6 +416,8 @@ export function useComposerActions(options: UseComposerActionsOptions) {
   }
 
   return {
+    acceptPlanSoftSwitchOffer,
+    declinePlanSoftSwitchOffer,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
     handleApproveRun,
