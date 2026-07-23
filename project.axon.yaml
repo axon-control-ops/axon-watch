@@ -1,0 +1,67 @@
+# Canonical Axon project contract (versioned).
+# Adapters: node_vue, python_fastapi, android_gradle (inspect-only when unsupported).
+version: 1
+project_id: workspace_axon_watch
+display_name: Axon-X / axon-watch
+stack: node_vue_python_fastapi
+certification_level: build
+extends: config/project-contracts/axon-watch.project.axon.yaml
+adapters:
+  - node_vue
+  - python_fastapi
+  - android_gradle
+environment:
+  bootstrap:
+    - npm ci
+commands:
+  lint:
+    - npm run lint --if-present
+  typecheck:
+    - npm run typecheck --workspace=apps/console-web
+  test:
+    - ./scripts/verify/run_contract_unit_tests.sh
+  build:
+    - npm run build --workspace=apps/console-web
+  security:
+    - ./scripts/dev/python.sh scripts/guardrails/check_hotspot_changes.py
+  diff_budget:
+    - ./scripts/dev/python.sh scripts/guardrails/check_file_sizes.py
+allowed_paths:
+  - apps/
+  - services/
+  - packages/
+  - scripts/
+  - tests/
+  - config/
+  - docs/
+  - .github/
+forbidden_path_globs:
+  - "**/.env"
+  - "**/secrets/**"
+artifacts:
+  - apps/console-web/dist
+health_probes:
+  - http://127.0.0.1:8787/healthz
+deployment:
+  staging_target: local-staging
+  rollback_command: ./scripts/ops/rollback-staging.sh
+risk_tiers:
+  default: bounded
+  production_requires_human: true
+approval_boundaries:
+  - merge_to_protected_branch
+  - production_deploy
+  - secrets_change
+  - destructive_migration
+  - external_spend
+  - authority_expansion
+verifier:
+  identity: verifier
+  immutable_to_implementer: true
+  required_checks:
+    - lint
+    - typecheck
+    - test
+    - build
+    - security
+    - diff_budget

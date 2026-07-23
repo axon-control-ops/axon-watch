@@ -258,6 +258,10 @@ def complete_run(run_id: str) -> dict[str, Any]:
             f"complete requires executing, review_ready, or paused phase, found {record['phase']}",
         )
 
+    from app.runs.acceptance_transitions import enforce_acceptance_for_executing_complete
+
+    enforce_acceptance_for_executing_complete(record, run_id)
+
     receipt_summary = (
         "Run completed after operator review"
         if record["phase"] == "review_ready"
@@ -265,7 +269,7 @@ def complete_run(run_id: str) -> dict[str, Any]:
         if record["phase"] == "paused"
         else "Run completed"
     )
-    return _transition_record(
+    completed = _transition_record(
         record,
         to_phase="completed",
         current_step="Run completed",
@@ -273,6 +277,10 @@ def complete_run(run_id: str) -> dict[str, Any]:
         receipt_type="operator_complete",
         receipt_summary=receipt_summary,
     )
+    from app.runs.run_material_change import notify_run_material_change
+
+    notify_run_material_change(run_id, completed)
+    return completed
 
 
 def fail_run(
@@ -295,7 +303,7 @@ def fail_run(
     if len(step) > 180:
         step = step[:179].rstrip() + "…"
 
-    return _transition_record(
+    failed = _transition_record(
         record,
         to_phase="failed",
         current_step=step,
@@ -303,26 +311,10 @@ def fail_run(
         receipt_type="run_failed",
         receipt_summary=receipt_summary,
     )
+    from app.runs.run_material_change import notify_run_material_change
 
-
-def mark_review_ready(run_id: str) -> dict[str, Any]:
-    record = run_store.get_run(run_id)
-    if record is None:
-        raise RunNotFoundError(f"run not found: {run_id}")
-
-    if record["phase"] != "executing":
-        raise RunLifecycleError(
-            f"review_ready requires executing phase, found {record['phase']}",
-        )
-
-    return _transition_record(
-        record,
-        to_phase="review_ready",
-        current_step="Awaiting operator review",
-        actor="control-plane",
-        receipt_type="review_ready",
-        receipt_summary="Active execution stopped; run awaiting operator review",
-    )
+    notify_run_material_change(run_id, failed)
+    return failed
 
 
 def stop_run(run_id: str) -> dict[str, Any]:
@@ -401,7 +393,7 @@ def approve_run(run_id: str) -> dict[str, Any]:
             f"approve requires awaiting_approval phase, found {record['phase']}",
         )
 
-    return _transition_record(
+    approved = _transition_record(
         record,
         to_phase="executing",
         current_step="Run approved by operator",
@@ -409,6 +401,10 @@ def approve_run(run_id: str) -> dict[str, Any]:
         receipt_type="operator_approve",
         receipt_summary="Operator approved the run to continue execution",
     )
+    from app.runs.run_material_change import notify_run_material_change
+
+    notify_run_material_change(run_id, approved)
+    return approved
 
 
 def reject_run(run_id: str) -> dict[str, Any]:
@@ -495,6 +491,7 @@ def append_run_execution_receipt(
 
 
 
+from app.runs.acceptance_transitions import mark_review_ready
 from app.runs.queries import (
     approval_summary,
     is_background_employee_run,
