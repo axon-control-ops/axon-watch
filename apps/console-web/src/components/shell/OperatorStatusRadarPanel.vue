@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, onMounted, watch } from 'vue';
 
 import { openWatchConnectors } from '../../composables/useIdeEditorStatusBar';
 import { buildOperatorQuickGuide, type OperatorQuickGuideActionId } from '../../lib/operator-quick-guide';
@@ -198,7 +198,14 @@ const showLiveFeed = computed(
       shell.runHistoryRows.length > 0),
 );
 
-const showMissionStage = computed(() => !onlyAutoCompleteReviewBacklog.value);
+const showMissionStage = computed(
+  () =>
+    !onlyAutoCompleteReviewBacklog.value &&
+    (executionStage.value.hasActiveRun ||
+      pendingApprovals.value > 0 ||
+      shell.canResumePrimaryRun ||
+      shell.canCompletePrimaryRun),
+);
 
 const showRunActions = computed(
   () =>
@@ -231,9 +238,171 @@ const quickGuide = computed(() =>
   }),
 );
 
+// Idle Grid stays readable: only attention guides overlay as standalone cards.
 const showStandaloneQuickGuide = computed(
-  () => !showMissionStage.value && Boolean(quickGuide.value),
+  () =>
+    !showMissionStage.value &&
+    Boolean(quickGuide.value) &&
+    quickGuide.value?.tone === 'attention',
 );
+
+// #region agent log
+watch(
+  () =>
+    ({
+      centerView: centerView.value,
+      brainHero: brainHeroMode.value,
+      showMissionStage: showMissionStage.value,
+      showStandaloneQuickGuide: showStandaloneQuickGuide.value,
+      guideTone: quickGuide.value?.tone ?? null,
+      guideTitle: quickGuide.value?.title ?? null,
+      voiceOrb: shell.voiceOrbVisible,
+      galaxyOrbGate: shell.operatorBrainGalaxyActive,
+    }) as const,
+  (state) => {
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'fc0b35',
+      },
+      body: JSON.stringify({
+        sessionId: 'fc0b35',
+        runId: 'mc-chaos',
+        hypothesisId: 'H-mc',
+        location: 'OperatorStatusRadarPanel.vue:overlay-state',
+        message: 'mission control overlay gates',
+        data: state,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  },
+  { immediate: true },
+);
+
+function measureMissionControlStack(): void {
+  if (typeof document === 'undefined' || brainHeroMode.value) {
+    return;
+  }
+  const root = document.getElementById('operator-mission-control');
+  if (!root) {
+    return;
+  }
+  const selectors = [
+    '.operator-fleet-grid',
+    '.operator-task-board',
+    '.operator-incident-feed',
+    '.operator-run-strip',
+    '.connectors-rail-panel',
+  ];
+  const boxes = selectors
+    .map((selector) => {
+      const el = root.querySelector(selector);
+      if (!(el instanceof HTMLElement)) {
+        return null;
+      }
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return {
+        selector,
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+        height: Math.round(rect.height),
+        zIndex: style.zIndex,
+        opacity: style.opacity,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  const overlaps: string[] = [];
+  for (let i = 0; i < boxes.length - 1; i += 1) {
+    const current = boxes[i];
+    const next = boxes[i + 1];
+    if (!current || !next) {
+      continue;
+    }
+    if (current.bottom > next.top + 2) {
+      overlaps.push(`${current.selector}>${next.selector}`);
+    }
+  }
+  const fleet = root.querySelector('.operator-fleet-grid');
+  let fleetHit: {
+    x: number;
+    y: number;
+    inFleet: boolean;
+    className: string | null;
+  } | null = null;
+  let fleetCellCount = 0;
+  let fleetLabels: string[] = [];
+  if (fleet instanceof HTMLElement) {
+    const rect = fleet.getBoundingClientRect();
+    const x = Math.round(rect.left + Math.max(rect.width / 2, 8));
+    const y = Math.round(rect.top + Math.min(72, Math.max(rect.height / 2, 12)));
+    const hit = document.elementFromPoint(x, y);
+    fleetHit = {
+      x,
+      y,
+      inFleet: Boolean(hit && fleet.contains(hit)),
+      className:
+        hit && typeof (hit as HTMLElement).className === 'string'
+          ? String((hit as HTMLElement).className).slice(0, 120)
+          : hit?.tagName ?? null,
+    };
+    fleetCellCount = fleet.querySelectorAll('.operator-fleet-grid__item').length;
+    fleetLabels = [...fleet.querySelectorAll('.operator-fleet-grid__label')]
+      .slice(0, 4)
+      .map((node) => (node.textContent || '').trim())
+      .filter(Boolean);
+  }
+  const header = root.querySelector('.operator-status-radar-panel__header');
+  const headerZ =
+    header instanceof HTMLElement ? getComputedStyle(header).zIndex : null;
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'fc0b35',
+    },
+    body: JSON.stringify({
+      sessionId: 'fc0b35',
+      runId: 'post-fix',
+      hypothesisId: 'H-mc-cover',
+      location: 'OperatorStatusRadarPanel.vue:measureMissionControlStack',
+      message: 'mission control section stack geometry',
+      data: {
+        centerView: centerView.value,
+        overlapCount: overlaps.length,
+        overlaps,
+        boxes,
+        headerZ,
+        fleetHit,
+        fleetCellCount,
+        fleetLabels,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
+
+onMounted(() => {
+  if (
+    shell.operatorFleetHealthLoadState === 'idle' ||
+    shell.operatorFleetHealthLoadState === 'error'
+  ) {
+    void shell.loadOperatorFleetHealth();
+  }
+  if (shell.currentWorkspace?.workspace_id) {
+    void shell.loadWorkspaceTasks();
+  }
+  void nextTick(() => measureMissionControlStack());
+});
+
+watch(
+  () => [centerView.value, brainHeroMode.value, shell.layoutMode] as const,
+  () => {
+    void nextTick(() => measureMissionControlStack());
+  },
+);
+// #endregion
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 
@@ -335,6 +504,26 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
           <h2 class="operator-status-radar-panel__title">Mission Control</h2>
         </div>
         <div class="operator-status-radar-panel__header-actions">
+          <div class="operator-center-view-switch" role="group" aria-label="Center view">
+            <button
+              type="button"
+              class="operator-center-view-switch__button"
+              :class="{ 'operator-center-view-switch__button--active': centerView === 'grid' }"
+              :aria-pressed="centerView === 'grid'"
+              @click="setCenterView('grid')"
+            >
+              GRID
+            </button>
+            <button
+              type="button"
+              class="operator-center-view-switch__button"
+              :class="{ 'operator-center-view-switch__button--active': centerView === 'graph' }"
+              :aria-pressed="centerView === 'graph'"
+              @click="setCenterView('graph')"
+            >
+              BRAIN
+            </button>
+          </div>
           <button
             type="button"
             class="operator-status-radar-panel__terminal-chip"
@@ -370,27 +559,6 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
           </div>
         </div>
       </header>
-
-      <div class="operator-center-view-switch" role="group" aria-label="Center view">
-        <button
-          type="button"
-          class="operator-center-view-switch__button"
-          :class="{ 'operator-center-view-switch__button--active': centerView === 'grid' }"
-          :aria-pressed="centerView === 'grid'"
-          @click="setCenterView('grid')"
-        >
-          GRID
-        </button>
-        <button
-          type="button"
-          class="operator-center-view-switch__button"
-          :class="{ 'operator-center-view-switch__button--active': centerView === 'graph' }"
-          :aria-pressed="centerView === 'graph'"
-          @click="setCenterView('graph')"
-        >
-          BRAIN
-        </button>
-      </div>
 
       <OperatorFleetHealthGrid />
 

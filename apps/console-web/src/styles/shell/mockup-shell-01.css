@@ -7,6 +7,7 @@
   height: 100vh;
   max-height: 100vh;
   overflow: hidden;
+  transition: none;
   grid-template-areas:
     "topbar topbar topbar"
     "leftSidebar centerWorkbench rightDock"
@@ -293,10 +294,31 @@ body:has(.console-shell--mockup) {
   gap: 0;
 }
 
+/* Operator rail is explicitly content + bottom deck. Auto margins were
+ * resolving to 0px in the runtime flex layout, leaving Voice mid-column. */
+.left-sidebar-mockup:not(.left-sidebar-mockup--ide) {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+
+.left-sidebar-mockup:not(.left-sidebar-mockup--ide)
+  > .left-sidebar-mockup__workspaces-panel {
+  grid-row: 1;
+  min-height: 0;
+}
+
+.left-sidebar-mockup:not(.left-sidebar-mockup--ide)
+  > .left-sidebar-mockup__status-anchor {
+  grid-row: 2;
+  align-self: end;
+}
+
 .left-sidebar-mockup__status-anchor {
+  position: relative;
   flex: 0 0 auto;
   margin-top: auto;
-  padding-top: 2rem;
+  padding-top: 0.75rem;
   padding-bottom: 0;
   width: 100%;
 }
@@ -309,23 +331,25 @@ body:has(.console-shell--mockup) {
   z-index: 3;
   width: 1px;
   height: calc(100% - 1.5rem);
-  background: rgba(0, 242, 255, 0.14);
+  background: rgba(122, 235, 255, 0.16);
   pointer-events: none;
 }
 
 .left-sidebar-mockup__resize-handle {
-  position: absolute;
+  position: absolute !important;
   top: 0;
   right: 0;
-  z-index: 5;
+  z-index: 20 !important;
   display: grid;
   place-items: center;
   width: 0.75rem;
   height: 100%;
+  pointer-events: auto;
+  touch-action: none;
   border: 0;
   background: transparent;
   cursor: col-resize;
-  transform: translateX(50%);
+  transform: none;
   touch-action: none;
 }
 

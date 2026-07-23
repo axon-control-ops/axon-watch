@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import IdeActivityBar from '../ide/IdeActivityBar.vue';
 import IdeAttentionPanel from '../ide/IdeAttentionPanel.vue';
@@ -12,6 +12,8 @@ import KairoVoiceDeckPanel from './KairoVoiceDeckPanel.vue';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
+import HudHoloPanelShell from '../../features/hud-holo/HudHoloPanelShell.vue';
+import type { HudHoloTone } from '../../features/hud-holo/hud-holo-tones';
 import {
   workspaceDisplayLabel,
 } from '../../lib/operator-workspace-catalog';
@@ -22,6 +24,7 @@ import { workspaceStatusLine } from '../../lib/mockup-shell-view';
 import { isActiveRun } from '../../stores/shell-run-selection';
 import {
   clampSidebarWidth,
+  MIN_SIDEBAR_WIDTH,
   readStoredSidebarWidth,
   SIDEBAR_WIDTH_KEY,
 } from '../../lib/sidebar-width-split';
@@ -29,6 +32,7 @@ import { useShellStore } from '../../stores/shell';
 import {
   resolveIdeSidebarWidthPx,
 } from '../../lib/ide-layout-prefs';
+import { useVerticalPanelResize } from '../../composables/useVerticalPanelResize';
 
 const shell = useShellStore();
 const workspaceFilter = ref('');
@@ -36,6 +40,22 @@ const showAddWorkspaceForm = ref(false);
 const sidebarRef = ref<HTMLElement | null>(null);
 const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? 280);
 const resizing = ref(false);
+const {
+  panelSize: voiceCardHeight,
+  resizing: voiceCardResizing,
+  ariaValueMin: voiceCardHeightMin,
+  ariaValueMax: voiceCardHeightMax,
+  resetSize: resetVoiceCardHeight,
+  startResize: startVoiceCardResize,
+  onResizeKeydown: onVoiceCardResizeKeydown,
+} = useVerticalPanelResize({
+  rootRef: sidebarRef,
+  cssVariable: '--voice-card-height',
+  storageKey: 'axon-shell-voice-card-height',
+  defaultSize: (height) => Math.min(212, Math.max(152, height * 0.21)),
+  minSize: 132,
+  maxSize: (height) => height * 0.45,
+});
 
 const catalogWorkspaces = computed(() => shell.workspaces);
 
@@ -63,10 +83,44 @@ const runCountsByWorkspace = computed(() => {
 
 const showSidebarModeToggle = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
+const workspacesHoloTone = computed<HudHoloTone>(() =>
+  shell.leftSidebarAttentionBadgeCount > 0 ? 'attention' : 'nominal',
+);
 
 function isActiveWorkspace(workspaceId: string): boolean {
   return shell.currentWorkspace?.workspace_id === workspaceId;
 }
+
+// #region agent log
+watch(
+  () => shell.currentWorkspace?.workspace_id ?? null,
+  (workspaceId) => {
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'fc0b35',
+      },
+      body: JSON.stringify({
+        sessionId: 'fc0b35',
+        runId: 'ws-glow',
+        hypothesisId: 'H-ws-glow',
+        location: 'LeftSidebar.vue:currentWorkspace',
+        message: 'workspace selection for glow chrome',
+        data: {
+          workspaceId,
+          listed: catalogWorkspaces.value.slice(0, 12).map((row) => ({
+            id: row.workspace_id,
+            active: row.workspace_id === workspaceId,
+          })),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  },
+  { immediate: true },
+);
+// #endregion
 
 function workspaceSubtext(workspaceId: string): string {
   return workspaceStatusLine(
@@ -109,7 +163,17 @@ function startSidebarResize(event: MouseEvent): void {
 
   const onMove = (moveEvent: MouseEvent): void => {
     const shellRoot = sidebarRef.value?.closest('.console-shell--mockup') as HTMLElement | null;
-    const clamped = clampSidebarWidth(startWidth + (moveEvent.clientX - startX), window.innerWidth);
+    const rightDockWidth =
+      shellRoot?.querySelector('.region-right-dock')?.getBoundingClientRect().width ?? 0;
+    const centerMinimum = Math.min(320, Math.max(220, window.innerWidth * 0.28));
+    const maximumWithCenter = Math.max(
+      MIN_SIDEBAR_WIDTH,
+      window.innerWidth - rightDockWidth - centerMinimum - 32,
+    );
+    const clamped = Math.min(
+      clampSidebarWidth(startWidth + (moveEvent.clientX - startX), window.innerWidth),
+      maximumWithCenter,
+    );
     expandedSidebarWidth.value = clamped;
     shellRoot?.style.setProperty('--shell-left-sidebar-width', `${clamped}px`);
   };
@@ -129,14 +193,128 @@ function startSidebarResize(event: MouseEvent): void {
   document.addEventListener('mouseup', onUp);
 }
 
+// #region agent log
+function measureLeftSidebarPanels(runId: string): void {
+  const root = sidebarRef.value;
+  if (!root) return;
+  const team =
+    (root.querySelector('.ide-team-panel') as HTMLElement | null) ||
+    (root.querySelector('.ide-explorer-panel') as HTMLElement | null);
+  const ideBody = root.querySelector('.left-sidebar-mockup__ide-body') as HTMLElement | null;
+  const ideMain = root.querySelector('.left-sidebar-mockup__ide-main') as HTMLElement | null;
+  const kairoAnchor = root.querySelector(
+    '.left-sidebar-mockup__status-anchor--ide',
+  ) as HTMLElement | null;
+  const workspaces = root.querySelector(
+    '.left-sidebar-mockup__workspaces-panel',
+  ) as HTMLElement | null;
+  const voiceAnchor = root.querySelector(
+    '.left-sidebar-mockup__status-anchor:not(.left-sidebar-mockup__status-anchor--ide):not(.left-sidebar-mockup__status-anchor--galaxy)',
+  ) as HTMLElement | null;
+  const voiceDeck = root.querySelector('.kairo-voice-deck') as HTMLElement | null;
+  const roster = root.querySelector('.company-roster') as HTMLElement | null;
+  const holoShells = Array.from(root.querySelectorAll('.hud-holo-shell')).map((el) => ({
+    label: el.getAttribute('data-holo-label'),
+    webgl: el.getAttribute('data-holo-webgl'),
+    h: Math.round(el.getBoundingClientRect().height),
+  }));
+  const frame =
+    (root.querySelector('.left-sidebar-mockup__workspaces-panel.hud-panel-frame') as HTMLElement | null) ||
+    (root.querySelector('.ide-team-panel') as HTMLElement | null) ||
+    root;
+  const cs = getComputedStyle(frame);
+  const rootCs = getComputedStyle(root);
+  const teamFlex = team ? getComputedStyle(team).flexGrow : null;
+  const teamH = team?.getBoundingClientRect().height ?? 0;
+  const bodyH = ideBody?.getBoundingClientRect().height ?? 0;
+  const mainH = ideMain?.getBoundingClientRect().height ?? 0;
+  const kairoH = kairoAnchor?.getBoundingClientRect().height ?? 0;
+  const wsH = workspaces?.getBoundingClientRect().height ?? 0;
+  const voiceH = voiceDeck?.getBoundingClientRect().height ?? voiceAnchor?.getBoundingClientRect().height ?? 0;
+  const sideH = root.getBoundingClientRect().height;
+  const gapAboveVoice = voiceAnchor
+    ? Math.round(voiceAnchor.getBoundingClientRect().top - (workspaces?.getBoundingClientRect().bottom ?? 0))
+    : null;
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'fc0b35',
+    },
+    body: JSON.stringify({
+      sessionId: 'fc0b35',
+      runId,
+      hypothesisId: 'H-team-flex',
+      location: 'LeftSidebar.vue:measureLeftSidebarPanels',
+      message: 'left sidebar panel geometry + color tokens',
+      data: {
+        layoutMode: shell.layoutMode,
+        activityView: shell.ideActivityView,
+        sideH: Math.round(sideH),
+        ideBodyH: Math.round(bodyH),
+        teamH: Math.round(teamH),
+        ideMainH: Math.round(mainH),
+        kairoH: Math.round(kairoH),
+        rosterH: Math.round(roster?.getBoundingClientRect().height ?? 0),
+        teamFillRatio: mainH > 0 ? Number((teamH / mainH).toFixed(3)) : null,
+        teamOfSidebar: sideH > 0 ? Number((teamH / sideH).toFixed(3)) : null,
+        teamFlexGrow: teamFlex,
+        wsH: Math.round(wsH),
+        voiceH: Math.round(voiceH),
+        gapAboveVoice,
+        wsOfSidebar: sideH > 0 ? Number((wsH / sideH).toFixed(3)) : null,
+        voiceOfSidebar: sideH > 0 ? Number((voiceH / sideH).toFixed(3)) : null,
+        wsDisplay: workspaces ? getComputedStyle(workspaces).display : null,
+        wsOverflow: workspaces ? getComputedStyle(workspaces).overflow : null,
+        wsMinHeight: workspaces ? getComputedStyle(workspaces).minHeight : null,
+        ideBodyDisplay: ideBody ? getComputedStyle(ideBody).display : null,
+        ideBodyMinHeight: ideBody ? getComputedStyle(ideBody).minHeight : null,
+        hudBorder: cs.getPropertyValue('--hud-surface-border').trim(),
+        hudFill: cs.getPropertyValue('--hud-surface-fill').trim(),
+        accentBrand: rootCs.getPropertyValue('--accent-brand').trim() ||
+          getComputedStyle(document.documentElement).getPropertyValue('--accent-brand').trim(),
+        statusAnchorBorderTop: kairoAnchor
+          ? getComputedStyle(kairoAnchor).borderTopColor
+          : voiceAnchor
+            ? getComputedStyle(voiceAnchor).borderTopColor
+            : null,
+        glass3d: Boolean(root.closest('.console-shell--glass3d')),
+        holoShells,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
+
+function schedulePanelMeasure(runId: string): void {
+  void nextTick(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => measureLeftSidebarPanels(runId));
+    });
+  });
+}
+// #endregion
+
 onMounted(() => {
   syncShellSidebarWidth();
+  // #region agent log
+  schedulePanelMeasure('post-fix-2');
+  // #endregion
 });
 
 watch(
-  () => [shell.layoutMode, shell.ideExplorerCollapsed] as const,
+  () =>
+    [
+      shell.layoutMode,
+      shell.ideExplorerCollapsed,
+      shell.leftSidebarMode,
+      shell.ideActivityView,
+    ] as const,
   () => {
     syncShellSidebarWidth();
+    // #region agent log
+    schedulePanelMeasure('post-fix-2-layout');
+    // #endregion
   },
 );
 
@@ -154,6 +332,7 @@ onBeforeUnmount(() => {
     class="region region-left-sidebar left-sidebar-mockup"
     :class="{
       'left-sidebar-mockup--resizing': resizing,
+      'left-sidebar-mockup--voice-resizing': voiceCardResizing,
       'left-sidebar-mockup--ide': isIdeMode,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
       'left-sidebar-mockup--galaxy': shell.operatorBrainGalaxyActive,
@@ -175,7 +354,11 @@ onBeforeUnmount(() => {
     </template>
 
     <template v-else>
-      <div class="left-sidebar-mockup__workspaces-panel hud-panel-frame">
+      <HudHoloPanelShell
+        class="left-sidebar-mockup__workspaces-panel"
+        label="workspaces"
+        :tone="workspacesHoloTone"
+      >
         <div
           v-if="showSidebarModeToggle"
           class="left-sidebar-mockup__mode-header panel-heading panel-heading--toggle"
@@ -293,7 +476,7 @@ onBeforeUnmount(() => {
           v-show="shell.leftSidebarMode === 'attention'"
           variant="sidebar"
         />
-      </div>
+      </HudHoloPanelShell>
     </template>
 
     <div
@@ -307,6 +490,22 @@ onBeforeUnmount(() => {
       v-else-if="!isIdeMode && !shell.operatorBrainGalaxyActive"
       class="left-sidebar-mockup__status-anchor"
     >
+      <div
+        class="voice-card-resize-handle"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize Voice card"
+        title="Drag or use arrow keys to resize. Enter or double-click to reset."
+        tabindex="0"
+        :aria-valuemin="voiceCardHeightMin"
+        :aria-valuemax="voiceCardHeightMax"
+        :aria-valuenow="voiceCardHeight"
+        @mousedown="startVoiceCardResize"
+        @keydown="onVoiceCardResizeKeydown"
+        @dblclick="resetVoiceCardHeight"
+      >
+        <span class="voice-card-resize-grip" aria-hidden="true" />
+      </div>
       <KairoVoiceDeckPanel />
     </div>
 

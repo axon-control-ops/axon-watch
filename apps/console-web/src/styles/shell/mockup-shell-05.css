@@ -103,12 +103,15 @@
 }
 
 .workspace-list__button--mockup.hud-active-chip--frame.hud-active-chip--active::before {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.11);
+  background: rgba(0, 242, 255, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(0, 242, 255, 0.42),
+    0 0 14px rgba(0, 242, 255, 0.32),
+    0 0 28px rgba(0, 180, 220, 0.18);
 }
 
 .workspace-list__button--mockup.hud-active-chip--frame.hud-active-chip--active::after {
-  --hud-chip-fill: rgba(4, 10, 16, 0.68);
+  --hud-chip-fill: rgba(4, 14, 22, 0.92);
 }
 
 .hud-active-chip--frame {

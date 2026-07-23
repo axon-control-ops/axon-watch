@@ -6,8 +6,10 @@
   border: 1px solid rgba(0, 242, 255, 0.16);
   border-radius: 0.45rem;
   background: rgba(0, 12, 20, 0.55);
-  flex-shrink: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-height: auto;
+  overflow: hidden;
 }
 
 .connectors-rail-panel__header {

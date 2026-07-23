@@ -1097,9 +1097,9 @@ button, input {
 }
 
 @media (max-width: 1080px) {
-  .console-shell,
-  .console-shell[data-layout-mode='operator'],
-  .console-shell[data-layout-mode='ide'] {
+  .console-shell:not(.console-shell--mockup),
+  .console-shell:not(.console-shell--mockup)[data-layout-mode='operator'],
+  .console-shell:not(.console-shell--mockup)[data-layout-mode='ide'] {
     height: auto;
     max-height: none;
     overflow: auto;

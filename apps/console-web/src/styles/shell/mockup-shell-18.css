@@ -1,20 +1,33 @@
-@import './operator-task-board.css';
-
 .operator-status-radar-panel__header,
 .operator-status-radar-panel__rail,
 .operator-status-radar-panel__utility-actions,
 .operator-status-radar-panel__controls,
-.operator-status-radar-panel__terminal-dock {
+.operator-status-radar-panel__terminal-dock,
+.operator-center-view-switch {
   flex-shrink: 0;
 }
 
-.operator-status-radar-panel__stage,
-.operator-status-radar-panel__feed,
-.operator-fleet-grid,
-.operator-brain-graph,
-.operator-incident-feed,
-.operator-task-board,
-.operator-run-strip {
+/* Grid sections size to content and scroll inside the panel.
+   flex-shrink + min-height:0 collapsed boxes so content painted over siblings.
+   z-index must stay >= 1 so hud-panel-frame ::after fill does not cover section content. */
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-status-radar-panel__stage,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-status-radar-panel__feed,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-status-radar-panel__guide,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-fleet-grid,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-incident-feed,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-task-board,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-run-strip,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .connectors-rail-panel {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-height: auto;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
+.operator-brain-graph {
   flex-shrink: 1;
   min-height: 0;
 }
@@ -23,7 +36,7 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.7rem;
   min-height: 0;
   padding: 0.75rem 0.85rem 0.65rem;
   overflow-x: hidden;

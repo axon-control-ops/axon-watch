@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 
 import type { OperatorBriefing } from '../contracts/canonical';
 import type { BriefingVoiceTranscriptEntry } from '../lib/briefing-voice-transcript';
@@ -88,6 +88,44 @@ function transcriptTimeLabel(value: string): string {
   }
   return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+// #region agent log
+onMounted(() => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  const briefingRoot = document.getElementById('dock-seam-briefing');
+  const reactorCount = document.querySelectorAll('.briefing-panel__reactor').length;
+  const voiceOrbCount = document.querySelectorAll('.kairo-voice-deck__orb').length;
+  const speakButtons = [...document.querySelectorAll('button')].filter((button) =>
+    /speak briefing|open briefing/i.test(button.textContent || ''),
+  ).length;
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'fc0b35',
+    },
+    body: JSON.stringify({
+      sessionId: 'fc0b35',
+      runId: 'post-fix',
+      hypothesisId: 'H-briefing-cine',
+      location: 'BriefingPanel.vue:onMounted',
+      message: 'briefing cinematic hud presence',
+      data: {
+        hero: Boolean(props.hero),
+        briefingRootPresent: Boolean(briefingRoot),
+        reactorCount,
+        voiceOrbCount,
+        speakOrOpenBriefingButtons: speakButtons,
+        cinematicHud: Boolean(document.querySelector('.briefing-panel__hud')),
+        cinematicBody: Boolean(document.querySelector('.briefing-panel__hero-body--cinematic')),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+});
+// #endregion
 </script>
 
 <template>
@@ -111,24 +149,43 @@ function transcriptTimeLabel(value: string): string {
     </template>
 
     <template v-else-if="hero">
-      <p v-if="summaryLine" class="briefing-panel__summary-line">{{ summaryLine }}</p>
+      <div class="briefing-panel__hud" aria-hidden="true">
+        <span class="briefing-panel__hud-grid" />
+        <span class="briefing-panel__hud-scan" />
+        <span class="briefing-panel__hud-glow" />
+        <span class="briefing-panel__hud-corner briefing-panel__hud-corner--tl" />
+        <span class="briefing-panel__hud-corner briefing-panel__hud-corner--tr" />
+        <span class="briefing-panel__hud-corner briefing-panel__hud-corner--bl" />
+        <span class="briefing-panel__hud-corner briefing-panel__hud-corner--br" />
+      </div>
 
-      <div class="briefing-panel__hero-body">
-        <div class="briefing-panel__reactor" aria-hidden="true">
-          <span class="briefing-panel__reactor-grid" />
-          <span class="briefing-panel__reactor-ring briefing-panel__reactor-ring--outer" />
-          <span class="briefing-panel__reactor-ring briefing-panel__reactor-ring--mid" />
-          <span class="briefing-panel__reactor-ring briefing-panel__reactor-ring--inner" />
-          <span class="briefing-panel__reactor-core" />
-          <span class="briefing-panel__reactor-sweep" />
-        </div>
+      <p
+        v-if="summaryLine"
+        class="briefing-panel__summary-line briefing-panel__summary-line--chip"
+      >
+        <span class="briefing-panel__live-dot" aria-hidden="true" />
+        {{ summaryLine }}
+      </p>
 
+      <div class="briefing-panel__hero-body briefing-panel__hero-body--cinematic">
         <div class="briefing-panel__voice-copy">
-          <p class="briefing-panel__kairo-title">{{ personaTitle }}</p>
-          <p class="briefing-panel__section-label briefing-panel__section-label--hero">Notice</p>
-          <p class="briefing-panel__kairo-subtitle">{{ heroNotice }}</p>
-          <p class="briefing-panel__section-label briefing-panel__section-label--hero">Advise</p>
-          <p class="briefing-panel__kairo-advise">{{ heroAdvise }}</p>
+          <header class="briefing-panel__persona-row">
+            <p class="briefing-panel__kairo-title">{{ personaTitle }}</p>
+            <span class="briefing-panel__meter" aria-hidden="true">
+              <i /><i /><i /><i /><i /><i />
+            </span>
+          </header>
+
+          <div class="briefing-panel__rhythm-block">
+            <p class="briefing-panel__section-label briefing-panel__section-label--hero">Notice</p>
+            <p class="briefing-panel__kairo-subtitle">{{ heroNotice }}</p>
+          </div>
+
+          <div class="briefing-panel__rhythm-block briefing-panel__rhythm-block--advise">
+            <p class="briefing-panel__section-label briefing-panel__section-label--hero">Advise</p>
+            <p class="briefing-panel__kairo-advise">{{ heroAdvise }}</p>
+          </div>
+
           <BriefingOpenLoopsStrip :briefing="briefing" />
           <p v-if="briefing?.degraded.active" class="region-copy region-copy--degraded">
             Degraded state · {{ briefing.degraded.reasons.join(', ') }}

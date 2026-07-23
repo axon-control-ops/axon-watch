@@ -271,6 +271,9 @@ import {
   shouldShowBriefingAttentionInCommandMode,
 } from '../lib/kairo-briefing-attention';
 import {
+  buildStatusBarSegments,
+} from '../lib/runtime-strip';
+import {
   persistOperatorWorkspaceId,
   readStoredOperatorWorkspaceId,
 } from '../lib/operator-workspace-selection';
@@ -517,6 +520,11 @@ export const useShellStore = defineStore('shell', () => {
   const workbenchTerminalPanelVisible = ref(false);
   const teamRosterRevealToken = ref(0);
 
+
+  const layoutModeLabel = computed(() =>
+    layoutMode.value === 'operator' ? 'Mission Control' : 'IDE mode',
+  );
+
   const workspaceRuns = computed(() =>
     currentWorkspace.value
       ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
@@ -538,9 +546,6 @@ export const useShellStore = defineStore('shell', () => {
     attentionSignals,
     workspaceAttentionSignalCount,
     statusBarZones,
-    statusBarSegments,
-    statusBarItems,
-    layoutModeLabel,
     workspaceStatusCardRows,
     briefingSummaryLine,
     runtimeStateLabel,
@@ -804,6 +809,17 @@ export const useShellStore = defineStore('shell', () => {
       idePresenceProfile: idePresenceProfile.value,
     }),
   );
+
+  const statusBarSegments = computed(() =>
+    buildStatusBarSegments({
+      layoutModeLabel: layoutModeLabel.value,
+      workspaceId: currentWorkspace.value?.workspace_id ?? null,
+      runtimeSummary: runtimeSummary.value,
+      pendingApprovals: pendingApprovalsCount.value,
+    }),
+  );
+
+  const statusBarItems = computed(() => statusBarSegments.value.map((segment) => segment.label));
 
   const dockSeamLayout = computed(() =>
     buildDockSeamLayout({
@@ -1202,11 +1218,78 @@ export const useShellStore = defineStore('shell', () => {
     bootstrapIdeActiveThreadId(workspaceId);
     applyIdeThreadMessagesToView(workspaceId);
     const threadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
-    if (!threadId) {
+    if (threadId) {
+      await loadWorkspaceThread(workspaceId, 'ide', threadId);
+      applyIdeThreadMessagesToView(workspaceId);
+    }
+    await ensureCompanyEmployeeIdeTabs(workspaceId);
+  }
+
+  /** Open one IDE tab per roster teammate (DashPro-style), focusing Lead when needed. */
+  async function ensureCompanyEmployeeIdeTabs(workspaceId: string): Promise<void> {
+    await loadCompanyEmployees(workspaceId);
+    const employees = companyEmployeesByWorkspaceId.value[workspaceId] ?? [];
+    if (employees.length < 2) {
       return;
     }
-    await loadWorkspaceThread(workspaceId, 'ide', threadId);
-    applyIdeThreadMessagesToView(workspaceId);
+
+    await loadIdeThreads(workspaceId);
+    let threads = ideThreadsByWorkspaceId.value[workspaceId] ?? [];
+    const byEmployee = new Map(
+      threads
+        .filter((thread) => (thread.employee_id ?? '').trim())
+        .map((thread) => [(thread.employee_id ?? '').trim(), thread] as const),
+    );
+
+    for (const employee of employees) {
+      const employeeId = employee.employee_id.trim();
+      if (!employeeId || byEmployee.has(employeeId)) {
+        continue;
+      }
+      try {
+        const created = await createWorkspaceChatThread(workspaceId, {
+          surface: 'ide',
+          title: employeeIdeThreadTitle(employee),
+          employeeId,
+          employeeRole: employee.role,
+        });
+        byEmployee.set(employeeId, created);
+        threads = sortIdeThreadsNewestFirst([
+          created,
+          ...threads.filter((thread) => thread.thread_id !== created.thread_id),
+        ]);
+      } catch {
+        // Keep hydrating other teammates even if one create fails.
+      }
+    }
+
+    ideThreadsByWorkspaceId.value = {
+      ...ideThreadsByWorkspaceId.value,
+      [workspaceId]: threads,
+    };
+
+    const openIds = employees
+      .map((employee) => byEmployee.get(employee.employee_id.trim())?.thread_id)
+      .filter((threadId): threadId is string => Boolean(threadId));
+    if (openIds.length) {
+      persistOpenIdeThreadTabs(workspaceId, openIds);
+    }
+
+    const activeId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+    const activeThread = threads.find((thread) => thread.thread_id === activeId);
+    if (activeThread?.employee_id?.trim()) {
+      return;
+    }
+    const primary =
+      employees.find((row) => row.primary) ??
+      employees.find((row) => row.role === 'lead') ??
+      employees[0];
+    const primaryThread = primary
+      ? byEmployee.get(primary.employee_id.trim())
+      : null;
+    if (primaryThread?.thread_id) {
+      await selectIdeThread(primaryThread.thread_id);
+    }
   }
 
   async function hydrateWorkspaceIdeChat(workspaceId: string): Promise<void> {
@@ -1793,7 +1876,7 @@ export const useShellStore = defineStore('shell', () => {
     ideDebugModeSelected.value = selected;
   }
 
-  /** Open the IDE chat dock without changing the draft. Keep Team (or other) left panel when requested. */
+  /** Open the IDE chat dock without changing the draft. Left sidebar (Team/Explorer) stays put. */
   function openIdeComposer(options: { keepActivityView?: boolean } = {}): void {
     commandMutationError.value = null;
     if (layoutMode.value !== 'ide') {
@@ -1801,9 +1884,8 @@ export const useShellStore = defineStore('shell', () => {
     }
     agentDockCollapsed.value = false;
     persistAgentDockCollapsed(false);
-    if (!options.keepActivityView) {
-      ideActivityView.value = 'agent';
-    }
+    // keepActivityView retained for callers; agent dock no longer owns the left sidebar.
+    void options.keepActivityView;
     commandFocusToken.value += 1;
   }
 

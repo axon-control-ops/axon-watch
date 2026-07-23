@@ -304,6 +304,15 @@
   align-items: center;
 }
 
+.kairo-voice-deck__body--copy-only {
+  gap: 0;
+}
+
+.kairo-voice-deck__body--copy-only .kairo-voice-deck__copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .kairo-voice-deck__orb {
   position: relative;
   width: 5.5rem;

@@ -22,7 +22,10 @@
 
   .console-shell--mockup[data-layout-mode='operator'],
   .console-shell--mockup[data-layout-mode='ide'] {
-    grid-template-columns: 220px minmax(0, 1fr) 300px;
+    grid-template-columns:
+      var(--shell-left-sidebar-width, 220px)
+      minmax(0, 1fr)
+      var(--shell-agent-dock-width, 300px);
   }
 
   .dock-hero-panel__toggle-button {
@@ -47,7 +50,10 @@
 
   .console-shell--mockup[data-layout-mode='operator'],
   .console-shell--mockup[data-layout-mode='ide'] {
-    grid-template-columns: 188px minmax(0, 1fr) 248px;
+    grid-template-columns:
+      var(--shell-left-sidebar-width, 188px)
+      minmax(0, 1fr)
+      var(--shell-agent-dock-width, 248px);
   }
 
   .topbar-mockup__subtitle,

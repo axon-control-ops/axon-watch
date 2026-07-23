@@ -71,9 +71,15 @@ function onCardActivate(kind: string, id: string): void {
   min-height: 0;
   overflow: auto;
   padding: 0.75rem 1rem 1rem;
+  border: 1px solid rgba(0, 242, 255, 0.18);
   background:
-    radial-gradient(ellipse at 10% 0%, rgba(0, 140, 200, 0.12), transparent 45%),
-    linear-gradient(180deg, rgba(6, 14, 22, 0.96), rgba(4, 10, 16, 0.98));
+    linear-gradient(145deg, rgba(255, 255, 255, 0.06), transparent 38%),
+    radial-gradient(ellipse at 10% 0%, rgba(0, 140, 200, 0.16), transparent 45%),
+    linear-gradient(180deg, rgba(6, 14, 22, 0.82), rgba(4, 10, 16, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(0, 140, 180, 0.1);
+  backdrop-filter: blur(12px) saturate(1.2);
 }
 
 .jarvis-ops__header {

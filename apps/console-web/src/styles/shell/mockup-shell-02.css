@@ -115,7 +115,7 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: min(62vh, 36rem);
   overflow: hidden;
   background: transparent;
 }
@@ -134,10 +134,10 @@
 .shell-mode-toggle {
   display: inline-flex;
   width: 100%;
-  border: 1px solid rgba(0, 242, 255, 0.22);
+  border: 1px solid rgba(122, 235, 255, 0.22);
   border-radius: 2px;
   overflow: hidden;
-  background: rgba(4, 14, 24, 0.88);
+  background: rgba(4, 12, 20, 0.72);
 }
 
 .shell-mode-toggle__button {
@@ -286,16 +286,17 @@
 .left-sidebar-mockup .hud-panel-frame,
 .left-sidebar-mockup .workspace-status-card,
 .left-sidebar-mockup .kairo-voice-deck {
-  --hud-surface-border: rgba(0, 242, 255, 0.44);
-  --hud-surface-fill: rgba(4, 10, 16, 0.92);
+  --hud-surface-border: rgba(122, 235, 255, 0.3);
+  --hud-surface-fill: rgba(4, 12, 20, 0.55);
 }
 
 .left-sidebar-mockup .hud-panel-frame::before,
 .left-sidebar-mockup .workspace-status-card::before,
 .left-sidebar-mockup .kairo-voice-deck::before {
   box-shadow:
-    0 0 2px rgba(0, 242, 255, 0.18),
-    0 0 5px rgba(0, 242, 255, 0.08);
+    0 0 2px rgba(90, 159, 255, 0.2),
+    0 0 10px rgba(122, 235, 255, 0.1),
+    0 0 18px rgba(255, 106, 168, 0.05);
 }
 
 .topbar-mockup__brand {

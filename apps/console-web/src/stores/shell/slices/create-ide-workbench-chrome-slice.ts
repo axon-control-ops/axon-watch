@@ -28,6 +28,12 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
   }
 
   function focusIdeSidebarView(view: IdeActivityView): void {
+    // Agent dock lives on the right edge — never replace Team/Explorer with the agent stub.
+    if (view === 'agent') {
+      input.agentDockCollapsed.value = false;
+      persistAgentDockCollapsed(false);
+      return;
+    }
     input.ideAttentionPanelOpen.value = false;
     input.ideBriefingPanelOpen.value = false;
     input.ideActivityView.value = view;
@@ -39,11 +45,6 @@ export function createIdeWorkbenchChromeSlice(input: CreateIdeWorkbenchChromeSli
     focusIdeSidebarView(view);
     if (view === 'terminal') {
       revealIdeTerminalPanel();
-      return;
-    }
-    if (view === 'agent') {
-      input.agentDockCollapsed.value = false;
-      persistAgentDockCollapsed(false);
     }
   }
 
