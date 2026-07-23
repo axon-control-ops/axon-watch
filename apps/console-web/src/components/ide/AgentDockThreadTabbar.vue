@@ -30,7 +30,8 @@ const allThreads = computed(() =>
 );
 const liveBusyEmployeeIds = computed(() => {
   const ids = new Set<string>();
-  for (const row of shell.companyEmployeesForCurrentWorkspace) {
+  const employees = shell.companyEmployeesForCurrentWorkspace;
+  for (const row of employees) {
     if (employeeIsActivelyBusy(row)) {
       ids.add(row.employee_id);
     }
@@ -38,7 +39,11 @@ const liveBusyEmployeeIds = computed(() => {
   if (shell.agentStreamActive) {
     const threadEmployeeId = shell.activeIdeThread?.employee_id?.trim();
     const recordEmployeeId = shell.activeIdeEmployeeRecord?.employee_id?.trim();
-    const streamOwnerId = threadEmployeeId || recordEmployeeId;
+    const primaryId =
+      employees.find((row) => row.primary)?.employee_id?.trim() ||
+      employees.find((row) => row.role === 'lead')?.employee_id?.trim() ||
+      null;
+    const streamOwnerId = threadEmployeeId || recordEmployeeId || primaryId;
     if (streamOwnerId) {
       ids.add(streamOwnerId);
     }

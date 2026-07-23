@@ -62,6 +62,9 @@ def replan_lead_goal(
     goal: str,
     mode: PlanMode = "auto",
     create_runs: bool = True,
+    attachment_ids: list[str] | None = None,
+    source_message_id: str | None = None,
+    dispatch_workers: bool = False,
 ) -> dict[str, Any]:
     """Supersede the active plan, cancel obsolete work, and materialize a new plan."""
     workspace = workspace_id.strip()
@@ -108,6 +111,9 @@ def replan_lead_goal(
         mode=mode,
         create_runs=create_runs,
         supersedes_plan_id=previous_plan_id,
+        attachment_ids=attachment_ids,
+        source_message_id=source_message_id,
+        dispatch_workers=dispatch_workers,
     )
     receipt = lead_plan_store.append_receipt(
         plan_id=str(materialized["plan_id"]),

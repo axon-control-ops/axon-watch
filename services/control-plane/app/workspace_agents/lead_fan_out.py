@@ -63,10 +63,14 @@ def materialize_lead_fan_out(
     mode: PlanMode = "auto",
     create_runs: bool = True,
     supersedes_plan_id: str | None = None,
+    attachment_ids: list[str] | None = None,
+    source_message_id: str | None = None,
+    dispatch_workers: bool = False,
 ) -> dict[str, Any]:
     """Build plan, persist tasks, and open leased runs for dependency-ready items.
 
-    Does **not** start Lane B dispatch or enable the continuous scheduler.
+    Does **not** enable the continuous scheduler. When ``dispatch_workers`` is
+    true, ready runs are dispatched explicitly through Lane B worker isolation.
     Ready runs appear on the task board / run list for operators and workers.
     """
     workspace = workspace_id.strip()
@@ -81,7 +85,13 @@ def materialize_lead_fan_out(
         raise LeadFanOutError(f"no company roster for workspace {workspace}")
 
     try:
-        plan = build_lead_task_plan(goal=cleaned_goal, roster=roster, mode=mode)
+        plan = build_lead_task_plan(
+            goal=cleaned_goal,
+            roster=roster,
+            mode=mode,
+            attachment_ids=attachment_ids,
+            source_message_id=source_message_id,
+        )
     except ValueError as exc:
         raise LeadFanOutError(str(exc)) from exc
 
@@ -94,6 +104,7 @@ def materialize_lead_fan_out(
     tasks_by_id = {str(row["task_id"]): row for row in persisted["tasks"]}
     runs: list[dict[str, Any]] = []
     deferred: list[dict[str, Any]] = []
+    dispatched_runs: list[dict[str, Any]] = []
 
     if create_runs:
         for row in persisted["tasks"]:
@@ -105,6 +116,7 @@ def materialize_lead_fan_out(
                         "task_id": task_id,
                         "plan_key": row.get("plan_key"),
                         "owner_role": fresh.get("owner_role"),
+                        "assignee_name": fresh.get("assignee_name"),
                         "reason": "dependencies_incomplete",
                     }
                 )
@@ -119,11 +131,14 @@ def materialize_lead_fan_out(
                         "task_id": task_id,
                         "plan_key": row.get("plan_key"),
                         "owner_role": owner_role,
+                        "assignee_name": fresh.get("assignee_name"),
                         "reason": str(exc),
                     }
                 )
                 continue
-            summary = f"{owner_role}: {str(leased.get('goal') or cleaned_goal)[:120]}"
+            assignee = str(leased.get("assignee_name") or "").strip()
+            summary_prefix = f"{assignee or owner_role}"
+            summary = f"{summary_prefix}: {str(leased.get('goal') or cleaned_goal)[:120]}"
             run = create_run(
                 workspace_id=workspace,
                 mode="agent",
@@ -131,6 +146,7 @@ def materialize_lead_fan_out(
                 detail=(
                     f"Lead fan-out ({plan.mode}) plan_key="
                     f"{row.get('plan_key')} task={task_id}"
+                    + (f" assignee={assignee}" if assignee else "")
                 ),
                 employee_role=owner_role,
                 task_id=task_id,
@@ -140,21 +156,70 @@ def materialize_lead_fan_out(
                 str(run["run_id"]),
                 receipt_type="lead_fan_out_assigned",
                 receipt_summary=(
-                    f"Lead assigned {owner_role} task {task_id} "
+                    f"Lead assigned {assignee or owner_role} task {task_id} "
                     f"({row.get('plan_key')})"
                 ),
                 actor="lead_planner",
             )
-            runs.append(
-                {
-                    "run_id": run["run_id"],
-                    "task_id": task_id,
-                    "plan_key": row.get("plan_key"),
-                    "owner_role": owner_role,
-                    "phase": run.get("phase"),
-                }
-            )
+            run_row = {
+                "run_id": run["run_id"],
+                "task_id": task_id,
+                "plan_key": row.get("plan_key"),
+                "owner_role": owner_role,
+                "assignee_name": assignee,
+                "attachment_ids": list(leased.get("attachment_ids") or []),
+                "phase": run.get("phase"),
+            }
+            runs.append(run_row)
             tasks_by_id[task_id] = task_store.get_task(task_id) or leased
+
+            if dispatch_workers:
+                from app.workspace_agents.config_loader import load_workspace_agent_configs
+                from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run
+
+                _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
+                company = companies.get(workspace)
+                employee = None
+                if company is not None:
+                    for candidate in company.employees:
+                        if str(candidate.role or "").strip().lower() == owner_role:
+                            if (
+                                not assignee
+                                or str(candidate.name or "").strip().lower()
+                                == assignee.lower()
+                            ):
+                                employee = candidate
+                                break
+                if employee is None:
+                    deferred.append(
+                        {
+                            "task_id": task_id,
+                            "plan_key": row.get("plan_key"),
+                            "owner_role": owner_role,
+                            "assignee_name": assignee,
+                            "reason": "employee_not_found_for_dispatch",
+                        }
+                    )
+                else:
+                    ok, finalized = dispatch_continuous_worker_run(
+                        workspace_id=workspace,
+                        employee=employee,
+                        run_record=run,
+                    )
+                    dispatched_runs.append(
+                        {
+                            "run_id": run["run_id"],
+                            "task_id": task_id,
+                            "owner_role": owner_role,
+                            "assignee_name": assignee,
+                            "dispatched": ok,
+                            "phase": (
+                                finalized.get("phase")
+                                if isinstance(finalized, dict)
+                                else run.get("phase")
+                            ),
+                        }
+                    )
 
     receipt = lead_plan_store.append_receipt(
         plan_id=plan_id,
@@ -165,6 +230,14 @@ def materialize_lead_fan_out(
             "task_count": len(persisted["tasks"]),
             "run_ids": [str(run["run_id"]) for run in runs],
             "deferred_task_ids": [str(row["task_id"]) for row in deferred],
+            "dispatch_workers": dispatch_workers,
+            "dispatched_run_ids": [
+                str(row["run_id"]) for row in dispatched_runs if row.get("dispatched")
+            ],
+            "source_message_id": str(source_message_id or "").strip(),
+            "attachment_ids": [
+                str(item).strip() for item in (attachment_ids or []) if str(item).strip()
+            ],
         },
     )
     return {
@@ -178,12 +251,18 @@ def materialize_lead_fan_out(
         "tasks": list(tasks_by_id.values()),
         "runs": runs,
         "deferred": deferred,
+        "dispatched_runs": dispatched_runs,
         "receipt": {
             "receipt_id": receipt["receipt_id"],
             "type": receipt["kind"],
             "summary": (
                 f"Lead materialized {len(persisted['tasks'])} tasks; "
                 f"started {len(runs)} ready runs; deferred {len(deferred)}"
+                + (
+                    f"; dispatched {sum(1 for row in dispatched_runs if row.get('dispatched'))}"
+                    if dispatch_workers
+                    else ""
+                )
             ),
             "mode": plan.mode,
             "run_count": len(runs),

@@ -25,18 +25,28 @@ class LeadPlanRequest(BaseModel):
     goal: str = Field(min_length=1)
     mode: Literal["auto", "fan_out", "sequential"] = "auto"
     persist: bool = False
+    attachment_ids: list[str] = Field(default_factory=list)
+    source_message_id: str | None = None
 
 
 class LeadFanOutRequest(BaseModel):
     goal: str = Field(min_length=1)
     mode: Literal["auto", "fan_out", "sequential"] = "auto"
     create_runs: bool = True
+    attachment_ids: list[str] = Field(default_factory=list)
+    source_message_id: str | None = None
+    dispatch_workers: bool = False
+    confirmed: bool = False
 
 
 class LeadReplanRequest(BaseModel):
     goal: str = Field(min_length=1)
     mode: Literal["auto", "fan_out", "sequential"] = "auto"
     create_runs: bool = True
+    attachment_ids: list[str] = Field(default_factory=list)
+    source_message_id: str | None = None
+    dispatch_workers: bool = False
+    confirmed: bool = False
 
 
 def _roster_members(workspace_id: str) -> list[LeadPlanRosterMember]:
@@ -71,6 +81,8 @@ def workspace_lead_plan(workspace_id: str, body: LeadPlanRequest) -> dict[str, A
             goal=goal,
             roster=_roster_members(workspace_id),
             mode=body.mode,  # type: ignore[arg-type]
+            attachment_ids=body.attachment_ids,
+            source_message_id=body.source_message_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -85,12 +97,20 @@ def workspace_lead_plan(workspace_id: str, body: LeadPlanRequest) -> dict[str, A
 
 @router.post("/api/workspaces/{workspace_id}/lead/fan-out")
 def workspace_lead_fan_out(workspace_id: str, body: LeadFanOutRequest) -> dict[str, Any]:
+    if body.dispatch_workers and not body.confirmed:
+        raise HTTPException(
+            status_code=400,
+            detail="dispatch_workers requires confirmed=true (operator approval)",
+        )
     try:
         return materialize_lead_fan_out(
             workspace_id=workspace_id,
             goal=body.goal,
             mode=body.mode,  # type: ignore[arg-type]
             create_runs=body.create_runs,
+            attachment_ids=body.attachment_ids,
+            source_message_id=body.source_message_id,
+            dispatch_workers=body.dispatch_workers,
         )
     except LeadFanOutError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -100,12 +120,20 @@ def workspace_lead_fan_out(workspace_id: str, body: LeadFanOutRequest) -> dict[s
 
 @router.post("/api/workspaces/{workspace_id}/lead/replan")
 def workspace_lead_replan(workspace_id: str, body: LeadReplanRequest) -> dict[str, Any]:
+    if body.dispatch_workers and not body.confirmed:
+        raise HTTPException(
+            status_code=400,
+            detail="dispatch_workers requires confirmed=true (operator approval)",
+        )
     try:
         return replan_lead_goal(
             workspace_id=workspace_id,
             goal=body.goal,
             mode=body.mode,  # type: ignore[arg-type]
             create_runs=body.create_runs,
+            attachment_ids=body.attachment_ids,
+            source_message_id=body.source_message_id,
+            dispatch_workers=body.dispatch_workers,
         )
     except LeadReplanError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

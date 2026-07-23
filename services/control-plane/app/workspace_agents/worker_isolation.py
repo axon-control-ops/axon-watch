@@ -15,6 +15,42 @@ from app.safe_improvement.isolated_executor import (
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 
+def stage_task_attachments(
+    *,
+    task: dict[str, Any],
+    agent_root: Path,
+) -> list[str]:
+    """Copy scoped chat attachments into the worker isolation as read-only inputs."""
+    from app.persistence import attachment_store
+
+    attachment_ids = task.get("attachment_ids")
+    if not isinstance(attachment_ids, list) or not attachment_ids:
+        return []
+
+    target_dir = agent_root / ".axon-attachments"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    staged: list[str] = []
+    for attachment_id in attachment_ids:
+        clean_id = str(attachment_id or "").strip()
+        if not clean_id:
+            continue
+        record = attachment_store.get_attachment(clean_id)
+        if record is None:
+            continue
+        source = Path(str(record.get("storage_path") or ""))
+        if not source.is_file():
+            continue
+        filename = str(record.get("filename") or source.name).strip() or source.name
+        destination = target_dir / f"{clean_id}_{filename}"
+        destination.write_bytes(source.read_bytes())
+        try:
+            destination.chmod(0o400)
+        except OSError:
+            pass
+        staged.append(str(destination))
+    return staged
+
+
 def create_worker_isolation(*, workspace_id: str, run_id: str) -> Path:
     """Create a disposable checkout for one continuous-worker run."""
     bound = resolve_workspace_root(workspace_id)
@@ -49,5 +85,6 @@ __all__ = [
     "cleanup_worker_isolation",
     "create_worker_isolation",
     "isolation_receipt_summary",
+    "stage_task_attachments",
     "worker_agent_workspace",
 ]

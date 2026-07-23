@@ -32,6 +32,7 @@ def build_continuous_worker_prompt(
     workspace_id: str,
     employee: EmployeeConfig,
     task: dict[str, Any] | None = None,
+    staged_attachment_paths: list[str] | None = None,
 ) -> str:
     role = str(employee.role or "").strip().lower() or "workspace_agent"
     owns = str(employee.owns or "").strip() or _DEFAULT_OWNS.get(role, "assigned workspace work")
@@ -52,6 +53,20 @@ def build_continuous_worker_prompt(
         if acceptance
         else " Use receipts to prove the goal is met."
     )
+    assignee = str(task_payload.get("assignee_name") or "").strip()
+    assignee_clause = f" Assigned teammate: {assignee}." if assignee else ""
+    staged = [str(path).strip() for path in (staged_attachment_paths or []) if str(path).strip()]
+    attachment_clause = ""
+    if staged:
+        listed = "; ".join(staged[:8])
+        attachment_clause = (
+            f" Scoped attachments staged read-only under .axon-attachments/: {listed}."
+            " Use only these attachment paths for this leased task."
+        )
+    elif isinstance(task_payload.get("attachment_ids"), list) and task_payload.get("attachment_ids"):
+        attachment_clause = (
+            " This task references chat attachments, but none were staged into isolation."
+        )
     ci_clause = ""
     if role in {"watcher", "backend", "integrations"}:
         ci_clause = (
@@ -80,7 +95,7 @@ def build_continuous_worker_prompt(
         f"This is a bounded continuous shift ({schedule}) for leased task {task_id}. "
         f"{prior_failure}"
         f"Execute only this leased task — do not invent or self-select other work. "
-        f"Goal: {goal}.{acceptance_clause} "
+        f"Goal: {goal}.{acceptance_clause}{assignee_clause}{attachment_clause} "
         "Do it with receipts and summarize what changed. Stay inside your role boundary."
         f"{ci_clause}"
         f"{memory_clause}"

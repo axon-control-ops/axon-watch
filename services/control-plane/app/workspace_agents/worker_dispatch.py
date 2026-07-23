@@ -25,6 +25,7 @@ from app.workspace_agents.worker_isolation import (
     cleanup_worker_isolation,
     create_worker_isolation,
     isolation_receipt_summary,
+    stage_task_attachments,
     worker_agent_workspace,
 )
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
@@ -150,6 +151,7 @@ def dispatch_continuous_worker_run(
         heartbeat.start()
         isolation_root = create_worker_isolation(workspace_id=workspace_id, run_id=run_id)
         agent_root = worker_agent_workspace(isolation_root)
+        staged_attachments = stage_task_attachments(task=task, agent_root=agent_root)
         append_run_execution_receipt(
             run_id,
             receipt_type="worker_isolation_created",
@@ -158,10 +160,23 @@ def dispatch_continuous_worker_run(
             success=True,
             intent="worker_isolation",
         )
+        if staged_attachments:
+            append_run_execution_receipt(
+                run_id,
+                receipt_type="worker_attachments_staged",
+                receipt_summary=(
+                    f"Staged {len(staged_attachments)} attachment(s) into "
+                    f".axon-attachments/ for task {task_id}"
+                ),
+                actor="workspace_scheduler",
+                success=True,
+                intent="worker_isolation",
+            )
         prompt = build_continuous_worker_prompt(
             workspace_id=workspace_id,
             employee=employee,
             task=task,
+            staged_attachment_paths=staged_attachments,
         )
         ensure_agent_session(workspace_id=workspace_id, run_id=run_id)
         context = LaneBContext(workspace_id=workspace_id, composer_mode="agent")

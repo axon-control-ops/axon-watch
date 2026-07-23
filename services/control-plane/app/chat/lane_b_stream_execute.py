@@ -10,8 +10,9 @@ from app.chat.lane_b_generated_image_actions import (
     bind_agent_generated_images,
     lane_b_open_file_ui_action,
 )
+from app.chat.lane_b_plan_run import finalize_lane_b_plan_run
 from app.chat.reply_verification import verify_lane_b_reply
-from app.cli_runtime.approval_gate import is_tool_capable_composer_mode
+from app.cli_runtime.approval_gate import is_run_linked_composer_mode, is_tool_capable_composer_mode
 from app.cli_runtime.research_stream_blocks import normalize_transcript_content
 from app.chat.progress_milestones import (
     persist_stream_delta,
@@ -88,6 +89,8 @@ def lane_b_system_content(
     if streaming:
         if is_tool_capable_composer_mode(composer_mode) and dispatch_run_id:
             return f"Lane B ({composer_mode}) — streaming runtime reply for run {dispatch_run_id}."
+        if str(composer_mode or "").strip().lower() == "plan" and dispatch_run_id:
+            return f"Lane B (plan) — streaming plan for run {dispatch_run_id}."
         return f"Lane B ({composer_mode}) — generating reply…"
 
     if is_tool_capable_composer_mode(composer_mode) and dispatch_run_id:
@@ -109,6 +112,17 @@ def lane_b_system_content(
         return (
             f"Lane B ({composer_mode}) recorded run {dispatch_run_id}, but runtime dispatch fell back "
             f"to a consultative reply (phase {run_phase or 'executing'})."
+        )
+    if str(composer_mode or "").strip().lower() == "plan" and dispatch_run_id:
+        phase = run_phase or "executing"
+        if dispatched:
+            return (
+                f"Lane B (plan) recorded run {dispatch_run_id} "
+                f"(phase {phase})."
+            )
+        return (
+            f"Lane B (plan) recorded run {dispatch_run_id}, but plan generation fell back "
+            f"(phase {phase})."
         )
     return f"Lane B ({composer_mode}) — conversational reply only; no command dispatch."
 
@@ -287,6 +301,22 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
                 dispatched=dispatched,
                 run_phase=str(run_record["phase"]) if run_record is not None else None,
             )
+        elif (
+            str(job.composer_mode or "").strip().lower() == "plan"
+            and job.dispatch_run_id
+        ):
+            # Plan is run-linked but not tool-capable; still finalize to review_ready.
+            dispatched, run_record = finalize_lane_b_plan_run(
+                run_id=job.dispatch_run_id,
+                lane_b_result=lane_b_result,
+                reply_text=agent_content,
+            )
+            system_content = lane_b_system_content(
+                composer_mode=job.composer_mode,
+                dispatch_run_id=job.dispatch_run_id,
+                dispatched=dispatched,
+                run_phase=str(run_record["phase"]) if run_record is not None else None,
+            )
         else:
             system_content = lane_b_system_content(
                 composer_mode=job.composer_mode,
@@ -346,7 +376,7 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             updated_at=updated_at,
         )
         run_record = None
-        if is_tool_capable_composer_mode(job.composer_mode) and job.dispatch_run_id:
+        if is_run_linked_composer_mode(job.composer_mode) and job.dispatch_run_id:
             try:
                 run_record = fail_run(
                     job.dispatch_run_id,
