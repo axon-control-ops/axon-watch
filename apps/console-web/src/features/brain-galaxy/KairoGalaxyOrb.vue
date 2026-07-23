@@ -163,6 +163,7 @@ function handleOrbContextMenu(event: MouseEvent): void {
           'kairo-galaxy-orb--radial-open': radialMenu.open.value,
         },
       ]"
+      :style="{ '--voice-beat': speaking ? (voiceBeat ? '1' : '0.55') : undefined }"
       :aria-label="`${personaName} voice orb`"
     >
       <KairoGalaxyOrbDragHandle

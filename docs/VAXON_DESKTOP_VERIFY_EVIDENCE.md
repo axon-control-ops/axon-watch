@@ -101,3 +101,25 @@ Non-claims: no always-on mic without wake word for cold ambient; no background m
 **Bug (verified in code):** Chromium Web Speech ends ambient hands-free sessions about once a second on silence. Galaxy presence / orb chrome treated `speechCapturing === true` as `LISTENING`, so with active signals the HUD thrashed **Listening ↔ Alerting/Ready** (Intelligence panel, ambient cards, orb status, mic label).
 
 **Fix:** ambient hands-free/barge-in no longer owns the Listening presence/orb label — only manual PTT (`conversationPhase === 'listening'`). Unlock banner teleported out of the mockup CSS grid. Ambient restart delay raised to 1.6s.
+
+## Packaged WebKitGTK Azure voice gesture (2026-07-22T20:33Z)
+
+**Result: PASS**
+
+- Live Azure TTS via `http://127.0.0.1:4173/api/kairo/tts` (`provider=azure`, voice bytes present)
+- System **WebKitGTK 4.1** (PyGObject / system `python3`) with `media-playback-requires-user-gesture=true`
+- Harness unlock click (GDK button + JS fallback) then Azure MP3 `file://` playback
+- Assertion: `engine=azure`
+
+Harness: `scripts/desktop/prove-packaged-voice.sh`
+
+Honesty note: unlock click is injected by the harness (not a human finger). This still proves
+WebKitGTK on this host can unlock audio and play a live Azure TTS payload — same engine family
+as packaged Tauri on Linux. It is not a full Tauri window E2E of the in-app unlock UX.
+
+## Continuous voice reliability checklist (2026-07-22T20:33Z)
+
+- Checklist written: `docs/VAXON_DESKTOP_VOICE_RELIABILITY_CHECKLIST.md`
+- Automated: Azure TTS + WebKitGTK unlock PASS
+- Manual soak rows remain open until operator evidence is recorded
+

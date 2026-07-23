@@ -30,6 +30,7 @@ from app.kairo.turn_memory import (
     remember_turn as _remember_turn,
     resolve_followup_action as _resolve_followup_action,
 )
+from app.kairo.conversation_mission_turn import try_mission_memory_turn
 
 from app.kairo.conversation_artifacts import (
     build_runtime_artifact,
@@ -48,7 +49,6 @@ from app.kairo_conversation_reply import (
 from app.kairo_conversation_runtime_context import (
     OPEN_DETAIL_RE as _OPEN_DETAIL_RE,
     build_runtime_context_block,
-    runtime_workspace_id,
 )
 from app.kairo_participant_memory import (
     apply_participant_address,
@@ -82,31 +82,6 @@ _WORKSPACE_ACTIVITY_RE = re.compile(
     r"\b(just did|doing|latest|recent|activity)\b",
     re.IGNORECASE,
 )
-def _runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
-    return runtime_workspace_id(workspace_id=workspace_id, pack=pack)
-
-
-def _build_runtime_context_block(
-    *,
-    content: str,
-    workspace_id: str,
-    pack: dict[str, Any],
-    session_id: str,
-    recent_turns: list[dict[str, str]],
-    context_node_id: str | None = None,
-    context_signal_id: str | None = None,
-) -> str:
-    return build_runtime_context_block(
-        content=content,
-        workspace_id=workspace_id,
-        pack=pack,
-        session_id=session_id,
-        recent_turns=recent_turns,
-        context_node_id=context_node_id,
-        context_signal_id=context_signal_id,
-    )
-
-
 def classify_conversation_turn(content: str) -> ConversationTurnKind:
     trimmed = content.strip()
     if not trimmed:
@@ -176,6 +151,17 @@ def converse_turn(
             target_workspace_id=resolved_workspace_id,
             task=f"Investigate signal {context_signal_id}",
         )
+    mission_turn = try_mission_memory_turn(
+        session_id=session_id,
+        trimmed=trimmed,
+        raw_content=raw_content,
+        workspace_id=workspace_id,
+        resolved_workspace_id=resolved_workspace_id,
+        guest_name=guest_name,
+        started_at=started_at,
+    )
+    if mission_turn is not None:
+        return mission_turn
     followup = _resolve_followup_action(trimmed, session_id)
     if followup:
         action_type = str(followup.get("type", ""))
@@ -346,7 +332,7 @@ def converse_turn(
         command_ack_line=command_ack_line,
         workspace_short_label=workspace_short_label,
         build_runtime_artifact=build_runtime_artifact,
-        build_runtime_context_block=_build_runtime_context_block,
+        build_runtime_context_block=build_runtime_context_block,
         remember_entities=_remember_entities,
         remember_top_signal=_remember_top_signal,
         dispatch_runtime=dispatch_ide_composer,

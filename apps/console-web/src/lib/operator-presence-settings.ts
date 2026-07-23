@@ -2,6 +2,7 @@ import type {
   OperatorPresenceSettings,
   SttMode,
   VoiceRoutingMode,
+  WakeWordSensitivity,
 } from '../contracts/canonical';
 
 export const OPERATOR_PRESENCE_SETTINGS_KEY = 'axon-x:operator-presence-settings';
@@ -12,6 +13,7 @@ export const DEFAULT_SPEECH_PITCH = 1.04;
 export const DEFAULT_AZURE_VOICE_ID = 'en-GB-RyanNeural';
 export const DEFAULT_STT_MODE: SttMode = 'cloud';
 export const DEFAULT_VOICE_ROUTING_MODE: VoiceRoutingMode = 'template_first';
+export const DEFAULT_WAKE_WORD_SENSITIVITY: WakeWordSensitivity = 'medium';
 
 export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
   return {
@@ -23,6 +25,11 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     ide_voice_strip_enabled: false,
     hands_free_enabled: false,
     proactive_duplex_enabled: false,
+    wake_word_listening_consent: false,
+    wake_word_listening_enabled: false,
+    wake_word_sensitivity: DEFAULT_WAKE_WORD_SENSITIVITY,
+    quiet_hours_start: '',
+    quiet_hours_end: '',
     speech_rate: DEFAULT_SPEECH_RATE,
     speech_pitch: DEFAULT_SPEECH_PITCH,
     azure_voice_id: DEFAULT_AZURE_VOICE_ID,
@@ -73,6 +80,22 @@ function normalizeVoiceRoutingMode(raw: unknown): VoiceRoutingMode {
   return DEFAULT_VOICE_ROUTING_MODE;
 }
 
+function normalizeWakeWordSensitivity(raw: unknown): WakeWordSensitivity {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (value === 'low' || value === 'medium' || value === 'high') {
+    return value;
+  }
+  return DEFAULT_WAKE_WORD_SENSITIVITY;
+}
+
+function normalizeQuietHoursClock(raw: unknown): string {
+  const value = String(raw ?? '').trim();
+  if (!value) {
+    return '';
+  }
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : '';
+}
+
 export function normalizeOperatorPresenceSettings(
   raw: Partial<OperatorPresenceSettings> | null | undefined,
 ): OperatorPresenceSettings {
@@ -80,6 +103,9 @@ export function normalizeOperatorPresenceSettings(
   if (!raw) {
     return defaults;
   }
+  const consent = raw.wake_word_listening_consent ?? defaults.wake_word_listening_consent;
+  const wakeEnabledRaw =
+    raw.wake_word_listening_enabled ?? defaults.wake_word_listening_enabled;
   return {
     operator_persona_enabled: raw.operator_persona_enabled ?? defaults.operator_persona_enabled,
     spoken_alerts_enabled: raw.spoken_alerts_enabled ?? defaults.spoken_alerts_enabled,
@@ -95,6 +121,16 @@ export function normalizeOperatorPresenceSettings(
     hands_free_enabled: raw.hands_free_enabled ?? defaults.hands_free_enabled,
     proactive_duplex_enabled:
       raw.proactive_duplex_enabled ?? defaults.proactive_duplex_enabled,
+    wake_word_listening_consent: consent,
+    // Consent is required; never silently arm always-listening.
+    wake_word_listening_enabled: Boolean(consent && wakeEnabledRaw),
+    wake_word_sensitivity: normalizeWakeWordSensitivity(
+      raw.wake_word_sensitivity ?? defaults.wake_word_sensitivity,
+    ),
+    quiet_hours_start: normalizeQuietHoursClock(
+      raw.quiet_hours_start ?? defaults.quiet_hours_start,
+    ),
+    quiet_hours_end: normalizeQuietHoursClock(raw.quiet_hours_end ?? defaults.quiet_hours_end),
     speech_rate: normalizeSpeechRate(raw.speech_rate ?? defaults.speech_rate),
     speech_pitch: normalizeSpeechPitch(raw.speech_pitch ?? defaults.speech_pitch),
     azure_voice_id: normalizeAzureVoiceId(raw.azure_voice_id ?? defaults.azure_voice_id),

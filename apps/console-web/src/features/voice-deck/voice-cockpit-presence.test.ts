@@ -4,6 +4,7 @@ import {
   shouldReactToBriefingSpokenAlert,
   voiceCockpitStatusLine,
 } from './voice-cockpit-presence';
+import { defaultOperatorPresenceSettings } from '../../lib/operator-presence-settings';
 
 describe('voice cockpit presence', () => {
   it('builds a status line from operator presence', () => {
@@ -12,20 +13,8 @@ describe('voice cockpit presence', () => {
         persona_voice_line: 'KAIRO: 1 approval waiting.',
         presence_state: 'alerting',
         settings: {
-          operator_persona_enabled: true,
-          spoken_alerts_enabled: true,
-          privacy_mode: false,
-          mobile_compact_preferred: true,
-          kairo_narration: 'conversational',
-          ide_voice_strip_enabled: false,
-          hands_free_enabled: false,
-          speech_rate: 1.0,
-          speech_pitch: 1.04,
-          azure_voice_id: 'en-GB-RyanNeural',
+          ...defaultOperatorPresenceSettings(),
           stt_mode: 'browser',
-          voice_routing_mode: 'template_first',
-          narrate_tool_progress: false,
-          proactive_duplex_enabled: false,
         },
         spoken_alert: {
           eligible: true,

@@ -332,15 +332,12 @@
   background: rgba(255, 159, 0, 0.96);
   box-shadow: 0 0 8px rgba(255, 159, 0, 0.35);
 }
-
 .operator-status-radar-panel__status-dot--watch {
   background: rgba(255, 201, 120, 0.96);
   box-shadow: 0 0 8px rgba(255, 201, 120, 0.28);
 }
-
 .operator-status-radar-panel__presence-title,
 .operator-status-radar-panel__presence-subtitle {
   font-size: 0.52rem;
   letter-spacing: 0.12em;
 }
-

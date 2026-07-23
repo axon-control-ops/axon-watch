@@ -1,6 +1,7 @@
 export type KairoNarrationLevel = 'off' | 'minimal' | 'conversational';
 export type VoiceRoutingMode = 'template_first' | 'runtime_on_deep' | 'runtime_aggressive';
 export type SttMode = 'browser' | 'browser_continuous' | 'cloud';
+export type WakeWordSensitivity = 'low' | 'medium' | 'high';
 
 /**
  * Continuous speech tuning — axon-local parity (`voice_speech_rate` / `voice_speech_pitch`).
@@ -19,6 +20,21 @@ export interface OperatorPresenceSettings {
    * (uses the follow-up window). Implies hands-free once voice is unlocked.
    */
   proactive_duplex_enabled: boolean;
+  /**
+   * Explicit consent for local always-listening wake-word engine.
+   * Pre-wake audio stays on-device; cloud STT starts only after wake/follow-up.
+   */
+  wake_word_listening_consent: boolean;
+  /** Local wake-word engine armed (requires consent; privacy mode wins). */
+  wake_word_listening_enabled: boolean;
+  /** Local wake-word sensitivity. */
+  wake_word_sensitivity: WakeWordSensitivity;
+  /**
+   * Quiet hours for proactive spoken alerts (local operator clock, HH:MM 24h).
+   * Empty strings disable quiet hours.
+   */
+  quiet_hours_start: string;
+  quiet_hours_end: string;
   /** Azure + browser speech rate (1.0 = engine default). */
   speech_rate: number;
   /** Azure + browser speech pitch (1.04 = axon-local Azure default). */

@@ -12,6 +12,8 @@ import {
   evaluateVoiceTranscript,
   type KairoVoiceCaptureMode,
 } from '../../lib/kairo-voice-gate';
+import { shouldRejectSpeakerBleed } from './kairo-duplex-phase';
+import { kairoConversationReply } from './kairo-conversation-state';
 import { isSpeechCaptureSupported, SpeechCaptureSession } from './speech-capture';
 import { CloudAudioCaptureSession, isCloudAudioCaptureSupported, preferredCloudRecorderMimeType } from './cloud-audio-capture';
 import {
@@ -187,6 +189,24 @@ async function handleFinalTranscript(transcript: string, mode: KairoVoiceCapture
   kairoCaptureLastAccepted.value = gate.accept;
   kairoCaptureLastGateReason.value = gate.reason;
 
+  if (
+    gate.accept &&
+    gate.submitContent &&
+    shouldRejectSpeakerBleed({
+      transcript: gate.submitContent,
+      lastSpokenReply: kairoConversationReply.value || '',
+    })
+  ) {
+    logKairoVoice('speaker_bleed_rejected', { transcript: gate.submitContent });
+    kairoCaptureLastAccepted.value = false;
+    kairoCaptureLastGateReason.value = 'speaker_bleed';
+    kairoCaptureLastSubmitState.value = 'ignored';
+    if (kairoConversationPhase.value === 'listening') {
+      setKairoConversationPhase('idle');
+    }
+    notifyCaptureEnd();
+    return;
+  }
 
   if (gate.shouldInterrupt) {
     triggerVoiceInterrupt('final');

@@ -2,6 +2,8 @@ import { onBeforeUnmount, watch, type WatchStopHandle } from 'vue';
 
 import { clearKairoVoiceFollowupWindow, kairoVoiceFollowupExpiresAt } from '../../lib/kairo-voice-followup-window';
 import { isKairoVoiceSpeaking } from '../../lib/kairo-voice-playback';
+import { logKairoVoice } from '../../lib/kairo-voice-debug';
+import { recordVoiceLoopDiagnostic } from '../../lib/kairo-voice-loop-diagnostics';
 import {
   canStartKairoSpeechCapture,
   kairoCaptureCapturing,
@@ -11,12 +13,12 @@ import {
   stopKairoSpeechCapture,
 } from './kairo-shared-speech-capture';
 import { kairoConversationPhase } from './kairo-conversation-state';
-
-const RESTART_DELAY_MS = 280;
-const POST_SPEECH_COOLDOWN_MS = 700;
-/** After a clean ambient end (Chromium no-speech), wait longer before restart to cut thrash. */
-const AMBIENT_RESTART_MS = 1600;
-const FAIL_BACKOFF_MS = [1200, 3000, 8000, 15000] as const;
+import {
+  resolveHandsFreeCaptureEnd,
+  resolveHandsFreeRestartTick,
+  resolveHandsFreeSync,
+  type HandsFreeLoopDecision,
+} from './kairo-hands-free-loop-policy';
 
 export function useKairoHandsFreeLoop(options: {
   enabled: () => boolean;
@@ -45,44 +47,21 @@ export function useKairoHandsFreeLoop(options: {
     );
   }
 
-  function nextFailDelayMs(): number {
-    const index = Math.min(consecutiveStartFailures, FAIL_BACKOFF_MS.length - 1);
-    return FAIL_BACKOFF_MS[index] ?? 15000;
-  }
+  function applyDecision(decision: HandsFreeLoopDecision): void {
+    recordVoiceLoopDiagnostic({
+      kind: 'hands_free_decision',
+      action: decision.action,
+      reason: decision.reason,
+      delayMs: 'delayMs' in decision ? decision.delayMs : undefined,
+      failures: consecutiveStartFailures,
+    });
+    logKairoVoice('hands_free_decision', {
+      action: decision.action,
+      reason: decision.reason,
+      failures: consecutiveStartFailures,
+    });
 
-  function scheduleRestart(delayMs = RESTART_DELAY_MS): void {
-    clearRestartTimer();
-    if (!options.enabled() || options.privacyBlocked()) {
-      return;
-    }
-    restartTimer = window.setTimeout(() => {
-      const blocked =
-        !options.enabled() ||
-        options.privacyBlocked() ||
-        options.conversationPending() ||
-        kairoCaptureCapturing.value ||
-        isVoiceOutputActive();
-      if (blocked) {
-        return;
-      }
-      if (!canStartKairoSpeechCapture()) {
-        consecutiveStartFailures += 1;
-        scheduleRestart(nextFailDelayMs());
-        return;
-      }
-      const started = startKairoSpeechCapture('hands_free');
-      if (!started) {
-        consecutiveStartFailures += 1;
-        scheduleRestart(nextFailDelayMs());
-        return;
-      }
-      consecutiveStartFailures = 0;
-    }, delayMs);
-  }
-
-  function syncHandsFreeState(): void {
-    const voiceOut = isVoiceOutputActive();
-    if (!options.enabled() || options.privacyBlocked()) {
+    if (decision.action === 'stop_all') {
       clearRestartTimer();
       clearKairoVoiceFollowupWindow();
       consecutiveStartFailures = 0;
@@ -93,49 +72,126 @@ export function useKairoHandsFreeLoop(options: {
       return;
     }
 
-    if (options.conversationPending()) {
+    if (decision.action === 'hold') {
       clearRestartTimer();
-      if (kairoCaptureCapturing.value) {
+      if (decision.reason === 'conversation_pending' && kairoCaptureCapturing.value) {
         stopKairoSpeechCapture();
       }
       return;
     }
 
-    if (voiceOut) {
+    if (decision.action === 'start_barge_in') {
       wasVoiceOutputActive = true;
       clearRestartTimer();
-      // Keep a lightweight barge-in capture alive during TTS so stop/wake works.
       if (!kairoCaptureCapturing.value) {
         startKairoSpeechCapture('barge_in');
       }
       return;
     }
 
-    if (!kairoCaptureCapturing.value) {
-      const delay =
-        consecutiveStartFailures > 0
-          ? nextFailDelayMs()
-          : wasVoiceOutputActive
-            ? POST_SPEECH_COOLDOWN_MS
-            : RESTART_DELAY_MS;
-      wasVoiceOutputActive = false;
-      scheduleRestart(delay);
+    if (decision.incrementFailure) {
+      consecutiveStartFailures += 1;
+    } else if (decision.reason === 'ambient_end' || decision.reason === 'post_speech') {
+      consecutiveStartFailures = 0;
     }
+
+    if (decision.delayMs <= 0) {
+      const started = startKairoSpeechCapture('hands_free');
+      if (!started) {
+        consecutiveStartFailures += 1;
+        scheduleRestartFromPolicy(
+          resolveHandsFreeRestartTick({
+            enabled: options.enabled(),
+            privacyBlocked: options.privacyBlocked(),
+            conversationPending: options.conversationPending(),
+            capturing: kairoCaptureCapturing.value,
+            voiceOutputActive: isVoiceOutputActive(),
+            canStartCapture: false,
+            consecutiveStartFailures,
+          }),
+        );
+        return;
+      }
+      consecutiveStartFailures = 0;
+      return;
+    }
+
+    scheduleRestartFromPolicy(decision);
+  }
+
+  function scheduleRestartFromPolicy(decision: HandsFreeLoopDecision): void {
+    if (decision.action !== 'schedule_restart') {
+      applyDecision(decision);
+      return;
+    }
+    clearRestartTimer();
+    if (!options.enabled() || options.privacyBlocked()) {
+      return;
+    }
+    const delayMs = decision.delayMs;
+    restartTimer = window.setTimeout(() => {
+      const tick = resolveHandsFreeRestartTick({
+        enabled: options.enabled(),
+        privacyBlocked: options.privacyBlocked(),
+        conversationPending: options.conversationPending(),
+        capturing: kairoCaptureCapturing.value,
+        voiceOutputActive: isVoiceOutputActive(),
+        canStartCapture: canStartKairoSpeechCapture(),
+        consecutiveStartFailures,
+      });
+      if (tick.action === 'schedule_restart' && tick.delayMs === 0 && !tick.incrementFailure) {
+        const started = startKairoSpeechCapture('hands_free');
+        if (!started) {
+          consecutiveStartFailures += 1;
+          applyDecision(
+            resolveHandsFreeRestartTick({
+              enabled: options.enabled(),
+              privacyBlocked: options.privacyBlocked(),
+              conversationPending: options.conversationPending(),
+              capturing: kairoCaptureCapturing.value,
+              voiceOutputActive: isVoiceOutputActive(),
+              canStartCapture: false,
+              consecutiveStartFailures,
+            }),
+          );
+          return;
+        }
+        consecutiveStartFailures = 0;
+        return;
+      }
+      applyDecision(tick);
+    }, delayMs);
+  }
+
+  function syncHandsFreeState(): void {
+    const voiceOut = isVoiceOutputActive();
+    const decision = resolveHandsFreeSync({
+      enabled: options.enabled(),
+      privacyBlocked: options.privacyBlocked(),
+      conversationPending: options.conversationPending(),
+      voiceOutputActive: voiceOut,
+      capturing: kairoCaptureCapturing.value,
+      consecutiveStartFailures,
+      wasVoiceOutputActive,
+    });
+    if (decision.action === 'schedule_restart' && !voiceOut) {
+      wasVoiceOutputActive = false;
+    }
+    applyDecision(decision);
   }
 
   const unregisterCaptureEnd = registerKairoCaptureEndListener(() => {
-    if (!options.enabled() || isVoiceOutputActive()) {
+    const decision = resolveHandsFreeCaptureEnd({
+      enabled: options.enabled(),
+      voiceOutputActive: isVoiceOutputActive(),
+      captureError: Boolean(kairoCaptureError.value),
+      consecutiveStartFailures,
+      wasVoiceOutputActive,
+    });
+    if (!decision) {
       return;
     }
-    if (kairoCaptureError.value) {
-      consecutiveStartFailures += 1;
-      scheduleRestart(nextFailDelayMs());
-      return;
-    }
-    consecutiveStartFailures = 0;
-    scheduleRestart(
-      wasVoiceOutputActive ? POST_SPEECH_COOLDOWN_MS : AMBIENT_RESTART_MS,
-    );
+    applyDecision(decision);
   });
 
   stopWatch = watch(
@@ -147,7 +203,6 @@ export function useKairoHandsFreeLoop(options: {
         options.conversationPending(),
         kairoConversationPhase.value,
         kairoCaptureCapturing.value,
-        // Re-arm mic when a follow-up window opens after unsolicited speech.
         kairoVoiceFollowupExpiresAt.value,
       ] as const,
     () => {

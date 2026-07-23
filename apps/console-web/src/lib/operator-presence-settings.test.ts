@@ -56,6 +56,11 @@ describe('operator-presence-settings', () => {
       ide_voice_strip_enabled: false,
       hands_free_enabled: false,
       proactive_duplex_enabled: false,
+      wake_word_listening_consent: false,
+      wake_word_listening_enabled: false,
+      wake_word_sensitivity: 'medium',
+      quiet_hours_start: '',
+      quiet_hours_end: '',
       speech_rate: 1.0,
       speech_pitch: 1.04,
       azure_voice_id: 'en-GB-RyanNeural',
@@ -76,6 +81,11 @@ describe('operator-presence-settings', () => {
       ide_voice_strip_enabled: false,
       hands_free_enabled: false,
       proactive_duplex_enabled: false,
+      wake_word_listening_consent: false,
+      wake_word_listening_enabled: false,
+      wake_word_sensitivity: 'medium',
+      quiet_hours_start: '',
+      quiet_hours_end: '',
       speech_rate: 1.0,
       speech_pitch: 1.04,
       azure_voice_id: 'en-GB-RyanNeural',
@@ -83,6 +93,21 @@ describe('operator-presence-settings', () => {
       voice_routing_mode: 'template_first',
       narrate_tool_progress: false,
     });
+  });
+
+  it('requires consent before arming wake-word listening', () => {
+    expect(
+      normalizeOperatorPresenceSettings({
+        wake_word_listening_enabled: true,
+        wake_word_listening_consent: false,
+      }).wake_word_listening_enabled,
+    ).toBe(false);
+    expect(
+      normalizeOperatorPresenceSettings({
+        wake_word_listening_enabled: true,
+        wake_word_listening_consent: true,
+      }).wake_word_listening_enabled,
+    ).toBe(true);
   });
 
   it('normalizes continuous speech rate and pitch like axon-local', () => {

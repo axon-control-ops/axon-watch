@@ -4,14 +4,20 @@ import { kairoAudioUnlockSnapshot, onKairoAudioUnlocked } from '../../lib/kairo-
 import { scheduleKairoVoiceFollowupWindowAfterSpeech } from '../../lib/kairo-voice-followup-window';
 import { speakKairoLine } from '../../lib/kairo-voice-playback';
 import { shouldEnableKairoHandsFreeLoop } from '../../lib/kairo-hands-free-armed';
+import { recordVoiceLoopDiagnostic } from '../../lib/kairo-voice-loop-diagnostics';
 import { useShellStore } from '../../stores/shell';
 import { registerKairoConversationSubmit } from './kairo-conversation-bus';
 import { kairoConversationPhase } from './kairo-conversation-state';
 import { useKairoHandsFreeLoop } from './use-kairo-hands-free-loop';
 import { useKairoConversation } from './use-kairo-conversation';
-import { setKairoSpeechPrivacyBlocked, setKairoSpeechSttMode } from './kairo-shared-speech-capture';
+import {
+  setKairoSpeechPrivacyBlocked,
+  setKairoSpeechSttMode,
+  startKairoSpeechCapture,
+} from './kairo-shared-speech-capture';
 import { useKairoVoiceInterrupt } from './use-kairo-voice-interrupt';
 import { setKairoSpeechTuningProvider } from '../../lib/kairo-voice-playback';
+import { getDesktopWakeWordEngine } from './browser-energy-wake-word-engine';
 
 const SESSION_READY_KEY = 'axon-x-duplex-session-ready';
 
@@ -23,6 +29,7 @@ export function useKairoAppVoice(): void {
   const shell = useShellStore();
   // App voice and typed surfaces use the same awaited turn-submission function.
   const { submitTurn } = useKairoConversation();
+  const wakeEngine = getDesktopWakeWordEngine();
 
   setKairoSpeechPrivacyBlocked(() => shell.operatorPresenceSettings.privacy_mode);
   setKairoSpeechSttMode(() => shell.operatorPresenceSettings.stt_mode);
@@ -44,6 +51,35 @@ export function useKairoAppVoice(): void {
     conversationPending: () =>
       kairoConversationPhase.value === 'thinking' || kairoConversationPhase.value === 'speaking',
   });
+
+  async function syncLocalWakeWord(): Promise<void> {
+    const settings = shell.operatorPresenceSettings;
+    if (settings.privacy_mode) {
+      await wakeEngine.mutePrivacy();
+      return;
+    }
+    const armed =
+      settings.wake_word_listening_enabled &&
+      settings.wake_word_listening_consent &&
+      kairoAudioUnlockSnapshot.value.mediaUnlocked;
+    if (!armed) {
+      await wakeEngine.stop();
+      return;
+    }
+    await wakeEngine.start({
+      keyword: 'VAXON',
+      sensitivity: settings.wake_word_sensitivity ?? 'medium',
+      consentGranted: settings.wake_word_listening_consent,
+      privacyMuted: settings.privacy_mode,
+      onStatus: (status) => {
+        recordVoiceLoopDiagnostic({ kind: 'wake_gate', action: status });
+      },
+      onWake: () => {
+        // Local energy/keyword gate only arms post-wake STT — transcript gate still validates.
+        startKairoSpeechCapture('hands_free');
+      },
+    });
+  }
 
   async function maybeSpeakDuplexSessionReady(): Promise<void> {
     const settings = shell.operatorPresenceSettings;
@@ -76,8 +112,13 @@ export function useKairoAppVoice(): void {
       [
         kairoAudioUnlockSnapshot.value.mediaUnlocked,
         shell.operatorPresenceSettings.proactive_duplex_enabled,
+        shell.operatorPresenceSettings.wake_word_listening_enabled,
+        shell.operatorPresenceSettings.wake_word_listening_consent,
+        shell.operatorPresenceSettings.wake_word_sensitivity,
+        shell.operatorPresenceSettings.privacy_mode,
       ] as const,
     ([mediaUnlocked, duplex]) => {
+      void syncLocalWakeWord();
       if (mediaUnlocked && duplex) {
         void maybeSpeakDuplexSessionReady();
       }
@@ -86,6 +127,7 @@ export function useKairoAppVoice(): void {
   );
 
   const unregisterUnlock = onKairoAudioUnlocked(() => {
+    void syncLocalWakeWord();
     void maybeSpeakDuplexSessionReady();
   });
 
@@ -95,5 +137,6 @@ export function useKairoAppVoice(): void {
     unregisterSubmit();
     unregisterUnlock();
     stopUnlockWatch();
+    void wakeEngine.stop();
   });
 }
