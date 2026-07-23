@@ -516,7 +516,6 @@ export const useShellStore = defineStore('shell', () => {
   const ideTerminalToggleToken = ref(0);
   const workbenchTerminalPanelVisible = ref(false);
   const teamRosterRevealToken = ref(0);
-
   const workspaceRuns = computed(() =>
     currentWorkspace.value
       ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
