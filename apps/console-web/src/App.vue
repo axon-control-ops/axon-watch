@@ -15,7 +15,6 @@ import OperatorSettingsSurface from './components/settings/OperatorSettingsSurfa
 import ScanHierarchyPreview from './dev/ScanHierarchyPreview.vue';
 import { useAppSurface } from './composables/useAppSurface';
 import { startLiveEventsSession } from './lib/live-events-session';
-import { runEngagementSurfaceRefresh } from './stores/shell/refresh-engagement-surfaces';
 import { useIdeLayoutShortcuts } from './composables/useIdeLayoutShortcuts';
 import { useIdeKairoInterrupt } from './composables/useIdeKairoInterrupt';
 import { useVoiceDeckOnBoot } from './features/voice-deck/use-voice-deck';
@@ -23,6 +22,7 @@ import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit
 import { useKairoAppVoice } from './features/kairo-conversation/use-kairo-app-voice';
 import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
 import VoiceOrbHost from './features/brain-galaxy/VoiceOrbHost.vue';
+import HudHoloAtmosphere from './features/hud-holo/HudHoloAtmosphere.vue';
 import { useShellStore } from './stores/shell';
 
 const shell = useShellStore();
@@ -106,19 +106,6 @@ watch(
         }
         return shell.refreshOperatorPresence();
       },
-      onMaterialChange: () => {
-        if (shell.layoutMode === 'ide') {
-          return;
-        }
-        return runEngagementSurfaceRefresh({
-          workspaceId: shell.currentWorkspace?.workspace_id ?? null,
-          briefingLoaded: shell.briefingLoadState === 'loaded',
-          loadRuns: (options) => shell.loadRuns(options),
-          loadOperatorBriefing: (options) => shell.loadOperatorBriefing(options),
-          refreshOperatorThreadMessages: (workspaceId) =>
-            shell.refreshOperatorThreadMessages(workspaceId),
-        });
-      },
       onSpokenBriefing: () => shell.speakOperatorBriefing(),
     });
   },
@@ -157,6 +144,7 @@ onUnmounted(() => {
         'console-shell--operator': shell.layoutMode === 'operator',
         'console-shell--brain-galaxy':
           shell.layoutMode === 'operator' && shell.operatorBrainGalaxyActive,
+        'console-shell--glass3d': !isFoundationSurface,
         'console-shell--vault': isVaultSurface,
         'console-shell--data': isDataSurface,
         'console-shell--skills': isSkillsSurface,
@@ -164,7 +152,9 @@ onUnmounted(() => {
         'console-shell--settings': isSettingsSurface,
       }"
       :data-layout-mode="shell.layoutMode"
+      data-hud="holographic"
     >
+      <HudHoloAtmosphere v-if="!isFoundationSurface" />
       <TopBar />
       <template v-if="!isFoundationSurface">
         <MobileVoiceCockpitStrip />

@@ -118,6 +118,11 @@
   padding-top: 0.08rem;
 }
 
+.briefing-panel__hero-body--copy-only {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
 .briefing-panel__reactor {
   position: relative;
   width: 4.1rem;
@@ -315,3 +320,4 @@
   margin-top: 0;
 }
 
+@import './briefing-hud-cinematic.css';

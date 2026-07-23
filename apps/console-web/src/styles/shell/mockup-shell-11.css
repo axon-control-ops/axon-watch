@@ -214,6 +214,11 @@
   background: rgba(0, 12, 20, 0.55);
 }
 
+.operator-fleet-grid.hud-holo-shell {
+  border-color: transparent;
+  background: transparent;
+}
+
 .operator-fleet-grid__header {
   display: flex;
   align-items: flex-start;
@@ -244,8 +249,8 @@
 
 .operator-fleet-grid__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.4rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -274,6 +279,7 @@
   flex-direction: column;
   gap: 0.2rem;
   width: 100%;
+  min-height: 4.35rem;
   padding: 0.45rem 0.55rem;
   border: 0;
   background: transparent;

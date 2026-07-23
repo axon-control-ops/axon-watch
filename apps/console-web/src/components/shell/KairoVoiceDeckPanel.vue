@@ -6,7 +6,6 @@ import {
   voiceCockpitStatusLine,
 } from '../../features/voice-deck/voice-cockpit-presence';
 import { briefingNotice, briefingAdvise } from '../../lib/briefing-panel-view';
-import OperatorPersonaMark from '../../components/OperatorPersonaMark.vue';
 import PersonaTitle from '../../components/PersonaTitle.vue';
 import {
   kairoVoiceDiagnosticsLabel,
@@ -41,15 +40,15 @@ const voiceBlocked = computed(
 
 const presenceLabel = computed(() => {
   if (voiceBlocked.value) {
-    return 'STANDBY';
+    return 'Standby';
   }
   if (speaking.value) {
-    return 'SPEAKING';
+    return 'Speaking';
   }
   if (presenceState.value === 'alerting') {
-    return 'ALERT';
+    return 'Alert';
   }
-  return 'ONLINE';
+  return 'Listening via orb';
 });
 
 function refreshSpeakingState(): void {
@@ -82,7 +81,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section
-    class="kairo-voice-deck hud-panel-frame"
+    class="kairo-voice-deck hud-panel-frame kairo-voice-deck--text-only"
     :class="[
       `kairo-voice-deck--${presenceState}`,
       { 'kairo-voice-deck--speaking': speaking },
@@ -90,30 +89,23 @@ onBeforeUnmount(() => {
     ]"
     aria-label="Operator voice control"
   >
-    <p class="kairo-voice-deck__title">
-      <PersonaTitle suffix="Voice" mark-size="xs" />
-    </p>
+    <header class="kairo-voice-deck__head">
+      <p class="kairo-voice-deck__title">
+        <PersonaTitle suffix="Voice" mark-size="xs" />
+      </p>
+      <span class="kairo-voice-deck__presence-pill" :data-state="presenceState">
+        {{ presenceLabel }}
+      </span>
+    </header>
 
-    <div class="kairo-voice-deck__body">
-      <div class="kairo-voice-deck__orb" aria-hidden="true">
-        <span class="kairo-voice-deck__ring kairo-voice-deck__ring--outer" />
-        <span class="kairo-voice-deck__ring kairo-voice-deck__ring--mid" />
-        <span class="kairo-voice-deck__ring kairo-voice-deck__ring--inner" />
-        <span class="kairo-voice-deck__core">
-          <span class="kairo-voice-deck__core-label-slot">
-            <OperatorPersonaMark size="sm" />
-          </span>
-          <span class="kairo-voice-deck__core-status">{{ presenceLabel }}</span>
-        </span>
-      </div>
-
+    <div class="kairo-voice-deck__body kairo-voice-deck__body--text">
       <div class="kairo-voice-deck__copy">
         <p class="kairo-voice-deck__line">{{ statusLine }}</p>
         <template v-if="!shell.operatorBrainGalaxyActive">
           <p v-if="notice" class="kairo-voice-deck__notice">{{ notice }}</p>
           <p v-if="advise" class="kairo-voice-deck__advise">{{ advise }}</p>
           <p class="kairo-voice-deck__hint">
-            Foreground voice · tap to hear briefing · remote control ready
+            Use the floating orb to talk · this card is status only
           </p>
           <div v-if="showDevVoiceDiagnostics" class="kairo-voice-deck__dev-diagnostics">
             <p class="kairo-voice-deck__dev-line">{{ kairoVoiceDiagnosticsLabel() }}</p>
