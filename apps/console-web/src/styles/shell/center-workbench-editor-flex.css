@@ -1,0 +1,20 @@
+/* Editor surface flex fill — keep markdown / Monaco hosts stretching in the workbench. */
+
+.center-workbench__editor .surface-host__body--editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.center-workbench__editor .editor-markdown-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.center-workbench__editor .surface-host__frame--editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-self: stretch;
+}
