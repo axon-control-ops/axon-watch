@@ -93,6 +93,24 @@ const handsFreeEnabled = computed({
   set: (value: boolean) => patchDraft({ hands_free_enabled: value }),
 });
 
+const wakeWordConsent = computed({
+  get: () => draft.value.wake_word_listening_consent,
+  set: (value: boolean) =>
+    patchDraft({
+      wake_word_listening_consent: value,
+      wake_word_listening_enabled: value ? draft.value.wake_word_listening_enabled : false,
+    }),
+});
+
+const wakeWordEnabled = computed({
+  get: () => draft.value.wake_word_listening_enabled,
+  set: (value: boolean) =>
+    patchDraft({
+      wake_word_listening_enabled: value,
+      wake_word_listening_consent: value ? true : draft.value.wake_word_listening_consent,
+    }),
+});
+
 const proactiveDuplexEnabled = computed({
   get: () => draft.value.proactive_duplex_enabled,
   set: (value: boolean) => {
@@ -446,6 +464,77 @@ defineExpose({
               (e.g. git status). Ignores side conversation. Say "stop" to interrupt speech.
             </small>
           </span>
+        </label>
+        <label class="operator-settings-form__row">
+          <input v-model="wakeWordConsent" type="checkbox" :disabled="saving || privacyMode" />
+          <span class="operator-settings-form__copy">
+            <strong>Local wake-word consent</strong>
+            <small>
+              Explicit consent for on-device always-listening. Pre-wake audio stays in a local ring
+              buffer and is never uploaded. Cloud STT starts only after wake or follow-up.
+            </small>
+          </span>
+        </label>
+        <label class="operator-settings-form__row">
+          <input
+            v-model="wakeWordEnabled"
+            type="checkbox"
+            :disabled="saving || privacyMode || !draft.wake_word_listening_consent"
+          />
+          <span class="operator-settings-form__copy">
+            <strong>Arm local wake-word engine</strong>
+            <small>
+              Interim energy gate until open-source WASM keyword evidence passes. Privacy mode is the
+              hardware kill switch.
+            </small>
+          </span>
+        </label>
+        <label class="operator-settings-form__row operator-settings-form__row--select">
+          <span class="operator-settings-form__copy">
+            <strong>Wake sensitivity</strong>
+            <small>Lower reduces false wakes; higher catches quieter “VAXON”.</small>
+          </span>
+          <select
+            class="operator-settings-form__select"
+            :value="draft.wake_word_sensitivity"
+            :disabled="saving || privacyMode || !draft.wake_word_listening_enabled"
+            @change="
+              patchDraft({
+                wake_word_sensitivity: ($event.target as HTMLSelectElement).value as
+                  | 'low'
+                  | 'medium'
+                  | 'high',
+              })
+            "
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <label class="operator-settings-form__row operator-settings-form__row--select">
+          <span class="operator-settings-form__copy">
+            <strong>Quiet hours (proactive alerts)</strong>
+            <small>Local clock HH:MM. Empty disables. Approvals/critical can still escalate once.</small>
+          </span>
+          <div class="operator-settings-form__slider-grid">
+            <input
+              type="time"
+              :value="draft.quiet_hours_start"
+              :disabled="saving"
+              @change="
+                patchDraft({ quiet_hours_start: ($event.target as HTMLInputElement).value || '' })
+              "
+            />
+            <input
+              type="time"
+              :value="draft.quiet_hours_end"
+              :disabled="saving"
+              @change="
+                patchDraft({ quiet_hours_end: ($event.target as HTMLInputElement).value || '' })
+              "
+            />
+          </div>
         </label>
         <label class="operator-settings-form__row">
           <input v-model="spokenAlertsEnabled" type="checkbox" :disabled="saving || privacyMode" />

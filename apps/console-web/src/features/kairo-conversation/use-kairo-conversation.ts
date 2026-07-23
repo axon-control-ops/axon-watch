@@ -1,6 +1,11 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
 
-import { postKairoConverse } from '../../lib/kairo-converse-client';
+import {
+  converseTimeoutFallbackReply,
+  KairoConverseTimeoutError,
+  postKairoConverse,
+  resolveKairoConverseTimeoutMs,
+} from '../../lib/kairo-converse-client';
 import { parseChatUiAction } from '../../lib/chat-ui-action';
 import { normalizeKairoCopy, normalizeVoiceTranscript } from '../../lib/kairo-entity-labels';
 import { recordOperatorArtifacts } from '../../lib/operator-artifact-view';
@@ -9,6 +14,7 @@ import {
   sanitizeSpokenReply,
 } from '../../lib/sanitize-spoken-reply';
 import { clearKairoVoiceFollowupWindow } from '../../lib/kairo-voice-followup-window';
+import { recordVoiceLoopDiagnostic } from '../../lib/kairo-voice-loop-diagnostics';
 import type { KairoVoiceCaptureMode } from '../../lib/kairo-voice-gate';
 import { useShellStore } from '../../stores/shell';
 import { handleConversationModelSwitchIntent } from './conversation-model-switch-handler';
@@ -18,7 +24,6 @@ import {
 } from './conversation-navigation-handler';
 import { dispatchKairoConverseOutcome } from './kairo-conversation-dispatch';
 import {
-  clearBriefingSurfaceOffer,
   mentionsBriefingSurfaceOffer,
   scheduleBriefingSurfaceOffer,
 } from './conversation-briefing-surface';
@@ -28,10 +33,9 @@ import {
   kairoConversationReply,
   setKairoConversationPhase,
 } from './kairo-conversation-state';
-import { brainGalaxyConversationFocus, setBrainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
+import { brainGalaxyConversationFocus } from '../brain-galaxy/brain-galaxy-focus';
 import { useKairoSpeechCapture } from './use-kairo-speech-capture';
 import {
-  CONTINUE_VOICE_RE,
   createKairoConversationTurnHandlers,
   HANDOFF_CLIENT_RE,
 } from './kairo-conversation-turn-handlers';
@@ -46,6 +50,7 @@ export function useKairoConversation() {
   const pending = ref(false);
   const thinkingLine = ref('');
   let lastOperatorPrompt = '';
+  let activeConverseAbort: AbortController | null = null;
 
   const canSubmit = computed(
     () =>
@@ -70,6 +75,15 @@ export function useKairoConversation() {
       operatorPrompt: operatorPrompt ?? lastOperatorPrompt,
       skipSpeakApi: true,
     });
+  }
+
+  function closeTurnSurface(options?: { keepPhase?: boolean }): void {
+    draft.value = '';
+    pending.value = false;
+    thinkingLine.value = '';
+    if (!options?.keepPhase && kairoConversationPhase.value === 'thinking') {
+      setKairoConversationPhase('idle');
+    }
   }
 
   const {
@@ -116,14 +130,35 @@ export function useKairoConversation() {
     }
     lastOperatorPrompt = content;
     const answerTier = determineAnswerTier(content);
+    const converseStartedAt = Date.now();
+
+    activeConverseAbort?.abort();
+    activeConverseAbort = new AbortController();
+    const abortSignal = activeConverseAbort.signal;
 
     pending.value = true;
     kairoConversationError.value = null;
     thinkingLine.value = thinkingStatusLine(content, answerTier);
     clearKairoVoiceFollowupWindow();
     setKairoConversationPhase('thinking');
+    recordVoiceLoopDiagnostic({
+      kind: 'converse_start',
+      phase: 'thinking',
+      reason: answerTier,
+    });
     if (answerTier === 'deep') {
       scheduleRuntimeAssistantCue(content);
+      window.setTimeout(() => {
+        if (!pending.value || kairoConversationPhase.value !== 'thinking') {
+          return;
+        }
+        thinkingLine.value = 'Still working — I will answer or time out shortly…';
+        recordVoiceLoopDiagnostic({
+          kind: 'converse_progress',
+          phase: 'thinking',
+          latencyMs: Date.now() - converseStartedAt,
+        });
+      }, 4_000);
     }
 
     const modelHandled = await handleConversationModelSwitchIntent({
@@ -132,13 +167,11 @@ export function useKairoConversation() {
       voiceCaptureMode: options?.voiceCaptureMode,
       clearRuntimeAssistantCue,
       deliverVoiceReply,
-      resetDraftState: () => {
-        draft.value = '';
-        pending.value = false;
-        thinkingLine.value = '';
-      },
+      resetDraftState: () => closeTurnSurface(),
     });
     if (modelHandled) {
+      clearRuntimeAssistantCue();
+      closeTurnSurface();
       return;
     }
 
@@ -151,73 +184,108 @@ export function useKairoConversation() {
         navIntent,
         deliverVoiceReply,
         voiceCaptureMode: options?.voiceCaptureMode,
-        resetDraftState: () => {
-          draft.value = '';
-          pending.value = false;
-          thinkingLine.value = '';
-        },
+        resetDraftState: () => closeTurnSurface(),
       });
+      clearRuntimeAssistantCue();
+      closeTurnSurface();
       return;
     }
 
     if (await tryBriefingSurfaceFollowup(content, options)) {
       clearRuntimeAssistantCue();
+      closeTurnSurface();
       return;
     }
 
     if (await tryResumeCurrentRun(content, options)) {
       clearRuntimeAssistantCue();
-      draft.value = '';
-      pending.value = false;
-      thinkingLine.value = '';
+      closeTurnSurface();
       return;
     }
 
     try {
-      const response = await postKairoConverse({
-        content,
-        session_id: kairoSpeechSessionId(),
-        workspace_id: workspaceId.value,
-        use_runtime: answerTier === 'deep',
-        answer_tier: answerTier,
-        context_workspace_id: brainGalaxyConversationFocus.value?.workspaceId ?? workspaceId.value,
-        context_signal_id: brainGalaxyConversationFocus.value?.signalId ?? '',
-        context_node_id: brainGalaxyConversationFocus.value?.nodeId ?? '',
-      });
+      const response = await postKairoConverse(
+        {
+          content,
+          session_id: kairoSpeechSessionId(),
+          workspace_id: workspaceId.value,
+          use_runtime: answerTier === 'deep',
+          answer_tier: answerTier,
+          context_workspace_id: brainGalaxyConversationFocus.value?.workspaceId ?? workspaceId.value,
+          context_signal_id: brainGalaxyConversationFocus.value?.signalId ?? '',
+          context_node_id: brainGalaxyConversationFocus.value?.nodeId ?? '',
+        },
+        { signal: abortSignal },
+      );
       clearRuntimeAssistantCue();
+      recordVoiceLoopDiagnostic({
+        kind: 'converse_done',
+        latencyMs: Date.now() - converseStartedAt,
+        phase: 'thinking',
+      });
       if (response.artifacts.length) {
         recordOperatorArtifacts(response.artifacts, parseChatUiAction);
       }
       if (!response.action && HANDOFF_CLIENT_RE.test(content)) {
         if (await tryClientHandoff(content)) {
-          draft.value = '';
-          pending.value = false;
-          thinkingLine.value = '';
+          closeTurnSurface();
           return;
         }
       }
       kairoConversationReply.value = normalizeKairoCopy(
         formatConversationDisplayReply(response.reply) || sanitizeSpokenReply(response.reply),
       );
-      draft.value = '';
-      pending.value = false;
-      thinkingLine.value = '';
+      closeTurnSurface({ keepPhase: true });
       await dispatchKairoConverseOutcome(shell, response, executeConverseAction);
       if (mentionsBriefingSurfaceOffer(response.reply)) {
         scheduleBriefingSurfaceOffer();
       }
       await deliverVoiceReply(response.reply, options?.voiceCaptureMode);
+      if (kairoConversationPhase.value === 'thinking') {
+        setKairoConversationPhase('idle');
+      }
     } catch (error) {
       clearRuntimeAssistantCue();
-      kairoConversationError.value =
-        error instanceof Error ? error.message : 'KAIRO conversation failed';
-      setKairoConversationPhase('idle');
-      pending.value = false;
-      thinkingLine.value = '';
+      const timedOut = error instanceof KairoConverseTimeoutError;
+      const timeoutMs = timedOut
+        ? error.timeoutMs
+        : resolveKairoConverseTimeoutMs(answerTier);
+      if (timedOut) {
+        recordVoiceLoopDiagnostic({
+          kind: 'converse_timeout',
+          latencyMs: Date.now() - converseStartedAt,
+          delayMs: timeoutMs,
+        });
+        const fallback = converseTimeoutFallbackReply(timeoutMs);
+        kairoConversationError.value = fallback;
+        kairoConversationReply.value = fallback;
+        closeTurnSurface({ keepPhase: true });
+        await deliverVoiceReply(fallback, options?.voiceCaptureMode);
+        if (kairoConversationPhase.value === 'thinking') {
+          setKairoConversationPhase('idle');
+        }
+      } else {
+        recordVoiceLoopDiagnostic({
+          kind: 'converse_error',
+          reason: error instanceof Error ? error.message : 'unknown',
+          latencyMs: Date.now() - converseStartedAt,
+        });
+        kairoConversationError.value =
+          error instanceof Error ? error.message : 'KAIRO conversation failed';
+        setKairoConversationPhase('idle');
+        closeTurnSurface();
+      }
     } finally {
       clearRuntimeAssistantCue();
       if (pending.value) {
         pending.value = false;
+      }
+      thinkingLine.value = '';
+      if (kairoConversationPhase.value === 'thinking') {
+        setKairoConversationPhase('idle');
+      }
+      if (activeConverseAbort?.signal === abortSignal) {
+        activeConverseAbort = null;
       }
     }
   }
@@ -244,6 +312,8 @@ export function useKairoConversation() {
   }
 
   onBeforeUnmount(() => {
+    activeConverseAbort?.abort();
+    activeConverseAbort = null;
     clearRuntimeAssistantCue();
   });
 

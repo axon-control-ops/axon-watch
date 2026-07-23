@@ -30,6 +30,11 @@ from app.kairo.turn_memory import (
     remember_turn as _remember_turn,
     resolve_followup_action as _resolve_followup_action,
 )
+from app.kairo.mission_memory import (
+    maybe_capture_explicit_remember,
+    propose_mission_action,
+    resolve_mission_confirmation,
+)
 
 from app.kairo.conversation_artifacts import (
     build_runtime_artifact,
@@ -175,6 +180,55 @@ def converse_turn(
             signal_id=context_signal_id,
             target_workspace_id=resolved_workspace_id,
             task=f"Investigate signal {context_signal_id}",
+        )
+    maybe_capture_explicit_remember(session_id, trimmed)
+    mission_confirm = resolve_mission_confirmation(session_id, trimmed)
+    if mission_confirm:
+        reply = apply_participant_address(str(mission_confirm.get("reply") or ""), guest_name)
+        _remember_turn(session_id, "user", trimmed)
+        _remember_turn(session_id, "assistant", reply)
+        return _log_voice_turn(
+            session_id=session_id,
+            workspace_id=workspace_id,
+            raw_content=raw_content,
+            normalized_content=trimmed,
+            payload={
+                "turn_kind": "action" if mission_confirm.get("action") else "chat",
+                "reply": reply,
+                "source": "template",
+                "command_content": None,
+                "requires_confirmation": False,
+                "action": mission_confirm.get("action"),
+                "artifacts": [],
+                "active_participant": guest_name,
+            },
+            duration_ms=round((time.perf_counter() - started_at) * 1000),
+        )
+    mission_propose = propose_mission_action(
+        session_id,
+        trimmed,
+        workspace_id=str(resolved_workspace_id or ""),
+    )
+    if mission_propose:
+        reply = apply_participant_address(str(mission_propose.get("reply") or ""), guest_name)
+        _remember_turn(session_id, "user", trimmed)
+        _remember_turn(session_id, "assistant", reply)
+        return _log_voice_turn(
+            session_id=session_id,
+            workspace_id=workspace_id,
+            raw_content=raw_content,
+            normalized_content=trimmed,
+            payload={
+                "turn_kind": "chat",
+                "reply": reply,
+                "source": "template",
+                "command_content": None,
+                "requires_confirmation": True,
+                "action": None,
+                "artifacts": [],
+                "active_participant": guest_name,
+            },
+            duration_ms=round((time.perf_counter() - started_at) * 1000),
         )
     followup = _resolve_followup_action(trimmed, session_id)
     if followup:

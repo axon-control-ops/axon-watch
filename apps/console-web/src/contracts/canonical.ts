@@ -16,6 +16,7 @@ export type {
   SttMode,
   ThreadMessage,
   VoiceRoutingMode,
+  WakeWordSensitivity,
   WorkspaceRecord,
   WorkspaceAgentListSnapshot,
   WorkspaceAgentRecord,

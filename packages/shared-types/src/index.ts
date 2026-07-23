@@ -35,6 +35,7 @@ export type {
   SpokenAlertEligibility,
   SttMode,
   VoiceRoutingMode,
+  WakeWordSensitivity,
 } from './presence';
 export type {
   RunMode,
