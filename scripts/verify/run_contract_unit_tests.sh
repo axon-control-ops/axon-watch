@@ -124,6 +124,7 @@ main_tests=(
   tests.test_lead_replan
   tests.test_gate6_verifier_contract
   tests.test_gate6_project_contract
+  tests.test_review_pr_loop
   tests.test_safe_improvement
   tests.test_safe_improvement_gate
 )
