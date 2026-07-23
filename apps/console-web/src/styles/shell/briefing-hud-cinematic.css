@@ -1,5 +1,7 @@
 /* Cinematic HUD treatment for Operator Briefing (and matching Voice deck parity). */
 
+@import './briefing-hud-cinematic-voice.css';
+
 .briefing-panel--hero {
   isolation: isolate;
   overflow: hidden;
@@ -279,5 +281,3 @@
   overflow: visible;
   line-height: 1.4;
 }
-
-@import './briefing-hud-cinematic-voice.css';

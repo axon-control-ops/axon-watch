@@ -1,5 +1,7 @@
 /* Glass-morphism + layered 3D depth — mobile operator shell (buildable CSS only) */
 
+@import './operator-hud-holographic.css';
+
 .operator-mobile-shell {
   position: relative;
   isolation: isolate;
@@ -234,6 +236,4 @@
     transition: none;
   }
 }
-
-@import './operator-hud-holographic.css';
 
