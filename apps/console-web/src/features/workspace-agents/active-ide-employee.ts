@@ -164,32 +164,48 @@ export function resolveActiveIdeEmployee(input: {
   employees: readonly CompanyEmployeeRecord[];
 }): ActiveIdeEmployeeView | null {
   const employeeId = input.thread?.employee_id?.trim() ?? '';
-  if (!employeeId) {
-    return null;
-  }
+  if (employeeId) {
+    const fromRoster = input.employees.find((row) => row.employee_id === employeeId);
+    if (fromRoster) {
+      return {
+        employee_id: fromRoster.employee_id,
+        name: fromRoster.name.trim() || 'Teammate',
+        role: fromRoster.role,
+        role_label: fromRoster.role_label,
+        azure_voice_id: fromRoster.azure_voice_id?.trim() || null,
+        initials: employeeInitials(fromRoster.name),
+      };
+    }
 
-  const fromRoster = input.employees.find((row) => row.employee_id === employeeId);
-  if (fromRoster) {
+    const titleName =
+      parseTitleName(input.thread?.title) ?? parseTitleName(input.thread?.preview_label);
+    const name = titleName || 'Teammate';
+    const role = (input.thread?.employee_role ?? '').trim() || 'agent';
     return {
-      employee_id: fromRoster.employee_id,
-      name: fromRoster.name.trim() || 'Teammate',
-      role: fromRoster.role,
-      role_label: fromRoster.role_label,
-      azure_voice_id: fromRoster.azure_voice_id?.trim() || null,
-      initials: employeeInitials(fromRoster.name),
+      employee_id: employeeId,
+      name,
+      role,
+      role_label: role,
+      azure_voice_id: null,
+      initials: employeeInitials(name),
     };
   }
 
-  const titleName =
-    parseTitleName(input.thread?.title) ?? parseTitleName(input.thread?.preview_label);
-  const name = titleName || 'Teammate';
-  const role = (input.thread?.employee_role ?? '').trim() || 'agent';
+  // Workspace-level IDE tabs (no employee_id) still belong to the company Lead —
+  // do not fall back to VAXON when a roster primary exists.
+  const primary =
+    input.employees.find((row) => row.primary) ??
+    input.employees.find((row) => row.role === 'lead') ??
+    null;
+  if (!primary) {
+    return null;
+  }
   return {
-    employee_id: employeeId,
-    name,
-    role,
-    role_label: role,
-    azure_voice_id: null,
-    initials: employeeInitials(name),
+    employee_id: primary.employee_id,
+    name: primary.name.trim() || 'Teammate',
+    role: primary.role,
+    role_label: primary.role_label,
+    azure_voice_id: primary.azure_voice_id?.trim() || null,
+    initials: employeeInitials(primary.name),
   };
 }

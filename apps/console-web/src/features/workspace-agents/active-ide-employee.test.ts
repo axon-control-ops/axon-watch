@@ -22,7 +22,32 @@ function employee(overrides: Partial<CompanyEmployeeRecord> = {}): CompanyEmploy
 }
 
 describe('resolveActiveIdeEmployee', () => {
-  it('returns null when the thread has no employee_id', () => {
+  it('falls back to the primary/lead employee when the thread has no employee_id', () => {
+    const lead = employee({
+      employee_id: 'employee-tps-lead',
+      name: 'Noor',
+      role: 'lead',
+      role_label: 'Lead',
+      primary: true,
+    });
+    expect(
+      resolveActiveIdeEmployee({
+        thread: {
+          employee_id: null,
+          employee_role: null,
+          title: 'Operator handoff',
+          preview_label: 'Operator handoff',
+        },
+        employees: [employee(), lead],
+      }),
+    ).toMatchObject({
+      employee_id: 'employee-tps-lead',
+      name: 'Noor',
+      role: 'lead',
+    });
+  });
+
+  it('returns null when the thread has no employee_id and no primary/lead exists', () => {
     expect(
       resolveActiveIdeEmployee({
         thread: {

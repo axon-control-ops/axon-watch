@@ -95,8 +95,20 @@ export function buildFleetHealthGridCells(input: {
   selectedWorkspaceId: string | null;
   maxRows?: number;
 }): FleetHealthGridCell[] {
+  const selectedId = input.selectedWorkspaceId?.trim() || null;
+  const limit = Math.max(input.maxRows ?? 24, 1);
+
   if (!input.snapshot) {
-    return [];
+    // Keep Mission Control Grid populated while fleet probe is still loading.
+    return input.workspaces.slice(0, limit).map((workspace) => ({
+      workspaceId: workspace.workspace_id,
+      label: workspace.display_name?.trim() || workspace.workspace_id,
+      health: 'nominal' as const,
+      summary: 'Loading…',
+      detail: workspace.workspace_id,
+      isSelected: workspace.workspace_id === selectedId,
+      isBoundProject: workspace.connection_kind === 'project_path',
+    }));
   }
 
   const boundIds = new Set(
@@ -105,9 +117,7 @@ export function buildFleetHealthGridCells(input: {
       .map((item) => item.workspace_id),
   );
   const sorted = sortFleetHealthRows(input.snapshot.items, input.workspaces);
-  const limit = Math.max(input.maxRows ?? 24, boundIds.size);
-  const selectedId = input.selectedWorkspaceId?.trim() || null;
-  const limited = sorted.slice(0, limit);
+  const limited = sorted.slice(0, Math.max(limit, boundIds.size));
   if (selectedId && !limited.some((row) => row.workspace_id === selectedId)) {
     const selected = sorted.find((row) => row.workspace_id === selectedId);
     if (selected) {

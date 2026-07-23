@@ -25,6 +25,10 @@ _TASK_COLUMNS = (
     "owner_role",
     "dependencies_json",
     "exclusive_paths_json",
+    "assignee_name",
+    "attachment_ids_json",
+    "source_message_id",
+    "output_artifacts_json",
     "status",
     "lease_holder",
     "lease_expires_at",
@@ -114,6 +118,26 @@ def ensure_task_ledger_schema(connection: Any) -> None:
             "ALTER TABLE workspace_tasks "
             "ADD COLUMN exclusive_paths_json TEXT NOT NULL DEFAULT '[]'"
         )
+    if "assignee_name" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_tasks "
+            "ADD COLUMN assignee_name TEXT NOT NULL DEFAULT ''"
+        )
+    if "attachment_ids_json" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_tasks "
+            "ADD COLUMN attachment_ids_json TEXT NOT NULL DEFAULT '[]'"
+        )
+    if "source_message_id" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_tasks "
+            "ADD COLUMN source_message_id TEXT NOT NULL DEFAULT ''"
+        )
+    if "output_artifacts_json" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_tasks "
+            "ADD COLUMN output_artifacts_json TEXT NOT NULL DEFAULT '[]'"
+        )
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_workspace_tasks_workspace_status
@@ -129,23 +153,30 @@ def ensure_task_ledger_schema(connection: Any) -> None:
     connection.commit()
 
 
+def _json_list(raw: Any) -> list[str]:
+    try:
+        parsed = json.loads(raw or "[]")
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(item).strip() for item in parsed if str(item).strip()]
+
+
 def _row_to_record(row: Any) -> dict[str, Any]:
-    dependencies_raw = row["dependencies_json"] if "dependencies_json" in row.keys() else "[]"
-    exclusive_paths_raw = (
-        row["exclusive_paths_json"] if "exclusive_paths_json" in row.keys() else "[]"
+    keys = set(row.keys())
+    dependencies = _json_list(
+        row["dependencies_json"] if "dependencies_json" in keys else "[]"
     )
-    try:
-        dependencies = json.loads(dependencies_raw or "[]")
-    except json.JSONDecodeError:
-        dependencies = []
-    try:
-        exclusive_paths = json.loads(exclusive_paths_raw or "[]")
-    except json.JSONDecodeError:
-        exclusive_paths = []
-    if not isinstance(dependencies, list):
-        dependencies = []
-    if not isinstance(exclusive_paths, list):
-        exclusive_paths = []
+    exclusive_paths = _json_list(
+        row["exclusive_paths_json"] if "exclusive_paths_json" in keys else "[]"
+    )
+    attachment_ids = _json_list(
+        row["attachment_ids_json"] if "attachment_ids_json" in keys else "[]"
+    )
+    output_artifacts = _json_list(
+        row["output_artifacts_json"] if "output_artifacts_json" in keys else "[]"
+    )
     return {
         "task_id": row["task_id"],
         "workspace_id": row["workspace_id"],
@@ -153,10 +184,18 @@ def _row_to_record(row: Any) -> dict[str, Any]:
         "acceptance_criteria": row["acceptance_criteria"] or "",
         "risk": row["risk"] or "normal",
         "owner_role": row["owner_role"] or "",
-        "dependencies": [str(item).strip() for item in dependencies if str(item).strip()],
-        "exclusive_paths": [
-            str(item).strip() for item in exclusive_paths if str(item).strip()
-        ],
+        "dependencies": dependencies,
+        "exclusive_paths": exclusive_paths,
+        "assignee_name": (
+            str(row["assignee_name"] or "").strip() if "assignee_name" in keys else ""
+        ),
+        "attachment_ids": attachment_ids,
+        "source_message_id": (
+            str(row["source_message_id"] or "").strip()
+            if "source_message_id" in keys
+            else ""
+        ),
+        "output_artifacts": output_artifacts,
         "status": row["status"],
         "lease_holder": row["lease_holder"],
         "lease_expires_at": row["lease_expires_at"],
@@ -234,6 +273,10 @@ def create_task(
     owner_role: str = "",
     dependencies: list[str] | None = None,
     exclusive_paths: list[str] | None = None,
+    assignee_name: str = "",
+    attachment_ids: list[str] | None = None,
+    source_message_id: str = "",
+    output_artifacts: list[str] | None = None,
     attempt_budget: int = DEFAULT_ATTEMPT_BUDGET,
 ) -> dict[str, Any]:
     workspace = workspace_id.strip()
@@ -245,6 +288,12 @@ def create_task(
     budget = max(1, min(int(attempt_budget), 32))
     deps = [str(item).strip() for item in (dependencies or []) if str(item).strip()]
     paths = [str(item).strip() for item in (exclusive_paths or []) if str(item).strip()]
+    attachments = [
+        str(item).strip() for item in (attachment_ids or []) if str(item).strip()
+    ]
+    artifacts = [
+        str(item).strip() for item in (output_artifacts or []) if str(item).strip()
+    ]
     timestamp = _utc_now_iso()
     record = {
         "task_id": f"task-{uuid.uuid4().hex[:16]}",
@@ -255,6 +304,10 @@ def create_task(
         "owner_role": owner_role.strip().lower(),
         "dependencies_json": json.dumps(deps),
         "exclusive_paths_json": json.dumps(paths),
+        "assignee_name": assignee_name.strip(),
+        "attachment_ids_json": json.dumps(attachments),
+        "source_message_id": source_message_id.strip(),
+        "output_artifacts_json": json.dumps(artifacts),
         "status": "open",
         "lease_holder": None,
         "lease_expires_at": None,

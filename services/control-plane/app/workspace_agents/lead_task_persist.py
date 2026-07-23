@@ -43,6 +43,10 @@ def persist_lead_task_plan(
             owner_role=item.owner_role,
             dependencies=dep_task_ids,
             exclusive_paths=item.exclusive_paths,
+            assignee_name=item.assignee_name,
+            attachment_ids=item.attachment_ids,
+            source_message_id=item.source_message_id,
+            output_artifacts=item.output_artifacts,
         )
         plan_key_to_task_id[plan_key] = str(created["task_id"])
         tasks.append(
@@ -50,6 +54,10 @@ def persist_lead_task_plan(
                 **created,
                 "plan_key": plan_key,
                 "exclusive_paths": list(item.exclusive_paths),
+                "assignee_name": item.assignee_name,
+                "attachment_ids": list(item.attachment_ids),
+                "source_message_id": item.source_message_id,
+                "output_artifacts": list(item.output_artifacts),
             }
         )
 

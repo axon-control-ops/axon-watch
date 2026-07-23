@@ -16,7 +16,8 @@ export function resolveIdeActivityBarSelectAction(input: {
   /** When set, any of these views re-click collapses the explorer sidebar. */
   sidebarViews?: ReadonlySet<string>;
 }): IdeActivityBarSelectAction {
-  if (input.view === 'agent' && !input.agentDockCollapsed) {
+  // Agent dock is independent of the left sidebar (Team/Explorer stay put).
+  if (input.view === 'agent') {
     return 'toggle-agent';
   }
 

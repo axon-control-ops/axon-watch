@@ -8,14 +8,42 @@ Companion to [`docs/HOW-TO-HANDBOOK.md`](../HOW-TO-HANDBOOK.md) and
 
 ---
 
-## 1. Mission Control task board (Gate 4)
+## 1. Mission Control plane (how to use it)
 
-### Where it is (easy to miss)
+**Mission Control** is the Operator **center column** — your day-to-day oversight board.
+It is **not** the Brain Graph starfield. Use the **GRID | BRAIN** toggle in the Mission
+Control header (or the footer / Intelligence **Mission Control** chips) to switch.
 
-**Mission Control** is the Operator **center panel** — but only in **Grid** view.
+| Mode | What you see | Use it for |
+| --- | --- | --- |
+| **GRID** | Mission Control plane (fleet → tasks → inbox → connectors) | Runs, tasks, incidents, connector health |
+| **BRAIN** | Starfield / VAXON CORE graph | Spatial map of workspaces + presence |
 
-Your Brain Graph starfield (VAXON CORE / DashPro orbs) is Operator too; it **replaces**
-the Mission Control title, Fleet health, and Task board until you leave Graph.
+### Map of the GRID plane (top → bottom)
+
+1. **Header** — title **Mission Control**, **GRID | BRAIN**, terminal chip, presence line.
+2. **Fleet health** — compact cards for workspaces. Click a card to select that workspace
+   (same as the left sidebar). Selected card glows cyan.
+3. **Task board** — durable goals for specialist roles (open / leased / done / failed).
+4. **Unified Inbox / Incidents** — open signals for the **selected** workspace.
+5. **Live execution / agent summary** — recent run history when there is activity.
+6. **Watch Lane / Connectors** — control-plane, console-web, watch, optional axon-local.
+   Use **REPROBE** or **Open :7734 fallback** only when you still need classic Axon.
+
+### Typical operator loop
+
+1. Top nav → **OPERATOR**.
+2. Ensure **GRID** (not BRAIN).
+3. Left sidebar → pick a workspace (or click its Fleet card).
+4. Scan Fleet → Task board → Inbox → Connectors.
+5. When something needs hands-on edits, switch top nav → **IDE**.
+6. When you want the spatial map, switch **BRAIN**, then return via **GRID** or
+   **Mission Control**.
+
+### Where Task board is (easy to miss)
+
+Your Brain Graph starfield **replaces** the Mission Control title, Fleet health, and
+Task board until you leave Graph.
 
 | You are here | How to open Task board |
 | --- | --- |
@@ -23,21 +51,44 @@ the Mission Control title, Fleet health, and Task board until you leave Graph.
 | Operator Grid already | Scroll under **Fleet health** → section **Task board** |
 | Top nav **IDE** | Click **OPERATOR** first, then use Grid / Mission Control as above |
 
-On Grid you should see the heading **Mission Control**, then **GRID | BRAIN**, then
-**Fleet health**, then **Task board**.
+On Grid you should see **Mission Control**, then **GRID | BRAIN**, then **Fleet health**,
+then **Task board**.
 
 ### What the task board is
 
 A durable **task ledger**. Continuous workers may only start when they **lease** an
 open task. Chat in the IDE is separate (see “Talk vs do work” below).
 
-### How to use it
+### How to seed a task
 
 1. Top nav → **OPERATOR**.
 2. Leave Brain Graph: **Mission Control** chip (or Intelligence → **Mission Control · Task board**).
 3. Under **Fleet health**, use **Task board**.
 4. Create a goal + owner role (e.g. `integrations`).
 5. Leave the worker scheduler **off** unless you intentionally want continuous shifts.
+
+---
+
+## 1b. Why Axon-X also appears on port **7734**
+
+You may see **two** browser tabs that both look like “Axon”:
+
+| URL | What it actually is |
+| --- | --- |
+| `http://127.0.0.1:5173` | **Vite dev** console-web (hot reload while hacking Axon-X) |
+| `http://127.0.0.1:4173` | **Production-packaged** Axon-X operator surface (`./scripts/dev/up.sh`) |
+| `http://127.0.0.1:7734` | **Classic axon-local** (legacy Axon Signal / daily-driver fallback) |
+
+**7734 is not a second copy of Axon-X.** It is the older Axon app (`axon-local`). Axon-X
+(`axon-watch`) is the modernization target. Until full parity retirement, operators keep
+**:7734** as an explicit fallback for capabilities that are still deferred (for example
+some DashPro WhatsApp paths). Mission Control → **Connectors** can open that fallback
+when the optional `axon_local` connector is needed.
+
+**Rule of thumb**
+
+- Day-to-day Axon-X work → **`:4173`** (or **`:5173`** only while developing UI).
+- Open **`:7734`** only when a known legacy gap forces it — then return to Axon-X.
 
 ### Talk vs do work (IDE teammate modes)
 

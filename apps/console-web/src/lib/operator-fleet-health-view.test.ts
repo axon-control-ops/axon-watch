@@ -90,6 +90,31 @@ describe('operator-fleet-health-view', () => {
     );
   });
 
+  it('falls back to workspace catalog cells while fleet snapshot is loading', () => {
+    const cells = buildFleetHealthGridCells({
+      snapshot: null,
+      workspaces: [
+        {
+          workspace_id: 'workspace_edudashpro',
+          display_name: 'EduDash PRO',
+          connection_kind: 'project_path',
+        },
+        {
+          workspace_id: 'workspace_dashpro',
+          display_name: 'DashPro',
+          connection_kind: 'project_path',
+        },
+      ],
+      selectedWorkspaceId: 'workspace_edudashpro',
+    });
+    expect(cells).toHaveLength(2);
+    expect(cells[0]).toMatchObject({
+      workspaceId: 'workspace_edudashpro',
+      summary: 'Loading…',
+      isSelected: true,
+    });
+  });
+
   it('always keeps the selected workspace on the grid even past the cap', () => {
     const many: FleetHealthSnapshot = {
       ...snapshot,

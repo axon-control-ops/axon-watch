@@ -41,16 +41,16 @@ describe('resolveIdeActivityBarSelectAction', () => {
     ).toBe('toggle-agent');
   });
 
-  it('expands agent dock when collapsed', () => {
+  it('expands agent dock when collapsed without changing the left sidebar view', () => {
     expect(
       resolveIdeActivityBarSelectAction({
         view: 'agent',
-        currentView: 'explorer',
+        currentView: 'team',
         explorerCollapsed: false,
         agentDockCollapsed: true,
         sidebarViews,
       }),
-    ).toBe('set-view');
+    ).toBe('toggle-agent');
   });
 
   it('toggles the workbench terminal when it is already visible', () => {
