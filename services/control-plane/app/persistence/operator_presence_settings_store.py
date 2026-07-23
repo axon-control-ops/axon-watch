@@ -85,7 +85,28 @@ def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str | fl
             if value in {"template_first", "runtime_on_deep", "runtime_aggressive"}:
                 normalized[key] = value
             continue
+        if key == "wake_word_sensitivity":
+            value = str(raw[key] or defaults[key]).strip().lower()
+            if value in {"low", "medium", "high"}:
+                normalized[key] = value
+            continue
+        if key in {"quiet_hours_start", "quiet_hours_end"}:
+            value = str(raw[key] or "").strip()
+            if not value:
+                normalized[key] = ""
+            elif len(value) == 5 and value[2] == ":" and value[:2].isdigit() and value[3:].isdigit():
+                hour = int(value[:2])
+                minute = int(value[3:])
+                if 0 <= hour <= 23 and 0 <= minute <= 59:
+                    normalized[key] = value
+            continue
+        if key in {"wake_word_listening_consent", "wake_word_listening_enabled"}:
+            normalized[key] = bool(raw[key])
+            continue
         normalized[key] = bool(raw[key])
+    # Consent gate: never arm wake listening without explicit consent.
+    if not bool(normalized.get("wake_word_listening_consent")):
+        normalized["wake_word_listening_enabled"] = False
     return normalized
 
 

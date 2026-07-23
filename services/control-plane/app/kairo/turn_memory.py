@@ -93,9 +93,14 @@ def entity_context(session_id: str) -> dict[str, str]:
 
 
 def build_lane_b_memory_appendix(session_id: str, *, max_chars: int = 800) -> str:
+    from app.kairo.mission_memory import mission_memory_appendix
+
     entity = entity_context(session_id)
     turns = recent_turns(session_id)
     lines: list[str] = []
+    mission_block = mission_memory_appendix(session_id, max_chars=min(400, max_chars))
+    if mission_block:
+        lines.append(mission_block)
     if entity:
         lines.append("KAIRO memory (non-authoritative):")
         if entity.get("target_workspace_id"):

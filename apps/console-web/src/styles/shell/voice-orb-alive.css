@@ -240,3 +240,33 @@
     animation: none !important;
   }
 }
+
+/* Continuous duplex presence signatures — restrained, reduced-motion aware. */
+.kairo-galaxy-orb--wake-listening {
+  --voice-beat: 0.35;
+  filter: drop-shadow(0 0 10px rgba(72, 210, 255, 0.35));
+}
+
+.kairo-galaxy-orb--followup-ready {
+  --voice-beat: 0.55;
+  filter: drop-shadow(0 0 14px rgba(120, 255, 200, 0.4));
+}
+
+.kairo-galaxy-orb--transcribing {
+  --voice-beat: 0.45;
+}
+
+.kairo-galaxy-orb--muted {
+  --voice-beat: 0;
+  opacity: 0.72;
+  filter: grayscale(0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kairo-galaxy-orb--wake-listening,
+  .kairo-galaxy-orb--followup-ready,
+  .kairo-galaxy-orb--transcribing {
+    --voice-beat: 0;
+    filter: none;
+  }
+}

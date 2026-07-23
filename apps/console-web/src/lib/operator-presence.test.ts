@@ -6,6 +6,7 @@ import {
   shouldUseMobileCompactLayout,
   spokenAlertDedupeKey,
 } from './operator-presence';
+import { defaultOperatorPresenceSettings } from './operator-presence-settings';
 import { speakKairoLine } from './kairo-voice-playback';
 import {
   clearQueuedSpokenAlerts,
@@ -28,20 +29,8 @@ describe('operator presence helpers', () => {
         persona_voice_line: 'VAXON: ready',
         presence_state: 'observing',
         settings: {
-          operator_persona_enabled: true,
-          spoken_alerts_enabled: true,
-          privacy_mode: false,
+          ...defaultOperatorPresenceSettings(),
           mobile_compact_preferred: true,
-          kairo_narration: 'conversational',
-          ide_voice_strip_enabled: false,
-          hands_free_enabled: false,
-          speech_rate: 1.0,
-          speech_pitch: 1.04,
-          azure_voice_id: 'en-GB-RyanNeural',
-          stt_mode: 'browser',
-          voice_routing_mode: 'template_first',
-          narrate_tool_progress: false,
-          proactive_duplex_enabled: false,
         },
         spoken_alert: {
           eligible: false,

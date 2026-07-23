@@ -19,6 +19,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 from app.main import app  # noqa: E402
 from app.persistence import run_store  # noqa: E402
 from app.runs.service import create_run  # noqa: E402
+from app.spoken_alert_policy import clear_spoken_alert_dedupe_for_tests  # noqa: E402
 
 
 def _watch_probe_ok() -> tuple[bool, str, None, str]:
@@ -27,6 +28,7 @@ def _watch_probe_ok() -> tuple[bool, str, None, str]:
 
 class ParityC4SpokenHighValueAlertsTests(unittest.TestCase):
     def setUp(self) -> None:
+        clear_spoken_alert_dedupe_for_tests()
         isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)

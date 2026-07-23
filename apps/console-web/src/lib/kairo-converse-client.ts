@@ -92,16 +92,96 @@ export interface KairoConverseResponse {
   artifacts: KairoConverseArtifact[];
 }
 
-export async function postKairoConverse(body: KairoConverseRequest): Promise<KairoConverseResponse> {
+/** Fast-path converse budget — never leave the UI latched in thinking. */
+export const KAIRO_CONVERSE_FAST_TIMEOUT_MS = 8_000;
+/** Deep/runtime converse budget — progress then abort with a spoken fallback. */
+export const KAIRO_CONVERSE_DEEP_TIMEOUT_MS = 20_000;
+
+export class KairoConverseTimeoutError extends Error {
+  readonly timeoutMs: number;
+
+  constructor(timeoutMs: number) {
+    super(`KAIRO converse timed out after ${timeoutMs}ms`);
+    this.name = 'KairoConverseTimeoutError';
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+export function resolveKairoConverseTimeoutMs(
+  answerTier: KairoConverseAnswerTier | undefined,
+  overrideMs?: number,
+): number {
+  if (typeof overrideMs === 'number' && overrideMs > 0) {
+    return overrideMs;
+  }
+  return answerTier === 'deep' ? KAIRO_CONVERSE_DEEP_TIMEOUT_MS : KAIRO_CONVERSE_FAST_TIMEOUT_MS;
+}
+
+function mergeAbortSignals(
+  timeoutMs: number,
+  external?: AbortSignal | null,
+): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException(`request timed out after ${timeoutMs}ms`, 'TimeoutError'));
+  }, timeoutMs);
+
+  const onExternalAbort = () => {
+    controller.abort(external?.reason);
+  };
+  if (external) {
+    if (external.aborted) {
+      onExternalAbort();
+    } else {
+      external.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    clear: () => {
+      clearTimeout(timer);
+      external?.removeEventListener('abort', onExternalAbort);
+    },
+  };
+}
+
+export async function postKairoConverse(
+  body: KairoConverseRequest,
+  options?: { signal?: AbortSignal | null; timeoutMs?: number },
+): Promise<KairoConverseResponse> {
+  const timeoutMs = resolveKairoConverseTimeoutMs(body.answer_tier, options?.timeoutMs);
   const baseUrl = controlPlaneBaseUrl();
   const url = baseUrl ? `${baseUrl}/api/kairo/converse` : '/api/kairo/converse';
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new Error(`KAIRO converse failed (${response.status})`);
+  const { signal, clear } = mergeAbortSignals(timeoutMs, options?.signal);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`KAIRO converse failed (${response.status})`);
+    }
+    return (await response.json()) as KairoConverseResponse;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new KairoConverseTimeoutError(timeoutMs);
+    }
+    if (error instanceof Error && error.name === 'AbortError') {
+      if (options?.signal?.aborted) {
+        throw error;
+      }
+      throw new KairoConverseTimeoutError(timeoutMs);
+    }
+    throw error;
+  } finally {
+    clear();
   }
-  return (await response.json()) as KairoConverseResponse;
+}
+
+export function converseTimeoutFallbackReply(timeoutMs: number): string {
+  const seconds = Math.max(1, Math.round(timeoutMs / 1000));
+  return `I could not finish that within ${seconds} seconds. Try a shorter question, or ask again when the runtime is free.`;
 }

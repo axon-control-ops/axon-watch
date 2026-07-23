@@ -271,9 +271,6 @@ import {
   shouldShowBriefingAttentionInCommandMode,
 } from '../lib/kairo-briefing-attention';
 import {
-  buildStatusBarSegments,
-} from '../lib/runtime-strip';
-import {
   persistOperatorWorkspaceId,
   readStoredOperatorWorkspaceId,
 } from '../lib/operator-workspace-selection';
@@ -520,11 +517,6 @@ export const useShellStore = defineStore('shell', () => {
   const workbenchTerminalPanelVisible = ref(false);
   const teamRosterRevealToken = ref(0);
 
-
-  const layoutModeLabel = computed(() =>
-    layoutMode.value === 'operator' ? 'Mission Control' : 'IDE mode',
-  );
-
   const workspaceRuns = computed(() =>
     currentWorkspace.value
       ? runs.value.filter((run) => run.workspace_id === currentWorkspace.value?.workspace_id)
@@ -546,6 +538,9 @@ export const useShellStore = defineStore('shell', () => {
     attentionSignals,
     workspaceAttentionSignalCount,
     statusBarZones,
+    statusBarSegments,
+    statusBarItems,
+    layoutModeLabel,
     workspaceStatusCardRows,
     briefingSummaryLine,
     runtimeStateLabel,
@@ -809,17 +804,6 @@ export const useShellStore = defineStore('shell', () => {
       idePresenceProfile: idePresenceProfile.value,
     }),
   );
-
-  const statusBarSegments = computed(() =>
-    buildStatusBarSegments({
-      layoutModeLabel: layoutModeLabel.value,
-      workspaceId: currentWorkspace.value?.workspace_id ?? null,
-      runtimeSummary: runtimeSummary.value,
-      pendingApprovals: pendingApprovalsCount.value,
-    }),
-  );
-
-  const statusBarItems = computed(() => statusBarSegments.value.map((segment) => segment.label));
 
   const dockSeamLayout = computed(() =>
     buildDockSeamLayout({

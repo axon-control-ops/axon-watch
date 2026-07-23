@@ -26,10 +26,29 @@
 }
 
 .galaxy-speech-captions--ide {
-  left: 1rem;
-  bottom: calc(var(--workbench-terminal-height, 12rem) + 2.75rem);
-  width: min(26rem, 48vw);
-  max-width: calc(100% - 2rem);
+  /* Keep captions tucked above the terminal, out of the editor reading column. */
+  left: 0.75rem;
+  right: auto;
+  bottom: calc(var(--workbench-terminal-height, 12rem) + 3.1rem);
+  width: min(18rem, 36vw);
+  max-width: calc(100% - 1.5rem);
+  opacity: 0.92;
+}
+
+.galaxy-speech-captions--ide .galaxy-speech-captions__speaker {
+  max-width: 100%;
+  padding: 0.28rem 0.55rem 0.28rem 0.28rem;
+  border-radius: 1rem;
+  background: rgba(6, 18, 28, 0.9);
+}
+
+.galaxy-speech-captions--ide .galaxy-speech-captions__activity {
+  max-width: 14rem;
+}
+
+.galaxy-speech-captions--ide .galaxy-speech-captions__line {
+  font-size: clamp(0.62rem, 0.95vw, 0.78rem);
+  max-width: 18rem;
 }
 
 .galaxy-speech-captions__speaker {

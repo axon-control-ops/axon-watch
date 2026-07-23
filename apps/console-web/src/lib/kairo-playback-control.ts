@@ -59,11 +59,25 @@ export function resumeKairoPlayback(): boolean {
   return false;
 }
 
+export function duckKairoPlaybackGain(factor: number): void {
+  const clamped = Math.max(0, Math.min(1, factor));
+  if (currentAudio) {
+    currentAudio.volume = clamped;
+  }
+}
+
+export function restoreKairoPlaybackGain(): void {
+  if (currentAudio) {
+    currentAudio.volume = 1;
+  }
+}
+
 export function stopKairoPlayback(): void {
   paused = false;
   if (currentAudio) {
     currentAudio.pause();
     currentAudio.src = '';
+    currentAudio.volume = 1;
     currentAudio = null;
   }
   stopSpeech(speechPort());

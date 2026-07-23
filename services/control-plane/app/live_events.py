@@ -52,3 +52,19 @@ def live_events_response() -> StreamingResponse:
             "Connection": "keep-alive",
         },
     )
+
+
+def broadcast_material_change(
+    *,
+    signal_id: str | None = None,
+    receipt_id: str | None = None,
+) -> int:
+    """Event-driven proactive invalidation — not a timer heartbeat."""
+    from app.live_event_hub import broadcast_live_event
+
+    payload: dict[str, object] = {"type": "material_change"}
+    if signal_id:
+        payload["signal_id"] = signal_id
+    if receipt_id:
+        payload["receipt_id"] = receipt_id
+    return broadcast_live_event(payload)

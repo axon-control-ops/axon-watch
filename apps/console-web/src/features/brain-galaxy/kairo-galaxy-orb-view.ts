@@ -271,26 +271,45 @@ export function galaxyOrbStateClass(
   capturing = false,
   agentStreamActive = false,
   captureMode: 'manual' | 'hands_free' | 'barge_in' = 'manual',
+  duplexPhase?:
+    | 'idle'
+    | 'wake_listening'
+    | 'transcribing'
+    | 'thinking'
+    | 'speaking'
+    | 'followup_ready'
+    | 'privacy_muted'
+    | 'alerting'
+    | null,
 ): string {
+  if (duplexPhase === 'privacy_muted' || state === 'privacy_blocked') {
+    return 'kairo-galaxy-orb--muted';
+  }
+  if (duplexPhase === 'alerting' || state === 'alerting') {
+    return 'kairo-galaxy-orb--alerting';
+  }
   if (agentStreamActive) {
     return 'kairo-galaxy-orb--thinking kairo-galaxy-orb--busy kairo-galaxy-orb--autonomous';
   }
-  if (conversationPhase === 'thinking') {
+  if (duplexPhase === 'thinking' || conversationPhase === 'thinking') {
     return 'kairo-galaxy-orb--thinking kairo-galaxy-orb--busy';
   }
-  if (speaking || conversationPhase === 'speaking') {
+  if (duplexPhase === 'speaking' || speaking || conversationPhase === 'speaking') {
     return 'kairo-galaxy-orb--speaking';
+  }
+  if (duplexPhase === 'transcribing') {
+    return 'kairo-galaxy-orb--listening kairo-galaxy-orb--transcribing';
+  }
+  if (duplexPhase === 'followup_ready') {
+    return 'kairo-galaxy-orb--followup-ready';
+  }
+  if (duplexPhase === 'wake_listening') {
+    return 'kairo-galaxy-orb--wake-listening';
   }
   const operatorOwnedListen =
     conversationPhase === 'listening' || (capturing && captureMode === 'manual');
   if (operatorOwnedListen) {
     return 'kairo-galaxy-orb--listening';
-  }
-  if (state === 'alerting') {
-    return 'kairo-galaxy-orb--alerting';
-  }
-  if (state === 'privacy_blocked') {
-    return 'kairo-galaxy-orb--muted';
   }
   // "observing" means watch is connected — not that the mic is open.
   if (state === 'observing') {

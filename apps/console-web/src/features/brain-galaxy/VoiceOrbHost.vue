@@ -21,7 +21,7 @@ watch(
   <Teleport to="body">
     <!-- Floating orb is Operator-only — IDE already has mic/voice strip chrome. -->
     <KairoGalaxyOrb
-      v-if="shell.voiceOrbVisible && shell.layoutMode !== 'ide'"
+      v-if="shell.voiceOrbVisible && shell.layoutMode !== 'ide' && shell.operatorBrainGalaxyActive"
       placement-mode="viewport"
     />
   </Teleport>
