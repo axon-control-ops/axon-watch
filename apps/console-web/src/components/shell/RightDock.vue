@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 
 import AgentDock from '../ide/AgentDock.vue';
+import ConversationSeamPanel from '../ConversationSeamPanel.vue';
 import DockHeroPanel from '../DockHeroPanel.vue';
 import HudSeamCard from '../HudSeamCard.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
@@ -59,9 +60,35 @@ const {
         @toggle="shell.toggleDockSeam('thread')"
       >
         <MissionControlActivityPanel />
+        <div
+          v-if="shell.operatorThreadMessages.length"
+          class="mission-control-receipts"
+          aria-label="Operator conversation receipts"
+        >
+          <p class="mission-control-receipts__label">Operator receipts</p>
+          <ConversationSeamPanel />
+        </div>
       </HudSeamCard>
     </div>
 
     <DockHeroPanel />
   </aside>
 </template>
+
+<style scoped>
+.mission-control-receipts {
+  flex: 0 1 35%;
+  min-height: 5rem;
+  border-top: 1px solid rgba(0, 242, 255, 0.14);
+  overflow: hidden;
+}
+
+.mission-control-receipts__label {
+  margin: 0;
+  padding: 0.35rem 0.55rem 0.2rem;
+  color: rgba(148, 163, 184, 0.8);
+  font: 0.5rem var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+</style>
