@@ -69,48 +69,12 @@ describe('shouldAutoPeekAgentDockForStreaming', () => {
     alreadyPeekedStreamMessageIds: new Set<string>(),
   };
 
-  it('opens the dock once per stream message in IDE mode', () => {
-    expect(shouldAutoPeekAgentDockForStreaming(base)).toBe(true);
-    expect(
-      shouldAutoPeekAgentDockForStreaming({
-        ...base,
-        alreadyPeekedStreamMessageIds: new Set(['msg_abc']),
-      }),
-    ).toBe(false);
+  it('never auto-peeks for streaming — quiet IDE keeps the dock collapsed', () => {
+    expect(shouldAutoPeekAgentDockForStreaming(base)).toBe(false);
     expect(
       shouldAutoPeekAgentDockForStreaming({
         ...base,
         streamMessageId: 'msg_def',
-      }),
-    ).toBe(true);
-  });
-
-  it('does not peek when the dock is open or the agent is idle', () => {
-    expect(
-      shouldAutoPeekAgentDockForStreaming({
-        ...base,
-        agentDockCollapsed: false,
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoPeekAgentDockForStreaming({
-        ...base,
-        streaming: false,
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoPeekAgentDockForStreaming({
-        ...base,
-        streamMessageId: null,
-      }),
-    ).toBe(false);
-  });
-
-  it('ignores operator layout', () => {
-    expect(
-      shouldAutoPeekAgentDockForStreaming({
-        ...base,
-        layoutMode: 'operator',
       }),
     ).toBe(false);
   });
@@ -125,54 +89,12 @@ describe('shouldAutoPeekAgentDockForRun', () => {
     alreadyPeekedRunIds: new Set<string>(),
   };
 
-  it('opens the dock once per active run in IDE mode', () => {
-    expect(shouldAutoPeekAgentDockForRun(base)).toBe(true);
-    expect(
-      shouldAutoPeekAgentDockForRun({
-        ...base,
-        alreadyPeekedRunIds: new Set(['run_abc']),
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoPeekAgentDockForRun({
-        ...base,
-        runId: 'run_def',
-      }),
-    ).toBe(true);
-  });
-
-  it('peeks for review_ready as well as executing', () => {
+  it('never auto-peeks for run phase — AGENT chip pulses instead', () => {
+    expect(shouldAutoPeekAgentDockForRun(base)).toBe(false);
     expect(
       shouldAutoPeekAgentDockForRun({
         ...base,
         runPhase: 'review_ready',
-      }),
-    ).toBe(true);
-  });
-
-  it('ignores idle phases, operator layout, and expanded dock', () => {
-    expect(
-      shouldAutoPeekAgentDockForRun({
-        ...base,
-        runPhase: 'paused',
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoPeekAgentDockForRun({
-        ...base,
-        layoutMode: 'operator',
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoPeekAgentDockForRun({
-        ...base,
-        agentDockCollapsed: false,
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoPeekAgentDockForRun({
-        ...base,
-        runId: null,
       }),
     ).toBe(false);
   });

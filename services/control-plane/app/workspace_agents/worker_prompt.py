@@ -73,6 +73,8 @@ def build_continuous_worker_prompt(
         "`typecheck` with large NODE_OPTIONS heaps unless the operator explicitly asked. "
         "Prefer editing + targeted tests. Never launch a second heavy server if one is "
         "already listening. Axon-X operator UI is :4173 — do not start legacy :7734. "
+        "Long-running OTA/Expo/EAS jobs: start once and wait for that shell tool; do not "
+        "busy-poll with repeated shell probes every few seconds — check sparsely (~30–60s). "
     )
     prior_failure = _prior_failure_clause(workspace_id=workspace_id, role=role)
     return append_critical_review_clause(

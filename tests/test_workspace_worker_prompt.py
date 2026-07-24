@@ -28,6 +28,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("frontend", prompt)
         self.assertIn("Shell Craft", prompt)
         self.assertIn("Vue shell and IDE polish", prompt)
+        self.assertIn("busy-poll", prompt)
 
     def test_backend_prompt_includes_ci_review_clause(self) -> None:
         prompt = build_continuous_worker_prompt(

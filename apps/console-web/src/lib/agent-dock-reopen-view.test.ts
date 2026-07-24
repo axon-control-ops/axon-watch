@@ -58,6 +58,16 @@ describe('agent dock reopen view', () => {
     expect(agentDockReopenAlive({ ...idle, runPhase: 'paused' })).toBe(false);
   });
 
+  it('surfaces speaking while the dock is collapsed', () => {
+    expect(agentDockReopenTitle({ ...idle, speaking: true })).toBe(
+      'Expand agent dock (Ctrl/Cmd+\\) · Speaking',
+    );
+    expect(agentDockReopenAriaLabel({ ...idle, speaking: true })).toBe(
+      'Expand agent dock, speaking',
+    );
+    expect(agentDockReopenAlive({ ...idle, speaking: true })).toBe(true);
+  });
+
   it('surfaces failed teammate shifts while the dock is collapsed', () => {
     expect(
       agentDockReopenTitle({

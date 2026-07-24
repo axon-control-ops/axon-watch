@@ -2250,9 +2250,9 @@ export const useShellStore = defineStore('shell', () => {
     leftSidebarModeTouched.value = false;
     applyOperatorDockDefaults();
     if (mode === 'ide') {
-      // Galaxy hide-right-dock CSS must not leave AgentDock collapsed/gone after IDE entry.
-      agentDockCollapsed.value = false;
-      persistAgentDockCollapsed(false);
+      // Quiet IDE: restore persisted collapse (default collapsed). Operator galaxy CSS
+      // only hides the right dock in Operator mode, so IDE entry no longer force-expands.
+      agentDockCollapsed.value = readStoredAgentDockCollapsed();
     }
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
@@ -2310,6 +2310,7 @@ export const useShellStore = defineStore('shell', () => {
     createVaxonTerminalSession,
     loadTerminalSessions,
     renameTerminalSession,
+    runCommandInAgentBackgroundTerminal,
     runCommandInOperatorTerminal,
     setActiveTerminalSession,
     splitTerminalSession,
@@ -3675,6 +3676,7 @@ export const useShellStore = defineStore('shell', () => {
     createTerminalSession,
     createVaxonTerminalSession,
     backgroundIdeAgentRun,
+    runCommandInAgentBackgroundTerminal,
     runCommandInOperatorTerminal,
     splitTerminalSession,
     renameTerminalSession,

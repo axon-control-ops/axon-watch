@@ -101,6 +101,44 @@ class KairoConversationTurnTests(unittest.TestCase):
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
     @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    def test_followup_yes_after_dig_in_offer_hands_off_to_ide(
+        self,
+        *_mocks: object,
+    ) -> None:
+        import app.kairo_conversation as kc
+
+        kc._remember_entities(
+            "dig-in-session",
+            signal_id="signal_monitor_dashpro_sentry_recent_issues_warning",
+            target_workspace_id="workspace_dashpro",
+            task='Investigate signal "Sentry spike in DashPro": 3 unresolved issues',
+            pending_dig_in="1",
+        )
+        payload = converse_turn(content="yes", session_id="dig-in-session")
+        self.assertEqual("action", payload["turn_kind"])
+        action = payload["action"]
+        assert isinstance(action, dict)
+        self.assertEqual("handoff_signal", action.get("type"))
+        self.assertEqual("workspace_dashpro", action.get("target_workspace_id"))
+        self.assertIn("handing this off", str(payload["reply"]).lower())
+        self.assertNotEqual("1", kc._entity_context("dig-in-session").get("pending_dig_in"))
+
+    def test_note_dig_in_offer_sets_pending_dig_in(self) -> None:
+        import app.kairo_conversation as kc
+        from app.kairo.turn_memory import note_dig_in_offer
+
+        kc._remember_entities("dig-in-offer-session", pending_dig_in="")
+        note_dig_in_offer(
+            "dig-in-offer-session",
+            "DashPro Sentry is critical. Shall I dig in?",
+        )
+        entity = kc._entity_context("dig-in-offer-session")
+        self.assertEqual("1", entity.get("pending_dig_in"))
+        self.assertNotEqual("1", entity.get("pending_briefing_surface"))
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
     def test_followup_yes_opens_briefing_surface(
         self,
         *_mocks: object,

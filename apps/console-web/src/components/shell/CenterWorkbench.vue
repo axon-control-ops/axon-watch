@@ -78,6 +78,7 @@ const agentDockReopenState = computed(() => ({
   runPhase: shell.primaryActiveRun?.phase ?? null,
   employeeFailureLine: shell.activeIdeEmployeeFailureLine,
   employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
+  speaking: shell.kairoSpeechActive,
 }));
 const {
   ideEditorStatusTerminalChip,
@@ -599,7 +600,6 @@ watch(
         />
         <CenterWorkbenchEditorFooter
           :is-ide-mode="isIdeMode"
-          :terminal-panel-visible="terminalPanelVisible"
           :show-minimap-toggle="!showAgentDiffReviewViewer"
           :editor-minimap-enabled="editorMinimapEnabled"
           :editor-cursor-line="editorCursorLine"
@@ -608,7 +608,6 @@ watch(
           :editor-eol="editorEol"
           :editor-language-label="editorLanguageLabel"
           :editor-access-status="editorAccessStatus"
-          :run-phase="shell.primaryActiveRun?.phase ?? null"
           :terminal-chip="ideEditorStatusTerminalChip"
           :connector-chip="ideEditorStatusConnectorChip"
           :git-chip="ideEditorStatusGitChip"
@@ -627,8 +626,8 @@ watch(
     </section>
 
     <OperatorStatusRadarPanel v-if="hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
-    <!-- Speaker face + captions: OPERATOR galaxy and IDE — who is talking (VAXON / any agent). -->
-    <GalaxySpeechCaptions />
+    <!-- Speaker HUD stays Operator-only — IDE keeps the editor clear (presence lives in left rail / status bar). -->
+    <GalaxySpeechCaptions v-if="!isIdeMode" />
     <WorkbenchTerminalDock v-if="showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
   </main>
 </template>

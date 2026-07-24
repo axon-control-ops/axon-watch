@@ -11,7 +11,9 @@ import {
   agentShellMirrorForcedText,
   armAgentShellMirror,
   clearAgentShellMirror,
+  pendingAgentBackgroundCommand,
   pendingOperatorTerminalCommand,
+  takePendingAgentBackgroundCommand,
   takePendingOperatorTerminalCommand,
 } from '../lib/agent-shell-mirror-state';
 import { terminalSessionTabLabel } from '../lib/terminal-session-view';
@@ -161,6 +163,7 @@ function setTerminalHostRef(sessionId: string, host: TerminalHostInstance | null
     }
   }
   flushPendingOperatorCommand(sessionId);
+  flushPendingAgentBackgroundCommand(sessionId);
 }
 
 function flushPendingOperatorCommand(sessionId?: string): void {
@@ -190,6 +193,36 @@ function flushPendingOperatorCommand(sessionId?: string): void {
   });
 }
 
+function flushPendingAgentBackgroundCommand(sessionId?: string): void {
+  const command = pendingAgentBackgroundCommand.value;
+  if (!command) {
+    return;
+  }
+  const agentSession = shell.terminalSessions.find((session) => session.role === 'agent');
+  if (!agentSession) {
+    return;
+  }
+  if (sessionId && sessionId !== agentSession.id) {
+    return;
+  }
+  if (shell.activeTerminalSessionId !== agentSession.id) {
+    return;
+  }
+  const host = terminalHostRefs.value[agentSession.id] as
+    | { writeInput?: (data: string) => void; exitMirrorMode?: () => void }
+    | undefined;
+  if (!host?.writeInput) {
+    return;
+  }
+  takePendingAgentBackgroundCommand();
+  clearAgentShellMirror();
+  host.exitMirrorMode?.();
+  visibleTerminalSessionIds.value = [agentSession.id];
+  requestAnimationFrame(() => {
+    host.writeInput?.(`${command}\r`);
+  });
+}
+
 watch(pendingOperatorTerminalCommand, (command) => {
   if (!command) {
     return;
@@ -204,6 +237,23 @@ watch(pendingOperatorTerminalCommand, (command) => {
   }
   requestAnimationFrame(() => {
     flushPendingOperatorCommand(operatorSession.id);
+  });
+});
+
+watch(pendingAgentBackgroundCommand, (command) => {
+  if (!command) {
+    return;
+  }
+  const agentSession = shell.terminalSessions.find((session) => session.role === 'agent');
+  if (!agentSession) {
+    return;
+  }
+  visibleTerminalSessionIds.value = [agentSession.id];
+  if (shell.activeTerminalSessionId !== agentSession.id) {
+    shell.setActiveTerminalSession(agentSession.id);
+  }
+  requestAnimationFrame(() => {
+    flushPendingAgentBackgroundCommand(agentSession.id);
   });
 });
 

@@ -140,8 +140,8 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     void shell.backgroundIdeAgentRun();
   }
 
-  async function continueTerminalInBash(command: string): Promise<void> {
-    await shell.runCommandInOperatorTerminal(command);
+  async function continueTerminalInBackground(command: string): Promise<void> {
+    await shell.runCommandInAgentBackgroundTerminal(command);
   }
 
   function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean): boolean {
@@ -266,7 +266,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     segmentKey,
     revealTerminalPanel,
     backgroundAgentTerminalRun,
-    continueTerminalInBash,
+    continueTerminalInBackground,
     showTerminalBackgroundControl,
     terminalMirrorBadge,
     thinkingBodyText,

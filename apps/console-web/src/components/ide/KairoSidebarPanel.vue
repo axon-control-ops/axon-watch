@@ -82,8 +82,20 @@ const signalBadge = computed(
   () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
 );
 const showStopSpeech = computed(() => shell.kairoSpeechActive);
-const runTranscriptText = computed(
-  () => spokenText.value || shell.ideComposerActivity?.liveBodyFull?.trim() || null,
+const hasLiveSpeechOrActivity = computed(
+  () => Boolean(spokenText.value?.trim()) || Boolean(shell.ideComposerActivity?.liveBodyFull?.trim()),
+);
+const transcriptLinkHint = computed(() => {
+  if (showStopSpeech.value) {
+    return `${activePersonaName.value} speaking · Open dock`;
+  }
+  if (hasLiveSpeechOrActivity.value) {
+    return 'Open agent dock for full transcript';
+  }
+  return 'Open agent dock';
+});
+const showTranscriptLink = computed(
+  () => showStopSpeech.value || hasLiveSpeechOrActivity.value,
 );
 
 function handleExpand(): void {
@@ -101,6 +113,13 @@ function handleExpand(): void {
 function handleStopSpeech(event: Event): void {
   event.stopPropagation();
   shell.stopKairoSpeech();
+}
+
+function openAgentTranscript(event: Event): void {
+  event.stopPropagation();
+  if (shell.agentDockCollapsed) {
+    shell.toggleAgentDock();
+  }
 }
 </script>
 
@@ -195,14 +214,16 @@ function handleStopSpeech(event: Event): void {
           Stop speaking
         </button>
       </div>
-      <section
-        v-if="runTranscriptText"
-        class="kairo-sidebar-panel__transcript"
-        aria-label="Current run transcript"
+      <button
+        v-if="showTranscriptLink"
+        type="button"
+        class="kairo-sidebar-panel__transcript-link"
+        aria-label="Open agent dock transcript"
+        @click="openAgentTranscript"
       >
-        <span class="kairo-sidebar-panel__transcript-label">Run transcript</span>
-        <p>{{ runTranscriptText }}</p>
-      </section>
+        <span class="kairo-sidebar-panel__transcript-label">Agent transcript</span>
+        <span class="kairo-sidebar-panel__transcript-hint">{{ transcriptLinkHint }}</span>
+      </button>
       <BriefingSurfaceFollowupPrompt />
     </div>
   </button>

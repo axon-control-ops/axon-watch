@@ -116,6 +116,7 @@ const agentDockState = computed(() => ({
   runPhase: shell.primaryActiveRun?.phase ?? null,
   employeeFailureLine: shell.activeIdeEmployeeFailureLine,
   employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
+  speaking: shell.kairoSpeechActive,
 }));
 
 const agentDockAlive = computed(() => agentDockReopenAlive(agentDockState.value));

@@ -370,3 +370,34 @@
   text-transform: uppercase;
 }
 
+/* Quieter IDE transcript density — more events visible without a prose wall. */
+.console-shell--mockup.console-shell--ide .agent-dock__transcript {
+  padding: 0 0.65rem 0.55rem;
+}
+
+.console-shell--mockup.console-shell--ide .agent-dock__transcript .conversation-seam__list {
+  gap: 0.32rem;
+}
+
+.console-shell--mockup.console-shell--ide .agent-dock__transcript .conversation-seam__item {
+  padding: 0.22rem 0;
+}
+
+.console-shell--mockup.console-shell--ide .agent-dock__transcript .conversation-seam__meta {
+  margin-bottom: 0.18rem;
+}
+
+.console-shell--mockup.console-shell--ide .agent-dock__transcript .conversation-seam__content,
+.console-shell--mockup.console-shell--ide .agent-dock__transcript .conversation-seam__content--agent {
+  font-size: 0.68rem;
+  line-height: 1.4;
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+}
+
+.console-shell--mockup.console-shell--ide .agent-dock__transcript .conversation-seam__markdown-block,
+.console-shell--mockup.console-shell--ide .agent-dock__transcript .conversation-seam__content--markdown {
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+}
+

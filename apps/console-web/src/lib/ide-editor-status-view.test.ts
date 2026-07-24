@@ -394,4 +394,24 @@ describe('buildIdeEditorStatusAgentChip', () => {
     });
     expect(chip?.title).toContain('Shift interrupted');
   });
+
+  it('surfaces SPEAKING when narration is active with the dock collapsed', () => {
+    const chip = buildIdeEditorStatusAgentChip({
+      agentDockCollapsed: true,
+      state: {
+        streaming: false,
+        pendingApprovals: 0,
+        runPhase: null,
+        speaking: true,
+      },
+    });
+
+    expect(chip).toMatchObject({
+      label: 'SPEAKING',
+      speaking: true,
+      showPulse: true,
+      alive: true,
+    });
+    expect(chip?.title).toContain('Speaking');
+  });
 });

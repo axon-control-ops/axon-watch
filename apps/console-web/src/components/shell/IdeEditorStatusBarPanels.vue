@@ -119,6 +119,7 @@ const emit = defineEmits<{
         'editor-statusbar__panel-toggle--agent-alive':
           agentChip.alive && !agentChip.failure && !agentChip.interrupted,
         'editor-statusbar__panel-toggle--agent-streaming': agentChip.streaming,
+        'editor-statusbar__panel-toggle--agent-speaking': agentChip.speaking,
         'editor-statusbar__panel-toggle--agent-approvals': agentChip.approvals,
         'editor-statusbar__panel-toggle--agent-executing': agentChip.executing,
         'editor-statusbar__panel-toggle--agent-review-ready': agentChip.reviewReady,

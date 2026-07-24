@@ -148,13 +148,14 @@ export function buildIdeEditorStatusTerminalChip(input: {
 }
 
 export type IdeEditorStatusAgentChip = {
-  label: 'AGENT';
+  label: 'AGENT' | 'SPEAKING';
   title: string;
   ariaLabel: string;
   showPulse: boolean;
   showBadge: number | null;
   alive: boolean;
   streaming: boolean;
+  speaking: boolean;
   approvals: boolean;
   executing: boolean;
   reviewReady: boolean;
@@ -282,18 +283,20 @@ export function buildIdeEditorStatusAgentChip(input: {
   const { state } = input;
   const pendingApprovals = state.pendingApprovals;
   const runPhase = state.runPhase ?? null;
+  const speaking = Boolean(state.speaking);
   const alive = agentDockReopenAlive(state);
   const failure = agentDockReopenEmployeeFailure(state);
   const interrupted = agentDockReopenEmployeeInterrupted(state);
 
   return {
-    label: 'AGENT',
+    label: speaking ? 'SPEAKING' : 'AGENT',
     title: agentDockReopenTitle(state),
     ariaLabel: agentDockReopenAriaLabel(state),
     showPulse: alive && pendingApprovals <= 0,
     showBadge: pendingApprovals > 0 ? pendingApprovals : null,
     alive,
     streaming: state.streaming,
+    speaking,
     approvals: pendingApprovals > 0,
     executing: runPhase === 'executing',
     reviewReady: runPhase === 'review_ready',

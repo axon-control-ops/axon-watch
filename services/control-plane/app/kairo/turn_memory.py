@@ -22,10 +22,19 @@ _HANDOFF_ACTION_RE = re.compile(
     r"\b(hand\s*it\s*off|hand\s*off|handoff|continue in ide|investigate in ide|open in ide)\b",
     re.IGNORECASE,
 )
-_CONFIRM_RE = re.compile(r"^(yes|yeah|yep|do it|confirm|go ahead)\.?$", re.IGNORECASE)
+_CONFIRM_RE = re.compile(
+    r"^(yes|yeah|yep|yup|do it|confirm|go ahead|dig in|please dig in|yes[,.]?\s*dig in)\.?$",
+    re.IGNORECASE,
+)
 _BRIEFING_SURFACE_OFFER_RE = re.compile(
     r"\b(pull\s+(?:it\s+)?to\s+the\s+front|bring\s+(?:it\s+)?(?:up|forward)|"
     r"open\s+the\s+briefing|shall\s+i\s+(?:pull|show|open))\b",
+    re.IGNORECASE,
+)
+# Ask-shaped spoken invites from explain_operator_alert / persona voice lines.
+_DIG_IN_OFFER_RE = re.compile(
+    r"\bshall\s+i\s+(?:dig\s+in|triage(?:\s+it)?|investigate(?:\s+it)?|"
+    r"diagnose(?:\s+it)?|take\s+a\s+look|look\s+into\s+it)\b",
     re.IGNORECASE,
 )
 
@@ -159,7 +168,56 @@ def remember_top_signal(
 
 def note_briefing_surface_offer(session_id: str, reply: str) -> None:
     if _BRIEFING_SURFACE_OFFER_RE.search(str(reply or "")):
-        remember_entities(session_id, pending_briefing_surface="1")
+        remember_entities(
+            session_id,
+            pending_briefing_surface="1",
+            pending_dig_in="",
+        )
+
+
+def note_dig_in_offer(session_id: str, reply: str) -> None:
+    """Arm yes→IDE handoff after VAXON asks 'Shall I dig in?' (or triage/investigate)."""
+    if _DIG_IN_OFFER_RE.search(str(reply or "")):
+        remember_entities(
+            session_id,
+            pending_dig_in="1",
+            pending_briefing_surface="",
+        )
+
+
+def remember_signal_from_speak_context(
+    session_id: str,
+    context: dict[str, Any] | None,
+    *,
+    fallback_workspace_id: str | None = None,
+) -> None:
+    """Capture top-signal ids from /api/kairo/speak alert context for dig-in yes."""
+    payload = context if isinstance(context, dict) else {}
+    signal_id = str(
+        payload.get("signal_id")
+        or payload.get("top_signal_id")
+        or ""
+    ).strip()
+    if not signal_id:
+        return
+    workspace_id = (
+        str(payload.get("top_signal_workspace_id") or payload.get("workspace_id") or "").strip()
+        or str(fallback_workspace_id or "").strip()
+    )
+    title = str(payload.get("top_signal_title") or "").strip()
+    summary = str(payload.get("top_signal_summary") or "").strip()
+    task = f'Investigate signal "{title}"' if title else f"Investigate signal {signal_id}"
+    if summary:
+        task = f"{task}: {summary}"
+    fields: dict[str, str] = {
+        "signal_id": signal_id,
+        "task": task,
+    }
+    if workspace_id:
+        fields["target_workspace_id"] = workspace_id
+    if title:
+        fields["signal_title"] = title
+    remember_entities(session_id, **fields)
 
 
 def resolve_followup_action(content: str, session_id: str) -> dict[str, object] | None:
@@ -169,6 +227,17 @@ def resolve_followup_action(content: str, session_id: str) -> dict[str, object] 
         pending_command = entity.get("pending_command", "")
         if pending_command:
             return {"type": "dispatch_command", "content": pending_command}
+        if entity.get("pending_dig_in") == "1":
+            signal_id = entity.get("signal_id", "")
+            target_workspace_id = entity.get("target_workspace_id", "")
+            task = entity.get("task", "")
+            if signal_id and target_workspace_id and task:
+                return {
+                    "type": "handoff_signal",
+                    "signal_id": signal_id,
+                    "target_workspace_id": target_workspace_id,
+                    "task": task,
+                }
         if entity.get("pending_briefing_surface") == "1":
             return {"type": "focus_briefing"}
     if _HANDOFF_ACTION_RE.search(trimmed):
@@ -204,8 +273,10 @@ __all__ = [
     "clear_memory_for_tests",
     "entity_context",
     "note_briefing_surface_offer",
+    "note_dig_in_offer",
     "recent_turns",
     "remember_entities",
+    "remember_signal_from_speak_context",
     "remember_top_signal",
     "remember_turn",
     "resolve_followup_action",

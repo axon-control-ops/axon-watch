@@ -6,7 +6,10 @@ import {
   agentShellMirrorForcedText,
   clearAgentShellMirror,
   clearAgentShellMirrorForcedText,
+  pendingAgentBackgroundCommand,
+  queueAgentBackgroundCommand,
   queueAgentShellMirrorText,
+  takePendingAgentBackgroundCommand,
 } from './agent-shell-mirror-state';
 
 describe('agent shell mirror state', () => {
@@ -24,5 +27,19 @@ describe('agent shell mirror state', () => {
     armAgentShellMirror();
     expect(agentShellMirrorActive.value).toBe(true);
     clearAgentShellMirror();
+  });
+
+  it('queues Continue in background commands and clears the mirror', () => {
+    armAgentShellMirror();
+    queueAgentShellMirrorText('$ npm run ota:canary\nbuilding…');
+    expect(agentShellMirrorActive.value).toBe(true);
+
+    queueAgentBackgroundCommand('npm run ota:canary');
+
+    expect(agentShellMirrorActive.value).toBe(false);
+    expect(agentShellMirrorForcedText.value).toBeNull();
+    expect(pendingAgentBackgroundCommand.value).toBe('npm run ota:canary');
+    expect(takePendingAgentBackgroundCommand()).toBe('npm run ota:canary');
+    expect(pendingAgentBackgroundCommand.value).toBeNull();
   });
 });

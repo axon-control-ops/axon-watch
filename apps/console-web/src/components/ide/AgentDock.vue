@@ -20,43 +20,24 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
 
-const dockAlive = computed(() =>
-  agentDockReopenAlive({
-    streaming: shell.agentStreamActive,
-    pendingApprovals: shell.pendingApprovalsCount,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
-    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-  }),
-);
-
-const dockEmployeeFailure = computed(() =>
-  agentDockReopenEmployeeFailure({
-    streaming: shell.agentStreamActive,
-    pendingApprovals: shell.pendingApprovalsCount,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
-    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-  }),
-);
-
-const dockEmployeeInterrupted = computed(() =>
-  agentDockReopenEmployeeInterrupted({
-    streaming: shell.agentStreamActive,
-    pendingApprovals: shell.pendingApprovalsCount,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
-    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-  }),
-);
-
 const reopenState = computed(() => ({
   streaming: shell.agentStreamActive,
   pendingApprovals: shell.pendingApprovalsCount,
   runPhase: shell.primaryActiveRun?.phase ?? null,
   employeeFailureLine: shell.activeIdeEmployeeFailureLine,
   employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
+  speaking: shell.kairoSpeechActive,
 }));
+
+const dockAlive = computed(() => agentDockReopenAlive(reopenState.value));
+
+const dockEmployeeFailure = computed(() =>
+  agentDockReopenEmployeeFailure(reopenState.value),
+);
+
+const dockEmployeeInterrupted = computed(() =>
+  agentDockReopenEmployeeInterrupted(reopenState.value),
+);
 
 const reopenTitle = computed(() => agentDockReopenTitle(reopenState.value));
 const reopenAriaLabel = computed(() => agentDockReopenAriaLabel(reopenState.value));

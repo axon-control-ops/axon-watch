@@ -38,7 +38,7 @@ export interface XtermSessionController {
   writeMirrorSnapshot: (text: string) => void;
   /** Leave mirror mode and reconnect the agent PTY websocket. */
   exitMirrorMode: () => void;
-  /** Send keystrokes to the live PTY (operator sessions only). */
+  /** Send keystrokes to the live PTY (operator interactive, or agent background continue). */
   writeInput: (data: string) => void;
 }
 
@@ -217,10 +217,6 @@ export async function createXtermSession(
       fitAddon.fit();
       sendResize(nextSocket, terminal);
 
-      if (sessionRole === 'agent') {
-        return;
-      }
-
       const sendInput = (data: string): void => {
         if (socket !== nextSocket || nextSocket.readyState !== WebSocket.OPEN) {
           return;
@@ -237,11 +233,14 @@ export async function createXtermSession(
       };
       socketSendInput = sendInput;
 
-      pasteDisposable = attachTerminalPasteHandler(container, sendInput);
-
-      inputDisposable = terminal.onData((data) => {
-        sendInput(data);
-      });
+      // Agent tabs stay keyboard-read-only; programmatic writeInput still works for
+      // Continue in background. Operator tabs accept interactive typing + paste.
+      if (sessionRole !== 'agent') {
+        pasteDisposable = attachTerminalPasteHandler(container, sendInput);
+        inputDisposable = terminal.onData((data) => {
+          sendInput(data);
+        });
+      }
     };
 
     nextSocket.onmessage = (event) => {
@@ -329,7 +328,12 @@ export async function createXtermSession(
     },
     writeMirrorSnapshot,
     writeInput(data: string) {
-      if (readOnly || mirrorMode || attachedSessionRole === 'agent') {
+      if (mirrorMode) {
+        return;
+      }
+      // Operator: honor readOnly. Agent: allow programmatic background continue even
+      // when the tab is keyboard-read-only.
+      if (readOnly && attachedSessionRole !== 'agent') {
         return;
       }
       socketSendInput?.(data);

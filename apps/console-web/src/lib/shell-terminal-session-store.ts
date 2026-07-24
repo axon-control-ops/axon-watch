@@ -10,6 +10,7 @@ import {
 import {
   armAgentShellMirror,
   clearAgentShellMirrorForcedText,
+  queueAgentBackgroundCommand,
   queueOperatorTerminalCommand,
 } from './agent-shell-mirror-state';
 import {
@@ -170,6 +171,25 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     await createTerminalSession({ role: 'operator', title: 'bash' });
   }
 
+  /**
+   * Continue a finished in-thread shell command in the vaxon agent PTY so the
+   * operator can watch long jobs (OTA, builds) while the agent continues other work.
+   */
+  async function runCommandInAgentBackgroundTerminal(command: string): Promise<void> {
+    const trimmed = command.trim();
+    if (!trimmed) {
+      return;
+    }
+    queueAgentBackgroundCommand(trimmed);
+    input.revealIdeTerminalPanel();
+    const agentSession = input.terminalSessions.value.find((session) => session.role === 'agent');
+    if (agentSession) {
+      input.activeTerminalSessionId.value = agentSession.id;
+      return;
+    }
+    await createVaxonTerminalSession(input.ideAgentRunId.value);
+  }
+
   async function splitTerminalSession(sessionId: string): Promise<string | null> {
     const source = input.terminalSessions.value.find((session) => session.id === sessionId);
     if (!source) {
@@ -230,6 +250,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     createVaxonTerminalSession,
     loadTerminalSessions,
     renameTerminalSession,
+    runCommandInAgentBackgroundTerminal,
     runCommandInOperatorTerminal,
     setActiveTerminalSession,
     splitTerminalSession,

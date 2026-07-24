@@ -249,6 +249,8 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     const context: Record<string, unknown> = {
       fallback: alert.message,
       pending_approvals: input.pendingApprovalsCount.value,
+      signal_id: alert.signal_id ?? topSignal?.signal_id ?? '',
+      top_signal_id: alert.signal_id ?? topSignal?.signal_id ?? '',
       top_signal_title: topSignal?.title ?? '',
       top_signal_workspace_id: topSignal?.workspace_id ?? '',
       top_signal_summary: topSignal?.summary ?? '',

@@ -17,7 +17,7 @@ import {
 describe('agent dock behavior contract', () => {
   it('uses stable storage keys for layout mode and dock collapse', () => {
     expect(LAYOUT_MODE_KEY).toBe('axon-x-layout-mode-v1');
-    expect(AGENT_DOCK_COLLAPSED_KEY).toBe('axon-x-agent-dock-collapsed-v1');
+    expect(AGENT_DOCK_COLLAPSED_KEY).toBe('axon-x-agent-dock-collapsed-v2');
   });
 
   it('persists and restores agent dock collapsed state', () => {
@@ -37,6 +37,8 @@ describe('agent dock behavior contract', () => {
     });
 
     try {
+      expect(readStoredAgentDockCollapsed()).toBe(true);
+      persistAgentDockCollapsed(false);
       expect(readStoredAgentDockCollapsed()).toBe(false);
       persistAgentDockCollapsed(true);
       expect(readStoredAgentDockCollapsed()).toBe(true);

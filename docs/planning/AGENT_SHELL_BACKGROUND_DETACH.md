@@ -24,8 +24,10 @@ Background / auto-surface on an open in-thread `:::terminal` block:
 4. Does **not** take ownership of the Cursor CLI shell process.
 5. Does **not** free the agent — Cursor CLI still awaits its own shell tool completion.
 
-Closed terminal cards may use **Continue in bash** to re-run the command in the
-interactive operator PTY (separate process — not detach).
+Closed terminal cards use **Continue in background** to re-run the command in the
+interactive **vaxon** agent PTY (separate process from Cursor’s shell tool). That lets
+the operator watch long jobs while the agent continues other tools on later turns —
+not true Cursor detach of an in-flight shell.
 
 Capability flag: `CURSOR_SHELL_PROCESS_DETACH_AVAILABLE === false`
 (`apps/console-web/src/lib/agent-terminal-background-view.ts`).
