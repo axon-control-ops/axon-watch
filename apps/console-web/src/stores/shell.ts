@@ -165,12 +165,6 @@ import {
   streamingThreadIdsFromUiMap,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
-import {
-  decideBusyEmployeeStreamAttach,
-  findIdeThreadIdForEmployee,
-  listBusyEmployeeStreamTargets,
-  resolveStreamingAgentMessageId,
-} from '../lib/follow-busy-employee-ide-streams';
 import { resolveKairoPresenceClickTarget } from '../lib/kairo-presence-action';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
@@ -312,6 +306,7 @@ import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary
 import { createShellDisplaySlice } from './shell/slices/create-shell-display-slice';
 import { createThreadSurfaceSlice } from './shell/slices/create-thread-surface-slice';
 import { createCompanyRosterSlice } from './shell/slices/create-company-roster-slice';
+import { createBusyEmployeeIdeStreamSlice } from './shell/slices/create-busy-employee-ide-stream-slice';
 import { createWorkspaceTasksSlice } from './shell/slices/create-workspace-tasks-slice';
 import { createViewportCompactSlice } from './shell/slices/create-viewport-compact-slice';
 import { createKairoVoiceSlice } from './shell/slices/create-kairo-voice-slice';
@@ -1827,90 +1822,17 @@ export const useShellStore = defineStore('shell', () => {
     );
   }
 
-  let busyEmployeeStreamFollowInFlight = false;
-
-  /**
-   * When specialists go mid-shift (fan-out / continuous worker), open their IDE tabs
-   * and attach chat_stream_* without stealing focus from the active teammate (e.g. Dana).
-   */
-  async function followBusyEmployeeIdeStreams(): Promise<void> {
-    const workspaceId = currentWorkspace.value?.workspace_id?.trim();
-    if (!workspaceId || layoutMode.value !== 'ide' || busyEmployeeStreamFollowInFlight) {
-      return;
-    }
-    const targets = listBusyEmployeeStreamTargets(companyEmployeesForCurrentWorkspace.value);
-    if (!targets.length) {
-      return;
-    }
-
-    busyEmployeeStreamFollowInFlight = true;
-    try {
-      await loadIdeThreads(workspaceId);
-      const threads = ideThreadsByWorkspaceId.value[workspaceId] ?? [];
-      for (const target of targets) {
-        const threadId = findIdeThreadIdForEmployee(threads, target.employeeId);
-        if (threadId) {
-          ensureIdeThreadTabOpen(threadId);
-        }
-        const streamUi = threadId ? getWorkspaceStreamUi(threadId) : defaultWorkspaceStreamUi();
-        let messages = threadId ? (workspaceIdeThreadMessagesById.value[threadId] ?? []) : [];
-        let messageId = resolveStreamingAgentMessageId(messages, target.runId);
-        if (threadId && !messageId) {
-          try {
-            const history = await fetchThreadHistory(threadId);
-            messages = filterThreadMessagesForSurface(
-              history.items.map((item) => mapChatMessageRecord(item)),
-              'ide',
-            );
-            workspaceIdeThreadMessagesById.value = {
-              ...workspaceIdeThreadMessagesById.value,
-              [threadId]: messages,
-            };
-            messageId = resolveStreamingAgentMessageId(messages, target.runId);
-          } catch {
-            continue;
-          }
-        }
-        const decision = decideBusyEmployeeStreamAttach({
-          threadId,
-          resolvedMessageId: messageId,
-          alreadyActive: Boolean(streamUi.active),
-          alreadyMessageId: streamUi.messageId,
-        });
-        if (decision !== 'attach' || !threadId || !messageId) {
-          continue;
-        }
-        const operatorPrompt =
-          [...messages]
-            .reverse()
-            .find(
-              (message) =>
-                message.role === 'operator' && (message.run_id ?? '').trim() === target.runId,
-            )?.content ?? '';
-        attachChatStream(workspaceId, threadId, messageId, {
-          activity: {
-            label: buildIdeStreamActivityLabel('full', 'agent'),
-            mode: 'agent',
-            executionAccess: 'full',
-            operatorPrompt,
-          },
-          ideAgentRunId: target.runId,
-          seedMessages: messages,
-        });
-      }
-    } finally {
-      busyEmployeeStreamFollowInFlight = false;
-    }
-  }
-
-  watch(
-    [companyEmployeesForCurrentWorkspace, layoutMode],
-    () => {
-      void followBusyEmployeeIdeStreams();
-    },
-    { flush: 'post' },
-  );
-
+  createBusyEmployeeIdeStreamSlice({
+    currentWorkspaceId: computed(() => currentWorkspace.value?.workspace_id ?? null),
+    layoutMode,
+    companyEmployees: companyEmployeesForCurrentWorkspace,
+    ideThreadsByWorkspaceId,
+    workspaceIdeThreadMessagesById,
+    loadIdeThreads,
+    ensureIdeThreadTabOpen,
+    getWorkspaceStreamUi,
+    attachChatStream,
+  });
   function clearIdeAgentRunLink(): void {
     ideAgentRunId.value = null;
   }
