@@ -14,8 +14,8 @@ def self_intro_candidates(content: str) -> list[str]:
     if not _SELF_RE.search(content.strip()):
         return []
     return [
-        "I'm VAXON, your voice-aware control point for Axon-X. I can answer from the workspace, runtime, and system state without wandering off into fiction.",
-        "I'm VAXON. I keep one eye on the workspace and the other on live runtime state, then answer with the shortest useful truth I can give you.",
-        "VAXON, sir — read-only in this lane, grounded in the repo, the runtime, and the control plane. Ask for status, structure, or the next sensible move.",
+        "I'm VAXON, sir — your JARVIS for Axon-X. I watch the workspace, the runtime, and the control plane, then answer with the shortest useful truth.",
+        "VAXON here. Mission control with manners: live workspace state, clear options, no fiction.",
+        "I'm VAXON. Grounded in the repo, the runtime, and the control plane — ask for status, structure, or the next sensible move.",
     ]
 

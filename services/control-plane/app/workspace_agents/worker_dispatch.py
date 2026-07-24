@@ -20,6 +20,13 @@ from app.runs.service import (
 )
 from app.terminal.session_registry import ensure_agent_session
 from app.workspace_agents.config_loader import EmployeeConfig
+from app.workspace_agents.worker_ide_stream import (
+    WorkerIdeStream,
+    fail_worker_ide_stream,
+    finalize_worker_ide_stream,
+    prepare_worker_ide_stream,
+    stream_worker_chunk,
+)
 from app.workspace_agents.worker_isolation import (
     IsolationError,
     cleanup_worker_isolation,
@@ -41,13 +48,30 @@ def worker_dispatch_enabled() -> bool:
     return raw not in {"0", "false", "off", "no"}
 
 
-def _throttled_worker_stream_progress(run_id: str) -> Callable[[str, str], None]:
-    """Emit worker_progress receipts from Lane B stream chunks (stale TTL uses these)."""
+def _throttled_worker_stream_progress(
+    run_id: str,
+    ide_stream: WorkerIdeStream | None = None,
+) -> Callable[[str, str], None]:
+    """Emit worker_progress receipts and mirror chunks into the employee IDE thread."""
     last_at = 0.0
     lock = threading.Lock()
+    milestone_content = ""
 
-    def on_chunk(_accumulated: str, _delta: str) -> None:
-        nonlocal last_at
+    def on_chunk(accumulated: str, delta: str) -> None:
+        nonlocal last_at, milestone_content
+        if ide_stream is not None:
+            try:
+                milestone_content = stream_worker_chunk(
+                    ide_stream,
+                    previous_content=milestone_content,
+                    accumulated=accumulated,
+                    delta=delta,
+                )
+            except Exception:  # noqa: BLE001 — never block dispatch on UI mirror
+                logger.exception(
+                    "continuous worker IDE stream chunk failed for %s",
+                    run_id,
+                )
         now = time.monotonic()
         with lock:
             if now - last_at < _PROGRESS_RECEIPT_MIN_SECONDS:
@@ -124,6 +148,9 @@ def dispatch_continuous_worker_run(
     )
     isolation_root = None
     lane_b_result: dict[str, Any] = {}
+    ide_stream: WorkerIdeStream | None = None
+    dispatched = False
+    finalized: dict[str, Any] | None = None
     try:
         touch_run_activity(run_id)
         try:
@@ -147,6 +174,21 @@ def dispatch_continuous_worker_run(
             ),
             actor="workspace_scheduler",
         )
+        try:
+            ide_stream = prepare_worker_ide_stream(
+                workspace_id=workspace_id,
+                employee=employee,
+                run_id=run_id,
+                task_id=task_id,
+                task=task,
+            )
+        except Exception:  # noqa: BLE001 — dispatch must continue even if IDE mirror fails
+            logger.exception(
+                "continuous worker IDE stream prepare failed for %s role=%s",
+                run_id,
+                employee.role,
+            )
+            ide_stream = None
         heartbeat.start()
         isolation_root = create_worker_isolation(workspace_id=workspace_id, run_id=run_id)
         agent_root = worker_agent_workspace(isolation_root)
@@ -170,16 +212,32 @@ def dispatch_continuous_worker_run(
             user_prompt=prompt,
             run_id=run_id,
             execution_access="full",
-            on_chunk=_throttled_worker_stream_progress(run_id),
+            on_chunk=_throttled_worker_stream_progress(run_id, ide_stream),
             cursor_trust_policy="worker",
             workspace_root=agent_root,
         )
+        reply_text = str(lane_b_result.get("content") or "")
         dispatched, finalized = finalize_lane_b_agent_run(
             dispatch_run_id=run_id,
             lane_b_result=lane_b_result,
-            reply_text=str(lane_b_result.get("content") or ""),
+            reply_text=reply_text,
+            workspace_root=str(agent_root),
         )
-        if dispatched and finalized is not None:
+        if ide_stream is not None:
+            try:
+                finalize_worker_ide_stream(
+                    ide_stream,
+                    reply_text=reply_text,
+                    dispatched=dispatched,
+                    run_record=finalized,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "continuous worker IDE stream finalize failed for %s",
+                    run_id,
+                )
+            ide_stream = None
+        if finalized is not None:
             phase = str(finalized.get("phase") or "").strip().lower()
             try:
                 if phase == "completed":
@@ -194,6 +252,16 @@ def dispatch_continuous_worker_run(
             run_id,
             employee.role,
         )
+        if ide_stream is not None:
+            try:
+                fail_worker_ide_stream(
+                    ide_stream,
+                    error=f"Continuous worker isolation failed: {exc}",
+                    run_id=run_id,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("continuous worker IDE stream fail failed for %s", run_id)
+            ide_stream = None
         failed = _fail_worker_run(
             run_id,
             receipt_summary=f"Continuous worker isolation failed: {exc}",
@@ -209,6 +277,16 @@ def dispatch_continuous_worker_run(
             run_id,
             employee.role,
         )
+        if ide_stream is not None:
+            try:
+                fail_worker_ide_stream(
+                    ide_stream,
+                    error=f"Continuous worker dispatch failed: {exc}",
+                    run_id=run_id,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("continuous worker IDE stream fail failed for %s", run_id)
+            ide_stream = None
         failed = _fail_worker_run(
             run_id,
             receipt_summary=f"Continuous worker dispatch failed: {exc}",
