@@ -1790,7 +1790,6 @@ export const useShellStore = defineStore('shell', () => {
   function clearIdeAgentRunLink(): void {
     ideAgentRunId.value = null;
   }
-
   function setIdeDebugModeSelected(selected: boolean): void {
     ideDebugModeSelected.value = selected;
   }
