@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "layout_mode_storage_key": "axon-x-layout-mode-v1",
-  "agent_dock_collapsed_storage_key": "axon-x-agent-dock-collapsed-v1",
+  "agent_dock_collapsed_storage_key": "axon-x-agent-dock-collapsed-v2",
   "dock_hero_mode_storage_key": "axon-x-dock-hero-mode-v1",
   "required_shell_files": [
     "apps/console-web/src/components/shell/RightDock.vue",
