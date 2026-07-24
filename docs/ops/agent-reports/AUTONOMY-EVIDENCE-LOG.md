@@ -86,3 +86,12 @@ Template:
 - exit criteria met: yes for master-plan Gate 5 exits — ordered DAG, role assignment, path conflict serialization (deps + lease), receipt-backed explicit replan, multi-specialist fan-out runs/receipts
 - residual risks: synthesis is deterministic terminal-status aggregation (not model prose); no approved-backlog entity; fan-out does not create/open IDE threads/tabs; sibling SSE preservation is Gate 4 code with helper-unit coverage only (no EventSource assertion); scheduler remains off
 - next gate unlocked: Gate 6 (mandatory verifier contract)
+
+### Gate 9 — 2026-07-24 (thin slice — Axon-X Fast Gate)
+- owner: agent
+- commit: (this change set)
+- commands run: `./scripts/dev/python.sh -m unittest tests.test_ci_remediation -v` (9 OK); report `docs/ops/agent-reports/gate9-ci-remediation-2026-07-24.md`
+- pass/fail: pass for unit/handler slice (HMAC, classify, ingest+dedupe, inbox merge, report-outcome, prompt clause)
+- exit criteria met: partial — coded webhook → signal → lease → dispatch/report path for Axon-X Fast Gate; live broken-test→draft-PR drill still requires webhook secret + host wiring (fallback poller script shipped)
+- residual risks: Lane B/`gh` credentials for actual autonomous fix; live throwaway-branch repair drill still pending; no protected merge
+- next gate unlocked: complete live Gate 9 drill; then enable other workspace bindings

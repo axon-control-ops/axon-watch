@@ -1,0 +1,168 @@
+"""Create/lease a CI repair task and one-shot dispatch a continuous worker."""
+
+from __future__ import annotations
+
+import logging
+import threading
+from typing import Any
+
+from app.ci_remediation.config import CiRemediationBinding
+from app.persistence import task_store
+from app.runs.service import RunLifecycleError, append_run_execution_receipt, create_run
+from app.workspace_agents.config_loader import (
+    EmployeeConfig,
+    load_workspace_agent_configs,
+)
+from app.workspace_agents.worker_dispatch import (
+    dispatch_continuous_worker_run,
+    worker_dispatch_enabled,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _employee_for_role(workspace_id: str, role: str) -> EmployeeConfig | None:
+    _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
+    company = companies.get(workspace_id)
+    if company is None:
+        return None
+    for employee in company.employees:
+        if str(employee.role or "").strip().lower() == role and employee.enabled:
+            return employee
+    return None
+
+
+def build_repair_goal(
+    classified: dict[str, str],
+    binding: CiRemediationBinding,
+    *,
+    dedupe_key: str,
+) -> str:
+    workflow = classified["workflow_name"]
+    branch = classified.get("head_branch") or "unknown-branch"
+    run_url = classified.get("html_url") or ""
+    failing = classified.get("failing_step") or "unknown failing step"
+    return (
+        f"CI repair: {workflow} failed on {branch}. "
+        f"Failing step hint: {failing}. "
+        f"Use `gh run view {classified['run_id']} --log-failed`, apply the smallest fix "
+        f"(often scripts/guardrails/hotspot_budgets.json or extraction), commit, "
+        f"push per push_policy={binding.push_policy} (draft PR; no protected merge/"
+        f"force-push), then `gh run watch {classified['run_id']} --exit-status` "
+        f"or watch the repair-head run and report its URL + conclusion. "
+        f"Source run: {run_url or classified['run_id']}. "
+        f"CI remediation dedupe_key: {dedupe_key}."
+    )
+
+
+def build_acceptance(classified: dict[str, str], binding: CiRemediationBinding) -> str:
+    return (
+        f"{classified['workflow_name']} green on the repair head OR a draft PR URL "
+        f"with a clear blocker after at most {binding.attempt_budget} attempts; "
+        "never merge protected branches; include Critical Review Confidence."
+    )
+
+
+def create_and_lease_repair_task(
+    *,
+    binding: CiRemediationBinding,
+    classified: dict[str, str],
+    dedupe_key: str,
+    owner_role: str | None = None,
+) -> dict[str, Any]:
+    role = (owner_role or binding.owner_role).strip().lower() or "watcher"
+    opened = task_store.create_task(
+        workspace_id=binding.workspace_id,
+        goal=build_repair_goal(classified, binding, dedupe_key=dedupe_key),
+        acceptance_criteria=build_acceptance(classified, binding),
+        risk="normal",
+        owner_role=role,
+        attempt_budget=binding.attempt_budget,
+    )
+    holder = f"ci-remediation-{binding.workspace_id}-{role}"
+    return task_store.lease_task(str(opened["task_id"]), lease_holder=holder)
+
+
+def _dispatch_thread(
+    *,
+    workspace_id: str,
+    employee: EmployeeConfig,
+    run_record: dict[str, Any],
+) -> None:
+    try:
+        dispatch_continuous_worker_run(
+            workspace_id=workspace_id,
+            employee=employee,
+            run_record=run_record,
+        )
+    except Exception:  # noqa: BLE001 — never crash webhook thread
+        logger.exception(
+            "CI remediation dispatch failed for run %s",
+            run_record.get("run_id"),
+        )
+
+
+def dispatch_repair_run(
+    *,
+    binding: CiRemediationBinding,
+    leased_task: dict[str, Any],
+    classified: dict[str, str],
+) -> dict[str, Any] | None:
+    role = str(leased_task.get("owner_role") or binding.owner_role).strip().lower()
+    employee = _employee_for_role(binding.workspace_id, role)
+    if employee is None:
+        logger.warning(
+            "CI remediation: no employee for role=%s workspace=%s",
+            role,
+            binding.workspace_id,
+        )
+        return None
+    task_id = str(leased_task.get("task_id") or "").strip()
+    name = str(employee.name or role).strip() or role
+    try:
+        run = create_run(
+            workspace_id=binding.workspace_id,
+            mode="agent",
+            summary=f"{name}: CI repair {classified.get('workflow_name', '')}"[:120],
+            detail=(
+                f"Gate 9 CI remediation for {classified.get('workflow_name')} "
+                f"run={classified.get('run_id')} task={task_id}"
+            ),
+            employee_role=role,
+            task_id=task_id,
+            require_leased_task=True,
+            requires_approval=False,
+        )
+    except RunLifecycleError as exc:
+        logger.warning("CI remediation create_run refused: %s", exc)
+        try:
+            task_store.fail_task(
+                task_id,
+                terminal_outcome=f"create_run refused: {exc}",
+                reopen_if_budget_remaining=True,
+            )
+        except task_store.TaskLedgerError:
+            logger.exception("could not reopen CI repair task %s", task_id)
+        return None
+
+    append_run_execution_receipt(
+        str(run["run_id"]),
+        receipt_type="ci_remediation_assigned",
+        receipt_summary=(
+            f"Gate 9 assigned {role} to repair {classified.get('workflow_name')} "
+            f"run {classified.get('run_id')}"
+        ),
+        actor="ci_remediation",
+    )
+    if binding.dispatch_on_ingest and worker_dispatch_enabled():
+        threading.Thread(
+            target=_dispatch_thread,
+            kwargs={
+                "workspace_id": binding.workspace_id,
+                "employee": employee,
+                "run_record": run,
+            },
+            daemon=True,
+            name=f"ci-repair-dispatch-{run.get('run_id')}",
+        ).start()
+    return run

@@ -203,6 +203,13 @@ gh run view --log-failed   # when red
 VAXON / the Axon-X watcher should treat **this repository’s Fast Gate** as part of
 runtime health after any push to `origin`.
 
+### Gate 9 — unaware-operator remediation (Axon-X)
+
+When Fast Gate fails, control-plane can ingest GitHub `workflow_run` events
+(HMAC webhook), raise an inbox signal, lease a repair task to **Rowan**, and
+report the outcome. See [`ci-remediation-gate9.md`](ci-remediation-gate9.md).
+Fallback poller: `./scripts/ops/poll-fast-gate-remediation.sh`.
+
 ---
 
 ## 6. Workspace company parity (vs DashPro)

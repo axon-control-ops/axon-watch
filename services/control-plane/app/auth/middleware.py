@@ -26,6 +26,8 @@ _EXEMPT_PREFIXES = (
     "/api/desktop/bootstrap",
     "/api/desktop/bootstrap-code",
     "/api/desktop/status",
+    # Gate 9: GitHub signs with X-Hub-Signature-256 (no operator bearer).
+    "/api/webhooks/github",
     "/docs",
     "/openapi.json",
     "/redoc",

@@ -69,6 +69,22 @@ def build_continuous_worker_prompt(
             "run URL + conclusion. Fix file-size ratchet failures via "
             "`scripts/guardrails/hotspot_budgets.json` or extraction — do not ignore red CI. "
         )
+    goal_l = goal.lower()
+    if "ci repair:" in goal_l or "gate 9" in goal_l or "fast gate" in goal_l:
+        ci_clause += (
+            " This leased task is a Gate 9 CI remediation. "
+            "1) `gh run view <run_id> --log-failed` for the first hard-fail step. "
+            "2) Apply the smallest fix (ratchet/extract/type). "
+            "3) Commit and open/update a draft PR (push_policy=draft_pr); "
+            "never force-push or merge protected branches. "
+            "4) Re-watch the exact workflow on the repair head. "
+            "5) POST JSON to "
+            "`http://127.0.0.1:8787/api/ci-remediation/report-outcome` with the "
+            "dedupe_key from the task goal, workspace_id, workflow_name, head_branch, "
+            "success true/false, detail, html_url, and draft_pr_url. Include "
+            "`Authorization: Bearer $AXON_WATCH_OPERATOR_TOKEN` when configured. "
+            "Report spoken-ready outcome for the unaware operator. "
+        )
     memory_clause = (
         " Memory safety: do NOT start DashPro `web:dev` / Expo / Metro / "
         "`typecheck` with large NODE_OPTIONS heaps unless the operator explicitly asked. "
