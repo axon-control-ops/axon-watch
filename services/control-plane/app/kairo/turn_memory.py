@@ -185,6 +185,12 @@ def note_dig_in_offer(session_id: str, reply: str) -> None:
         )
 
 
+def note_followup_offers(session_id: str, reply: str) -> None:
+    """Arm yes-followups from ask-shaped spoken/converse replies."""
+    note_briefing_surface_offer(session_id, reply)
+    note_dig_in_offer(session_id, reply)
+
+
 def remember_signal_from_speak_context(
     session_id: str,
     context: dict[str, Any] | None,
@@ -274,6 +280,7 @@ __all__ = [
     "entity_context",
     "note_briefing_surface_offer",
     "note_dig_in_offer",
+    "note_followup_offers",
     "recent_turns",
     "remember_entities",
     "remember_signal_from_speak_context",

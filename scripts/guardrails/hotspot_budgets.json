@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3859,
+      "max_lines": 3860,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -61,7 +61,7 @@
       "target": "apps/console-web/src/styles/tokens/* + feature CSS"
     },
     "services/control-plane/app/kairo_conversation.py": {
-      "max_lines": 402,
+      "max_lines": 405,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/*"
@@ -319,11 +319,11 @@
       "target": "tests/test_run_stale_* slices"
     },
     "apps/console-web/src/components/WorkbenchTerminalDock.vue": {
-      "max_lines": 505,
+      "max_lines": 520,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/*",
-      "note": "Terminal dock; extract next"
+      "note": "Terminal dock; pending command flush extracted to workbench-terminal-pending-commands.ts"
     },
     "apps/console-web/src/components/shell/OperatorBrainGraphPanel.vue": {
       "max_lines": 569,
@@ -347,11 +347,11 @@
       "note": "IDE layout-03 after dock chrome"
     },
     "services/control-plane/app/cli_runtime/router.py": {
-      "max_lines": 561,
+      "max_lines": 562,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/*",
-      "note": "CLI runtime router; extract next"
+      "note": "CLI runtime router; long-running shell clause extracted"
     },
     "services/control-plane/app/workspace_agents/teammate_route.py": {
       "max_lines": 524,

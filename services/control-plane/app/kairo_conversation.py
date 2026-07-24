@@ -24,7 +24,7 @@ from app.persistence.operator_presence_settings_store import load_settings as lo
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
     note_briefing_surface_offer as _note_briefing_surface_offer,
-    note_dig_in_offer as _note_dig_in_offer,
+    note_followup_offers as _note_followup_offers,
     recent_turns as _recent_turns,
     remember_entities as _remember_entities,
     remember_top_signal as _remember_top_signal,
@@ -368,8 +368,7 @@ def converse_turn(
         reply = normalize_spoken_line(reply)
         reply = apply_participant_address(reply, guest_name or get_active_participant(session_id))
 
-    _note_briefing_surface_offer(session_id, reply)
-    _note_dig_in_offer(session_id, reply)
+    _note_followup_offers(session_id, reply)
     _remember_turn(session_id, "user", trimmed)
     _remember_turn(session_id, "assistant", reply)
 
