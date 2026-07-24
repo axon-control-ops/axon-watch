@@ -39,21 +39,21 @@ onMounted(() => {
       render-mode="always"
     >
       <TresPerspectiveCamera :position="cameraPosition" :fov="42" />
-      <TresAmbientLight :intensity="0.35" />
-      <TresPointLight :position="lightA" :intensity="2.8" color="#00f2ff" :distance="18" />
-      <TresPointLight :position="lightB" :intensity="1.6" color="#5adfff" :distance="14" />
-      <TresPointLight :position="lightC" :intensity="0.75" color="#7aebff" :distance="12" />
+      <TresAmbientLight :intensity="0.42" />
+      <TresPointLight :position="lightA" :intensity="3.1" color="#00f2ff" :distance="20" />
+      <TresPointLight :position="lightB" :intensity="1.8" color="#5adfff" :distance="15" />
+      <TresPointLight :position="lightC" :intensity="0.85" color="#7aebff" :distance="12" />
 
       <HudHoloAtmosphereField :reduced-motion="reducedMotion" />
 
       <EffectComposerPmndrs>
         <BloomPmndrs
-          :intensity="reducedMotion ? 0.5 : 1.55"
-          :luminance-threshold="0.16"
-          :luminance-smoothing="0.38"
+          :intensity="reducedMotion ? 0.2 : 0.45"
+          :luminance-threshold="0.4"
+          :luminance-smoothing="0.55"
           :mipmap-blur="true"
         />
-        <VignettePmndrs :offset="0.3" :darkness="0.6" />
+        <VignettePmndrs :offset="0.32" :darkness="0.55" />
       </EffectComposerPmndrs>
     </TresCanvas>
   </div>

@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import type { WorkspaceTaskRecord } from '../api/tasks-api';
-import { buildOperatorTaskBoardView } from './operator-task-board-view';
+import {
+  buildOperatorTaskBoardView,
+  filterTaskBoardRows,
+} from './operator-task-board-view';
 
-function task(partial: Partial<WorkspaceTaskRecord> & Pick<WorkspaceTaskRecord, 'task_id' | 'goal' | 'status'>): WorkspaceTaskRecord {
+function task(
+  partial: Partial<WorkspaceTaskRecord> &
+    Pick<WorkspaceTaskRecord, 'task_id' | 'goal' | 'status'>,
+): WorkspaceTaskRecord {
   return {
     workspace_id: 'workspace_dashpro',
     acceptance_criteria: '',
@@ -46,6 +52,12 @@ describe('buildOperatorTaskBoardView', () => {
         terminal_outcome: 'acceptance met',
         updated_at: '2026-07-22T11:00:00Z',
       }),
+      task({
+        task_id: 'task-cancelled',
+        goal: 'Noise',
+        status: 'cancelled',
+        updated_at: '2026-07-22T13:00:00Z',
+      }),
     ]);
 
     expect(view.counts).toEqual({
@@ -53,20 +65,45 @@ describe('buildOperatorTaskBoardView', () => {
       leased: 1,
       completed: 1,
       failed: 0,
-      cancelled: 0,
-      total: 3,
+      cancelled: 1,
+      total: 4,
     });
-    expect(view.headline).toBe('1 leased · 1 open');
+    expect(view.headline).toBe('1 leased · 1 waiting');
+    expect(view.defaultFilter).toBe('active');
     expect(view.rows[0]?.taskId).toBe('task-leased');
-    expect(view.rows[0]?.canCancel).toBe(false);
+    expect(view.rows[0]?.canCancel).toBe(true);
     expect(view.rows[1]?.taskId).toBe('task-open');
-    expect(view.rows[1]?.canCancel).toBe(true);
+    expect(view.rows.find((row) => row.taskId === 'task-cancelled')?.bucket).toBe(
+      'cancelled',
+    );
+  });
+
+  it('defaults to done when only completed work remains', () => {
+    const view = buildOperatorTaskBoardView([
+      task({
+        task_id: 'task-done',
+        goal: 'Finished',
+        status: 'completed',
+      }),
+      task({
+        task_id: 'task-cancelled',
+        goal: 'Noise',
+        status: 'cancelled',
+        updated_at: '2026-07-22T13:00:00Z',
+      }),
+    ]);
+    expect(view.defaultFilter).toBe('done');
+    expect(view.headline).toBe('1 done');
+    expect(filterTaskBoardRows(view.rows, 'done').map((row) => row.taskId)).toEqual([
+      'task-done',
+    ]);
+    expect(filterTaskBoardRows(view.rows, 'active')).toEqual([]);
   });
 
   it('shows empty copy when ledger is empty', () => {
     const view = buildOperatorTaskBoardView([]);
     expect(view.rows).toEqual([]);
-    expect(view.headline).toBe('No leased work');
-    expect(view.emptyCopy).toContain('seed an open goal');
+    expect(view.headline).toBe('Nothing queued');
+    expect(view.purpose.toLowerCase()).toContain('specialist');
   });
 });

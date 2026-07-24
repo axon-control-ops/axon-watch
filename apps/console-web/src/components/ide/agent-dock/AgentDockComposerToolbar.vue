@@ -195,6 +195,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
         :disabled="!canConvertInstructions"
         @click="emit('convert-to-instructions')"
       >
+        <span class="agent-dock-composer__tool-icon" aria-hidden="true">≡</span>
         <span>Instructions</span>
       </button>
     </div>
@@ -208,6 +209,7 @@ function runtimeStatusLine(record: AgentDockComposerRuntimeTarget): string {
         aria-label="Open tools registry"
         @click="emit('toggle-section', 'tools')"
       >
+        <span class="agent-dock-composer__tool-icon" aria-hidden="true">⚙</span>
         <span>Tools</span>
         <span
           v-if="mcpToolsForMode.length"

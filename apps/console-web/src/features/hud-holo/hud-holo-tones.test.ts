@@ -11,14 +11,14 @@ import {
 } from './hud-holo-tones';
 
 describe('hud-holo-tones', () => {
-  it('keeps galaxy ice / signal / connector palette (not flat #00F0FF wireframe)', () => {
+  it('keeps neon cyan / signal / connector palette for concept-art hologram', () => {
     const tones: HudHoloTone[] = ['nominal', 'attention', 'critical'];
     for (const tone of tones) {
       expect(HUD_HOLO_EDGE[tone].toLowerCase()).not.toBe('#00f0ff');
       expect(HUD_HOLO_FILL[tone].toLowerCase()).not.toBe('#00f0ff');
       expect(HUD_HOLO_FILL_OPACITY[tone]).toBeGreaterThan(0);
     }
-    expect(HUD_HOLO_EDGE.nominal).toBe('#7aebff');
+    expect(HUD_HOLO_EDGE.nominal).toBe('#00f2ff');
     expect(HUD_HOLO_EDGE.critical).toBe('#ff6aa8');
   });
 

@@ -11,13 +11,13 @@ export type HudHoloSignal = {
 };
 
 export const HUD_HOLO_EDGE: Record<HudHoloTone, string> = {
-  nominal: '#7aebff',
+  nominal: '#00f2ff',
   attention: '#ffa040',
   critical: '#ff6aa8',
 };
 
 export const HUD_HOLO_FILL: Record<HudHoloTone, string> = {
-  nominal: '#5a9fff',
+  nominal: '#00c8e6',
   attention: '#ffa040',
   critical: '#ff6aa8',
 };

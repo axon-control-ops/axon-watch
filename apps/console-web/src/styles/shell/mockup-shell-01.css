@@ -294,9 +294,10 @@ body:has(.console-shell--mockup) {
 }
 
 .left-sidebar-mockup__status-anchor {
+  position: relative;
   flex: 0 0 auto;
   margin-top: auto;
-  padding-top: 2rem;
+  padding-top: 0.85rem;
   padding-bottom: 0;
   width: 100%;
 }

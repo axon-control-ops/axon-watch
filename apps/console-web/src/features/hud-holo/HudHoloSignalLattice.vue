@@ -2,7 +2,6 @@
 import { onBeforeUnmount, watch } from 'vue';
 import { useLoop } from '@tresjs/core';
 import {
-  AdditiveBlending,
   Color,
   Group,
   Mesh,
@@ -77,9 +76,8 @@ function rebuild(): void {
     const material = new MeshBasicMaterial({
       color: new Color(HUD_HOLO_EDGE[signal.tone]),
       transparent: true,
-      opacity: signal.selected ? 0.42 : 0.18,
+      opacity: signal.selected ? 0.22 : 0.08,
       depthWrite: false,
-      blending: AdditiveBlending,
     });
     const mesh = new Mesh(padGeometry, material);
     mesh.position.set(originX + col * cellW, originY - row * cellH, 0);
@@ -108,14 +106,14 @@ const { onBeforeRender } = useLoop();
 onBeforeRender(({ elapsed }) => {
   if (props.reducedMotion) {
     for (const pad of pads) {
-      pad.material.opacity = (pad.selected ? 0.36 : 0.16) * pad.weight;
+      pad.material.opacity = (pad.selected ? 0.2 : 0.07) * pad.weight;
     }
     return;
   }
   for (const pad of pads) {
-    const pulse = 0.5 + 0.5 * Math.sin(elapsed * (pad.selected ? 2.4 : 1.35) + pad.phase);
-    const base = pad.selected ? 0.28 : 0.12;
-    pad.material.opacity = (base + pulse * (pad.selected ? 0.28 : 0.14)) * pad.weight;
+    const pulse = 0.5 + 0.5 * Math.sin(elapsed * (pad.selected ? 2.0 : 1.1) + pad.phase);
+    const base = pad.selected ? 0.14 : 0.05;
+    pad.material.opacity = (base + pulse * (pad.selected ? 0.1 : 0.05)) * pad.weight;
   }
 });
 

@@ -33,24 +33,31 @@ const parallaxX = ref(0);
 const parallaxY = ref(0);
 const cameraPosition = new Vector3(0, 0, 5.8);
 
+/** Mission Control modules keep CSS chrome only — Tres bloom/lattice was painting magenta bands under cards. */
+const useWebGlChrome = computed(
+  () => webglOk.value && props.variant !== 'module',
+);
+
 const shellClass = computed(() => ({
-  'hud-holo-shell--webgl': webglOk.value,
-  'hud-holo-shell--css-fallback': !webglOk.value,
+  'hud-holo-shell--webgl': useWebGlChrome.value,
+  'hud-holo-shell--css-fallback': !useWebGlChrome.value,
   'hud-holo-shell--module': props.variant === 'module',
   [`hud-holo-shell--${props.tone}`]: true,
 }));
 
 const bloomIntensity = computed(() => {
   if (reducedMotion.value) {
-    return 0.35;
+    return 0.2;
   }
-  return props.variant === 'module' ? 0.85 : 1.15;
+  return 0.45;
 });
 
-const hasSignals = computed(() => (props.signals?.length ?? 0) > 0);
+const hasSignals = computed(
+  () => useWebGlChrome.value && (props.signals?.length ?? 0) > 0,
+);
 
 function onPointerMove(event: PointerEvent): void {
-  if (reducedMotion.value || !webglOk.value) {
+  if (reducedMotion.value || !useWebGlChrome.value) {
     return;
   }
   const target = event.currentTarget as HTMLElement;
@@ -82,14 +89,14 @@ onMounted(() => {
     class="hud-holo-shell"
     :class="shellClass"
     :data-holo-label="label"
-    :data-holo-engine="webglOk ? 'tres' : 'css'"
-    :data-holo-webgl="webglOk ? '1' : '0'"
+    :data-holo-engine="useWebGlChrome ? 'tres' : 'css'"
+    :data-holo-webgl="useWebGlChrome ? '1' : '0'"
     :data-holo-variant="variant"
     @pointermove="onPointerMove"
     @pointerleave="onPointerLeave"
   >
     <div
-      v-if="webglOk"
+      v-if="useWebGlChrome"
       class="hud-holo-shell__canvas-host"
       aria-hidden="true"
     >
@@ -112,14 +119,14 @@ onMounted(() => {
           v-if="hasSignals"
           :signals="signals"
           :reduced-motion="reducedMotion"
-          :offset-y="variant === 'module' ? -0.35 : -0.55"
+          :offset-y="-0.55"
         />
         <HudHoloDust :reduced-motion="reducedMotion" />
         <EffectComposerPmndrs>
           <BloomPmndrs
             :intensity="bloomIntensity"
-            :luminance-threshold="0.2"
-            :luminance-smoothing="0.4"
+            :luminance-threshold="0.48"
+            :luminance-smoothing="0.6"
             :mipmap-blur="true"
           />
         </EffectComposerPmndrs>

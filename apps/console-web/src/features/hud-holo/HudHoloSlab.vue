@@ -40,7 +40,7 @@ const veilPos = new Vector3(0, 0, -0.1);
 const scanPos = new Vector3(0, 0, 0.03);
 const edgeOpacity = ref(0.92);
 const fillOpacity = ref(HUD_HOLO_FILL_OPACITY.nominal);
-const scanOpacity = ref(0.12);
+const scanOpacity = ref(0.04);
 
 const edgeColor = computed(() => HUD_HOLO_EDGE[props.tone]);
 const fillColor = computed(() => HUD_HOLO_FILL[props.tone]);
@@ -86,7 +86,7 @@ onBeforeRender(({ elapsed }) => {
   edgeOpacity.value = 0.72 + Math.sin(elapsed * 1.45) * 0.12;
   frameMaterial.opacity = edgeOpacity.value;
   innerMaterial.opacity = 0.2 + Math.sin(elapsed * 0.8) * 0.06;
-  scanOpacity.value = 0.05 + Math.sin(elapsed * 2.2) * 0.035;
+  scanOpacity.value = 0.02 + Math.sin(elapsed * 1.6) * 0.015;
   scanPos.y = Math.sin(elapsed * 0.85) * 1.8;
 });
 

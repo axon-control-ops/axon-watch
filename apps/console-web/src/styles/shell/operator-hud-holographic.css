@@ -1,4 +1,5 @@
 @import '../../features/hud-holo/hud-holo-panel-shell.css';
+@import './operator-hud-holographic-mission.css';
 
 /*
  * Operator HUD — Brain Galaxy cinematic language.
@@ -6,9 +7,9 @@
  */
 
 .console-shell--mockup.console-shell--glass3d {
-  /* Concept-art cyan hologram (screenshot-1): neon ice over deep console black */
+  /* Concept-art cyan hologram: neon ice over deep console black — solid enough to read. */
   --surface-shell: #03070c;
-  --surface-panel: rgba(4, 16, 22, 0.48);
+  --surface-panel: rgba(4, 14, 20, 0.9);
   --text-hud: #9ef9ff;
   --accent-brand: #00f2ff;
   --accent-brand-soft: rgba(0, 242, 255, 0.14);
@@ -16,10 +17,10 @@
   --border-glass: rgba(0, 210, 255, 0.22);
   --hud-frame-border: rgba(0, 242, 255, 0.42);
   --hud-surface-border: rgba(0, 242, 255, 0.34);
-  --hud-surface-fill: rgba(3, 12, 18, 0.52);
-  --glow-text-cyan: 0 0 12px rgba(0, 242, 255, 0.35);
+  --hud-surface-fill: rgba(4, 12, 18, 0.82);
+  --glow-text-cyan: 0 0 10px rgba(0, 242, 255, 0.28);
   --hud-frame-glow: drop-shadow(0 0 4px rgba(0, 242, 255, 0.28))
-    drop-shadow(0 0 14px rgba(0, 200, 255, 0.14));
+    drop-shadow(0 0 14px rgba(0, 200, 255, 0.12));
   --galaxy-ice: #00f2ff;
   --galaxy-mist: #b8f8ff;
   --galaxy-signal: #ff6aa8;
@@ -27,17 +28,19 @@
   --galaxy-attention: #ffa040;
   --galaxy-fog: #03070c;
 
-  --glass-blur: 20px;
+  --glass-blur: 14px;
   position: relative;
   isolation: isolate;
-  transform-style: preserve-3d;
-  perspective: 1600px;
+  transform-style: flat;
+  perspective: none;
   background:
-    radial-gradient(ellipse 70% 50% at 18% 12%, rgba(0, 242, 255, 0.08), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 18% 12%, rgba(0, 242, 255, 0.09), transparent 55%),
     radial-gradient(ellipse 60% 45% at 88% 18%, rgba(0, 180, 255, 0.1), transparent 52%),
     radial-gradient(ellipse 55% 40% at 70% 88%, rgba(0, 242, 255, 0.07), transparent 50%),
     radial-gradient(ellipse 90% 55% at 50% -5%, rgba(0, 242, 255, 0.1), transparent 58%),
     #03070c !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 /* Starfield dust */
@@ -47,16 +50,16 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.55;
+  opacity: 0.5;
   background-image:
-    radial-gradient(1px 1px at 12% 22%, rgba(184, 236, 255, 0.55), transparent),
-    radial-gradient(1px 1px at 28% 68%, rgba(122, 235, 255, 0.4), transparent),
-    radial-gradient(1.5px 1.5px at 44% 18%, rgba(255, 180, 220, 0.35), transparent),
-    radial-gradient(1px 1px at 62% 42%, rgba(90, 159, 255, 0.45), transparent),
-    radial-gradient(1px 1px at 78% 76%, rgba(184, 236, 255, 0.35), transparent),
-    radial-gradient(1.5px 1.5px at 91% 28%, rgba(122, 235, 255, 0.4), transparent),
-    radial-gradient(1px 1px at 8% 88%, rgba(90, 159, 255, 0.3), transparent),
-    radial-gradient(1px 1px at 55% 90%, rgba(255, 106, 168, 0.25), transparent);
+    radial-gradient(1px 1px at 12% 22%, rgba(184, 236, 255, 0.65), transparent),
+    radial-gradient(1px 1px at 28% 68%, rgba(0, 242, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 44% 18%, rgba(0, 242, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 62% 42%, rgba(90, 220, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 78% 76%, rgba(184, 236, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 91% 28%, rgba(0, 242, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 8% 88%, rgba(90, 200, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 55% 90%, rgba(0, 242, 255, 0.3), transparent);
   mask-image: radial-gradient(ellipse 85% 75% at 50% 45%, #000 15%, transparent 88%);
 }
 
@@ -70,13 +73,13 @@
   background: linear-gradient(
     105deg,
     transparent 0%,
-    rgba(90, 159, 255, 0.035) 42%,
-    rgba(255, 106, 168, 0.025) 50%,
+    rgba(0, 200, 255, 0.04) 42%,
+    rgba(0, 242, 255, 0.03) 50%,
     transparent 62%
   );
   background-size: 220% 100%;
   animation: galaxy-nebula-drift 14s ease-in-out infinite;
-  opacity: 0.85;
+  opacity: 0.7;
 }
 
 @keyframes galaxy-nebula-drift {
@@ -97,70 +100,70 @@
 /* Top / status — frosted ice glass */
 .console-shell--mockup.console-shell--glass3d .topbar-mockup,
 .console-shell--mockup.console-shell--glass3d .status-bar-mockup {
-  border: 1px solid rgba(122, 235, 255, 0.22) !important;
+  border: 1px solid rgba(122, 235, 255, 0.2) !important;
   border-radius: 0.45rem;
   background:
-    linear-gradient(180deg, rgba(184, 236, 255, 0.08), transparent 55%),
-    linear-gradient(135deg, rgba(90, 159, 255, 0.06), transparent 40%),
-    rgba(6, 12, 22, 0.58) !important;
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+    linear-gradient(180deg, rgba(184, 236, 255, 0.05), transparent 55%),
+    linear-gradient(135deg, rgba(90, 159, 255, 0.04), transparent 40%),
+    rgba(6, 12, 22, 0.92) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.1);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.1);
   box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 28px rgba(90, 159, 255, 0.08);
+    0 12px 28px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
-/* Main columns — readable Vue surfaces over the 3D atmosphere.
+/* Main columns — solid readable surfaces (not washed glass).
  * Never perspective-transform interactive DOM: it changes hit geometry,
- * clips scroll surfaces, and compresses the left rail. */
+ * clips scroll surfaces, softens glyphs, and collapses flex height. */
 .console-shell--mockup.console-shell--glass3d .region-left-sidebar,
 .console-shell--mockup.console-shell--glass3d .region-center-workbench,
 .console-shell--mockup.console-shell--glass3d .region-right-dock {
   position: relative;
-  overflow: hidden;
+  /* visible so col-resize handles (translateX outside the pane) stay hittable */
+  overflow: visible;
   border-radius: 0.55rem;
-  border: 1px solid rgba(0, 242, 255, 0.42) !important;
+  border: 1px solid rgba(0, 242, 255, 0.4) !important;
   background:
-    linear-gradient(160deg, rgba(0, 242, 255, 0.12) 0%, transparent 36%),
-    linear-gradient(210deg, rgba(0, 180, 255, 0.06) 0%, transparent 42%),
-    rgba(4, 14, 20, 0.34) !important;
-  backdrop-filter: blur(calc(var(--glass-blur) + 4px)) saturate(1.55);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 4px)) saturate(1.55);
+    linear-gradient(160deg, rgba(0, 242, 255, 0.1) 0%, transparent 36%),
+    linear-gradient(210deg, rgba(0, 180, 255, 0.05) 0%, transparent 42%),
+    rgba(4, 12, 18, 0.78) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
   box-shadow:
-    0 28px 64px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(180, 255, 255, 0.16),
-    inset 0 0 56px rgba(0, 200, 255, 0.08),
-    0 0 56px rgba(0, 242, 255, 0.22),
-    0 0 3px rgba(0, 242, 255, 0.7) !important;
-  transform: none;
+    0 22px 52px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(180, 255, 255, 0.14),
+    inset 0 0 40px rgba(0, 200, 255, 0.05),
+    0 0 42px rgba(0, 242, 255, 0.18),
+    0 0 2px rgba(0, 242, 255, 0.55) !important;
+  transform: none !important;
   transition: box-shadow 220ms ease, border-color 220ms ease;
 }
 
 .console-shell--mockup.console-shell--glass3d.console-shell--operator .region-center-workbench {
-  border-color: rgba(0, 242, 255, 0.52) !important;
+  border-color: rgba(0, 242, 255, 0.5) !important;
   box-shadow:
-    0 34px 72px rgba(0, 0, 0, 0.62),
-    inset 0 1px 0 rgba(180, 255, 255, 0.18),
-    0 0 68px rgba(0, 242, 255, 0.28),
-    0 0 4px rgba(0, 242, 255, 0.8) !important;
+    0 26px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(180, 255, 255, 0.16),
+    0 0 56px rgba(0, 242, 255, 0.24),
+    0 0 3px rgba(0, 242, 255, 0.7) !important;
 }
 
 .console-shell--mockup.console-shell--glass3d.console-shell--operator .region-right-dock {
-  border-color: rgba(90, 159, 255, 0.34) !important;
+  border-color: rgba(90, 159, 255, 0.28) !important;
 }
 
 .console-shell--mockup.console-shell--glass3d.console-shell--operator .region-left-sidebar {
-  border-color: rgba(122, 235, 255, 0.34) !important;
+  border-color: rgba(122, 235, 255, 0.28) !important;
 }
 
 .console-shell--mockup.console-shell--glass3d.console-shell--operator .operator-task-board:not(.hud-holo-shell) {
   transform: none;
-  border-color: rgba(0, 242, 255, 0.55) !important;
+  border-color: rgba(0, 242, 255, 0.52) !important;
   box-shadow:
-    0 24px 48px rgba(0, 0, 0, 0.5),
-    0 0 42px rgba(0, 242, 255, 0.24),
-    inset 0 1px 0 rgba(180, 255, 255, 0.14) !important;
+    0 18px 36px rgba(0, 0, 0, 0.42),
+    0 0 32px rgba(0, 242, 255, 0.2),
+    inset 0 1px 0 rgba(180, 255, 255, 0.12) !important;
 }
 
 .console-shell--mockup.console-shell--glass3d.console-shell--ide .region-left-sidebar {
@@ -187,7 +190,7 @@
 .console-shell--mockup.console-shell--glass3d .region-left-sidebar > *,
 .console-shell--mockup.console-shell--glass3d .region-center-workbench > *,
 .console-shell--mockup.console-shell--glass3d .region-right-dock > * {
-  position: relative;
+  /* Do not override absolute resize handles and caption overlays. */
   z-index: 1;
 }
 
@@ -196,19 +199,18 @@
 .console-shell--mockup.console-shell--glass3d .hud-seam,
 .console-shell--mockup.console-shell--glass3d .kairo-voice-deck,
 .console-shell--mockup.console-shell--glass3d .dock-hero-panel {
-  --hud-surface-fill: rgba(4, 12, 20, 0.5);
-  --hud-surface-border: rgba(122, 235, 255, 0.3);
+  --hud-surface-fill: rgba(4, 12, 20, 0.9);
+  --hud-surface-border: rgba(122, 235, 255, 0.26);
   border-radius: 0.45rem;
   box-shadow:
-    0 14px 36px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 24px rgba(90, 159, 255, 0.08);
+    0 10px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .console-shell--mockup.console-shell--glass3d .kairo-voice-deck,
 .console-shell--mockup.console-shell--glass3d .dock-hero-panel.hud-seam--hero {
-  transform: translateZ(12px);
-  border-color: rgba(122, 235, 255, 0.28);
+  transform: none;
+  border-color: rgba(122, 235, 255, 0.26);
 }
 
 /* Mission Control modules — CSS glass only when not backed by Tres HudHoloPanelShell */
@@ -221,18 +223,16 @@
   border-radius: 0.5rem;
   border: 1px solid rgba(122, 235, 255, 0.18);
   background:
-    linear-gradient(155deg, rgba(184, 236, 255, 0.06) 0%, transparent 40%),
-    linear-gradient(210deg, rgba(90, 159, 255, 0.05) 0%, transparent 45%),
-    rgba(4, 12, 20, 0.5) !important;
+    linear-gradient(155deg, rgba(184, 236, 255, 0.04) 0%, transparent 40%),
+    linear-gradient(210deg, rgba(90, 159, 255, 0.03) 0%, transparent 45%),
+    rgba(4, 12, 20, 0.9) !important;
   box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 20px rgba(90, 159, 255, 0.06);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  transform: translateZ(5px);
+    0 10px 22px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transform: none;
   transition:
-    transform 180ms var(--motion-ease-out),
     box-shadow 180ms ease,
     border-color 180ms ease;
 }
@@ -240,17 +240,16 @@
 .console-shell--mockup.console-shell--glass3d .operator-fleet-grid:not(.hud-holo-shell):hover,
 .console-shell--mockup.console-shell--glass3d .operator-task-board:not(.hud-holo-shell):hover,
 .console-shell--mockup.console-shell--glass3d .operator-incident-feed:hover {
-  border-color: rgba(122, 235, 255, 0.34);
+  border-color: rgba(122, 235, 255, 0.3);
   box-shadow:
-    0 16px 36px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 0 28px rgba(122, 235, 255, 0.12);
-  transform: translateZ(9px) translateY(-1px);
+    0 12px 26px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: none;
 }
 
 .console-shell--mockup.console-shell--glass3d .hud-holo-shell.operator-fleet-grid,
 .console-shell--mockup.console-shell--glass3d .hud-holo-shell.operator-task-board {
-  transform: translateZ(8px);
+  transform: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -259,9 +258,9 @@
   border-radius: 0.4rem;
   border-color: rgba(90, 159, 255, 0.16);
   background:
-    linear-gradient(165deg, rgba(184, 236, 255, 0.05), transparent 45%),
-    rgba(6, 14, 24, 0.7);
-  box-shadow: inset 0 0 18px rgba(40, 80, 120, 0.12);
+    linear-gradient(165deg, rgba(184, 236, 255, 0.04), transparent 45%),
+    rgba(6, 14, 24, 0.92);
+  box-shadow: none;
 }
 
 .console-shell--mockup.console-shell--glass3d .operator-fleet-grid__item--selected {
@@ -289,7 +288,7 @@
 .console-shell--mockup.console-shell--glass3d .operator-fleet-grid__title,
 .console-shell--mockup.console-shell--glass3d .briefing-panel__kairo-title {
   color: var(--galaxy-mist);
-  text-shadow: 0 0 14px rgba(122, 235, 255, 0.25);
+  text-shadow: none;
 }
 
 .console-shell--mockup.console-shell--glass3d .operator-status-radar-panel__eyebrow,
@@ -338,8 +337,8 @@
 .console-shell--mockup.console-shell--glass3d .briefing-panel__hud-glow {
   background: radial-gradient(
     ellipse at center,
-    rgba(90, 159, 255, 0.14),
-    rgba(255, 106, 168, 0.06),
+    rgba(0, 200, 255, 0.14),
+    rgba(0, 242, 255, 0.05),
     transparent 65%
   );
 }
@@ -353,8 +352,8 @@
 }
 
 .console-shell--mockup.console-shell--glass3d .kairo-voice-deck__action--talking {
-  border-color: rgba(255, 106, 168, 0.55);
-  box-shadow: 0 0 20px rgba(255, 106, 168, 0.22);
+  border-color: rgba(0, 242, 255, 0.55);
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.18);
 }
 
 .console-shell--mockup.console-shell--glass3d .command-seam__input,
@@ -389,20 +388,18 @@
 }
 
 .console-shell--mockup.console-shell--glass3d .left-sidebar-mockup__workspaces-panel:not(.hud-holo-shell),
-.console-shell--mockup.console-shell--glass3d .ide-team-panel.hud-panel-frame:not(.hud-holo-shell) {
-  --hud-surface-border: rgba(122, 235, 255, 0.34);
-  --hud-surface-fill: rgba(4, 12, 22, 0.48);
+.console-shell--mockup.console-shell--glass3d .ide-team-panel.hud-panel-frame:not(.hud-holo-shell),
+.console-shell--mockup.console-shell--glass3d .ide-team-panel:not(.hud-holo-shell) {
+  --hud-surface-border: rgba(122, 235, 255, 0.28);
+  --hud-surface-fill: rgba(4, 12, 22, 0.92);
   background:
-    linear-gradient(165deg, rgba(184, 236, 255, 0.07) 0%, transparent 38%),
-    linear-gradient(210deg, rgba(90, 159, 255, 0.06) 0%, transparent 48%),
-    linear-gradient(320deg, rgba(255, 106, 168, 0.04) 0%, transparent 40%),
-    rgba(4, 10, 18, 0.5) !important;
+    linear-gradient(165deg, rgba(184, 236, 255, 0.04) 0%, transparent 38%),
+    rgba(4, 10, 18, 0.92) !important;
   box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 28px rgba(90, 159, 255, 0.1);
-  backdrop-filter: blur(14px) saturate(1.25);
-  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    0 10px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .console-shell--mockup.console-shell--glass3d .shell-mode-toggle {
@@ -455,42 +452,36 @@
   outline-color: rgba(122, 235, 255, 0.55);
 }
 
-.console-shell--mockup.console-shell--glass3d .kairo-voice-deck {
-  height: var(--voice-card-height, clamp(9.5rem, 21vh, 13.25rem));
+.console-shell--mockup.console-shell--glass3d .kairo-voice-deck__copy {
+  align-self: stretch;
+  flex: 1 1 auto;
   min-height: 0;
   max-height: none;
   overflow: hidden;
-}
-
-.console-shell--mockup.console-shell--glass3d .kairo-voice-deck__copy {
-  align-self: stretch;
-  max-height: none;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .console-shell--mockup.console-shell--glass3d .kairo-voice-deck__dev-diagnostics {
-  max-height: 3.3rem;
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .console-shell--mockup.console-shell--glass3d .kairo-voice-deck__dev-log,
 .console-shell--mockup.console-shell--glass3d .kairo-voice-deck__tts-log {
-  max-height: 2.5rem;
+  flex: 1 1 auto;
+  min-height: 2.5rem;
+  max-height: none;
   overflow: auto;
 }
 
 .console-shell--mockup.console-shell--glass3d .left-sidebar-mockup__status-anchor--ide {
-  border-top-color: rgba(122, 235, 255, 0.2);
+  border-top-color: rgba(122, 235, 255, 0.18);
+  background: rgba(4, 10, 16, 0.96);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .console-shell--mockup.console-shell--glass3d::after {
-    animation: none;
-  }
 
-  .console-shell--mockup.console-shell--glass3d .region-center-workbench,
-  .console-shell--mockup.console-shell--glass3d .region-right-dock,
-  .console-shell--mockup.console-shell--glass3d .region-left-sidebar {
-    transform: none;
-  }
-}

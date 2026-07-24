@@ -1,3 +1,5 @@
+@import './ide-layout-10-composer-compact.css';
+
 .agent-dock-composer__access-banner {
   display: flex;
   align-items: center;
