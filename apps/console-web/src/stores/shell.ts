@@ -165,6 +165,12 @@ import {
   streamingThreadIdsFromUiMap,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
+import {
+  decideBusyEmployeeStreamAttach,
+  findIdeThreadIdForEmployee,
+  listBusyEmployeeStreamTargets,
+  resolveStreamingAgentMessageId,
+} from '../lib/follow-busy-employee-ide-streams';
 import { resolveKairoPresenceClickTarget } from '../lib/kairo-presence-action';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
@@ -1279,7 +1285,9 @@ export const useShellStore = defineStore('shell', () => {
       );
       if (existing?.thread_id) {
         flushIdeComposerDraft();
-        await selectIdeThread(existing.thread_id);
+        // Continuous-worker / fan-out writes the teammate thread out-of-band — always
+        // refetch so AgentDock does not show a stale pre-shift cache.
+        await selectIdeThread(existing.thread_id, { forceRefresh: true });
         openIdeComposer({ keepActivityView: true });
         return existing.thread_id;
       }
@@ -1300,7 +1308,7 @@ export const useShellStore = defineStore('shell', () => {
         ]),
       };
       flushIdeComposerDraft();
-      await selectIdeThread(created.thread_id);
+      await selectIdeThread(created.thread_id, { forceRefresh: true });
       ideComposerDraft.value = '';
       persistIdeComposerDraft(workspaceId, '', created.thread_id);
       openIdeComposer({ keepActivityView: true });
@@ -1312,19 +1320,23 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function selectIdeThread(threadId: string): Promise<void> {
+  async function selectIdeThread(
+    threadId: string,
+    options?: { forceRefresh?: boolean },
+  ): Promise<void> {
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (!workspaceId) {
       return;
     }
 
+    const forceRefresh = options?.forceRefresh === true;
     const previousThreadId = activeIdeThreadId.value;
-    if (previousThreadId === threadId) {
+    if (previousThreadId === threadId && !forceRefresh) {
       ensureIdeThreadTabOpen(threadId);
       return;
     }
 
-    if (previousThreadId) {
+    if (previousThreadId && previousThreadId !== threadId) {
       flushIdeComposerDraft();
       // Keep the previous thread's live SSE + message cache — do not disconnect.
       workspaceIdeThreadMessagesById.value = {
@@ -1349,12 +1361,18 @@ export const useShellStore = defineStore('shell', () => {
       ideAgentRunId.value = getWorkspaceStreamUi(threadId).ideAgentRunId;
     }
 
-    const cached = workspaceIdeThreadMessagesById.value[threadId];
-    if (cached?.length) {
-      threadMessages.value = cached;
-      commandMutationState.value = 'idle';
-      commandMutationError.value = null;
-      return;
+    if (forceRefresh) {
+      const nextCache = { ...workspaceIdeThreadMessagesById.value };
+      delete nextCache[threadId];
+      workspaceIdeThreadMessagesById.value = nextCache;
+    } else {
+      const cached = workspaceIdeThreadMessagesById.value[threadId];
+      if (cached?.length) {
+        threadMessages.value = cached;
+        commandMutationState.value = 'idle';
+        commandMutationError.value = null;
+        return;
+      }
     }
 
     if (layoutMode.value === 'ide') {
@@ -1601,23 +1619,45 @@ export const useShellStore = defineStore('shell', () => {
     focusKairoBriefing,
   });
 
-  function attachChatStream(workspaceId: string, threadId: string, messageId: string): void {
-    const attachedRunId = ideAgentRunId.value;
+  function attachChatStream(
+    workspaceId: string,
+    threadId: string,
+    messageId: string,
+    options?: {
+      activity?: IdeComposerActivity | null;
+      ideAgentRunId?: string | null;
+      /** Seed this thread's cache (background follow). Prefer over copying the focused transcript. */
+      seedMessages?: OperatorThreadEntry[];
+      /** Keep an existing cache entry instead of overwriting from the focused transcript. */
+      preserveMessageCache?: boolean;
+    },
+  ): void {
+    const streamActivity = options?.activity !== undefined ? options.activity : ideComposerActivity.value;
+    const streamRunId =
+      options?.ideAgentRunId !== undefined ? options.ideAgentRunId : ideAgentRunId.value;
+    const attachedRunId = streamRunId;
     // Only replace this thread's session — leave sibling teammate streams running.
     disconnectChatStreamSession(threadId);
     setWorkspaceStreamUi(threadId, {
       active: true,
       messageId,
-      activity: ideComposerActivity.value,
-      ideAgentRunId: ideAgentRunId.value,
+      activity: streamActivity,
+      ideAgentRunId: streamRunId,
     });
-    workspaceIdeThreadMessagesById.value = {
-      ...workspaceIdeThreadMessagesById.value,
-      [threadId]: [...threadMessages.value],
-    };
-    const composerMode = ideComposerActivity.value?.mode;
-    const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
-    const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
+    if (options?.seedMessages) {
+      workspaceIdeThreadMessagesById.value = {
+        ...workspaceIdeThreadMessagesById.value,
+        [threadId]: [...options.seedMessages],
+      };
+    } else if (!options?.preserveMessageCache) {
+      workspaceIdeThreadMessagesById.value = {
+        ...workspaceIdeThreadMessagesById.value,
+        [threadId]: [...threadMessages.value],
+      };
+    }
+    const composerMode = streamActivity?.mode;
+    const fullAccessNarration = streamActivity?.executionAccess === 'full';
+    const operatorPrompt = streamActivity?.operatorPrompt?.trim() ?? '';
     let streamedContent = '';
     let terminalAutoRevealSeen = false;
     const streamIncremental = createAgentStreamIncrementalState({
@@ -1786,6 +1826,90 @@ export const useShellStore = defineStore('shell', () => {
       }),
     );
   }
+
+  let busyEmployeeStreamFollowInFlight = false;
+
+  /**
+   * When specialists go mid-shift (fan-out / continuous worker), open their IDE tabs
+   * and attach chat_stream_* without stealing focus from the active teammate (e.g. Dana).
+   */
+  async function followBusyEmployeeIdeStreams(): Promise<void> {
+    const workspaceId = currentWorkspace.value?.workspace_id?.trim();
+    if (!workspaceId || layoutMode.value !== 'ide' || busyEmployeeStreamFollowInFlight) {
+      return;
+    }
+    const targets = listBusyEmployeeStreamTargets(companyEmployeesForCurrentWorkspace.value);
+    if (!targets.length) {
+      return;
+    }
+
+    busyEmployeeStreamFollowInFlight = true;
+    try {
+      await loadIdeThreads(workspaceId);
+      const threads = ideThreadsByWorkspaceId.value[workspaceId] ?? [];
+      for (const target of targets) {
+        const threadId = findIdeThreadIdForEmployee(threads, target.employeeId);
+        if (threadId) {
+          ensureIdeThreadTabOpen(threadId);
+        }
+        const streamUi = threadId ? getWorkspaceStreamUi(threadId) : defaultWorkspaceStreamUi();
+        let messages = threadId ? (workspaceIdeThreadMessagesById.value[threadId] ?? []) : [];
+        let messageId = resolveStreamingAgentMessageId(messages, target.runId);
+        if (threadId && !messageId) {
+          try {
+            const history = await fetchThreadHistory(threadId);
+            messages = filterThreadMessagesForSurface(
+              history.items.map((item) => mapChatMessageRecord(item)),
+              'ide',
+            );
+            workspaceIdeThreadMessagesById.value = {
+              ...workspaceIdeThreadMessagesById.value,
+              [threadId]: messages,
+            };
+            messageId = resolveStreamingAgentMessageId(messages, target.runId);
+          } catch {
+            continue;
+          }
+        }
+        const decision = decideBusyEmployeeStreamAttach({
+          threadId,
+          resolvedMessageId: messageId,
+          alreadyActive: Boolean(streamUi.active),
+          alreadyMessageId: streamUi.messageId,
+        });
+        if (decision !== 'attach' || !threadId || !messageId) {
+          continue;
+        }
+        const operatorPrompt =
+          [...messages]
+            .reverse()
+            .find(
+              (message) =>
+                message.role === 'operator' && (message.run_id ?? '').trim() === target.runId,
+            )?.content ?? '';
+        attachChatStream(workspaceId, threadId, messageId, {
+          activity: {
+            label: buildIdeStreamActivityLabel('full', 'agent'),
+            mode: 'agent',
+            executionAccess: 'full',
+            operatorPrompt,
+          },
+          ideAgentRunId: target.runId,
+          seedMessages: messages,
+        });
+      }
+    } finally {
+      busyEmployeeStreamFollowInFlight = false;
+    }
+  }
+
+  watch(
+    [companyEmployeesForCurrentWorkspace, layoutMode],
+    () => {
+      void followBusyEmployeeIdeStreams();
+    },
+    { flush: 'post' },
+  );
 
   function clearIdeAgentRunLink(): void {
     ideAgentRunId.value = null;

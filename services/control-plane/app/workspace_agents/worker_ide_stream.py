@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -19,6 +20,7 @@ from app.persistence import chat_store
 from app.workspace_agents import build_company_roster
 from app.workspace_agents.config_loader import EmployeeConfig
 
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class WorkerIdeStream:
@@ -78,6 +80,13 @@ def prepare_worker_ide_stream(
     """Bind the employee IDE thread and seed streaming placeholders for this shift."""
     employee_id = resolve_worker_employee_id(workspace_id, employee)
     if not employee_id:
+        logger.warning(
+            "prepare_worker_ide_stream: no employee_id for workspace=%s role=%s name=%s run=%s",
+            workspace_id,
+            employee.role,
+            employee.name,
+            run_id,
+        )
         return None
 
     created_at = _utc_now()

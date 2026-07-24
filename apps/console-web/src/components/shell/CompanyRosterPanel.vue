@@ -349,10 +349,10 @@ async function focusFailedEmployee(): Promise<void> {
 
 async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> {
   selectEmployee(employee);
-  if (employeeFailureLine(employee)) {
-    await shell.openOrFocusEmployeeIdeThread(employee);
-    scrollDockIntoView();
-  }
+  // Busy fan-out specialists write into their own IDE thread — selecting them must
+  // open/refetch that dock, not leave the operator on Dana's stale conversation.
+  await shell.openOrFocusEmployeeIdeThread(employee);
+  scrollDockIntoView();
 }
 </script>
 

@@ -182,6 +182,13 @@ def dispatch_continuous_worker_run(
                 task_id=task_id,
                 task=task,
             )
+            if ide_stream is None:
+                logger.warning(
+                    "continuous worker IDE stream prepare returned None for %s "
+                    "role=%s (employee_id unresolved — specialist dock will stay empty)",
+                    run_id,
+                    employee.role,
+                )
         except Exception:  # noqa: BLE001 — dispatch must continue even if IDE mirror fails
             logger.exception(
                 "continuous worker IDE stream prepare failed for %s role=%s",

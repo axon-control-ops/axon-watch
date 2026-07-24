@@ -103,7 +103,8 @@ const canCloseTab = computed(() => openTabs.value.length > 1);
 const showScrollControls = computed(() => canScrollLeft.value || canScrollRight.value);
 
 function selectThread(threadId: string): void {
-  void shell.selectIdeThread(threadId);
+  // Fan-out / continuous workers update specialist threads out-of-band.
+  void shell.selectIdeThread(threadId, { forceRefresh: true });
   historyOpen.value = false;
 }
 
