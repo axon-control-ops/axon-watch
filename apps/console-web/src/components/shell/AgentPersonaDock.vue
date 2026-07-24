@@ -160,7 +160,7 @@ const displayActions = computed(() =>
           type="button"
           class="agent-persona-dock__receipt-run-btn"
           :title="receiptRunId"
-          :aria-label="`View receipts for ${receiptRunLabel || receiptRunId}`"
+          :aria-label="`Explain receipts for ${receiptRunLabel || receiptRunId}`"
           @click="emit('action', receiptsAction)"
         >
           {{ receiptRunLabel || receiptRunId }}

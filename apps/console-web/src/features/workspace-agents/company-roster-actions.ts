@@ -191,7 +191,7 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
   };
   const receiptsAction: TeamMemberQuickAction = {
     id: 'receipts',
-    label: 'View receipts',
+    label: 'Explain receipts',
     kind: 'chat',
     chatKind: 'receipts',
     composerMode: 'ask',

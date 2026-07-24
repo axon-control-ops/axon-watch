@@ -124,6 +124,9 @@ describe('company-roster-actions', () => {
     expect(employeeQuickActions(failed).find((action) => action.id === 'retry')?.label).toBe(
       'Retry shift',
     );
+    expect(employeeQuickActions(failed).find((action) => action.id === 'receipts')?.label).toBe(
+      'Explain receipts',
+    );
     expect(employeeRetryDraft(failed)).toContain('Retry the last failed shift');
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
     expect(employeeChatDraft(failed, 'retry')).toBe(employeeRetryDraft(failed));

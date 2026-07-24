@@ -111,7 +111,7 @@ function handleOpenTeam(): void {
         :disabled="actionsDisabled"
         @click="handleReceipts"
       >
-        View receipts
+        Explain receipts
       </button>
       <button
         type="button"

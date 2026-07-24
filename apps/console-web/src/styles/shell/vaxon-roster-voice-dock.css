@@ -1,0 +1,141 @@
+.vaxon-roster-voice-dock {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(70, 225, 255, 0.38);
+  border-radius: 0.55rem;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(0, 220, 255, 0.13), transparent 42%),
+    linear-gradient(145deg, rgba(5, 24, 32, 0.96), rgba(8, 14, 25, 0.98));
+  box-shadow: inset 0 0 28px rgba(0, 195, 230, 0.06), 0 0 18px rgba(0, 210, 255, 0.08);
+}
+
+.vaxon-roster-voice-dock__header {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.vaxon-roster-voice-dock__orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 3.35rem;
+  height: 3.35rem;
+  border: 1px solid rgba(85, 235, 255, 0.7);
+  border-radius: 999px;
+  color: #9af5ff;
+  background:
+    radial-gradient(circle at 42% 38%, rgba(220, 255, 255, 0.95) 0 4%, transparent 5%),
+    radial-gradient(circle, rgba(0, 235, 255, 0.34), rgba(0, 85, 130, 0.14) 48%, transparent 72%);
+  box-shadow:
+    inset 0 0 18px rgba(80, 235, 255, 0.36),
+    0 0 18px rgba(0, 220, 255, 0.3);
+}
+
+.vaxon-roster-voice-dock__orb-ring {
+  position: absolute;
+  inset: -0.28rem;
+  border: 1px dashed rgba(90, 235, 255, 0.4);
+  border-radius: inherit;
+  animation: vaxon-roster-orb-spin 8s linear infinite;
+}
+
+.vaxon-roster-voice-dock[data-speaking='true'] .vaxon-roster-voice-dock__orb {
+  border-color: rgba(255, 110, 190, 0.9);
+  box-shadow:
+    inset 0 0 20px rgba(255, 95, 180, 0.36),
+    0 0 22px rgba(255, 70, 175, 0.35);
+  animation: vaxon-roster-orb-speak 1.15s ease-in-out infinite;
+}
+
+.vaxon-roster-voice-dock__eyebrow,
+.vaxon-roster-voice-dock__title,
+.vaxon-roster-voice-dock__line {
+  margin: 0;
+}
+
+.vaxon-roster-voice-dock__eyebrow {
+  color: rgba(125, 235, 255, 0.78);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.vaxon-roster-voice-dock__title {
+  margin-top: 0.12rem;
+  color: rgba(232, 251, 255, 0.96);
+  font-size: 0.76rem;
+}
+
+.vaxon-roster-voice-dock__line {
+  max-height: 6.2rem;
+  overflow-y: auto;
+  color: rgba(220, 241, 247, 0.9);
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.vaxon-roster-voice-dock__quick-actions,
+.vaxon-roster-voice-dock__form {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.vaxon-roster-voice-dock button,
+.vaxon-roster-voice-dock input {
+  min-width: 0;
+  border: 1px solid rgba(70, 225, 255, 0.26);
+  border-radius: 0.35rem;
+  color: rgba(230, 249, 255, 0.96);
+  background: rgba(4, 18, 28, 0.86);
+}
+
+.vaxon-roster-voice-dock button {
+  padding: 0.38rem 0.55rem;
+  cursor: pointer;
+  font-size: 0.58rem;
+}
+
+.vaxon-roster-voice-dock button:hover:not(:disabled) {
+  border-color: rgba(80, 235, 255, 0.7);
+  background: rgba(0, 95, 120, 0.32);
+}
+
+.vaxon-roster-voice-dock button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.vaxon-roster-voice-dock__form input {
+  flex: 1 1 auto;
+  padding: 0.42rem 0.5rem;
+  font-size: 0.62rem;
+  outline: none;
+}
+
+.vaxon-roster-voice-dock__form input:focus {
+  border-color: rgba(100, 240, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(30, 210, 240, 0.18);
+}
+
+@keyframes vaxon-roster-orb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes vaxon-roster-orb-speak {
+  50% {
+    transform: scale(1.055);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vaxon-roster-voice-dock__orb,
+  .vaxon-roster-voice-dock__orb-ring {
+    animation: none;
+  }
+}

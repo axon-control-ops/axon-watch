@@ -25,6 +25,7 @@ from app.kairo.turn_memory import (  # noqa: E402
     recent_turns,
     remember_entities,
     remember_turn,
+    resolve_followup_action,
     session_key as turn_session_key,
 )
 from app.kairo_conversation import converse_turn  # noqa: E402
@@ -74,6 +75,18 @@ class KairoTurnMemoryTests(unittest.TestCase):
         self.assertEqual(8, len(turns))
         self.assertEqual("turn-1", turns[0]["content"])
         self.assertEqual("turn-8", turns[-1]["content"])
+
+    def test_not_now_clears_pending_dig_in(self) -> None:
+        session = "decline-dig-in-session"
+        remember_entities(
+            session,
+            pending_dig_in="1",
+            signal_id="signal_ci_1",
+            target_workspace_id="workspace_dashpro",
+            task="Investigate CI",
+        )
+        self.assertIsNone(resolve_followup_action("not now", session))
+        self.assertNotIn("pending_dig_in", entity_context(session))
 
     def test_context_pack_ttl_reuses_within_window(self) -> None:
         builds: list[int] = []

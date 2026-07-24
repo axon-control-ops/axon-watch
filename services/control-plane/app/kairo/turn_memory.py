@@ -26,6 +26,10 @@ _CONFIRM_RE = re.compile(
     r"^(yes|yeah|yep|yup|do it|confirm|go ahead|dig in|please dig in|yes[,.]?\s*dig in)\.?$",
     re.IGNORECASE,
 )
+_DECLINE_RE = re.compile(
+    r"^(no|nope|not now|later|cancel|leave it)\.?$",
+    re.IGNORECASE,
+)
 _BRIEFING_SURFACE_OFFER_RE = re.compile(
     r"\b(pull\s+(?:it\s+)?to\s+the\s+front|bring\s+(?:it\s+)?(?:up|forward)|"
     r"open\s+the\s+briefing|shall\s+i\s+(?:pull|show|open))\b",
@@ -229,6 +233,15 @@ def remember_signal_from_speak_context(
 def resolve_followup_action(content: str, session_id: str) -> dict[str, object] | None:
     trimmed = content.strip()
     entity = entity_context(session_id)
+    if _DECLINE_RE.match(trimmed) and (
+        entity.get("pending_dig_in") == "1"
+        or entity.get("pending_briefing_surface") == "1"
+    ):
+        remember_entities(
+            session_id,
+            pending_dig_in="",
+            pending_briefing_surface="",
+        )
     if _CONFIRM_RE.match(trimmed):
         pending_command = entity.get("pending_command", "")
         if pending_command:

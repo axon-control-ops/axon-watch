@@ -3,6 +3,8 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import AgentPersonaDock from './AgentPersonaDock.vue';
 import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
+import VaxonRosterVoiceDock from './VaxonRosterVoiceDock.vue';
+import { useVaxonRosterVoiceDock } from '../../features/kairo-conversation/use-vaxon-roster-voice-dock';
 import { resolveRosterSelectionForIdeThread } from '../../features/workspace-agents/active-ide-employee';
 import {
   buildCompanyRosterAlertBadge,
@@ -39,6 +41,7 @@ import { navigateToSettingsSection } from '../../lib/settings-section-route';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
+const vaxonVoiceDock = useVaxonRosterVoiceDock(computed(() => shell.kairoSpeechActive));
 const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 /** Single roster source of truth — shell owns the poll; do not dual-poll here (causes IDE flicker). */
 const employees = computed(() => shell.companyEmployeesForCurrentWorkspace);
@@ -441,8 +444,14 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
       />
 
       <div :id="COMPANY_ROSTER_DOCK_ID" ref="dockRootRef" class="company-roster__dock-host">
+        <VaxonRosterVoiceDock
+          v-if="vaxonVoiceDock.visible.value"
+          :speaking="vaxonVoiceDock.speaking.value"
+          :line="vaxonVoiceDock.line.value"
+          :remaining-seconds="vaxonVoiceDock.remainingSeconds.value"
+        />
         <AgentPersonaDock
-          v-if="selectedEmployee"
+          v-else-if="selectedEmployee"
           :key="selectedEmployee.employee_id"
           :employee="selectedEmployee"
           :actions="selectedActions"
