@@ -2,16 +2,22 @@ import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue';
 
 import {
   applyOrbFieldSampleToElement,
+  ORB_FIELD_DRAG_MAX_PUSH,
+  ORB_FIELD_DRAG_SOFT_EXTRA,
+  ORB_FIELD_MAX_PUSH,
+  ORB_FIELD_SOFT_EXTRA,
   sampleOrbFieldInfluence,
   type OrbFieldBox,
 } from '../lib/orb-field-influence';
+import {
+  measureVoiceOrbLiveBox,
+  voiceOrbBoxFromPosition,
+} from '../lib/voice-orb-live-box';
 import { useShellStore } from '../stores/shell';
 
-const DEFAULT_ORB_BOX = { width: 212, height: 268 };
-
 /**
- * Makes `[data-orb-field]` descendants yield around the floating VAXON orb
- * (push + circular bite mask) while it docks / drags.
+ * Yield `[data-orb-field]` descendants around the live floating orb rect.
+ * Continuous rAF while dragging; push clamped inside the host so overflow cannot erase it.
  */
 export function useOrbFieldReactiveHost(options: {
   root: Ref<HTMLElement | null>;
@@ -21,6 +27,7 @@ export function useOrbFieldReactiveHost(options: {
   const shell = useShellStore();
   const selector = options.selector ?? '[data-orb-field]';
   let frame = 0;
+  let dragLoop = 0;
   let ro: ResizeObserver | null = null;
 
   function isEnabled(): boolean {
@@ -31,16 +38,10 @@ export function useOrbFieldReactiveHost(options: {
   }
 
   function readOrbBox(): OrbFieldBox | null {
-    const pos = shell.voiceOrbPosition;
-    if (!pos || !shell.voiceOrbVisible || shell.layoutMode === 'ide') {
+    if (!shell.voiceOrbVisible || shell.layoutMode === 'ide') {
       return null;
     }
-    return {
-      x: pos.x,
-      y: pos.y,
-      width: DEFAULT_ORB_BOX.width,
-      height: DEFAULT_ORB_BOX.height,
-    };
+    return measureVoiceOrbLiveBox() ?? voiceOrbBoxFromPosition(shell.voiceOrbPosition);
   }
 
   function clearAll(root: HTMLElement): void {
@@ -50,7 +51,6 @@ export function useOrbFieldReactiveHost(options: {
   }
 
   function tick(): void {
-    frame = 0;
     const root = options.root.value;
     if (!root || !isEnabled()) {
       if (root) {
@@ -65,6 +65,8 @@ export function useOrbFieldReactiveHost(options: {
       return;
     }
     const dragging = shell.voiceOrbDragging;
+    const rootRect = root.getBoundingClientRect();
+    const pad = 8;
     nodes.forEach((el) => {
       const rect = el.getBoundingClientRect();
       if (rect.width < 2 || rect.height < 2) {
@@ -79,10 +81,31 @@ export function useOrbFieldReactiveHost(options: {
           width: rect.width,
           height: rect.height,
         },
-        maxPush: dragging ? 36 : 24,
-        softExtra: dragging ? 48 : 34,
+        maxPush: dragging ? ORB_FIELD_DRAG_MAX_PUSH : ORB_FIELD_MAX_PUSH,
+        softExtra: dragging ? ORB_FIELD_DRAG_SOFT_EXTRA : ORB_FIELD_SOFT_EXTRA,
       });
-      applyOrbFieldSampleToElement(el, sample);
+      if (!sample) {
+        applyOrbFieldSampleToElement(el, null);
+        return;
+      }
+      let { pushX, pushY } = sample;
+      const nextLeft = rect.left + pushX;
+      const nextTop = rect.top + pushY;
+      const nextRight = nextLeft + rect.width;
+      const nextBottom = nextTop + rect.height;
+      if (nextLeft < rootRect.left + pad) {
+        pushX += rootRect.left + pad - nextLeft;
+      }
+      if (nextTop < rootRect.top + pad) {
+        pushY += rootRect.top + pad - nextTop;
+      }
+      if (nextRight > rootRect.right - pad) {
+        pushX -= nextRight - (rootRect.right - pad);
+      }
+      if (nextBottom > rootRect.bottom - pad) {
+        pushY -= nextBottom - (rootRect.bottom - pad);
+      }
+      applyOrbFieldSampleToElement(el, { ...sample, pushX, pushY });
     });
   }
 
@@ -90,7 +113,31 @@ export function useOrbFieldReactiveHost(options: {
     if (frame) {
       return;
     }
-    frame = window.requestAnimationFrame(tick);
+    frame = window.requestAnimationFrame(() => {
+      frame = 0;
+      tick();
+    });
+  }
+
+  function stopDragLoop(): void {
+    if (dragLoop) {
+      cancelAnimationFrame(dragLoop);
+      dragLoop = 0;
+    }
+  }
+
+  function startDragLoop(): void {
+    stopDragLoop();
+    const step = (): void => {
+      tick();
+      if (shell.voiceOrbDragging && isEnabled()) {
+        dragLoop = window.requestAnimationFrame(step);
+      } else {
+        dragLoop = 0;
+        schedule();
+      }
+    };
+    dragLoop = window.requestAnimationFrame(step);
   }
 
   function onScrollOrResize(): void {
@@ -107,12 +154,16 @@ export function useOrbFieldReactiveHost(options: {
         ro.observe(options.root.value);
       }
     }
+    if (shell.voiceOrbDragging) {
+      startDragLoop();
+    }
   });
 
   onBeforeUnmount(() => {
     if (frame) {
       cancelAnimationFrame(frame);
     }
+    stopDragLoop();
     window.removeEventListener('resize', onScrollOrResize);
     window.removeEventListener('scroll', onScrollOrResize, true);
     ro?.disconnect();
@@ -122,14 +173,24 @@ export function useOrbFieldReactiveHost(options: {
   });
 
   watch(
-    () => [
-      shell.voiceOrbPosition?.x,
-      shell.voiceOrbPosition?.y,
-      shell.voiceOrbDragging,
-      shell.voiceOrbVisible,
-      shell.layoutMode,
-    ],
-    () => schedule(),
+    () => [shell.voiceOrbPosition?.x, shell.voiceOrbPosition?.y, shell.voiceOrbVisible, shell.layoutMode],
+    () => {
+      if (!shell.voiceOrbDragging) {
+        schedule();
+      }
+    },
+  );
+
+  watch(
+    () => shell.voiceOrbDragging,
+    (dragging) => {
+      if (dragging) {
+        startDragLoop();
+      } else {
+        stopDragLoop();
+        schedule();
+      }
+    },
   );
 
   watch(

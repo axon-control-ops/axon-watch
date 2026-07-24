@@ -5,6 +5,7 @@ from __future__ import annotations
 WORKSPACE_AGENT_STATUSES = (
     "idle",
     "watching",
+    "assigned",
     "planning",
     "executing",
     "verifying",

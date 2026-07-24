@@ -1,5 +1,5 @@
-/* Grid sections size to content and scroll inside the panel.
-   flex-shrink + min-height:0 collapsed boxes so content painted over siblings.
+/* Grid sections size to content.
+   Orb-field hosts keep overflow visible so push/bite is not clipped.
    z-index must stay >= 1 so hud-panel-frame ::after fill does not cover section content. */
 .operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-status-radar-panel__stage,
 .operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-status-radar-panel__feed,
@@ -14,10 +14,25 @@
   flex: 0 0 auto;
   flex-shrink: 0;
   min-height: auto;
-  overflow: hidden;
   position: relative;
   z-index: 1;
   isolation: isolate;
+}
+
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-status-radar-panel__guide,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .connectors-rail-panel {
+  overflow: hidden;
+}
+
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-fleet-grid,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-fleet-grid-host,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-task-board,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-task-board-host,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-incident-feed,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-run-strip,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-status-radar-panel__stage,
+.operator-status-radar-panel:not(.operator-status-radar-panel--galaxy-only) > .operator-status-radar-panel__feed {
+  overflow: visible;
 }
 
 .operator-fleet-grid-host,
@@ -31,4 +46,8 @@
 .operator-task-board-host > .operator-task-board {
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.operator-status-radar-panel--orb-live [data-orb-field] {
+  z-index: 2;
 }

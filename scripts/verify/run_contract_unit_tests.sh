@@ -40,6 +40,7 @@ main_tests=(
   tests.test_control_plane_chat_health
   tests.test_employee_chat_thread
   tests.test_employee_persona_prompt
+  tests.test_team_roster_context
   tests.test_teammate_route
   tests.test_command_executor
   tests.test_workspace_agent_scheduler

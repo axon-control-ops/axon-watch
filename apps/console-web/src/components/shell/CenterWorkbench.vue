@@ -6,6 +6,7 @@ import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
 import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
 import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
+import EditorCsvToolbar from './EditorCsvToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
 import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
 import CenterWorkbenchEditorFooter from './CenterWorkbenchEditorFooter.vue';
@@ -29,6 +30,7 @@ import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
 import { isBinaryFilePath, isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
+import { useEditorCsvPreview } from '../../lib/use-editor-csv-preview';
 import { resolveThreadImageUrl } from '../../lib/thread-image-url';
 import { useEditorPdfPreview } from '../../lib/use-editor-pdf-preview';
 import { useEditorBreadcrumbSegments } from '../../lib/use-editor-breadcrumb-segments';
@@ -118,6 +120,15 @@ const editorBreadcrumbSegments = useEditorBreadcrumbSegments({
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
 );
+const {
+  isCsvEditorDocument,
+  csvTablePreviewEnabled,
+  editorCsvTableHtml,
+  setCsvTablePreviewMode,
+} = useEditorCsvPreview({
+  activeDocument: computed(() => shell.activeEditorDocument),
+  activeEditorValue,
+});
 const isImageEditorDocument = computed(() => {
   const document = shell.activeEditorDocument;
   if (!document) {
@@ -540,7 +551,13 @@ watch(
         @breadcrumb-click="handleBreadcrumbSegmentClick"
       />
 
-      <section class="center-workbench__editor" :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }">
+      <section
+        class="center-workbench__editor"
+        :class="{
+          'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled,
+          'center-workbench__editor--csv-table-preview': isCsvEditorDocument && csvTablePreviewEnabled,
+        }"
+      >
         <CenterWorkbenchIdeQuickGuide
           v-if="ideQuickGuideSticky"
           :guide="ideQuickGuideSticky"
@@ -558,15 +575,21 @@ watch(
           @set-preview="setEditorPreviewMode"
           @build-plan="buildActivePlan"
         />
+        <EditorCsvToolbar
+          v-if="isCsvEditorDocument && shell.activeEditorDocument"
+          :table-enabled="csvTablePreviewEnabled"
+          @set-table="setCsvTablePreviewMode"
+        />
         <AgentEditReviewViewer
           v-if="shell.activeEditorDocument && showAgentDiffReviewViewer"
           :content="shell.activeEditorDocument.value"
         />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
+          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && (!isCsvEditorDocument || !csvTablePreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
           :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
+          :theme-profile="isIdeMode ? 'cursor' : 'mockup'"
           :title="shell.activeEditorDocument.title"
           :value="shell.activeEditorDocument.value"
           :language="shell.activeEditorDocument.language"
@@ -597,6 +620,11 @@ watch(
           class="editor-markdown-preview conversation-seam__content conversation-seam__content--markdown"
           v-html="editorPreviewHtml"
           @click="handleEditorPreviewClick"
+        />
+        <div
+          v-else-if="shell.activeEditorDocument && isCsvEditorDocument && csvTablePreviewEnabled"
+          class="editor-csv-preview conversation-seam__content conversation-seam__content--markdown"
+          v-html="editorCsvTableHtml"
         />
         <CenterWorkbenchEditorFooter
           :is-ide-mode="isIdeMode"

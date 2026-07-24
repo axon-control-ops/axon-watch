@@ -176,6 +176,7 @@ function handleOrbContextMenu(event: MouseEvent): void {
       <button
         type="button"
         class="kairo-galaxy-orb__trigger"
+        data-voice-orb-core
         :aria-disabled="voiceBlocked"
         :title="`Tap to toggle hands-free · hold to talk · right-click for command ring · long-press to move · double-click to reset`"
         :aria-label="triggerAriaLabel"

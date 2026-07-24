@@ -56,9 +56,6 @@ function toggleMenu(event: MouseEvent): void {
   menuOpen.value = nextOpen;
   if (nextOpen) {
     void loadWorkspaceAgents({ reason: 'menu-open' });
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'ui-polish',hypothesisId:'Z1',location:'AgentDockWorkspaceMenu.vue:toggleMenu',message:'workspace picker opened',data:{open:true,workspaceCount:shell.workspaces.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }
 }
 

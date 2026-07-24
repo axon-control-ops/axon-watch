@@ -10,6 +10,7 @@ export type EditorDocumentLanguage =
   | 'shell'
   | 'html'
   | 'css'
+  | 'csv'
   | 'image';
 
 export interface WorkspaceDocumentDescriptor {

@@ -131,7 +131,9 @@ specialist** (not a single specialty-route winner).
 | HTTP | `POST /api/workspaces/{id}/lead/plan` · `.../lead/fan-out` |
 
 Continuous **dispatch** (Lane B) is still separate — fan-out creates leased tasks
-and runs with `lead_fan_out_assigned` receipts; the scheduler stays off.
+and **queued** runs with `lead_fan_out_assigned` receipts (not fake-executing).
+Assignment is posted into each specialist IDE thread. The scheduler (when on)
+promotes queued fan-out runs into Lane B; keep it off until Gate 6 is solid.
 
 ### Examples
 

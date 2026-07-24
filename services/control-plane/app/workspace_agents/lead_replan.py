@@ -132,6 +132,8 @@ def replan_lead_goal(
 
 def synthesize_lead_plan(plan_id: str) -> dict[str, Any]:
     """Summarize terminal specialist task outcomes and persist a synthesis receipt."""
+    from app.persistence import run_store
+
     plan = lead_plan_store.get_plan(plan_id)
     if plan is None:
         raise LeadReplanError(f"lead plan not found: {plan_id}")
@@ -149,18 +151,63 @@ def synthesize_lead_plan(plan_id: str) -> dict[str, Any]:
             "summary": "",
         }
 
-    findings = [
-        {
-            "task_id": str(task["task_id"]),
-            "plan_key": str(task.get("plan_key") or ""),
-            "owner_role": str(task.get("owner_role") or ""),
-            "status": str(task.get("status") or ""),
-            "outcome": str(task.get("terminal_outcome") or ""),
+    plan_status = str(plan.get("status") or "").strip().lower()
+    if plan_status in {"completed", "awaiting_engagement"}:
+        from app.workspace_agents.lead_vaxon_handoff import post_lead_synthesis_to_vaxon
+
+        prior = next(
+            (
+                row
+                for row in lead_plan_store.list_receipts(plan_id)
+                if str(row.get("kind") or "") == "lead_synthesis_completed"
+            ),
+            None,
+        )
+        payload = (prior or {}).get("payload") if isinstance(prior, dict) else {}
+        summary = str((payload or {}).get("summary") or "")
+        findings = list((payload or {}).get("findings") or [])
+        handoff = post_lead_synthesis_to_vaxon(
+            plan_id=plan_id,
+            workspace_id=str(plan["workspace_id"]),
+            goal=str(plan.get("goal") or ""),
+            summary=summary,
+            findings=findings,
+            synthesis_receipt_id=str((prior or {}).get("receipt_id") or ""),
+        )
+        return {
+            "plan_id": plan_id,
+            "status": plan_status if plan_status == "awaiting_engagement" else "completed",
+            "summary": summary,
+            "findings": findings,
+            "receipt_id": (prior or {}).get("receipt_id"),
+            "vaxon_handoff": handoff,
         }
-        for task in tasks
-    ]
+
+    runs_by_task: dict[str, list[str]] = {}
+    for run in run_store.list_runs():
+        task_id = str(run.get("task_id") or "").strip()
+        run_id = str(run.get("run_id") or "").strip()
+        if task_id and run_id:
+            runs_by_task.setdefault(task_id, []).append(run_id)
+
+    findings = []
+    for task in tasks:
+        task_id = str(task["task_id"])
+        findings.append(
+            {
+                "task_id": task_id,
+                "plan_key": str(task.get("plan_key") or ""),
+                "owner_role": str(task.get("owner_role") or ""),
+                "assignee_name": str(task.get("assignee_name") or ""),
+                "status": str(task.get("status") or ""),
+                "outcome": str(task.get("terminal_outcome") or ""),
+                "attachment_ids": list(task.get("attachment_ids") or []),
+                "output_artifacts": list(task.get("output_artifacts") or []),
+                "run_ids": list(runs_by_task.get(task_id) or []),
+            }
+        )
     summary = "; ".join(
-        f"{row['owner_role']}={row['status']}"
+        f"{row['assignee_name'] or row['owner_role']}={row['status']}"
         + (f" ({row['outcome']})" if row["outcome"] else "")
         for row in findings
     )
@@ -171,12 +218,27 @@ def synthesize_lead_plan(plan_id: str) -> dict[str, Any]:
         kind="lead_synthesis_completed",
         payload={"summary": summary, "findings": findings},
     )
+    handoff: dict[str, Any] = {}
+    try:
+        from app.workspace_agents.lead_vaxon_handoff import post_lead_synthesis_to_vaxon
+
+        handoff = post_lead_synthesis_to_vaxon(
+            plan_id=plan_id,
+            workspace_id=str(plan["workspace_id"]),
+            goal=str(plan.get("goal") or ""),
+            summary=summary,
+            findings=findings,
+            synthesis_receipt_id=str(receipt["receipt_id"]),
+        )
+    except Exception:
+        handoff = {"status": "handoff_failed"}
     return {
         "plan_id": plan_id,
         "status": "completed",
         "summary": summary,
         "findings": findings,
         "receipt_id": receipt["receipt_id"],
+        "vaxon_handoff": handoff,
     }
 
 

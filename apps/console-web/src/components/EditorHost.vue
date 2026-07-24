@@ -20,6 +20,7 @@ const props = defineProps<{
   readOnly?: boolean;
   dirty?: boolean;
   variant?: 'default' | 'mockup';
+  themeProfile?: 'mockup' | 'cursor';
   minimapEnabled?: boolean;
   revealRequest?: EditorRevealRequest | null;
 }>();
@@ -102,6 +103,7 @@ onMounted(async () => {
       language: props.language,
       readOnly: props.readOnly,
       variant: props.variant,
+      themeProfile: props.themeProfile,
       minimapEnabled: props.minimapEnabled,
       onValueChange: (value) => {
         if (suppressChangeEmit) {

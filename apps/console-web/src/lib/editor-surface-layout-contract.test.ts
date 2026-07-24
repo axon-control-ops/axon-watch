@@ -4,12 +4,15 @@ import { readCss, ruleBlock } from './css-layout-contract-helpers';
 
 describe('IDE editor surface layout contract', () => {
   it('keeps Monaco editor host relative (EditContext-safe; do not absolute-collapse)', () => {
-    const css = readCss('shell/mockup-shell-07.css');
-    const body = ruleBlock(css, '.center-workbench__editor .surface-host__body--editor');
+    const shell07 = readCss('shell/mockup-shell-07.css');
+    expect(shell07).toMatch(/@import\s+['"]\.\/mockup-shell-07-monaco\.css['"]/);
+
+    const body = ruleBlock(shell07, '.center-workbench__editor .surface-host__body--editor');
     expect(body).toMatch(/position:\s*relative/);
     expect(body).toMatch(/isolation:\s*isolate/);
 
-    const frame = ruleBlock(css, '.center-workbench__editor .surface-host__frame--editor');
+    const monaco = readCss('shell/mockup-shell-07-monaco.css');
+    const frame = ruleBlock(monaco, '.center-workbench__editor .surface-host__frame--editor');
     expect(frame).toMatch(/position:\s*relative/);
     expect(frame).not.toMatch(/position:\s*absolute/);
   });
@@ -305,6 +308,7 @@ describe('IDE editor surface layout contract', () => {
 
     const tail = readCss('shell/mockup-shell-tail.css');
     expect(tail).toMatch(/@import\s+['"]\.\/mockup-shell-32\.css['"]/);
+    expect(tail).toMatch(/@import\s+['"]\.\/mockup-shell-33\.css['"]/);
 
     const shell32 = readCss('shell/mockup-shell-32.css');
     expect(shell32).toMatch(/@import\s+['"]\.\/company-roster-alert\.css['"]/);

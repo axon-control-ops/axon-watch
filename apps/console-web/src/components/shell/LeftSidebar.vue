@@ -42,6 +42,7 @@ const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? 280);
 const resizing = ref(false);
 const {
   panelSize: voiceCardHeight,
+  userSized: voiceCardUserSized,
   resizing: voiceCardResizing,
   ariaValueMin: voiceCardHeightMin,
   ariaValueMax: voiceCardHeightMax,
@@ -52,9 +53,10 @@ const {
   rootRef: sidebarRef,
   cssVariable: '--voice-card-height',
   storageKey: 'axon-shell-voice-card-height',
-  defaultSize: (height) => Math.min(212, Math.max(152, height * 0.21)),
-  minSize: 132,
-  maxSize: (height) => height * 0.45,
+  // Auto-height until the operator drags; this is the initial resize target.
+  defaultSize: (height) => Math.min(Math.round(height * 0.38), 280),
+  minSize: 152,
+  maxSize: (height) => Math.round(height * 0.55),
 });
 
 const catalogWorkspaces = computed(() => shell.workspaces);
@@ -194,6 +196,7 @@ onBeforeUnmount(() => {
     :class="{
       'left-sidebar-mockup--resizing': resizing,
       'left-sidebar-mockup--voice-resizing': voiceCardResizing,
+      'left-sidebar-mockup--voice-user-sized': voiceCardUserSized,
       'left-sidebar-mockup--ide': isIdeMode,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
       'left-sidebar-mockup--galaxy': shell.operatorBrainGalaxyActive,

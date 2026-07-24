@@ -99,11 +99,11 @@ watch(
 );
 
 const items: Array<{ id: IdeActivityView; label: string }> = [
+  { id: 'team', label: 'Team' },
   { id: 'explorer', label: 'Explorer' },
   { id: 'search', label: 'Search' },
   { id: 'git', label: 'Source Control' },
   { id: 'run', label: 'Run' },
-  { id: 'team', label: 'Team' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'agent', label: 'Agent Dock' },
 ];

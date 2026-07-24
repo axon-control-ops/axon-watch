@@ -256,6 +256,12 @@ onMounted(() => {
   if (shell.currentWorkspace?.workspace_id) {
     void shell.loadWorkspaceTasks(shell.currentWorkspace.workspace_id);
   }
+  // Park the floating orb off fleet/task after mosaic obstacles exist in the DOM.
+  window.setTimeout(() => {
+    if (shell.layoutMode === 'operator' && shell.voiceOrbVisible) {
+      shell.requestVoiceOrbSmartDodge({ force: true });
+    }
+  }, 80);
 });
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);

@@ -30,7 +30,7 @@ def mark_review_ready(run_id: str) -> dict[str, Any]:
 
     enforce_acceptance_for_publish(run_id)
 
-    return _transition_record(
+    reviewed = _transition_record(
         record,
         to_phase="review_ready",
         current_step="Awaiting operator review",
@@ -38,3 +38,10 @@ def mark_review_ready(run_id: str) -> dict[str, Any]:
         receipt_type="review_ready",
         receipt_summary="Active execution stopped; run awaiting operator review",
     )
+    try:
+        from app.runs.run_material_change import notify_run_material_change
+
+        notify_run_material_change(run_id, reviewed)
+    except Exception:
+        pass
+    return reviewed

@@ -19,7 +19,7 @@ describe('live events session helpers', () => {
     );
   });
 
-  it('parses connected, runtime_refresh, presence_refresh, and spoken_briefing payloads', () => {
+  it('parses connected, runtime_refresh, presence_refresh, spoken_briefing, and material_change payloads', () => {
     expect(parseLiveEventData('{"type":"connected"}')).toEqual({ type: 'connected' });
     expect(parseLiveEventData('{"type":"runtime_refresh"}')).toEqual({
       type: 'runtime_refresh',
@@ -30,6 +30,9 @@ describe('live events session helpers', () => {
     expect(parseLiveEventData('{"type":"spoken_briefing"}')).toEqual({
       type: 'spoken_briefing',
     });
+    expect(parseLiveEventData('{"type":"material_change"}')).toEqual({
+      type: 'material_change',
+    });
     expect(parseLiveEventData('{"type":"unknown"}')).toBeNull();
     expect(parseLiveEventData('not-json')).toBeNull();
   });
@@ -37,7 +40,9 @@ describe('live events session helpers', () => {
   it('routes refresh kinds to the correct handlers', () => {
     expect(shouldTriggerRefresh({ type: 'connected' })).toBe(false);
     expect(shouldTriggerRefresh({ type: 'runtime_refresh' })).toBe(true);
+    expect(shouldTriggerRefresh({ type: 'material_change' })).toBe(true);
     expect(shouldTriggerPresenceRefresh({ type: 'presence_refresh' })).toBe(true);
+    expect(shouldTriggerPresenceRefresh({ type: 'material_change' })).toBe(true);
     expect(shouldTriggerPresenceRefresh({ type: 'runtime_refresh' })).toBe(false);
   });
 });
@@ -205,6 +210,45 @@ describe('startLiveEventsSession', () => {
     messageHandler!({ data: '{"type":"spoken_briefing"}' } as MessageEvent);
     await Promise.resolve();
     expect(onSpokenBriefing).toHaveBeenCalledTimes(1);
+    session.disconnect();
+  });
+
+  it('routes material_change to onMaterialChange without speaking', async () => {
+    const onRefresh = vi.fn();
+    const onSpokenBriefing = vi.fn();
+    const onMaterialChange = vi.fn();
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+
+    class MockEventSource {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(_url: string) {
+        messageHandler = (event) => {
+          this.onmessage?.(event);
+        };
+      }
+
+      close(): void {}
+    }
+
+    const session = startLiveEventsSession({
+      onRefresh,
+      onSpokenBriefing,
+      onMaterialChange,
+      EventSourceImpl: MockEventSource as unknown as typeof EventSource,
+      documentRef: {
+        visibilityState: 'visible',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    messageHandler!({ data: '{"type":"material_change"}' } as MessageEvent);
+    await Promise.resolve();
+    expect(onMaterialChange).toHaveBeenCalledTimes(1);
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(onSpokenBriefing).not.toHaveBeenCalled();
     session.disconnect();
   });
 

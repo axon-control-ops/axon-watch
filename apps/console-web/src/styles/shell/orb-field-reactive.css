@@ -8,43 +8,46 @@
   --orb-local-x: 50%;
   --orb-local-y: 50%;
   --orb-bite-r: 0px;
+  --orb-feather: 14px;
   --orb-influence: 0;
+  position: relative;
   transform: translate3d(var(--orb-push-x), var(--orb-push-y), 0) scale(var(--orb-scale));
   transform-origin: center center;
   will-change: transform;
   transition:
-    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 160ms ease,
-    box-shadow 160ms ease;
+    transform 90ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 120ms ease,
+    box-shadow 120ms ease;
 }
 
 [data-orb-field][data-orb-influenced='1'] {
   border-radius: var(--orb-radius);
   box-shadow:
-    0 10px 28px rgba(0, 0, 0, 0.28),
-    0 0 calc(18px + 24px * var(--orb-influence)) rgba(122, 235, 255, calc(0.08 + 0.22 * var(--orb-influence)));
+    0 14px 34px rgba(0, 0, 0, 0.34),
+    0 0 calc(24px + 40px * var(--orb-influence))
+      rgba(122, 235, 255, calc(0.14 + 0.36 * var(--orb-influence)));
+  z-index: 2;
 }
 
 [data-orb-field][data-orb-mask='1'] {
   -webkit-mask-image: radial-gradient(
     circle at var(--orb-local-x) var(--orb-local-y),
     transparent 0,
-    transparent calc(var(--orb-bite-r) - 4px),
-    #000 calc(var(--orb-bite-r) + 10px),
+    transparent calc(var(--orb-bite-r) - var(--orb-feather)),
+    #000 var(--orb-bite-r),
     #000 100%
   );
   mask-image: radial-gradient(
     circle at var(--orb-local-x) var(--orb-local-y),
     transparent 0,
-    transparent calc(var(--orb-bite-r) - 4px),
-    #000 calc(var(--orb-bite-r) + 10px),
+    transparent calc(var(--orb-bite-r) - var(--orb-feather)),
+    #000 var(--orb-bite-r),
     #000 100%
   );
 }
 
-.operator-fleet-grid-host--orb-live [data-orb-field],
-.operator-task-board-host--orb-live [data-orb-field] {
-  transition-duration: 70ms;
+.operator-status-radar-panel--orb-live [data-orb-field] {
+  transition-duration: 45ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

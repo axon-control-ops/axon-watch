@@ -493,16 +493,26 @@
 
 .ide-team-panel {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
 }
 
 .ide-team-panel__body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
+}
+
+.ide-team-panel__body > .company-roster {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0;
+  border-top: 0;
+  background: transparent;
 }
 
 @keyframes company-roster-glow-pulse {

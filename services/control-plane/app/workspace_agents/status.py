@@ -25,7 +25,10 @@ def status_from_run(run: dict[str, Any]) -> str:
         return "blocked"
     if phase == "executing":
         return "executing"
-    if phase in {"queued", "starting"} or status == "running":
+    # Queued/starting = assigned ledger work, not mid-shift Lane B yet.
+    if phase in {"queued", "starting"}:
+        return "assigned"
+    if status == "running":
         return "executing"
     return "watching"
 

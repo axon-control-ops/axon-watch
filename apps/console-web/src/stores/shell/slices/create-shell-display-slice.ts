@@ -338,14 +338,21 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     return Math.max(fromSummary, fromBriefing);
   });
 
-  const leftSidebarAttentionBadgeCount = computed(() =>
-    computeLeftSidebarAttentionBadgeCount({
+  const leftSidebarAttentionBadgeCount = computed(() => {
+    const workspaceId = input.currentWorkspace.value?.workspace_id;
+    const reviewReadyCount = input.runs.value.filter(
+      (run) =>
+        run.phase === 'review_ready' &&
+        (!workspaceId || run.workspace_id === workspaceId),
+    ).length;
+    return computeLeftSidebarAttentionBadgeCount({
       pendingApprovals: pendingApprovalsCount.value,
       briefing: input.operatorBriefing.value,
       inboxItems: input.inboxItems.value,
       inboxLoadState: input.inboxLoadState.value,
-    }),
-  );
+      reviewReadyCount,
+    });
+  });
 
   return {
     workspaceTrailLabel,

@@ -58,6 +58,12 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         with patch(
             "app.workspace_agents.employee_persona_prompt.find_roster_employee",
             return_value=roster_row,
+        ), patch(
+            "app.workspace_agents.employee_persona_prompt.build_team_roster_context",
+            return_value=(
+                "Company team roster (authoritative — do not search the repo for this):\n"
+                "- Quinn (Integrations / integrations) — owns: connectors"
+            ),
         ):
             appendix = build_employee_persona_appendix(
                 workspace_id="workspace_axon_watch",
@@ -71,11 +77,46 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("not as VAXON", appendix)
         self.assertIn("say which role should own it", appendix)
         self.assertIn("frontend, backend, integrations, watcher, or lead", appendix)
+        self.assertIn("Company team roster (authoritative", appendix)
+
+    def test_lead_appendix_includes_authoritative_team_and_no_search_clause(self) -> None:
+        roster_row = {
+            "employee_id": "employee-workspace_dashpro-lead-0",
+            "name": "Dana",
+            "role": "lead",
+            "role_label": "Lead",
+            "owns": "DashPro product priorities and handoffs",
+        }
+        with patch(
+            "app.workspace_agents.employee_persona_prompt.find_roster_employee",
+            return_value=roster_row,
+        ), patch(
+            "app.workspace_agents.employee_persona_prompt.build_team_roster_context",
+            return_value=(
+                "Company team roster (authoritative — do not search the repo for this):\n"
+                "- Dana (Lead / lead)[LEAD] — owns: priorities\n"
+                "- Priya (Frontend / frontend) — owns: payments UI\n"
+                "Do NOT Glob, Grep, or Read the filesystem to discover teammates"
+            ),
+        ):
+            appendix = build_employee_persona_appendix(
+                workspace_id="workspace_dashpro",
+                employee_id="employee-workspace_dashpro-lead-0",
+                employee_role="lead",
+            )
+        assert appendix is not None
+        self.assertIn("You are Dana, the lead employee", appendix)
+        self.assertIn("never rediscover staffing by searching the tree", appendix)
+        self.assertIn("Priya (Frontend / frontend)", appendix)
+        self.assertIn("Do NOT Glob, Grep, or Read", appendix)
 
     def test_appendix_fallback_when_roster_misses(self) -> None:
         with patch(
             "app.workspace_agents.employee_persona_prompt.find_roster_employee",
             return_value=None,
+        ), patch(
+            "app.workspace_agents.employee_persona_prompt.build_team_roster_context",
+            return_value="",
         ):
             appendix = build_employee_persona_appendix(
                 workspace_id="workspace_axon_watch",
@@ -112,15 +153,19 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertEqual("Quinn", found.get("name"))
 
     def test_continuous_worker_still_uses_shared_identity(self) -> None:
-        prompt = build_continuous_worker_prompt(
-            workspace_id="workspace_axon_watch",
-            employee=EmployeeConfig(
-                name="Shell Craft",
-                role="frontend",
-                owns="Vue shell and IDE polish",
-                schedule="continuous",
-            ),
-        )
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Shell Craft",
+                    role="frontend",
+                    owns="Vue shell and IDE polish",
+                    schedule="continuous",
+                ),
+            )
         self.assertIn(
             "You are Shell Craft, the frontend employee for workspace workspace_axon_watch.",
             prompt,

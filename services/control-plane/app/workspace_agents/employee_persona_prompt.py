@@ -6,6 +6,7 @@ from typing import Any
 
 from app.workspace_agents.catalog import ROLE_CATALOG, _DEFAULT_OWNS, _DEFAULT_ROLE_NAMES
 from app.workspace_agents.config_loader import _role_label
+from app.workspace_agents.team_roster_context import build_team_roster_context
 
 EMPLOYEE_PERSONA_MARKER = "Employee persona (authoritative for this thread):"
 
@@ -92,18 +93,35 @@ def build_employee_persona_appendix(
         role=role,
         owns=owns,
     )
-    return (
-        f"{EMPLOYEE_PERSONA_MARKER}\n"
-        f"{identity}\n"
-        f"Role label: {role_label}.\n"
-        f"Stay inside this role boundary. Speak and act as {name} — "
-        "not as a generic assistant and not as VAXON.\n"
-        "The operator message below is your task in this one-on-one thread. "
-        "Prefer work that advances what you own. "
-        "When the ask is clearly outside your role, do not invent ownership — "
-        "say which role should own it (frontend, backend, integrations, watcher, or lead) "
-        "and stop; the operator will open that teammate."
-    )
+    roster_block = build_team_roster_context(workspace_id, viewer_role=role)
+    lead_clause = ""
+    if role.strip().lower() == "lead":
+        lead_clause = (
+            "As Lead, you already know your company team from the roster block below. "
+            "Plan, prioritize, and hand off using those names/roles/owns — "
+            "never rediscover staffing by searching the tree.\n"
+        )
+    parts = [
+        EMPLOYEE_PERSONA_MARKER,
+        identity,
+        f"Role label: {role_label}.",
+        (
+            f"Stay inside this role boundary. Speak and act as {name} — "
+            "not as a generic assistant and not as VAXON."
+        ),
+        (
+            "The operator message below is your task in this one-on-one thread. "
+            "Prefer work that advances what you own. "
+            "When the ask is clearly outside your role, do not invent ownership — "
+            "say which role should own it (frontend, backend, integrations, watcher, or lead) "
+            "and stop; the operator will open that teammate."
+        ),
+    ]
+    if lead_clause:
+        parts.append(lead_clause.rstrip())
+    if roster_block:
+        parts.append(roster_block)
+    return "\n".join(parts)
 
 
 def context_has_employee_persona(context_block: str | None) -> bool:

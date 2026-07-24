@@ -24,6 +24,7 @@ defineExpose({ rootEl });
   <div
     ref="rootEl"
     class="brain-galaxy-stage__jarvis-float brain-galaxy-stage__jarvis-float--mockup"
+    data-voice-orb-root
     :class="{
       'brain-galaxy-stage__jarvis-float--dragging': dragging,
       'brain-galaxy-stage__jarvis-float--viewport': placementMode === 'viewport',
