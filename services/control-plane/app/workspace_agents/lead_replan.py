@@ -11,6 +11,7 @@ from app.workspace_agents.lead_fan_out import materialize_lead_fan_out
 from app.workspace_agents.lead_task_plan import PlanMode
 
 _TERMINAL_TASK_STATUSES = frozenset({"completed", "failed", "cancelled"})
+_ACTIVE_SYNTH_PLAN_STATUSES = frozenset({"active", "completed", "awaiting_engagement"})
 
 
 class LeadReplanError(ValueError):
@@ -24,6 +25,297 @@ def _plan_tasks(plan_id: str) -> list[dict[str, Any]]:
         if task is not None:
             tasks.append({**task, "plan_key": link["plan_key"]})
     return tasks
+
+
+def _roster_name_for_role(workspace_id: str, role: str) -> str:
+    from app.workspace_agents import build_company_roster
+
+    company = build_company_roster(workspace_id)
+    rows = company.get("employees") if isinstance(company, dict) else None
+    if not isinstance(rows, list):
+        return ""
+    want = role.strip().lower()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("role") or "").strip().lower() == want:
+            return str(row.get("name") or "").strip()
+    return ""
+
+
+def _specialist_reply_excerpt(workspace_id: str, run_id: str, *, max_len: int = 400) -> str:
+    from app.persistence import chat_store
+
+    cleaned_run = str(run_id or "").strip()
+    if not cleaned_run:
+        return ""
+    for thread in chat_store.list_threads_for_workspace(workspace_id, thread_kind="ide", limit=50):
+        thread_id = str(thread.get("thread_id") or "").strip()
+        if not thread_id:
+            continue
+        try:
+            history = chat_store.list_thread_messages(thread_id)
+        except Exception:
+            continue
+        for message in reversed(history or []):
+            if str(message.get("run_id") or "").strip() != cleaned_run:
+                continue
+            if str(message.get("role") or "").strip() != "agent":
+                continue
+            text = " ".join(str(message.get("content") or "").split())
+            if not text:
+                continue
+            # Prefer the conversational report after thinking blocks when present.
+            if ":::thinking" in text and ":::" in text[12:]:
+                parts = text.split(":::")
+                # take last non-empty non-thinking segment
+                for part in reversed(parts):
+                    cleaned = part.strip()
+                    if cleaned and not cleaned.startswith("thinking") and not cleaned.startswith("tool"):
+                        text = cleaned
+                        break
+            if len(text) > max_len:
+                return f"{text[: max_len - 1].rstrip()}…"
+            return text
+    return ""
+
+
+def _build_synthesis_findings(
+    *,
+    workspace_id: str,
+    tasks: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, Any]]]:
+    from app.persistence import run_store
+
+    runs_by_task: dict[str, list[dict[str, Any]]] = {}
+    for run in run_store.list_runs():
+        task_id = str(run.get("task_id") or "").strip()
+        run_id = str(run.get("run_id") or "").strip()
+        if task_id and run_id:
+            runs_by_task.setdefault(task_id, []).append(run)
+
+    findings: list[dict[str, Any]] = []
+    for task in tasks:
+        task_id = str(task["task_id"])
+        owner_role = str(task.get("owner_role") or "").strip()
+        runs = runs_by_task.get(task_id) or []
+        run_ids = [str(run.get("run_id") or "").strip() for run in runs if run.get("run_id")]
+        latest_run_id = run_ids[-1] if run_ids else ""
+        excerpt = (
+            _specialist_reply_excerpt(workspace_id, latest_run_id) if latest_run_id else ""
+        )
+        findings.append(
+            {
+                "task_id": task_id,
+                "plan_key": str(task.get("plan_key") or ""),
+                "owner_role": owner_role,
+                "assignee_name": _roster_name_for_role(workspace_id, owner_role)
+                or str(task.get("assignee_name") or ""),
+                "status": str(task.get("status") or ""),
+                "outcome": str(task.get("terminal_outcome") or ""),
+                "goal": str(task.get("goal") or ""),
+                "acceptance_criteria": str(task.get("acceptance_criteria") or ""),
+                "run_ids": run_ids,
+                "specialist_reply_excerpt": excerpt,
+                "attachment_ids": list(task.get("attachment_ids") or []),
+                "output_artifacts": list(task.get("output_artifacts") or []),
+            }
+        )
+
+    lines = []
+    for row in findings:
+        label = row["assignee_name"] or row["owner_role"] or "specialist"
+        line = f"{label}={row['status']}"
+        if row["outcome"]:
+            line = f"{line} ({row['outcome']})"
+        lines.append(line)
+    summary = "; ".join(lines)
+    return summary, findings
+
+
+def _post_synthesis_handoffs(
+    *,
+    plan_id: str,
+    workspace_id: str,
+    goal: str,
+    summary: str,
+    findings: list[dict[str, Any]],
+    synthesis_receipt_id: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    from app.workspace_agents.lead_dana_report import post_lead_synthesis_to_dana_ide
+    from app.workspace_agents.lead_vaxon_handoff import post_lead_synthesis_to_vaxon
+
+    vaxon: dict[str, Any] = {}
+    dana: dict[str, Any] = {}
+    try:
+        vaxon = post_lead_synthesis_to_vaxon(
+            plan_id=plan_id,
+            workspace_id=workspace_id,
+            goal=goal,
+            summary=summary,
+            findings=findings,
+            synthesis_receipt_id=synthesis_receipt_id,
+        )
+    except Exception:
+        vaxon = {"status": "handoff_failed"}
+    try:
+        dana = post_lead_synthesis_to_dana_ide(
+            plan_id=plan_id,
+            workspace_id=workspace_id,
+            goal=goal,
+            summary=summary,
+            findings=findings,
+            synthesis_receipt_id=synthesis_receipt_id,
+        )
+    except Exception:
+        dana = {"status": "handoff_failed"}
+    return vaxon, dana
+
+
+def synthesize_lead_plan(plan_id: str) -> dict[str, Any]:
+    """Summarize terminal specialist task outcomes and persist a synthesis receipt."""
+    plan = lead_plan_store.get_plan(plan_id)
+    if plan is None:
+        raise LeadReplanError(f"lead plan not found: {plan_id}")
+    workspace_id = str(plan["workspace_id"])
+    goal = str(plan.get("goal") or "")
+    tasks = _plan_tasks(plan_id)
+    pending = [
+        str(task["task_id"])
+        for task in tasks
+        if str(task.get("status") or "").strip().lower() not in _TERMINAL_TASK_STATUSES
+    ]
+    if pending:
+        return {
+            "plan_id": plan_id,
+            "status": "awaiting_results",
+            "pending_task_ids": pending,
+            "summary": "",
+        }
+
+    plan_status = str(plan.get("status") or "").strip().lower()
+    if plan_status in {"completed", "awaiting_engagement"}:
+        prior = next(
+            (
+                row
+                for row in lead_plan_store.list_receipts(plan_id)
+                if str(row.get("kind") or "") == "lead_synthesis_completed"
+            ),
+            None,
+        )
+        payload = (prior or {}).get("payload") if isinstance(prior, dict) else {}
+        summary = str((payload or {}).get("summary") or "")
+        findings = list((payload or {}).get("findings") or [])
+        vaxon, dana = _post_synthesis_handoffs(
+            plan_id=plan_id,
+            workspace_id=workspace_id,
+            goal=goal,
+            summary=summary,
+            findings=findings,
+            synthesis_receipt_id=str((prior or {}).get("receipt_id") or ""),
+        )
+        return {
+            "plan_id": plan_id,
+            "status": plan_status if plan_status == "awaiting_engagement" else "completed",
+            "summary": summary,
+            "findings": findings,
+            "receipt_id": (prior or {}).get("receipt_id"),
+            "vaxon_handoff": vaxon,
+            "dana_handoff": dana,
+        }
+
+    summary, findings = _build_synthesis_findings(workspace_id=workspace_id, tasks=tasks)
+    lead_plan_store.set_plan_status(plan_id, "completed")
+    receipt = lead_plan_store.append_receipt(
+        plan_id=plan_id,
+        workspace_id=workspace_id,
+        kind="lead_synthesis_completed",
+        payload={"summary": summary, "findings": findings},
+    )
+    vaxon, dana = _post_synthesis_handoffs(
+        plan_id=plan_id,
+        workspace_id=workspace_id,
+        goal=goal,
+        summary=summary,
+        findings=findings,
+        synthesis_receipt_id=str(receipt["receipt_id"]),
+    )
+    return {
+        "plan_id": plan_id,
+        "status": "completed",
+        "summary": summary,
+        "findings": findings,
+        "receipt_id": receipt["receipt_id"],
+        "vaxon_handoff": vaxon,
+        "dana_handoff": dana,
+    }
+
+
+def maybe_synthesize_lead_plan_for_task(task_id: str) -> dict[str, Any] | None:
+    """Idempotent synthesize when a lead-plan task becomes terminal."""
+    plan_id = lead_plan_store.plan_id_for_task(task_id)
+    if not plan_id:
+        return None
+    plan = lead_plan_store.get_plan(plan_id)
+    if plan is None:
+        return None
+    status = str(plan.get("status") or "").strip().lower()
+    if status not in _ACTIVE_SYNTH_PLAN_STATUSES:
+        return None
+    return synthesize_lead_plan(plan_id)
+
+
+def notify_lead_after_worker_task(
+    *,
+    workspace_id: str,
+    task_id: str,
+    run_id: str,
+    employee_role: str,
+    employee_name: str,
+    phase: str,
+    reply_text: str | None = None,
+) -> dict[str, Any]:
+    """Specialist → Dana status, then auto-synthesize when the plan is fully terminal."""
+    task = task_store.get_task(task_id)
+    if task is None:
+        return {"status": "skipped_missing_task"}
+    task_status = str(task.get("status") or "").strip().lower()
+    if task_status not in _TERMINAL_TASK_STATUSES:
+        # fail_task may reopen when attempt budget remains.
+        return {"status": "skipped_task_not_terminal", "task_status": task_status}
+
+    plan_id = lead_plan_store.plan_id_for_task(task_id)
+    if not plan_id:
+        return {"status": "skipped_not_lead_plan"}
+
+    plan_key = None
+    for link in lead_plan_store.plan_task_links(plan_id):
+        if link.get("task_id") == task_id:
+            plan_key = link.get("plan_key")
+            break
+
+    from app.workspace_agents.lead_dana_report import post_specialist_status_to_dana
+
+    status_post = post_specialist_status_to_dana(
+        workspace_id=workspace_id,
+        plan_id=plan_id,
+        task_id=task_id,
+        plan_key=plan_key,
+        run_id=run_id,
+        employee_role=employee_role,
+        employee_name=employee_name,
+        phase=phase if phase in {"completed", "failed"} else task_status,
+        goal=str(task.get("goal") or ""),
+        outcome=str(task.get("terminal_outcome") or ""),
+        reply_excerpt=(reply_text or "")[:400],
+    )
+    synthesis = maybe_synthesize_lead_plan_for_task(task_id)
+    return {
+        "status": "ok",
+        "plan_id": plan_id,
+        "specialist_status": status_post,
+        "synthesis": synthesis,
+    }
 
 
 def _cancel_obsolete_tasks(plan_id: str) -> tuple[list[str], list[dict[str, str]]]:
@@ -130,120 +422,10 @@ def replan_lead_goal(
     }
 
 
-def synthesize_lead_plan(plan_id: str) -> dict[str, Any]:
-    """Summarize terminal specialist task outcomes and persist a synthesis receipt."""
-    from app.persistence import run_store
-
-    plan = lead_plan_store.get_plan(plan_id)
-    if plan is None:
-        raise LeadReplanError(f"lead plan not found: {plan_id}")
-    tasks = _plan_tasks(plan_id)
-    pending = [
-        str(task["task_id"])
-        for task in tasks
-        if str(task.get("status") or "").strip().lower() not in _TERMINAL_TASK_STATUSES
-    ]
-    if pending:
-        return {
-            "plan_id": plan_id,
-            "status": "awaiting_results",
-            "pending_task_ids": pending,
-            "summary": "",
-        }
-
-    plan_status = str(plan.get("status") or "").strip().lower()
-    if plan_status in {"completed", "awaiting_engagement"}:
-        from app.workspace_agents.lead_vaxon_handoff import post_lead_synthesis_to_vaxon
-
-        prior = next(
-            (
-                row
-                for row in lead_plan_store.list_receipts(plan_id)
-                if str(row.get("kind") or "") == "lead_synthesis_completed"
-            ),
-            None,
-        )
-        payload = (prior or {}).get("payload") if isinstance(prior, dict) else {}
-        summary = str((payload or {}).get("summary") or "")
-        findings = list((payload or {}).get("findings") or [])
-        handoff = post_lead_synthesis_to_vaxon(
-            plan_id=plan_id,
-            workspace_id=str(plan["workspace_id"]),
-            goal=str(plan.get("goal") or ""),
-            summary=summary,
-            findings=findings,
-            synthesis_receipt_id=str((prior or {}).get("receipt_id") or ""),
-        )
-        return {
-            "plan_id": plan_id,
-            "status": plan_status if plan_status == "awaiting_engagement" else "completed",
-            "summary": summary,
-            "findings": findings,
-            "receipt_id": (prior or {}).get("receipt_id"),
-            "vaxon_handoff": handoff,
-        }
-
-    runs_by_task: dict[str, list[str]] = {}
-    for run in run_store.list_runs():
-        task_id = str(run.get("task_id") or "").strip()
-        run_id = str(run.get("run_id") or "").strip()
-        if task_id and run_id:
-            runs_by_task.setdefault(task_id, []).append(run_id)
-
-    findings = []
-    for task in tasks:
-        task_id = str(task["task_id"])
-        findings.append(
-            {
-                "task_id": task_id,
-                "plan_key": str(task.get("plan_key") or ""),
-                "owner_role": str(task.get("owner_role") or ""),
-                "assignee_name": str(task.get("assignee_name") or ""),
-                "status": str(task.get("status") or ""),
-                "outcome": str(task.get("terminal_outcome") or ""),
-                "attachment_ids": list(task.get("attachment_ids") or []),
-                "output_artifacts": list(task.get("output_artifacts") or []),
-                "run_ids": list(runs_by_task.get(task_id) or []),
-            }
-        )
-    summary = "; ".join(
-        f"{row['assignee_name'] or row['owner_role']}={row['status']}"
-        + (f" ({row['outcome']})" if row["outcome"] else "")
-        for row in findings
-    )
-    lead_plan_store.set_plan_status(plan_id, "completed")
-    receipt = lead_plan_store.append_receipt(
-        plan_id=plan_id,
-        workspace_id=str(plan["workspace_id"]),
-        kind="lead_synthesis_completed",
-        payload={"summary": summary, "findings": findings},
-    )
-    handoff: dict[str, Any] = {}
-    try:
-        from app.workspace_agents.lead_vaxon_handoff import post_lead_synthesis_to_vaxon
-
-        handoff = post_lead_synthesis_to_vaxon(
-            plan_id=plan_id,
-            workspace_id=str(plan["workspace_id"]),
-            goal=str(plan.get("goal") or ""),
-            summary=summary,
-            findings=findings,
-            synthesis_receipt_id=str(receipt["receipt_id"]),
-        )
-    except Exception:
-        handoff = {"status": "handoff_failed"}
-    return {
-        "plan_id": plan_id,
-        "status": "completed",
-        "summary": summary,
-        "findings": findings,
-        "receipt_id": receipt["receipt_id"],
-        "vaxon_handoff": handoff,
-    }
-
-
 __all__ = [
     "LeadReplanError",
+    "maybe_synthesize_lead_plan_for_task",
+    "notify_lead_after_worker_task",
     "replan_lead_goal",
     "synthesize_lead_plan",
 ]

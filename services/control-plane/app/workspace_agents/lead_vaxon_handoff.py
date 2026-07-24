@@ -40,34 +40,31 @@ def build_lead_synthesis_vaxon_message(
     findings: list[dict[str, Any]],
 ) -> str:
     """Build one operator-facing VAXON rollup (no PII invention)."""
-    goal_line = _truncate(goal, max_len=160) or "Lead plan"
+    goal_line = _truncate(goal, max_len=280) or "Lead plan"
     lines = [
         "VAXON: Lead team rollup is ready for your review.",
         f"Goal: {goal_line}",
         f"Plan: {plan_id}",
     ]
-    clean_summary = _truncate(summary, max_len=240)
+    clean_summary = _truncate(summary, max_len=500)
     if clean_summary:
         lines.append(f"Outcome: {clean_summary}")
 
     for row in findings[:8]:
         owner = str(row.get("assignee_name") or row.get("owner_role") or "specialist").strip()
         status = str(row.get("status") or "").strip() or "unknown"
-        outcome = _truncate(str(row.get("outcome") or ""), max_len=100)
+        outcome = _truncate(str(row.get("outcome") or ""), max_len=160)
+        excerpt = _truncate(str(row.get("specialist_reply_excerpt") or ""), max_len=160)
         run_ids = [str(item).strip() for item in (row.get("run_ids") or []) if str(item).strip()]
         run_bit = f" · runs {', '.join(run_ids[:3])}" if run_ids else ""
-        artifact_ids = [
-            str(item).strip()
-            for item in (row.get("output_artifacts") or [])
-            if str(item).strip()
-        ]
-        artifact_bit = f" · artifacts {', '.join(artifact_ids[:2])}" if artifact_ids else ""
         detail = f"{owner}: {status}"
         if outcome:
             detail = f"{detail} ({outcome})"
-        lines.append(f"- {detail}{run_bit}{artifact_bit}")
+        if excerpt:
+            detail = f"{detail} — {excerpt}"
+        lines.append(f"- {detail}{run_bit}")
 
-    lines.append("Ask me about any specialist result, or tell Dana what to do next.")
+    lines.append("Open Dana's Lead thread for the full narrative, or ask me what to do next.")
     return "\n".join(lines)
 
 

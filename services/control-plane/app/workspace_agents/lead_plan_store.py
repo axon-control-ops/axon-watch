@@ -48,6 +48,8 @@ def ensure_lead_plan_schema(connection: Any) -> None:
             task_id TEXT NOT NULL,
             PRIMARY KEY(plan_id, plan_key)
         );
+        CREATE INDEX IF NOT EXISTS idx_lead_plan_tasks_task
+            ON lead_plan_tasks(task_id);
         CREATE TABLE IF NOT EXISTS lead_plan_receipts (
             receipt_id TEXT PRIMARY KEY,
             plan_id TEXT NOT NULL,
@@ -167,6 +169,28 @@ def plan_task_links(plan_id: str) -> list[dict[str, str]]:
             (plan_id.strip(),),
         ).fetchall()
     return [{"plan_key": row["plan_key"], "task_id": row["task_id"]} for row in rows]
+
+
+def plan_id_for_task(task_id: str) -> str | None:
+    """Reverse-lookup which Lead plan owns a workspace task (if any)."""
+    cleaned = str(task_id or "").strip()
+    if not cleaned:
+        return None
+    with _connection() as connection:
+        row = connection.execute(
+            """
+            SELECT plan_id
+            FROM lead_plan_tasks
+            WHERE task_id = ?
+            ORDER BY plan_id DESC
+            LIMIT 1
+            """,
+            (cleaned,),
+        ).fetchone()
+    if row is None:
+        return None
+    plan_id = str(row["plan_id"] or "").strip()
+    return plan_id or None
 
 
 def list_plans_by_status(
@@ -296,6 +320,7 @@ __all__ = [
     "list_plans_by_status",
     "list_receipts",
     "persist_plan",
+    "plan_id_for_task",
     "plan_task_links",
     "reset_store",
     "set_plan_status",

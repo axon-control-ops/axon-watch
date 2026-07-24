@@ -10,9 +10,11 @@ import {
 import { kairoPresenceLabel } from '../../lib/kairo-presence';
 import { ideShowKairoSidebarExpanded, resolveIdeKairoChipState, shouldSurfaceIdeEmployeeFailure } from '../../lib/ide-presence-profile';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
+import { resolveSidebarAgentTranscript } from '../../lib/sidebar-agent-transcript-view';
 import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
 import AgentLiveLineHeadline from './AgentLiveLineHeadline.vue';
+import KairoSidebarTranscript from './KairoSidebarTranscript.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 
@@ -70,7 +72,7 @@ const briefingHeadline = computed(() =>
 );
 const notice = computed(() => {
   if (shell.kairoAgentLiveLine) {
-    return 'Streaming agent activity — thinking, tools, and edits appear here as they land.';
+    return 'Streaming agent activity — thinking, tools, and edits appear below as they land.';
   }
   return briefingNotice(shell.operatorBriefing, shell.briefingLoadState);
 });
@@ -82,20 +84,12 @@ const signalBadge = computed(
   () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
 );
 const showStopSpeech = computed(() => shell.kairoSpeechActive);
-const hasLiveSpeechOrActivity = computed(
-  () => Boolean(spokenText.value?.trim()) || Boolean(shell.ideComposerActivity?.liveBodyFull?.trim()),
-);
-const transcriptLinkHint = computed(() => {
-  if (showStopSpeech.value) {
-    return `${activePersonaName.value} speaking · Open dock`;
-  }
-  if (hasLiveSpeechOrActivity.value) {
-    return 'Open agent dock for full transcript';
-  }
-  return 'Open agent dock';
-});
-const showTranscriptLink = computed(
-  () => showStopSpeech.value || hasLiveSpeechOrActivity.value,
+const transcriptView = computed(() =>
+  resolveSidebarAgentTranscript({
+    messages: shell.threadMessages,
+    agentStreamActive: shell.agentStreamActive,
+    agentStreamMessageId: shell.agentStreamMessageId,
+  }),
 );
 
 function handleExpand(): void {
@@ -115,8 +109,7 @@ function handleStopSpeech(event: Event): void {
   shell.stopKairoSpeech();
 }
 
-function openAgentTranscript(event: Event): void {
-  event.stopPropagation();
+function openAgentTranscript(): void {
   if (shell.agentDockCollapsed) {
     shell.toggleAgentDock();
   }
@@ -148,11 +141,10 @@ function openAgentTranscript(event: Event): void {
       {{ presenceLabel }}
     </span>
   </button>
-  <button
+  <div
     v-else
     id="ide-kairo-sidebar-panel"
-    type="button"
-    class="kairo-sidebar-panel hud-panel-frame"
+    class="kairo-sidebar-panel kairo-sidebar-panel--expanded hud-panel-frame"
     :class="[
       `kairo-sidebar-panel--${shell.kairoPresenceState}`,
       {
@@ -163,68 +155,82 @@ function openAgentTranscript(event: Event): void {
         'kairo-sidebar-panel--employee-interrupted':
           surfaceEmployeeFailure && shell.activeIdeEmployeeShiftInterrupted,
         'kairo-sidebar-panel--alerting': chipState === 'alerting',
+        'kairo-sidebar-panel--streaming': transcriptView.streaming,
       },
     ]"
     :aria-label="`${activePersonaName}. ${shell.briefingSummaryLine}`"
-    @click="handleExpand"
   >
-    <p class="kairo-sidebar-panel__title">
-      <OperatorPersonaMark size="sm" :mark="activePersonaMark" />
-    </p>
-    <div class="kairo-sidebar-panel__body">
-      <div class="kairo-sidebar-panel__radar" aria-hidden="true">
-        <span class="kairo-sidebar-panel__ring kairo-sidebar-panel__ring--outer" />
-        <span class="kairo-sidebar-panel__ring kairo-sidebar-panel__ring--mid" />
-        <span class="kairo-sidebar-panel__ring kairo-sidebar-panel__ring--inner" />
-        <span class="kairo-sidebar-panel__sweep" />
-      </div>
-      <div class="kairo-sidebar-panel__copy">
-        <p class="kairo-sidebar-panel__state">{{ presenceLabel }}</p>
-        <p
-          v-if="surfaceEmployeeFailure && !debugModeActive"
-          class="kairo-sidebar-panel__employee-failure"
-          :title="employeeFailureTooltip"
-        >
-          {{ shell.activeIdeEmployeeFailureLine }}
-        </p>
-        <AgentLiveLineHeadline
-          class="kairo-sidebar-panel__headline"
-          :activity="shell.ideComposerActivity"
-          :fallback="briefingHeadline"
-        />
-        <p v-if="shell.briefingSummaryLine" class="kairo-sidebar-panel__summary">
-          {{ shell.briefingSummaryLine }}
-        </p>
-        <p class="kairo-sidebar-panel__notice">{{ notice }}</p>
-        <p v-if="advise" class="kairo-sidebar-panel__advise">{{ advise }}</p>
-        <div v-if="approvalBadge || signalBadge" class="kairo-sidebar-panel__badges">
-          <span v-if="approvalBadge" class="kairo-sidebar-panel__badge">
-            {{ approvalBadge }} approval{{ approvalBadge === 1 ? '' : 's' }}
-          </span>
-          <span v-if="signalBadge" class="kairo-sidebar-panel__badge kairo-sidebar-panel__badge--signal">
-            {{ signalBadge }} signal{{ signalBadge === 1 ? '' : 's' }}
-          </span>
+    <div
+      class="kairo-sidebar-panel__card"
+      role="button"
+      tabindex="0"
+      :aria-label="`${activePersonaName}. ${shell.briefingSummaryLine}`"
+      @click="handleExpand"
+      @keydown.enter.prevent="handleExpand"
+      @keydown.space.prevent="handleExpand"
+    >
+      <p class="kairo-sidebar-panel__title">
+        <OperatorPersonaMark size="sm" :mark="activePersonaMark" />
+      </p>
+      <div class="kairo-sidebar-panel__body">
+        <div class="kairo-sidebar-panel__radar" aria-hidden="true">
+          <span class="kairo-sidebar-panel__ring kairo-sidebar-panel__ring--outer" />
+          <span class="kairo-sidebar-panel__ring kairo-sidebar-panel__ring--mid" />
+          <span class="kairo-sidebar-panel__ring kairo-sidebar-panel__ring--inner" />
+          <span class="kairo-sidebar-panel__sweep" />
         </div>
-        <button
-          v-if="showStopSpeech"
-          type="button"
-          class="kairo-sidebar-panel__stop-speech"
-          @click="handleStopSpeech"
-        >
-          Stop speaking
-        </button>
+        <div class="kairo-sidebar-panel__copy">
+          <p class="kairo-sidebar-panel__state">{{ presenceLabel }}</p>
+          <p
+            v-if="surfaceEmployeeFailure && !debugModeActive"
+            class="kairo-sidebar-panel__employee-failure"
+            :title="employeeFailureTooltip"
+          >
+            {{ shell.activeIdeEmployeeFailureLine }}
+          </p>
+          <AgentLiveLineHeadline
+            class="kairo-sidebar-panel__headline"
+            :activity="shell.ideComposerActivity"
+            :fallback="briefingHeadline"
+          />
+          <p v-if="shell.briefingSummaryLine" class="kairo-sidebar-panel__summary">
+            {{ shell.briefingSummaryLine }}
+          </p>
+          <p class="kairo-sidebar-panel__notice">{{ notice }}</p>
+          <p v-if="advise" class="kairo-sidebar-panel__advise">{{ advise }}</p>
+          <div v-if="approvalBadge || signalBadge" class="kairo-sidebar-panel__badges">
+            <span v-if="approvalBadge" class="kairo-sidebar-panel__badge">
+              {{ approvalBadge }} approval{{ approvalBadge === 1 ? '' : 's' }}
+            </span>
+            <span v-if="signalBadge" class="kairo-sidebar-panel__badge kairo-sidebar-panel__badge--signal">
+              {{ signalBadge }} signal{{ signalBadge === 1 ? '' : 's' }}
+            </span>
+          </div>
+          <button
+            v-if="showStopSpeech"
+            type="button"
+            class="kairo-sidebar-panel__stop-speech"
+            @click="handleStopSpeech"
+          >
+            Stop speaking
+          </button>
+          <p
+            v-if="spokenText?.trim()"
+            class="kairo-sidebar-panel__spoken"
+          >
+            {{ spokenText }}
+          </p>
+        </div>
       </div>
-      <button
-        v-if="showTranscriptLink"
-        type="button"
-        class="kairo-sidebar-panel__transcript-link"
-        aria-label="Open agent dock transcript"
-        @click="openAgentTranscript"
-      >
-        <span class="kairo-sidebar-panel__transcript-label">Agent transcript</span>
-        <span class="kairo-sidebar-panel__transcript-hint">{{ transcriptLinkHint }}</span>
-      </button>
       <BriefingSurfaceFollowupPrompt />
     </div>
-  </button>
+
+    <KairoSidebarTranscript
+      :lines="transcriptView.lines"
+      :streaming="transcriptView.streaming"
+      :empty-hint="transcriptView.emptyHint"
+      :persona-name="activePersonaName"
+      @open-dock="openAgentTranscript"
+    />
+  </div>
 </template>

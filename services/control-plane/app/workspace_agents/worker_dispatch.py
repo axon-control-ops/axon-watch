@@ -15,6 +15,7 @@ from app.runs.service import (
     RunLifecycleError,
     RunNotFoundError,
     append_run_execution_receipt,
+    complete_run,
     fail_run,
     touch_run_activity,
 )
@@ -229,7 +230,59 @@ def dispatch_continuous_worker_run(
             lane_b_result=lane_b_result,
             reply_text=reply_text,
             workspace_root=str(agent_root),
+            defer_complete=True,
         )
+        preserve_isolation = False
+        if dispatched and finalized is not None:
+            phase = str(finalized.get("phase") or "").strip().lower()
+            if phase not in {"failed", "cancelled"}:
+                from app.workspace_agents.verifier_contract import (
+                    has_passing_acceptance_evidence,
+                    run_requires_acceptance_evidence,
+                )
+                from app.runs.service import get_run
+                from app.workspace_delivery import publish_worker_isolation
+
+                run_snapshot = get_run(run_id)
+                if run_requires_acceptance_evidence(run_snapshot) and not has_passing_acceptance_evidence(
+                    run_id
+                ):
+                    finalized = _fail_worker_run(
+                        run_id,
+                        receipt_summary=(
+                            "Workspace delivery blocked: missing or failing "
+                            "acceptance_evidence (Gate 6)"
+                        ),
+                    )
+                    dispatched = False
+                    preserve_isolation = True
+                else:
+                    publish = publish_worker_isolation(
+                        workspace_id=workspace_id,
+                        run_id=run_id,
+                        isolation_root=agent_root,
+                        task_id=task_id,
+                        turn_subject=str(task.get("goal") or "") if isinstance(task, dict) else None,
+                    )
+                    preserve_isolation = not publish.cleanup_isolation
+                    if publish.ok:
+                        try:
+                            finalized = complete_run(run_id)
+                        except RunLifecycleError as exc:
+                            logger.exception("complete_run after delivery failed for %s", run_id)
+                            finalized = _fail_worker_run(
+                                run_id,
+                                receipt_summary=f"Delivery succeeded but complete_run failed: {exc}",
+                            )
+                            dispatched = False
+                    else:
+                        finalized = _fail_worker_run(
+                            run_id,
+                            receipt_summary=(
+                                f"Workspace delivery blocked at {publish.stage}: {publish.detail}"
+                            ),
+                        )
+                        dispatched = False
         if ide_stream is not None:
             try:
                 finalize_worker_ide_stream(
@@ -253,6 +306,28 @@ def dispatch_continuous_worker_run(
                     task_store.fail_task(task_id, run_id=run_id)
             except task_store.TaskLedgerError:
                 logger.exception("task ledger finalize failed for %s task=%s", run_id, task_id)
+            if phase in {"completed", "failed"}:
+                try:
+                    from app.workspace_agents.lead_replan import notify_lead_after_worker_task
+
+                    notify_lead_after_worker_task(
+                        workspace_id=workspace_id,
+                        task_id=task_id,
+                        run_id=run_id,
+                        employee_role=str(employee.role or ""),
+                        employee_name=str(employee.name or ""),
+                        phase=phase,
+                        reply_text=reply_text,
+                    )
+                except Exception:  # noqa: BLE001 — never block worker finalize on Lead notify
+                    logger.exception(
+                        "lead notify/synthesize after worker task failed for %s task=%s",
+                        run_id,
+                        task_id,
+                    )
+        if preserve_isolation:
+            # Keep disposable checkout for operator recovery after publish failure.
+            isolation_root = None
     except IsolationError as exc:
         logger.exception(
             "continuous worker isolation failed for %s role=%s",
@@ -277,6 +352,20 @@ def dispatch_continuous_worker_run(
             task_store.fail_task(task_id, run_id=run_id)
         except task_store.TaskLedgerError:
             logger.exception("task fail after isolation error for %s", task_id)
+        try:
+            from app.workspace_agents.lead_replan import notify_lead_after_worker_task
+
+            notify_lead_after_worker_task(
+                workspace_id=workspace_id,
+                task_id=task_id,
+                run_id=run_id,
+                employee_role=str(employee.role or ""),
+                employee_name=str(employee.name or ""),
+                phase="failed",
+                reply_text=str(exc),
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("lead notify after isolation fail for %s", run_id)
         return False, failed
     except Exception as exc:  # noqa: BLE001 — never leave role-tagged runs stuck executing
         logger.exception(
@@ -302,6 +391,20 @@ def dispatch_continuous_worker_run(
             task_store.fail_task(task_id, run_id=run_id)
         except task_store.TaskLedgerError:
             logger.exception("task fail after dispatch crash for %s", task_id)
+        try:
+            from app.workspace_agents.lead_replan import notify_lead_after_worker_task
+
+            notify_lead_after_worker_task(
+                workspace_id=workspace_id,
+                task_id=task_id,
+                run_id=run_id,
+                employee_role=str(employee.role or ""),
+                employee_name=str(employee.name or ""),
+                phase="failed",
+                reply_text=str(exc),
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("lead notify after dispatch crash for %s", run_id)
         return False, failed
     finally:
         stop_heartbeat.set()

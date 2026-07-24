@@ -12,11 +12,12 @@
 }
 
 .left-sidebar-mockup__status-anchor--ide .kairo-sidebar-panel.hud-panel-frame {
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   max-height: none;
-  overflow: auto;
+  overflow: hidden;
   text-align: left;
 }
 
