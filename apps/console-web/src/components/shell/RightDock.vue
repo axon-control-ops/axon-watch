@@ -2,11 +2,11 @@
 import { ref } from 'vue';
 
 import AgentDock from '../ide/AgentDock.vue';
-import ConversationSeamPanel from '../ConversationSeamPanel.vue';
 import DockHeroPanel from '../DockHeroPanel.vue';
 import HudSeamCard from '../HudSeamCard.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
 import { useShellStore } from '../../stores/shell';
+import MissionControlActivityPanel from './MissionControlActivityPanel.vue';
 
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
@@ -51,18 +51,14 @@ const {
     <div class="dock-stack__upper dock-stack__upper--conversation">
       <HudSeamCard
         seam-id="dock-seam-thread"
-        :title="shell.layoutMode === 'operator' ? 'Operator thread' : 'Conversation'"
+        title="Live operations"
         seam-class="dock-seam dock-seam--thread"
         :collapsed="shell.dockSeamState('thread')?.collapsed ?? false"
-        :compact-summary="
-          shell.layoutMode === 'operator'
-            ? 'Actions, KAIRO turns, and receipts — not the run queue'
-            : shell.dockSeamState('thread')?.compactSummary
-        "
+        compact-summary="Autonomous workers, CI repairs, signals, and receipts"
         :collapsible="true"
         @toggle="shell.toggleDockSeam('thread')"
       >
-        <ConversationSeamPanel />
+        <MissionControlActivityPanel />
       </HudSeamCard>
     </div>
 

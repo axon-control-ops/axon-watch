@@ -53,7 +53,7 @@
 }
 
 .agent-dock__composer {
-  --agent-dock-composer-overlay-z: 120;
+  --agent-dock-composer-overlay-z: 1200;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -63,7 +63,7 @@
   /* Menus open upward over the transcript — must not clip or sit under threads. */
   overflow: visible;
   position: relative;
-  z-index: 40;
+  z-index: 200;
   isolation: isolate;
   padding: 0.55rem 0.8rem 0.8rem;
   border-top: 1px solid rgba(138, 154, 173, 0.1);
