@@ -48,6 +48,8 @@ const planSoftSwitchReasonLabel = computed(() => {
   return notice ? PLAN_SOFT_SWITCH_REASON_LABEL[notice.reason] ?? notice.reason : undefined;
 });
 
+const planSoftSwitchKind = computed(() => props.planSoftSwitchNotice?.kind ?? 'switched');
+
 const emit = defineEmits<{
   'update:fullAccessConsentChecked': [checked: boolean];
   cancelFullAccessConsent: [];
@@ -62,6 +64,8 @@ const emit = defineEmits<{
   rejectRun: [];
   undoPlanSoftSwitch: [];
   dismissPlanSoftSwitch: [];
+  acceptPlanSoftSwitchOffer: [];
+  declinePlanSoftSwitchOffer: [];
   undoTeammateRoute: [];
   dismissTeammateRoute: [];
 }>();
@@ -111,8 +115,11 @@ const emit = defineEmits<{
   <AgentDockPlanSwitchBanner
     :show="Boolean(planSoftSwitchNotice)"
     :reason-label="planSoftSwitchReasonLabel"
+    :kind="planSoftSwitchKind"
     @undo="emit('undoPlanSoftSwitch')"
     @dismiss="emit('dismissPlanSoftSwitch')"
+    @accept-offer="emit('acceptPlanSoftSwitchOffer')"
+    @decline-offer="emit('declinePlanSoftSwitchOffer')"
   />
   <AgentDockTeammateRouteBanner
     :show="Boolean(teammateRouteNotice)"

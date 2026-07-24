@@ -127,4 +127,5 @@ export const PLAN_SOFT_SWITCH_REASON_LABEL: Record<string, string> = {
   bullet_heavy: 'structured list',
   long_multistep: 'long multi-step ask',
   plan_keyword: 'plan keyword',
+  explicit_plan_request: 'explicit plan request',
 };
