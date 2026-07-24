@@ -4,6 +4,7 @@ import {
   formatAnsweredQuestionChoice,
   formatQuestionAnswer,
   moveQuestionOptionSelection,
+  normalizeAskOptionLabel,
   parseAskOptions,
   resolveAskBlockPrompt,
   truncateQuestionOptionLabel,
@@ -117,6 +118,45 @@ describe('agent question view', () => {
       '2. Updated scripts/verify/run_contract_unit_tests.sh',
     ].join('\n');
     expect(tryParseClarifyingMarkdown(text)).toBeNull();
+  });
+
+  it('does not upgrade reports with duplicate numbered sections into ask cards', () => {
+    const report = [
+      'Status after picking a birthday child.',
+      '',
+      '1. **Database** — Added party_pack.collected_at (migration applied).',
+      '2. **Backend** — Edge function supports marking party pack handouts.',
+      '3. **Teacher UI** — After picking a birthday child and marking payments:',
+      '1. Pick the birthday child',
+      '2. Mark who paid (R25)',
+      '3. Open **Party packs** > mark each learner',
+    ].join('\n');
+    expect(tryParseClarifyingMarkdown(report)).toBeNull();
+  });
+
+  it('does not treat "picking" in status prose as an ask cue', () => {
+    const text = [
+      'After picking a birthday child and marking payments:',
+      '1. Database migration applied',
+      '2. Backend deployed',
+      '3. Teacher UI updated',
+    ].join('\n');
+    expect(tryParseClarifyingMarkdown(text)).toBeNull();
+  });
+
+  it('strips markdown emphasis from option labels', () => {
+    expect(normalizeAskOptionLabel('**Database** — Added columns')).toBe(
+      'Database — Added columns',
+    );
+    expect(
+      parseAskOptions([
+        '1. **Database** — Added party_pack.collected_at',
+        '2. Open **Party packs** > mark each learner',
+      ]),
+    ).toEqual([
+      { id: '1', label: 'Database — Added party_pack.collected_at' },
+      { id: '2', label: 'Open Party packs > mark each learner' },
+    ]);
   });
 
   it('truncates long option labels for display', () => {

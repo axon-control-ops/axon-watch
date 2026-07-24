@@ -27,10 +27,20 @@ export function withOtherQuestionOption(options: AgentQuestionOption[]): AgentQu
 
 const ASK_OPTION_PIPE_RE = /^\s*[-*]\s+(\d+)\s*\|\s+(.+?)\s*$/;
 const ASK_OPTION_DASH_RE = /^\s*[-*]\s+(\d+)[.)]\s+(.+?)\s*$/;
-const NUMBERED_OPTION_RE = /^\s*(\d+)[.)]\s+\*?(.+?)\*?\s*$/;
+const NUMBERED_OPTION_RE = /^\s*(\d+)[.)]\s+(.+?)\s*$/;
+
+const MAX_CLARIFYING_OPTIONS = 6;
+const MAX_CLARIFYING_PROMPT_CHARS = 420;
+/** Long audit/report prose with numbered lists must stay markdown — not a question card. */
+const MAX_CLARIFYING_SOURCE_CHARS = 1200;
 
 export const AGENT_QUESTION_PROMPT_MAX = 280;
 export const AGENT_QUESTION_OPTION_LABEL_MAX = 160;
+
+/** Strip markdown emphasis leftovers so option labels do not show `Database**`. */
+export function normalizeAskOptionLabel(label: string): string {
+  return label.replace(/\*+/g, '').replace(/\s+/g, ' ').trim();
+}
 
 export function isAskOptionLine(line: string): boolean {
   const trimmed = line.trim();
@@ -120,17 +130,17 @@ export function parseAskOptions(bodyLines: string[]): AgentQuestionOption[] {
     }
     const pipe = line.match(ASK_OPTION_PIPE_RE);
     if (pipe) {
-      options.push({ id: pipe[1], label: pipe[2].trim() });
+      options.push({ id: pipe[1], label: normalizeAskOptionLabel(pipe[2]) });
       continue;
     }
     const dashed = line.match(ASK_OPTION_DASH_RE);
     if (dashed) {
-      options.push({ id: dashed[1], label: dashed[2].trim() });
+      options.push({ id: dashed[1], label: normalizeAskOptionLabel(dashed[2]) });
       continue;
     }
     const numbered = line.match(NUMBERED_OPTION_RE);
     if (numbered) {
-      options.push({ id: numbered[1], label: numbered[2].replace(/^\*+|\*+$/g, '').trim() });
+      options.push({ id: numbered[1], label: normalizeAskOptionLabel(numbered[2]) });
     }
   }
   return options;
@@ -139,25 +149,28 @@ export function parseAskOptions(bodyLines: string[]): AgentQuestionOption[] {
 /** Upgrade plain "Reply with 1, 2, or 3" clarifying prose into a question card model. */
 export function tryParseClarifyingMarkdown(text: string): AgentQuestionView | null {
   const trimmed = text.trim();
-  if (!trimmed) {
+  if (!trimmed || trimmed.length > MAX_CLARIFYING_SOURCE_CHARS) {
     return null;
   }
   const lower = trimmed.toLowerCase();
+  // Use word boundaries — "picking" / "chosen" in status dumps must not promote asks.
   const looksLikeAsk =
-    lower.includes('reply with')
+    /\breply with\b/.test(lower)
     || lower.includes('what should this plan focus')
-    || (/\b[123]\b/.test(trimmed) && (lower.includes('pick') || lower.includes('choose')));
+    || (/\b[123]\b/.test(trimmed) && /\b(?:pick|choose)\b/.test(lower));
   if (!looksLikeAsk) {
-    return null;
-  }
-  // Do not turn long agent status dumps into question cards unless they look like asks.
-  if (trimmed.length > 1200 && !lower.includes('reply with')) {
     return null;
   }
 
   const lines = trimmed.split('\n');
   const options = parseAskOptions(lines);
-  if (options.length < 2) {
+  if (options.length < 2 || options.length > MAX_CLARIFYING_OPTIONS) {
+    return null;
+  }
+
+  const optionIds = options.map((option) => option.id);
+  if (new Set(optionIds).size !== optionIds.length) {
+    // Duplicate ids (e.g. two "1." sections in a report) → not a single ask card.
     return null;
   }
 
@@ -166,6 +179,9 @@ export function tryParseClarifyingMarkdown(text: string): AgentQuestionView | nu
     bodyLines: lines,
     options,
   });
+  if (prompt.length > MAX_CLARIFYING_PROMPT_CHARS) {
+    return null;
+  }
 
   return { prompt, options };
 }
