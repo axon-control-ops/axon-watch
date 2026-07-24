@@ -21,7 +21,7 @@ export type TerminalPendingSession = {
 type FlushDeps = {
   sessions: readonly TerminalPendingSession[];
   activeSessionId: string;
-  hosts: Record<string, TerminalPendingHost | undefined>;
+  hosts: Record<string, TerminalPendingHost | null | undefined>;
   setVisibleSessionIds: (ids: string[]) => void;
 };
 
