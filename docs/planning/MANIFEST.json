@@ -2,8 +2,8 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-20",
-  "file_count": 43,
+  "generated_on": "2026-07-25",
+  "file_count": 44,
   "files": {
     "ADR-001-greenfield-repo.md": {
       "sha256": "558fd8d8fa76eacbae7b2d276c01bc85bf8e2e33c86af49a62bafc3c0a42cedc",
@@ -40,6 +40,10 @@
     "CONTRACT_TESTING_SPEC.md": {
       "sha256": "c4081b0ac81cc283dfed0f32b82633115a06d0808dcdb1a0373a29b27d31edb4",
       "bytes": 3647
+    },
+    "CURSOR_IDE_PARITY_PLAN.md": {
+      "sha256": "cc9f5b74a2317b110c7c0c22f39199a620c380779bf6d996228230dba5e15149",
+      "bytes": 3567
     },
     "DASHPRO_CI_AGENT_PLAYBOOK.md": {
       "sha256": "e7290a6468ec2f3bd3286813f2610d7a70cebb6d48cb21d5d60bc497174f3ba6",
