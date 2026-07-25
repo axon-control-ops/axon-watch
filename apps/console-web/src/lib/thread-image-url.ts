@@ -79,10 +79,28 @@ export function resolveEditorImagePreviewUrl(input: {
   projectRoot?: string | null;
   filePath?: string | null;
   title?: string | null;
+  previewUrl?: string | null;
   isImageDocument: boolean;
   source?: string | null;
 }): string {
-  if (!input.isImageDocument || input.source !== 'file' || !input.workspaceId?.trim()) {
+  if (!input.isImageDocument) {
+    return '';
+  }
+  const direct = String(input.previewUrl ?? '').trim();
+  if (direct) {
+    // Draft canvas tabs stash a ready URL (usually chat-attachment-backed).
+    if (/^https?:\/\//i.test(direct) || direct.startsWith('data:')) {
+      return direct;
+    }
+    if (direct.startsWith('/api/chat/attachments/')) {
+      return resolveChatAttachmentUrl(direct);
+    }
+    return resolveThreadImageUrl(direct, {
+      workspaceId: input.workspaceId,
+      projectRoot: input.projectRoot,
+    });
+  }
+  if (input.source !== 'file' || !input.workspaceId?.trim()) {
     return '';
   }
   return resolveThreadImageUrl(input.filePath || input.title || '', {

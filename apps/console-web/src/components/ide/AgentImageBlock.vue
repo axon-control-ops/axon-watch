@@ -55,7 +55,14 @@ const enlargedPreview = computed(() => {
 });
 
 function openInCanvas(): void {
-  void shell.openWorkspaceFile(resolvedPath.value);
+  const url = imageUrl.value.trim();
+  const attachmentUrl =
+    String(props.attachmentUrl ?? '').trim() ||
+    (url.includes('/api/chat/attachments/') ? url : '');
+  void shell.openImageInCanvas({
+    path: props.path,
+    attachmentUrl: attachmentUrl || null,
+  });
 }
 </script>
 

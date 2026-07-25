@@ -190,16 +190,15 @@ const editorPreviewHtml = computed(() => {
   });
 });
 
-const editorImagePreviewUrl = computed(() =>
-  resolveEditorImagePreviewUrl({
-    workspaceId: shell.currentWorkspace?.workspace_id,
-    projectRoot: shell.currentWorkspace?.project_root,
-    filePath: shell.activeEditorDocument?.filePath,
-    title: shell.activeEditorDocument?.title,
-    isImageDocument: isImageEditorDocument.value,
-    source: shell.activeEditorDocument?.source,
-  }),
-);
+const editorImagePreviewUrl = computed(() => {
+  const doc = shell.activeEditorDocument;
+  const ws = shell.currentWorkspace;
+  return resolveEditorImagePreviewUrl({
+    workspaceId: ws?.workspace_id, projectRoot: ws?.project_root,
+    filePath: doc?.filePath, title: doc?.title, previewUrl: doc?.previewUrl,
+    isImageDocument: isImageEditorDocument.value, source: doc?.source,
+  });
+});
 
 function handleEditorPreviewClick(event: MouseEvent): void {
   const baseFilePath =

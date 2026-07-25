@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeGeneratedImagePath,
   rewriteMarkdownImageSources,
+  resolveEditorImagePreviewUrl,
   resolveThreadImageUrl,
   threadAttachmentUrlForImagePath,
 } from './thread-image-url';
@@ -54,6 +55,18 @@ describe('thread image urls', () => {
         attachmentUrl: '/api/chat/attachments/attachment_123',
       }),
     ).toBe('/api/chat/attachments/attachment_123');
+  });
+
+  it('uses draft canvas previewUrl for editor image preview', () => {
+    expect(
+      resolveEditorImagePreviewUrl({
+        isImageDocument: true,
+        source: 'draft',
+        previewUrl: '/api/chat/attachments/attachment_abc',
+        filePath: 'assets/evidence-block-play-mildred.png',
+        title: 'evidence-block-play-mildred.png',
+      }),
+    ).toBe('/api/chat/attachments/attachment_abc');
   });
 
   it('matches attachment urls by image filename', () => {

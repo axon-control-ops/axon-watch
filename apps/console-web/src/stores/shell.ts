@@ -206,7 +206,6 @@ import {
   isBinaryFilePath,
   workspaceFileDocumentId,
 } from '../lib/workspace-file-language';
-import { resolveAgentEditOpenPath } from '../lib/agent-edit-open-path';
 import {
   buildOpenedFileDocuments,
   isSafeWorkspaceFilePath,
@@ -232,15 +231,11 @@ import {
   writeOpenEditorFilePathsForWorkspace,
 } from '../lib/editor-open-tabs-prefs';
 import { formatAgentDraftTitle } from '../lib/editor-tab-labels';
-import type { IdeAgentEditSummary } from '../lib/ide-agent-center-view';
 import {
-  agentEditReviewDocumentId,
-  agentEditReviewDocumentTitle,
-  formatAgentEditReviewContent,
   isAgentEditReviewDocumentId,
   isMarkdownAgentEditPath,
-  shouldOpenWorkspaceFileForEditReview,
 } from '../lib/ide-agent-edit-review';
+import { createShellAgentCanvasOps } from '../lib/shell-agent-canvas-ops';
 import {
   resolveRunHistoryRunId,
   selectRunSeamDisplayRun,
@@ -2639,72 +2634,16 @@ export const useShellStore = defineStore('shell', () => {
     return id;
   }
 
-  function openAgentEditReview(edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'>): void {
-    const path = resolveAgentEditOpenPath(edit.path, currentWorkspace.value?.project_root);
-    if (!path) {
-      return;
-    }
-    if (layoutMode.value !== 'ide') {
-      setLayoutMode('ide');
-    }
-    if (shouldOpenWorkspaceFileForEditReview(edit)) {
-      if (languageForFilePath(path) === 'markdown') {
-        persistEditorMarkdownPreviewEnabled(workspaceFileDocumentId(path), true);
-      }
-      void openWorkspaceFile(path);
-      return;
-    }
-
-    if (!openedFilePaths.value.includes(path)) {
-      openedFilePaths.value = [...openedFilePaths.value, path];
-      void ensureWorkspaceFileLoaded(path);
-    }
-
-    const id = agentEditReviewDocumentId(path);
-    const title = agentEditReviewDocumentTitle(path);
-    const content = formatAgentEditReviewContent(edit);
-    const language = (
-      languageForFilePath(path) === 'markdown' ? 'markdown' : 'plaintext'
-    ) as EditorDocumentLanguage;
-    const existing = draftDocuments.value.find((document) => document.id === id);
-
-    if (existing) {
-      draftDocuments.value = draftDocuments.value.map((document) =>
-        document.id === id
-          ? {
-              ...document,
-              title,
-              language,
-              value: content,
-              dirty: document.value !== content,
-            }
-          : document,
-      );
-    } else {
-      draftDocuments.value = [
-        ...draftDocuments.value,
-        {
-          id,
-          title,
-          language,
-          value: content,
-          description:
-            language === 'markdown'
-              ? 'Agent markdown review (Preview/Raw). Diff markers are stripped for readable rendering.'
-              : 'Agent proposed changes from the transcript diff (read-only review).',
-          source: 'draft',
-          readOnly: true,
-          dirty: false,
-          filePath: path,
-        },
-      ];
-    }
-
-    if (language === 'markdown') {
-      persistEditorMarkdownPreviewEnabled(id, true);
-    }
-    activeEditorDocumentId.value = id;
-  }
+  const { openImageInCanvas, openAgentEditReview } = createShellAgentCanvasOps({
+    layoutMode,
+    setLayoutMode,
+    currentWorkspace,
+    draftDocuments,
+    openedFilePaths,
+    activeEditorDocumentId,
+    openWorkspaceFile,
+    ensureWorkspaceFileLoaded,
+  });
 
   function recordAgentReportEditorLink(
     messageId: string,
@@ -3860,6 +3799,7 @@ export const useShellStore = defineStore('shell', () => {
     loadWorkspaceFiles,
     openAgentContentInEditor,
     openAgentEditReview,
+    openImageInCanvas,
     openWorkspaceFile,
     openResearchInEditor,
     proveResearchSource,
