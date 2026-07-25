@@ -1,18 +1,6 @@
 /* IDE mode: activity bar + explorer + KAIRO footer + agent dock (ADR-008) */
 @import './ide-layout-01-dock.css';
 
-.console-shell--mockup .left-sidebar-mockup--ide {
-  display: grid !important;
-  grid-template-rows:
-    minmax(0, 1fr)
-    var(--ide-kairo-panel-height, clamp(14rem, 42%, 28rem));
-  gap: 0;
-  height: 100% !important;
-  max-height: 100%;
-  align-self: stretch;
-  min-height: 0;
-}
-
 .left-sidebar-mockup__ide-body {
   display: flex;
   grid-row: 1;

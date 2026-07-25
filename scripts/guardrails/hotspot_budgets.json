@@ -209,7 +209,7 @@
       "note": "Mission control panel; extract quick-guide rail when shrinking"
     },
     "apps/console-web/src/styles/ide/ide-layout-01.css": {
-      "max_lines": 424,
+      "max_lines": 412,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",

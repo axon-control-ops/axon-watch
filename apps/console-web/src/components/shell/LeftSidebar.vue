@@ -232,23 +232,23 @@ onBeforeUnmount(() => {
           <IdeExplorerPanel v-else />
         </div>
       </div>
+      <div
+        class="ide-kairo-panel-resize-handle"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize agent card"
+        title="Drag up/down to resize agent card. Enter or double-click to reset."
+        tabindex="0"
+        :aria-valuemin="ideKairoPanelHeightMin"
+        :aria-valuemax="ideKairoPanelHeightMax"
+        :aria-valuenow="ideKairoPanelHeight"
+        @mousedown="startIdeKairoPanelResize"
+        @keydown="onIdeKairoPanelResizeKeydown"
+        @dblclick="resetIdeKairoPanelHeight"
+      >
+        <span class="ide-kairo-panel-resize-grip" aria-hidden="true" />
+      </div>
       <div class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
-        <div
-          class="voice-card-resize-handle ide-kairo-panel-resize-handle"
-          role="separator"
-          aria-orientation="horizontal"
-          aria-label="Resize agent card"
-          title="Drag or use arrow keys to resize. Enter or double-click to reset."
-          tabindex="0"
-          :aria-valuemin="ideKairoPanelHeightMin"
-          :aria-valuemax="ideKairoPanelHeightMax"
-          :aria-valuenow="ideKairoPanelHeight"
-          @mousedown="startIdeKairoPanelResize"
-          @keydown="onIdeKairoPanelResizeKeydown"
-          @dblclick="resetIdeKairoPanelHeight"
-        >
-          <span class="voice-card-resize-grip" aria-hidden="true" />
-        </div>
         <KairoSidebarPanel />
       </div>
     </template>
