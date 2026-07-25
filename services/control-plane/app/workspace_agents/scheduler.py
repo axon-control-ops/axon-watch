@@ -277,6 +277,15 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
     if pruned:
         logger.info("continuous worker tick pruned %s terminal employee run(s)", len(pruned))
 
+    try:
+        from app.workspace_delivery.poll import poll_pending_deliveries
+
+        timed_out = poll_pending_deliveries()
+        if timed_out:
+            logger.info("workspace delivery poll updated %s delivery(ies)", len(timed_out))
+    except Exception:  # noqa: BLE001 — never block scheduler on delivery poll
+        logger.exception("workspace delivery poll failed")
+
     if not scheduler_enabled():
         return []
 

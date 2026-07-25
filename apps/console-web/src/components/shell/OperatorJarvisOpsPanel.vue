@@ -18,9 +18,6 @@ const view = computed(() =>
 );
 
 function onCardActivate(kind: string, id: string): void {
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'jarvis-ops',hypothesisId:'OPS1',location:'OperatorJarvisOpsPanel.vue:onCardActivate',message:'jarvis ops card activated',data:{kind,id,cardCount:view.value.cards.length},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (kind === 'command') {
     shell.focusCommandSeam();
     return;

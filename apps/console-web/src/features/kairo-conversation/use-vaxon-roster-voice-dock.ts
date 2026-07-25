@@ -1,12 +1,21 @@
 import { computed, onBeforeUnmount, onMounted, ref, type ComputedRef } from 'vue';
 
 import {
+  clearVaxonBriefingInteraction,
+  getVaxonBriefingInteraction,
+  recordVaxonBriefingInteraction,
+  vaxonBriefingInteractionKey,
+} from '../../lib/vaxon-briefing-interaction';
+import {
   getKairoVoiceUtteranceState,
   subscribeKairoVoiceUtterance,
 } from '../../lib/kairo-voice-utterance';
 import { kairoVoiceFollowupExpiresAt } from '../../lib/kairo-voice-followup-window';
 
-export function useVaxonRosterVoiceDock(speechActive: ComputedRef<boolean>) {
+export function useVaxonRosterVoiceDock(
+  speechActive: ComputedRef<boolean>,
+  workspaceId: ComputedRef<string | null | undefined>,
+) {
   const now = ref(Date.now());
   const lastLine = ref('');
   const lastSpeakerWasVaxon = ref(false);
@@ -21,13 +30,30 @@ export function useVaxonRosterVoiceDock(speechActive: ComputedRef<boolean>) {
     }
     if (state.speaker?.kind === 'vaxon') {
       lastSpeakerWasVaxon.value = true;
-      if (state.text?.trim()) {
-        lastLine.value = state.text.trim();
+      const text = state.text?.trim();
+      if (text) {
+        lastLine.value = text;
+        const ws = workspaceId.value?.trim();
+        if (ws) {
+          recordVaxonBriefingInteraction({
+            workspaceId: ws,
+            line: text,
+            utteranceKey: vaxonBriefingInteractionKey(text, state.speaker.id),
+          });
+        }
       }
     }
   }
 
   onMounted(() => {
+    const ws = workspaceId.value?.trim();
+    if (ws) {
+      const pending = getVaxonBriefingInteraction(ws);
+      if (pending) {
+        lastSpeakerWasVaxon.value = true;
+        lastLine.value = pending.line;
+      }
+    }
     applyUtterance();
     unsubscribe = subscribeKairoVoiceUtterance(() => applyUtterance());
     timer = globalThis.setInterval(() => {
@@ -53,14 +79,41 @@ export function useVaxonRosterVoiceDock(speechActive: ComputedRef<boolean>) {
   });
   const followupActive = computed(() => remainingSeconds.value > 0);
   const speaking = computed(() => lastSpeakerWasVaxon.value && speechActive.value);
-  const visible = computed(
-    () => lastSpeakerWasVaxon.value && (speaking.value || followupActive.value),
+  const pendingInteraction = computed(() => {
+    const ws = workspaceId.value?.trim();
+    return ws ? getVaxonBriefingInteraction(ws) : null;
+  });
+  const displayLine = computed(
+    () => pendingInteraction.value?.line || lastLine.value,
   );
+  const visible = computed(
+    () =>
+      Boolean(displayLine.value.trim()) &&
+      (speaking.value || followupActive.value || Boolean(pendingInteraction.value)),
+  );
+
+  function dismiss(): void {
+    const ws = workspaceId.value?.trim();
+    if (ws) {
+      clearVaxonBriefingInteraction(ws);
+    }
+    lastLine.value = '';
+    lastSpeakerWasVaxon.value = false;
+  }
+
+  function markReplied(): void {
+    const ws = workspaceId.value?.trim();
+    if (ws) {
+      clearVaxonBriefingInteraction(ws);
+    }
+  }
 
   return {
     visible,
     speaking,
-    line: computed(() => lastLine.value),
+    line: displayLine,
     remainingSeconds,
+    dismiss,
+    markReplied,
   };
 }

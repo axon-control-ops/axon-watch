@@ -55,6 +55,7 @@ import {
   handleAgentStreamVoiceDelta,
 } from '../lib/agent-stream-voice-session';
 import { createRafStreamUiBatcher } from '../lib/stream-ui-raf-batch';
+import { createStreamMessageContentBatcher } from '../lib/stream-message-content-batch';
 import {
   resolveBootstrapIdeThreadId,
   shouldApplyWorkspaceThreadLoad,
@@ -1661,6 +1662,23 @@ export const useShellStore = defineStore('shell', () => {
     const streamUiBatcher = createRafStreamUiBatcher<Partial<WorkspaceStreamUiState>>(
       (streamThreadId, partial) => setWorkspaceStreamUi(streamThreadId, partial),
     );
+    const contentBatcher = createStreamMessageContentBatcher(patchThreadMessageContent);
+    const settleStreamUi = (clearRunId = false) => {
+      streamUiBatcher.flushNow(threadId);
+      contentBatcher.flushNow(threadId);
+      setWorkspaceStreamUi(threadId, {
+        active: false,
+        messageId: null,
+        activity: null,
+        ...(clearRunId ? { ideAgentRunId: null } : {}),
+      });
+      streamUiBatcher.cancel(threadId);
+      contentBatcher.cancel(threadId);
+      disconnectChatStreamSession(threadId);
+      void refreshRunSurfaces().finally(() => {
+        void flushIdeComposerQueueIfIdle();
+      });
+    };
     const voiceContext = kairoVoiceContext();
     const voiceNarration = createAgentStreamVoiceSession({
       composerMode,
@@ -1684,7 +1702,7 @@ export const useShellStore = defineStore('shell', () => {
         messageId,
         onDelta: (content) => {
           streamedContent = content;
-          patchThreadMessageContent(threadId, messageId, content);
+          contentBatcher.schedule(threadId, { messageId, content });
           const activity = getWorkspaceStreamUi(threadId).activity as IdeComposerActivity | null;
           handleAgentStreamVoiceDelta({
             voiceNarration,
@@ -1723,6 +1741,7 @@ export const useShellStore = defineStore('shell', () => {
         },
         onDone: (payload) => {
           try {
+            contentBatcher.flushNow(threadId);
             clearIdeRunRecovery(attachedRunId ?? undefined);
             if (payload.system_message_id && payload.system_content) {
               patchThreadMessageContent(
@@ -1775,18 +1794,7 @@ export const useShellStore = defineStore('shell', () => {
               }
             }
           } finally {
-            streamUiBatcher.flushNow(threadId);
-            setWorkspaceStreamUi(threadId, {
-              active: false,
-              messageId: null,
-              activity: null,
-              ideAgentRunId: null,
-            });
-            streamUiBatcher.cancel(threadId);
-            disconnectChatStreamSession(threadId);
-            void refreshRunSurfaces().finally(() => {
-              void flushIdeComposerQueueIfIdle();
-            });
+            settleStreamUi(true);
           }
         },
         onError: (message, payload) => {
@@ -1806,17 +1814,7 @@ export const useShellStore = defineStore('shell', () => {
           ) {
             commandMutationError.value = message;
           }
-          streamUiBatcher.flushNow(threadId);
-          setWorkspaceStreamUi(threadId, {
-            active: false,
-            messageId: null,
-            activity: null,
-          });
-          streamUiBatcher.cancel(threadId);
-          disconnectChatStreamSession(threadId);
-          void refreshRunSurfaces().finally(() => {
-            void flushIdeComposerQueueIfIdle();
-          });
+          settleStreamUi();
         },
       }),
     );

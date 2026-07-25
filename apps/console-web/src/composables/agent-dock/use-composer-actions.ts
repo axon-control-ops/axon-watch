@@ -190,55 +190,11 @@ export function useComposerActions(options: UseComposerActionsOptions) {
       await applyEmployeeSpecialtyRoute(shell, routeDecision);
     }
     const applyMs = Date.now() - submitStartedAt;
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'fc0b35',
-      },
-      body: JSON.stringify({
-        sessionId: 'fc0b35',
-        runId: 'send-delay',
-        hypothesisId: 'H8a-H8b',
-        location: 'use-composer-actions.ts:handleSubmit',
-        message: 'pre-submit route timing',
-        data: {
-          routeMs,
-          applyMs,
-          shouldRoute: routeDecision.shouldRoute,
-          reason: routeDecision.reason,
-          source: routeDecision.source,
-          winnerName: routeDecision.employee?.name ?? null,
-          modeForSubmit,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     const attachmentFiles = composerImages.value.map((image) => image.file);
     // openOrFocusEmployeeIdeThread may clear/restore drafts — keep the routed prompt.
     shell.ideComposerDraft = submitDraft;
     await shell.submitIdeComposer(modeForSubmit, { attachmentFiles });
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'fc0b35',
-      },
-      body: JSON.stringify({
-        sessionId: 'fc0b35',
-        runId: 'send-delay',
-        hypothesisId: 'H8c',
-        location: 'use-composer-actions.ts:handleSubmit',
-        message: 'submitIdeComposer returned',
-        data: { totalMs: Date.now() - submitStartedAt, modeForSubmit },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);
   }

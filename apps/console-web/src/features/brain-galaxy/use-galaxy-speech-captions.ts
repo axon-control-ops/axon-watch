@@ -120,9 +120,6 @@ export function useGalaxySpeechCaptions() {
     clearTimers();
     captions.value = [];
     generation += 1;
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'S1-S2',location:'use-galaxy-speech-captions.ts:startUtterance',message:'caption and speaker activity synced to utterance',data:{layoutMode:shell.layoutMode,hasSpeaker:Boolean(speaker),speakerKind:speaker?.kind??null,speakerId:speaker?.id??null,speakerName:speaker?.name??null,fleetSize:shell.companyEmployeesFleet.length,hasFace:Boolean(speaker),utterancePreview:activeUtteranceText.value?.slice(0,80)??null,activityPreview:activityLine.value?.slice(0,80)??null,inSync:activityLine.value===activeUtteranceText.value||Boolean(activeUtteranceText.value&&activityLine.value?.startsWith(activeUtteranceText.value.slice(0,117)))},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }
 
   function endUtterance(): void {

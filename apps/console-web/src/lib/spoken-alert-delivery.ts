@@ -190,9 +190,6 @@ export async function deliverSpokenOperatorAlert(
   }
 
   const speaker = resolveSpokenAlertSpeaker(options);
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'speaker-avatar',hypothesisId:'A',location:'spoken-alert-delivery.ts:deliverSpokenOperatorAlert',message:'spoken alert speaker resolved',data:{priority:options.priority??'alert',speakerKind:speaker.kind,speakerId:speaker.id,hasAzureVoice:Boolean(options.azureVoiceId?.trim()),messagePreview:alert.message.slice(0,80)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   const result = await speakKairoLine(alert.message, {
     priority: options.priority ?? 'alert',
     azureVoiceId: options.azureVoiceId?.trim() || undefined,

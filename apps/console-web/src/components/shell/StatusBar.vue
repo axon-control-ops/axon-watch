@@ -20,7 +20,7 @@ function updateClock(): void {
   });
   // #region agent log
   if (now.getSeconds() === 0) {
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'H5',location:'StatusBar.vue:updateClock',message:'status bar local clock tick',data:{label:clockLabel.value,utcHours:now.getUTCHours(),localHours:now.getHours(),clockNodeCount:typeof document!=='undefined'?document.querySelectorAll('.status-bar-mockup__clock').length:-1},timestamp:Date.now()})}).catch(()=>{});
+
   }
   // #endregion
 }

@@ -119,7 +119,14 @@ def finalize_lane_b_agent_run(
     lane_b_result: dict[str, object],
     reply_text: str = "",
     workspace_root: str | None = None,
+    defer_complete: bool = False,
 ) -> tuple[bool, dict[str, object] | None]:
+    """Finalize a Lane B agent run.
+
+    When ``defer_complete`` is True (scheduled workers), critical review and
+    Gate 6 acceptance still run, but ``complete_run`` is left to the caller so
+    workspace delivery can publish before the terminal phase.
+    """
     dispatched = bool(lane_b_result.get("dispatched"))
     runtime_label = str(lane_b_result.get("runtime_label") or "runtime fallback")
     reason = str(lane_b_result.get("reason") or "").strip()
@@ -169,7 +176,17 @@ def finalize_lane_b_agent_run(
                 dispatch_run_id,
                 workspace_root=workspace_root,
             )
-            run_record = complete_run(dispatch_run_id)
+            if defer_complete:
+                append_run_execution_receipt(
+                    dispatch_run_id,
+                    receipt_type="worker_delivery",
+                    receipt_summary="stage=verified · awaiting workspace delivery publish",
+                    actor="workspace_delivery",
+                    success=True,
+                    intent="workspace_delivery",
+                )
+            else:
+                run_record = complete_run(dispatch_run_id)
         else:
             run_record = fail_run(
                 dispatch_run_id,
@@ -190,6 +207,7 @@ def finalize_lane_b_agent_run(
                 success=False,
                 intent="lane_b_agent",
             )
+            dispatched = False
     return dispatched, run_record
 
 

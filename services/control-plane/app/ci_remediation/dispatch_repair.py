@@ -45,11 +45,12 @@ def build_repair_goal(
     return (
         f"CI repair: {workflow} failed on {branch}. "
         f"Failing step hint: {failing}. "
+        f"Checkout the exact failing head `{classified.get('head_sha') or 'HEAD'}` "
+        f"on branch `{branch}` (fast-forward only; never force-push). "
         f"Use `gh run view {classified['run_id']} --log-failed`, apply the smallest fix "
         f"(often scripts/guardrails/hotspot_budgets.json or extraction), commit, "
         f"push per push_policy={binding.push_policy} (draft PR; no protected merge/"
-        f"force-push), then `gh run watch {classified['run_id']} --exit-status` "
-        f"or watch the repair-head run and report its URL + conclusion. "
+        f"force-push), then watch the repair-head run and report its URL + conclusion. "
         f"Source run: {run_url or classified['run_id']}. "
         f"CI remediation dedupe_key: {dedupe_key}."
     )

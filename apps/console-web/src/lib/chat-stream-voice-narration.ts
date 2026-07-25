@@ -134,9 +134,6 @@ export function createChatStreamVoiceNarration(input: {
       !thinkingThrottle.canSpeak() ||
       !input.voiceDeliveryAllowed()
     ) {
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'H2',location:'chat-stream-voice-narration.ts:maybeSpeakThinkingBlock',message:'thinking speech skipped',data:{preview:cleaned.slice(0,100),waitProgress,spokeWaitProgress,similarity,hasFence:/:::/.test(spokenBlock)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       return false;
     }
     cancelStaleNarration();
@@ -153,9 +150,6 @@ export function createChatStreamVoiceNarration(input: {
     if (waitProgress) {
       spokeWaitProgress = true;
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'H1-H2',location:'chat-stream-voice-narration.ts:maybeSpeakThinkingBlock',message:'live thinking spoken — tools will defer',data:{preview:cleaned.slice(0,100),spokenCount:thinkingThrottle.spokenCount(),waitProgress,spokeWaitProgress,hasFence:/:::/.test(cleaned)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return true;
   }
 
@@ -177,7 +171,7 @@ export function createChatStreamVoiceNarration(input: {
     ) {
       // #region agent log
       if (milestone.key.startsWith('tool:') || milestone.key.startsWith('edit:')) {
-        fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'agent-aware-speech',hypothesisId:'H-skip-tool',location:'chat-stream-voice-narration.ts:narrateAgentMilestone',message:'skipped canned tool/edit milestone',data:{key:milestone.key,toolLabel:milestone.toolLabel??null,thinkingCarriesUpdate,narration},timestamp:Date.now()})}).catch(()=>{});
+
       }
       // #endregion
       return;
@@ -191,9 +185,6 @@ export function createChatStreamVoiceNarration(input: {
     agentMilestoneNarrator?.narrate(milestone);
     if (milestone.key.startsWith('tool:')) {
       toolThrottle.recordSpoken();
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'agent-aware-speech',hypothesisId:'H-tool',location:'chat-stream-voice-narration.ts:narrateAgentMilestone',message:'speaking tool milestone',data:{key:milestone.key,toolLabel:milestone.toolLabel??null,messagePreview:(milestone.message??'').slice(0,100)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     }
   }
 

@@ -17,9 +17,6 @@ export function useSpokenUtteranceText() {
     unsubscribe = subscribeKairoVoiceUtterance((state) => {
       const next = state.text?.trim() ? stripAgentStreamFenceMarkers(state.text) : null;
       spokenText.value = next || null;
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'S1',location:'useSpokenUtteranceText.ts:subscribe',message:'spoken utterance for transcript sync',data:{hasText:Boolean(spokenText.value),preview:(spokenText.value??'').slice(0,80),hasFence:/:::/.test(state.text??'')},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
     });
   });
 

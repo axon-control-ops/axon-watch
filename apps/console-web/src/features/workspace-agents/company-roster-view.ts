@@ -266,6 +266,12 @@ export function employeeTalkLine(employee: CompanyEmployeeRecord): string | null
   if (failure) {
     return failure;
   }
+  const pipeline = String(employee.pipeline_stage || '').trim();
+  if (pipeline && ['watcher', 'integrations', 'lead', 'backend'].includes(String(employee.role || '').toLowerCase())) {
+    const label = pipeline.replace(/_/g, ' ');
+    const detail = employee.pipeline_detail?.trim();
+    return detail ? `Delivery ${label}: ${detail}` : `Delivery ${label}.`;
+  }
   if (!employeeIsWorking(employee.status)) {
     return null;
   }

@@ -41,8 +41,11 @@ import { navigateToSettingsSection } from '../../lib/settings-section-route';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
-const vaxonVoiceDock = useVaxonRosterVoiceDock(computed(() => shell.kairoSpeechActive));
 const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
+const vaxonVoiceDock = useVaxonRosterVoiceDock(
+  computed(() => shell.kairoSpeechActive),
+  currentWorkspaceId,
+);
 /** Single roster source of truth — shell owns the poll; do not dual-poll here (causes IDE flicker). */
 const employees = computed(() => shell.companyEmployeesForCurrentWorkspace);
 const loadState = computed<'idle' | 'loading' | 'loaded'>(() => {
@@ -449,6 +452,8 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :speaking="vaxonVoiceDock.speaking.value"
           :line="vaxonVoiceDock.line.value"
           :remaining-seconds="vaxonVoiceDock.remainingSeconds.value"
+          :on-dismiss="vaxonVoiceDock.dismiss"
+          :on-replied="vaxonVoiceDock.markReplied"
         />
         <AgentPersonaDock
           v-else-if="selectedEmployee"

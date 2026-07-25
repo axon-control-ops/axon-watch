@@ -1,10 +1,8 @@
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import type { KairoVoiceSpeaker } from '../../lib/kairo-voice-utterance';
 import { buildEmployeeAvatar, type EmployeeAvatarModel } from '../workspace-agents/employee-avatar';
-import {
-  buildEmployeeFaceAvatarUrl,
-  buildVaxonFaceAvatarUrl,
-} from '../workspace-agents/employee-face-avatar';
+import { buildEmployeeFaceAvatarUrl } from '../workspace-agents/employee-face-avatar';
+import { resolveVaxonAvatarUrl } from '../../lib/vaxon-avatar-view';
 
 export type GalaxySpeakerAvatarView = {
   id: string;
@@ -60,7 +58,7 @@ export function resolveGalaxySpeakerAvatar(
       initials: VAXON_AVATAR.initials,
       background: VAXON_AVATAR.background,
       foreground: VAXON_AVATAR.foreground,
-      faceUrl: buildVaxonFaceAvatarUrl(),
+      faceUrl: resolveVaxonAvatarUrl(),
       speaking,
       workspaceLabel: null,
       activityLine,

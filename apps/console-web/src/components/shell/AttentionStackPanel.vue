@@ -6,6 +6,8 @@ import HudSeamCard from '../HudSeamCard.vue';
 import HandoffToIdeButton from './HandoffToIdeButton.vue';
 import SentryIssuesList from './SentryIssuesList.vue';
 import VerifyDismissSignalButton from './VerifyDismissSignalButton.vue';
+import WorkerDeliveryPipelineCard from './WorkerDeliveryPipelineCard.vue';
+import { useDockDeliveryPipeline } from './use-dock-delivery-pipeline';
 import {
   formatRunDisplayName,
   formatRunShortId,
@@ -44,6 +46,11 @@ const showingRecentCompletedRun = computed(
 const recentReceipts = computed(() => {
   const limit = props.variant === 'sidebar' ? 2 : 3;
   return shell.runHistoryRows.slice(-limit).reverse();
+});
+
+const deliveryPipeline = useDockDeliveryPipeline({
+  receiptLabels: computed(() => shell.runHistoryRows.map((row) => row.label)),
+  employees: computed(() => shell.companyEmployeesForCurrentWorkspace),
 });
 
 const otherReviewReadyRuns = computed(() =>
@@ -205,6 +212,11 @@ function approvalExplanation(): OperatorAlertExplanation {
             <span class="dock-run-receipts__label">{{ row.label }}</span>
           </li>
         </ul>
+
+        <WorkerDeliveryPipelineCard
+          v-if="deliveryPipeline"
+          :pipeline="deliveryPipeline"
+        />
 
         <div v-if="otherReviewReadyRuns.length" class="dock-run-seam__also-waiting">
           <div class="dock-run-seam__also-header">

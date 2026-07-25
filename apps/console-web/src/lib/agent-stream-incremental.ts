@@ -239,7 +239,7 @@ export function createAgentStreamIncrementalState(options?: {
       const sanitized = sanitizeAgentThinkingForOperator(thinking);
       // #region agent log
       if (/:::/.test(thinking) || /:::/.test(sanitized)) {
-        fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'H1',location:'agent-stream-incremental.ts:toStreamingActivityView',message:'thinking fence in activity path',data:{rawHasFence:/:::/.test(thinking),sanitizedHasFence:/:::/.test(sanitized),rawPreview:thinking.slice(-80),sanitizedPreview:sanitized.slice(-80)},timestamp:Date.now()})}).catch(()=>{});
+
       }
       // #endregion
       if (sanitized) {

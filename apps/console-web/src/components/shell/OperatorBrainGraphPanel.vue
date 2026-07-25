@@ -186,9 +186,6 @@ watch(
     }
     const ys = next.nodes.map((node) => node.y);
     const ySpan = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H9',location:'OperatorBrainGraphPanel.vue:svg-nebula',message:'SVG nebula fallback layout',data:{nodeCount:next.nodes.length,labeled:next.nodes.filter((n)=>n.showLabel).length,ySpan:Number(ySpan.toFixed(1)),nebulaRx:Number(next.nebula.rx.toFixed(1)),nebulaRy:Number(next.nebula.ry.toFixed(1)),stars:next.stars.length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   },
   { immediate: true },
 );

@@ -376,6 +376,9 @@
 }
 
 .agent-dock__header {
+  /* Above .agent-dock__thread so the workspace picker can overhang the transcript. */
+  position: relative;
+  z-index: 30;
   flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
@@ -441,5 +444,22 @@
   flex: 0 1 auto;
   min-width: 0;
   max-width: 13rem;
+}
+
+.agent-dock-workspace-menu:has(.agent-dock-workspace-menu__panel) {
+  z-index: 80;
+}
+
+/* glass3d flattens dock children to z-index:1 — restore chrome above transcript. */
+.console-shell--mockup.console-shell--glass3d
+  .region-right-dock.agent-dock
+  > .agent-dock__header {
+  z-index: 30;
+}
+
+.console-shell--mockup.console-shell--glass3d
+  .region-right-dock.agent-dock
+  > .agent-dock__composer {
+  z-index: 40;
 }
 

@@ -196,7 +196,7 @@ export class BrainGalaxyScene {
             ),
           )
         : null;
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-nebula-dust',hypothesisId:'H13',location:'brain-galaxy-scene.ts:setSnapshot',message:'nebula dust galaxy layout applied',data:{nodeCount:this.layout.nodes.length,workspaceCount:workspaces.length,ySpan:Number(ySpan.toFixed(3)),minCoreGap:minGap==null?null:Number(minGap.toFixed(3)),haze:'points-dust',camera:cam?{x:+cam.x.toFixed(2),y:+cam.y.toFixed(2),z:+cam.z.toFixed(2)}:null,sample:workspaces.slice(0,4).map((n)=>({id:n.label,x:+n.x.toFixed(2),y:+n.y.toFixed(2),z:+n.z.toFixed(2)}))},timestamp:Date.now()})}).catch(()=>{});
+
     }
     // #endregion
     this.rebuildGraph();
