@@ -112,6 +112,8 @@ export interface IdeThreadTabItem {
   workspace_id: string;
   run_id: string | null;
   thread_kind: string;
+  employee_id?: string | null;
+  employee_role?: string | null;
   created_at: string;
   updated_at: string;
   preview_label: string;
@@ -144,6 +146,8 @@ export function resolveOpenIdeThreadTabItems(input: {
       workspace_id: input.workspaceId,
       run_id: null,
       thread_kind: 'ide',
+      employee_id: null,
+      employee_role: null,
       created_at: '',
       updated_at: '',
       preview_label: 'New chat',
