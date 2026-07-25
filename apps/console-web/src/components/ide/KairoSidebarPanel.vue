@@ -10,16 +10,15 @@ import {
 import { kairoPresenceLabel } from '../../lib/kairo-presence';
 import { ideShowKairoSidebarExpanded, resolveIdeKairoChipState, shouldSurfaceIdeEmployeeFailure } from '../../lib/ide-presence-profile';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
-import { resolveSidebarAgentTranscript } from '../../lib/sidebar-agent-transcript-view';
 import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
 import AgentLiveLineHeadline from './AgentLiveLineHeadline.vue';
-import KairoSidebarTranscript from './KairoSidebarTranscript.vue';
+import KairoSidebarSpeechChip from './KairoSidebarSpeechChip.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 
 const shell = useShellStore();
-const { spokenText } = useSpokenUtteranceText();
+const { spokenText, speaker } = useSpokenUtteranceText();
 const debugModeActive = computed(() => shell.ideDebugModeSelected);
 const activePersonaName = computed(
   () => shell.activeIdeEmployee?.name?.trim() || OPERATOR_PERSONA_NAME,
@@ -71,8 +70,8 @@ const briefingHeadline = computed(() =>
   briefingPanelHeadline(shell.operatorBriefing, shell.briefingLoadState),
 );
 const notice = computed(() => {
-  if (shell.kairoAgentLiveLine) {
-    return 'Streaming agent activity — thinking, tools, and edits appear below as they land.';
+  if (shell.kairoSpeechActive || spokenText.value?.trim()) {
+    return 'Spoken replies from the agent who is talking appear below.';
   }
   return briefingNotice(shell.operatorBriefing, shell.briefingLoadState);
 });
@@ -84,12 +83,8 @@ const signalBadge = computed(
   () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
 );
 const showStopSpeech = computed(() => shell.kairoSpeechActive);
-const transcriptView = computed(() =>
-  resolveSidebarAgentTranscript({
-    messages: shell.threadMessages,
-    agentStreamActive: shell.agentStreamActive,
-    agentStreamMessageId: shell.agentStreamMessageId,
-  }),
+const speechPersonaName = computed(
+  () => speaker.value?.name?.trim() || activePersonaName.value,
 );
 
 function handleExpand(): void {
@@ -104,15 +99,9 @@ function handleExpand(): void {
   shell.focusKairoBriefing();
 }
 
-function handleStopSpeech(event: Event): void {
-  event.stopPropagation();
+function handleStopSpeech(event?: Event): void {
+  event?.stopPropagation();
   shell.stopKairoSpeech();
-}
-
-function openAgentTranscript(): void {
-  if (shell.agentDockCollapsed) {
-    shell.toggleAgentDock();
-  }
 }
 </script>
 
@@ -155,7 +144,7 @@ function openAgentTranscript(): void {
         'kairo-sidebar-panel--employee-interrupted':
           surfaceEmployeeFailure && shell.activeIdeEmployeeShiftInterrupted,
         'kairo-sidebar-panel--alerting': chipState === 'alerting',
-        'kairo-sidebar-panel--streaming': transcriptView.streaming,
+        'kairo-sidebar-panel--speaking': shell.kairoSpeechActive,
       },
     ]"
     :aria-label="`${activePersonaName}. ${shell.briefingSummaryLine}`"
@@ -214,23 +203,17 @@ function openAgentTranscript(): void {
           >
             Stop speaking
           </button>
-          <p
-            v-if="spokenText?.trim()"
-            class="kairo-sidebar-panel__spoken"
-          >
-            {{ spokenText }}
-          </p>
         </div>
       </div>
       <BriefingSurfaceFollowupPrompt />
     </div>
 
-    <KairoSidebarTranscript
-      :lines="transcriptView.lines"
-      :streaming="transcriptView.streaming"
-      :empty-hint="transcriptView.emptyHint"
-      :persona-name="activePersonaName"
-      @open-dock="openAgentTranscript"
+    <KairoSidebarSpeechChip
+      :spoken-text="spokenText"
+      :speaker="speaker"
+      :speaking="shell.kairoSpeechActive"
+      :fallback-persona-name="speechPersonaName"
+      @stop-speech="handleStopSpeech()"
     />
   </div>
 </template>

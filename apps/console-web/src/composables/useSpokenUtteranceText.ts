@@ -1,15 +1,20 @@
-/** Reactive text currently being spoken — keeps RUN TRANSCRIPT / speaker chips in sync. */
+/** Reactive text currently being spoken — keeps speaker chips / left-rail voice in sync. */
 
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 import {
-  getKairoVoiceUtterance,
+  getKairoVoiceUtteranceState,
   subscribeKairoVoiceUtterance,
+  type KairoVoiceSpeaker,
 } from '../lib/kairo-voice-utterance';
 import { stripAgentStreamFenceMarkers } from '../lib/agent-live-line-view';
 
 export function useSpokenUtteranceText() {
-  const spokenText = ref<string | null>(getKairoVoiceUtterance());
+  const initial = getKairoVoiceUtteranceState();
+  const spokenText = ref<string | null>(
+    initial.text?.trim() ? stripAgentStreamFenceMarkers(initial.text) : null,
+  );
+  const speaker = ref<KairoVoiceSpeaker | null>(initial.speaker);
 
   let unsubscribe: (() => void) | null = null;
 
@@ -17,6 +22,7 @@ export function useSpokenUtteranceText() {
     unsubscribe = subscribeKairoVoiceUtterance((state) => {
       const next = state.text?.trim() ? stripAgentStreamFenceMarkers(state.text) : null;
       spokenText.value = next || null;
+      speaker.value = next ? state.speaker : null;
     });
   });
 
@@ -25,5 +31,5 @@ export function useSpokenUtteranceText() {
     unsubscribe = null;
   });
 
-  return { spokenText };
+  return { spokenText, speaker };
 }

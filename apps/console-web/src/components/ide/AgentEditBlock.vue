@@ -52,8 +52,9 @@ const imageUrl = computed(() => {
   if (!isImage.value) {
     return '';
   }
-  return resolveThreadImageUrl(normalizedPath.value, {
+  return resolveThreadImageUrl(props.path, {
     workspaceId: shell.currentWorkspace?.workspace_id ?? null,
+    projectRoot: shell.currentWorkspace?.project_root ?? null,
   });
 });
 

@@ -206,6 +206,7 @@ import {
   isBinaryFilePath,
   workspaceFileDocumentId,
 } from '../lib/workspace-file-language';
+import { resolveAgentEditOpenPath } from '../lib/agent-edit-open-path';
 import {
   buildOpenedFileDocuments,
   isSafeWorkspaceFilePath,
@@ -240,7 +241,6 @@ import {
   isMarkdownAgentEditPath,
   shouldOpenWorkspaceFileForEditReview,
 } from '../lib/ide-agent-edit-review';
-import { normalizeEditedFilePath } from '../lib/agent-transcript-blocks';
 import {
   resolveRunHistoryRunId,
   selectRunSeamDisplayRun,
@@ -2640,7 +2640,10 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function openAgentEditReview(edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'>): void {
-    const path = normalizeEditedFilePath(edit.path);
+    const path = resolveAgentEditOpenPath(edit.path, currentWorkspace.value?.project_root);
+    if (!path) {
+      return;
+    }
     if (shouldOpenWorkspaceFileForEditReview(edit)) {
       if (layoutMode.value !== 'ide') {
         setLayoutMode('ide');

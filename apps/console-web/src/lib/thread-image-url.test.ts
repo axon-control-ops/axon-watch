@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { rewriteMarkdownImageSources, resolveThreadImageUrl, threadAttachmentUrlForImagePath } from './thread-image-url';
+import {
+  normalizeGeneratedImagePath,
+  rewriteMarkdownImageSources,
+  resolveThreadImageUrl,
+  threadAttachmentUrlForImagePath,
+} from './thread-image-url';
 
 describe('thread image urls', () => {
   it('rewrites workspace image paths to raw file urls', () => {
@@ -17,6 +22,29 @@ describe('thread image urls', () => {
     ).toBe(
       '/api/workspaces/workspace_axon_watch/files/assets/axon-x-mobile-glass-3d-mockup.png/raw',
     );
+  });
+
+  it('relativizes absolute assets paths for canvas preview urls', () => {
+    expect(
+      resolveThreadImageUrl(
+        '/home/edp/cursor/projects/home-edp-Projectx-client-young-ea/assets/evidence-storytelling-mildred.png',
+        {
+          workspaceId: 'workspace_young_eagles_day_care',
+          projectRoot: '/home/edp/cursor/projects/home-edp-Projectx-client-young-ea',
+        },
+      ),
+    ).toBe(
+      '/api/workspaces/workspace_young_eagles_day_care/files/assets/evidence-storytelling-mildred.png/raw',
+    );
+  });
+
+  it('collapses foreign absolute image paths onto assets/<basename>', () => {
+    expect(
+      normalizeGeneratedImagePath(
+        '/tmp/elsewhere/evidence-block-play-mildred.png',
+        '/home/edp/cursor/projects/home-edp-Projectx-client-young-ea',
+      ),
+    ).toBe('assets/evidence-block-play-mildred.png');
   });
 
   it('prefers persisted attachment urls when provided', () => {

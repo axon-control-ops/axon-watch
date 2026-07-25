@@ -31,7 +31,7 @@ import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
 import { isBinaryFilePath, isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
 import { useEditorCsvPreview } from '../../lib/use-editor-csv-preview';
-import { resolveThreadImageUrl } from '../../lib/thread-image-url';
+import { resolveEditorImagePreviewUrl } from '../../lib/thread-image-url';
 import { useEditorPdfPreview } from '../../lib/use-editor-pdf-preview';
 import { useEditorBreadcrumbSegments } from '../../lib/use-editor-breadcrumb-segments';
 import {
@@ -131,12 +131,8 @@ const {
 });
 const isImageEditorDocument = computed(() => {
   const document = shell.activeEditorDocument;
-  if (!document) {
-    return false;
-  }
-  if (document.language === 'image') {
-    return true;
-  }
+  if (!document) return false;
+  if (document.language === 'image') return true;
   return document.source === 'file' && isImageFilePath(document.filePath ?? document.title);
 });
 const { isPdfEditorDocument, editorPdfPreviewUrl } = useEditorPdfPreview({
@@ -194,15 +190,16 @@ const editorPreviewHtml = computed(() => {
   });
 });
 
-const editorImagePreviewUrl = computed(() => {
-  const document = shell.activeEditorDocument;
-  const workspaceId = shell.currentWorkspace?.workspace_id;
-  if (!document || !workspaceId || !isImageEditorDocument.value || document.source !== 'file') {
-    return '';
-  }
-  const filePath = document.filePath ?? document.title;
-  return resolveThreadImageUrl(filePath, { workspaceId });
-});
+const editorImagePreviewUrl = computed(() =>
+  resolveEditorImagePreviewUrl({
+    workspaceId: shell.currentWorkspace?.workspace_id,
+    projectRoot: shell.currentWorkspace?.project_root,
+    filePath: shell.activeEditorDocument?.filePath,
+    title: shell.activeEditorDocument?.title,
+    isImageDocument: isImageEditorDocument.value,
+    source: shell.activeEditorDocument?.source,
+  }),
+);
 
 function handleEditorPreviewClick(event: MouseEvent): void {
   const baseFilePath =
