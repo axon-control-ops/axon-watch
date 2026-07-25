@@ -2644,20 +2644,15 @@ export const useShellStore = defineStore('shell', () => {
     if (!path) {
       return;
     }
+    if (layoutMode.value !== 'ide') {
+      setLayoutMode('ide');
+    }
     if (shouldOpenWorkspaceFileForEditReview(edit)) {
-      if (layoutMode.value !== 'ide') {
-        setLayoutMode('ide');
-      }
-      // Completed edits are already on disk — open the real file (Preview / canvas).
       if (languageForFilePath(path) === 'markdown') {
         persistEditorMarkdownPreviewEnabled(workspaceFileDocumentId(path), true);
       }
       void openWorkspaceFile(path);
       return;
-    }
-
-    if (layoutMode.value !== 'ide') {
-      setLayoutMode('ide');
     }
 
     if (!openedFilePaths.value.includes(path)) {
