@@ -26,6 +26,5 @@ app.add_middleware(
 # Outer middleware runs first on the request; auth must see mutating methods.
 app.add_middleware(MutatingAuthMiddleware)
 register_routes(app)
-
 # Re-export for tests/support/stable_connector_probe.py patch sites.
 __all__ = ["app", "probe_all_connectors"]
