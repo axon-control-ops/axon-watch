@@ -95,7 +95,6 @@
   padding: 0.32rem;
   border: 1px solid rgba(138, 154, 173, 0.16);
   border-radius: 10px;
-  /* Solid fill — translucent glass let transcript Thought lines show through rows. */
   background: #0a0e14;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   overflow: auto;
