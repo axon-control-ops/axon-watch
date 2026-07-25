@@ -41,8 +41,10 @@ describe('workspaceAgentLabel', () => {
         agent_name: 'Axon Local Workspace Agent',
         agent_key: 'axon_local_workspace_agent',
         role: 'workspace_agent',
+        // Runtime payloads can be polluted; picker must ignore prose.
         status:
-          'Thought — All tests pass. A critical review summary follows. Locked the graduation confirmation aut',
+          'Thought — All tests pass. A critical review summary follows. Locked the graduation confirmation aut' as
+            'executing',
         owns: 'axon-local work',
         enabled: true,
       }),
