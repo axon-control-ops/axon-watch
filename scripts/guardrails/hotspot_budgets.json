@@ -373,6 +373,13 @@
       "hard_limit": 500,
       "target": "services/control-plane/app/persistence/*",
       "note": "Gate 4/5 task ledger + exclusive-path lease conflicts"
+    },
+    "scripts/ops/_gate9_drill_oversized_pad.py": {
+      "max_lines": 520,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "scripts/ops/*",
+      "note": "Gate 9 drill: deliberate file-size overshoot for CI remediation exercise"
     }
   }
 }
