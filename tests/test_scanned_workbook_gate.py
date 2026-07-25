@@ -10,6 +10,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.chat.reply_verification import verify_lane_b_reply  # noqa: E402
 from app.chat.scanned_workbook_gate import (  # noqa: E402
+    ASSIGNMENT_DOCUMENT_QUALITY_RULE,
     assignment_workbook_policy_appendix,
     scan_scanned_workbook_completion_risks,
     scanned_workbook_context,
@@ -72,16 +73,40 @@ class ScannedWorkbookGateTests(unittest.TestCase):
             str(self.fixture["user_prompt"]),
             str(self.fixture["context_snippet"]),
         )
+        self.assertIn(ASSIGNMENT_DOCUMENT_QUALITY_RULE, policy)
         self.assertIn("full-page question/activity inventory", policy)
 
-    def test_router_prompt_includes_scanned_workbook_policy(self) -> None:
-        prompt = _build_prompt(
-            composer_mode="agent",
-            user_prompt=str(self.fixture["user_prompt"]),
-            context_block=str(self.fixture["context_snippet"]),
-            execution_tier="executing",
+    def test_reference_assignment_pdf_gets_full_quality_rule_without_scan_signal(self) -> None:
+        policy = assignment_workbook_policy_appendix(
+            "Create the same assignment as /tmp/Annatjie_Unit_13855.pdf for Mildred.",
         )
-        self.assertIn("Scanned workbook policy", prompt)
+        self.assertIn("operator-named reference file as authoritative", policy)
+        self.assertIn("Inspect every image after", policy)
+        self.assertIn("exact page count", policy)
+        self.assertNotIn("Scanned workbook policy", policy)
+
+    def test_printable_evidence_pack_gets_full_quality_rule(self) -> None:
+        policy = assignment_workbook_policy_appendix(
+            "Render the final printable evidence pack and verify it.",
+        )
+        self.assertIn(ASSIGNMENT_DOCUMENT_QUALITY_RULE, policy)
+
+    def test_every_composer_mode_includes_assignment_quality_rule(self) -> None:
+        for mode, tier in (
+            ("agent", "executing"),
+            ("ask", "consultative"),
+            ("plan", "consultative"),
+            ("debug", "executing"),
+        ):
+            with self.subTest(mode=mode):
+                prompt = _build_prompt(
+                    composer_mode=mode,
+                    user_prompt=str(self.fixture["user_prompt"]),
+                    context_block=str(self.fixture["context_snippet"]),
+                    execution_tier=tier,
+                )
+                self.assertIn(ASSIGNMENT_DOCUMENT_QUALITY_RULE, prompt)
+                self.assertIn("Scanned workbook policy", prompt)
 
     def test_verify_lane_b_reply_appends_notice_for_fixture(self) -> None:
         verified, warnings = verify_lane_b_reply(

@@ -1,0 +1,14 @@
+---
+description: Verify assignments, evidence images, and printable outputs against their references
+alwaysApply: true
+---
+
+# Assignment and printable-document quality
+
+When work creates, adapts, audits, or renders an assignment, workbook, evidence
+pack, PDF, or printable document, read and follow the canonical policy in
+`config/agent-rules/assignment-document-quality.md`.
+
+Do not claim completion or Confidence above 8 until content completeness,
+reference parity, generated-image inspection, and rendered-output verification
+all have receipts.
