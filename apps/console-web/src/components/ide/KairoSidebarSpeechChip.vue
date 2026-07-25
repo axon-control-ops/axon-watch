@@ -2,7 +2,10 @@
 import { computed, ref, watch } from 'vue';
 
 import type { KairoVoiceSpeaker } from '../../lib/kairo-voice-utterance';
-import { resolveSidebarSpeechChipView } from '../../lib/sidebar-speech-chip-view';
+import {
+  resolveSidebarSpeechChipView,
+  sidebarSpeechCanExpand,
+} from '../../lib/sidebar-speech-chip-view';
 
 const props = defineProps<{
   spokenText: string | null;
@@ -17,6 +20,7 @@ const emit = defineEmits<{
 
 const stickyText = ref('');
 const stickySpeakerName = ref('');
+const expanded = ref(false);
 
 watch(
   () => [props.spokenText, props.speaker?.name, props.fallbackPersonaName] as const,
@@ -41,25 +45,56 @@ const view = computed(() =>
     stickySpeakerName: stickySpeakerName.value,
   }),
 );
+const canExpand = computed(() => sidebarSpeechCanExpand(view.value.displayText));
+
+watch(
+  () => view.value.displayText,
+  () => {
+    expanded.value = false;
+  },
+);
+
+function toggleExpanded(): void {
+  expanded.value = !expanded.value;
+}
 </script>
 
 <template>
   <section
     class="kairo-sidebar-speech"
+    :class="{ 'kairo-sidebar-speech--expanded': expanded }"
     :data-speaking="speaking ? 'true' : 'false'"
     :aria-label="view.statusLabel"
     @click.stop
   >
     <header class="kairo-sidebar-speech__header">
-      <span class="kairo-sidebar-speech__label">{{ view.statusLabel }}</span>
-      <button
-        v-if="speaking"
-        type="button"
-        class="kairo-sidebar-speech__stop"
-        @click="emit('stopSpeech')"
-      >
-        Stop
-      </button>
+      <span class="kairo-sidebar-speech__identity">
+        <span class="kairo-sidebar-speech__activity" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+        <span class="kairo-sidebar-speech__label">{{ view.statusLabel }}</span>
+      </span>
+      <span class="kairo-sidebar-speech__actions">
+        <button
+          v-if="canExpand"
+          type="button"
+          class="kairo-sidebar-speech__expand"
+          :aria-expanded="expanded"
+          @click="toggleExpanded"
+        >
+          {{ expanded ? 'Less' : 'More' }}
+        </button>
+        <button
+          v-if="speaking"
+          type="button"
+          class="kairo-sidebar-speech__stop"
+          @click="emit('stopSpeech')"
+        >
+          Stop
+        </button>
+      </span>
     </header>
 
     <div class="kairo-sidebar-speech__body">

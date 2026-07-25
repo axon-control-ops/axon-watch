@@ -8,6 +8,14 @@ export type SidebarSpeechChipView = {
   empty: boolean;
 };
 
+export function sidebarSpeechCanExpand(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) {
+    return false;
+  }
+  return normalized.length > 180 || normalized.split(/\r?\n/).length > 4;
+}
+
 export function resolveSidebarSpeechChipView(input: {
   spokenText: string | null | undefined;
   speaker: KairoVoiceSpeaker | null | undefined;

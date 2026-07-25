@@ -1,0 +1,104 @@
+/* JARVIS-style live agent link states for the IDE left rail. */
+
+.kairo-sidebar-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.kairo-sidebar-panel__eyebrow {
+  color: rgba(186, 230, 253, 0.72);
+  font-size: 0.52rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.kairo-sidebar-panel__link-state {
+  margin-left: auto;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid rgba(0, 242, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.06);
+  color: rgba(148, 220, 238, 0.86);
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kairo-sidebar-panel__link-state[data-state='thinking'],
+.kairo-sidebar-panel__link-state[data-state='speaking'],
+.kairo-sidebar-panel__link-state[data-state='listening'] {
+  border-color: rgba(0, 245, 212, 0.42);
+  color: rgba(167, 255, 235, 0.96);
+  box-shadow: 0 0 0.65rem rgba(0, 245, 212, 0.12);
+}
+
+.kairo-sidebar-panel__link-state[data-state='alerting'] {
+  border-color: rgba(255, 159, 0, 0.46);
+  background: rgba(255, 159, 0, 0.08);
+  color: rgba(255, 206, 135, 0.96);
+}
+
+.kairo-sidebar-panel__state {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.54rem;
+  font-weight: 700;
+}
+
+.kairo-sidebar-panel__state-dot {
+  flex: 0 0 auto;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: rgba(129, 140, 248, 0.72);
+  box-shadow: 0 0 0.4rem rgba(99, 102, 241, 0.38);
+}
+
+.kairo-sidebar-panel__state-dot[data-state='thinking'],
+.kairo-sidebar-panel__state-dot[data-state='speaking'],
+.kairo-sidebar-panel__state-dot[data-state='listening'] {
+  background: rgba(0, 245, 212, 0.95);
+  box-shadow: 0 0 0.6rem rgba(0, 245, 212, 0.68);
+  animation: kairo-sidebar-link-pulse 1.35s ease-in-out infinite;
+}
+
+.kairo-sidebar-panel__state-dot[data-state='alerting'] {
+  background: rgba(255, 159, 0, 0.96);
+  box-shadow: 0 0 0.65rem rgba(255, 159, 0, 0.62);
+}
+
+.kairo-sidebar-panel__headline {
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.42;
+}
+
+.kairo-sidebar-panel__notice {
+  margin-top: 0.28rem;
+  line-height: 1.42;
+}
+
+.kairo-sidebar-panel__advise {
+  margin-top: 0.22rem;
+  line-height: 1.42;
+}
+
+@keyframes kairo-sidebar-link-pulse {
+  0%,
+  100% {
+    opacity: 0.68;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kairo-sidebar-panel__state-dot {
+    animation: none !important;
+  }
+}

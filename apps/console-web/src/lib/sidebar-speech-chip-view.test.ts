@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveSidebarSpeechChipView } from './sidebar-speech-chip-view';
+import {
+  resolveSidebarSpeechChipView,
+  sidebarSpeechCanExpand,
+} from './sidebar-speech-chip-view';
 
 describe('resolveSidebarSpeechChipView', () => {
   it('labels the speaking agent and shows spoken text', () => {
@@ -42,5 +45,11 @@ describe('resolveSidebarSpeechChipView', () => {
     });
     expect(after.statusLabel).toBe('Lila · last spoken');
     expect(after.displayText).toContain('graduation confirmation');
+  });
+
+  it('offers expansion only for transcript copy that exceeds the compact card', () => {
+    expect(sidebarSpeechCanExpand('Short spoken update.')).toBe(false);
+    expect(sidebarSpeechCanExpand('Line 1\nLine 2\nLine 3\nLine 4\nLine 5')).toBe(true);
+    expect(sidebarSpeechCanExpand('A'.repeat(181))).toBe(true);
   });
 });

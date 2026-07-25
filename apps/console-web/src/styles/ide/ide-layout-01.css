@@ -5,7 +5,7 @@
   display: grid !important;
   grid-template-rows:
     minmax(0, 1fr)
-    max(var(--voice-card-height, 0px), clamp(18rem, 58%, 32rem));
+    var(--ide-kairo-panel-height, clamp(14rem, 42%, 28rem));
   gap: 0;
   height: 100% !important;
   max-height: 100%;

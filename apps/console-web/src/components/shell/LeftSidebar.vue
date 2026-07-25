@@ -59,6 +59,24 @@ const {
   maxSize: (height) => Math.round(height * 0.55),
 });
 
+const {
+  panelSize: ideKairoPanelHeight,
+  userSized: ideKairoPanelUserSized,
+  resizing: ideKairoPanelResizing,
+  ariaValueMin: ideKairoPanelHeightMin,
+  ariaValueMax: ideKairoPanelHeightMax,
+  resetSize: resetIdeKairoPanelHeight,
+  startResize: startIdeKairoPanelResize,
+  onResizeKeydown: onIdeKairoPanelResizeKeydown,
+} = useVerticalPanelResize({
+  rootRef: sidebarRef,
+  cssVariable: '--ide-kairo-panel-height',
+  storageKey: 'axon-shell-ide-kairo-panel-height',
+  defaultSize: (height) => Math.min(Math.round(height * 0.42), 360),
+  minSize: 200,
+  maxSize: (height) => Math.round(height * 0.7),
+});
+
 const catalogWorkspaces = computed(() => shell.workspaces);
 
 const filteredWorkspaces = computed(() => {
@@ -197,6 +215,8 @@ onBeforeUnmount(() => {
       'left-sidebar-mockup--resizing': resizing,
       'left-sidebar-mockup--voice-resizing': voiceCardResizing,
       'left-sidebar-mockup--voice-user-sized': voiceCardUserSized,
+      'left-sidebar-mockup--ide-kairo-resizing': ideKairoPanelResizing,
+      'left-sidebar-mockup--ide-kairo-user-sized': ideKairoPanelUserSized,
       'left-sidebar-mockup--ide': isIdeMode,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
       'left-sidebar-mockup--galaxy': shell.operatorBrainGalaxyActive,
@@ -213,6 +233,22 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
+        <div
+          class="voice-card-resize-handle ide-kairo-panel-resize-handle"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize agent card"
+          title="Drag or use arrow keys to resize. Enter or double-click to reset."
+          tabindex="0"
+          :aria-valuemin="ideKairoPanelHeightMin"
+          :aria-valuemax="ideKairoPanelHeightMax"
+          :aria-valuenow="ideKairoPanelHeight"
+          @mousedown="startIdeKairoPanelResize"
+          @keydown="onIdeKairoPanelResizeKeydown"
+          @dblclick="resetIdeKairoPanelHeight"
+        >
+          <span class="voice-card-resize-grip" aria-hidden="true" />
+        </div>
         <KairoSidebarPanel />
       </div>
     </template>

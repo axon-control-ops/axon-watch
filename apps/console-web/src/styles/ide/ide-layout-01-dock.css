@@ -11,6 +11,10 @@
   background: rgba(8, 10, 18, 0.96);
 }
 
+.left-sidebar-mockup__status-anchor--ide .ide-kairo-panel-resize-handle {
+  z-index: 8;
+}
+
 .left-sidebar-mockup__status-anchor--ide .kairo-sidebar-panel.hud-panel-frame {
   display: flex;
   flex-direction: column;
@@ -21,16 +25,26 @@
   text-align: left;
 }
 
-.left-sidebar-mockup--voice-user-sized .left-sidebar-mockup__status-anchor--ide {
+.left-sidebar-mockup--ide-kairo-user-sized .left-sidebar-mockup__status-anchor--ide,
+.left-sidebar-mockup--ide-kairo-resizing .left-sidebar-mockup__status-anchor--ide {
   height: 100%;
   overflow: hidden;
 }
 
-.left-sidebar-mockup--voice-user-sized
+.left-sidebar-mockup--ide-kairo-user-sized
+  .left-sidebar-mockup__status-anchor--ide
+  .kairo-sidebar-panel.hud-panel-frame,
+.left-sidebar-mockup--ide-kairo-resizing
   .left-sidebar-mockup__status-anchor--ide
   .kairo-sidebar-panel.hud-panel-frame {
   height: 100%;
   max-height: none;
+}
+
+.left-sidebar-mockup--ide-kairo-resizing .voice-card-resize-grip {
+  width: 4rem;
+  background: rgba(122, 235, 255, 0.88);
+  box-shadow: 0 0 10px rgba(90, 159, 255, 0.55);
 }
 
 .left-sidebar-mockup__status-anchor--ide .kairo-sidebar-panel--compact {

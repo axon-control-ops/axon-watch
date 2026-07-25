@@ -86,6 +86,18 @@ const showStopSpeech = computed(() => shell.kairoSpeechActive);
 const speechPersonaName = computed(
   () => speaker.value?.name?.trim() || activePersonaName.value,
 );
+const agentLinkLabel = computed(() => {
+  if (shell.kairoSpeechActive) {
+    return 'Voice live';
+  }
+  if (shell.agentStreamActive) {
+    return 'Live stream';
+  }
+  if (surfaceEmployeeFailure.value || chipState.value === 'alerting') {
+    return 'Attention';
+  }
+  return 'Standby';
+});
 
 function handleExpand(): void {
   if (showStopSpeech.value) {
@@ -160,6 +172,13 @@ function handleStopSpeech(event?: Event): void {
     >
       <p class="kairo-sidebar-panel__title">
         <OperatorPersonaMark size="sm" :mark="activePersonaMark" />
+        <span class="kairo-sidebar-panel__eyebrow">Agent link</span>
+        <span
+          class="kairo-sidebar-panel__link-state"
+          :data-state="chipState"
+        >
+          {{ agentLinkLabel }}
+        </span>
       </p>
       <div class="kairo-sidebar-panel__body">
         <div class="kairo-sidebar-panel__radar" aria-hidden="true">
@@ -169,7 +188,14 @@ function handleStopSpeech(event?: Event): void {
           <span class="kairo-sidebar-panel__sweep" />
         </div>
         <div class="kairo-sidebar-panel__copy">
-          <p class="kairo-sidebar-panel__state">{{ presenceLabel }}</p>
+          <p class="kairo-sidebar-panel__state" aria-live="polite">
+            <span
+              class="kairo-sidebar-panel__state-dot"
+              :data-state="chipState"
+              aria-hidden="true"
+            />
+            <span>{{ presenceLabel }}</span>
+          </p>
           <p
             v-if="surfaceEmployeeFailure && !debugModeActive"
             class="kairo-sidebar-panel__employee-failure"
