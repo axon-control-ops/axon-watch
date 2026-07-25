@@ -25,7 +25,7 @@ describe('resolveGalaxySpeakerAvatar', () => {
     expect(view?.kind).toBe('vaxon');
     expect(view?.initials).toBe('VX');
     expect(view?.speaking).toBe(true);
-    expect(view?.faceUrl.startsWith('data:image/svg+xml')).toBe(true);
+    expect(view?.faceUrl).toBe('/vaxon-portrait.jpg');
   });
 
   it('resolves employee face avatars from roster identity', () => {
