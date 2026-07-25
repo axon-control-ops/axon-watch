@@ -72,9 +72,10 @@ const {
   rootRef: sidebarRef,
   cssVariable: '--ide-kairo-panel-height',
   storageKey: 'axon-shell-ide-kairo-panel-height',
-  defaultSize: (height) => Math.min(Math.round(height * 0.42), 360),
-  minSize: 200,
-  maxSize: (height) => Math.round(height * 0.7),
+  // Leave headroom above default so dragging the bottom card up is always possible.
+  defaultSize: (height) => Math.min(Math.round(height * 0.34), 300),
+  minSize: 180,
+  maxSize: (height) => Math.round(height * 0.72),
 });
 
 const catalogWorkspaces = computed(() => shell.workspaces);
@@ -232,23 +233,23 @@ onBeforeUnmount(() => {
           <IdeExplorerPanel v-else />
         </div>
       </div>
-      <div
-        class="ide-kairo-panel-resize-handle"
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="Resize agent card"
-        title="Drag up/down to resize agent card. Enter or double-click to reset."
-        tabindex="0"
-        :aria-valuemin="ideKairoPanelHeightMin"
-        :aria-valuemax="ideKairoPanelHeightMax"
-        :aria-valuenow="ideKairoPanelHeight"
-        @mousedown="startIdeKairoPanelResize"
-        @keydown="onIdeKairoPanelResizeKeydown"
-        @dblclick="resetIdeKairoPanelHeight"
-      >
-        <span class="ide-kairo-panel-resize-grip" aria-hidden="true" />
-      </div>
       <div class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
+        <div
+          class="ide-kairo-panel-resize-handle"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize agent card"
+          title="Drag the top of this card up or down. Team panel resizes with it. Double-click to reset."
+          tabindex="0"
+          :aria-valuemin="ideKairoPanelHeightMin"
+          :aria-valuemax="ideKairoPanelHeightMax"
+          :aria-valuenow="ideKairoPanelHeight"
+          @mousedown="startIdeKairoPanelResize"
+          @keydown="onIdeKairoPanelResizeKeydown"
+          @dblclick="resetIdeKairoPanelHeight"
+        >
+          <span class="ide-kairo-panel-resize-grip" aria-hidden="true" />
+        </div>
         <KairoSidebarPanel />
       </div>
     </template>

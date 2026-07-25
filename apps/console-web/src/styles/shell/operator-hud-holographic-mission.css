@@ -49,6 +49,7 @@
 .console-shell--mockup.console-shell--glass3d .left-sidebar-mockup__resize-handle,
 .console-shell--mockup.console-shell--glass3d .right-dock__resize-handle,
 .console-shell--mockup.console-shell--glass3d .voice-card-resize-handle,
+.console-shell--mockup.console-shell--glass3d .ide-kairo-panel-resize-handle,
 .console-shell--mockup.console-shell--glass3d .briefing-card-resize-handle,
 .console-shell--mockup.console-shell--glass3d .center-workbench__resize-handle {
   z-index: 30;

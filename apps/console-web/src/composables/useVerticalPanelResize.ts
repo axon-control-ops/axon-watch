@@ -100,6 +100,16 @@ export function useVerticalPanelResize(options: UseVerticalPanelResizeOptions) {
     applySize(defaultPanelSize());
   }
 
+  function readAppliedSize(): number {
+    const root = options.rootRef.value;
+    if (!root) {
+      return panelSize.value;
+    }
+    const raw = getComputedStyle(root).getPropertyValue(options.cssVariable).trim();
+    const parsed = Number.parseFloat(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : panelSize.value;
+  }
+
   function startResize(event: MouseEvent): void {
     if (event.button !== 0) {
       return;
@@ -109,7 +119,9 @@ export function useVerticalPanelResize(options: UseVerticalPanelResizeOptions) {
     userSized.value = true;
     resizing.value = true;
     const startY = event.clientY;
-    const startSize = panelSize.value;
+    // Prefer the live CSS size so the first drag delta matches what the user sees.
+    const startSize = readAppliedSize() || panelSize.value;
+    panelSize.value = startSize;
     const direction = options.growsUp === false ? 1 : -1;
 
     const onMove = (moveEvent: MouseEvent): void => {
