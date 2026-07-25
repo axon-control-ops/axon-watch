@@ -6,6 +6,31 @@ export interface ApprovalRecord {
 
 export interface WorkspaceRecord {
   workspace_id: string;
+  connection_kind?: 'isolated_root' | 'project_path';
+  project_root?: string;
+  display_name?: string;
+}
+
+export interface WorkspaceHandoffRecord {
+  handoff_id: string;
+  source_workspace_id: string;
+  target_workspace_id: string;
+  task: string;
+  reason: string;
+  status: 'recorded' | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceHandoffSummary {
+  run_count: number;
+  active_run_count: number;
+  active_runs: Array<{
+    run_id: string;
+    status: string;
+    phase: string;
+    summary: string;
+  }>;
 }
 
 export interface ThreadMessage {

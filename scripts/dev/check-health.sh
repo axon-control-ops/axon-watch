@@ -37,4 +37,14 @@ echo "ok $(service_base_url "control-plane")/api/runs"
 echo "Workspaces:"
 curl -fsS "$(service_base_url "control-plane")/api/workspaces" >/dev/null
 echo "ok $(service_base_url "control-plane")/api/workspaces"
+echo "Live events (SSE):"
+live_events_url="$(service_base_url "control-plane")/api/live/events"
+live_events_chunk="$(
+  curl -sS --max-time 2 -H 'Accept: text/event-stream' "${live_events_url}" 2>/dev/null | head -c 256
+)" || true
+if [[ "${live_events_chunk}" == *connected* ]]; then
+  echo "ok ${live_events_url}"
+else
+  echo "warn ${live_events_url}" >&2
+fi
 echo

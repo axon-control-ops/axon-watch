@@ -1,8 +1,12 @@
+import { OPERATOR_PERSONA_NAME, personaStatusLabel } from './operator-persona-name';
+
 export type KairoPresenceState =
   | 'idle'
   | 'observing'
   | 'listening'
   | 'speaking'
+  | 'thinking'
+  | 'paused'
   | 'alerting'
   | 'privacy_blocked';
 
@@ -29,19 +33,48 @@ export function resolveKairoPresenceState(input: {
   return 'idle';
 }
 
-export function kairoPresenceLabel(state: KairoPresenceState): string {
+export function kairoPresenceSubtitle(state: KairoPresenceState): string {
   switch (state) {
     case 'observing':
-      return 'KAIRO · observing';
+      return 'observing';
     case 'listening':
-      return 'KAIRO · listening';
+      return 'listening';
     case 'speaking':
-      return 'KAIRO · speaking';
+      return 'speaking';
+    case 'thinking':
+      return 'checking';
+    case 'paused':
+      return 'paused';
     case 'alerting':
-      return 'KAIRO · attention';
+      return 'attention';
     case 'privacy_blocked':
-      return 'KAIRO · muted';
+      return 'muted';
     default:
-      return 'KAIRO';
+      return 'standby';
+  }
+}
+
+export function kairoPresenceLabel(
+  state: KairoPresenceState,
+  personaName: string = OPERATOR_PERSONA_NAME,
+): string {
+  const name = personaName.trim() || OPERATOR_PERSONA_NAME;
+  switch (state) {
+    case 'observing':
+      return personaStatusLabel('observing', name);
+    case 'listening':
+      return personaStatusLabel('listening', name);
+    case 'speaking':
+      return personaStatusLabel('speaking', name);
+    case 'thinking':
+      return personaStatusLabel('checking', name);
+    case 'paused':
+      return personaStatusLabel('paused', name);
+    case 'alerting':
+      return personaStatusLabel('attention', name);
+    case 'privacy_blocked':
+      return personaStatusLabel('muted', name);
+    default:
+      return name;
   }
 }

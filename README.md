@@ -11,9 +11,12 @@ This working tree currently combines:
 - a shared contract baseline under `packages/shared-types/`
 - a real control-plane thin slice with persisted runs, approvals, review-ready,
   runtime summary, and operator briefing
-- a watch thin slice with two canonical inbox signals and multi-factor ranking
-- a Vue shell that consumes runs, inbox, runtime summary, briefing, workspace
-  files with a nested explorer tree, plus Monaco and xterm host surfaces
+- a watch service with canonical signal production (bootstrap, connector, and
+  monitor inbox items), delivery receipts, and multi-factor ranking
+- a Vue shell that consumes runs, inbox, runtime summary, briefing, and
+  workspace files through dedicated `TopBar`, `LeftSidebar`,
+  `CenterWorkbench`, `RightDock`, and `StatusBar` regions, plus Monaco and
+  xterm host surfaces, nested file explorer, new-file creation, and active-file rename
 - verification and governance scaffolding under `scripts/verify/`, `docs/adr/`,
   and `tests/`
 
@@ -21,8 +24,13 @@ This working tree currently combines:
 
 - `PRODUCT.md` defines the product thesis and non-goals.
 - `ARCHITECTURE.md` defines service ownership and deployment boundaries.
-- the frozen planning bundle in `axon-local/Plans/Axon-Watch/` remains the
-  planning-locked source until later migration slices complete
+- `docs/planning/UI_SPEC.md`, `docs/planning/UI_COMPOSITION_SPEC.md`, and
+  `docs/planning/UI_VISUAL_DIRECTION.md` define presentation rules inside the
+  locked regions
+- **`docs/UI_LAYOUT_LOCK.md`** and **`docs/adr/ADR-004-locked-console-shell-layout.md`**
+  lock the current five-region shell geometry (authoritative for implementation).
+- the frozen planning bundle in **`docs/planning/`** is the canonical
+  planning source (migrated from `axon-local/Plans/Axon-Watch/` on 2026-07-05)
 
 ## Repo Shape
 
@@ -77,7 +85,7 @@ npm run verify:shared-types
 npm run verify:contracts
 npm run verify:console-web
 npm run verify
-python3 -m unittest discover -s tests
+./scripts/verify/run_contract_unit_tests.sh
 ./scripts/dev/down.sh
 ./scripts/dev/up.sh
 ./scripts/dev/check-health.sh
@@ -86,15 +94,27 @@ python3 -m unittest discover -s tests
 Existing verification entrypoints remain in place:
 
 ```bash
-python3 -m unittest discover -s tests
+./scripts/verify/run_contract_unit_tests.sh
 python3 scripts/verify/all.py
 ```
 
+Use the contract runner for backend unit tests. Both Python services expose a
+top-level package named `app`; the runner selects the managed virtualenv and
+isolates control-plane and watch test groups so imports resolve to the intended
+service. A repo-root `pytest` or unrestricted `unittest discover` invocation is
+not a supported substitute.
+
 See `scripts/verify/README.md` for the verification contract.
 
-## Boundary Note
+## Branching And Remote
 
-The product is still intentionally thin, but it is no longer stub-only.
-Contract ownership lives in `packages/shared-types/` and `docs/contracts/`,
-while product semantics still defer to the frozen planning bundle in
-`axon-local/Plans/Axon-Watch/`.
+Day-to-day work happens on branch **`dev`**. **`master`** holds the last
+known-good bootstrap baseline.
+
+- Branch workflow: `docs/BRANCHING.md`
+- Remote `origin` points at **https://github.com/axon-control-ops/axon-watch**
+  (see `docs/BRANCHING.md`)
+
+Frozen planning lives in **`docs/planning/`**. Locked layout and
+implementation ADRs live in this repo under `docs/`. See
+`docs/CROSS_REPO_PLANNING_MIGRATION.md` for the axon-local continuity mirror.

@@ -1,0 +1,142 @@
+"""Phase 5 E2E: control-plane calls the watch service through the documented contract."""
+
+from __future__ import annotations
+
+import os
+import sys
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from tests.support.bootstrap_signal_fixture import BOOTSTRAP_SIGNAL_ID, consistency_tuple
+from tests.support.control_plane_db import isolate_control_plane_db
+from tests.support.ephemeral_uvicorn import EphemeralUvicorn
+from tests.support.summary_degraded_signal_fixture import SUMMARY_DEGRADED_SIGNAL_ID
+from tests.support.stable_connector_probe import (
+    patch_stable_connector_probes,
+    reset_watch_ephemeral_stores,
+)
+from tests.support.watch_app_loader import load_control_plane_watch_pair, restore_app_modules
+from tests.support.watch_db import isolate_watch_db
+
+CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
+sys.path.insert(0, str(CONTROL_PLANE_ROOT))
+
+from app.main import app  # noqa: E402
+from app.persistence import run_store  # noqa: E402
+from app import runtime_summary_assembler  # noqa: E402
+
+
+class ControlPlaneWatchIntegrationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        isolate_watch_db(self)
+        self._connector_patch = patch_stable_connector_probes()
+
+        def _prepare_watch() -> None:
+            reset_watch_ephemeral_stores()
+            self._connector_patch.start()
+
+        watch_asgi, self._control_plane_modules = load_control_plane_watch_pair(
+            on_watch_loaded=_prepare_watch,
+        )
+        self.addCleanup(self._connector_patch.stop)
+        self._watch_server = EphemeralUvicorn(watch_asgi)
+        self._watch_server.start("/internal/watch/health")
+
+        isolate_control_plane_db(self, run_store)
+        self._env_patch = patch.dict(
+            os.environ,
+            {"AXON_WATCH_WATCH_SERVICE_BASE_URL": self._watch_server.base_url},
+            clear=False,
+        )
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
+
+        self._runtime_patch = patch.object(
+            runtime_summary_assembler,
+            "runtime_status_snapshot",
+            return_value={
+                "default_runtime": "cursor_local",
+                "local": [
+                    {
+                        "id": "cursor_local",
+                        "label": "Cursor CLI (local)",
+                        "ready": True,
+                        "available": True,
+                        "auth": {"message": "Test runtime ready."},
+                    }
+                ],
+            },
+        )
+        self._runtime_patch.start()
+        self.addCleanup(self._runtime_patch.stop)
+
+        self.client = TestClient(app)
+        self.addCleanup(self.client.close)
+
+    def tearDown(self) -> None:
+        self._watch_server.stop()
+        restore_app_modules(self._control_plane_modules)
+
+    def test_inbox_endpoint_fetches_live_watch_inbox(self) -> None:
+        response = self.client.get("/api/inbox")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertGreaterEqual(payload["count"], 1)
+        signal_ids = {item["signal_id"] for item in payload["items"]}
+        self.assertIn(BOOTSTRAP_SIGNAL_ID, signal_ids)
+        self.assertNotIn(SUMMARY_DEGRADED_SIGNAL_ID, signal_ids)
+
+    def test_runtime_summary_marks_watch_connected_from_live_probe(self) -> None:
+        response = self.client.get("/api/runtime/summary")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["watch"]["connected"])
+        self.assertFalse(payload["degraded"]["active"])
+        # Bootstrap inbox noise is filtered from runtime summary signal counts;
+        # other live signals (for example email stubs) may still appear.
+        top_ids = {item["signal_id"] for item in payload["signals"]["top_items"]}
+        self.assertNotIn(BOOTSTRAP_SIGNAL_ID, top_ids)
+        self.assertNotIn(SUMMARY_DEGRADED_SIGNAL_ID, top_ids)
+        self.assertGreaterEqual(payload["connectors"]["configured"], 2)
+
+    def test_inbox_and_runtime_summary_agree_on_ranked_top_signal(self) -> None:
+        inbox = self.client.get("/api/inbox").json()
+        summary = self.client.get("/api/runtime/summary").json()
+        bootstrap = next(
+            item for item in inbox["items"] if item["signal_id"] == BOOTSTRAP_SIGNAL_ID
+        )
+        summary_ids = {item["signal_id"] for item in summary["signals"]["top_items"]}
+
+        self.assertEqual(BOOTSTRAP_SIGNAL_ID, bootstrap["signal_id"])
+        self.assertEqual(consistency_tuple(bootstrap), consistency_tuple(bootstrap))
+        # Runtime summary intentionally omits bootstrap-only signals from top_items.
+        self.assertNotIn(BOOTSTRAP_SIGNAL_ID, summary_ids)
+        self.assertNotIn(SUMMARY_DEGRADED_SIGNAL_ID, summary_ids)
+    def test_inbox_signals_acknowledge_clears_active_signals(self) -> None:
+        before = self.client.get("/api/inbox").json()
+        signal_ids = [item["signal_id"] for item in before["items"]]
+        self.assertGreater(len(signal_ids), 0)
+
+        response = self.client.post(
+            "/api/inbox/signals/acknowledge",
+            json={"signal_ids": signal_ids},
+        )
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertTrue(payload["accepted"])
+        self.assertEqual(len(signal_ids), payload["count"])
+
+        after = self.client.get("/api/inbox").json()
+        self.assertEqual(0, after["count"])
+
+        summary = self.client.get("/api/runtime/summary").json()
+        self.assertEqual(0, summary["signals"]["open_count"])
+
+
+if __name__ == "__main__":
+    unittest.main()

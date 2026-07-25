@@ -1,7 +1,10 @@
-# Caddy Skeleton
+# Caddy Reverse Proxy
 
-This directory is reserved for future reverse-proxy examples once the public
-entrypoint and internal service routing are locked down.
+`Caddyfile.example` routes:
 
-Lane 1 keeps only the directory placeholder so the dedicated-server topology
-remains visible without freezing proxy semantics too early.
+- `/api/*` → control-plane (8787)
+- `/` → built console-web static assets
+
+Watch internal routes (`/internal/watch/*`) are **not** exposed publicly.
+
+See `docs/DEDICATED_SERVER_READINESS.md`.

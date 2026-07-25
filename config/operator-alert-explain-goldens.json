@@ -1,0 +1,101 @@
+[
+  {
+    "id": "approvals_two",
+    "input": {
+      "pending_approvals": 2,
+      "reason": "operator_approval_required"
+    },
+    "expect_spoken_contains": ["yes or no", "2", "Approve or reject"],
+    "expect_what_contains": ["2 agent jobs"],
+    "expect_agent_do_contains": ["Do not continue until the operator approves"]
+  },
+  {
+    "id": "email_triage",
+    "input": {
+      "signal_id": "signal_email_stub_urgent",
+      "title": "Email needs follow-up: Urgent deploy",
+      "meta": {
+        "signal_family": "email_triage",
+        "sender": "CTO <cto@example.com>",
+        "recommended_action": "reply_or_investigate"
+      }
+    },
+    "expect_spoken_contains": ["CTO", "Shall I triage"],
+    "expect_what_contains": ["An email from CTO"],
+    "expect_agent_do_contains": ["Triage the email from CTO"]
+  },
+  {
+    "id": "child_project_monitor",
+    "input": {
+      "signal_id": "signal_monitor_dashpro_sentry_recent_issues_warning",
+      "title": "DashPro Sentry warning",
+      "meta": {
+        "signal_family": "child_project_monitor",
+        "workspace_label": "DashPro",
+        "monitor_status": "warning"
+      }
+    },
+    "expect_spoken_contains": ["DashPro", "Shall I investigate"],
+    "expect_what_contains": ["DashPro"],
+    "expect_agent_do_contains": ["Investigate the DashPro monitor"]
+  },
+  {
+    "id": "connector",
+    "input": {
+      "signal_id": "signal_connector_console_web_unavailable",
+      "title": "Console web connector unavailable"
+    },
+    "expect_spoken_contains": ["connection", "Shall I diagnose"],
+    "expect_what_contains": ["connection"],
+    "expect_agent_do_contains": ["Diagnose"]
+  },
+  {
+    "id": "bootstrap",
+    "input": {
+      "signal_id": "signal_runtime_summary_degraded",
+      "title": "Bootstrap: runtime summary stale"
+    },
+    "expect_spoken_contains": ["warm-up", "confirm Watch"],
+    "expect_what_contains": ["warming up"],
+    "expect_agent_do_contains": ["not treat this as an incident"]
+  },
+  {
+    "id": "generic",
+    "input": {
+      "signal_id": "signal_custom_example",
+      "title": "Unusual queue backlog",
+      "summary": "Queue depth exceeded soft limit"
+    },
+    "expect_spoken_contains": ["Unusual queue backlog", "Shall I dig in"],
+    "expect_what_contains": ["Queue depth exceeded soft limit"],
+    "expect_agent_do_contains": ["Do not assume a category"]
+  },
+  {
+    "id": "meta_override",
+    "input": {
+      "signal_id": "signal_custom_operator_hint",
+      "title": "Obscure subsystem code 0x4f",
+      "summary": "raw diagnostic blob",
+      "meta": {
+        "operator_what": "The backup job did not finish last night.",
+        "operator_you_do": "Open Attention and hand this to the agent if you want it fixed.",
+        "operator_agent_do": "Inspect last night's backup logs and report the plain-English outcome.",
+        "operator_spoken": "Last night's backup did not finish."
+      }
+    },
+    "expect_spoken_contains": ["backup"],
+    "expect_what_contains": ["backup job"],
+    "expect_agent_do_contains": ["backup logs"]
+  },
+  {
+    "id": "health_word_no_false_degraded",
+    "input": {
+      "signal_id": "signal_custom_health_ok_note",
+      "title": "Nightly health summary ready",
+      "summary": "Scheduled health digest posted"
+    },
+    "expect_spoken_contains": ["Nightly health summary", "Shall I dig in"],
+    "expect_what_contains": ["Scheduled health digest"],
+    "expect_agent_do_contains": ["Do not assume a category"]
+  }
+]

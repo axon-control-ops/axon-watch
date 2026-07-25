@@ -43,7 +43,8 @@ describe('resolveKairoPresenceState', () => {
 
 describe('kairoPresenceLabel', () => {
   it('maps states to operator-facing labels', () => {
-    expect(kairoPresenceLabel('observing')).toBe('KAIRO · observing');
-    expect(kairoPresenceLabel('alerting')).toBe('KAIRO · attention');
+    expect(kairoPresenceLabel('observing')).toBe('VAXON · observing');
+    expect(kairoPresenceLabel('thinking')).toBe('VAXON · checking');
+    expect(kairoPresenceLabel('alerting')).toBe('VAXON · attention');
   });
 });

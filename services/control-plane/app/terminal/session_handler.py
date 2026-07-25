@@ -9,7 +9,12 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app.terminal.pty_process import PtyProcess
+from app.terminal.session_registry import (
+    create_session,
+    ensure_operator_session,
+    get_session,
+)
+from app.terminal.session_runtime import ensure_runtime
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
 
@@ -21,7 +26,13 @@ async def _send_json(websocket: WebSocket, payload: dict[str, Any]) -> None:
     await websocket.send_text(json.dumps(payload, ensure_ascii=False))
 
 
-async def handle_terminal_session(websocket: WebSocket, workspace_id: str) -> None:
+async def handle_terminal_session(
+    websocket: WebSocket,
+    workspace_id: str,
+    *,
+    session_id: str = "terminal-operator",
+    role: str = "operator",
+) -> None:
     await websocket.accept()
 
     try:
@@ -31,7 +42,25 @@ async def handle_terminal_session(websocket: WebSocket, workspace_id: str) -> No
         await websocket.close(code=4400)
         return
 
-    pty = PtyProcess(str(workspace_root))
+    clean_session_id = str(session_id or "terminal-operator").strip() or "terminal-operator"
+    clean_role = str(role or "operator").strip().lower() or "operator"
+    session = get_session(workspace_id, clean_session_id)
+    if session is None:
+        if clean_session_id == "terminal-operator":
+            session = ensure_operator_session(workspace_id)
+        else:
+            session = create_session(
+                workspace_id=workspace_id,
+                role=clean_role,
+                session_id=clean_session_id,
+            )
+
+    runtime = ensure_runtime(
+        workspace_id=workspace_id,
+        workspace_root=str(workspace_root),
+        session=session,
+    )
+    pty = runtime.pty
     loop = asyncio.get_running_loop()
     output_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
 
@@ -50,6 +79,9 @@ async def handle_terminal_session(websocket: WebSocket, workspace_id: str) -> No
             "type": "ready",
             "workspace_id": workspace_id,
             "workspace_root": str(workspace_root),
+            "session_id": session.session_id,
+            "role": session.role,
+            "title": session.title,
         },
     )
 
@@ -65,7 +97,7 @@ async def handle_terminal_session(websocket: WebSocket, workspace_id: str) -> No
             msg_type = message.get("type")
             if msg_type == "input":
                 data = message.get("data", "")
-                if isinstance(data, str):
+                if session.role != "agent" and isinstance(data, str):
                     pty.write(data.encode("utf-8"))
             elif msg_type == "resize":
                 pty.resize(int(message.get("cols", 80)), int(message.get("rows", 24)))
@@ -80,7 +112,6 @@ async def handle_terminal_session(websocket: WebSocket, workspace_id: str) -> No
         with contextlib.suppress(asyncio.CancelledError):
             await writer_task
         pty.detach_reader(loop)
-        pty.close()
 
 
 async def _pump_output(websocket: WebSocket, output_queue: asyncio.Queue[bytes | None]) -> None:

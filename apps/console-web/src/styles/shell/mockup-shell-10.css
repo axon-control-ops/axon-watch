@@ -1,0 +1,426 @@
+.panel-heading__action {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(0, 242, 255, 0.32);
+  border-radius: 2px;
+  width: 1.35rem;
+  height: 1.35rem;
+  background: rgba(0, 242, 255, 0.04);
+  color: var(--accent-brand);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.workspace-filter__icon {
+  color: var(--accent-brand);
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.workspace-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+  padding: 0.42rem 0.5rem;
+  border: 0;
+  border-radius: 2px;
+  background: rgba(4, 10, 16, 0.88);
+}
+
+.workspace-filter__input {
+  color: rgba(196, 210, 222, 0.88);
+}
+
+.workspace-filter__input::placeholder {
+  color: rgba(127, 148, 168, 0.78);
+}
+
+.workspace-list--mockup {
+  gap: 0.42rem;
+}
+
+.workspace-list__button--mockup {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 0;
+  padding: 0.58rem 0.62rem;
+  border: 0;
+  background: transparent;
+}
+
+.workspace-list__button--mockup:not(.workspace-list__button--active) {
+  border: 0;
+  background: transparent;
+}
+
+.workspace-list__icon {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.workspace-filter__input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  outline: none;
+  font-size: 0.76rem;
+}
+
+.workspace-list__icon--cube::before {
+  width: 0.52rem;
+  height: 0.52rem;
+  transform: rotate(45deg);
+}
+
+.workspace-list__icon--chart::before {
+  width: 0.15rem;
+  height: 0.55rem;
+  border: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 45%,
+    currentColor 45% 55%,
+    transparent 55% 70%,
+    currentColor 70% 80%,
+    transparent 80%
+  );
+  box-shadow:
+    -0.22rem 0.08rem 0 -0.08rem currentColor,
+    0.22rem -0.08rem 0 -0.08rem currentColor;
+}
+
+.workspace-list__icon--building::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-bottom-width: 2px;
+  background:
+    linear-gradient(currentColor, currentColor) 0.12rem 0.12rem / 0.1rem 0.18rem no-repeat,
+    linear-gradient(currentColor, currentColor) 0.28rem 0.12rem / 0.1rem 0.18rem no-repeat;
+}
+
+.workspace-list__icon--chat::before {
+  width: 0.55rem;
+  height: 0.38rem;
+  border-radius: 0.12rem;
+}
+
+.workspace-list__icon--lens::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.workspace-list__icon--node::before {
+  width: 0.42rem;
+  height: 0.42rem;
+  transform: rotate(45deg);
+}
+
+.workspace-list__icon--flask::before {
+  width: 0.34rem;
+  height: 0.56rem;
+  border-radius: 0.1rem 0.1rem 0.2rem 0.2rem;
+}
+
+.workspace-list__icon--orbit::before,
+.workspace-list__icon--hex::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.workspace-list__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+}
+
+.workspace-list__name {
+  font-size: 0.8rem;
+}
+
+.workspace-list__meta {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.left-sidebar-mockup__explorer {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.workspace-status-card__title {
+  margin: 0 0 0.55rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  color: var(--text-hud);
+}
+
+.workspace-status-card__body {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.workspace-status-card__radar {
+  position: relative;
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.workspace-status-card__crosshair {
+  position: absolute;
+  background: rgba(0, 242, 255, 0.28);
+  z-index: 1;
+}
+
+.workspace-status-card__crosshair--h {
+  left: 0.55rem;
+  right: 0.55rem;
+  top: 50%;
+  height: 1px;
+}
+
+.workspace-status-card__crosshair--v {
+  top: 0.55rem;
+  bottom: 0.55rem;
+  left: 50%;
+  width: 1px;
+}
+
+.workspace-status-card__tick {
+  position: absolute;
+  background: rgba(0, 242, 255, 0.45);
+  z-index: 1;
+}
+
+.workspace-status-card__tick--n {
+  top: 0.15rem;
+  left: 50%;
+  width: 1px;
+  height: 0.35rem;
+}
+
+.workspace-status-card__tick--s {
+  bottom: 0.15rem;
+  left: 50%;
+  width: 1px;
+  height: 0.35rem;
+}
+
+.workspace-status-card__tick--e {
+  right: 0.15rem;
+  top: 50%;
+  width: 0.35rem;
+  height: 1px;
+}
+
+.workspace-status-card__tick--w {
+  left: 0.15rem;
+  top: 50%;
+  width: 0.35rem;
+  height: 1px;
+}
+
+.workspace-status-card__ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(0, 210, 255, 0.22);
+  border-radius: 50%;
+}
+
+.workspace-status-card__ring--mid {
+  inset: 0.7rem;
+}
+
+.workspace-status-card__ring--inner {
+  inset: 1.4rem;
+}
+
+.workspace-status-card__sweep {
+  position: absolute;
+  inset: 0.2rem;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(0, 210, 255, 0.35) 42deg, transparent 84deg);
+  animation: radar-sweep 3.5s linear infinite;
+}
+
+.workspace-status-card__meta {
+  margin: 0;
+  display: grid;
+  gap: 0.28rem;
+  font-size: 0.68rem;
+}
+
+.workspace-status-card__meta div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+}
+
+.workspace-status-card__meta dt {
+  color: var(--text-muted);
+}
+
+.workspace-status-card__meta dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.kairo-voice-deck {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  background: transparent;
+}
+
+.kairo-voice-deck__title {
+  margin: 0;
+  color: var(--text-hud);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+}
+
+.kairo-voice-deck__body {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  min-height: 0;
+}
+
+.kairo-voice-deck__body--text {
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.kairo-voice-deck__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.kairo-voice-deck__presence-pill {
+  flex: 0 0 auto;
+  padding: 0.16rem 0.45rem;
+  border: 1px solid rgba(122, 235, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(8, 24, 36, 0.72);
+  color: rgba(184, 236, 255, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.kairo-voice-deck--speaking .kairo-voice-deck__presence-pill {
+  border-color: rgba(255, 106, 168, 0.5);
+  color: rgba(255, 180, 210, 0.95);
+}
+
+.kairo-voice-deck--text-only .kairo-voice-deck__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.kairo-voice-deck__orb-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 5.5rem;
+  height: 5.5rem;
+  flex-shrink: 0;
+}
+
+.kairo-voice-deck__orb-stage .hud-holo-voice-orb {
+  position: absolute;
+  inset: -0.45rem;
+  width: auto;
+  height: auto;
+  z-index: 0;
+}
+
+.kairo-voice-deck__body--text {
+  align-items: flex-start;
+}
+
+.kairo-voice-deck__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.kairo-voice-deck__presence-pill {
+  flex: 0 0 auto;
+  padding: 0.16rem 0.45rem;
+  border: 1px solid rgba(122, 235, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(8, 24, 36, 0.72);
+  color: rgba(184, 236, 255, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.kairo-voice-deck--speaking .kairo-voice-deck__presence-pill {
+  border-color: rgba(255, 106, 168, 0.5);
+  color: rgba(255, 180, 210, 0.95);
+}
+
+.kairo-voice-deck--text-only .kairo-voice-deck__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.kairo-voice-deck__orb-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 5.5rem;
+  height: 5.5rem;
+  flex-shrink: 0;
+}
+
+.kairo-voice-deck__orb-stage .hud-holo-voice-orb {
+  position: absolute;
+  inset: -0.45rem;
+  width: auto;
+  height: auto;
+  z-index: 0;
+}
+
+.kairo-voice-deck__orb {
+  position: relative;
+  z-index: 1;
+  width: 5.5rem;
+  height: 5.5rem;
+  flex-shrink: 0;
+}
+
+.kairo-voice-deck__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(72, 196, 255, 0.35);
+}
+

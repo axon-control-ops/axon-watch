@@ -104,5 +104,35 @@ class RuntimeSummaryActiveRunsTests(unittest.TestCase):
         self.assertEqual("review", payload["active_runs"][0]["status"])
 
 
+    def test_runtime_summary_omits_background_employee_runs(self) -> None:
+        self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "Control Plane: continuous worker shift",
+                "employee_role": "backend",
+            },
+        )
+        operator_run = self.client.post(
+            "/api/runs",
+            json={
+                "workspace_id": "workspace_alpha",
+                "mode": "agent",
+                "summary": "Operator git status",
+            },
+        ).json()
+
+        with patch(
+            "app.runtime_summary_assembler.default_watch_probe",
+            return_value=(True, "ok", None, "2026-07-03T15:00:00Z"),
+        ):
+            response = self.client.get("/api/runtime/summary")
+
+        payload = response.json()
+        self.assertEqual(1, len(payload["active_runs"]))
+        self.assertEqual(operator_run["run_id"], payload["active_runs"][0]["run_id"])
+
+
 if __name__ == "__main__":
     unittest.main()

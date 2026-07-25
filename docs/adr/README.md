@@ -44,8 +44,17 @@ Every numbered ADR must include:
 - [ADR-001: Vue 3, Pinia, Monaco, and xterm.js stack](ADR-001-vue-monaco-xterm-stack.md)
 - [ADR-002: Control-plane run truth and backend-only briefing](ADR-002-control-plane-run-truth-and-briefing-seam.md) — superseded for shell briefing by ADR-003
 - [ADR-003: Shell consumes operator briefing in the right dock](ADR-003-shell-consumes-operator-briefing.md)
+- [ADR-004: Locked console shell layout](ADR-004-locked-console-shell-layout.md) — operator right-dock seam order superseded in part by ADR-005
+- [ADR-005: Operator sidebar attention toggle](ADR-005-operator-sidebar-attention-toggle.md)
+- [ADR-006: Operator command hero and footer attention](ADR-006-operator-command-hero-and-footer-attention.md)
+- [ADR-007: Operator workbench demotion](ADR-007-operator-workbench-demotion.md) — implementation spec: [`OPERATOR_MISSION_CONTROL_V1.md`](../OPERATOR_MISSION_CONTROL_V1.md)
+- [ADR-008: IDE shell content lock](ADR-008-ide-shell-content-lock.md)
 
-## Verification
+**Planning-only (not yet copied here):**
+
+- ADR-005 KAIRO as operator presence layer — accepted in
+  `axon-local/Plans/Axon-Watch/ADR-005-kairo-as-operator-presence-layer.md`.
+  Implementation blocked until coordinator assigns the JX slices.
 
 Use the template in `_TEMPLATE.md`, then run:
 

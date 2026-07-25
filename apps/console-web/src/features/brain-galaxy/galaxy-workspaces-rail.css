@@ -1,0 +1,295 @@
+/* Left workspaces rail (mockup) */
+.galaxy-workspaces-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  padding: 0.7rem 0.65rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(72, 210, 255, 0.32);
+  background:
+    radial-gradient(ellipse 70% 35% at 20% 0%, rgba(0, 180, 255, 0.1), transparent 50%),
+    linear-gradient(180deg, rgba(4, 14, 22, 0.92) 0%, rgba(2, 8, 14, 0.9) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 210, 255, 0.06) inset,
+    0 0 1.6rem rgba(0, 160, 220, 0.14);
+  backdrop-filter: blur(14px) saturate(1.08);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.galaxy-workspaces-rail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.galaxy-workspaces-rail__title {
+  margin: 0;
+  color: rgba(170, 200, 220, 0.88);
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.galaxy-workspaces-rail__add-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  border-radius: 0.28rem;
+  background: rgba(0, 18, 28, 0.8);
+  color: rgba(0, 230, 255, 0.95);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.galaxy-workspaces-rail__search {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.16);
+  background: rgba(0, 10, 16, 0.72);
+}
+
+.galaxy-workspaces-rail__search-icon {
+  color: rgba(0, 210, 255, 0.7);
+  font-size: 0.72rem;
+}
+
+.galaxy-workspaces-rail__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(220, 240, 255, 0.95);
+  font: inherit;
+  font-size: 0.68rem;
+  outline: none;
+}
+
+.galaxy-workspaces-rail__search input::placeholder {
+  color: rgba(130, 160, 180, 0.72);
+}
+
+.galaxy-workspaces-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.galaxy-workspaces-rail__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 0.28rem;
+  border: 1px solid transparent;
+  border-radius: 0.38rem;
+  padding: 0.1rem;
+}
+
+.galaxy-workspaces-rail__row:hover {
+  border-color: rgba(0, 210, 255, 0.18);
+  background: rgba(0, 210, 255, 0.05);
+}
+
+.galaxy-workspaces-rail__row--active {
+  border-color: rgba(0, 230, 255, 0.45);
+  background: rgba(0, 210, 255, 0.1);
+  box-shadow:
+    0 0 0.9rem rgba(0, 200, 255, 0.2),
+    0 0 0.6rem rgba(0, 210, 255, 0.08) inset;
+}
+
+.galaxy-workspaces-rail__item {
+  display: grid;
+  grid-template-columns: 1.35rem minmax(0, 1fr) 0.45rem;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.42rem 0.45rem;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.galaxy-workspaces-rail__item:hover,
+.galaxy-workspaces-rail__item--active {
+  /* Row owns the active/hover chrome so Open can sit beside it. */
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.galaxy-workspaces-rail__open {
+  align-self: center;
+  margin-right: 0.2rem;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  border-radius: 0.28rem;
+  background: rgba(0, 28, 40, 0.85);
+  color: rgba(160, 230, 255, 0.95);
+  font: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.galaxy-workspaces-rail__row:hover .galaxy-workspaces-rail__open,
+.galaxy-workspaces-rail__open--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.galaxy-workspaces-rail__open:hover {
+  border-color: rgba(0, 230, 255, 0.7);
+  color: #fff;
+  background: rgba(0, 60, 80, 0.95);
+}
+
+.galaxy-workspaces-rail__glyph {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 0.28rem;
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(180, 240, 255, 0.35), transparent 55%),
+    rgba(0, 24, 36, 0.9);
+  box-shadow:
+    0 0 0.4rem rgba(0, 200, 255, 0.2),
+    0 0 0.15rem rgba(0, 230, 255, 0.25) inset;
+}
+
+.galaxy-workspaces-rail__glyph--core {
+  box-shadow: 0 0 0.55rem rgba(0, 230, 255, 0.35);
+}
+
+.galaxy-workspaces-rail__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.galaxy-workspaces-rail__copy strong {
+  color: rgba(235, 248, 255, 0.96);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.galaxy-workspaces-rail__item--active .galaxy-workspaces-rail__copy strong {
+  color: rgba(120, 235, 255, 0.98);
+}
+
+.galaxy-workspaces-rail__copy span {
+  color: rgba(140, 175, 195, 0.82);
+  font-size: 0.56rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.galaxy-workspaces-rail__dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: rgba(90, 120, 140, 0.55);
+  justify-self: end;
+}
+
+.galaxy-workspaces-rail__item--active .galaxy-workspaces-rail__dot {
+  background: #2dff9a;
+  box-shadow: 0 0 0.45rem rgba(45, 255, 154, 0.65);
+}
+
+.galaxy-workspaces-rail__item--attention .galaxy-workspaces-rail__dot {
+  background: #ffa040;
+}
+
+.galaxy-workspaces-rail__item--critical .galaxy-workspaces-rail__dot {
+  background: #ff5050;
+}
+
+.galaxy-workspaces-rail__new {
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 1px dashed rgba(0, 210, 255, 0.28);
+  border-radius: 0.35rem;
+  background: rgba(0, 16, 24, 0.45);
+  color: rgba(160, 220, 240, 0.92);
+  font: inherit;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.galaxy-workspaces-rail__new:hover {
+  border-style: solid;
+  border-color: rgba(0, 230, 255, 0.45);
+  color: #fff;
+}
+
+
+.galaxy-workspaces-rail__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-top: 0.18rem;
+}
+
+.galaxy-workspaces-rail__chip {
+  padding: 0.1rem 0.34rem;
+  clip-path: polygon(0.18rem 0, 100% 0, calc(100% - 0.18rem) 100%, 0 100%);
+  border: 1px solid rgba(0, 210, 255, 0.38);
+  background:
+    linear-gradient(90deg, rgba(0, 180, 255, 0.16), transparent 55%),
+    rgba(0, 20, 30, 0.82);
+  color: rgba(180, 220, 240, 0.92);
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: 0 0 0.55rem rgba(0, 180, 255, 0.14);
+}
+
+.galaxy-workspaces-rail__chip--attention {
+  border-color: rgba(255, 160, 64, 0.65);
+  background:
+    linear-gradient(90deg, rgba(255, 150, 50, 0.22), transparent 55%),
+    rgba(40, 22, 6, 0.85);
+  color: #ffb45a;
+  box-shadow: 0 0 0.65rem rgba(255, 150, 50, 0.22);
+}
+
+.galaxy-workspaces-rail__chip--critical {
+  border-color: rgba(255, 80, 80, 0.7);
+  background:
+    linear-gradient(90deg, rgba(255, 70, 70, 0.24), transparent 55%),
+    rgba(40, 8, 10, 0.88);
+  color: #ff8a8a;
+  box-shadow: 0 0 0.7rem rgba(255, 70, 70, 0.28);
+}
+
+.galaxy-workspaces-rail__chip--info {
+  border-color: rgba(72, 196, 255, 0.45);
+  color: #7ad8ff;
+}

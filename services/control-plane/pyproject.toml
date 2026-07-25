@@ -6,6 +6,10 @@ requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.115,<1.0",
   "uvicorn>=0.30,<1.0",
+  "python-multipart",
+  # Required for the workspace terminal WebSocket endpoint; uvicorn refuses
+  # WS upgrades with a 500 when no websocket protocol library is installed.
+  "websockets>=12,<16",
 ]
 
 [build-system]

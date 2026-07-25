@@ -10,6 +10,28 @@ It is intentionally narrow:
 
 ## Commands
 
+Run TEST-0 acceptance (dev stack required):
+
+```bash
+./scripts/verify/test0-workspace-smoke.sh
+# alias:
+npm run verify:test0
+```
+
+Run parity closure gates (post-cutover):
+
+```bash
+npm run verify:parity-a1   # P-A1 run stop/resume cross-surface parity
+npm run verify:parity-a2   # P-A2 approval boundaries cross-surface parity
+npm run verify:parity-a3   # P-A3 review-ready cross-surface parity
+npm run verify:parity-a4   # P-A4 signal/inbox consistency cross-surface parity
+npm run verify:phase-a     # Phase A E2E (P-A1 … P-A4; no full verify monolith)
+npm run verify:signal-parity-matrix  # G5 composite gate (TEST-26)
+npm run verify:headed-browser-smoke  # Playwright shell/operator/IDE smoke + screenshots
+npm run verify:retirement-readiness  # TEST-17 (G6.4; requires dry-run + discard acks)
+# see docs/PARITY_CLOSURE_ROADMAP.md for P-A2 … P-D6
+```
+
 Run the full scaffold:
 
 ```bash

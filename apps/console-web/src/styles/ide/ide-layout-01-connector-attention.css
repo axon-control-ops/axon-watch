@@ -1,0 +1,120 @@
+/* Run activity-bar connector attention pulse — extracted from ide-layout-01.css */
+
+.ide-activity-bar__pulse--warning {
+  background: rgba(255, 190, 110, 0.92);
+  box-shadow: 0 0 8px rgba(255, 159, 0, 0.45);
+  animation: ide-activity-bar-pulse-warning 1.8s ease-in-out infinite;
+}
+
+@keyframes ide-activity-bar-pulse-warning {
+  0%,
+  100% {
+    opacity: 0.82;
+    box-shadow: 0 0 6px rgba(255, 159, 0, 0.35);
+  }
+
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(255, 190, 110, 0.68);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ide-activity-bar__pulse--warning {
+    animation: none;
+  }
+}
+
+/* Team activity-bar failed-shift attention — matches roster alert chip */
+.ide-activity-bar__button--team-attention {
+  color: rgba(255, 170, 150, 0.96);
+  box-shadow: inset 0 -2px 0 rgba(190, 80, 60, 0.42);
+}
+
+.ide-activity-bar__button--team-attention-interrupted {
+  color: rgba(255, 210, 150, 0.96);
+  box-shadow: inset 0 -2px 0 rgba(255, 180, 90, 0.42);
+}
+
+.ide-activity-bar__button--team-attention-mixed {
+  color: rgba(255, 200, 170, 0.96);
+  box-shadow: inset 0 -2px 0 rgba(255, 150, 110, 0.42);
+}
+
+/* Source Control activity-bar unsaved-file attention — matches editor tab dirty dot */
+.ide-activity-bar__button--git-attention {
+  color: rgba(170, 225, 255, 0.96);
+  box-shadow: inset 0 -2px 0 rgba(0, 242, 255, 0.32);
+}
+
+.ide-activity-bar__badge--failure {
+  border-color: rgba(255, 130, 105, 0.52);
+  background: rgba(120, 40, 32, 0.42);
+  color: rgba(255, 230, 220, 0.96);
+}
+
+.ide-activity-bar__badge--interrupted {
+  border-color: rgba(255, 180, 90, 0.48);
+  background: rgba(100, 65, 18, 0.62);
+  color: rgba(255, 240, 210, 0.96);
+}
+
+.ide-activity-bar__badge--mixed {
+  border-color: rgba(255, 150, 110, 0.46);
+  background: rgba(110, 48, 28, 0.58);
+  color: rgba(255, 220, 200, 0.98);
+}
+
+.ide-activity-bar__badge--dirty {
+  border-color: rgba(0, 242, 255, 0.42);
+  background: rgba(0, 242, 255, 0.12);
+  color: rgba(170, 235, 255, 0.96);
+}
+
+/* Team sidebar frame — mirrors activity-bar failed-shift attention */
+.ide-team-panel--attention {
+  box-shadow: inset 0 0 0 1px rgba(255, 110, 90, 0.28);
+}
+
+.ide-team-panel--attention .panel-heading__title {
+  color: rgba(255, 170, 150, 0.96);
+}
+
+.ide-team-panel--attention-interrupted {
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 90, 0.28);
+}
+
+.ide-team-panel--attention-interrupted .panel-heading__title {
+  color: rgba(255, 210, 150, 0.96);
+}
+
+.ide-team-panel--attention-mixed {
+  box-shadow: inset 0 0 0 1px rgba(255, 150, 110, 0.28);
+}
+
+.ide-team-panel--attention-mixed .panel-heading__title {
+  color: rgba(255, 200, 170, 0.96);
+}
+
+/* Source Control sidebar frame — mirrors activity-bar unsaved-file attention */
+.ide-explorer-panel--git-attention {
+  box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.22);
+}
+
+.ide-explorer-panel--git-attention .panel-heading__title {
+  color: rgba(170, 225, 255, 0.96);
+}
+
+/* Search sidebar frame — mirrors activity-bar load-failure attention */
+.ide-activity-bar__button--search-attention {
+  color: rgba(255, 200, 150, 0.96);
+  box-shadow: inset 0 -2px 0 rgba(255, 180, 120, 0.38);
+}
+
+.ide-explorer-panel--search-attention {
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 120, 0.24);
+}
+
+.ide-explorer-panel--search-attention .panel-heading__title {
+  color: rgba(255, 200, 150, 0.96);
+}

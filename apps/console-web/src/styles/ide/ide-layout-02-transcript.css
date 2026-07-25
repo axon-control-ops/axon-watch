@@ -1,0 +1,224 @@
+/* Left-rail Kairo card + spoken-agent speech chip (not AgentDock transcript). */
+
+.kairo-sidebar-panel--expanded {
+  min-height: 0;
+  gap: 0.4rem;
+}
+
+.kairo-sidebar-panel__card {
+  display: block;
+  flex: 1 1 52%;
+  min-height: 6.5rem;
+  width: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.kairo-sidebar-panel__card:focus-visible {
+  outline: 1px solid rgba(0, 242, 255, 0.55);
+  outline-offset: -1px;
+}
+
+.kairo-sidebar-speech {
+  display: flex;
+  flex: 1 1 48%;
+  flex-direction: column;
+  min-height: 4.75rem;
+  margin: 0 0.45rem 0.45rem;
+  padding: 0.45rem 0.5rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  border-radius: 0.45rem;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(0, 242, 255, 0.12), transparent 48%),
+    linear-gradient(165deg, rgba(8, 20, 30, 0.96), rgba(4, 10, 18, 0.98));
+  box-shadow: inset 0 0 24px rgba(0, 200, 255, 0.05);
+  overflow: hidden;
+  transition:
+    flex-grow 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.kairo-sidebar-speech--expanded {
+  flex-grow: 1.8;
+}
+
+.kairo-sidebar-speech[data-speaking='true'] {
+  border-color: rgba(255, 120, 190, 0.55);
+  box-shadow:
+    inset 0 0 20px rgba(255, 90, 170, 0.1),
+    0 0 14px rgba(0, 220, 255, 0.12);
+}
+
+.kairo-sidebar-speech__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.kairo-sidebar-speech__identity,
+.kairo-sidebar-speech__actions {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.kairo-sidebar-speech__identity {
+  gap: 0.4rem;
+}
+
+.kairo-sidebar-speech__actions {
+  flex: 0 0 auto;
+  gap: 0.3rem;
+}
+
+.kairo-sidebar-speech__activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 0.7rem;
+}
+
+.kairo-sidebar-speech__activity > span {
+  width: 2px;
+  height: 35%;
+  border-radius: 999px;
+  background: rgba(125, 235, 255, 0.74);
+}
+
+.kairo-sidebar-speech[data-speaking='true'] .kairo-sidebar-speech__activity > span {
+  animation: kairo-sidebar-voice-bar 760ms ease-in-out infinite alternate;
+}
+
+.kairo-sidebar-speech[data-speaking='true']
+  .kairo-sidebar-speech__activity
+  > span:nth-child(2) {
+  animation-delay: -380ms;
+}
+
+.kairo-sidebar-speech[data-speaking='true']
+  .kairo-sidebar-speech__activity
+  > span:nth-child(3) {
+  animation-delay: -190ms;
+}
+
+.kairo-sidebar-speech__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(125, 235, 255, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kairo-sidebar-speech__expand,
+.kairo-sidebar-speech__stop {
+  margin: 0;
+  padding: 0.14rem 0.4rem;
+  border: 1px solid rgba(255, 140, 120, 0.42);
+  border-radius: 0.25rem;
+  background: rgba(255, 120, 72, 0.12);
+  color: rgba(255, 210, 190, 0.96);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kairo-sidebar-speech__expand {
+  border-color: rgba(125, 235, 255, 0.28);
+  background: rgba(0, 210, 255, 0.08);
+  color: rgba(170, 238, 255, 0.9);
+}
+
+.kairo-sidebar-speech__expand:hover,
+.kairo-sidebar-speech__expand:focus-visible,
+.kairo-sidebar-speech__stop:hover,
+.kairo-sidebar-speech__stop:focus-visible {
+  border-color: rgba(125, 235, 255, 0.52);
+  outline: none;
+}
+
+.kairo-sidebar-speech__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.kairo-sidebar-speech__text {
+  margin: 0;
+  color: rgba(232, 244, 252, 0.96);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.kairo-sidebar-speech:not(.kairo-sidebar-speech--expanded)
+  .kairo-sidebar-speech__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.kairo-sidebar-speech__empty {
+  margin: 0.2rem 0;
+  color: rgba(148, 163, 184, 0.82);
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.kairo-sidebar-panel--speaking .kairo-sidebar-speech__text {
+  animation: kairo-sidebar-speech-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes kairo-sidebar-speech-pulse {
+  50% {
+    opacity: 0.88;
+  }
+}
+
+@keyframes kairo-sidebar-voice-bar {
+  from {
+    height: 28%;
+    opacity: 0.62;
+  }
+  to {
+    height: 100%;
+    opacity: 1;
+  }
+}
+
+@media (max-height: 46rem) {
+  .kairo-sidebar-panel__card {
+    min-height: 5.5rem;
+  }
+
+  .kairo-sidebar-speech {
+    min-height: 4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kairo-sidebar-panel--speaking .kairo-sidebar-speech__text,
+  .kairo-sidebar-speech[data-speaking='true'] .kairo-sidebar-speech__activity > span {
+    animation: none;
+  }
+}

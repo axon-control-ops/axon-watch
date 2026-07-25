@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "assessed_on": "2026-07-07",
+  "source_docs": [
+    "docs/LEGACY_CONNECTOR_INVENTORY.md",
+    "config/watch-connectors.json",
+    "config/parity-snapshot.json",
+    "docs/planning/IMPORT_MATRIX.md"
+  ],
+  "inventory": [
+    {
+      "id": "control_plane",
+      "display_name": "Control plane",
+      "category": "health_probe",
+      "axon_x_status": "migrated",
+      "owner": "services/control-plane",
+      "phase_g_slice": null,
+      "probe": {
+        "kind": "http",
+        "url": "${AXON_WATCH_CONTROL_PLANE_BASE_URL}/api/health",
+        "watch_connector_id": "control_plane",
+        "required": true,
+        "gate": "verify:test3"
+      },
+      "fallback": null,
+      "removal_criteria": "Already native on Axon-X. axon-local not required for control-plane API."
+    },
+    {
+      "id": "console_web",
+      "display_name": "Console web",
+      "category": "health_probe",
+      "axon_x_status": "migrated",
+      "owner": "apps/console-web",
+      "phase_g_slice": null,
+      "probe": {
+        "kind": "http",
+        "url": "${AXON_WATCH_PUBLIC_BASE_URL}/",
+        "watch_connector_id": "console_web",
+        "required": true,
+        "gate": "verify:test3"
+      },
+      "fallback": null,
+      "removal_criteria": "Primary operator surface is :4173. axon-local UI is explicit fallback only."
+    },
+    {
+      "id": "axon_local",
+      "display_name": "axon-local (legacy)",
+      "category": "legacy_surface",
+      "axon_x_status": "optional_fallback",
+      "owner": "axon-local (:7734)",
+      "phase_g_slice": "G6",
+      "probe": {
+        "kind": "http",
+        "url": "http://127.0.0.1:7734/api/health",
+        "watch_connector_id": "axon_local",
+        "required": false,
+        "gate": "verify:test3"
+      },
+      "fallback": {
+        "url": "http://127.0.0.1:7734",
+        "ui_entry": "Mission Control → Connectors → Open :7734 fallback"
+      },
+      "removal_criteria": "Remove fallback rail + probe only after G4.2–G4.5 unmigrated slices are replaced or operator-discarded, G5 capability matrix is green, and G6 one-week :4173-only sign-off."
+    },
+    {
+      "id": "agent_orchestration",
+      "display_name": "Full agent ReAct loop",
+      "category": "runtime_capability",
+      "axon_x_status": "replaced",
+      "owner": "services/control-plane/app/cli_runtime + run store",
+      "phase_g_slice": "G3",
+      "probe": {
+        "kind": "gate",
+        "gate": "verify:agent-orchestration-parity",
+        "note": "ReAct may still run inside a Cursor agent turn; brain.py is not ported."
+      },
+      "fallback": null,
+      "removal_criteria": "Retirement blocker cleared when verify:agent-orchestration-parity stays green and operator no longer needs :7734 for agent file edits."
+    },
+    {
+      "id": "whatsapp_web_monitor",
+      "display_name": "WhatsApp Web monitor",
+      "category": "child_project_integration",
+      "axon_x_status": "unmigrated",
+      "owner": "axon-local axon_api/services/whatsapp_web_monitor.py",
+      "phase_g_slice": "G4.2",
+      "probe": {
+        "kind": "manual",
+        "donor_path": "axon-local scheduler job_whatsapp_web_watch",
+        "note": "No Axon-X HTTP probe yet; status only via axon-local when running."
+      },
+      "fallback": {
+        "url": "http://127.0.0.1:7734",
+        "ui_entry": "axon-local WhatsApp monitor surfaces"
+      },
+      "removal_criteria": "Bounded watch monitor slice with vault-fed auth + inbox signals on Axon-X, or explicit operator discard documented in G5.4."
+    },
+    {
+      "id": "cloudflare_tunnel",
+      "display_name": "Cloudflare tunnel / remote public URL",
+      "category": "child_project_integration",
+      "axon_x_status": "partial",
+      "owner": "services/axon-watch/app/tunnel",
+      "phase_g_slice": "G4.3",
+      "probe": {
+        "kind": "gate",
+        "gate": "verify:tunnel-remote-control",
+        "note": "Native Axon-X binary, auth, process ownership, start/stop, and connectors-rail diagnostics; no axon-local script dependency."
+      },
+      "fallback": {
+        "url": "http://127.0.0.1:7734",
+        "ui_entry": "legacy process owner until operator auth cutover"
+      },
+      "removal_criteria": "Tunnel slice stays green, Axon-X auth is available, and the operator replaces the currently unmanaged tunnel process with the native owner."
+    },
+    {
+      "id": "voice_deck_mobile_cockpit",
+      "display_name": "Voice deck / mobile JARVIS cockpit",
+      "category": "legacy_surface",
+      "axon_x_status": "partial",
+      "owner": "apps/console-web/features/voice-deck + operator-presence",
+      "phase_g_slice": "G4.4",
+      "probe": {
+        "kind": "gate",
+        "gate": "verify:voice-cockpit",
+        "note": "Event-driven spoken alerts via briefing watch + presence_refresh SSE; mobile compact strip is foreground-only."
+      },
+      "fallback": {
+        "url": "http://127.0.0.1:7734",
+        "ui_entry": "axon-local voice deck / mobile controller"
+      },
+      "removal_criteria": "Event-driven presence on Axon-X replaces Alpine polling, or operator approves foreground-only + push as v1 ceiling (G5.4 discard)."
+    },
+    {
+      "id": "agent_dock_legacy_parity",
+      "display_name": "Agent Dock legacy parity gaps",
+      "category": "legacy_surface",
+      "axon_x_status": "partial",
+      "owner": "apps/console-web RightDock + AgentDock",
+      "phase_g_slice": "G4.5",
+      "probe": {
+        "kind": "gate",
+        "gate": "verify:agent-dock-parity",
+        "contract": "config/dock-behavior-contract.json"
+      },
+      "fallback": {
+        "url": "http://127.0.0.1:7734",
+        "ui_entry": "axon-local Agent Dock thread deck richness"
+      },
+      "removal_criteria": "Remaining parity-snapshot dock gaps closed or documented as intentional v1 degradation with operator acknowledgment."
+    },
+    {
+      "id": "dashpro_external_monitors",
+      "display_name": "DashPro Sentry / PostHog monitors",
+      "category": "child_project_integration",
+      "axon_x_status": "partial",
+      "owner": "services/axon-watch/app/monitors",
+      "phase_g_slice": "G4.2",
+      "probe": {
+        "kind": "gate",
+        "gate": "verify:dashpro-monitors",
+        "config": "config/dashpro-monitor-slice.json"
+      },
+      "fallback": null,
+      "removal_criteria": "Child-project monitor slice covers operator-needed external checks; WhatsApp and tunnel remain separate G4.2/G4.3 rows."
+    },
+    {
+      "id": "legacy_settings_storage",
+      "display_name": "Classic axon-local settings / SQLite paths",
+      "category": "legacy_surface",
+      "axon_x_status": "unmigrated",
+      "owner": "axon-local db.py + settings stores",
+      "phase_g_slice": "G5",
+      "probe": {
+        "kind": "manual",
+        "note": "No unified probe; capability matrix (G5.1) maps each settings key to Axon-X owner or discard."
+      },
+      "fallback": {
+        "url": "http://127.0.0.1:7734",
+        "ui_entry": "axon-local settings surfaces"
+      },
+      "removal_criteria": "G5 capability matrix shows every operator-needed key has Axon-X owner or documented discard; no silent truth merge between stores."
+    }
+  ],
+  "retirement_blocker_map": {
+    "WhatsApp Web monitor unmigrated (G4.2 deferred)": [
+      "whatsapp_web_monitor"
+    ],
+    "Legacy settings paths without Axon-X owner (G5.1 partial rows)": [
+      "legacy_settings_storage"
+    ],
+    "Tunnel start/stop dependency on axon-local script (G4.3 partial)": [
+      "cloudflare_tunnel",
+      "axon_local"
+    ]
+  }
+}

@@ -1,0 +1,466 @@
+@import './ide-layout-02-transcript.css';
+@import './ide-kairo-live-agent.css';
+
+.kairo-sidebar-panel {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+}
+
+.kairo-sidebar-panel--emphasized,
+.ide-kairo-footer__interrupt--emphasized {
+  box-shadow: 0 0 0 1px rgba(72, 196, 255, 0.45), 0 0 18px rgba(72, 196, 255, 0.22);
+}
+
+.kairo-sidebar-panel--debug-mode {
+  border-color: rgba(167, 139, 250, 0.48) !important;
+  background:
+    linear-gradient(145deg, rgba(76, 29, 149, 0.3), rgba(12, 16, 26, 0.94)) !important;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.08),
+    0 0 18px rgba(124, 58, 237, 0.16);
+}
+
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__ring {
+  border-color: rgba(167, 139, 250, 0.42);
+}
+
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__ring--inner {
+  background: rgba(124, 58, 237, 0.14);
+}
+
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(167, 139, 250, 0.5),
+    transparent 35%
+  );
+}
+
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__state,
+.kairo-sidebar-panel--debug-mode .kairo-sidebar-panel__compact-label {
+  color: rgba(221, 214, 254, 0.98);
+}
+
+.briefing-surface-followup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-top: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(72, 196, 255, 0.35);
+  border-radius: 0.45rem;
+  background: rgba(72, 196, 255, 0.08);
+}
+
+.briefing-surface-followup--compact {
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.55rem;
+}
+
+.briefing-surface-followup__copy {
+  margin: 0;
+  color: var(--text-hud);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.briefing-surface-followup__timer {
+  margin-left: 0.35rem;
+  color: rgba(72, 196, 255, 0.95);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.briefing-surface-followup__action {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(72, 196, 255, 0.55);
+  border-radius: 0.35rem;
+  background: rgba(72, 196, 255, 0.14);
+  color: var(--text-hud);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.briefing-surface-followup__action:hover {
+  background: rgba(72, 196, 255, 0.24);
+}
+
+.ide-kairo-footer .briefing-surface-followup {
+  width: 100%;
+}
+
+.kairo-sidebar-panel__title {
+  margin: 0;
+  padding: 0.55rem 0.7rem 0.35rem;
+  color: var(--text-hud);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+}
+
+.kairo-sidebar-panel__body {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  gap: 0.55rem;
+  padding: 0 0.7rem 0.65rem;
+}
+
+.kairo-sidebar-panel__radar {
+  position: relative;
+  width: 3.2rem;
+  height: 3.2rem;
+}
+
+.kairo-sidebar-panel__ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 50%;
+}
+
+.kairo-sidebar-panel__ring--mid {
+  inset: 0.45rem;
+}
+
+.kairo-sidebar-panel__ring--inner {
+  inset: 0.9rem;
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.kairo-sidebar-panel__sweep {
+  position: absolute;
+  inset: 0.2rem;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent, rgba(0, 242, 255, 0.35), transparent 35%);
+  animation: kairo-radar-spin 4s linear infinite;
+}
+
+.kairo-sidebar-panel__copy {
+  min-width: 0;
+}
+
+.kairo-sidebar-panel__state,
+.kairo-sidebar-panel__headline,
+.kairo-sidebar-panel__notice,
+.kairo-sidebar-panel__advise {
+  margin: 0;
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.kairo-sidebar-panel__state {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kairo-sidebar-panel__headline {
+  margin-top: 0.2rem;
+  color: var(--text-primary);
+}
+
+.kairo-sidebar-panel__summary {
+  margin: 0.25rem 0 0;
+  color: var(--text-hud);
+  font-size: 0.62rem;
+  text-shadow: var(--glow-text-cyan);
+}
+
+.kairo-sidebar-panel__notice {
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+}
+
+.kairo-sidebar-panel__advise {
+  margin-top: 0.15rem;
+  color: var(--accent-warning);
+}
+
+.kairo-sidebar-panel__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.kairo-sidebar-panel__badge {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid rgba(255, 159, 0, 0.45);
+  color: #ffbf66;
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.05em;
+}
+
+.kairo-sidebar-panel__badge--signal {
+  border-color: rgba(0, 242, 255, 0.35);
+  color: var(--text-hud);
+}
+
+.kairo-sidebar-panel__stop-speech {
+  margin-top: 0.45rem;
+  width: 100%;
+  border: 1px solid rgba(255, 140, 120, 0.42);
+  border-radius: 0.35rem;
+  background: rgba(255, 120, 72, 0.12);
+  color: rgba(255, 210, 190, 0.96);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  padding: 0.35rem 0.55rem;
+}
+
+.kairo-sidebar-panel--compact {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 0.45rem;
+  background: rgba(12, 14, 24, 0.82);
+  color: rgba(199, 210, 254, 0.88);
+  cursor: pointer;
+}
+
+.kairo-sidebar-panel__compact-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(129, 140, 248, 0.72);
+  box-shadow: 0 0 0.35rem rgba(99, 102, 241, 0.35);
+}
+
+.kairo-sidebar-panel__compact-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.agent-dock {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  gap: 0;
+  overflow: visible;
+  background: linear-gradient(180deg, rgba(8, 12, 18, 0.94), rgba(6, 10, 16, 0.98));
+  transition: box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.agent-dock--alive {
+  box-shadow:
+    inset 2px 0 0 rgba(0, 220, 200, 0.35),
+    0 0 22px rgba(20, 120, 160, 0.16);
+  animation: agent-dock-alive-breathe 3.2s ease-in-out infinite;
+}
+
+.agent-dock--streaming {
+  box-shadow:
+    inset 2px 0 0 rgba(0, 245, 212, 0.55),
+    0 0 28px rgba(0, 180, 200, 0.22);
+  animation: agent-dock-stream-pulse 1.8s ease-in-out infinite;
+}
+
+.agent-dock--alive::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 230, 210, 0.15) 18%,
+    rgba(0, 245, 212, 0.75) 50%,
+    rgba(0, 230, 210, 0.15) 82%,
+    transparent 100%
+  );
+  opacity: 0.85;
+}
+
+@keyframes agent-dock-alive-breathe {
+  0%,
+  100% {
+    box-shadow:
+      inset 2px 0 0 rgba(0, 220, 200, 0.28),
+      0 0 16px rgba(20, 120, 160, 0.1);
+  }
+  50% {
+    box-shadow:
+      inset 2px 0 0 rgba(0, 235, 215, 0.48),
+      0 0 26px rgba(20, 140, 180, 0.2);
+  }
+}
+
+@keyframes agent-dock-stream-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 2px 0 0 rgba(0, 245, 212, 0.4),
+      0 0 18px rgba(0, 180, 200, 0.14);
+  }
+  50% {
+    box-shadow:
+      inset 2px 0 0 rgba(80, 255, 230, 0.72),
+      0 0 34px rgba(0, 200, 220, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-dock--alive,
+  .agent-dock--streaming {
+    animation: none;
+  }
+}
+
+.agent-dock__resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.35rem;
+  z-index: 4;
+  width: 0.7rem;
+  cursor: col-resize;
+}
+
+.agent-dock__resize-grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: rgba(138, 154, 173, 0.28);
+  transform: translate(-50%, -50%);
+  transition: background 120ms ease, height 120ms ease;
+}
+
+.agent-dock__resize-handle:hover .agent-dock__resize-grip,
+.agent-dock__resize-handle:focus-visible .agent-dock__resize-grip,
+.agent-dock--resizing .agent-dock__resize-grip {
+  height: 3rem;
+  background: rgba(0, 245, 212, 0.72);
+}
+
+.agent-dock__resize-handle:focus-visible {
+  outline: none;
+}
+
+.agent-dock__resize-handle:focus-visible::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.55rem;
+  height: 3.4rem;
+  border: 1px solid rgba(0, 245, 212, 0.55);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.agent-dock__header {
+  /* Above .agent-dock__thread so the workspace picker can overhang the transcript. */
+  position: relative;
+  z-index: 30;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  padding: 0.45rem 0.65rem 0.4rem;
+  border-bottom: 1px solid rgba(138, 154, 173, 0.14);
+}
+
+.agent-dock__header--compact {
+  padding-bottom: 0.4rem;
+}
+
+.agent-dock__head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  position: relative;
+  z-index: 40;
+}
+
+.agent-dock__head-main {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+.agent-dock__head-tabs {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  /* Keep visible so the chat-history panel is not clipped under the transcript. */
+  overflow: visible;
+  position: relative;
+  z-index: 20;
+  margin: 0.35rem -0.65rem -0.4rem;
+  border-top: 1px solid rgba(0, 242, 255, 0.14);
+  background: #031622;
+}
+
+.agent-dock__head-tabs > .agent-dock-thread-tabbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.agent-dock__head-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.agent-dock-workspace-menu {
+  position: relative;
+  z-index: 50;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 13rem;
+}
+
+.agent-dock-workspace-menu:has(.agent-dock-workspace-menu__panel) {
+  z-index: 80;
+}
+
+/* glass3d flattens dock children to z-index:1 — restore chrome above transcript. */
+.console-shell--mockup.console-shell--glass3d
+  .region-right-dock.agent-dock
+  > .agent-dock__header {
+  z-index: 30;
+}
+
+.console-shell--mockup.console-shell--glass3d
+  .region-right-dock.agent-dock
+  > .agent-dock__composer {
+  z-index: 40;
+}
+

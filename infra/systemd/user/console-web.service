@@ -1,0 +1,21 @@
+[Unit]
+Description=Axon-X Console Web :4173 (user always-on)
+After=network.target control-plane.service
+Wants=network-online.target
+Requires=control-plane.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/axon-watch/deployment.env
+WorkingDirectory=%h
+ExecStartPre=/bin/bash -lc 'cd "%h/axon-nvme/repos/axon-watch" && test -d apps/console-web/dist || npm run build -w @axon-watch/console-web'
+ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/run-service.sh console-web
+Restart=on-failure
+RestartSec=3
+MemoryAccounting=yes
+MemoryHigh=512M
+MemoryMax=1G
+OOMPolicy=stop
+
+[Install]
+WantedBy=default.target

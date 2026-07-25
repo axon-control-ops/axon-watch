@@ -1,0 +1,182 @@
+@import './center-workbench-panel-surface.css';
+@import './editor-statusbar-panels.css';
+@import './editor-statusbar-meta.css';
+@import './center-workbench-ide-guide.css';
+@import './center-workbench-editor-flex.css';
+@import './mockup-shell-07-monaco.css';
+.editor-tabbar__tab-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.42rem 0.2rem 0.42rem 0.7rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.editor-tabbar__tab-select:focus-visible {
+  outline: 2px solid rgba(0, 242, 255, 0.45);
+  outline-offset: -2px;
+}
+
+.editor-tabbar__file-icon {
+  flex: 0 0 auto;
+  opacity: 0.72;
+}
+
+.editor-tabbar__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-tabbar__dirty-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: rgba(0, 242, 255, 0.88);
+  box-shadow: 0 0 4px rgba(0, 242, 255, 0.45);
+}
+
+.editor-tabbar--mockup .editor-tabbar__tab--active {
+  color: rgba(241, 245, 249, 0.98);
+  border-bottom-color: rgba(56, 189, 248, 0.85);
+  background: #0f1724;
+}
+
+.editor-tabbar--mockup .editor-tabbar__tab--dirty .editor-tabbar__label::after {
+  content: '';
+  display: inline-block;
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-left: 0.35rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.9);
+  vertical-align: middle;
+}
+
+.editor-tabbar--mockup .editor-tabbar__tools {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 0.2rem;
+  margin-left: auto;
+  padding: 0 0.35rem 0 0.2rem;
+}
+
+.editor-tabbar--mockup .editor-tabbar__tool {
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  cursor: default;
+}
+
+.editor-tabbar__tool {
+  display: inline-grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: rgba(148, 163, 184, 0.82);
+  font-size: 0.78rem;
+}
+
+.editor-tabbar__tab--active {
+  color: var(--text-primary);
+}
+
+.editor-tabbar__close {
+  display: inline-grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-right: 0.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.55);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.editor-tabbar__tab:hover .editor-tabbar__close,
+.editor-tabbar__tab--active .editor-tabbar__close {
+  opacity: 1;
+}
+
+.editor-tabbar__close:hover {
+  background: rgba(148, 163, 184, 0.14);
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.editor-tabbar__close:focus-visible {
+  opacity: 1;
+  background: rgba(148, 163, 184, 0.14);
+  color: rgba(226, 232, 240, 0.96);
+  outline: 2px solid rgba(0, 242, 255, 0.45);
+  outline-offset: 1px;
+}
+
+.editor-tabbar__close-icon {
+  opacity: 0.85;
+}
+
+.editor-tabbar__close:hover .editor-tabbar__close-icon {
+  opacity: 1;
+}
+
+.center-workbench__editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+
+.center-workbench__editor .surface-host--mockup {
+  flex: 1;
+  margin-top: 0;
+  min-height: 0;
+}
+
+.center-workbench__editor .surface-host--mockup .surface-host__body {
+  flex: 1;
+  min-height: 0;
+}
+
+.center-workbench__editor .surface-host__body--editor {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.center-workbench__editor .editor-markdown-preview,
+.center-workbench__editor .editor-csv-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.center-workbench__editor .agent-edit-review-viewer {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: 1rem 1.15rem 1.25rem;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: #05111b;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-editor, 0.78rem);
+  line-height: var(--leading-code, 1.45);
+  white-space: pre;
+}

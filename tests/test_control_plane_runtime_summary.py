@@ -3,17 +3,12 @@ from __future__ import annotations
 import json
 import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from tests.support.control_plane_app_loader import prepare_control_plane_imports
 from tests.support.control_plane_db import isolate_control_plane_db
-
-CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
-sys.path.insert(0, str(CONTROL_PLANE_ROOT))
-
-from app.main import app  # noqa: E402
 
 from scripts.verify.common import load_config  # noqa: E402
 
@@ -25,6 +20,8 @@ _CANONICAL_TOP_LEVEL_KEYS = {
     "active_runs",
     "approvals",
     "signals",
+    "connectors",
+    "cli_runtime",
     "capabilities",
     "degraded",
 }
@@ -32,11 +29,21 @@ _CANONICAL_TOP_LEVEL_KEYS = {
 
 class ControlPlaneRuntimeSummaryTests(unittest.TestCase):
     def setUp(self) -> None:
+        self._saved_modules = prepare_control_plane_imports()
+        self.addCleanup(self._restore_control_plane_modules)
+
+        from app.main import app
         from app.persistence import run_store
 
         isolate_control_plane_db(self, run_store)
         self.client = TestClient(app)
         self.addCleanup(self.client.close)
+
+    def _restore_control_plane_modules(self) -> None:
+        for name in list(sys.modules):
+            if name == "app" or name.startswith("app."):
+                del sys.modules[name]
+        sys.modules.update(self._saved_modules)
 
     def test_runtime_summary_endpoint_returns_assembled_canonical_shape(self) -> None:
         with patch(

@@ -1,7 +1,9 @@
-"""List, read, and write UTF-8 files under workspace-scoped directories."""
+"""List, read, and write workspace-scoped files."""
 
 from __future__ import annotations
 
+import mimetypes
+import os
 from pathlib import Path
 
 from app.terminal.workspace_roots import resolve_workspace_root
@@ -10,6 +12,74 @@ from app.workspace_catalog import get_workspace_record
 
 class WorkspaceFileError(ValueError):
     pass
+
+
+_SKIPPED_DIRECTORY_NAMES = {
+    "__pycache__",
+    "coverage",
+    "dist",
+    "build",
+    "node_modules",
+    "venv",
+}
+_MAX_LISTED_FILES = 5000
+_IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".avif"})
+_BINARY_EXTENSIONS = frozenset(
+    {
+        ".pdf",
+        ".zip",
+        ".gz",
+        ".tgz",
+        ".bz2",
+        ".xz",
+        ".7z",
+        ".rar",
+        ".exe",
+        ".dll",
+        ".so",
+        ".dylib",
+        ".bin",
+        ".wasm",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".ico",
+        ".mp3",
+        ".mp4",
+        ".webm",
+        ".mov",
+        ".avi",
+        ".wav",
+        ".ogg",
+        ".sqlite",
+        ".sqlite3",
+        ".db",
+        ".apk",
+        ".aab",
+        ".dmg",
+        ".iso",
+    }
+)
+_MAX_RAW_FILE_BYTES = 16 * 1024 * 1024
+_MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024
+
+
+def is_image_workspace_file(file_path: str) -> bool:
+    return Path(str(file_path or "").strip()).suffix.lower() in _IMAGE_EXTENSIONS
+
+
+def is_binary_workspace_file(file_path: str) -> bool:
+    suffix = Path(str(file_path or "").strip()).suffix.lower()
+    return suffix in _IMAGE_EXTENSIONS or suffix in _BINARY_EXTENSIONS
+
+
+def workspace_file_media_type(file_path: str) -> str:
+    guessed, _ = mimetypes.guess_type(str(file_path or "").strip())
+    if guessed:
+        return guessed
+    return "application/octet-stream"
 
 
 def _safe_resolve(workspace_root: Path, relative_path: str) -> Path:
@@ -51,36 +121,72 @@ def ensure_bootstrap_files(workspace_id: str) -> Path:
     return root
 
 
+def _should_skip_directory(name: str) -> bool:
+    return name.startswith(".") or name in _SKIPPED_DIRECTORY_NAMES
+
+
+def _should_skip_file(name: str) -> bool:
+    return name.startswith(".")
+
+
 def list_workspace_files(workspace_id: str) -> list[dict[str, object]]:
     root = ensure_bootstrap_files(workspace_id)
     items: list[dict[str, object]] = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(root).as_posix()
-        if relative.startswith(".") or "/." in relative:
-            continue
-        items.append(
-            {
-                "path": relative,
-                "size_bytes": path.stat().st_size,
-            }
+    for current_root, dirnames, filenames in os.walk(root, topdown=True):
+        dirnames[:] = sorted(
+            directory for directory in dirnames if not _should_skip_directory(directory)
         )
+        for filename in sorted(filenames):
+            if _should_skip_file(filename):
+                continue
+            path = Path(current_root) / filename
+            relative = path.relative_to(root).as_posix()
+            items.append(
+                {
+                    "path": relative,
+                    "size_bytes": path.stat().st_size,
+                }
+            )
+            if len(items) >= _MAX_LISTED_FILES:
+                return items
     return items
 
 
-def read_workspace_file(workspace_id: str, file_path: str) -> dict[str, object]:
+def resolve_workspace_file_path(workspace_id: str, file_path: str) -> Path:
     root = resolve_workspace_root(workspace_id)
     target = _safe_resolve(root, file_path)
     if not target.is_file():
         raise WorkspaceFileError(f"file not found: {file_path}")
-    content = target.read_text(encoding="utf-8")
+    return target
+
+
+def read_workspace_file(workspace_id: str, file_path: str) -> dict[str, object]:
+    target = resolve_workspace_file_path(workspace_id, file_path)
+    if is_binary_workspace_file(file_path):
+        raise WorkspaceFileError("binary files must be fetched via the raw file endpoint")
+    size_bytes = target.stat().st_size
+    if size_bytes > _MAX_TEXT_FILE_BYTES:
+        raise WorkspaceFileError("text file exceeds 2MB editor limit")
+    try:
+        content = target.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise WorkspaceFileError(
+            "binary files must be fetched via the raw file endpoint"
+        ) from exc
     return {
         "workspace_id": workspace_id,
         "path": file_path,
         "content": content,
-        "size_bytes": target.stat().st_size,
+        "size_bytes": size_bytes,
     }
+
+
+def read_workspace_file_bytes(workspace_id: str, file_path: str) -> tuple[bytes, str, int]:
+    target = resolve_workspace_file_path(workspace_id, file_path)
+    size_bytes = target.stat().st_size
+    if size_bytes > _MAX_RAW_FILE_BYTES:
+        raise WorkspaceFileError("file exceeds 16MB raw download limit")
+    return target.read_bytes(), workspace_file_media_type(file_path), size_bytes
 
 
 def write_workspace_file(workspace_id: str, file_path: str, content: str) -> dict[str, object]:
@@ -93,4 +199,39 @@ def write_workspace_file(workspace_id: str, file_path: str, content: str) -> dic
         "path": file_path,
         "size_bytes": target.stat().st_size,
         "saved": True,
+    }
+
+
+def rename_workspace_file(
+    workspace_id: str,
+    old_path: str,
+    new_path: str,
+) -> dict[str, object]:
+    root = resolve_workspace_root(workspace_id)
+    source = _safe_resolve(root, old_path)
+    target = _safe_resolve(root, new_path)
+
+    if not source.is_file():
+        raise WorkspaceFileError(f"file not found: {old_path}")
+
+    if source == target:
+        return {
+            "workspace_id": workspace_id,
+            "old_path": old_path,
+            "path": new_path,
+            "size_bytes": source.stat().st_size,
+            "renamed": True,
+        }
+
+    if target.exists():
+        raise WorkspaceFileError(f"file already exists: {new_path}")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    source.rename(target)
+    return {
+        "workspace_id": workspace_id,
+        "old_path": old_path,
+        "path": new_path,
+        "size_bytes": target.stat().st_size,
+        "renamed": True,
     }

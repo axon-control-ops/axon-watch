@@ -1,0 +1,50 @@
+.center-workbench__editor .surface-host__frame--editor {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-self: stretch;
+  box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.06);
+}
+
+.center-workbench__editor .surface-host__frame--editor .monaco-editor {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+}
+
+/* Do not style Monaco .view-line / span internals — that breaks glyph painting
+   (especially with EditContext). Theme colors come from defineMockupMonacoTheme. */
+
+.center-workbench__editor .surface-host__frame--editor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 242, 255, 0.03) 0%, transparent 12%, transparent 88%, rgba(0, 242, 255, 0.02) 100%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 242, 255, 0.015) 0,
+      rgba(0, 242, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  opacity: 0.55;
+}
+
+.console-shell--mockup .monaco-editor .minimap,
+.console-shell--mockup .monaco-editor .minimap canvas {
+  opacity: 0.92;
+}
+
+.console-shell--ide .monaco-editor .minimap,
+.console-shell--ide .monaco-editor .minimap canvas {
+  opacity: 1;
+}
+
+.console-shell--mockup .monaco-editor .sticky-widget {
+  box-shadow: inset 0 -1px 0 rgba(0, 242, 255, 0.12);
+}

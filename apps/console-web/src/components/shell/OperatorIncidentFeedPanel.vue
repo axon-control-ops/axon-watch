@@ -1,0 +1,79 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+
+import { buildOperatorIncidentFeed } from '../../lib/operator-incident-feed-view';
+import HandoffToIdeButton from './HandoffToIdeButton.vue';
+import { useShellStore } from '../../stores/shell';
+
+const shell = useShellStore();
+
+const feedView = computed(() => {
+  const spoken = shell.operatorBriefing?.operator_presence?.spoken_alert;
+  return buildOperatorIncidentFeed({
+    topSignals: shell.operatorBriefing?.top_signals ?? [],
+    workspaceId: shell.currentWorkspace?.workspace_id ?? null,
+    fleetHealth: shell.operatorFleetHealth,
+    serverExplanation: spoken?.explanation ?? null,
+    serverSignalId: spoken?.signal_id ?? null,
+    serverReason: spoken?.reason ?? null,
+  });
+});
+
+function focusSignal(signalId: string): void {
+  shell.focusAttentionSidebar(signalId);
+}
+</script>
+
+<template>
+  <section class="operator-incident-feed" data-orb-obstacle="mission" aria-label="Incident feed">
+    <header class="operator-incident-feed__header" data-orb-field>
+      <div>
+        <p class="operator-incident-feed__eyebrow">Unified inbox</p>
+        <h3 class="operator-incident-feed__title">Incidents</h3>
+      </div>
+      <span class="operator-incident-feed__headline">{{ feedView.headline }}</span>
+    </header>
+
+    <ul v-if="feedView.items.length" class="operator-incident-feed__list">
+      <li
+        v-for="item in feedView.items"
+        :key="item.id"
+        class="operator-incident-feed__item"
+        data-orb-field
+        :class="`operator-incident-feed__item--${item.severity}`"
+      >
+        <div class="operator-incident-feed__row">
+          <button type="button" class="operator-incident-feed__button" @click="focusSignal(item.id)">
+            <span class="operator-incident-feed__item-title">
+              {{ item.title }}
+              <span v-if="item.monitorSignal" class="operator-incident-feed__monitor-tag">Monitor</span>
+            </span>
+            <span class="operator-incident-feed__item-summary">{{ item.plainWhat || item.summary }}</span>
+            <span class="operator-incident-feed__item-meta">
+              {{ item.source === 'fleet' ? 'Fleet rollup' : 'Signal inbox' }}
+            </span>
+          </button>
+          <div v-if="item.source === 'signal'" class="operator-incident-feed__handoff-card">
+            <p class="operator-incident-feed__handoff-label">Investigate in IDE</p>
+            <HandoffToIdeButton
+              :signal-id="item.id"
+              :workspace-id="item.workspaceId"
+              :title="item.title"
+              :summary="item.summary"
+              :meta="item.meta"
+              compact
+            />
+          </div>
+        </div>
+      </li>
+    </ul>
+    <p v-else class="operator-incident-feed__empty">{{ feedView.emptyCopy }}</p>
+    <p
+      v-if="shell.handoffMutationError"
+      class="operator-incident-feed__handoff-error"
+      role="alert"
+    >
+      {{ shell.handoffMutationError }}
+    </p>
+  </section>
+</template>

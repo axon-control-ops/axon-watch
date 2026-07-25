@@ -100,6 +100,18 @@ export interface SignalView {
   created_at: string;
   updated_at: string;
   action_type: SignalActionType;
+  delivery_state?: DeliveryState;
+  latest_receipt_id?: string;
+  watch_rule?: WatchRule;
+  meta?: Record<string, unknown>;
+}
+
+export type WatchRuleMode = 'observe' | 'advise' | 'approval' | 'execute';
+
+export interface WatchRule {
+  mode: WatchRuleMode;
+  reason: string;
+  interrupts: boolean;
 }
 
 export type InboxItem = SignalView;

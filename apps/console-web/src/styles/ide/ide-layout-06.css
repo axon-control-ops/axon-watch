@@ -1,0 +1,425 @@
+.agent-dock-composer__activity {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0.65rem 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: rgba(8, 47, 73, 0.35);
+  color: rgba(186, 230, 253, 0.92);
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
+.agent-dock-composer__activity--full-access {
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(76, 5, 25, 0.42);
+  color: rgba(255, 205, 214, 0.96);
+}
+
+.agent-dock-composer__activity-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.9);
+  animation: agent-dock-activity-pulse 1.1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.agent-dock-composer__activity--full-access .agent-dock-composer__activity-dot {
+  background: rgba(244, 63, 94, 0.95);
+}
+
+@keyframes agent-dock-activity-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.agent-dock-composer__queue {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem 0;
+}
+
+.agent-dock-composer__queue-summary {
+  margin: 0;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(150, 231, 255, 0.82);
+}
+
+.agent-dock-composer__queue-list {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-dock-composer__queue-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+  border-radius: 0.45rem;
+  background: rgba(8, 12, 18, 0.72);
+}
+
+.agent-dock-composer__queue-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.68rem;
+  color: rgba(214, 226, 240, 0.92);
+}
+
+.agent-dock-composer__queue-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.agent-dock-composer__queue-edit {
+  border: 0;
+  background: transparent;
+  color: rgba(168, 186, 208, 0.92);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 0.2rem 0.28rem;
+  border-radius: 0.28rem;
+  cursor: pointer;
+}
+
+.agent-dock-composer__queue-edit:hover {
+  color: rgba(230, 240, 255, 0.98);
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.agent-dock-composer__queue-steer {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(0, 245, 212, 0.92), rgba(0, 196, 167, 0.88));
+  color: rgba(2, 6, 23, 0.96);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-dock-composer__queue-steer:hover {
+  background: linear-gradient(180deg, rgba(0, 245, 212, 1), rgba(0, 196, 167, 0.98));
+}
+
+.agent-dock-composer__queue-remove {
+  border: 0;
+  background: transparent;
+  color: rgba(138, 154, 173, 0.88);
+  font-size: 0.82rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-dock-composer__queue-remove:hover {
+  color: rgba(255, 180, 180, 0.95);
+}
+
+.agent-dock-composer__queue-hint {
+  margin: 0;
+  padding-right: 0.35rem;
+  font-size: 0.58rem;
+  line-height: 1.2;
+  color: rgba(138, 154, 173, 0.88);
+  white-space: nowrap;
+}
+
+.agent-dock-composer__kairo-reply {
+  margin: 0.35rem 0.55rem 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(72, 196, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(4, 16, 28, 0.62);
+  max-height: 8.5rem;
+  overflow-y: auto;
+}
+
+.agent-dock-composer__kairo-reply-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+  color: rgba(150, 231, 255, 0.88);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__kairo-reply-text {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: rgba(214, 226, 240, 0.92);
+  white-space: pre-wrap;
+}
+
+.agent-dock-composer__kairo-reply strong {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: rgba(150, 231, 255, 0.88);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__kairo-hint {
+  margin: 0.35rem 0.55rem 0;
+  font-size: 0.62rem;
+  color: rgba(138, 154, 173, 0.82);
+}
+
+.agent-dock-composer__tool--mic.is-active {
+  border-color: rgba(56, 189, 248, 0.55);
+  color: rgba(186, 230, 253, 0.96);
+}
+
+.agent-dock-full-access-consent {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right))
+    max(1.25rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+  background: rgba(4, 8, 14, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.agent-dock-full-access-consent__card {
+  width: min(100%, 26rem);
+  max-height: min(85vh, 32rem);
+  overflow: auto;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(244, 63, 94, 0.42);
+  border-radius: 0.65rem;
+  background: rgba(18, 10, 14, 0.98);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(244, 63, 94, 0.12);
+}
+
+.agent-dock-full-access-consent__title {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 210, 218, 0.98);
+}
+
+.agent-dock-full-access-consent__list {
+  margin: 0 0 0.65rem;
+  padding-left: 1.1rem;
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.agent-dock-full-access-consent__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: rgba(255, 220, 226, 0.96);
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
+.agent-dock-full-access-consent__error {
+  margin: 0 0 0.65rem;
+  color: rgba(252, 165, 165, 0.96);
+  font-size: 0.62rem;
+  line-height: 1.4;
+}
+
+.agent-dock-full-access-consent__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.agent-dock-full-access-consent__btn {
+  flex: 1;
+  padding: 0.48rem 0.65rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(138, 154, 173, 0.28);
+  background: rgba(10, 14, 20, 0.82);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.agent-dock-full-access-consent__btn--confirm {
+  border-color: rgba(244, 63, 94, 0.48);
+  background: rgba(136, 19, 55, 0.62);
+  color: rgba(255, 220, 228, 0.98);
+}
+
+.agent-dock-full-access-consent__btn--confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agent-dock-composer__shell--drag-over .agent-dock-composer__card {
+  border-color: rgba(56, 189, 248, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.28),
+    0 0 18px rgba(56, 189, 248, 0.16);
+}
+
+.agent-dock-composer__shell--plan .agent-dock-composer__card {
+  border-color: rgba(56, 189, 248, 0.18);
+}
+
+.agent-dock-composer__shell:focus-within .agent-dock-composer__card {
+  border-color: rgba(55, 148, 255, 0.34);
+  box-shadow:
+    0 0 0 1px rgba(55, 148, 255, 0.12),
+    0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.agent-dock-composer__shell--agent:focus-within .agent-dock-composer__card {
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow:
+    0 0 0 1px rgba(245, 158, 11, 0.1),
+    0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.agent-dock-composer__shell--debug:focus-within .agent-dock-composer__card {
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.16),
+    0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.agent-dock-composer__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.55rem 0.65rem 0;
+}
+
+.agent-dock-composer__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(31, 31, 31, 0.98);
+  color: rgba(226, 232, 240, 0.94);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+.agent-dock-composer__chip--skill {
+  gap: 0.28rem;
+  padding: 0.18rem 0.42rem 0.18rem 0.34rem;
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(39, 44, 54, 0.96);
+  color: rgba(226, 232, 240, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.agent-dock-composer__chip--skill:hover {
+  border-color: rgba(148, 163, 184, 0.42);
+  background: rgba(48, 54, 66, 0.98);
+}
+
+.agent-dock-composer__chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 0.28rem;
+  background: rgba(99, 102, 241, 0.22);
+  color: rgba(196, 181, 253, 0.98);
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
+.agent-dock-composer__chip-kind {
+  color: rgba(148, 163, 184, 0.88);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__chip--skill .agent-dock-composer__chip-label {
+  font-size: 0.68rem;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  color: rgba(241, 245, 249, 0.96);
+}
+
+.agent-dock-composer__chip-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-composer__chip-remove {
+  color: rgba(148, 163, 184, 0.88);
+}
+
+.agent-dock-composer__chip--skill .agent-dock-composer__chip-remove {
+  margin-left: 0.05rem;
+  color: rgba(148, 163, 184, 0.72);
+}
+
+.agent-dock-composer__image-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem 0.15rem;
+}
+
+.agent-dock-composer__image-card {
+  position: relative;
+  display: block;
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  border: 1px solid rgba(138, 154, 173, 0.18);
+  border-radius: 10px;
+  background: rgba(8, 12, 18, 0.92);
+  overflow: hidden;
+}
+
+.agent-dock-composer__image-open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}

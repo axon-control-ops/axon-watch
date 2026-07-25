@@ -1,0 +1,5 @@
+# Axon-Watch Python services (install into repo .venv)
+-e services/axon-watch
+-e services/control-plane
+qrcode[pil]>=7.4,<9
+httpx2

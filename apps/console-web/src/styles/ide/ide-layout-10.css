@@ -1,0 +1,369 @@
+@import './ide-layout-10-composer-compact.css';
+
+.agent-dock-composer__access-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.5rem;
+  padding: 0.38rem 0.6rem;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.agent-dock-composer__access-banner-pulse {
+  width: 0.48rem;
+  height: 0.48rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+  animation: agent-dock-access-pulse 1.8s ease-out infinite;
+}
+
+.agent-dock-composer__access-banner-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.35rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.agent-dock-composer__access-banner-title {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__access-banner-sep {
+  font-size: 0.54rem;
+  opacity: 0.55;
+  font-weight: 500;
+}
+
+.agent-dock-composer__access-banner-detail {
+  font-size: 0.54rem;
+  opacity: 0.88;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-weight: 500;
+}
+
+.agent-dock-composer__access-banner-tag {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0.1rem 0.34rem;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 212, 191, 0.45);
+  background: rgba(6, 78, 72, 0.55);
+  color: rgba(167, 243, 208, 0.96);
+  font-size: 0.46rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.agent-dock-composer__access-banner--sandbox-full .agent-dock-composer__access-banner-tag {
+  border-color: rgba(251, 191, 36, 0.5);
+  background: linear-gradient(90deg, rgba(6, 78, 72, 0.7), rgba(88, 28, 38, 0.65));
+  color: rgba(254, 243, 199, 0.98);
+}
+
+.agent-dock-composer__access-banner--full {
+  border: 1px solid rgba(244, 63, 94, 0.42);
+  background: linear-gradient(90deg, rgba(136, 19, 55, 0.45), rgba(76, 5, 25, 0.28));
+  color: rgba(255, 205, 214, 0.98);
+}
+
+.agent-dock-composer__access-banner--sandbox {
+  border: 1px solid rgba(45, 212, 191, 0.45);
+  background: linear-gradient(90deg, rgba(6, 95, 85, 0.5), rgba(6, 60, 55, 0.28));
+  color: rgba(167, 243, 208, 0.98);
+}
+
+.agent-dock-composer__access-banner--sandbox-full {
+  border: 1px solid rgba(251, 191, 36, 0.48);
+  background: linear-gradient(
+    90deg,
+    rgba(6, 95, 85, 0.42) 0%,
+    rgba(120, 40, 50, 0.38) 55%,
+    rgba(90, 50, 10, 0.3) 100%
+  );
+  color: rgba(254, 243, 199, 0.98);
+}
+
+@keyframes agent-dock-access-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35);
+    opacity: 1;
+  }
+  70% {
+    box-shadow: 0 0 0 0.45rem rgba(255, 255, 255, 0);
+    opacity: 0.85;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    opacity: 1;
+  }
+}
+
+.agent-dock-composer__tool--mode-full-access {
+  border-color: rgba(244, 63, 94, 0.45) !important;
+  background: rgba(76, 5, 25, 0.55) !important;
+  color: rgba(255, 190, 200, 0.98) !important;
+}
+
+.agent-dock-composer__tool--mode-full-access .agent-dock-composer__tool-label {
+  color: rgba(255, 210, 218, 0.98);
+  font-weight: 600;
+}
+
+.agent-dock-composer__tool--mode-sandbox {
+  border-color: rgba(45, 212, 191, 0.5) !important;
+  background: rgba(6, 78, 72, 0.55) !important;
+  color: rgba(167, 243, 208, 0.98) !important;
+}
+
+.agent-dock-composer__tool--mode-sandbox .agent-dock-composer__tool-label {
+  color: rgba(204, 251, 241, 0.98);
+  font-weight: 600;
+}
+
+.agent-dock-composer__tool--mode-sandbox-full {
+  border-color: rgba(251, 191, 36, 0.55) !important;
+  background: linear-gradient(
+    120deg,
+    rgba(6, 78, 72, 0.55),
+    rgba(88, 28, 38, 0.5)
+  ) !important;
+  color: rgba(254, 243, 199, 0.98) !important;
+}
+
+.agent-dock-composer__tool--mode-sandbox-full .agent-dock-composer__tool-label {
+  color: rgba(254, 249, 195, 0.98);
+  font-weight: 600;
+}
+
+.agent-dock-composer__mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.agent-dock-composer__mode-pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0.08rem 0.34rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.agent-dock-composer__mode-pill--sandbox {
+  border-color: rgba(45, 212, 191, 0.55);
+  background: rgba(6, 95, 85, 0.55);
+  color: rgba(167, 243, 208, 0.98);
+}
+
+.agent-dock-composer__mode-pill--full {
+  border-color: rgba(244, 63, 94, 0.55);
+  background: rgba(136, 19, 55, 0.55);
+  color: rgba(255, 205, 214, 0.98);
+}
+
+.agent-dock-composer__tool--mode-sandbox-full .agent-dock-composer__mode-pill--full {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(120, 53, 15, 0.55);
+  color: rgba(254, 243, 199, 0.98);
+}
+
+.agent-dock-composer__send--full {
+  background: rgba(76, 5, 25, 0.92) !important;
+  color: rgba(255, 205, 214, 0.98) !important;
+  box-shadow: 0 0 18px rgba(244, 63, 94, 0.22);
+}
+
+.agent-dock-composer__send--full:hover:not(:disabled) {
+  background: rgba(136, 19, 55, 0.96) !important;
+}
+
+.agent-dock-composer__send--full:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.agent-dock-composer__send--sandbox {
+  background: rgba(6, 78, 72, 0.92) !important;
+  color: rgba(167, 243, 208, 0.98) !important;
+  box-shadow: 0 0 18px rgba(45, 212, 191, 0.22);
+}
+
+.agent-dock-composer__send--sandbox:hover:not(:disabled) {
+  background: rgba(6, 95, 85, 0.96) !important;
+}
+
+.agent-dock-composer__send--sandbox-full {
+  background: linear-gradient(
+    120deg,
+    rgba(6, 78, 72, 0.92),
+    rgba(88, 28, 38, 0.9)
+  ) !important;
+  color: rgba(254, 243, 199, 0.98) !important;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.2);
+}
+
+.agent-dock-composer__send--sandbox-full:hover:not(:disabled) {
+  background: linear-gradient(
+    120deg,
+    rgba(6, 95, 85, 0.96),
+    rgba(120, 40, 50, 0.94)
+  ) !important;
+}
+
+/* Mode-colored IDE thread status strip (V mark + activity). */
+
+.agent-dock__transcript .conversation-seam__item--thread-status {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--ask {
+  border-color: rgba(100, 116, 139, 0.45);
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--ask .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--ask .conversation-seam__thread-status-label {
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--plan {
+  border-color: rgba(245, 158, 11, 0.42);
+  background: rgba(66, 32, 6, 0.55);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--plan .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--plan .conversation-seam__thread-status-label {
+  color: rgba(253, 224, 171, 0.96);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--agent {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(8, 47, 73, 0.42);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--agent .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--agent .conversation-seam__thread-status-label {
+  color: rgba(186, 230, 253, 0.94);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--agent-full,
+.agent-dock__transcript .conversation-seam__item--thread-status--debug-full {
+  border-color: rgba(244, 63, 94, 0.42);
+  background: rgba(76, 5, 25, 0.48);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--agent-full .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--agent-full .conversation-seam__thread-status-label,
+.agent-dock__transcript .conversation-seam__item--thread-status--debug-full .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--debug-full .conversation-seam__thread-status-label {
+  color: rgba(255, 205, 214, 0.96);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--debug {
+  border-color: rgba(167, 139, 250, 0.42);
+  background: rgba(46, 16, 101, 0.48);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--debug .persona-glyph,
+.agent-dock__transcript .conversation-seam__item--thread-status--debug .conversation-seam__thread-status-label {
+  color: rgba(221, 214, 254, 0.96);
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--streaming::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 45%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 55%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: thread-status-shimmer 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.agent-dock__transcript .conversation-seam__item--thread-status--streaming .persona-glyph {
+  animation: thread-status-mark-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes thread-status-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes thread-status-mark-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.agent-dock-composer__plan-switch-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin-bottom: 0.45rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  background: rgba(66, 32, 6, 0.45);
+}
+
+.agent-dock-composer__plan-switch-copy {
+  margin: 0;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: rgba(253, 224, 171, 0.96);
+}
+
+.agent-dock-composer__plan-switch-btn {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 0.3rem;
+  background: rgba(120, 53, 15, 0.55);
+  color: rgba(254, 243, 199, 0.98);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.6rem;
+}
+
+.agent-dock-composer__plan-switch-btn:hover {
+  background: rgba(146, 64, 14, 0.7);
+}

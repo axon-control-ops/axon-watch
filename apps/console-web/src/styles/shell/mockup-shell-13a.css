@@ -1,0 +1,295 @@
+.brain-galaxy-stage__error {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  margin: 0;
+  color: var(--state-critical);
+  font-size: 0.72rem;
+}
+
+.brain-galaxy-stage__hud {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.brain-galaxy-stage__hud > * {
+  pointer-events: auto;
+}
+
+.brain-galaxy-stage__hud--top {
+  top: 0.55rem;
+  left: 0.65rem;
+  right: calc(min(22.5rem, 32vw) + 1.35rem);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.brain-galaxy-stage:not(:has(.brain-galaxy-stage__hud--inspector))
+  .brain-galaxy-stage__hud--top {
+  right: 0.65rem;
+}
+
+.brain-galaxy-stage__title-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  background: rgba(0, 8, 14, 0.55);
+  backdrop-filter: blur(10px);
+}
+
+.brain-galaxy-stage__brand {
+  max-width: 16rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 242, 255, 0.18);
+  background: rgba(0, 8, 14, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.brain-galaxy-stage__eyebrow {
+  margin: 0;
+  color: var(--text-hud);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.brain-galaxy-stage__title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.brain-galaxy-stage__stats {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+
+.brain-galaxy-stage__top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.brain-galaxy-stage__chip {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 0.3rem;
+  background: rgba(0, 8, 14, 0.78);
+  backdrop-filter: blur(8px);
+  color: rgba(0, 242, 255, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.brain-galaxy-stage__chip--accent {
+  border-color: rgba(255, 159, 0, 0.38);
+  color: rgba(255, 224, 170, 0.96);
+}
+
+.brain-galaxy-stage__hud--left {
+  top: 0.75rem;
+  left: 0.75rem;
+  bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.55rem);
+  width: var(--galaxy-left-width, min(14rem, 22vw));
+  max-height: none;
+  overflow: auto;
+  padding: 0.55rem 0.55rem 0.65rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(0, 210, 255, 0.2);
+  background: linear-gradient(
+    180deg,
+    rgba(4, 14, 22, 0.9) 0%,
+    rgba(2, 8, 14, 0.88) 100%
+  );
+  box-shadow: 0 0 1.2rem rgba(0, 180, 255, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.brain-galaxy-stage__hud--inspector {
+  /* Side inspector (Bloom / Cognee / mockup pattern). */
+  top: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(var(--galaxy-bottom-reserve, 5.75rem) + 0.55rem);
+  left: auto;
+  transform: none;
+  width: var(--galaxy-inspector-width, min(22.5rem, 32vw));
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  text-align: left;
+  z-index: 30;
+}
+
+.galaxy-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  height: 100%;
+  max-height: 100%;
+  overflow: auto;
+  padding: 0.7rem 0.75rem 0.8rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(4, 14, 22, 0.94) 0%,
+    rgba(2, 8, 14, 0.92) 100%
+  );
+  box-shadow:
+    0 0 0 1px rgba(0, 210, 255, 0.06) inset,
+    0 0 1.6rem rgba(0, 180, 255, 0.12);
+  backdrop-filter: blur(14px);
+}
+
+.galaxy-inspector__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.galaxy-inspector__eyebrow {
+  margin: 0;
+  color: rgba(0, 220, 255, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.galaxy-inspector__close {
+  width: 1.55rem;
+  height: 1.55rem;
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  border-radius: 0.28rem;
+  background: rgba(0, 18, 28, 0.85);
+  color: rgba(210, 240, 255, 0.95);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.galaxy-inspector__close:hover {
+  border-color: rgba(0, 242, 255, 0.6);
+  color: #fff;
+}
+
+.galaxy-inspector__entity {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 210, 255, 0.16);
+  background: rgba(0, 20, 30, 0.45);
+}
+
+.galaxy-inspector__glyph {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  color: rgba(0, 230, 255, 0.95);
+  font-size: 0.95rem;
+}
+
+.galaxy-inspector__entity-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.galaxy-inspector__entity-copy strong {
+  color: rgba(235, 248, 255, 0.98);
+  font-size: 0.86rem;
+}
+
+.galaxy-inspector__entity-copy span {
+  color: rgba(150, 190, 210, 0.88);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.galaxy-inspector__entity-copy code {
+  color: rgba(0, 210, 255, 0.78);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+}
+
+.galaxy-inspector__summary {
+  margin: 0;
+  color: rgba(210, 230, 242, 0.9);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.galaxy-inspector__hint {
+  margin: 0;
+  color: rgba(120, 160, 180, 0.82);
+  font-size: 0.6rem;
+}
+
+.galaxy-inspector__section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 0.35rem;
+  color: rgba(0, 220, 255, 0.86);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.galaxy-inspector__section-label span {
+  color: rgba(160, 200, 220, 0.75);
+}
+
+.galaxy-inspector__evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.galaxy-inspector__evidence li {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 210, 255, 0.1);
+  background: rgba(0, 12, 20, 0.55);
+}
+
+.galaxy-inspector__evidence-mark {
+  flex: 0 0 auto;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.28rem;
+  border-radius: 999px;
+  background: rgba(0, 220, 255, 0.85);
+  box-shadow: 0 0 0.45rem rgba(0, 220, 255, 0.45);
+}

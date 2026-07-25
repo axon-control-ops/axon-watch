@@ -1,0 +1,26 @@
+[Unit]
+Description=Axon-X Control Plane (user always-on)
+After=network.target axon-watch.service
+Wants=network-online.target
+Requires=axon-watch.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/axon-watch/deployment.env
+WorkingDirectory=%h
+ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/run-service.sh control-plane
+Restart=on-failure
+RestartSec=15
+# Do not death-spiral: systemd-oomd / OOMPolicy stop with SIGKILL must stay down
+# until an operator restarts the unit intentionally.
+RestartPreventExitStatus=SIGKILL
+# Hard cap — a prior peak of ~10.5G froze the desktop (OOM / VT kill).
+# Prefer killing the CP unit over taking down the whole machine.
+MemoryAccounting=yes
+MemoryHigh=3G
+MemoryMax=5G
+OOMPolicy=stop
+
+[Install]
+WantedBy=default.target
+

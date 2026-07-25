@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "axon-research": {
+      "command": "/home/edp/axon-nvme/repos/axon-watch/.venv/bin/python3",
+      "args": [
+        "-m",
+        "app.research.mcp_server"
+      ],
+      "cwd": "/home/edp/axon-nvme/repos/axon-watch/services/control-plane",
+      "env": {
+        "PYTHONPATH": "/home/edp/axon-nvme/repos/axon-watch/services/control-plane"
+      }
+    }
+  }
+}

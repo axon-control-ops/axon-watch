@@ -1,0 +1,58 @@
+# Dedicated-server reference compose (internal watch, proxied control-plane + static UI).
+# Usage: copy config/deployment.env.example to .env and adjust host paths.
+
+services:
+  axon-watch:
+    image: python:3.13-slim
+    working_dir: /app/services/axon-watch
+    volumes:
+      - ./:/app:ro
+      - axon-state:/var/lib/axon-watch/state
+    env_file:
+      - ./config/deployment.env.example
+    environment:
+      AXON_WATCH_REPO_ROOT: /app
+      AXON_WATCH_STATE_DIR: /var/lib/axon-watch/state
+      AXON_WATCH_BIND_HOST: 0.0.0.0
+    command: python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8788
+    expose:
+      - "8788"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8788/internal/watch/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  control-plane:
+    image: python:3.13-slim
+    working_dir: /app/services/control-plane
+    volumes:
+      - ./:/app:ro
+      - axon-state:/var/lib/axon-watch/state
+    env_file:
+      - ./config/deployment.env.example
+    environment:
+      AXON_WATCH_REPO_ROOT: /app
+      AXON_WATCH_STATE_DIR: /var/lib/axon-watch/state
+      AXON_WATCH_WATCH_SERVICE_BASE_URL: http://axon-watch:8788
+      AXON_WATCH_BIND_HOST: 0.0.0.0
+    command: python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8787
+    depends_on:
+      axon-watch:
+        condition: service_healthy
+    expose:
+      - "8787"
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./infra/caddy/Caddyfile.example:/etc/caddy/Caddyfile:ro
+      - ./apps/console-web/dist:/opt/axon-watch/apps/console-web/dist:ro
+    depends_on:
+      - control-plane
+
+volumes:
+  axon-state:

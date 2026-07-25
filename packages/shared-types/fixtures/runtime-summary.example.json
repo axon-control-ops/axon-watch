@@ -58,6 +58,14 @@
     ],
     "last_updated_at": "2026-07-03T15:02:00Z"
   },
+  "connectors": {
+    "configured": 3,
+    "ok": 2,
+    "degraded": 0,
+    "unavailable": 1,
+    "required_unavailable": 0,
+    "last_updated_at": "2026-07-03T15:02:00Z"
+  },
   "capabilities": {
     "editor": true,
     "terminal": true,

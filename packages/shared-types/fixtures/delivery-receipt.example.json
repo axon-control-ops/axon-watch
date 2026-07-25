@@ -1,0 +1,10 @@
+{
+  "receipt_id": "rcpt-example-001",
+  "signal_id": "signal_runtime_summary_degraded",
+  "event_id": "event-delivery-signal_runtime_summary_degraded",
+  "channel": "inbox",
+  "attempted_at": "2026-07-05T08:00:00Z",
+  "result": "succeeded",
+  "error": "",
+  "policy_reason": "inbox_projection_available"
+}

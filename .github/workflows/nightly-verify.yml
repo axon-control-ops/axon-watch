@@ -1,0 +1,57 @@
+name: Axon-X Nightly Strict Verify
+
+on:
+  schedule:
+    # 02:15 UTC daily
+    - cron: "15 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly-strict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AXON_WATCH_SKIP_ENSURE_AXON_LOCAL: "1"
+      AXON_WATCH_SHELL_BOOT_MODE: auto
+      AXON_WATCH_WORKSPACE_BINDINGS_FILE: config/workspace-project-bindings.ci.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Start isolated Axon-X stack
+        run: ./scripts/dev/up.sh
+
+      - name: Collect live latency and shell-boot evidence
+        run: ./scripts/dev/collect-verify-evidence.sh
+
+      - name: Strict verify with required live evidence
+        run: >
+          ./scripts/dev/verify-with-evidence.sh
+          --strict-pending
+          --require-live-evidence
+
+      - name: Upload live verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axon-x-live-verification-evidence
+          path: .local/verify/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Stop isolated Axon-X stack
+        if: always()
+        run: ./scripts/dev/down.sh

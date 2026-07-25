@@ -1,0 +1,110 @@
+"""Tests for DashPro Sentry monitor check."""
+
+from __future__ import annotations
+
+import json
+import sys
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+WATCH_SERVICE_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
+for module_name in list(sys.modules):
+    if module_name == "app" or module_name.startswith("app."):
+        sys.modules.pop(module_name, None)
+sys.path.insert(0, str(WATCH_SERVICE_ROOT))
+
+import app.monitors.dashpro_sentry as dashpro_sentry  # noqa: E402
+
+
+class DashProSentryMonitorTests(unittest.TestCase):
+    def test_recent_issues_reports_unresolved_sample(self) -> None:
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        issues = [
+            {
+                "id": "1",
+                "shortId": "RN-1",
+                "title": "TypeError: boom",
+                "level": "error",
+                "count": "4",
+                "permalink": "https://sentry.io/issues/1/",
+                "culprit": "app",
+            }
+        ]
+
+        def fake_urlopen(req, timeout=0):
+            self.assertEqual("GET", req.get_method())
+            self.assertIn("/issues/", req.full_url)
+            return _FakeResponse(200, issues)
+
+        with patch.object(dashpro_sentry, "urlopen", side_effect=fake_urlopen):
+            status, detail, sample = dashpro_sentry.check_sentry_recent_issues(
+                env={
+                    "SENTRY_AUTH_TOKEN": "token",
+                    "SENTRY_ORG_SLUG": "edudashpro",
+                    "SENTRY_PROJECT_SLUG": "react-native",
+                },
+                warning_threshold=10,
+                critical_threshold=20,
+            )
+
+        self.assertEqual("ok", status)
+        self.assertIn("1 unresolved issue(s)", detail)
+        self.assertEqual(1, len(sample))
+
+    def test_transport_failure_downgrades_to_warning(self) -> None:
+        with patch.object(
+            dashpro_sentry,
+            "urlopen",
+            side_effect=TimeoutError("The read operation timed out"),
+        ):
+            status, detail, sample = dashpro_sentry.check_sentry_recent_issues(
+                env={"SENTRY_AUTH_TOKEN": "token"}
+            )
+
+        self.assertEqual("warning", status)
+        self.assertIn("Sentry API query failed", detail)
+        self.assertEqual([], sample)
+
+    def test_transport_failure_maps_to_warning_inbox_severity(self) -> None:
+        from app.signals.monitor_signal import monitor_inbox_item  # noqa: WPS433
+
+        with patch.object(
+            dashpro_sentry,
+            "urlopen",
+            side_effect=TimeoutError("The read operation timed out"),
+        ):
+            status, detail, _sample = dashpro_sentry.check_sentry_recent_issues(
+                env={"SENTRY_AUTH_TOKEN": "token"}
+            )
+
+        item = monitor_inbox_item(
+            {
+                "check_id": "dashpro_sentry_recent_issues",
+                "check_type": "sentry_recent_issues",
+                "service": "Sentry",
+                "workspace_id": "workspace_dashpro",
+                "workspace_label": "DashPro",
+                "status": status,
+                "detail": detail,
+            }
+        )
+        assert item is not None
+        self.assertEqual("warning", item["severity"])
+
+
+if __name__ == "__main__":
+    unittest.main()

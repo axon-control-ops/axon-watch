@@ -11,15 +11,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tresjs/core": "^5.8.3",
+    "@tresjs/post-processing": "^3.7.4",
     "@xterm/addon-fit": "latest",
     "@xterm/xterm": "latest",
+    "marked": "^18.0.5",
     "monaco-editor": "latest",
     "pinia": "latest",
+    "three": "^0.185.1",
     "vue": "latest"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "latest",
     "@types/node": "latest",
+    "@types/three": "^0.185.0",
+    "@vitejs/plugin-vue": "latest",
     "typescript": "latest",
     "vite": "latest",
     "vitest": "latest",

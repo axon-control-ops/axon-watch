@@ -10,17 +10,27 @@ import subprocess
 import termios
 from typing import Callable
 
+from app.terminal.shell_invocation import (
+    build_shell_command,
+    build_shell_env,
+    resolve_terminal_shell,
+)
+
 
 class PtyProcess:
-    def __init__(self, workspace_root: str) -> None:
+    def __init__(self, workspace_root: str, *, session_id: str | None = None) -> None:
         self.workspace_root = workspace_root
+        self.session_id = session_id
         self.master_fd, slave_fd = pty.openpty()
-        shell = os.environ.get("AXON_WATCH_TERMINAL_SHELL", os.environ.get("SHELL", "/bin/bash"))
-        env = os.environ.copy()
-        env.setdefault("TERM", "xterm-256color")
-        env["PWD"] = workspace_root
+        shell = resolve_terminal_shell()
+        env = build_shell_env(
+            os.environ,
+            workspace_root=workspace_root,
+            shell=shell,
+            session_id=session_id,
+        )
         self.proc = subprocess.Popen(
-            [shell],
+            build_shell_command(shell),
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
@@ -48,6 +58,8 @@ class PtyProcess:
         try:
             return os.read(self.master_fd, size)
         except BlockingIOError:
+            return b""
+        except OSError:
             return b""
 
     def poll(self) -> int | None:

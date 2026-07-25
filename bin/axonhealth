@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Resolve through ~/.local/bin symlinks to the real repo bin/.
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+BIN_DIR="$(cd -- "$(dirname -- "${SCRIPT_PATH}")" && pwd)"
+REPO_ROOT="$(cd -- "$BIN_DIR/.." && pwd)"
+exec "$REPO_ROOT/scripts/ops/axonhealth.sh" "$@"

@@ -1,0 +1,328 @@
+.brain-galaxy-stage__run-orbit-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.brain-galaxy-stage__run-phase {
+  padding: 0.12rem 0.35rem;
+  border-radius: 0.2rem;
+  background: rgba(255, 196, 72, 0.16);
+  color: rgba(255, 224, 170, 0.96);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+}
+
+.brain-galaxy-stage__run-name {
+  color: var(--text-primary);
+  font-size: 0.72rem;
+}
+
+.brain-galaxy-stage__run-name span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.brain-galaxy-stage__run-elapsed {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+
+.brain-galaxy-stage__run-orbit-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.3rem;
+}
+
+.brain-galaxy-stage__run-btn {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(0, 242, 255, 0.28);
+  border-radius: 0.28rem;
+  background: rgba(0, 242, 255, 0.08);
+  color: rgba(0, 242, 255, 0.92);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.brain-galaxy-stage__run-btn--stop {
+  border-color: rgba(255, 96, 96, 0.38);
+  background: rgba(255, 96, 96, 0.12);
+  color: rgba(255, 180, 180, 0.96);
+}
+
+.brain-galaxy-stage__run-btn--warn {
+  border-color: rgba(255, 196, 72, 0.38);
+  color: rgba(255, 224, 170, 0.96);
+}
+
+.operator-brain-graph__edge {
+  stroke: rgba(120, 200, 255, 0.22);
+  stroke-width: 1;
+}
+
+.operator-brain-graph__edge--emits {
+  stroke: rgba(255, 196, 72, 0.35);
+  stroke-dasharray: 3 3;
+}
+
+.operator-brain-graph__edge--monitors {
+  stroke: rgba(120, 200, 255, 0.14);
+  stroke-dasharray: 1 3;
+}
+
+.operator-brain-graph__node {
+  cursor: pointer;
+}
+
+.operator-brain-graph__node circle {
+  fill: rgba(12, 24, 38, 0.9);
+  stroke: rgba(120, 200, 255, 0.4);
+  stroke-width: 1.25;
+}
+
+.operator-brain-graph__node--core circle {
+  fill: rgba(72, 196, 255, 0.16);
+  stroke: rgba(72, 196, 255, 0.8);
+  stroke-width: 2;
+}
+
+.operator-brain-graph__node--attention circle {
+  stroke: rgba(255, 196, 72, 0.75);
+}
+
+.operator-brain-graph__node--critical circle {
+  stroke: rgba(255, 96, 96, 0.85);
+}
+
+.operator-brain-graph__node-label {
+  fill: var(--text-secondary);
+  font-size: 9px;
+  pointer-events: none;
+}
+
+.operator-brain-graph__node--core .operator-brain-graph__node-label,
+.operator-brain-graph__node--workspace .operator-brain-graph__node-label {
+  fill: var(--text-primary);
+  font-size: 10px;
+}
+
+.operator-brain-graph__legend {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+
+.operator-brain-graph__error {
+  margin: 0;
+  color: var(--state-critical);
+  font-size: 0.72rem;
+}
+
+.operator-incident-feed,
+.operator-run-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  clip-path: polygon(
+    0 0.4rem,
+    0.4rem 0,
+    calc(100% - 0.4rem) 0,
+    100% 0.4rem,
+    100% calc(100% - 0.4rem),
+    calc(100% - 0.4rem) 100%,
+    0.4rem 100%,
+    0 calc(100% - 0.4rem)
+  );
+  border: 1px solid rgba(0, 242, 255, 0.32);
+  background:
+    linear-gradient(90deg, rgba(0, 200, 255, 0.08), transparent 22%),
+    rgba(0, 12, 20, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(0, 210, 255, 0.08) inset,
+    0 0 1.4rem rgba(0, 170, 255, 0.16);
+}
+
+.operator-incident-feed__header,
+.operator-run-strip__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.operator-incident-feed__eyebrow,
+.operator-run-strip__headline {
+  margin: 0;
+}
+
+.operator-incident-feed__eyebrow {
+  color: var(--text-hud);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.operator-incident-feed__title {
+  margin: 0.15rem 0 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.operator-incident-feed__headline,
+.operator-run-strip__detail {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.operator-incident-feed__list,
+.operator-run-strip__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operator-incident-feed__item {
+  position: relative;
+  clip-path: polygon(
+    0 0.28rem,
+    0.28rem 0,
+    calc(100% - 0.28rem) 0,
+    100% 0.28rem,
+    100% calc(100% - 0.28rem),
+    calc(100% - 0.28rem) 100%,
+    0.28rem 100%,
+    0 calc(100% - 0.28rem)
+  );
+  border: 1px solid rgba(120, 200, 255, 0.28);
+  background:
+    linear-gradient(90deg, rgba(0, 160, 220, 0.12), transparent 34%),
+    rgba(6, 12, 20, 0.82);
+  box-shadow: 0 0 0.9rem rgba(0, 160, 220, 0.12);
+}
+
+.operator-incident-feed__item--high,
+.operator-incident-feed__item--critical {
+  border-color: rgba(255, 196, 72, 0.55);
+  box-shadow: 0 0 1.1rem rgba(255, 170, 60, 0.22);
+}
+
+.operator-incident-feed__item--critical {
+  border-color: rgba(255, 110, 110, 0.6);
+  box-shadow: 0 0 1.2rem rgba(255, 80, 80, 0.28);
+}
+
+.operator-incident-feed__button,
+.operator-run-strip__toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.operator-run-strip__toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  padding: 0;
+}
+
+.operator-incident-feed__item-title,
+.operator-run-strip__headline {
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.operator-incident-feed__item-summary,
+.operator-run-strip__detail {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.operator-incident-feed__item-meta {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.operator-incident-feed__empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.operator-run-strip--collapsed {
+  border-color: rgba(255, 196, 72, 0.22);
+}
+
+.operator-run-strip--auto-complete {
+  background: rgba(20, 16, 0, 0.35);
+}
+
+.operator-run-strip__complete {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(72, 196, 255, 0.35);
+  border-radius: 0.35rem;
+  background: rgba(72, 196, 255, 0.08);
+  color: var(--text-hud);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.operator-run-strip__complete:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.operator-run-strip__chevron {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.operator-run-strip__group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.35rem;
+  background: rgba(6, 12, 20, 0.72);
+}
+
+.operator-run-strip__group-label {
+  color: var(--text-primary);
+  font-size: 0.72rem;
+}
+
+.operator-run-strip__group-count {
+  color: var(--text-hud);
+}
+
+.operator-run-strip__group-tag {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+

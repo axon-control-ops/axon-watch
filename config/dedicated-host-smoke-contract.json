@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "readiness_required_fields": [
+    "service",
+    "status",
+    "mode",
+    "watch_base_url",
+    "state_dir",
+    "public_base_url"
+  ],
+  "allowed_modes": ["bootstrap", "dedicated"],
+  "dedicated_rules": {
+    "state_dir_must_be_absolute": true,
+    "public_base_url_must_not_use_loopback": true
+  }
+}

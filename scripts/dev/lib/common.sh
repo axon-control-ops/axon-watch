@@ -9,9 +9,21 @@ resolve_repo_root() {
   cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd
 }
 
+resolve_python() {
+  local root="${1:-${repo_root:-$(resolve_repo_root)}}"
+  if [[ -x "${root}/.venv/bin/python3" ]]; then
+    printf '%s' "${root}/.venv/bin/python3"
+  else
+    printf '%s' "python3"
+  fi
+}
+
 load_env() {
   repo_root="${1:-${repo_root:-$(resolve_repo_root)}}"
 
+  # Export every assignment from the env file so child processes (uvicorn, MCP)
+  # inherit optional secrets such as AXON_WATCH_GOOGLE_CSE_*.
+  set -a
   if [[ -f "${repo_root}/.env" ]]; then
     # shellcheck disable=SC1091
     source "${repo_root}/.env"
@@ -19,11 +31,26 @@ load_env() {
     # shellcheck disable=SC1091
     source "${repo_root}/.env.example"
   fi
+  set +a
 
   : "${AXON_WATCH_CONSOLE_WEB_PORT:=4173}"
   : "${AXON_WATCH_CONTROL_PLANE_PORT:=8787}"
   : "${AXON_WATCH_WATCH_SERVICE_PORT:=8788}"
   : "${AXON_WATCH_STATE_DIR:=./.local/state}"
+  # Always pin an absolute control-plane DB path so service cwd cannot create/wipe a second store.
+  if [[ "${AXON_WATCH_STATE_DIR}" != /* ]]; then
+    AXON_WATCH_STATE_DIR="${repo_root}/${AXON_WATCH_STATE_DIR#./}"
+  elif [[ "${AXON_WATCH_STATE_DIR}" != "${repo_root}"/* ]]; then
+    # Inherited absolute paths (e.g. $HOME/.local/state) silently fork an empty chat DB.
+    echo "WARN: AXON_WATCH_STATE_DIR=${AXON_WATCH_STATE_DIR} is outside repo; using ${repo_root}/.local/state" >&2
+    AXON_WATCH_STATE_DIR="${repo_root}/.local/state"
+  fi
+  # Prefer derived DB path under the resolved state dir unless an in-repo absolute override is set.
+  if [[ -z "${AXON_WATCH_CONTROL_PLANE_DB:-}" ]] \
+    || [[ "${AXON_WATCH_CONTROL_PLANE_DB}" != /* ]] \
+    || [[ "${AXON_WATCH_CONTROL_PLANE_DB}" != "${repo_root}"/* ]]; then
+    AXON_WATCH_CONTROL_PLANE_DB="${AXON_WATCH_STATE_DIR}/control-plane.sqlite3"
+  fi
   : "${AXON_WATCH_PUBLIC_BASE_URL:=http://127.0.0.1:${AXON_WATCH_CONSOLE_WEB_PORT}}"
   : "${AXON_WATCH_CONTROL_PLANE_BASE_URL:=http://127.0.0.1:${AXON_WATCH_CONTROL_PLANE_PORT}}"
   : "${AXON_WATCH_WATCH_SERVICE_BASE_URL:=http://127.0.0.1:${AXON_WATCH_WATCH_SERVICE_PORT}}"
@@ -33,6 +60,7 @@ load_env() {
   export AXON_WATCH_CONTROL_PLANE_PORT
   export AXON_WATCH_WATCH_SERVICE_PORT
   export AXON_WATCH_STATE_DIR
+  export AXON_WATCH_CONTROL_PLANE_DB
   export AXON_WATCH_PUBLIC_BASE_URL
   export AXON_WATCH_CONTROL_PLANE_BASE_URL
   export AXON_WATCH_WATCH_SERVICE_BASE_URL
@@ -155,6 +183,50 @@ list_listener_pids() {
   fi
 }
 
+service_health_ready() {
+  local name="$1"
+  curl -fsS -o /dev/null "$(service_health_url "${name}")" 2>/dev/null
+}
+
+bootstrap_stack_healthy() {
+  local name
+  while IFS= read -r name; do
+    service_health_ready "${name}" || return 1
+  done < <(service_names)
+}
+
+try_reuse_healthy_bootstrap_stack() {
+  bootstrap_stack_healthy || return 1
+
+  prune_stale_pid_files
+  write_stack_manifest
+
+  echo "Bootstrap services already healthy on configured ports (external/systemd ownership):"
+  echo "  console-web   $(service_health_url "console-web")"
+  echo "  control-plane $(service_health_url "control-plane")"
+  echo "  axon-watch    $(service_health_url "axon-watch")"
+  echo
+  echo "Health: ./scripts/dev/check-health.sh"
+  echo "Logs: .local/logs/ (dev bootstrap) or journalctl --user -u axon-watch.service"
+  echo "Stop dev bootstrap with: ./scripts/dev/down.sh"
+  echo "Stop always-on units with: systemctl --user stop axon-watch.service control-plane.service console-web.service"
+  return 0
+}
+
+listener_managed_externally() {
+  local pid="$1"
+  [[ -n "${pid}" ]] || return 1
+
+  local cgroup_path="/proc/${pid}/cgroup"
+  [[ -f "${cgroup_path}" ]] || return 1
+
+  # User/system systemd units (always-on stack) must survive dev down/up cleanup.
+  if grep -q '\.service' "${cgroup_path}" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
 assert_port_free() {
   local port="$1"
   local name="$2"
@@ -162,6 +234,7 @@ assert_port_free() {
   if port_in_use "${port}"; then
     echo "Configured port ${port} for ${name} is already in use." >&2
     echo "Run ./scripts/dev/down.sh if this is a stale Axon-Watch stack, or free the port before retrying." >&2
+    echo "If always-on systemd units own the ports, health should pass and ./scripts/dev/up.sh will reuse them." >&2
     return 1
   fi
 }
@@ -263,6 +336,10 @@ cleanup_port_orphans() {
 
       local command=""
       command="$(ps -o command= -p "${pid}" 2>/dev/null || true)"
+
+      if listener_managed_externally "${pid}"; then
+        continue
+      fi
 
       if [[ "${cwd}" == "${repo_root}"* ]] || [[ "${command}" == *"${repo_root}"* ]]; then
         stop_process_tree "${pid}"

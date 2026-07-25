@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "spoken_alert_required_fields": ["eligible", "reason", "signal_id", "message"],
+  "spoken_alert_optional_fields": ["explanation"],
+  "explanation_required_fields_when_present": ["what", "you_do", "agent_do", "spoken"],
+  "require_explanation_when_eligible": true,
+  "require_null_or_absent_explanation_when_ineligible": true,
+  "eligible_reasons": [
+    "operator_approval_required",
+    "high_urgency_signal",
+    "approval",
+    "execute"
+  ],
+  "blocked_reasons": [
+    "privacy_mode_active",
+    "spoken_alerts_disabled",
+    "no_interruptive_signal"
+  ],
+  "require_message_when_eligible": true,
+  "require_empty_message_when_ineligible": true
+}

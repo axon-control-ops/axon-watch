@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=VAXON
+GenericName=Axon-X Operator Console
+Comment=Self-contained VAXON / Axon-X operator console
+Exec=axon-console-desktop
+Icon=ai.axon.x.console
+Terminal=false
+Categories=Development;IDE;
+StartupNotify=true
+StartupWMClass=axon-console-desktop
+Keywords=axon;axon-x;vaxon;operator;console;

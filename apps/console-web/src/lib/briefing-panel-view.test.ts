@@ -1,15 +1,40 @@
 import { describe, expect, it } from 'vitest';
 
-import type { OperatorBriefing } from '../contracts/canonical';
+import type { ExecutiveOperatorRhythm, OperatorBriefing } from '../contracts/canonical';
 import {
+  briefingAdvise,
   briefingConnectivityLabels,
   briefingHasTopSignals,
   briefingIsEmpty,
+  briefingNotice,
   briefingPanelHeadline,
+  briefingRhythmField,
 } from './briefing-panel-view';
+
+function rhythmFrom(
+  notice: string,
+  advise: string,
+  overrides: Partial<ExecutiveOperatorRhythm> = {},
+): ExecutiveOperatorRhythm {
+  return {
+    notice,
+    advise,
+    decide: 'Decide whether to continue.',
+    execute: 'Execute the next safe action.',
+    verify: 'Verify canonical state before continuing.',
+    report: 'Report: systems nominal.',
+    ...overrides,
+  };
+}
 
 const emptyBriefing: OperatorBriefing = {
   generated_at: '2026-07-04T08:00:00Z',
+  notice: 'No active runs. Systems nominal.',
+  advise: 'Describe the next action in Command.',
+  executive_rhythm: rhythmFrom(
+    'No active runs. Systems nominal.',
+    'Describe the next action in Command.',
+  ),
   top_signals: [],
   pending_approvals: { count: 0, items: [] },
   active_runs: [],
@@ -20,6 +45,16 @@ const emptyBriefing: OperatorBriefing = {
 
 const approvalBriefing: OperatorBriefing = {
   ...emptyBriefing,
+  notice: '1 run awaiting explicit approval.',
+  advise: 'Approve test run to continue execution.',
+  executive_rhythm: rhythmFrom(
+    '1 run awaiting explicit approval.',
+    'Approve test run to continue execution.',
+    {
+      decide: 'Decide whether to approve or reject the guarded run before execution continues.',
+      execute: 'Execute: approve the guarded run to unblock execution.',
+    },
+  ),
   pending_approvals: {
     count: 1,
     items: [
@@ -62,9 +97,11 @@ const signalBriefing: OperatorBriefing = {
 };
 
 describe('briefing panel view helpers', () => {
-  it('reports nominal headline when no pending approvals exist', () => {
+  it('keeps a compact idle headline without manufacturing briefing copy', () => {
     expect(briefingPanelHeadline(emptyBriefing, 'loaded')).toBe('Systems nominal');
     expect(briefingIsEmpty(emptyBriefing)).toBe(true);
+    expect(briefingNotice(emptyBriefing, 'loaded')).toBe('');
+    expect(briefingAdvise(emptyBriefing, 'loaded')).toBe('');
   });
 
   it('surfaces pending approval count from OperatorBriefing', () => {
@@ -85,5 +122,41 @@ describe('briefing panel view helpers', () => {
         watch_connected: false,
       }),
     ).toEqual(['Control plane ready', 'Watch disconnected']);
+  });
+
+  it('surfaces live notice and advice but suppresses generic idle filler', () => {
+    expect(briefingNotice(approvalBriefing, 'loaded')).toBe(
+      approvalBriefing.notice ?? '1 run awaiting explicit approval.',
+    );
+    expect(briefingAdvise(approvalBriefing, 'loaded')).toBe(
+      'Approve test run to continue execution.',
+    );
+    expect(briefingNotice(signalBriefing, 'loaded')).toBe('Watch summary degraded.');
+    expect(briefingAdvise(signalBriefing, 'loaded')).toBe('');
+    expect(briefingRhythmField(approvalBriefing, 'decide', 'loaded')).toContain('approve or reject');
+  });
+
+  it('overrides idle no-runs notice when a primary active run exists', () => {
+    expect(
+      briefingNotice(emptyBriefing, 'loaded', {
+        primaryActiveRun: {
+          run_id: 'run_review_me',
+          summary: 'Review me',
+          detail: '',
+          phase: 'review_ready',
+        },
+      }),
+    ).toBe('Review me is ready for your review.');
+
+    expect(
+      briefingNotice(emptyBriefing, 'loaded', {
+        primaryActiveRun: {
+          run_id: 'run_abcdef123',
+          summary: 'Build fix',
+          detail: '',
+          phase: 'executing',
+        },
+      }),
+    ).toContain('EXECUTE');
   });
 });

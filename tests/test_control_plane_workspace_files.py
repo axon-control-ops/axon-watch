@@ -76,6 +76,27 @@ class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
         paths = {item["path"] for item in response.json()["items"]}
         self.assertIn("src/notes.md", paths)
 
+    def test_list_workspace_files_skips_generated_and_hidden_directories(self) -> None:
+        root = Path(self.workspace_tempdir.name) / "workspace_alpha"
+        hidden = root / ".git" / "config"
+        hidden.parent.mkdir(parents=True, exist_ok=True)
+        hidden.write_text("[core]\n", encoding="utf-8")
+
+        generated = root / "node_modules" / "left-pad" / "index.js"
+        generated.parent.mkdir(parents=True, exist_ok=True)
+        generated.write_text("module.exports = 1;\n", encoding="utf-8")
+
+        source = root / "src" / "main.ts"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("export const ok = true;\n", encoding="utf-8")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files")
+        self.assertEqual(200, response.status_code)
+        paths = {item["path"] for item in response.json()["items"]}
+        self.assertIn("src/main.ts", paths)
+        self.assertNotIn(".git/config", paths)
+        self.assertNotIn("node_modules/left-pad/index.js", paths)
+
     def test_write_nested_workspace_file_creates_directories(self) -> None:
         write_response = self.client.put(
             "/api/workspaces/workspace_alpha/files/src/deep.txt",
@@ -90,6 +111,103 @@ class ControlPlaneWorkspaceFilesTests(unittest.TestCase):
         list_response = self.client.get("/api/workspaces/workspace_alpha/files")
         paths = {item["path"] for item in list_response.json()["items"]}
         self.assertIn("src/deep.txt", paths)
+
+    def test_rename_workspace_file_moves_path_and_preserves_content(self) -> None:
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt",
+            json={"content": "nested content\n"},
+        )
+
+        rename_response = self.client.post(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt/rename",
+            json={"new_path": "src/renamed.txt"},
+        )
+        self.assertEqual(200, rename_response.status_code)
+        self.assertEqual("src/renamed.txt", rename_response.json()["path"])
+
+        read_response = self.client.get("/api/workspaces/workspace_alpha/files/src/renamed.txt")
+        self.assertEqual(200, read_response.status_code)
+        self.assertEqual("nested content\n", read_response.json()["content"])
+
+        old_response = self.client.get("/api/workspaces/workspace_alpha/files/src/deep.txt")
+        self.assertEqual(404, old_response.status_code)
+
+    def test_rename_workspace_file_rejects_existing_target(self) -> None:
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt",
+            json={"content": "nested content\n"},
+        )
+        self.client.put(
+            "/api/workspaces/workspace_alpha/files/src/existing.txt",
+            json={"content": "existing\n"},
+        )
+
+        rename_response = self.client.post(
+            "/api/workspaces/workspace_alpha/files/src/deep.txt/rename",
+            json={"new_path": "src/existing.txt"},
+        )
+        self.assertEqual(409, rename_response.status_code)
+
+    def test_raw_workspace_image_endpoint_serves_binary(self) -> None:
+        image_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "assets" / "mockup.png"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_bytes = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+            b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+            b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        image_path.write_bytes(image_bytes)
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/assets/mockup.png/raw")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("image/png", response.headers.get("content-type"))
+        self.assertEqual(image_bytes, response.content)
+
+    def test_text_workspace_file_endpoint_rejects_images(self) -> None:
+        image_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "assets" / "mockup.png"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/assets/mockup.png")
+        self.assertEqual(404, response.status_code)
+
+    def test_text_workspace_file_endpoint_rejects_pdf(self) -> None:
+        pdf_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "docs" / "report.pdf"
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4 binary-not-utf8\xff\xfe")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/docs/report.pdf")
+        self.assertEqual(404, response.status_code)
+
+        raw = self.client.get("/api/workspaces/workspace_alpha/files/docs/report.pdf/raw")
+        self.assertEqual(200, raw.status_code)
+        self.assertEqual(b"%PDF-1.4 binary-not-utf8\xff\xfe", raw.content)
+
+    def test_text_workspace_file_endpoint_rejects_known_binary_extensions(self) -> None:
+        pdf_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "docs" / "brief.pdf"
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4 sample")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/docs/brief.pdf")
+        self.assertEqual(404, response.status_code)
+
+    def test_text_workspace_file_endpoint_rejects_oversized_text(self) -> None:
+        large_path = Path(self.workspace_tempdir.name) / "workspace_alpha" / "big.log"
+        large_path.parent.mkdir(parents=True, exist_ok=True)
+        # Just over the 2MB editor text limit enforced by read_workspace_file.
+        large_path.write_bytes(b"x" * (2 * 1024 * 1024 + 1))
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/big.log")
+        self.assertEqual(404, response.status_code)
+
+    def test_text_workspace_file_endpoint_rejects_non_utf8_payload(self) -> None:
+        disguised = Path(self.workspace_tempdir.name) / "workspace_alpha" / "data" / "looks.txt"
+        disguised.parent.mkdir(parents=True, exist_ok=True)
+        disguised.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        response = self.client.get("/api/workspaces/workspace_alpha/files/data/looks.txt")
+        self.assertEqual(404, response.status_code)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,72 @@
+{
+  "bindings": {
+    "workspace_audio_transcribe": {
+      "display_name": "audio-transcribe",
+      "project_root": "/home/edp/Projectx/product/audio-transcribe"
+    },
+    "workspace_axon_local": {
+      "display_name": "axon-local",
+      "project_root": "/home/edp/axon-nvme/repos/axon-local"
+    },
+    "workspace_axon_online": {
+      "display_name": "axon-online",
+      "project_root": "/home/edp/Projectx/internal/axon-online"
+    },
+    "workspace_axon_watch": {
+      "display_name": "axon-watch",
+      "project_root": "/home/edp/axon-nvme/repos/axon-watch"
+    },
+    "workspace_bkk_invoice_system": {
+      "display_name": "bkk-invoice-system",
+      "project_root": "/home/edp/Projectx/client/bkk-invoice-system"
+    },
+    "workspace_bkkinnovationhub": {
+      "display_name": "bkkinnovationhub",
+      "project_root": "/home/edp/Projectx/client/bkkinnovationhub"
+    },
+    "workspace_dashpro": {
+      "display_name": "DashPro",
+      "project_root": "/home/edp/Projectx/product/dashpro"
+    },
+    "workspace_dashpro_pr_integration": {
+      "display_name": "dashpro-pr-integration",
+      "project_root": "/home/edp/Projectx/product/dashpro-pr-integration"
+    },
+    "workspace_ecd_staff_desktop": {
+      "display_name": "ecd-staff-desktop",
+      "project_root": "/home/edp/Projectx/internal/ecd-staff-desktop"
+    },
+    "workspace_edudashpro_school": {
+      "display_name": "EduDash PRO School of Excellence",
+      "project_root": "/home/edp/Projectx/client/edudashpro-school-of-excellence"
+    },
+    "workspace_edusitepro": {
+      "display_name": "edusitepro",
+      "project_root": "/home/edp/Projectx/product/edusitepro"
+    },
+    "workspace_forum_registration": {
+      "display_name": "forum-registration",
+      "project_root": "/home/edp/Projectx/client/forum-registration"
+    },
+    "workspace_khanyisa_website": {
+      "display_name": "khanyisa-website",
+      "project_root": "/home/edp/Projectx/client/khanyisa-website"
+    },
+    "workspace_tps": {
+      "display_name": "TPS",
+      "project_root": "/home/edp/Projectx/client/tps"
+    },
+    "workspace_transcriber": {
+      "display_name": "transcriber",
+      "project_root": "/home/edp/Projectx/product/transcriber"
+    },
+    "workspace_web": {
+      "display_name": "web",
+      "project_root": "/home/edp/Documents/archives/dev/web"
+    },
+    "workspace_young_eagles_day_care": {
+      "display_name": "Young Eagles Day Care",
+      "project_root": "/home/edp/Projectx/client/young-eagles-day-care"
+    }
+  }
+}

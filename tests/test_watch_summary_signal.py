@@ -8,12 +8,18 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from tests.support.summary_degraded_signal_fixture import (
+    BOOTSTRAP_SUMMARY_DEGRADED_BODY,
+    BOOTSTRAP_SUMMARY_DEGRADED_SUMMARY,
+    BOOTSTRAP_SUMMARY_DEGRADED_TITLE,
     CONSISTENCY_FIELDS,
     SUMMARY_DEGRADED_INBOX_ITEM,
     SUMMARY_DEGRADED_SIGNAL_EVENT_STATIC,
     SUMMARY_DEGRADED_SIGNAL_ID,
     consistency_tuple,
 )
+
+from tests.support.stable_connector_probe import patch_stable_connector_probes
+from tests.support.watch_db import isolate_watch_db
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES_DIR = REPO_ROOT / "packages" / "shared-types" / "fixtures"
@@ -35,9 +41,12 @@ def _load_watch_app():
 
     sys.path.insert(0, str(WATCH_ROOT))
     from app.main import app as watch_app  # noqa: WPS433
-    from app.signals.summary_degraded_signal import summary_degraded_signal_event  # noqa: WPS433
+    from app.signals.summary_degraded_signal import (  # noqa: WPS433
+        summary_degraded_inbox_item,
+        summary_degraded_signal_event,
+    )
 
-    return watch_app, summary_degraded_signal_event, cached
+    return watch_app, summary_degraded_inbox_item, summary_degraded_signal_event, cached
 
 
 def _restore_modules(cached: dict[str, object]) -> None:
@@ -47,7 +56,7 @@ def _restore_modules(cached: dict[str, object]) -> None:
     sys.modules.update(cached)
 
 
-_STATIC_EVENT_FIELDS = (
+_IDENTITY_EVENT_FIELDS = (
     "event_id",
     "signal_id",
     "event_type",
@@ -56,41 +65,48 @@ _STATIC_EVENT_FIELDS = (
     "project_id",
     "severity",
     "status",
-    "title",
-    "body",
-    "summary",
     "dedupe_key",
     "action_type",
     "action_payload",
     "correlation_ref",
     "delivery_state",
-    "meta",
 )
 
 
 class WatchSummarySignalTests(unittest.TestCase):
     def setUp(self) -> None:
         self._cached_modules: dict[str, object] = {}
-        watch_app, self.summary_degraded_signal_event, self._cached_modules = _load_watch_app()
+        (
+            watch_app,
+            self.summary_degraded_inbox_item,
+            self.summary_degraded_signal_event,
+            self._cached_modules,
+        ) = _load_watch_app()
+        isolate_watch_db(self)
+        from app.delivery import store as delivery_store  # noqa: WPS433
+        from app.events import store as event_store  # noqa: WPS433
+
+        delivery_store.reset_store()
+        event_store.reset_store()
+        self._connector_patch = patch_stable_connector_probes()
+        self._connector_patch.start()
+        self.addCleanup(self._connector_patch.stop)
         self.client = TestClient(watch_app)
 
     def tearDown(self) -> None:
         _restore_modules(self._cached_modules)
 
-    def test_watch_inbox_ranks_summary_degraded_above_bootstrap(self) -> None:
+    def test_watch_inbox_omits_summary_degraded_when_required_connectors_ok(self) -> None:
         response = self.client.get("/internal/watch/inbox")
 
         self.assertEqual(200, response.status_code)
         items = response.json()["items"]
-        self.assertEqual(2, len(items))
-        self.assertEqual(SUMMARY_DEGRADED_SIGNAL_ID, items[0]["signal_id"])
-        self.assertEqual("signal_watch_bootstrap_ready", items[1]["signal_id"])
+        signal_ids = [item["signal_id"] for item in items]
+        self.assertNotIn(SUMMARY_DEGRADED_SIGNAL_ID, signal_ids)
+        self.assertIn("signal_watch_bootstrap_ready", signal_ids)
 
     def test_watch_inbox_item_matches_summary_degraded_contract_fixture(self) -> None:
-        response = self.client.get("/internal/watch/inbox")
-        item = next(
-            row for row in response.json()["items"] if row["signal_id"] == SUMMARY_DEGRADED_SIGNAL_ID
-        )
+        item = self.summary_degraded_inbox_item()
         fixture_item = _load_fixture("inbox-item.example.json")
 
         self.assertEqual(consistency_tuple(fixture_item), consistency_tuple(item))
@@ -100,13 +116,33 @@ class WatchSummarySignalTests(unittest.TestCase):
         self.assertEqual(SUMMARY_DEGRADED_INBOX_ITEM["summary"], item["summary"])
         self.assertEqual(SUMMARY_DEGRADED_INBOX_ITEM["action_type"], item["action_type"])
 
-    def test_summary_degraded_event_matches_signal_event_contract_fixture(self) -> None:
+    def test_summary_degraded_event_preserves_contract_identity_fields(self) -> None:
         event = self.summary_degraded_signal_event()
         fixture_event = _load_fixture("signal-event.example.json")
 
-        for field in _STATIC_EVENT_FIELDS:
+        for field in _IDENTITY_EVENT_FIELDS:
             self.assertEqual(fixture_event[field], event[field])
         self.assertEqual(SUMMARY_DEGRADED_SIGNAL_EVENT_STATIC["dedupe_key"], event["dedupe_key"])
+
+    def test_summary_degraded_event_bootstrap_copy_clarifies_dev_expectation(self) -> None:
+        event = self.summary_degraded_signal_event()
+
+        self.assertEqual(BOOTSTRAP_SUMMARY_DEGRADED_TITLE, event["title"])
+        self.assertEqual(BOOTSTRAP_SUMMARY_DEGRADED_SUMMARY, event["summary"])
+        self.assertEqual(BOOTSTRAP_SUMMARY_DEGRADED_BODY, event["body"])
+
+        meta = event["meta"]
+        self.assertIsInstance(meta, dict)
+        self.assertTrue(meta.get("bootstrap_expected"))
+        presentation = meta.get("presentation")
+        self.assertIsInstance(presentation, dict)
+        self.assertEqual("informational", presentation.get("tone"))
+        self.assertEqual("warning", presentation.get("severity_display"))
+
+        watch_rule = event["watch_rule"]
+        self.assertEqual("observe", watch_rule["mode"])
+        self.assertFalse(watch_rule["interrupts"])
+        self.assertEqual("bootstrap_summary_stale", watch_rule["reason"])
 
 
 if __name__ == "__main__":

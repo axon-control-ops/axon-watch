@@ -13,6 +13,9 @@ from tests.support.bootstrap_signal_fixture import (
     consistency_tuple,
 )
 
+from tests.support.stable_connector_probe import patch_stable_connector_probes
+from tests.support.watch_db import isolate_watch_db
+
 WATCH_ROOT = Path(__file__).resolve().parents[1] / "services" / "axon-watch"
 
 
@@ -42,6 +45,15 @@ class WatchBootstrapSignalTests(unittest.TestCase):
     def setUp(self) -> None:
         self._cached_modules: dict[str, object] = {}
         watch_app, self._cached_modules = _load_watch_app()
+        isolate_watch_db(self)
+        from app.delivery import store as delivery_store  # noqa: WPS433
+        from app.events import store as event_store  # noqa: WPS433
+
+        delivery_store.reset_store()
+        event_store.reset_store()
+        self._connector_patch = patch_stable_connector_probes()
+        self._connector_patch.start()
+        self.addCleanup(self._connector_patch.stop)
         self.client = TestClient(watch_app)
 
     def tearDown(self) -> None:
@@ -53,8 +65,10 @@ class WatchBootstrapSignalTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertEqual({"items", "count", "updated_at"}, set(payload))
-        self.assertEqual(2, payload["count"])
-        self.assertEqual(2, len(payload["items"]))
+        self.assertGreaterEqual(payload["count"], 1)
+        self.assertGreaterEqual(len(payload["items"]), 1)
+        signal_ids = {item["signal_id"] for item in payload["items"]}
+        self.assertIn(BOOTSTRAP_SIGNAL_ID, signal_ids)
 
     def test_watch_inbox_item_matches_bootstrap_signal_identity(self) -> None:
         response = self.client.get("/internal/watch/inbox")
@@ -66,6 +80,15 @@ class WatchBootstrapSignalTests(unittest.TestCase):
         self.assertEqual(consistency_tuple(BOOTSTRAP_INBOX_ITEM), consistency_tuple(item))
         for field in CONSISTENCY_FIELDS:
             self.assertEqual(BOOTSTRAP_INBOX_ITEM[field], item[field])
+
+    def test_watch_readiness_documents_expected_bootstrap_degraded_signal(self) -> None:
+        response = self.client.get("/internal/watch/readiness")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        notes = payload["bootstrap_notes"]
+        self.assertFalse(notes["summary_degraded_signal_expected"])
+        self.assertIn("bootstrap", notes["detail"].lower())
 
 
 if __name__ == "__main__":

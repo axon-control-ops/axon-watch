@@ -1,0 +1,22 @@
+{
+  "connectors": {
+    "control_plane": {
+      "display_name": "Control plane",
+      "health_url": "${AXON_WATCH_CONTROL_PLANE_BASE_URL}/api/health",
+      "required": true,
+      "workspace_id": "workspace_axon_watch"
+    },
+    "console_web": {
+      "display_name": "Console web",
+      "health_url": "${AXON_WATCH_PUBLIC_BASE_URL}/api/health",
+      "required": true,
+      "workspace_id": "workspace_axon_watch"
+    },
+    "axon_local": {
+      "display_name": "axon-local (legacy)",
+      "health_url": "http://127.0.0.1:7734/api/health",
+      "required": false,
+      "workspace_id": "workspace_axon_local"
+    }
+  }
+}

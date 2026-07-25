@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "description": "Per-workspace automatic worker delivery (commit → push → draft PR → CI).",
+  "defaults": {
+    "enabled": true,
+    "push_policy": "draft_pr",
+    "attempt_budget": 3,
+    "owner_role": "watcher",
+    "escalate_role": "integrations",
+    "lead_role": "lead",
+    "ci_poll_timeout_seconds": 1800,
+    "protected_branches": ["main", "master", "dev", "production", "release"]
+  },
+  "workspaces": [
+    {
+      "workspace_id": "workspace_axon_watch",
+      "enabled": true,
+      "base_branch": "dev",
+      "github_owner": "axon-control-ops",
+      "github_repo": "axon-watch",
+      "workflow_names": ["Axon-X Fast Gate"],
+      "attempt_budget": 3,
+      "push_policy": "draft_pr"
+    },
+    {
+      "workspace_id": "workspace_dashpro",
+      "enabled": true,
+      "base_branch": "dev",
+      "github_owner": "axon-control-ops",
+      "github_repo": "dashpro",
+      "workflow_names": [
+        "CI",
+        "Android CI/CD Pipeline",
+        "Database SQL Linting",
+        "Docs Policy Enforcement",
+        "Security Scan"
+      ],
+      "attempt_budget": 3,
+      "push_policy": "draft_pr"
+    }
+  ]
+}

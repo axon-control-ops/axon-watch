@@ -1,0 +1,16 @@
+{
+  "bindings": {
+    "workspace_axon_local": {
+      "project_root": "../axon-local",
+      "display_name": "axon-local"
+    },
+    "workspace_axon_watch": {
+      "project_root": ".",
+      "display_name": "axon-watch"
+    },
+    "workspace_dashpro": {
+      "project_root": "/home/edp/Projectx/product/dashpro",
+      "display_name": "DashPro"
+    }
+  }
+}

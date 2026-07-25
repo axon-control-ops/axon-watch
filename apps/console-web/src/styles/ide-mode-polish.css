@@ -1,0 +1,298 @@
+
+/* IDE mode shell differentiation — distinct from operator Mission Control chrome */
+
+.console-shell--ide {
+  --ide-accent: rgba(99, 102, 241, 0.72);
+  --ide-accent-soft: rgba(99, 102, 241, 0.12);
+}
+
+.console-shell--ide .topbar-mockup {
+  border-bottom-color: rgba(99, 102, 241, 0.22);
+  background:
+    linear-gradient(180deg, rgba(12, 14, 24, 0.98), rgba(8, 10, 18, 0.96)),
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 45%);
+}
+
+.console-shell--ide .topbar-mockup__subtitle {
+  color: rgba(165, 180, 252, 0.88);
+}
+
+.console-shell--ide .topbar-mockup__grid--ide-interrupt {
+  grid-template-columns:
+    minmax(10rem, 0.9fr)
+    minmax(0, 1.6fr)
+    minmax(11rem, 14rem)
+    auto;
+}
+
+.console-shell--ide .region-left-sidebar {
+  border-right: 1px solid rgba(99, 102, 241, 0.16);
+  background:
+    linear-gradient(180deg, rgba(10, 12, 20, 0.98), rgba(6, 8, 14, 0.99)),
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.06), transparent 50%);
+  transform: none !important;
+}
+
+.console-shell--ide .ide-explorer-panel,
+.console-shell--ide .ide-activity-bar {
+  --hud-surface-fill: rgba(10, 12, 20, 0.92);
+}
+
+.console-shell--ide .center-workbench__operator-status {
+  display: none;
+}
+
+.console-shell--ide .region-center-workbench {
+  border-left: 1px solid rgba(99, 102, 241, 0.12);
+  border-right: 1px solid rgba(99, 102, 241, 0.12);
+}
+
+.console-shell--ide .center-workbench__editor-stack {
+  background:
+    linear-gradient(180deg, rgba(8, 10, 18, 0.98), rgba(4, 6, 12, 0.99)),
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.05), transparent 55%);
+}
+
+.console-shell--ide .editor-chrome--mockup {
+  border-color: rgba(99, 102, 241, 0.14);
+}
+
+.console-shell--ide .editor-tabbar--mockup,
+.console-shell--ide .editor-breadcrumb--mockup {
+  border-color: rgba(99, 102, 241, 0.12);
+}
+
+.console-shell--ide .agent-dock {
+  border-left: 1px solid rgba(99, 102, 241, 0.18);
+  background:
+    linear-gradient(180deg, rgba(15, 18, 28, 0.98), rgba(8, 10, 18, 0.99)),
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 55%);
+}
+
+.console-shell--ide .agent-dock__header--ide {
+  background: rgba(15, 18, 28, 0.72);
+  border-bottom-color: rgba(99, 102, 241, 0.16);
+}
+
+.console-shell--ide .agent-dock__ide-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.console-shell--ide .agent-dock__eyebrow {
+  margin: 0;
+  color: rgba(165, 180, 252, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.console-shell--ide .agent-dock__title {
+  margin: 0;
+  color: rgba(238, 242, 255, 0.96);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.console-shell--ide .agent-dock__pill--runtime {
+  border-color: rgba(129, 140, 248, 0.28);
+  background: rgba(99, 102, 241, 0.1);
+  color: rgba(224, 231, 255, 0.94);
+}
+
+.console-shell--ide .agent-dock__pill--runtime-ready {
+  border-color: rgba(110, 231, 183, 0.28);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.console-shell--ide .agent-dock__pill--runtime-partial,
+.console-shell--ide .agent-dock__pill--runtime-error {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.console-shell--ide .agent-dock__pill--runtime-loading,
+.console-shell--ide .agent-dock__pill--runtime-missing {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.console-shell--ide .agent-dock__pill--runtime-vault {
+  border-color: rgba(56, 189, 248, 0.34);
+  background: rgba(14, 165, 233, 0.12);
+  color: rgba(224, 242, 254, 0.96);
+}
+
+.console-shell--ide .kairo-chip--idle .kairo-chip__pulse {
+  animation: none;
+  opacity: 0.45;
+}
+
+.console-shell--ide .kairo-chip--idle .kairo-chip__waveform {
+  display: none;
+}
+
+.console-shell--ide .ide-kairo-footer__chip.kairo-chip--idle .kairo-chip__pulse {
+  animation: none;
+  opacity: 0.45;
+}
+
+.console-shell--ide .kairo-chip--employee-failed {
+  border-color: rgba(255, 110, 90, 0.55);
+  box-shadow: 0 0 16px rgba(220, 70, 60, 0.22);
+}
+
+.console-shell--ide .kairo-chip--employee-failed .kairo-chip__pulse {
+  animation: kairo-pulse 1.8s ease-in-out infinite;
+  opacity: 1;
+  background: rgba(255, 110, 90, 0.95);
+  box-shadow: 0 0 10px rgba(220, 70, 60, 0.65);
+}
+
+.console-shell--ide .kairo-chip--employee-interrupted {
+  border-color: rgba(255, 180, 90, 0.55);
+  box-shadow: 0 0 16px rgba(255, 160, 60, 0.22);
+}
+
+.console-shell--ide .kairo-chip--employee-interrupted .kairo-chip__pulse {
+  animation: kairo-pulse 1.8s ease-in-out infinite;
+  opacity: 1;
+  background: rgba(255, 180, 90, 0.95);
+  box-shadow: 0 0 10px rgba(255, 160, 60, 0.65);
+}
+
+.console-shell--ide .kairo-sidebar-panel--employee-failed.kairo-sidebar-panel--alerting {
+  border-color: rgba(255, 110, 90, 0.42);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-failed.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__ring {
+  border-color: rgba(255, 110, 90, 0.38);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-failed.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__ring--inner {
+  background: rgba(180, 45, 35, 0.14);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-failed.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(255, 110, 90, 0.45),
+    transparent 35%
+  );
+}
+
+.console-shell--ide .kairo-sidebar-panel--employee-failed .kairo-sidebar-panel__compact-dot {
+  background: rgba(255, 110, 90, 0.95);
+  box-shadow: 0 0 10px rgba(220, 70, 60, 0.55);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted.kairo-sidebar-panel--alerting {
+  border-color: rgba(255, 180, 90, 0.42);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__ring {
+  border-color: rgba(255, 180, 90, 0.38);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__ring--inner {
+  background: rgba(100, 62, 18, 0.14);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted.kairo-sidebar-panel--alerting
+  .kairo-sidebar-panel__sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    rgba(255, 180, 90, 0.45),
+    transparent 35%
+  );
+}
+
+.console-shell--ide .kairo-sidebar-panel--employee-interrupted .kairo-sidebar-panel__compact-dot {
+  background: rgba(255, 180, 90, 0.95);
+  box-shadow: 0 0 10px rgba(255, 160, 60, 0.55);
+}
+
+.console-shell--ide
+  .kairo-sidebar-panel--employee-interrupted
+  .kairo-sidebar-panel__employee-failure {
+  color: rgba(255, 230, 195, 0.94);
+  background: rgba(80, 52, 18, 0.38);
+  border-color: rgba(255, 180, 90, 0.28);
+}
+
+.console-shell--ide .kairo-sidebar-panel__employee-failure {
+  margin: 0.2rem 0 0;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.3rem;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: rgba(255, 210, 200, 0.94);
+  background: rgba(90, 28, 24, 0.38);
+  border: 1px solid rgba(255, 120, 100, 0.28);
+  overflow-wrap: anywhere;
+}
+
+.console-shell--ide .ide-kairo-footer__interrupt--employee-failed {
+  border-color: rgba(255, 110, 90, 0.42);
+}
+
+.console-shell--ide .ide-kairo-footer__interrupt--employee-failed .ide-kairo-footer__interrupt-state {
+  color: rgba(255, 190, 175, 0.96);
+}
+
+.console-shell--ide .ide-kairo-footer__interrupt--employee-interrupted {
+  border-color: rgba(255, 180, 90, 0.42);
+}
+
+.console-shell--ide .ide-kairo-footer__interrupt--employee-interrupted .ide-kairo-footer__interrupt-state {
+  color: rgba(255, 220, 170, 0.96);
+}
+
+.console-shell--ide .ide-kairo-footer__interrupt--employee-interrupted .ide-kairo-footer__employee-failure {
+  color: rgba(255, 230, 195, 0.94);
+  background: rgba(80, 52, 18, 0.38);
+  border-color: rgba(255, 180, 90, 0.28);
+}
+
+.console-shell--ide .ide-kairo-footer__employee-failure {
+  margin: 0;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.3rem;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: rgba(255, 210, 200, 0.94);
+  background: rgba(90, 28, 24, 0.38);
+  border: 1px solid rgba(255, 120, 100, 0.28);
+  overflow-wrap: anywhere;
+}
+
+.console-shell--ide .agent-dock__composer {
+  background: rgba(10, 12, 20, 0.88);
+  border-top-color: rgba(99, 102, 241, 0.14);
+}
+
+.console-shell--ide .agent-dock__transcript .conversation-seam__item--agent {
+  border: 0;
+  background: transparent;
+}
+
+.console-shell--ide .workspace-file-tree__status {
+  color: rgba(199, 210, 254, 0.72);
+}

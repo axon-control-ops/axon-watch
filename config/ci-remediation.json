@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "description": "Gate 9 CI remediation bindings for Axon-X and DashPro workflows.",
+  "defaults": {
+    "attempt_budget": 3,
+    "push_policy": "draft_pr",
+    "owner_role": "watcher",
+    "escalate_role": "integrations",
+    "lead_role": "lead",
+    "dispatch_on_ingest": true
+  },
+  "bindings": [
+    {
+      "enabled": true,
+      "workspace_id": "workspace_axon_watch",
+      "github_owner": "axon-control-ops",
+      "github_repo": "axon-watch",
+      "workflow_name": "Axon-X Fast Gate",
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "owner_role": "watcher",
+      "escalate_role": "integrations",
+      "lead_role": "lead",
+      "dispatch_on_ingest": true
+    },
+    {
+      "enabled": true,
+      "workspace_id": "workspace_dashpro",
+      "github_owner": "axon-control-ops",
+      "github_repo": "dashpro",
+      "workflow_name": "CI",
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "owner_role": "watcher",
+      "escalate_role": "integrations",
+      "lead_role": "lead",
+      "dispatch_on_ingest": true
+    },
+    {
+      "enabled": true,
+      "workspace_id": "workspace_dashpro",
+      "github_owner": "axon-control-ops",
+      "github_repo": "dashpro",
+      "workflow_name": "Android CI/CD Pipeline",
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "owner_role": "watcher",
+      "escalate_role": "integrations",
+      "lead_role": "lead",
+      "dispatch_on_ingest": true
+    },
+    {
+      "enabled": true,
+      "workspace_id": "workspace_dashpro",
+      "github_owner": "axon-control-ops",
+      "github_repo": "dashpro",
+      "workflow_name": "Database SQL Linting",
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "owner_role": "watcher",
+      "escalate_role": "integrations",
+      "lead_role": "lead",
+      "dispatch_on_ingest": true
+    },
+    {
+      "enabled": true,
+      "workspace_id": "workspace_dashpro",
+      "github_owner": "axon-control-ops",
+      "github_repo": "dashpro",
+      "workflow_name": "Docs Policy Enforcement",
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "owner_role": "watcher",
+      "escalate_role": "integrations",
+      "lead_role": "lead",
+      "dispatch_on_ingest": true
+    },
+    {
+      "enabled": true,
+      "workspace_id": "workspace_dashpro",
+      "github_owner": "axon-control-ops",
+      "github_repo": "dashpro",
+      "workflow_name": "Security Scan",
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "owner_role": "watcher",
+      "escalate_role": "integrations",
+      "lead_role": "lead",
+      "dispatch_on_ingest": true
+    },
+    {
+      "enabled": true,
+      "workspace_id": "workspace_dashpro",
+      "github_owner": "axon-control-ops",
+      "github_repo": "dashpro",
+      "workflow_name": "Voice Benchmark Nightly",
+      "attempt_budget": 3,
+      "push_policy": "draft_pr",
+      "owner_role": "watcher",
+      "escalate_role": "integrations",
+      "lead_role": "lead",
+      "dispatch_on_ingest": true
+    }
+  ]
+}

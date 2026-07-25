@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Axon-X">
+  <defs>
+    <radialGradient id="void" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#0b1c2c"/>
+      <stop offset="70%" stop-color="#050d16"/>
+      <stop offset="100%" stop-color="#02060c"/>
+    </radialGradient>
+    <linearGradient id="xStroke" x1="18%" y1="12%" x2="86%" y2="90%">
+      <stop offset="0%" stop-color="#e8fbff"/>
+      <stop offset="45%" stop-color="#48c4ff"/>
+      <stop offset="100%" stop-color="#00f2ff"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Soft plate (not a heavy tile / no AXON SIGNAL wordmark) -->
+  <rect width="512" height="512" rx="108" fill="url(#void)"/>
+  <circle cx="256" cy="248" r="168" fill="none" stroke="#48c4ff" stroke-opacity="0.16" stroke-width="3"/>
+  <g filter="url(#glow)" fill="none" stroke="url(#xStroke)" stroke-width="46" stroke-linecap="round">
+    <path d="M156 156 L356 356"/>
+    <path d="M356 156 L156 356"/>
+  </g>
+  <circle cx="256" cy="256" r="18" fill="#9ef0ff" opacity="0.95"/>
+</svg>

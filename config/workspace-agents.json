@@ -1,0 +1,264 @@
+{
+  "schema_version": 2,
+  "defaults": {
+    "role": "lead",
+    "name_template": "{display_name} Lead",
+    "company_name_template": "{display_name}",
+    "staffing_template": [
+      { "role": "lead", "schedule": "on_demand" },
+      { "role": "watcher", "schedule": "always_on" },
+      { "role": "frontend", "schedule": "continuous" },
+      { "role": "backend", "schedule": "continuous" },
+      { "role": "integrations", "schedule": "continuous" }
+    ]
+  },
+  "companies": {
+    "workspace_axon_watch": {
+      "company_name": "Axon-X",
+      "employees": [
+        {
+          "name": "Mira",
+          "role": "lead",
+          "owns": "priorities, handoffs, product direction, and Fast Gate triage for axon-watch",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-GB-SoniaNeural"
+        },
+        {
+          "name": "Rowan",
+          "role": "watcher",
+          "owns": "signals, connectors, runtime health, and Axon-X Fast Gate after every push to origin",
+          "schedule": "always_on",
+          "azure_voice_id": "en-GB-ThomasNeural"
+        },
+        {
+          "name": "Jules",
+          "role": "frontend",
+          "owns": "console UI/UX, dock, and shell polish",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Reed",
+          "role": "backend",
+          "owns": "APIs, runs, approvals, and persistence",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Quinn",
+          "role": "integrations",
+          "owns": "connectors, watch service, cross-repo wiring, and axon-watch GitHub Actions / Fast Gate",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
+    },
+    "workspace_dashpro": {
+      "company_name": "DashPro",
+      "employees": [
+        {
+          "name": "Dana",
+          "role": "lead",
+          "owns": "DashPro product priorities, CI triage decisions, and handoffs",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-US-AriaNeural"
+        },
+        {
+          "name": "Cass",
+          "role": "watcher",
+          "owns": "DashPro signals, runtime health, and CI red-build alerts",
+          "schedule": "always_on",
+          "azure_voice_id": "en-US-DavisNeural"
+        },
+        {
+          "name": "Priya",
+          "role": "frontend",
+          "owns": "DashPro UI/UX and Expo/Android app-config CI breaks",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-JennyNeural"
+        },
+        {
+          "name": "Marco",
+          "role": "backend",
+          "owns": "DashPro APIs, services, and quality-gate CI failures",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-GuyNeural"
+        },
+        {
+          "name": "Soren",
+          "role": "integrations",
+          "owns": "DashPro connectors, GitHub Actions, runner/SDK/secrets CI wiring",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-SaraNeural"
+        }
+      ]
+    },
+    "workspace_edudashpro_school": {
+      "company_name": "EduDash PRO School of Excellence",
+      "employees": [
+        {
+          "name": "Lindi",
+          "role": "lead",
+          "owns": "Centre priorities, Aftercare/Preschool planning order, and handoffs",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-ZA-LeahNeural"
+        },
+        {
+          "name": "Thabo",
+          "role": "watcher",
+          "owns": "School workspace readiness signals and planning blockers",
+          "schedule": "always_on",
+          "azure_voice_id": "en-ZA-LukeNeural"
+        },
+        {
+          "name": "Naledi",
+          "role": "frontend",
+          "owns": "Planning docs layout and parent-facing materials structure",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Sipho",
+          "role": "backend",
+          "owns": "Ops checklists, enrolment/process notes, and data hygiene",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Amara",
+          "role": "integrations",
+          "owns": "EduDash PRO product linkage notes for the centre",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
+    },
+    "workspace_tps": {
+      "company_name": "TPS",
+      "employees": [
+        {
+          "name": "Noor",
+          "role": "lead",
+          "owns": "TPS product priorities, handoffs, and review gates",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-US-AriaNeural"
+        },
+        {
+          "name": "Blair",
+          "role": "watcher",
+          "owns": "TPS signals, runtime health, and deploy alerts",
+          "schedule": "always_on",
+          "azure_voice_id": "en-US-DavisNeural"
+        },
+        {
+          "name": "Vera",
+          "role": "frontend",
+          "owns": "TPS UI surfaces and client-facing flows",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-JennyNeural"
+        },
+        {
+          "name": "Hugo",
+          "role": "backend",
+          "owns": "TPS APIs, services, and data integrity",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-GuyNeural"
+        },
+        {
+          "name": "Tess",
+          "role": "integrations",
+          "owns": "TPS connectors, CI wiring, and third-party hooks",
+          "schedule": "continuous",
+          "azure_voice_id": "en-US-SaraNeural"
+        }
+      ]
+    },
+    "workspace_young_eagles_day_care": {
+      "company_name": "Young Eagles Day Care",
+      "employees": [
+        {
+          "name": "Imani",
+          "role": "lead",
+          "owns": "Centre priorities, parent comms order, and handoffs",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-ZA-LeahNeural"
+        },
+        {
+          "name": "Ash",
+          "role": "watcher",
+          "owns": "Centre readiness signals and enrolment blockers",
+          "schedule": "always_on",
+          "azure_voice_id": "en-ZA-LukeNeural"
+        },
+        {
+          "name": "Lila",
+          "role": "frontend",
+          "owns": "Letters, printable packs, and parent-facing layouts",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Cole",
+          "role": "backend",
+          "owns": "Enrolment data, NPO records, and ops checklists",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Sol",
+          "role": "integrations",
+          "owns": "Document export hooks and EduDash linkage notes",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
+    },
+    "workspace_axon_local": {
+      "company_name": "Axon Local",
+      "employees": [
+        {
+          "name": "Avery",
+          "role": "lead",
+          "owns": "axon-local donor patterns, priorities, and handoffs",
+          "schedule": "on_demand",
+          "primary": true,
+          "azure_voice_id": "en-GB-SoniaNeural"
+        },
+        {
+          "name": "Remy",
+          "role": "watcher",
+          "owns": "axon-local signals and runtime health",
+          "schedule": "always_on",
+          "azure_voice_id": "en-GB-ThomasNeural"
+        },
+        {
+          "name": "Sable",
+          "role": "frontend",
+          "owns": "axon-local UI reference surfaces",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-LibbyNeural"
+        },
+        {
+          "name": "Mina",
+          "role": "backend",
+          "owns": "axon-local API and persistence donor patterns",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-ElliotNeural"
+        },
+        {
+          "name": "Drew",
+          "role": "integrations",
+          "owns": "axon-local connector and packaging wiring",
+          "schedule": "continuous",
+          "azure_voice_id": "en-GB-HollieNeural"
+        }
+      ]
+    }
+  },
+  "agents": {}
+}

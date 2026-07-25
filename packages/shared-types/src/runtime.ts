@@ -64,6 +64,24 @@ export interface RuntimeSummaryDegradedState {
   reasons: string[];
 }
 
+export interface CliRuntimeReadiness {
+  dispatch_ready: boolean;
+  ready_count: number;
+  local_count: number;
+  default_runtime: string;
+  default_ready: boolean;
+  blockers: string[];
+}
+
+export interface RuntimeSummaryConnectors {
+  configured: number;
+  ok: number;
+  degraded: number;
+  unavailable: number;
+  required_unavailable: number;
+  last_updated_at: string;
+}
+
 export interface RuntimeSummary {
   generated_at: string;
   control_plane: RuntimeSummaryControlPlane;
@@ -72,6 +90,8 @@ export interface RuntimeSummary {
   active_runs: RuntimeSummaryActiveRun[];
   approvals: RuntimeSummaryApprovals;
   signals: RuntimeSummarySignals;
+  connectors: RuntimeSummaryConnectors;
   capabilities: RuntimeSummaryCapabilities;
   degraded: RuntimeSummaryDegradedState;
+  cli_runtime?: CliRuntimeReadiness;
 }

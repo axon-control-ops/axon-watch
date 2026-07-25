@@ -1,0 +1,20 @@
+[Unit]
+Description=Axon-X Watch Service (user always-on)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/axon-watch/deployment.env
+WorkingDirectory=%h
+ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/run-service.sh axon-watch
+Restart=on-failure
+RestartSec=3
+MemoryAccounting=yes
+MemoryHigh=400M
+MemoryMax=800M
+OOMPolicy=stop
+
+[Install]
+WantedBy=default.target
+

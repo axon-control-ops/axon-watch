@@ -82,3 +82,30 @@ export function flattenWorkspaceFileTree(
 
   return rows;
 }
+
+export function collectDirectoryPaths(nodes: WorkspaceFileTreeNode[]): string[] {
+  const paths: string[] = [];
+
+  for (const node of nodes) {
+    if (node.kind === 'directory') {
+      paths.push(node.path);
+      if (node.children?.length) {
+        paths.push(...collectDirectoryPaths(node.children));
+      }
+    }
+  }
+
+  return paths;
+}
+
+export function buildExpandedDirectoryState(
+  nodes: WorkspaceFileTreeNode[],
+): Record<string, boolean> {
+  return Object.fromEntries(collectDirectoryPaths(nodes).map((path) => [path, true]));
+}
+
+export function buildCollapsedDirectoryState(
+  nodes: WorkspaceFileTreeNode[],
+): Record<string, boolean> {
+  return Object.fromEntries(collectDirectoryPaths(nodes).map((path) => [path, false]));
+}

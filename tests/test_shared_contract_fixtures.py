@@ -9,7 +9,7 @@ from scripts.verify.common import compact_json_size_bytes, load_config
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES_DIR = REPO_ROOT / "packages" / "shared-types" / "fixtures"
 
-RUN_MODES = {"ask", "agent", "plan", "auto", "watch"}
+RUN_MODES = {"ask", "agent", "plan", "debug", "auto", "watch"}
 RUN_PHASES = {
     "queued",
     "starting",
@@ -116,6 +116,7 @@ class SharedContractFixtureTests(unittest.TestCase):
                 "active_runs",
                 "approvals",
                 "signals",
+                "connectors",
                 "capabilities",
                 "degraded",
             },
@@ -197,6 +198,24 @@ class SharedContractFixtureTests(unittest.TestCase):
         self.assertIn(payload["action_type"], SIGNAL_ACTION_TYPES)
         self.assertIn(payload["delivery_state"], DELIVERY_STATES)
 
+    def test_delivery_receipt_fixture_matches_canonical_shape(self) -> None:
+        payload = _load_fixture("delivery-receipt.example.json")
+
+        self.assertEqual(
+            {
+                "receipt_id",
+                "signal_id",
+                "event_id",
+                "channel",
+                "attempted_at",
+                "result",
+                "error",
+                "policy_reason",
+            },
+            set(payload),
+        )
+        self.assertEqual("succeeded", payload["result"])
+
     def test_minimal_identity_fixtures_exist_for_shell_families(self) -> None:
         approval = _load_fixture("approval-record.example.json")
         workspace = _load_fixture("workspace-record.example.json")
@@ -247,18 +266,32 @@ class SharedContractFixtureTests(unittest.TestCase):
         self.assertEqual(
             {
                 "generated_at",
+                "notice",
+                "advise",
+                "executive_rhythm",
                 "top_signals",
                 "pending_approvals",
                 "active_runs",
                 "next_safe_actions",
                 "degraded",
                 "connectivity",
+                "operator_presence",
             },
             set(payload),
         )
-        self.assertEqual({"count", "items"}, set(payload["pending_approvals"]))
+        rhythm = payload["executive_rhythm"]
+        self.assertEqual(payload["notice"], rhythm["notice"])
+        self.assertEqual(payload["advise"], rhythm["advise"])
+        self.assertIn("decide", rhythm)
+        self.assertIn("execute", rhythm)
+        self.assertIn("verify", rhythm)
+        self.assertIn("report", rhythm)
         self.assertEqual({"active", "reasons"}, set(payload["degraded"]))
         self.assertEqual({"control_plane_ready", "watch_connected"}, set(payload["connectivity"]))
+        presence = payload["operator_presence"]
+        self.assertIn("persona_voice_line", presence)
+        self.assertIn("spoken_alert", presence)
+        self.assertTrue(presence["mobile"]["foreground_only"])
 
         action = payload["next_safe_actions"][0]
         self.assertEqual(

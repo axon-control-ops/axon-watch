@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "foreground_only": true,
+  "event_sources": ["briefing_reactive", "live_events_presence_refresh"],
+  "mobile_compact_strip": true,
+  "spoken_alert_channel": "voice_deck"
+}

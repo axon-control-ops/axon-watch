@@ -1,0 +1,524 @@
+.agent-dock-workspace-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.32rem;
+  width: 100%;
+  max-width: 13rem;
+  min-height: 1.65rem;
+  padding: 0.22rem 0.5rem;
+  border: 1px solid rgba(138, 154, 173, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(196, 206, 218, 0.94);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-dock-workspace-menu__trigger--active {
+  border-color: rgba(0, 242, 255, 0.34);
+  background: rgba(0, 242, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.08);
+  color: #edf8ff;
+}
+
+.agent-dock-workspace-menu__trigger-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.agent-dock-workspace-menu__trigger-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.04rem;
+  min-width: 0;
+}
+
+.agent-dock-workspace-menu__icon,
+.agent-dock-workspace-menu__item-icon {
+  flex-shrink: 0;
+  color: rgba(191, 219, 254, 0.88);
+}
+
+.agent-dock-workspace-menu__trigger:hover,
+.agent-dock-workspace-menu__trigger[aria-expanded='true'] {
+  border-color: rgba(0, 242, 255, 0.22);
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.agent-dock-workspace-menu__label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-workspace-menu__meta {
+  overflow: hidden;
+  min-width: 0;
+  color: rgba(138, 154, 173, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-workspace-menu__chevron {
+  flex-shrink: 0;
+  color: rgba(138, 154, 173, 0.88);
+  font-size: 0.68rem;
+  transition: transform 120ms ease;
+}
+
+.agent-dock-workspace-menu__chevron--open {
+  transform: rotate(180deg);
+}
+
+.agent-dock-workspace-menu__panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.14rem;
+  width: 13.5rem;
+  max-height: 13rem;
+  padding: 0.32rem;
+  border: 1px solid rgba(138, 154, 173, 0.16);
+  border-radius: 10px;
+  background: #0a0e14;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  overflow: auto;
+  isolation: isolate;
+}
+
+.agent-dock-workspace-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.38rem 0.46rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.94);
+  font-family: var(--font-ui);
+  font-size: 0.64rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-dock-workspace-menu__item-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.agent-dock-workspace-menu__item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.agent-dock-workspace-menu__item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-workspace-menu__item-meta {
+  overflow: hidden;
+  color: rgba(138, 154, 173, 0.84);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-workspace-menu__item-active-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.92);
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.16);
+}
+
+.agent-dock-workspace-menu__item--active {
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.agent-dock-workspace-menu__item--add {
+  margin-top: 0.25rem;
+  border-top: 1px solid rgba(0, 242, 255, 0.12);
+  border-radius: 0;
+  color: rgba(120, 220, 255, 0.9);
+}
+
+.agent-dock-workspace-menu__add-form {
+  padding: 0.45rem;
+}
+
+.agent-dock-thread-tabbar {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border-bottom: 0;
+  background: transparent;
+  padding-inline: 0.35rem 0.45rem;
+}
+
+/* flex-basis 0 forces a bounded width so overflow-x can scroll (not grow/clip). */
+.agent-dock-thread-tabbar.editor-tabbar--mockup .agent-dock-thread-tabbar__tabs,
+.agent-dock-thread-tabbar__tabs {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  /* Inherit Cursor overlay scrollbar from mockup-shell-01 (do not set scrollbar-*). */
+  -webkit-overflow-scrolling: touch;
+}
+
+.agent-dock-thread-tabbar__scroll {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  align-self: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0 0.05rem;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 6px;
+  background: rgba(8, 14, 22, 0.72);
+  color: rgba(186, 230, 253, 0.92);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__scroll:hover:not(:disabled) {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.agent-dock-thread-tabbar__scroll:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.agent-dock-thread-tabbar__tab {
+  flex: 0 0 auto;
+  max-width: 9.5rem;
+}
+
+.agent-dock-thread-tabbar__tab-icon {
+  flex-shrink: 0;
+  color: rgba(191, 219, 254, 0.88);
+}
+
+.agent-dock-thread-tabbar__tab-fail-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  font-size: 0.48rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255, 230, 220, 0.98);
+  background: rgba(180, 45, 35, 0.95);
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95);
+}
+
+.agent-dock-thread-tabbar__tab--active .agent-dock-thread-tabbar__tab-fail-mark {
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95), 0 0 0 2px rgba(255, 110, 90, 0.45);
+}
+
+.agent-dock-thread-tabbar__tab--failed:not(.agent-dock-thread-tabbar__tab--active) {
+  border-color: rgba(255, 110, 90, 0.32);
+  background: rgba(90, 28, 24, 0.22);
+}
+
+.agent-dock-thread-tabbar__tab--failed.agent-dock-thread-tabbar__tab--active {
+  border-color: rgba(255, 110, 90, 0.52);
+  box-shadow: 0 0 0 1px rgba(255, 110, 90, 0.18);
+}
+
+.agent-dock-thread-tabbar__tab-busy-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  font-size: 0.42rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(20, 40, 35, 0.98);
+  background: rgba(70, 230, 180, 0.95);
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95);
+  animation: agent-dock-tab-busy-dot 1.1s ease-in-out infinite;
+}
+
+/* Busy glow wins over stale failure; override hud-active-chip !important fill. */
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy {
+  border: 1px solid rgba(70, 230, 180, 0.72) !important;
+  background: rgba(12, 78, 58, 0.72) !important;
+  box-shadow:
+    0 0 0 1px rgba(70, 230, 180, 0.35),
+    0 0 14px rgba(50, 210, 160, 0.45),
+    inset 0 0 18px rgba(40, 190, 140, 0.22) !important;
+  animation: agent-dock-tab-busy-glow 1.35s ease-in-out infinite;
+}
+
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy.agent-dock-thread-tabbar__tab--active,
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy.hud-active-chip--active {
+  border-color: rgba(110, 255, 210, 0.92) !important;
+  background: rgba(14, 96, 72, 0.88) !important;
+  box-shadow:
+    0 0 0 1px rgba(90, 240, 190, 0.45),
+    0 0 18px rgba(60, 230, 170, 0.55),
+    inset 0 0 22px rgba(50, 210, 150, 0.28) !important;
+}
+
+.agent-dock-thread-tabbar__tab--busy .agent-dock-thread-tabbar__tab-icon,
+.agent-dock-thread-tabbar__tab--busy .agent-dock-thread-tabbar__tab-label {
+  color: rgba(190, 255, 230, 0.98);
+}
+
+.agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy.hud-active-chip--active::before {
+  background: rgba(90, 240, 190, 0.55);
+  box-shadow: 0 0 8px rgba(70, 230, 180, 0.45);
+}
+
+.agent-dock-thread-tabbar__tab-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-thread-tabbar__tab-close {
+  display: inline-grid;
+  place-items: center;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-left: 0.08rem;
+  border-radius: 4px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__tab:hover .agent-dock-thread-tabbar__tab-close,
+.agent-dock-thread-tabbar__tab--active .agent-dock-thread-tabbar__tab-close {
+  opacity: 1;
+}
+
+.agent-dock-thread-tabbar__tab-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.agent-dock-thread-tabbar__tools {
+  flex-shrink: 0;
+}
+
+.agent-dock-thread-tabbar__history {
+  position: relative;
+}
+
+.agent-dock-thread-tabbar__tool-button.is-active {
+  border-color: rgba(0, 242, 255, 0.28);
+  background: rgba(0, 242, 255, 0.1);
+}
+
+.agent-dock-thread-tabbar__history-panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 0.14rem;
+  width: min(18rem, 72vw);
+  max-height: min(22rem, 55vh);
+  padding: 0.32rem;
+  border: 1px solid rgba(138, 154, 173, 0.16);
+  border-radius: 10px;
+  background: rgba(10, 14, 20, 0.98);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  overflow: auto;
+}
+
+.agent-dock-thread-tabbar__history-new {
+  width: 100%;
+  padding: 0.42rem 0.5rem;
+  border: 1px dashed rgba(138, 154, 173, 0.22);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(150, 231, 255, 0.94);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.38rem 0.46rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.94);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-dock-thread-tabbar__history-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.06rem;
+  min-width: 0;
+}
+
+.agent-dock-thread-tabbar__history-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.agent-dock-thread-tabbar__history-fail-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  font-size: 0.48rem;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255, 230, 220, 0.98);
+  background: rgba(180, 45, 35, 0.95);
+  box-shadow: 0 0 0 1px rgba(20, 30, 40, 0.95);
+}
+
+.agent-dock-thread-tabbar__history-label,
+.agent-dock-thread-tabbar__history-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-thread-tabbar__history-item--failed .agent-dock-thread-tabbar__history-label {
+  color: rgba(255, 210, 200, 0.95);
+}
+
+.agent-dock-thread-tabbar__history-item--busy {
+  border-color: rgba(70, 230, 180, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(70, 230, 180, 0.12);
+}
+
+.agent-dock-thread-tabbar__history-item--busy .agent-dock-thread-tabbar__history-label {
+  color: rgba(160, 255, 215, 0.96);
+}
+
+.agent-dock-thread-tabbar__history-meta {
+  color: rgba(138, 154, 173, 0.82);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+}
+
+.agent-dock-thread-tabbar__history-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.92);
+}
+
+.agent-dock-thread-tabbar__history-item--busy .agent-dock-thread-tabbar__history-dot {
+  background: rgba(70, 230, 180, 0.95);
+  box-shadow: 0 0 8px rgba(60, 200, 160, 0.55);
+  animation: agent-dock-tab-busy-dot 1.1s ease-in-out infinite;
+}
+
+.agent-dock-thread-tabbar__history-new:hover,
+.agent-dock-thread-tabbar__history-item:hover,
+.agent-dock-thread-tabbar__history-item--active {
+  background: rgba(0, 242, 255, 0.08);
+}
+
+.agent-dock-thread-tabbar__history-item--failed:hover,
+.agent-dock-thread-tabbar__history-item--failed.agent-dock-thread-tabbar__history-item--active {
+  background: rgba(120, 40, 32, 0.22);
+}
+
+.agent-dock-thread-tabbar__history-item--busy:hover:not(.agent-dock-thread-tabbar__history-item--failed),
+.agent-dock-thread-tabbar__history-item--busy.agent-dock-thread-tabbar__history-item--active:not(
+    .agent-dock-thread-tabbar__history-item--failed
+  ) {
+  background: rgba(30, 90, 70, 0.28);
+}
+
+@keyframes agent-dock-tab-busy-glow {
+  0%,
+  100% {
+    filter: brightness(0.94) saturate(1);
+  }
+  50% {
+    filter: brightness(1.22) saturate(1.3);
+  }
+}
+
+@keyframes agent-dock-tab-busy-dot {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-dock-thread-tabbar__tab--busy,
+  .agent-dock-thread-tabbar__tab-busy-mark,
+  .agent-dock-thread-tabbar__history-item--busy .agent-dock-thread-tabbar__history-dot {
+    animation: none;
+    filter: none;
+  }
+}
+
+.agent-dock-workspace-menu__item:hover,
+.agent-dock-workspace-menu__item--active {
+  background: rgba(0, 242, 255, 0.08);
+  color: #edf4fb;
+}
+

@@ -1,0 +1,2 @@
+# Optional dev tooling for axon-watch (install into repo .venv).
+playwright>=1.49.0

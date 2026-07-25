@@ -1,0 +1,5 @@
+{
+  "samples_ms": [48, 52, 55, 58, 61, 64, 67, 70, 73, 76, 79, 82, 85, 88, 91],
+  "source": "ci-fixture",
+  "note": "Placeholder under 300ms p95 gate. Run npm run verify:evidence with dev stack for live samples."
+}

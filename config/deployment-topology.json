@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "description": "Dedicated-server topology for Axon-X three-service stack",
+  "startup_order": [
+    "storage",
+    "axon-watch",
+    "control-plane",
+    "console-web",
+    "reverse-proxy"
+  ],
+  "services": {
+    "axon-watch": {
+      "role": "watch",
+      "bind_env": "AXON_WATCH_BIND_HOST",
+      "port_env": "AXON_WATCH_WATCH_SERVICE_PORT",
+      "health_path": "/internal/watch/health",
+      "readiness_path": "/internal/watch/readiness",
+      "public_exposure": "internal_only"
+    },
+    "control-plane": {
+      "role": "control-plane",
+      "bind_env": "AXON_WATCH_BIND_HOST",
+      "port_env": "AXON_WATCH_CONTROL_PLANE_PORT",
+      "health_path": "/api/health",
+      "readiness_path": "/api/readiness",
+      "public_exposure": "via_reverse_proxy"
+    },
+    "console-web": {
+      "role": "console-web",
+      "bind_env": "AXON_WATCH_BIND_HOST",
+      "port_env": "AXON_WATCH_CONSOLE_WEB_PORT",
+      "health_path": "/",
+      "readiness_path": "/",
+      "public_exposure": "via_reverse_proxy"
+    }
+  },
+  "storage": {
+    "state_dir_env": "AXON_WATCH_STATE_DIR",
+    "control_plane_db_env": "AXON_WATCH_CONTROL_PLANE_DB",
+    "watch_db_env": "AXON_WATCH_WATCH_SERVICE_DB"
+  },
+  "networking": {
+    "public_base_url_env": "AXON_WATCH_PUBLIC_BASE_URL",
+    "control_plane_base_url_env": "AXON_WATCH_CONTROL_PLANE_BASE_URL",
+    "watch_service_base_url_env": "AXON_WATCH_WATCH_SERVICE_BASE_URL",
+    "watch_internal_only": true
+  }
+}

@@ -1,0 +1,139 @@
+/* Inspector denser mockup chrome */
+.brain-galaxy-stage--mockup .galaxy-inspector {
+  gap: 0.65rem;
+  padding: 0.85rem 0.85rem 0.9rem;
+  border-color: rgba(72, 220, 255, 0.42);
+  background:
+    radial-gradient(ellipse 80% 35% at 50% 0%, rgba(0, 180, 255, 0.12), transparent 55%),
+    linear-gradient(180deg, rgba(4, 14, 22, 0.94) 0%, rgba(2, 8, 14, 0.9) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 210, 255, 0.06) inset,
+    0 0 1.5rem rgba(0, 170, 255, 0.16);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__eyebrow {
+  color: rgba(230, 248, 255, 0.96);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__entity {
+  align-items: center;
+  padding: 0.55rem 0.55rem;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__glyph {
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 1.15rem;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__entity-label {
+  margin: 0;
+  color: rgba(0, 210, 255, 0.78);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__id {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.08rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(0, 210, 255, 0.78);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  cursor: pointer;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__summary {
+  color: rgba(190, 215, 230, 0.9);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__evidence {
+  gap: 0.35rem;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__evidence li {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr);
+  gap: 0.45rem;
+  padding: 0.45rem 0.45rem 0.45rem 0.5rem;
+  clip-path: polygon(
+    0 0.28rem,
+    0.28rem 0,
+    calc(100% - 0.28rem) 0,
+    100% 0.28rem,
+    100% calc(100% - 0.28rem),
+    calc(100% - 0.28rem) 100%,
+    0.28rem 100%,
+    0 calc(100% - 0.28rem)
+  );
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  background:
+    linear-gradient(90deg, rgba(0, 180, 255, 0.12), transparent 40%),
+    rgba(0, 14, 22, 0.72);
+  box-shadow: 0 0 0.85rem rgba(0, 170, 255, 0.12);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__evidence-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
+  border-radius: 0.28rem;
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(180, 240, 255, 0.4), transparent 60%),
+    rgba(0, 28, 40, 0.95);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__tags-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.35rem;
+  margin-top: auto;
+  border-width: 1.5px;
+  border-color: rgba(0, 230, 255, 0.55);
+  box-shadow: 0 0 1rem rgba(0, 210, 255, 0.18);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy {
+  margin: 0;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(140, 185, 210, 0.9);
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy--critical {
+  color: #ff7a7a;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy--attention {
+  color: #ffb45a;
+}
+
+.brain-galaxy-stage--mockup .galaxy-inspector__autonomy--info {
+  color: #7ad8ff;
+}

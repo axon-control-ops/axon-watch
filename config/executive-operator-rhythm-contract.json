@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "description": "Executive operator rhythm contract aligned with axon-local executive_operator_workflow.py labels.",
+  "required_keys": ["notice", "advise", "decide", "execute", "verify", "report"]
+}

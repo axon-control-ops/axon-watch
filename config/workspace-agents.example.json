@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "defaults": {
+    "role": "lead",
+    "name_template": "{display_name} Lead",
+    "company_name_template": "{display_name}",
+    "staffing_template": [
+      { "role": "lead", "schedule": "on_demand" },
+      { "role": "watcher", "schedule": "always_on" },
+      { "role": "frontend", "schedule": "continuous" },
+      { "role": "backend", "schedule": "continuous" },
+      { "role": "integrations", "schedule": "continuous" }
+    ]
+  },
+  "companies": {
+    "workspace_axon_watch": {
+      "company_name": "Axon-X",
+      "employees": [
+        {
+          "name": "Axon-X Lead",
+          "role": "lead",
+          "owns": "priorities, handoffs, and product direction",
+          "schedule": "on_demand",
+          "primary": true
+        },
+        {
+          "name": "Night Watch",
+          "role": "watcher",
+          "owns": "signals, connectors, and runtime health",
+          "schedule": "always_on"
+        },
+        {
+          "name": "Shell Craft",
+          "role": "frontend",
+          "owns": "console UI/UX, dock, and shell polish",
+          "schedule": "continuous"
+        },
+        {
+          "name": "Control Plane",
+          "role": "backend",
+          "owns": "APIs, runs, approvals, and persistence",
+          "schedule": "continuous"
+        },
+        {
+          "name": "Bridge",
+          "role": "integrations",
+          "owns": "connectors, watch service, and cross-repo wiring",
+          "schedule": "continuous"
+        }
+      ]
+    }
+  },
+  "agents": {
+    "workspace_axon_local": {
+      "agent_name": "Axon Local Lead",
+      "role": "lead",
+      "owns": "legacy axon-local reference and donor patterns"
+    }
+  }
+}

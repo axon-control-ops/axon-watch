@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "assessed_on": "2026-07-07",
+  "assessment_scope": "Axon-X v1 parity (Phases A–D, TEST-0–TEST-10) plus Phase G gates TEST-18–TEST-26 on axon-watch/dev",
+  "decision": "bounded_cutover_approved",
+  "full_axon_local_retirement": false,
+  "summary": {
+    "total_behaviors": 19,
+    "verified_v1": 19,
+    "partially_verified": 0,
+    "verified_full_parity": 0
+  },
+  "required_gates_passed": [
+    "TEST-0",
+    "TEST-1",
+    "TEST-2",
+    "TEST-3",
+    "TEST-4",
+    "TEST-5",
+    "TEST-6",
+    "TEST-7",
+    "TEST-8",
+    "TEST-9",
+    "TEST-10",
+    "TEST-18",
+    "TEST-19",
+    "TEST-20",
+    "TEST-25",
+    "TEST-26"
+  ],
+  "behaviors": [
+    {
+      "id": "run_stop_resume",
+      "status": "verified",
+      "evidence_gates": ["P-A1"],
+      "evidence": [
+        "tests/test_parity_a1_run_stop_resume.py cross-surface stop/resume consistency",
+        "tests/test_control_plane_runs.py operator_stop/operator_resume receipts",
+        "operator-status-radar-view.test.ts paused/executing mission projections"
+      ],
+      "gap": "Browser click E2E deferred to nightly shell-boot harness (acceptable v1 degradation)."
+    },
+    {
+      "id": "approval_boundaries",
+      "status": "verified",
+      "evidence_gates": ["P-A2"],
+      "evidence": [
+        "tests/test_parity_a2_approval_boundaries.py cross-surface approval boundary",
+        "tests/test_control_plane_runs.py approve/reject/resume guards",
+        "orchestrate_command_run blocks non-executing phases",
+        "operator-status-radar-view.test.ts awaiting approval projections"
+      ],
+      "gap": "Browser click E2E deferred; not every legacy axon-local guarded action type."
+    },
+    {
+      "id": "review_ready_state",
+      "status": "verified",
+      "evidence_gates": ["P-A3"],
+      "evidence": [
+        "tests/test_parity_a3_review_ready_state.py cross-surface review_ready",
+        "tests/test_control_plane_runs.py review_ready/resume/complete transitions",
+        "execute_resume_from_review command path"
+      ],
+      "gap": "No apply/discard UI parity with axon-local (acceptable v1 degradation)."
+    },
+    {
+      "id": "workspace_handoffs",
+      "status": "verified",
+      "evidence_gates": ["TEST-2", "P-D4"],
+      "evidence": [
+        "tests/test_test2_workspace_handoff_acceptance.py",
+        "tests/test_parity_d4_multi_project.py watch→local handoff proof",
+        "docs/WORKSPACE_HANDOFF.md"
+      ],
+      "gap": null
+    },
+    {
+      "id": "real_project_workspace_connection",
+      "status": "verified",
+      "evidence_gates": ["TEST-1", "P-D4"],
+      "evidence": [
+        "tests/test_test1_workspace_project_connection_acceptance.py",
+        "tests/test_parity_d4_multi_project.py bindings + git status proof",
+        "config/multi-project-bindings-contract.json",
+        "live git status in workspace_axon_local and workspace_axon_watch"
+      ],
+      "gap": null
+    },
+    {
+      "id": "operator_vs_ide_mode_semantics",
+      "status": "verified",
+      "evidence_gates": ["TEST-0"],
+      "evidence": [
+        "tests/test_test0_workspace_smoke_acceptance.py",
+        "docs/OPERATOR_MISSION_CONTROL_V1.md",
+        "ADR-007 operator workbench demotion"
+      ],
+      "gap": "Mission control feed is receipt-depth only (acceptable v1 degradation)."
+    },
+    {
+      "id": "dock_behavior",
+      "status": "verified",
+      "evidence_gates": ["P-D6"],
+      "evidence": [
+        "config/dock-behavior-contract.json + check_dock_behavior_contract.py",
+        "apps/console-web/src/lib/agent-dock-behavior.test.ts collapse + layout prefs",
+        "RightDock operator conversation stack + AgentDock IDE resize/collapse",
+        "dock-seam-layout.ts + agent-dock-width.ts persisted behavior"
+      ],
+      "gap": "Reduced visual richness vs axon-local thread deck; v1 contract covers collapse, layout mode, and seam ordering."
+    },
+    {
+      "id": "runtime_summary_behavior",
+      "status": "verified",
+      "evidence_gates": ["P-B2", "P-B3"],
+      "evidence": [
+        "scripts/verify/fixtures/runtime-summary-latency.ci.json + watch-summary-latency.ci.json under p95 gates",
+        "config/runtime-summary-boot-critical-fields.json allowlist",
+        "tests/test_parity_b3_boot_critical_fields.py assembler + /api/runtime/summary",
+        "tests/test_control_plane_runtime_summary.py contract regression"
+      ],
+      "gap": "Fewer enrichment fields than axon-local runtime truth; CI uses fixture latency samples not live stack."
+    },
+    {
+      "id": "initial_shell_boot_expectations",
+      "status": "verified",
+      "evidence_gates": ["P-B1"],
+      "evidence": [
+        "scripts/verify/fixtures/shell-boot-report.dev.json wired into default npm run verify",
+        "tests/test_parity_b1_shell_boot_verify_wiring.py",
+        "scripts/dev/measure_shell_boot.py bootstrap-critical-path report shape"
+      ],
+      "gap": "CI uses bootstrap-critical-path fixture; Playwright browser paint measurement deferred to nightly."
+    },
+    {
+      "id": "signal_inbox_consistency",
+      "status": "verified",
+      "evidence_gates": ["P-A4"],
+      "evidence": [
+        "tests/test_parity_a4_signal_inbox_consistency.py inbox/summary/briefing agreement",
+        "tests/test_signal_consistency.py ranked top signal regression"
+      ],
+      "gap": "Mocked watch inbox in gate; bootstrap/dev signal set only."
+    },
+    {
+      "id": "desktop_and_browser_startup",
+      "status": "verified",
+      "evidence_gates": ["TEST-8", "P-D6"],
+      "evidence": [
+        "scripts/dev/up.sh browser startup documented and verified",
+        "docs/BROWSER_ONLY_STARTUP_CONTRACT.md explicit desktop deferral",
+        "config/browser-startup-contract.json + check_browser_startup_contract.py",
+        "BootWakeOverlay session key axon-x-boot-complete",
+        "/api/readiness mode + public_base_url (P-D3)"
+      ],
+      "gap": "Packaged desktop startup explicitly deferred; browser path verified."
+    },
+    {
+      "id": "kairo_watch_rules",
+      "status": "verified",
+      "evidence_gates": ["TEST-6"],
+      "evidence": [
+        "tests/test_test6_kairo_watch_rules_acceptance.py",
+        "services/axon-watch/app/signals/watch_rule.py"
+      ],
+      "gap": null
+    },
+    {
+      "id": "spoken_high_value_alerts",
+      "status": "verified",
+      "evidence_gates": ["TEST-7", "P-C4", "P-D5"],
+      "evidence": [
+        "spoken_alert_policy.py eligibility on /api/briefing",
+        "config/spoken-alert-contract.json + check_spoken_alert_policy.py",
+        "spoken-alert-delivery.ts voice-deck hook with browser TTS fallback",
+        "apps/console-web/src/features/voice-deck/ registerVoiceDeckOnBoot in App.vue",
+        "OperatorPresenceSettingsPanel spoken_alerts_enabled toggle",
+        "tests/test_parity_c4_spoken_high_value_alerts.py policy + settings proof",
+        "tests/test_parity_d5_voice_deck.py + voice-deck.test.ts boot handler proof"
+      ],
+      "gap": null
+    },
+    {
+      "id": "delivery_receipts_operator_attention",
+      "status": "verified",
+      "evidence_gates": ["TEST-5", "P-D2"],
+      "evidence": [
+        "tests/test_test5_delivery_receipts_acceptance.py",
+        "inbox delivery_state + Attention DELIVERED badge",
+        "SQLite-backed watch delivery receipts (P-D1)",
+        "delivery/adapters registry with webhook/desktop/mobile_push/slack + retry"
+      ],
+      "gap": "File-based desktop ledger and HTTP webhook adapters; native OS push/Slack app install deferred."
+    },
+    {
+      "id": "executive_operator_rhythm",
+      "status": "verified",
+      "evidence_gates": ["P-C2"],
+      "evidence": [
+        "executive_rhythm block on /api/briefing with Notice/Advise/Decide/Execute/Verify/Report",
+        "config/executive-operator-rhythm-contract.json + check_executive_operator_rhythm.py",
+        "tests/test_parity_c2_executive_operator_rhythm.py canonical-state derivation proof",
+        "BriefingPanel + mission-control Decide projection"
+      ],
+      "gap": "Template-based rhythm strings; not full executive_operator_workflow plan generation."
+    },
+    {
+      "id": "kairo_persona_operator_copy",
+      "status": "verified",
+      "evidence_gates": ["P-C1"],
+      "evidence": [
+        "GET/PUT /api/operator-presence/settings with SQLite persistence",
+        "tests/test_parity_c1_persona_settings.py tone-without-truth-drift proof",
+        "console-web OperatorPresenceSettingsPanel + localStorage sync",
+        "kairo_persona.py neutral copy when operator_persona_enabled=false"
+      ],
+      "gap": "Single persona toggle only; full JARVIS identity options deferred."
+    },
+    {
+      "id": "mobile_operator_cockpit_compactness",
+      "status": "verified",
+      "evidence_gates": ["TEST-7", "P-C3"],
+      "evidence": [
+        "viewport_compact on /api/briefing",
+        "console-shell--mobile-compact class",
+        "apps/console-web/src/lib/viewport-compact.ts breakpoint + refetch helpers",
+        "shell store resize listener + shouldRequestViewportCompactBriefing refetch",
+        "tests/test_parity_c3_mobile_compact_viewport.py"
+      ],
+      "gap": "Foreground-only honest model; native mobile shell deferred."
+    },
+    {
+      "id": "watch_connectors_runtime_awareness",
+      "status": "verified",
+      "evidence_gates": ["TEST-3"],
+      "evidence": [
+        "tests/test_test3_watch_connectors_acceptance.py",
+        "runtime summary connectors block"
+      ],
+      "gap": null
+    },
+    {
+      "id": "watch_command_event_status_depth",
+      "status": "verified",
+      "evidence_gates": ["TEST-4"],
+      "evidence": [
+        "tests/test_test4_watch_command_event_acceptance.py",
+        "reprobe_connector + events log + summary observation",
+        "services/axon-watch/app/persistence/watch_store_sqlite.py (P-D1)"
+      ],
+      "gap": null
+    }
+  ],
+  "blockers_for_full_retirement": [
+    "WhatsApp Web monitor unmigrated (G4.2 deferred)",
+    "Legacy settings paths without Axon-X owner (G5.1 partial rows)",
+    "Tunnel start/stop dependency on axon-local script (G4.3 partial)",
+    "Operator has not completed one-week :4173-only dry-run (G6.2)",
+    "Operator has not signed PHASE_G5_INTENTIONAL_DISCARDS.md acknowledgments (G5.4)"
+  ],
+  "production_operator": {
+    "status": "axon_x",
+    "declared_on": "2026-07-05",
+    "primary_url": "http://127.0.0.1:4173",
+    "fallback_url": "http://127.0.0.1:7734",
+    "evidence_gates": ["production-operator"],
+    "evidence": [
+      "config/operator-production.json",
+      "docs/PRODUCTION_OPERATOR_SURFACE.md",
+      "scripts/verify/production-operator-smoke.sh"
+    ]
+  },
+  "approved_primary_surfaces": [
+    "Production operator console at http://127.0.0.1:4173 (Axon-X console-web)",
+    "axon-watch control-plane and axon-watch service thin slices",
+    "Cutover verification and planning on axon-watch/docs/planning/"
+  ],
+  "axon_local_remains_required_for": [
+    "Explicit fallback when Axon-X capability regresses (see docs/PHASE_G6_RETIREMENT_READINESS.md rollback criteria)",
+    "WhatsApp Web monitor until G4.2 ships or operator signs discard",
+    "Tunnel start/stop when AXON_LOCAL_ROOT script path is required",
+    "Legacy settings/storage paths not yet owned by Axon-X"
+  ]
+}

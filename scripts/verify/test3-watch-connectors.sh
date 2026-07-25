@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "${repo_root}"
+
+source "${repo_root}/scripts/dev/lib/common.sh"
+load_env
+
+echo "TEST-3: watch connectors gate"
+echo
+
+if [[ -f "$(service_pid_file "axon-watch")" ]]; then
+  echo "[0/5] Restart watch + control-plane to load connector routes"
+  stop_service "control-plane"
+  stop_service "axon-watch"
+  start_service \
+    "axon-watch" \
+    "${repo_root}/services/axon-watch" \
+    python3 -m uvicorn app.main:app --host 127.0.0.1 --port "${AXON_WATCH_WATCH_SERVICE_PORT}"
+  wait_for_http \
+    "axon-watch" \
+    "$(service_ready_url "axon-watch")" \
+    30 \
+    "$(service_pid_file "axon-watch")"
+  start_service \
+    "control-plane" \
+    "${repo_root}/services/control-plane" \
+    python3 -m uvicorn app.main:app --host 127.0.0.1 --port "${AXON_WATCH_CONTROL_PLANE_PORT}"
+  wait_for_http \
+    "control-plane" \
+    "$(service_ready_url "control-plane")" \
+    30 \
+    "$(service_pid_file "control-plane")"
+  echo
+fi
+
+echo "[1/5] Dev stack health"
+./scripts/dev/check-health.sh
+echo
+
+echo "[2/5] Watch connector unit tests"
+python3 -m unittest tests.test_watch_connectors tests.test_control_plane_connectors -v
+PYTHONPATH="${repo_root}/services/axon-watch" python3 -m unittest \
+  tests.test_connector_probe_cache \
+  tests.test_connector_signal \
+  tests.test_connector_inbox_integration \
+  tests.test_actionable_inbox_signals \
+  tests.test_watch_inbox_assembly \
+  -v
+python3 -m unittest \
+  tests.test_parity_a4_signal_inbox_consistency \
+  tests.test_signal_consistency \
+  -v
+echo
+
+echo "[3/5] Live watch connector acceptance"
+python3 -m unittest tests.test_test3_watch_connectors_acceptance -v
+echo
+
+echo "[4/5] Watch integration regression"
+python3 -m unittest tests.test_control_plane_watch_integration -v
+echo
+
+echo "[5/5] Connector parity bundle (scoped — not full verify)"
+npm run verify:connector-parity
+echo
+
+echo "TEST-3 PASS"

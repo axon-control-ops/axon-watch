@@ -1,0 +1,376 @@
+.kairo-voice-deck__ring--mid {
+  inset: 0.45rem;
+  border-color: rgba(72, 196, 255, 0.22);
+}
+
+.kairo-voice-deck__ring--inner {
+  inset: 0.9rem;
+  border-color: rgba(72, 196, 255, 0.14);
+}
+
+.kairo-voice-deck--speaking .kairo-voice-deck__ring--outer,
+.kairo-voice-deck--alerting .kairo-voice-deck__ring--outer {
+  animation: kairo-voice-pulse 1.4s ease-in-out infinite;
+}
+
+.kairo-voice-deck__core {
+  position: absolute;
+  inset: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(72, 196, 255, 0.18), rgba(4, 10, 16, 0.95));
+  box-shadow: 0 0 1rem rgba(72, 196, 255, 0.25);
+}
+
+.kairo-voice-deck__core-label {
+  color: var(--text-hud);
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+}
+
+.kairo-voice-deck__core-status {
+  margin-top: 0.15rem;
+  color: var(--state-success);
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+}
+
+.kairo-voice-deck--alerting .kairo-voice-deck__core-status {
+  color: var(--state-warning);
+}
+
+.kairo-voice-deck__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kairo-voice-deck__line,
+.kairo-voice-deck__notice,
+.kairo-voice-deck__advise,
+.kairo-voice-deck__hint {
+  margin: 0;
+}
+
+.kairo-voice-deck__line {
+  color: var(--text-primary);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.kairo-voice-deck__notice {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.kairo-voice-deck__advise {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+}
+
+.kairo-voice-deck__hint {
+  color: var(--text-muted);
+  font-size: 0.58rem;
+}
+
+.kairo-voice-deck__dev-diagnostics {
+  margin-top: 0.55rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid rgba(72, 196, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(4, 16, 28, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.kairo-voice-deck__dev-line {
+  margin: 0;
+  flex: 0 0 auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.56rem;
+  line-height: 1.45;
+  color: rgba(200, 236, 255, 0.82);
+}
+
+.kairo-voice-deck__dev-log {
+  margin: 0;
+  padding-left: 1rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.54rem;
+  line-height: 1.4;
+  color: rgba(180, 220, 240, 0.78);
+}
+
+.kairo-voice-deck__draft {
+  display: flex;
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+}
+
+.kairo-voice-deck__draft-input {
+  width: 100%;
+  min-height: 2.4rem;
+  max-height: 6rem;
+  resize: vertical;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgba(72, 196, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(2, 10, 18, 0.78);
+  color: rgba(210, 238, 255, 0.92);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.56rem;
+  line-height: 1.35;
+}
+
+.kairo-voice-deck__draft-input:focus {
+  outline: 1px solid rgba(122, 235, 255, 0.45);
+  outline-offset: 0;
+}
+
+.kairo-voice-deck__draft-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.kairo-voice-deck__actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.kairo-voice-deck__action {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(120, 200, 255, 0.18);
+  border-radius: 0.35rem;
+  background: rgba(6, 12, 20, 0.72);
+  color: var(--text-secondary);
+  font-size: 0.64rem;
+  cursor: pointer;
+}
+
+.kairo-voice-deck__action--primary {
+  border-color: rgba(72, 196, 255, 0.45);
+  color: var(--text-hud);
+}
+
+.kairo-voice-deck__action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kairo-voice-deck--galaxy-compact {
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+}
+
+.kairo-voice-deck--galaxy-compact .kairo-voice-deck__orb {
+  width: 3.6rem;
+  height: 3.6rem;
+}
+
+.kairo-voice-deck--galaxy-compact .kairo-voice-deck__core {
+  inset: 0.85rem;
+}
+
+.kairo-voice-deck--galaxy-compact .kairo-voice-deck__actions {
+  justify-content: stretch;
+}
+
+.briefing-panel--galaxy-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.15rem 0;
+}
+
+.briefing-panel__galaxy-compact-copy {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.briefing-panel__galaxy-compact-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(0, 242, 255, 0.88);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.console-shell--brain-galaxy .dock-hero-panel--briefing .briefing-panel--galaxy-compact {
+  min-height: 0;
+}
+
+/* Galaxy mode (operator only): inspector lives inside the stage — never hide IDE AgentDock.
+   Full-bleed canvas: left shell rail hidden; mockup workspaces live inside the stage. */
+.console-shell--mockup.console-shell--operator.console-shell--brain-galaxy {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-left-sidebar {
+  display: none;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-right-dock {
+  display: none;
+}
+
+.console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-center-workbench {
+  grid-column: leftSidebar / rightDock;
+}
+
+@keyframes kairo-voice-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(72, 196, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 0.65rem rgba(72, 196, 255, 0.35);
+  }
+}
+
+.operator-fleet-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(0, 242, 255, 0.16);
+  border-radius: 0.45rem;
+  background: rgba(0, 12, 20, 0.55);
+}
+
+.operator-fleet-grid.hud-holo-shell {
+  border-color: transparent;
+  background: transparent;
+}
+
+.operator-fleet-grid__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.operator-fleet-grid__eyebrow {
+  margin: 0;
+  color: var(--text-hud);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.operator-fleet-grid__title {
+  margin: 0.15rem 0 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.operator-fleet-grid__headline {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.operator-fleet-grid__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operator-fleet-grid__item {
+  border: 1px solid rgba(120, 200, 255, 0.12);
+  border-radius: 0.4rem;
+  background: rgba(6, 12, 20, 0.72);
+}
+
+.operator-fleet-grid__item--attention {
+  border-color: rgba(255, 196, 72, 0.35);
+}
+
+.operator-fleet-grid__item--critical {
+  border-color: rgba(255, 96, 96, 0.45);
+}
+
+.operator-fleet-grid__item--selected {
+  box-shadow: 0 0 0 1px rgba(72, 196, 255, 0.45);
+}
+
+.operator-fleet-grid__button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  min-height: 4.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.operator-fleet-grid__label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.operator-fleet-grid__badge {
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(72, 196, 255, 0.12);
+  color: var(--text-hud);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.operator-fleet-grid__summary {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.operator-fleet-grid__detail {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-family: var(--font-mono);
+}
+
+.operator-fleet-grid__error {
+  margin: 0;
+  color: var(--state-critical);
+  font-size: 0.72rem;
+}
+
+.operator-center-view-switch {
+  display: flex;
+  gap: 0.35rem;
+  align-self: flex-end;
+}
+

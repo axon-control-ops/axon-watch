@@ -7,7 +7,11 @@ export type EditorDocumentLanguage =
   | 'typescript'
   | 'javascript'
   | 'python'
-  | 'shell';
+  | 'shell'
+  | 'html'
+  | 'css'
+  | 'csv'
+  | 'image';
 
 export interface WorkspaceDocumentDescriptor {
   id: string;
@@ -15,10 +19,14 @@ export interface WorkspaceDocumentDescriptor {
   language: EditorDocumentLanguage;
   value: string;
   description: string;
-  source: 'dto' | 'file';
+  source: 'dto' | 'file' | 'draft';
   filePath?: string;
   readOnly?: boolean;
   dirty?: boolean;
+  /** Durable plan id when this draft is a View Plan artifact. */
+  planId?: string;
+  /** Direct image/PDF preview URL (chat attachment or raw file) for canvas tabs. */
+  previewUrl?: string;
 }
 
 interface BuildWorkspaceDocumentsInput {

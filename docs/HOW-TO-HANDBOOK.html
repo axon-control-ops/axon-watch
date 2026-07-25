@@ -1,0 +1,2685 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Axon-X How-To Handbook</title>
+  <link rel="stylesheet" href="file:///home/edp/axon-nvme/repos/axon-watch/docs/how-to-handbook-print.css" />
+</head>
+<body>
+  <main class="page">
+    
+<section class="cover-page">
+  <div class="cover-inner">
+    <div class="cover-brand">
+      <div class="cover-logo">AX</div>
+      <div class="cover-brand-text">Axon-X · axon-watch</div>
+    </div>
+    <div class="cover-hero">
+      <h1 class="cover-title">How-To <em>Handbook</em></h1>
+      <p class="cover-subtitle">Your field guide for bootstrapping, verifying, troubleshooting, and shipping thin slices in the next-generation operator console.</p>
+      <div class="cover-pills">
+        <span class="cover-pill">Shell <code>:4173</code></span>
+        <span class="cover-pill">Control plane <code>:8787</code></span>
+        <span class="cover-pill">Watch <code>:8788</code></span>
+      </div>
+    </div>
+    <div class="cover-footer">
+      <div class="cover-meta">
+        <strong>Last verified</strong> · 2026-07-22 — Gate 5 closed (DAG, conflict serialization, fan-out, replans, synthesis, sibling stream preservation); Gate 4 closed; Mission Control task board. Scheduler still **off** by default. After every push run `./scripts/ops/watch-fast-gate.sh`.<br/>
+        Generated 22 Jul 2026
+      </div>
+      <div class="cover-chips">
+        <span class="cover-chip">console-web</span>
+        <span class="cover-chip">control-plane</span>
+        <span class="cover-chip">shared-types</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+    
+<nav class="toc" id="table-of-contents">
+  <div class="toc-header">
+    <div class="toc-kicker">Field guide</div>
+    <h2>16 chapters</h2>
+  </div>
+  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
+</nav>
+
+    
+<section class="intro-panel">
+  <h2>Read this first</h2>
+  <p>Practical guide for operators, reviewers, and developers working in the <strong>axon-watch</strong> repo — the greenfield home of <strong>Axon-X</strong>.</p>
+  <ul>
+    <li>Plans live in <code>axon-local/Plans/Axon-Watch/</code> — implement here, don't redefine semantics there.</li>
+    <li>Start with <code>./scripts/dev/up.sh</code>, verify with <code>npm run verify</code>.</li>
+    <li>Treat bootstrap-real and feature-real as different things — see parity ledger before assuming parity.</li>
+  </ul>
+</section>
+
+    <article class="doc-body">
+      <section class="chapter" id="chapter-table-of-contents"><div class="chapter-header"><span class="chapter-num">01</span><h2 id="table-of-contents">Table of Contents</h2></div><div class="chapter-body">
+<ol>
+<li><a href="#quick-start">Quick Start</a> — first 5 minutes</li>
+<li><a href="#handbook-map">Handbook map</a> — who reads what</li>
+<li><a href="#operator-manual">Operator manual</a> — daily rituals
+3.5. <a href="#runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a> — Pro vs API key, native vs Cursor
+3.6. <a href="how-to/ci-merge-and-worker-agents.md">CI, merge, and worker agents</a> — Fast Gate, <code>dev</code>, company roster
+3.65. <a href="how-to/autonomy-gates-and-service-identity.md">Autonomy gates &amp; service identity</a> — Gate 4 tasks, scheduler off, watch token + mTLS
+3.66. <a href="how-to/recent-operator-features.md">Recent operator features</a> — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
+3.7. <a href="#vaxon-desktop">VAXON Desktop</a> — packaged Linux install</li>
+<li><a href="#teaching-axon-x-to-someone-else">Teaching Axon-X</a> — explain it to others</li>
+<li><a href="#codebase-in-plain-english">Codebase in plain English</a> — what happens under the hood</li>
+<li><a href="#source-index">Source index</a> — where truth lives</li>
+<li><a href="#snippet-cookbook">Snippet cookbook</a> — copy-paste commands</li>
+<li><a href="#terminology-and-abbreviations">Terminology</a></li>
+<li><a href="#what-axon-x-is">Architecture &amp; repo layout</a> — structure and ownership</li>
+<li><a href="#detailed-setup-first-install">Detailed setup</a> — first install</li>
+<li><a href="#what-the-current-app-does-on-boot">Boot flow</a> — what loads on refresh</li>
+<li><a href="#locked-shell-layout">Shell layout</a> — regions and modes</li>
+<li><a href="#the-most-important-files-right-now">Key files</a> — start reading here</li>
+<li><a href="#verification-commands">Verification</a> — gates and PASS/PENDING/FAIL</li>
+<li><a href="#common-working-patterns">Working patterns</a> — how to add code safely</li>
+<li><a href="#debugging-playbook">Debugging playbook</a> — step-by-step fixes</li>
+<li><a href="#tips-hints-and-tricks">Tips, hints &amp; tricks</a></li>
+<li><a href="#upgrading-and-updating">Upgrading &amp; updating</a> — pulls, deps, planning sync</li>
+<li><a href="#what-a-good-next-slice-looks-like">Next slices</a> — what to build next</li>
+</ol>
+<hr>
+</div></section><section class="chapter" id="chapter-handbook-map"><div class="chapter-header"><span class="chapter-num">02</span><h2 id="handbook-map">Handbook map</h2></div><div class="chapter-body">
+<table>
+<thead>
+<tr>
+<th>Audience</th>
+<th>Start here</th>
+<th>Then read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Operator (daily use)</strong></td>
+<td><a href="#quick-start">Quick Start</a></td>
+<td><a href="#runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a>, <a href="#vaxon-desktop">VAXON Desktop</a>, <a href="#operator-manual">Operator manual</a></td>
+</tr>
+<tr>
+<td><strong>Teacher / reviewer</strong></td>
+<td><a href="#teaching-axon-x-to-someone-else">Teaching Axon-X</a></td>
+<td><a href="#verification-commands">Verification</a>, <code>docs/FINAL_PARITY_VERIFICATION.md</code></td>
+</tr>
+<tr>
+<td><strong>Developer</strong></td>
+<td><a href="#codebase-in-plain-english">Codebase in plain English</a></td>
+<td><a href="#source-index">Source index</a>, <a href="#common-working-patterns">Common working patterns</a></td>
+</tr>
+<tr>
+<td><strong>Integrator / merge</strong></td>
+<td><a href="how-to/ci-merge-and-worker-agents.md">CI, merge, and worker agents</a></td>
+<td><a href="CI_GATES.md"><code>docs/CI_GATES.md</code></a>, <code>./scripts/ops/watch-fast-gate.sh</code></td>
+</tr>
+<tr>
+<td><strong>Autonomy / remote host</strong></td>
+<td><a href="how-to/autonomy-gates-and-service-identity.md">Autonomy gates &amp; service identity</a></td>
+<td><a href="how-to/recent-operator-features.md">Recent operator features</a></td>
+</tr>
+<tr>
+<td><strong>Debugger</strong></td>
+<td><a href="#debugging-playbook">Debugging playbook</a></td>
+<td><a href="#troubleshooting">Troubleshooting</a></td>
+</tr>
+<tr>
+<td><strong>Upgrader</strong></td>
+<td><a href="#upgrading-and-updating">Upgrading &amp; updating</a></td>
+<td><code>./scripts/ops/sync_planning_mirror_to_axon_local.py</code></td>
+</tr>
+</tbody>
+</table>
+<p>Shorter onboarding: <a href="AXON-X-STARTER-GUIDE.md"><code>docs/AXON-X-STARTER-GUIDE.md</code></a></p>
+<hr>
+</div></section><section class="chapter" id="chapter-quick-start"><div class="chapter-header"><span class="chapter-num">03</span><h2 id="quick-start">Quick Start</h2></div><div class="chapter-body">
+<p>This section is the living operator onboarding guide.</p>
+<h3>Start the stack</h3>
+<p><strong>Always-on host (this machine — preferred):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>axonhealth</code></td>
+<td>Probe console + control-plane + watch (+ key APIs)</td>
+</tr>
+<tr>
+<td><code>axonrestart</code></td>
+<td>Soft restart of systemd user units, then health check</td>
+</tr>
+<tr>
+<td><code>axonrevive</code></td>
+<td><strong>Use when the shell is empty</strong> (Runtime unavailable / No workspace). Force-kills a wedged control-plane, restarts all three units, health-checks</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-bash">axonhealth          # is everything up?
+axonrevive          # empty shell / hung API — fix it
+# then hard-refresh http://127.0.0.1:4173
+</code></pre>
+<p>These are on your PATH (<code>~/.local/bin</code> → <code>bin/</code> in this repo). See <a href="#snippet-cookbook">Snippet cookbook</a>.</p>
+<p><strong>Dev bootstrap (alternate, not used when systemd owns the ports):</strong></p>
+<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+./scripts/dev/up.sh
+./scripts/dev/check-health.sh
+</code></pre>
+<p>Open <strong>http://127.0.0.1:4173</strong> and hard-refresh after upgrades (<code>Ctrl+Shift+R</code>).</p>
+<blockquote>
+<p><strong>Important:</strong> <code>./scripts/dev/down.sh</code> does <strong>not</strong> stop systemd always-on units. On this host use <code>axonrestart</code> / <code>axonrevive</code>.</p>
+</blockquote>
+<h3>Pick a real workspace</h3>
+<p>The left sidebar should show <strong>axon-watch</strong> and <strong>axon-local</strong> (bound project
+roots). Start with <strong>axon-watch</strong> for Axon-X development, or <strong>axon-local</strong> when
+you need the legacy repo context.</p>
+<p>Demo names like <code>workspace_nlp</code> are mock catalog entries — they are hidden when
+real project bindings exist.</p>
+<h3>Two modes — different jobs</h3>
+<p>Axon-X has two layout modes (top-right toggle). They are <strong>not</strong> two different apps;
+they are two views over the same workspace, runs, and APIs.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>Operator mode</strong></th>
+<th><strong>IDE mode</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Run oversight, signals, approvals, command execution</td>
+<td>Files, editor, terminal, agent dock</td>
+</tr>
+<tr>
+<td><strong>Center</strong></td>
+<td>Mission control — run phase, live feed, resume/complete</td>
+<td>Monaco editor + bottom terminal dock</td>
+</tr>
+<tr>
+<td><strong>Left sidebar</strong></td>
+<td>Workspaces + <strong>Attention</strong> (signals, inbox, receipts)</td>
+<td>Explorer / search / git activity bar</td>
+</tr>
+<tr>
+<td><strong>Right dock</strong></td>
+<td>Conversation transcript + Command/KAIRO hero</td>
+<td>Resizable agent dock (conversation + composer)</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>“What is running? What needs me? Run this command.”</td>
+<td>“Edit files, use terminal, review code.”</td>
+</tr>
+<tr>
+<td><strong>Input style</strong></td>
+<td><strong>Exact commands</strong> in the Command seam (see footer <strong>Commands</strong>)</td>
+<td>Same command seam in agent dock + full editor/terminal</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Operator mode</strong> is the default production surface for day-to-day oversight.</p>
+<p><strong>IDE mode</strong> is for hands-on work in the bound repo (real <code>project_root</code> on disk).</p>
+<p>Switch modes anytime — workspace selection, runs, and conversation thread persist.</p>
+<h3>What you can do in Axon-X today (v1)</h3>
+<p>Real and verified today:</p>
+<ul>
+<li>Select <strong>axon-watch</strong> or <strong>axon-local</strong> workspace</li>
+<li>View <strong>runtime summary</strong>, <strong>inbox signals</strong>, and <strong>KAIRO briefing</strong> from live APIs</li>
+<li>Track <strong>run phase</strong> in mission control (stop/resume/review-ready flows)</li>
+<li>Send <strong>supported commands</strong> (not free-form chat) via the Command seam</li>
+<li>Run <strong>git status</strong> against the bound repo root</li>
+<li><strong>IDE mode</strong>: open workspace files in Monaco, PTY terminal in repo root</li>
+<li><strong>Attention sidebar</strong>: connector/signal/delivery visibility</li>
+</ul>
+<p>Still thin or deferred (use axon-local <code>:7734</code> fallback if needed):</p>
+<ul>
+<li>General conversational chat (“Hi”, “explain this repo”)</li>
+<li>Full agent tool loop parity with classic Axon</li>
+<li>Child-project connectors and legacy integration surfaces</li>
+<li>Native tray notifications beyond hide-on-close packaging</li>
+</ul>
+<h3>Supported commands (Operator mode)</h3>
+<p>The conversation/command seam accepts <strong>exact commands</strong> only. Natural language
+will return “unsupported command”.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>health</code> / <code>api/health</code></td>
+<td>Probe control-plane health</td>
+</tr>
+<tr>
+<td><code>ls</code> / <code>list files</code></td>
+<td>List files in the workspace</td>
+</tr>
+<tr>
+<td><code>read README.md</code> / <code>cat notes.txt</code></td>
+<td>Read a workspace file</td>
+</tr>
+<tr>
+<td><code>git status</code></td>
+<td>Git status in the bound project root</td>
+</tr>
+<tr>
+<td><code>resume from review</code></td>
+<td>Resume the primary <code>review_ready</code> run</td>
+</tr>
+</tbody>
+</table>
+<p>In the UI: footer <strong>Commands</strong> button (Operator mode) opens the list and can prefill
+the Command seam. Source of truth:
+<code>apps/console-web/src/lib/operator-supported-commands.ts</code> (keep in sync with
+<code>services/control-plane/app/chat/command_executor.py</code>).</p>
+<h3>Typical first session</h3>
+<ol>
+<li>Open <code>:4173</code> → wait for boot overlay → shell loads</li>
+<li>Left sidebar → select <strong>axon-watch</strong></li>
+<li>Operator mode → right dock → <strong>Command</strong> tab</li>
+<li>Type <code>git status</code> → send → read agent receipt in <strong>Conversation</strong></li>
+<li>Center mission control shows run phase if a run was created</li>
+<li>Toggle <strong>IDE</strong> → open <code>README.md</code>, use terminal in the real repo root</li>
+<li>Left <strong>Attention</strong> → inspect signals when watch reports degraded summary</li>
+</ol>
+<h3>When things look noisy</h3>
+<p>Dev SQLite may contain old smoke runs (“32 runs ready for review”). Reset if needed:</p>
+<pre><code class="language-bash">./scripts/dev/down.sh
+rm -f .local/state/control-plane.sqlite3
+./scripts/dev/up.sh
+</code></pre>
+<h3>Verify smoke</h3>
+<pre><code class="language-bash">npm run verify:production-operator
+</code></pre>
+<h3>Understanding runs, review_ready, RESUME, and COMPLETE</h3>
+<p><strong>Analogy:</strong> Axon-X is a <strong>supervised assistant</strong>, not a chat bot. When you send a
+command like <code>read README.md</code> or <code>health</code>, the system starts a <strong>run</strong> (a tracked
+job): do the work → show output in <strong>Conversation</strong> → <strong>pause</strong> at a checkpoint called
+<strong>review_ready</strong>. That pause is intentional — you look at the result before anything
+else happens.</p>
+<table>
+<thead>
+<tr>
+<th>Button / action</th>
+<th>Plain meaning</th>
+<th>When to use it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>COMPLETE RUN</strong></td>
+<td>“I’m done — this job succeeded.”</td>
+<td>One-shot commands (<code>read …</code>, <code>git status</code>, <code>health</code>) when output looks good</td>
+</tr>
+<tr>
+<td><strong>RESUME RUN</strong></td>
+<td>“I’ve reviewed it — keep this run going.”</td>
+<td>Multi-step work, or when KAIRO <strong>ADVISE</strong> says to resume a named run</td>
+</tr>
+<tr>
+<td><strong>Command → <code>resume from review</code></strong></td>
+<td>Same as RESUME for the <strong>primary</strong> paused run</td>
+<td>When buttons are unclear; acts on one run at a time</td>
+</tr>
+<tr>
+<td><strong>Left → Attention</strong></td>
+<td>Signal inbox (bootstrap noise, delivery receipts)</td>
+<td>When footer shows <strong>SIGNALS: N ACTIVE</strong> — usually informational in dev</td>
+</tr>
+</tbody>
+</table>
+<p><strong>“Phase is now review_ready. Review when ready.”</strong> — not an error. The command
+finished; Mission Control is asking you to <strong>COMPLETE</strong> (usual) or <strong>RESUME</strong> (if more
+steps expected).</p>
+<h3>“2 runs are ready for operator review” — what that means</h3>
+<p>This is a <strong>count of paused jobs</strong>, not a failure. Each command you ran (<code>health</code>,
+<code>read README.md</code>, <code>git status</code>, …) can leave its own run sitting in <strong>review_ready</strong>
+until you <strong>COMPLETE</strong> or <strong>RESUME</strong> it. <strong>2 runs</strong> = two unfinished checkpoints
+(e.g. one Health run + one Read README run).</p>
+<p><strong>What to do:</strong></p>
+<ol>
+<li><strong>Center → Mission Control</strong> — handles the <strong>primary</strong> (most recent) run via
+   <strong>RESUME RUN</strong> / <strong>COMPLETE RUN</strong>.</li>
+<li><strong>Right → KAIRO Briefing</strong> — see <strong>NOTICE</strong> (the count) and <strong>ADVISE</strong> (suggested
+   next click).</li>
+<li><strong>Clear the backlog</strong> — for each run you’re happy with, click <strong>COMPLETE RUN</strong>.
+   Repeat until the notice says “No active runs” or only one remains.</li>
+<li><strong>Dev reset</strong> (optional) — wipe stale runs from smoke tests:</li>
+</ol>
+<pre><code class="language-bash">./scripts/dev/down.sh &amp;&amp; rm -f .local/state/control-plane.sqlite3 &amp;&amp; ./scripts/dev/up.sh
+</code></pre>
+<h3>KAIRO NOTICE / ADVISE / DECIDE — where to go</h3>
+<p>KAIRO Briefing (right dock → <strong>KAIRO</strong> tab, or footer <strong>Open KAIRO Briefing</strong>) is a
+<strong>short summary</strong>, not a second app. It mirrors the same backend truth as Mission
+Control and Attention.</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+<th>Where to act</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>NOTICE</strong></td>
+<td>Headline (“2 runs are ready…”)</td>
+<td>Read only — context</td>
+</tr>
+<tr>
+<td><strong>ADVISE</strong></td>
+<td>Suggested next step (e.g. “Resume Health.”)</td>
+<td>Usually → <strong>RESUME RUN</strong> in center, or <strong>COMPLETE RUN</strong> if that job is done</td>
+</tr>
+<tr>
+<td><strong>DECIDE</strong></td>
+<td>What choice is waiting</td>
+<td>Center buttons, or Attention for signals</td>
+</tr>
+<tr>
+<td><strong>EXECUTE</strong></td>
+<td>Concrete action phrase</td>
+<td>Command tab, or the button ADVISE points to</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong> ADVISE says <strong>“Resume Health.”</strong> → you previously ran <code>health</code> and that
+run is paused → go to <strong>Mission Control</strong> → <strong>RESUME RUN</strong> (continues that run) or
+<strong>COMPLETE RUN</strong> (closes it if you only wanted a one-time health check).</p>
+<p><strong>Signals (e.g. “Bootstrap: runtime summary stale”)</strong> in <strong>Attention</strong> are often
+<strong>expected in local dev</strong> — watch/bootstrap scaffolding, not production outage. Review
+them in <strong>Left → Attention</strong>; they do not block <strong>COMPLETE RUN</strong> unless an approval
+gate is open.</p>
+<h3>Bootstrap &amp; signals — what to do</h3>
+<p><strong>Bootstrap</strong> in Axon-X means the console and services are up, but some runtime
+summary fields are still intentionally thin while watch/control-plane parity grows.
+That is normal in local dev — not the same as “the app is broken.”</p>
+<table>
+<thead>
+<tr>
+<th>What you see</th>
+<th>What it means</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Bootstrap: runtime summary stale</strong> (Attention → Signals)</td>
+<td>Watch is connected; summary assembly is bootstrap-thin</td>
+<td><strong>Ignore</strong>, tap <strong>Details</strong>, or hit <strong>CLEAR</strong> to acknowledge and hide bootstrap noise</td>
+</tr>
+<tr>
+<td><strong>OBSERVE</strong> chip on a signal</td>
+<td>KAIRO watch mode: informational only</td>
+<td><strong>No click action.</strong> Read-only label.</td>
+</tr>
+<tr>
+<td><strong>DELIVERED</strong> chip</td>
+<td>Delivery receipt was recorded</td>
+<td><strong>No click action.</strong> Read-only label.</td>
+</tr>
+<tr>
+<td><strong>SIGNALS: N ACTIVE</strong> (footer)</td>
+<td>N open inbox signals</td>
+<td>Open <strong>Attention</strong> or <strong>Open Attention</strong> from Mission Control — review, then return to Command</td>
+</tr>
+<tr>
+<td><strong>IDLE</strong> + bootstrap signal only</td>
+<td>Nothing waiting on you</td>
+<td>No run action required — optional signal review only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>When bootstrap noise is OK:</strong> local <code>./scripts/dev/up.sh</code>, watch healthy, no pending
+approvals, runs complete normally.</p>
+<p><strong>When to investigate:</strong> approvals stuck open, runs won’t resume/complete, watch
+disconnected in footer, or bootstrap signal persists <strong>after</strong> a production deploy
+with full runtime summary expected.</p>
+<p>See also <a href="#tip-6-distinguish-bootstrap-real-from-feature-real">Tip 6: bootstrap-real vs feature-real</a>.</p>
+<h3>Run names — what you see in the UI</h3>
+<p>Every command creates a <strong>run</strong> with two identifiers:</p>
+<table>
+<thead>
+<tr>
+<th>What you see</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Health check</strong>, <strong>Read README.md</strong>, <strong>Git status</strong></td>
+<td>Friendly <strong>task name</strong> (from your command)</td>
+</tr>
+<tr>
+<td><strong>#cdb931</strong> (6 characters)</td>
+<td>Short <strong>run ref</strong> — internal tracking only; you rarely need the full <code>run_…</code> id</td>
+</tr>
+</tbody>
+</table>
+<p>Old runs stored raw command text (<code>health</code>, <code>git status</code>); the UI <strong>humanizes</strong> those labels.
+KAIRO <strong>ADVISE</strong> uses the same friendly names (e.g. “Resume Health check.” not “Resume health.”).</p>
+<p>When <strong>2+ paused tasks</strong> appear, Mission Control lists each friendly name — click <strong>COMPLETE RUN</strong>
+for the current one, repeat until the queue clears.</p>
+</div></section><section class="chapter" id="chapter-runtime-auth-cli-and-tools"><div class="chapter-header"><span class="chapter-num">04</span><h2 id="runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</h2></div><div class="chapter-body">
+<p>This section explains how Axon-X authenticates agent runtimes, when you need
+secrets in <strong>/vault</strong>, and when Axon uses its own executors vs external CLIs.</p>
+<p>Official Cursor CLI reference:
+<a href="https://cursor.com/docs/cli/reference/authentication">Cursor CLI authentication</a></p>
+<h3>Two auth paths for Cursor (Pro / daily use vs headless)</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>When to use</th>
+<th>What you do</th>
+<th>Vault key required?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CLI subscription (recommended)</strong></td>
+<td>Daily operator work on your machine with Cursor Pro/Team</td>
+<td>Run <code>cursor agent login</code> once on the <strong>host</strong>; verify with <code>cursor agent status</code></td>
+<td><strong>No</strong> — <code>CURSOR_API_KEY</code> is optional</td>
+</tr>
+<tr>
+<td><strong>API key (headless / CI)</strong></td>
+<td>Servers without browser, automation, cloud agents</td>
+<td>Generate key in <strong>Cursor Dashboard → Integrations → API Keys</strong>; store as <code>CURSOR_API_KEY</code> in /vault or shell env</td>
+<td><strong>Yes</strong> (or shell env)</td>
+</tr>
+</tbody>
+</table>
+<p>Axon-X probes subscription auth live:</p>
+<ul>
+<li><strong>Vault consumer</strong> (<code>/vault</code> → Consumer readiness): marks <strong>Cursor CLI runtime</strong> <strong>Ready</strong> when <code>cursor agent status</code> shows a logged-in account, even with zero vault keys.</li>
+<li><strong>Control plane</strong> (<code>GET /api/runtime/status</code>, <code>GET /api/runtime/cursor/status</code>): same probe; composer shows account + auth method.</li>
+<li><strong>Dispatch</strong>: if subscription is active, control-plane <strong>strips</strong> <code>CURSOR_API_KEY</code> from the subprocess env to avoid auth conflicts (browser login and API key are alternate paths per Cursor docs).</li>
+</ul>
+<p><strong>Pro without vault key:</strong> if <code>cursor agent status</code> prints <code>Logged in as …@…</code> and vault search shows no <code>CURSOR_API_KEY</code>, you are on the <strong>subscription path</strong> — correct for daily Pro use.</p>
+<h3>Codex / OpenAI auth</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Setup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Codex CLI login</strong></td>
+<td><code>codex login</code> on the host; vault consumer probes <code>codex login status</code></td>
+</tr>
+<tr>
+<td><strong>API keys in vault</strong></td>
+<td><code>CODEX_API_KEY</code> or <code>OPENAI_API_KEY</code> in /vault (either satisfies the codex consumer)</td>
+</tr>
+</tbody>
+</table>
+<h3>Vault consumers vs runtime dispatch</h3>
+<p><strong>Consumers</strong> are readiness labels for operators — they never expose secret values.</p>
+<table>
+<thead>
+<tr>
+<th>Consumer</th>
+<th>Ready when</th>
+<th>Optional / fallback</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cursor_runtime</code></td>
+<td>CLI subscription <strong>or</strong> <code>CURSOR_API_KEY</code> in vault</td>
+<td>API key only needed for headless</td>
+</tr>
+<tr>
+<td><code>codex_runtime</code></td>
+<td><code>codex login</code> <strong>or</strong> Codex/OpenAI vault keys</td>
+<td></td>
+</tr>
+<tr>
+<td><code>openai_provider</code></td>
+<td><code>OPENAI_API_KEY</code> in vault</td>
+<td>Direct OpenAI fallback</td>
+</tr>
+<tr>
+<td>DashPro monitor consumers</td>
+<td>Required monitor keys in vault/import</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Source: <code>services/axon-watch/app/vault/snapshot.py</code>, <code>cli_runtime_probe.py</code></p>
+<p><strong>Runtime dispatch</strong> (actually running a model) lives in the control-plane:</p>
+<ul>
+<li><code>services/control-plane/app/cli_runtime/catalog.py</code> — auth probes, ready flags</li>
+<li><code>services/control-plane/app/cli_runtime/router.py</code> — picks binary, env, retry without API key on oauth</li>
+<li><code>services/control-plane/app/cli_runtime/vault_keys.py</code> — merges unlocked vault keys into runtime context</li>
+</ul>
+<h3>Native Axon tools vs Cursor CLI</h3>
+<p>Axon-X has <strong>two execution lanes</strong> — do not mix them when debugging.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Lane</th>
+<th>Executor</th>
+<th>Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Operator mode</strong> → Command seam</td>
+<td><strong>Lane A — Command</strong></td>
+<td>Axon <code>command_executor.py</code></td>
+<td>Exact commands only (<code>health</code>, <code>git status</code>, <code>read …</code>) — <strong>Axon native</strong></td>
+</tr>
+<tr>
+<td><strong>IDE mode</strong> → Agent dock composer</td>
+<td><strong>Lane B — Ask / Plan / Agent</strong></td>
+<td>Cursor CLI subprocess (<code>cursor agent …</code>)</td>
+<td>Cursor model + consultative prompt; <strong>not</strong> full Cursor IDE agent tools yet</td>
+</tr>
+<tr>
+<td><strong>Future (G3.5+)</strong></td>
+<td>MCP registry</td>
+<td>Planned wiring</td>
+<td>Static registry exists; <strong>not</strong> connected to dispatch today</td>
+</tr>
+</tbody>
+</table>
+<p><strong>When to use native Axon tools:</strong> Operator oversight, deterministic repo commands, health checks, file reads — anything in the <a href="#supported-commands-operator-mode">supported commands</a> table.</p>
+<p><strong>When Cursor CLI runs:</strong> IDE composer messages in Ask, Plan, or Agent mode with runtime target <strong>Cursor CLI (local)</strong>. Streaming (SSE) applies to this lane when <code>AXON_WATCH_LANE_B_STREAMING=1</code> (default).</p>
+<p><strong>Composer modes (IDE dock):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Cursor CLI flag</th>
+<th>Behavior today</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ask</strong></td>
+<td><code>--mode ask</code></td>
+<td>Read-only style answers</td>
+</tr>
+<tr>
+<td><strong>Plan</strong></td>
+<td><code>--mode plan</code></td>
+<td>Step mapping before execution</td>
+</tr>
+<tr>
+<td><strong>Agent</strong></td>
+<td>Default consultative; <strong>Full Access</strong> in composer → approval → Cursor <code>--mode agent</code> / Codex workspace-write</td>
+<td><code>execution_access: full</code> + G3.3 approval gate</td>
+</tr>
+</tbody>
+</table>
+<h3>Choosing runtime target and model</h3>
+<p>Open the <strong>model picker</strong> (⚡ chip) in the IDE agent dock:</p>
+<ol>
+<li><strong>Runtime target</strong> — <code>Cursor CLI (local)</code>, <code>Codex CLI (local)</code>, or cloud placeholders. Preference persists in shell local storage via <code>shell.setSelectedRuntimeTarget</code>.</li>
+<li><strong>Auto toggle</strong> — when ON, Cursor picks the best model per request (no <code>--model</code> flag). When OFF, your pinned catalog model is passed to the CLI.</li>
+<li><strong>Add models</strong> — browse live output of <code>cursor agent --list-models</code> (cached ~5 min). Badges like <strong>Fast</strong> / <strong>High</strong> come from CLI labels when present.</li>
+<li><strong>Auth line</strong> — shows <code>CLI subscription · you@domain</code> or vault/API-key status; <strong>Open Vault</strong> only when auth is actually blocked (vault locked or missing keys <strong>and</strong> CLI not signed in).</li>
+</ol>
+<p>Environment overrides:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AXON_WATCH_CURSOR_CLI_PATH</code></td>
+<td>Non-default <code>cursor</code> binary path</td>
+</tr>
+<tr>
+<td><code>AXON_WATCH_CODEX_CLI_PATH</code></td>
+<td>Non-default <code>codex</code> binary path</td>
+</tr>
+<tr>
+<td><code>AXON_WATCH_LANE_B_STREAMING</code></td>
+<td><code>1</code> (default) SSE streaming for IDE composer; <code>0</code> in tests</td>
+</tr>
+</tbody>
+</table>
+<p>API endpoints:</p>
+<ul>
+<li><code>GET /api/runtime/status</code> — all targets + vault posture</li>
+<li><code>GET /api/runtime/cursor/status?force_refresh=1</code> — Cursor auth + live model catalog</li>
+<li><code>GET /api/vault/status</code> — consumer readiness (axon-watch service)</li>
+</ul>
+<h3>Troubleshooting auth</h3>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vault shows <strong>Missing: CURSOR_API_KEY</strong> but CLI is logged in</td>
+<td>Stale UI or old snapshot</td>
+<td>Refresh /vault; consumer should show <strong>CLI subscription · …</strong></td>
+</tr>
+<tr>
+<td>Composer says invalid API key</td>
+<td>Stale <code>CURSOR_API_KEY</code> in vault <strong>or</strong> shell env conflicting with subscription</td>
+<td>Remove bad key from vault; unset shell <code>CURSOR_API_KEY</code>; restart control-plane</td>
+</tr>
+<tr>
+<td><code>cursor agent status</code> → not logged in</td>
+<td>No subscription session on host</td>
+<td><code>cursor agent login</code></td>
+</tr>
+<tr>
+<td>Runtime ready but dispatch fails</td>
+<td>Wrong binary or model id</td>
+<td>Check <code>AXON_WATCH_CURSOR_CLI_PATH</code>; pick <strong>Auto</strong> or a model from live catalog</td>
+</tr>
+<tr>
+<td><strong>Open Vault</strong> when Pro works</td>
+<td>Should not show if oauth ready</td>
+<td>Hard-refresh; verify <code>GET /api/runtime/status</code> shows <code>ready: true</code></td>
+</tr>
+<tr>
+<td><strong>Out of usage</strong> / rate limit from Cursor</td>
+<td>Current CLI account hit subscription quota</td>
+<td>Switch accounts (below) or use <strong>Auto</strong> / another model; admin may need to raise team limits</td>
+</tr>
+</tbody>
+</table>
+<h3>Switch Cursor subscription account (logout → login)</h3>
+<p>When the agent reports <strong>out of usage</strong> or you need a different Pro/Team account on this machine:</p>
+<pre><code class="language-bash"># 1. Sign out (clears stored CLI session on this host)
+cursor agent logout
+
+# 2. Confirm logged out
+cursor agent status   # should say not logged in / auth required
+
+# 3. Sign in with the other Cursor account (opens browser)
+cursor agent login
+
+# 4. Verify the new account
+cursor agent status   # expect: Logged in as other@domain
+</code></pre>
+<p>Headless terminal (no browser auto-open):</p>
+<pre><code class="language-bash">NO_OPEN_BROWSER=1 cursor agent login
+# Open the printed URL manually in a browser logged into the target account
+</code></pre>
+<p>After switching:</p>
+<ol>
+<li>Refresh <strong>/vault</strong> → Cursor consumer should show the new <strong>CLI subscription · email</strong></li>
+<li>Hard-refresh <code>:4173</code> or reopen the model picker (forces runtime status refresh)</li>
+<li>Retry IDE composer — old thread errors are from the prior account/session; start a new turn</li>
+</ol>
+<p><strong>Note:</strong> Axon-X does not store Cursor passwords. Logout/login only affects the <strong>host Cursor CLI</strong> session. Vault <code>CURSOR_API_KEY</code> (if present) is separate — remove or update it if you switch to API-key auth instead.</p>
+<p>Quick host checks:</p>
+<pre><code class="language-bash">cursor agent status          # expect: Logged in as …
+echo &quot;${CURSOR_API_KEY:+set}&quot; # empty = good for Pro path
+curl -s http://127.0.0.1:8787/api/runtime/cursor/status | python3 -m json.tool
+</code></pre>
+</div></section><section class="chapter" id="chapter-vaxon-desktop"><div class="chapter-header"><span class="chapter-num">05</span><h2 id="vaxon-desktop">VAXON Desktop</h2></div><div class="chapter-body">
+<p>See <a href="how-to/vaxon-desktop.md"><code>docs/how-to/vaxon-desktop.md</code></a>.</p>
+</div></section><section class="chapter" id="chapter-terminology-and-abbreviations"><div class="chapter-header"><span class="chapter-num">06</span><h2 id="terminology-and-abbreviations">Terminology And Abbreviations</h2></div><div class="chapter-body">
+<p>Use this glossary when reading plans, ADRs, code, or agent summaries.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ADR</strong></td>
+<td>Architecture Decision Record — a numbered, immutable write-up of a significant technical or process choice. Accepted ADRs live in <code>docs/adr/</code>. Do not rewrite them; supersede with a new ADR instead.</td>
+</tr>
+<tr>
+<td><strong>Axon-X</strong></td>
+<td>User-facing product name for the next-generation operator console.</td>
+</tr>
+<tr>
+<td><strong>axon-watch</strong></td>
+<td>Internal repo folder and npm workspace name. Legacy naming; not the product label shown to operators.</td>
+</tr>
+<tr>
+<td><strong>axon-local</strong></td>
+<td>The current production Axon app repo (port <strong>7734</strong>). Planning for Axon-X still lives here under <code>Plans/Axon-Watch/</code>.</td>
+</tr>
+<tr>
+<td><strong>Bootstrap</strong></td>
+<td>Early boot / dev scaffolding state — services run, but some DTO fields (runtime summary depth, signal richness) are intentionally thin until parity slices land. Signals like <code>Bootstrap: runtime summary stale</code> are <strong>expected locally</strong>, not production outages.</td>
+</tr>
+<tr>
+<td><strong>Briefing seam</strong></td>
+<td><code>GET /api/briefing</code> returns canonical <code>OperatorBriefing</code>. The shell loads it at bootstrap and projects that data across the right dock: approvals, signals, and the KAIRO briefing card all read from the same briefing/runtime truth. Approval mutations stay on the run approval seam. See <code>docs/contracts/BRIEFING-SEAM.md</code>.</td>
+</tr>
+<tr>
+<td><strong>Control plane</strong></td>
+<td>FastAPI service on port <strong>8787</strong> that owns run truth, runtime summary, inbox projection, workspaces list, and briefing.</td>
+</tr>
+<tr>
+<td><strong>Console-web / shell</strong></td>
+<td>Vue 3 frontend on port <strong>4173</strong> — the visible Axon-X UI.</td>
+</tr>
+<tr>
+<td><strong>Contract / shared contract</strong></td>
+<td>Canonical TypeScript types and JSON fixtures in <code>packages/shared-types/</code>. Frontend and backend must agree here first.</td>
+</tr>
+<tr>
+<td><strong>Coordinator lane</strong></td>
+<td>Single owner of serial-only semantics during multi-agent work. See <code>docs/MULTITASK-LANES.md</code>.</td>
+</tr>
+<tr>
+<td><strong>DTO</strong></td>
+<td>Data Transfer Object — a typed payload shape exchanged between services or UI layers (for example <code>RuntimeSummary</code>, <code>RunRecord</code>).</td>
+</tr>
+<tr>
+<td><strong>Fitness function</strong></td>
+<td>An automated check that guards architecture or performance (dependency direction, DTO size budgets, latency thresholds).</td>
+</tr>
+<tr>
+<td><strong>Frozen planning bundle</strong></td>
+<td>The locked docs under <code>axon-local/Plans/Axon-Watch/</code>. Implementation must not silently drift from these.</td>
+</tr>
+<tr>
+<td><strong>KAIRO</strong></td>
+<td>Knowledge-Augmented Intelligence for Response and Oversight — operator-presence layer (watching, advising, interrupting, executing with receipts). <strong>NOTICE / ADVISE / DECIDE</strong> in the KAIRO Briefing panel are rhythm labels from <code>GET /api/briefing</code> — suggested reading, not separate commands. See Quick Start → <em>KAIRO NOTICE / ADVISE</em>.</td>
+</tr>
+<tr>
+<td><strong>Lane A/B/C/D</strong></td>
+<td>Parallel implementation ownership areas defined in <code>docs/MULTITASK-LANES.md</code> (watch, shell, control-plane, dev/verify).</td>
+</tr>
+<tr>
+<td><strong>Monaco host</strong></td>
+<td>In-browser code editor surface (<code>EditorHost.vue</code>). Loads workspace files on disk (README.md, notes.txt) plus read-only DTO overview tabs.</td>
+</tr>
+<tr>
+<td><strong>Parity ledger</strong></td>
+<td>Checklist of behaviors Axon-X must eventually match from current Axon. Lives in frozen planning.</td>
+</tr>
+<tr>
+<td><strong>Run / run record</strong></td>
+<td>Canonical execution unit with <code>phase</code>, <code>status</code>, capability flags, and transition history.</td>
+</tr>
+<tr>
+<td><strong>Run phase</strong></td>
+<td>High-level lifecycle stage (<code>queued</code>, <code>starting</code>, <code>executing</code>, <code>awaiting_approval</code>, <code>review_ready</code>, <code>completed</code>, etc.). Defined in frozen <code>run-state.md</code>.</td>
+</tr>
+<tr>
+<td><strong>Runtime summary</strong></td>
+<td>Boot-critical DTO at <code>GET /api/runtime/summary</code> — identity, watch connection, active runs, approvals snapshot.</td>
+</tr>
+<tr>
+<td><strong>Signal / inbox item</strong></td>
+<td>Watch-produced event surfaced through control-plane <code>GET /api/inbox</code>.</td>
+</tr>
+<tr>
+<td><strong>Thin slice</strong></td>
+<td>A small, verifiable vertical increment — one owned behavior with tests, not a broad rewrite.</td>
+</tr>
+<tr>
+<td><strong>Watch service</strong></td>
+<td>FastAPI service on port <strong>8788</strong> that produces canonical signals; control-plane projects them into inbox/runtime summary.</td>
+</tr>
+<tr>
+<td><strong>xterm host</strong></td>
+<td>In-browser terminal surface (<code>TerminalHost.vue</code>) attached to a <strong>backend PTY session</strong> via <code>WS /api/workspaces/{workspace_id}/terminal</code>. Runs real shell commands in a workspace-scoped directory under <code>.local/workspaces/</code> (override with <code>AXON_WATCH_WORKSPACE_ROOT</code>).</td>
+</tr>
+<tr>
+<td><strong>Workspace</strong></td>
+<td>Logical operator context keyed by <code>workspace_id</code>. Today the API returns IDs only; rich catalog metadata is deferred.</td>
+</tr>
+</tbody>
+</table>
+<h3>Two repos, two apps</h3>
+<p>Do not confuse these:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>axon-local</strong> (current Axon)</th>
+<th><strong>axon-watch</strong> (Axon-X)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Default URL</td>
+<td><code>http://127.0.0.1:7734</code> (fallback)</td>
+<td><code>http://127.0.0.1:4173</code> (<strong>production operator</strong>)</td>
+</tr>
+<tr>
+<td>Start command</td>
+<td><code>./start.sh</code> from axon-local</td>
+<td><code>./scripts/dev/up.sh</code> from axon-watch</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Legacy daily-driver / fallback</td>
+<td>Primary operator console (v1)</td>
+</tr>
+<tr>
+<td>Relationship</td>
+<td>Source of parity targets and frozen plans</td>
+<td>Implementation target for modernization</td>
+</tr>
+</tbody>
+</table>
+</div></section><section class="chapter" id="chapter-what-axon-x-is"><div class="chapter-header"><span class="chapter-num">07</span><h2 id="what-axon-x-is">What Axon-X Is</h2></div><div class="chapter-body">
+<p><strong>Axon-X</strong> is the next-generation Axon console and operator environment.</p>
+<p>The code lives in the <code>axon-watch</code> repo folder for now. That folder name is
+legacy/internal; the product name is <strong>Axon-X</strong>.</p>
+<p>The target product combines:</p>
+<ul>
+<li>an IDE-style shell</li>
+<li>a control plane</li>
+<li>a dedicated watcher service</li>
+</ul>
+<p>The implementation repo is here:</p>
+<ul>
+<li><code>/home/edp/axon-nvme/repos/axon-watch</code></li>
+</ul>
+<p>The frozen planning source-of-truth still lives here:</p>
+<ul>
+<li><code>/home/edp/axon-nvme/repos/axon-local/Plans/Axon-Watch/</code></li>
+</ul>
+<p>Important rule:</p>
+<ul>
+<li>read plans from <code>axon-local</code></li>
+<li>implement in <code>axon-watch</code></li>
+</ul>
+<p>Do not casually move back and forth inventing new semantics in both places.</p>
+</div></section><section class="chapter" id="chapter-what-state-the-repo-is-in-right-now"><div class="chapter-header"><span class="chapter-num">08</span><h2 id="what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</h2></div><div class="chapter-body">
+<p>The repo is in an early but real bootstrap state.</p>
+<p>What already exists:</p>
+<ul>
+<li>repo scaffold</li>
+<li><code>console-web</code> shell skeleton</li>
+<li><code>control-plane</code> FastAPI bootstrap service</li>
+<li><code>axon-watch</code> FastAPI bootstrap service</li>
+<li>shared contract package</li>
+<li>verification harness</li>
+<li>health and readiness scripts</li>
+</ul>
+<p>What is already real:</p>
+<ul>
+<li>root workspace scripts</li>
+<li>service startup/shutdown flow</li>
+<li><code>/api/runtime/summary</code>, <code>/api/inbox</code>, <code>/api/runs</code>, and <code>/api/briefing</code> routes in the control plane</li>
+<li>shared contract types under <code>packages/shared-types/</code></li>
+<li>shell consumption of canonical runtime summary, inbox, and run DTOs</li>
+<li>thin Monaco and xterm host surfaces in <code>console-web</code></li>
+</ul>
+<p>What is still intentionally thin or deferred:</p>
+<ul>
+<li>full signal production and deeper ranking beyond current inbox rule stack</li>
+<li>deep watch summary logic</li>
+<li>performance evidence for all budgets</li>
+</ul>
+<p>What is now real in the thin slice (verified 2026-07-04):</p>
+<ul>
+<li>run create/complete/stop/resume lifecycle</li>
+<li>explicit approval boundary (<code>requires_approval</code>, approve/reject)</li>
+<li>review-ready entry, completion, and follow-up resume path</li>
+<li>SQLite-backed run persistence (survives control-plane restart)</li>
+<li>operator briefing loaded at bootstrap and rendered in the right dock (<code>BriefingPanel.vue</code>)</li>
+<li>two watch-produced inbox signals with multi-factor ranking (severity, recency,
+  unresolved duration via <code>created_at</code>, status, action-type, workspace priority)</li>
+<li>workspace list API and shell workspace selector (IDs only)</li>
+<li>the shell is split into <code>TopBar</code>, <code>LeftSidebar</code>, <code>CenterWorkbench</code>,
+  <code>RightDock</code>, and <code>StatusBar</code> regions with mockup-shell chrome</li>
+<li>Monaco host bound to canonical DTO documents and <strong>workspace files on disk</strong>
+  with a nested explorer tree, lazy file loading, new-file creation, and active-file rename</li>
+<li>backend PTY terminal attachment for the selected workspace (real shell I/O via WebSocket)</li>
+<li>workspace-scoped conversation rehydration: <code>GET /api/workspaces/{workspace_id}/chat/thread</code>
+  plus existing thread history read reloads the Conversation seam after page refresh.
+  When no thread exists yet, the lookup returns HTTP 200 with null <code>thread_id</code> (not 404).</li>
+</ul>
+<p><strong>Workspace IDs (operator vs catalog):</strong></p>
+<ul>
+<li><strong>Operator shell</strong> uses <code>MOCKUP_WORKSPACE_IDS</code> only (<code>workspace_smoke</code>, <code>workspace_recsys</code>,
+  …). <code>mergeMockupWorkspaceCatalog()</code> trims API extras so <code>currentWorkspace</code> is always
+  sidebar-visible.</li>
+<li><strong>Control-plane catalog</strong> may still list fixture defaults (<code>workspace_alpha</code>,
+  <code>workspace_bootstrap</code>) and run/inbox IDs for tests and API consumers; the shell does
+  not select those as <code>currentWorkspace</code>.</li>
+<li>Bootstrap picks workspace deterministically: active run workspace (when visible) →
+  <code>workspace_smoke</code> default → first mockup workspace.</li>
+</ul>
+<p>Manual acceptance for reload-safe chat (use <strong><code>workspace_smoke</code></strong>):</p>
+<ol>
+<li><code>./scripts/dev/up.sh</code></li>
+<li>Open <code>http://127.0.0.1:4173</code></li>
+<li>Confirm <strong><code>workspace_smoke</code></strong> is selected (or select it)</li>
+<li>Post a command in the Command seam</li>
+<li>Hard reload the page</li>
+<li>Conversation should rehydrate automatically for the same workspace when an active run
+   or default bootstrap applies; if needed, re-select <strong><code>workspace_smoke</code></strong></li>
+</ol>
+<p>API-only check (any valid catalog ID):</p>
+<pre><code class="language-bash">curl -s http://127.0.0.1:8787/api/workspaces/workspace_smoke/chat/thread
+curl -s http://127.0.0.1:8787/api/chat/threads/&lt;thread_id&gt;/history
+</code></pre>
+<p>What is <strong>not</strong> real yet despite similar-sounding names:</p>
+<ul>
+<li><strong>Full KAIRO operator presence</strong> — the current shell has visual scaffolding,
+  but spoken alerts, persona settings, and richer operator-presence behavior are
+  still planned in axon-local docs</li>
+<li><strong>Full parity with axon-local</strong> — intentional; see parity ledger for gaps</li>
+</ul>
+<p>So this repo is not a fake mockup, but it is also not feature-complete or a
+drop-in replacement for the current Axon UI.</p>
+</div></section><section class="chapter" id="chapter-source-of-truth-rules"><div class="chapter-header"><span class="chapter-num">09</span><h2 id="source-of-truth-rules">Source Of Truth Rules</h2></div><div class="chapter-body">
+<p>When you are unsure what something should mean, check the planning bundle.</p>
+<p>The most important frozen planning docs are:</p>
+<ul>
+<li><code>PRODUCT.md</code></li>
+<li><code>ARCHITECTURE.md</code></li>
+<li><code>UI_SPEC.md</code></li>
+<li><code>UI_COMPOSITION_SPEC.md</code></li>
+<li><code>UI_VISUAL_DIRECTION.md</code></li>
+<li><code>UI_REFERENCE_ARCHETYPES.md</code></li>
+<li><code>run-state.md</code></li>
+<li><code>runtime-summary.md</code></li>
+<li><code>signal-events.md</code></li>
+<li><code>watch-api.md</code></li>
+<li><code>control-api.md</code></li>
+<li><code>PARITY_LEDGER.md</code></li>
+<li><code>FITNESS_FUNCTIONS.md</code></li>
+<li><code>TRANSITION_ARCHITECTURE.md</code></li>
+<li><code>CONTRACT_TESTING_SPEC.md</code></li>
+</ul>
+<h3>Things you must not redefine casually</h3>
+<p>These are serial-only semantics and should not drift:</p>
+<ul>
+<li>canonical run phases</li>
+<li>runtime summary vocabulary</li>
+<li>signal identity, severity, and status</li>
+<li>approval semantics</li>
+<li>transition seams and rollback rules</li>
+<li>parity acceptance rules</li>
+</ul>
+<p>If the plan seems wrong or insufficient:</p>
+<ul>
+<li>do not silently change it</li>
+<li>raise a proposed amendment instead</li>
+</ul>
+</div></section><section class="chapter" id="chapter-repo-layout"><div class="chapter-header"><span class="chapter-num">10</span><h2 id="repo-layout">Repo Layout</h2></div><div class="chapter-body">
+<p>Top-level structure:</p>
+<pre><code class="language-text">axon-watch/
+  apps/
+    console-web/
+  services/
+    control-plane/
+    axon-watch/
+  packages/
+    shared-types/
+  docs/
+  scripts/
+    dev/
+    verify/
+  infra/
+  tests/
+</code></pre>
+<h3>What each part owns</h3>
+<h4><code>apps/console-web/</code></h4>
+<p>Owns the integrated shell:</p>
+<ul>
+<li>topbar</li>
+<li>left sidebar</li>
+<li>center workbench (including the embedded terminal dock)</li>
+<li>right dock</li>
+<li>status bar</li>
+</ul>
+<p>It should consume canonical contracts, not invent backend truth.</p>
+<h4><code>services/control-plane/</code></h4>
+<p>Owns interactive backend responsibilities such as:</p>
+<ul>
+<li>UI-facing health/readiness</li>
+<li>runtime summary assembly</li>
+<li>later run-state, approvals, and workspace orchestration</li>
+</ul>
+<h4><code>services/axon-watch/</code></h4>
+<p>Owns watcher responsibilities such as:</p>
+<ul>
+<li>monitoring loops</li>
+<li>watch health/readiness</li>
+<li>later signal production</li>
+<li>later inbox/signal summaries</li>
+</ul>
+<h4><code>packages/shared-types/</code></h4>
+<p>Owns canonical shared contract types.</p>
+<p>This is one of the most important directories in the repo.</p>
+<p>If frontend and backend disagree about what a thing means, the fix should start
+here, not in ad hoc local types.</p>
+<h4><code>scripts/dev/</code></h4>
+<p>Owns local run helpers:</p>
+<ul>
+<li>start</li>
+<li>stop</li>
+<li>health checks</li>
+</ul>
+<h4><code>scripts/verify/</code></h4>
+<p>Owns cheap, repeatable verification:</p>
+<ul>
+<li>dependency direction checks</li>
+<li>DTO size checks</li>
+<li>ADR governance checks</li>
+<li>latency-budget check scaffolding</li>
+</ul>
+</div></section><section class="chapter" id="chapter-the-current-architecture-in-plain-english"><div class="chapter-header"><span class="chapter-num">11</span><h2 id="the-current-architecture-in-plain-english">The Current Architecture In Plain English</h2></div><div class="chapter-body">
+<p>Think of the new app as three cooperating parts:</p>
+<ol>
+<li>the shell the user sees</li>
+<li>the control plane that serves user-facing APIs</li>
+<li>the watcher service that will eventually observe and normalize signals</li>
+</ol>
+<p>The current implementation is following a thin-slice path:</p>
+<ul>
+<li>bootstrap the shell and services first</li>
+<li>land canonical contracts early</li>
+<li>add real endpoints against those contracts</li>
+<li>then deepen behavior</li>
+</ul>
+<p>This is deliberate.</p>
+<p>It avoids:</p>
+<ul>
+<li>giant rewrites</li>
+<li>hidden semantic drift</li>
+<li>UI and backend inventing different meanings</li>
+</ul>
+</div></section><section class="chapter" id="chapter-detailed-setup-first-install"><div class="chapter-header"><span class="chapter-num">12</span><h2 id="detailed-setup-first-install">Detailed setup (first install)</h2></div><div class="chapter-body">
+<h2>1. Go to the repo</h2>
+<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+</code></pre>
+<h2>2. Install JavaScript dependencies</h2>
+<pre><code class="language-bash">npm install
+</code></pre>
+<p>This is important because root workspace commands now rely on npm workspaces.</p>
+<h2>3. Review environment defaults</h2>
+<p>Default values are provided in:</p>
+<ul>
+<li><code>.env.example</code></li>
+</ul>
+<p>If you need custom ports or local paths:</p>
+<pre><code class="language-bash">cp .env.example .env
+</code></pre>
+<p>Then edit <code>.env</code> as needed.</p>
+<h2>4. Start the local stack</h2>
+<pre><code class="language-bash">./scripts/dev/up.sh
+</code></pre>
+<p><code>up.sh</code> does not report success until all three services are actually reachable.</p>
+<p>This starts:</p>
+<ul>
+<li><code>console-web</code></li>
+<li><code>control-plane</code></li>
+<li><code>axon-watch</code></li>
+</ul>
+<p>Important startup contract:</p>
+<ul>
+<li>ports are fixed by <code>.env</code> / <code>.env.example</code></li>
+<li>startup fails fast if <code>4173</code>, <code>8787</code>, or <code>8788</code> is already in use</li>
+<li>startup rolls back partial processes if readiness fails</li>
+<li>services stay detached after the launching shell exits</li>
+</ul>
+<h2>5. Check health</h2>
+<pre><code class="language-bash">./scripts/dev/check-health.sh
+</code></pre>
+<p>Expected endpoints:</p>
+<ul>
+<li>console web: <code>http://127.0.0.1:4173</code></li>
+<li>control plane health: <code>http://127.0.0.1:8787/api/health</code></li>
+<li>watch health: <code>http://127.0.0.1:8788/internal/watch/health</code></li>
+<li>briefing: <code>http://127.0.0.1:8787/api/briefing</code> (also loaded by the shell at bootstrap)</li>
+<li>runtime summary: <code>http://127.0.0.1:8787/api/runtime/summary</code></li>
+<li>inbox: <code>http://127.0.0.1:8787/api/inbox</code></li>
+<li>runs: <code>http://127.0.0.1:8787/api/runs</code></li>
+<li>workspaces: <code>http://127.0.0.1:8787/api/workspaces</code></li>
+</ul>
+<p><code>check-health.sh</code> also probes <code>/api/workspaces</code>.</p>
+<h2>6. Stop the stack</h2>
+<pre><code class="language-bash">./scripts/dev/down.sh
+</code></pre>
+</div></section><section class="chapter" id="chapter-what-the-current-app-does-on-boot"><div class="chapter-header"><span class="chapter-num">13</span><h2 id="what-the-current-app-does-on-boot">What The Current App Does On Boot</h2></div><div class="chapter-body">
+<p>Right now, the shell boots and loads five control-plane seams in parallel.</p>
+<p>That flow looks like this:</p>
+<ol>
+<li><code>apps/console-web/src/main.ts</code> creates the Vue app</li>
+<li>the shell store initializes</li>
+<li><code>loadBootstrapData()</code> is called</li>
+<li>the frontend fetches <code>/api/runtime/summary</code>, <code>/api/inbox</code>, and <code>/api/briefing</code></li>
+<li>workspaces and runs load sequentially; <code>resolveBootstrapWorkspaceId()</code> sets
+   <code>currentWorkspace</code> (active run workspace when sidebar-visible, else <code>workspace_smoke</code>)</li>
+<li>workspace files and chat thread history load for that workspace</li>
+<li>the shell renders topbar context, workspace state, editor/terminal workbench,
+   right-dock seams, and status bar truth strips</li>
+</ol>
+<p>Important limitations:</p>
+<ul>
+<li><strong>Operator workspace list</strong> — shell and sidebar share the same <code>MOCKUP_WORKSPACE_IDS</code>
+  catalog; catalog-only IDs such as <code>workspace_alpha</code> remain API-visible but are not
+  selected in the shell</li>
+<li><strong>Bootstrap workspace selection</strong> — deterministic via <code>resolveBootstrapWorkspaceId()</code>
+  after sequential workspace + run load (no parallel race)</li>
+<li><strong>Chat rehydration</strong> — scoped per workspace; messages posted under one ID do not appear
+  when another workspace is selected; only the latest thread per workspace is returned</li>
+<li><strong>Chat orchestration</strong> — <code>POST /api/chat/messages</code> returns operator + system + agent
+  messages; new dispatches run bounded executor (<code>health</code> / <code>list files</code> / <code>read …</code>) then
+  <code>review_ready</code> with <code>command_execution</code> receipt</li>
+<li><strong>Workspace catalog</strong> — sidebar uses seven mockup IDs; API may expose more — see
+  <code>docs/WORKSPACE_CATALOG.md</code></li>
+<li>Operator mode renders the right dock as <strong>Run → Approvals → Signals → Conversation →
+  Command → KAIRO Briefing</strong> with the briefing card anchored at the bottom of the dock</li>
+<li>briefing data is projected across the dock rather than shown as one raw DTO
+  dump: approvals stay in the approvals seam, top signals stay in the signals
+  seam, and the KAIRO card stays summary/CTA-oriented</li>
+<li>Monaco host loads workspace files on disk and read-only DTO overview tabs</li>
+<li>xterm host attaches to a backend PTY scoped to the selected workspace directory</li>
+<li>inbox ranking uses severity, recency, unresolved duration (<code>created_at</code>), status,
+  action-type, and a thin watch-owned workspace priority map</li>
+</ul>
+<p>That is okay for this stage.</p>
+</div></section><section class="chapter" id="chapter-locked-shell-layout"><div class="chapter-header"><span class="chapter-num">14</span><h2 id="locked-shell-layout">Locked Shell Layout</h2></div><div class="chapter-body">
+<p><strong>Locked 2026-07-04</strong> — see <code>docs/UI_LAYOUT_LOCK.md</code> and
+<code>docs/adr/ADR-004-locked-console-shell-layout.md</code>.</p>
+<p>Do not rearrange shell regions or dock seam order without a superseding ADR.
+Frozen planning in <code>axon-local/Plans/Axon-Watch/UI_COMPOSITION_SPEC.md</code> is amended
+to match this geometry.</p>
+<p>Five-region grid:</p>
+<table>
+<thead>
+<tr>
+<th>Region</th>
+<th>Component</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Top bar</td>
+<td><code>TopBar.vue</code></td>
+<td>identity zone + runtime strip + KAIRO module + mode toggle</td>
+</tr>
+<tr>
+<td>Left sidebar</td>
+<td><code>LeftSidebar.vue</code></td>
+<td>workspaces, optional explorer (IDE), status card</td>
+</tr>
+<tr>
+<td>Center workbench</td>
+<td><code>CenterWorkbench.vue</code></td>
+<td>Monaco editor + embedded resizable terminal dock</td>
+</tr>
+<tr>
+<td>Right dock</td>
+<td><code>RightDock.vue</code></td>
+<td>Run → Approvals → Signals (upper stack), KAIRO Briefing bottom hero</td>
+</tr>
+<tr>
+<td>Status bar</td>
+<td><code>StatusBar.vue</code></td>
+<td>HUD runtime strip</td>
+</tr>
+</tbody>
+</table>
+<p>KAIRO Briefing height tracks the workbench terminal dock via <code>--briefing-dock-height</code>.</p>
+</div></section><section class="chapter" id="chapter-current-shell-layout"><div class="chapter-header"><span class="chapter-num">15</span><h2 id="current-shell-layout">Current Shell Layout</h2></div><div class="chapter-body">
+<p>The locked shell matches the mockup/live screenshots:</p>
+<ul>
+<li><code>TopBar</code> — brand frame, mockup breadcrumb/version context panel, DTO runtime
+  strip, KAIRO presence module, Operator/IDE toggle, settings action</li>
+<li><code>LeftSidebar</code> — workspace list first, workspace status card second, explorer
+  tree only in IDE mode</li>
+<li><code>CenterWorkbench</code> — editor tabbar + breadcrumb + Monaco editor above a
+  resizable bottom terminal/log dock</li>
+<li><code>RightDock</code> — run seam, approvals seam, signals seam, KAIRO briefing card</li>
+<li><code>StatusBar</code> — persistent watch / run phase / signals / operator strip</li>
+</ul>
+<p>This is the layout you should compare against the mockup and live screenshots,
+not the older single-file shell description from earlier thin slices.</p>
+</div></section><section class="chapter" id="chapter-mockup-live-parity-notes"><div class="chapter-header"><span class="chapter-num">16</span><h2 id="mockup-live-parity-notes">Mockup / Live Parity Notes</h2></div><div class="chapter-body">
+<p>Parity observations from the current mockup and live screenshots:</p>
+<ul>
+<li>the region geometry now largely matches the mockup: topbar, workspace rail,
+  editor-over-terminal workbench, right dock, and bottom status strip</li>
+<li>the <strong>runtime strip</strong>, status bar zones, and workspace status card derive from
+  live shell state / <code>RuntimeSummary</code>, but the topbar breadcrumb and runtime
+  version chips are still mockup-style presentation helpers</li>
+<li>the sidebar and shell store share the same operator workspace catalog (<code>MOCKUP_WORKSPACE_IDS</code>)</li>
+<li>the dock uses operator-facing seam titles (<code>Active Run</code>, <code>Approvals</code>, <code>Signals</code>, <code>Conversation</code>) from <code>dock-seam-layout.ts</code></li>
+<li>live shell refresh uses <code>GET /api/live/events</code> (SSE refresh hints) via <code>live-events-session.ts</code>, with visibility-aware polling fallback when EventSource is unavailable</li>
+<li>Operator mode renders the right dock as <strong>Run → Approvals → Signals → Conversation →
+  Command → KAIRO Briefing</strong> with the briefing card anchored at the bottom of the dock</li>
+<li>the workbench terminal dock default height is ~240px (responsive cap 280px) unless the
+  operator resizes it; height persists in session storage when customized</li>
+</ul>
+</div></section><section class="chapter" id="chapter-the-most-important-files-right-now"><div class="chapter-header"><span class="chapter-num">17</span><h2 id="the-most-important-files-right-now">The Most Important Files Right Now</h2></div><div class="chapter-body">
+<p>If you need to understand the current implementation quickly, read these first:</p>
+<h3>Shared contracts</h3>
+<ul>
+<li><code>packages/shared-types/src/index.ts</code></li>
+<li><code>packages/shared-types/src/run.ts</code></li>
+<li><code>packages/shared-types/src/runtime.ts</code></li>
+<li><code>packages/shared-types/src/signals.ts</code></li>
+<li><code>packages/shared-types/src/control-plane.ts</code></li>
+<li><code>packages/shared-types/src/watch.ts</code></li>
+</ul>
+<h3>Fixture payloads</h3>
+<ul>
+<li><code>packages/shared-types/fixtures/runtime-summary.example.json</code></li>
+<li><code>packages/shared-types/fixtures/watch-summary.example.json</code></li>
+<li><code>packages/shared-types/fixtures/run-record.example.json</code></li>
+<li><code>packages/shared-types/fixtures/signal-event.example.json</code></li>
+</ul>
+<h3>Control plane</h3>
+<ul>
+<li><code>services/control-plane/app/main.py</code></li>
+<li><code>services/control-plane/app/workspace_catalog.py</code></li>
+<li><code>services/control-plane/app/runs/service.py</code></li>
+<li><code>services/control-plane/app/runtime_summary_assembler.py</code></li>
+<li><code>services/control-plane/app/operator_briefing.py</code></li>
+</ul>
+<h3>Frontend shell</h3>
+<ul>
+<li><code>apps/console-web/src/main.ts</code></li>
+<li><code>apps/console-web/src/api/control-plane.ts</code></li>
+<li><code>apps/console-web/src/stores/shell.ts</code></li>
+<li><code>apps/console-web/src/App.vue</code></li>
+<li><code>apps/console-web/src/components/EditorHost.vue</code></li>
+<li><code>apps/console-web/src/components/TerminalHost.vue</code></li>
+<li><code>apps/console-web/src/lib/workspace-documents.ts</code></li>
+</ul>
+<h3>Verification</h3>
+<ul>
+<li><code>scripts/verify/README.md</code></li>
+<li><code>scripts/verify/verification_config.json</code></li>
+<li><code>tests/test_shared_contract_fixtures.py</code></li>
+<li><code>tests/test_control_plane_runtime_summary.py</code></li>
+<li><code>tests/test_verify_harness.py</code></li>
+</ul>
+</div></section><section class="chapter" id="chapter-verification-commands"><div class="chapter-header"><span class="chapter-num">18</span><h2 id="verification-commands">Verification Commands</h2></div><div class="chapter-body">
+<p>Use these from the repo root.</p>
+<p><strong>CI, merge to <code>dev</code>, and employee agents:</strong> see
+<strong><a href="how-to/ci-merge-and-worker-agents.md">docs/how-to/ci-merge-and-worker-agents.md</a></strong>
+(Fast Gate workflow, PR workflow, roster/scheduler, how to tell if workers are live).</p>
+<h2>Shared contract verification</h2>
+<pre><code class="language-bash">npm run verify:shared-types
+</code></pre>
+<p>This confirms the shared-types package typechecks.</p>
+<h2>Contract verification</h2>
+<pre><code class="language-bash">npm run verify:contracts
+</code></pre>
+<p>This verifies:</p>
+<ul>
+<li>shared contract package typing</li>
+<li>shared fixture tests</li>
+<li>control-plane run/inbox/runtime-summary/briefing behavior</li>
+<li>watch signal contract alignment</li>
+</ul>
+<h2>Full current verification bundle</h2>
+<pre><code class="language-bash">npm run verify
+</code></pre>
+<p>This runs:</p>
+<ul>
+<li>contract verification</li>
+<li>console-web typecheck, unit test, and production build</li>
+<li>verify harness checks</li>
+<li>DTO size checks using representative fixtures</li>
+</ul>
+<h2>TEST-0 acceptance (<code>workspace_smoke</code>)</h2>
+<p>Requires the dev stack (<code>./scripts/dev/up.sh</code>).</p>
+<pre><code class="language-bash">npm run verify:test0
+</code></pre>
+<p>This runs, in order:</p>
+<ol>
+<li><code>./scripts/dev/check-health.sh</code></li>
+<li>Mission control unit tests (<code>operator-status-radar-view</code>, <code>workbench-terminal-split</code>)</li>
+<li>Live acceptance — <code>tests/test_test0_workspace_smoke_acceptance.py</code> against
+   <code>workspace_smoke</code> (briefing Notice/Advise, git status, resume from review, inbox/runs)</li>
+<li><code>npm run verify</code></li>
+</ol>
+<p>See also <code>docs/OPERATOR_MISSION_CONTROL_V1.md</code> for the manual UI checklist.</p>
+</div></section><section class="chapter" id="chapter-latency-evidence-d1"><div class="chapter-header"><span class="chapter-num">20</span><h2 id="latency-evidence-d1">Latency evidence (D1)</h2></div><div class="chapter-body">
+<p>When the dev stack is running, collect warm-route timing samples and re-run verify
+with evidence files:</p>
+<pre><code class="language-bash">./scripts/dev/up.sh
+npm run verify:evidence
+npm run verify:nightly
+</code></pre>
+<p>This writes JSON under <code>.local/verify/</code> and passes them to <code>scripts/verify/all.py</code>.</p>
+<p>Shell boot measurement:</p>
+<ul>
+<li><code>scripts/dev/measure_shell_boot.py</code> records <code>shell_ready_ms</code></li>
+<li><code>auto</code> mode uses Playwright Chromium when installed; otherwise it measures the
+  bootstrap critical path (index fetch + parallel <code>/api/runtime/summary</code>,
+  <code>/api/inbox</code>, <code>/api/briefing</code>, <code>/api/workspaces</code>, <code>/api/runs</code>)</li>
+<li>optional full browser mode: <code>pip install playwright &amp;&amp; playwright install chromium</code>
+  then <code>AXON_WATCH_SHELL_BOOT_MODE=browser npm run verify:evidence</code></li>
+<li>repo-local setup:</li>
+</ul>
+<pre><code class="language-bash">python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m playwright install chromium
+</code></pre>
+<p><code>collect-verify-evidence.sh</code> prefers <code>.venv/bin/python3</code> when present so <code>auto</code> mode can use Playwright.</p>
+<p>Example fixture: <code>scripts/verify/fixtures/shell-boot-report.dev.json</code>.</p>
+<p><code>./scripts/dev/check-health.sh</code> also probes <code>GET /api/live/events</code> (SSE).</p>
+<h2>Frontend checks</h2>
+<pre><code class="language-bash">npm run typecheck -w @axon-watch/console-web
+npm run test -w @axon-watch/console-web
+npm run build -w @axon-watch/console-web
+</code></pre>
+<h2>Python syntax checks</h2>
+<pre><code class="language-bash">python3 -m py_compile services/control-plane/app/main.py services/control-plane/app/runs/service.py services/control-plane/app/domain/run_state.py services/control-plane/app/domain/run_transitions.py services/control-plane/app/operator_briefing.py
+</code></pre>
+<h2>Service tests</h2>
+<pre><code class="language-bash">python3 -m unittest discover -s tests
+</code></pre>
+</div></section><section class="chapter" id="chapter-what-pass-pending-fail-mean-in-verification"><div class="chapter-header"><span class="chapter-num">21</span><h2 id="what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</h2></div><div class="chapter-body">
+<p>The verify harness uses explicit states.</p>
+<h3><code>PASS</code></h3>
+<p>The supplied evidence met the rule.</p>
+<p>Examples:</p>
+<ul>
+<li>DTO payload fits its size budget</li>
+<li>dependency direction rule is respected</li>
+</ul>
+<h3><code>PENDING</code></h3>
+<p>The check exists, but the slice does not provide enough real implementation or
+evidence yet.</p>
+<p>Examples:</p>
+<ul>
+<li>shell boot timing evidence not supplied yet</li>
+<li>runtime summary latency budget not yet measured</li>
+<li>no numbered ADR yet exists</li>
+</ul>
+<p><code>PENDING</code> is not automatically bad at this stage.</p>
+<p>It means the governance has been created ahead of the full implementation.</p>
+<h3><code>FAIL</code></h3>
+<p>The rule was violated or the harness itself is broken.</p>
+<p>This is the one that should stop you.</p>
+</div></section><section class="chapter" id="chapter-common-working-patterns"><div class="chapter-header"><span class="chapter-num">22</span><h2 id="common-working-patterns">Common Working Patterns</h2></div><div class="chapter-body">
+<h2>When adding frontend work</h2>
+<p>Use real shared types from <code>packages/shared-types/</code>.</p>
+<p>Do not:</p>
+<ul>
+<li>invent local copies of DTOs</li>
+<li>widen semantics casually in component code</li>
+<li>hide backend meaning in placeholder strings</li>
+</ul>
+<p>Good pattern:</p>
+<ul>
+<li>define or refine contract in shared-types</li>
+<li>use it in store/API layer</li>
+<li>render it in Vue components</li>
+</ul>
+<h2>When adding control-plane work</h2>
+<p>Prefer:</p>
+<ul>
+<li>canonical DTO assembly</li>
+<li>light endpoint handlers</li>
+<li>explicit payload validation</li>
+</ul>
+<p>Avoid:</p>
+<ul>
+<li>stuffing frontend-specific assumptions into the backend</li>
+<li>returning huge boot payloads</li>
+<li>redefining contract shapes inline</li>
+</ul>
+<h2>When adding watch work</h2>
+<p>Prefer:</p>
+<ul>
+<li>narrow, owned summaries</li>
+<li>canonical signal/event identities</li>
+<li>explicit watch responsibilities</li>
+</ul>
+<p>Avoid:</p>
+<ul>
+<li>pulling UI logic into the watch service</li>
+<li>importing control-plane domain semantics directly</li>
+<li>inventing competing signal vocabulary</li>
+</ul>
+</div></section><section class="chapter" id="chapter-troubleshooting"><div class="chapter-header"><span class="chapter-num">23</span><h2 id="troubleshooting">Troubleshooting</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-debugging-playbook"><div class="chapter-header"><span class="chapter-num">24</span><h2 id="debugging-playbook">Debugging playbook</h2></div><div class="chapter-body">
+<p>Use this order when something breaks:</p>
+<ol>
+<li><strong>Stack health</strong> — <code>axonhealth</code> (or <code>./scripts/dev/check-health.sh</code>).</li>
+<li><strong>Empty shell / Runtime unavailable</strong> — <code>axonrevive</code>, then hard-refresh <code>:4173</code>. Do <strong>not</strong> rely on <code>./scripts/dev/down.sh</code> when systemd owns the ports.</li>
+<li><strong>Soft refresh</strong> — <code>axonrestart</code> after backend route changes (if the API still answers).</li>
+<li><strong>Stale UI on <code>:4173</code></strong> — rebuild console-web (<code>npm run build -w @axon-watch/console-web</code>), <code>systemctl --user restart console-web.service</code>, then hard-refresh. Source-only / <code>:5173</code> Vite edits do <strong>not</strong> update the systemd bundle.</li>
+<li><strong>Browser cache</strong> — hard refresh <code>:4173</code> (<code>Ctrl+Shift+R</code>) after console-web bundle changes.</li>
+<li><strong>Connectors truth</strong> — Mission Control → <strong>Connectors</strong> rail or <code>GET /api/connectors</code>.</li>
+<li><strong>Gate scripts</strong> — <code>npm run verify:production-operator</code>, then the slice gate (<code>verify:testN</code> / <code>verify:shell-commands</code>).</li>
+<li><strong>Logs</strong> — <code>journalctl --user -u control-plane.service -n 80</code> (always-on) or <code>.local/logs/</code> (dev bootstrap).</li>
+</ol>
+<p>Symptom-specific fixes continue in the sections below.</p>
+<h2>Problem: Runtime unavailable / No workspace selected / Briefing unavailable</h2>
+<p>This is the <strong>wedged control-plane</strong> pattern. The Vue shell is up, but <code>/api/*</code> times out (even <code>/api/health</code>). Bootstrap never selects a workspace, so explorer + chat look empty.</p>
+<pre><code class="language-bash">axonrevive
+# hard-refresh http://127.0.0.1:4173
+</code></pre>
+<p>Why <code>./scripts/dev/down.sh</code> / <code>up.sh</code> fail here: this host runs <strong>user systemd units</strong> (<code>control-plane.service</code>, etc.). Dev down/up skip those listeners. Soft <code>systemctl --user restart</code> can also hang on a stuck worker — <code>axonrevive</code> force-kills first.</p>
+<h2>Problem: online research falls back / Google search returns 403</h2>
+<p>See <strong><a href="how-to/searxng-research.md">docs/how-to/searxng-research.md</a></strong> for SearXNG
+setup, provider order (SearXNG → legacy Google → DuckDuckGo), and Google 403
+troubleshooting.</p>
+<h2>Problem: <code>./scripts/dev/up.sh</code> fails or the frontend does not start</h2>
+<p>Check:</p>
+<ol>
+<li>Did you run <code>npm install</code> at repo root?</li>
+<li>Are ports <code>4173</code>, <code>8787</code>, and <code>8788</code> free?</li>
+<li>Did <code>up.sh</code> print a specific port conflict or readiness failure message?</li>
+</ol>
+<p>Current expected path:</p>
+<ul>
+<li>root install: <code>npm install</code></li>
+<li>root startup: <code>./scripts/dev/up.sh</code></li>
+<li>health check: <code>./scripts/dev/check-health.sh</code></li>
+</ul>
+<p>If startup fails, inspect:</p>
+<ul>
+<li><code>.local/logs/console-web.log</code></li>
+<li><code>.local/logs/control-plane.log</code></li>
+<li><code>.local/logs/axon-watch.log</code></li>
+</ul>
+<h2>Problem: <code>check-health.sh</code> fails</h2>
+<p>This usually means one or more services never started.</p>
+<p>Steps:</p>
+<ol>
+<li>stop everything:</li>
+</ol>
+<pre><code class="language-bash">./scripts/dev/down.sh
+</code></pre>
+<ol start="2">
+<li>start again:</li>
+</ol>
+<pre><code class="language-bash">./scripts/dev/up.sh
+</code></pre>
+<ol start="3">
+<li>inspect logs:</li>
+</ol>
+<ul>
+<li><code>.local/logs/control-plane.log</code></li>
+<li><code>.local/logs/axon-watch.log</code></li>
+<li><code>.local/logs/console-web.log</code></li>
+</ul>
+<ol start="4">
+<li>re-run:</li>
+</ol>
+<pre><code class="language-bash">./scripts/dev/check-health.sh
+</code></pre>
+<h2>Problem: stale pid files block startup</h2>
+<p><code>up.sh</code> now clears stale pid files automatically before it checks for a live stack.</p>
+<p>First try:</p>
+<pre><code class="language-bash">./scripts/dev/down.sh
+</code></pre>
+<p>If that is not enough, inspect:</p>
+<ul>
+<li><code>.local/pids/</code></li>
+<li><code>.local/logs/console-web.log</code></li>
+<li><code>.local/logs/control-plane.log</code></li>
+<li><code>.local/logs/axon-watch.log</code></li>
+</ul>
+<p>If <code>up.sh</code> still fails, it usually means one of the configured ports is held by
+another live process. Free the port or stop the other process before retrying.</p>
+<h2>Problem: the shell loads but runtime summary is unavailable</h2>
+<p>Check:</p>
+<ol>
+<li>Is control-plane running?</li>
+<li>Does this endpoint work?</li>
+</ol>
+<pre><code class="language-bash">curl -fsS http://127.0.0.1:8787/api/runtime/summary | python3 -m json.tool
+</code></pre>
+<ol start="3">
+<li>If running through Vite dev server, is <code>/api</code> proxied to control-plane?</li>
+</ol>
+<p>Current dev proxy lives in:</p>
+<ul>
+<li><code>apps/console-web/vite.config.ts</code></li>
+</ul>
+<p>You can also override the target with:</p>
+<ul>
+<li><code>VITE_CONTROL_PLANE_BASE_URL</code></li>
+</ul>
+<h2>Problem: <code>npm run verify</code> shows <code>PENDING</code></h2>
+<p>That is often expected at this stage.</p>
+<p>Examples of currently expected pending checks:</p>
+<ul>
+<li>shell boot readiness</li>
+<li>runtime summary latency</li>
+<li>watch summary latency</li>
+<li>numbered ADR presence</li>
+</ul>
+<p>Treat <code>PENDING</code> as:</p>
+<ul>
+<li>“scaffold exists, evidence not landed yet”</li>
+</ul>
+<p>Treat <code>FAIL</code> as:</p>
+<ul>
+<li>“something is wrong right now”</li>
+</ul>
+<h2>Problem: dependency direction checks fail</h2>
+<p>Check for forbidden imports across boundaries.</p>
+<p>The current verify harness guards things like:</p>
+<ul>
+<li>watch service must not depend on UI internals</li>
+<li>frontend must not depend on watch internals</li>
+<li>future domain-layer cross-imports must stay clean</li>
+</ul>
+<p>If a dependency check fails:</p>
+<ol>
+<li>remove the cross-boundary import</li>
+<li>move shared meaning into <code>packages/shared-types/</code> if appropriate</li>
+<li>use an adapter or API boundary instead of direct reach-through</li>
+</ol>
+<h2>Problem: contract tests fail after changing fixtures or DTOs</h2>
+<p>This usually means one of three things:</p>
+<ol>
+<li>you changed a canonical field name</li>
+<li>you widened/narrowed a type without updating the fixture</li>
+<li>you changed semantics without updating the contract layer first</li>
+</ol>
+<p>Fix sequence:</p>
+<ol>
+<li>check the frozen planning doc</li>
+<li>check the shared contract type</li>
+<li>check the fixture</li>
+<li>check the consumer/provider test</li>
+</ol>
+<p>Do not patch the frontend alone and ignore the canonical contract.</p>
+<h2>Problem: you are unsure whether something should become a new ADR</h2>
+<p>Ask:</p>
+<ol>
+<li>Is this a real architecture or process decision?</li>
+<li>Is it broader than one small implementation detail?</li>
+<li>Would future readers need to know why this choice was made?</li>
+</ol>
+<p>If yes, use ADR governance.</p>
+<p>Current ADR process docs live in:</p>
+<ul>
+<li><code>docs/adr/README.md</code></li>
+<li><code>docs/adr/_TEMPLATE.md</code></li>
+</ul>
+<p>Note:</p>
+<ul>
+<li>accepted ADRs should be numbered</li>
+<li>accepted ADRs should not be rewritten materially</li>
+<li>changed decisions should be superseded, not silently edited</li>
+</ul>
+</div></section><section class="chapter" id="chapter-tips-and-tricks"><div class="chapter-header"><span class="chapter-num">25</span><h2 id="tips-and-tricks">Tips And Tricks</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-snippet-cookbook"><div class="chapter-header"><span class="chapter-num">26</span><h2 id="snippet-cookbook">Snippet cookbook</h2></div><div class="chapter-body">
+<h3>One-word stack commands (always-on host)</h3>
+<p>Installed on PATH via <code>~/.local/bin</code> → repo <code>bin/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Expands to</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>axonhealth</code></strong></td>
+<td><code>./scripts/dev/check-health.sh</code></td>
+<td>Quick “is the stack OK?”</td>
+</tr>
+<tr>
+<td><strong><code>axonrestart</code></strong></td>
+<td><code>systemctl --user restart</code> axon-watch + control-plane + console-web, then health</td>
+<td>Soft restart when APIs still respond</td>
+</tr>
+<tr>
+<td><strong><code>axonrevive</code></strong></td>
+<td>Force-kill control-plane → restart all three → health</td>
+<td>Empty shell, hung health, wedged worker</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-bash">axonhealth
+axonrestart
+axonrevive
+</code></pre>
+<p>Repo scripts (same behavior without PATH):</p>
+<pre><code class="language-bash">./scripts/ops/axonhealth.sh
+./scripts/ops/axonrestart.sh
+./scripts/ops/axonrevive.sh
+</code></pre>
+<p>Open console after revive: <strong>http://127.0.0.1:4173</strong> (hard-refresh).</p>
+<h3>Console-web rebuild (always-on <code>:4173</code>)</h3>
+<p><code>:4173</code> serves the <strong>built</strong> <code>apps/console-web/dist</code> via systemd <code>console-web.service</code>. Source edits (including Vite <code>:5173</code>) are <strong>not</strong> live on <code>:4173</code> until:</p>
+<pre><code class="language-bash">npm run build -w @axon-watch/console-web
+systemctl --user restart console-web.service
+# then hard-refresh http://127.0.0.1:4173
+</code></pre>
+<h3>Local verify loop</h3>
+<pre><code class="language-bash">./scripts/ops/change-verify-loop.sh              # dirty working tree
+./scripts/ops/change-verify-loop.sh --head-only  # committed HEAD only
+./scripts/ops/change-verify-loop.sh --watch
+</code></pre>
+<h3>Dev bootstrap (when systemd is not owning ports)</h3>
+<pre><code class="language-bash">./scripts/dev/up.sh
+./scripts/dev/down.sh
+./scripts/dev/check-health.sh
+</code></pre>
+</div></section><section class="chapter" id="chapter-upgrading-and-updating"><div class="chapter-header"><span class="chapter-num">27</span><h2 id="upgrading-and-updating">Upgrading and updating</h2></div><div class="chapter-body">
+<p>After pulling new commits or changing dependencies:</p>
+<pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
+git pull
+npm install
+./scripts/dev/down.sh &amp;&amp; ./scripts/dev/up.sh
+npm run verify:production-operator
+</code></pre>
+<p>Sync planning docs back to axon-local when Axon-Watch planning changed:</p>
+<pre><code class="language-bash">python3 scripts/ops/sync_planning_mirror_to_axon_local.py
+</code></pre>
+<p>Hard-refresh <code>:4173</code> after frontend changes. Restart the stack after control-plane or watch route changes.</p>
+<h2>Tip 1: Read the planning bundle before expanding semantics</h2>
+<p>The planning bundle is not optional context. It is the definition of intended
+meaning.</p>
+<h2>Tip 2: Treat <code>packages/shared-types/</code> as sacred</h2>
+<p>If the frontend and backend disagree, fix it here first.</p>
+<h2>Tip 3: Keep slices narrow</h2>
+<p>The repo is intentionally growing by thin slices.</p>
+<p>If you are touching:</p>
+<ul>
+<li>run-state</li>
+<li>runtime summary</li>
+<li>signals</li>
+<li>approvals</li>
+</ul>
+<p>then keep the slice tightly bounded and verifiable.</p>
+<h2>Tip 4: Prefer fixtures early</h2>
+<p>Fixtures are useful in early slices because they:</p>
+<ul>
+<li>keep contracts concrete</li>
+<li>make DTO size checks easy</li>
+<li>let frontend and backend agree before deeper logic exists</li>
+</ul>
+<h2>Tip 5: Use the verify harness even when it is not strict</h2>
+<p><code>PENDING</code> today becomes <code>PASS</code> or <code>FAIL</code> tomorrow.</p>
+<p>The harness is part of how this repo avoids drifting back into a monolith.</p>
+<h2>Tip 6: Distinguish “bootstrap-real” from “feature-real”</h2>
+<p>Something can be real enough to run and still be intentionally shallow.</p>
+<p>Current examples:</p>
+<ul>
+<li>runtime summary endpoint is real</li>
+<li>runtime summary assembly is still bootstrap-thin</li>
+<li>axon-watch emits <code>signal_runtime_summary_degraded</code> with bootstrap-aware copy
+  (<code>Bootstrap: runtime summary stale</code>) while watch connectivity is healthy — this
+  is expected local scaffolding, not a production outage</li>
+</ul>
+<p>That distinction matters during review.</p>
+<h2>Tip 7: Do not overreact to incomplete polish</h2>
+<p>Prefer contracts and verify harness first; cosmetic cleanup can wait.</p>
+</div></section><section class="chapter" id="chapter-what-a-good-next-slice-looks-like"><div class="chapter-header"><span class="chapter-num">28</span><h2 id="what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</h2></div><div class="chapter-body">
+<p>A good next slice should:</p>
+<ul>
+<li>keep shared contract semantics stable</li>
+<li>improve one owned behavior</li>
+<li>preserve boot simplicity</li>
+<li>come with verification</li>
+</ul>
+<p><strong>Completed thin slices (do not re-do):</strong></p>
+<ul>
+<li>bootstrap + shared contracts + runtime summary</li>
+<li>first watch signal path</li>
+<li>npm workspace dev ergonomics</li>
+<li>first run lifecycle (create → executing → complete)</li>
+<li>startup supervision reliability (<code>scripts/dev/lib/common.sh</code>)</li>
+<li>stop/resume, approval, review-ready, SQLite persistence, and briefing-backed
+  dock projections</li>
+<li>workspace list + backend PTY terminal + file-backed Monaco host + nested
+  explorer tree + new-file creation + active-file rename + resizable bottom terminal dock</li>
+<li>richer inbox ranking (severity, recency, unresolved duration, status,
+  action-type, workspace priority)</li>
+<li>split shell regions (<code>TopBar</code>, <code>LeftSidebar</code>, <code>CenterWorkbench</code>, <code>RightDock</code>,
+  <code>StatusBar</code>) with mockup-shell HUD chrome</li>
+<li>Conversation and Command dock seams backed by control-plane chat endpoints
+  (<code>POST /api/chat/messages</code>, <code>GET /api/workspaces/{workspace_id}/chat/thread</code>,
+  <code>GET /api/chat/threads/{thread_id}/history</code>)</li>
+</ul>
+<p><strong>Suggested next slices (2026-07-04):</strong></p>
+<ol>
+<li><strong>Coordinator</strong> — KAIRO operator-presence integration when explicitly assigned</li>
+<li><strong>Lane B</strong> — agent orchestration hook for chat messages (beyond system ack stub)</li>
+</ol>
+<p>Bad next slices:</p>
+<ul>
+<li>broad UI rewrite</li>
+<li>expanding multiple semantic families at once</li>
+<li>changing run-state and signal-state in one uncontrolled pass</li>
+<li>skipping verification because “it is still early”</li>
+<li>claiming full IDE parity when workspace file operations are still intentionally
+  thin-slice (open, edit, save, create, rename) rather than a full VS Code clone</li>
+</ul>
+</div></section><section class="chapter" id="chapter-final-guidance"><div class="chapter-header"><span class="chapter-num">29</span><h2 id="final-guidance">Final Guidance</h2></div><div class="chapter-body">
+<p>If you are unsure what to do next, choose the smaller move that:</p>
+<ul>
+<li>preserves ownership</li>
+<li>strengthens verification</li>
+<li>reduces placeholders</li>
+<li>keeps the shell boot-safe</li>
+</ul>
+<p>That is the design center of this repo right now.</p>
+<hr>
+</div></section><section class="chapter" id="chapter-ci-merge-workflow-and-worker-agents"><div class="chapter-header"><span class="chapter-num">30</span><h2 id="ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-22</p>
+<p>This chapter explains how Axon-X lands code through GitHub CI, how that relates
+to the <code>dev</code> branch, and how <strong>company employee agents</strong> (the roster in IDE /
+Mission Control) work — including how to tell whether they are actually running
+and how good the automation is today.</p>
+<p><strong>Related:</strong> <a href="../CI_GATES.md"><code>docs/CI_GATES.md</code></a>, <a href="../planning/EXECUTION_PLAN.md"><code>docs/planning/EXECUTION_PLAN.md</code></a>,
+<a href="recent-operator-features.md"><code>recent-operator-features.md</code></a></p>
+<hr>
+<h3>Names — do not confuse these</h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Axon-X Fast Gate</strong></td>
+<td>GitHub Actions workflow (<code>.github/workflows/fast-gate.yml</code>) — automated tests on every push and PR</td>
+</tr>
+<tr>
+<td><strong>GitHub → Agents tab</strong></td>
+<td>GitHub product UI (Copilot / cloud agents). <strong>Not</strong> the Axon company roster</td>
+</tr>
+<tr>
+<td><strong>Company roster / employee agents</strong></td>
+<td>Config-driven roles (<code>Night Watch</code>, <code>Shell Craft</code>, …) in <code>config/workspace-agents.json</code> — continuous workers on a schedule</td>
+</tr>
+<tr>
+<td><strong>Lane B / IDE agent</strong></td>
+<td>Cursor CLI agent runs you start from the IDE composer (operator-driven)</td>
+</tr>
+<tr>
+<td><strong>Cursor worker-server</strong></td>
+<td>Internal Cursor subprocess; not an Axon employee by itself</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3>CI and merge — how it works</h3>
+<h4>Integration truth</h4>
+<table>
+<thead>
+<tr>
+<th>Branch</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>dev</code></strong></td>
+<td>Integration branch. Protected on GitHub — <strong><code>fast-gate</code> must pass</strong> before merge</td>
+</tr>
+<tr>
+<td><strong><code>feat/*</code></strong></td>
+<td>One feature slice per branch (e.g. <code>feat/operator-console</code>)</td>
+</tr>
+<tr>
+<td><strong><code>master</code></strong></td>
+<td>Legacy default; <strong>not</strong> the day-to-day Axon-X integration target</td>
+</tr>
+</tbody>
+</table>
+<p>Day-to-day console work targets <strong><code>dev</code></strong> via pull request. Do not camp on
+<code>master</code> for operator-console slices.</p>
+<h4>What triggers CI</h4>
+<p>Workflow: <strong>Axon-X Fast Gate</strong> (<code>.github/workflows/fast-gate.yml</code>)</p>
+<p>Runs on:</p>
+<ul>
+<li>every <strong>push</strong> to any branch</li>
+<li>every <strong>pull_request</strong> (open, sync, reopen)</li>
+</ul>
+<p>In the GitHub UI: <strong>Actions</strong> → workflow runs show green ✓ or red ✗. A PR also
+shows the same check on the PR page.</p>
+<h4>Poll Fast Gate from the terminal (required after every push)</h4>
+<p>Agents and operators should <strong>not</strong> wait for someone to notice a red run:</p>
+<pre><code class="language-bash">./scripts/ops/watch-fast-gate.sh
+## or follow a known run id:
+./scripts/ops/watch-fast-gate.sh 29925529734
+</code></pre>
+<p>On failure:</p>
+<pre><code class="language-bash">gh run view --log-failed
+## Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json
+</code></pre>
+<p><strong>Axon-X company ownership:</strong> Rowan (watcher) + Mira (Lead) own Fast Gate for
+<code>workspace_axon_watch</code>. Quinn (integrations) supports Actions wiring.</p>
+<h4>What Fast Gate runs (~2–3 minutes)</h4>
+<ol>
+<li><strong><code>npm run verify:contracts</code></strong> — shared types, control-plane/watch contract
+   unit tests, file-size ratchets</li>
+<li><strong><code>npm run verify:hotspot-changes</code></strong> — critical hotspots must shrink or stay
+   within budget when changed (PR compares against base branch)</li>
+<li><strong><code>npm run verify:console-web</code></strong> — Vue typecheck, full Vitest suite, production build</li>
+<li><strong><code>scripts/verify/all.py --strict-pending</code></strong> — import boundaries, DTO budgets,
+   ADR governance, latency scaffold</li>
+</ol>
+<p>If any step fails, the run is red and <strong><code>dev</code> cannot merge</strong> that PR until fixed.</p>
+<h4>Operator merge workflow</h4>
+<pre><code class="language-text">feat/my-slice  →  push  →  open PR to dev  →  fast-gate green  →  merge  →  git pull origin dev
+</code></pre>
+<p>Step by step:</p>
+<ol>
+<li><strong>Work on a feature branch</strong> (not directly on <code>dev</code>).</li>
+<li><strong>Commit focused slices</strong> — one concern per PR when possible (worker scheduler
+   separate from IDE chrome, separate from connector parity).</li>
+<li><strong>Push</strong> the branch (<code>git push -u origin feat/my-slice</code>).</li>
+<li><strong>Open a PR</strong> to <code>dev</code> (<code>gh pr create --base dev --head feat/my-slice</code>).</li>
+<li><strong>Wait for <code>fast-gate</code></strong> — green on the PR (not only on an earlier push).</li>
+<li><strong>Merge</strong> when green (GitHub UI or <code>gh pr merge</code>).</li>
+<li><strong>Sync locally:</strong> <code>git fetch origin dev &amp;&amp; git checkout feat/my-slice &amp;&amp; git merge origin/dev</code> (or rebase per team habit).</li>
+</ol>
+<p><strong>Important:</strong> A green check on an old push does <strong>not</strong> guarantee the open PR
+is green. Always read the check on the <strong>PR</strong> itself.</p>
+<h4>Local preflight (before you push)</h4>
+<pre><code class="language-bash">npm run verify:preflight   # via scripts/sc on commit — blocks bad commits locally
+npm run verify:contracts   # fastest backend + ratchet signal
+cd apps/console-web &amp;&amp; npm run typecheck &amp;&amp; npm run test
+</code></pre>
+<p>Full local bundle (slower):</p>
+<pre><code class="language-bash">npm run verify
+</code></pre>
+<h4>Nightly gate (not on every PR)</h4>
+<p>Workflow: <code>.github/workflows/nightly-verify.yml</code> — live stack evidence. See
+<a href="../CI_GATES.md"><code>docs/CI_GATES.md</code></a>.</p>
+<hr>
+<h3>Worker / employee agents — how they work</h3>
+<h4>What they are</h4>
+<p>Axon-X models each workspace as a <strong>small company</strong> with named employees
+(lead, watcher, frontend, backend, integrations). Configuration lives in:</p>
+<ul>
+<li><strong><code>config/workspace-agents.json</code></strong> — companies, roles, schedules, <code>owns</code> text</li>
+<li><strong><code>services/control-plane/app/workspace_agents/</code></strong> — load config, derive status, scheduler</li>
+</ul>
+<p>UI:</p>
+<ul>
+<li><strong>IDE → TEAM tab</strong> (<code>IdeTeamPanel</code> → <code>CompanyRosterPanel</code>)</li>
+<li><strong>Talk / Assign</strong> — pre-fills the IDE composer (operator-driven); does not by
+  itself start a scheduled worker</li>
+</ul>
+<h4>Schedules</h4>
+<table>
+<thead>
+<tr>
+<th>Schedule</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>on_demand</code></td>
+<td>No automatic shift (typical for <strong>lead</strong>)</td>
+</tr>
+<tr>
+<td><code>always_on</code></td>
+<td>Watcher-style; scheduler starts bounded shifts (e.g. <strong>Night Watch</strong>)</td>
+</tr>
+<tr>
+<td><code>continuous</code></td>
+<td>Specialist roles (frontend, backend, integrations) get recurring shifts</td>
+</tr>
+</tbody>
+</table>
+<p>Skipped from auto-schedule: <code>lead</code>, <code>overview_agent</code>.</p>
+<h4>Scheduler loop (WA-1)</h4>
+<p>When the control plane starts (<code>services/control-plane/app/bootstrap.py</code>):</p>
+<ol>
+<li><strong><code>start_continuous_worker_scheduler()</code></strong> runs a background tick (default <strong>every 45s</strong>).</li>
+<li>Each tick, for each <code>always_on</code> / <code>continuous</code> employee without an active
+   role-tagged run, the scheduler:
+   - <strong><code>create_run(..., employee_role=&lt;role&gt;)</code></strong> — run record in SQLite
+   - <strong><code>dispatch_continuous_worker_run()</code></strong> — headless Lane B with a role-scoped
+     prompt (<code>worker_prompt.py</code> → <code>worker_dispatch.py</code> → Cursor/Codex CLI)</li>
+</ol>
+<p>Guards (so one restart cannot flood the fleet):</p>
+<ul>
+<li><strong><code>MAX_STARTS_PER_TICK</code></strong> (6) — cap new starts per tick</li>
+<li><strong><code>MAX_ACTIVE_EXECUTING</code></strong> (24) — skip new starts when executing debt is high</li>
+<li>Per-role gate — only one busy shift per <code>(workspace_id, employee_role)</code> at a time</li>
+</ul>
+<h4>Environment knobs (<code>.env</code> / vault)</h4>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AXON_WATCH_WORKER_SCHEDULER</code></td>
+<td><code>1</code></td>
+<td>Enable/disable scheduler</td>
+</tr>
+<tr>
+<td><code>AXON_WATCH_WORKER_SCHEDULER_DISPATCH</code></td>
+<td><code>1</code></td>
+<td>Lane B dispatch after <code>create_run</code></td>
+</tr>
+<tr>
+<td><code>AXON_WATCH_WORKER_SCHEDULER_INTERVAL_SECONDS</code></td>
+<td><code>45</code></td>
+<td>Tick interval</td>
+</tr>
+<tr>
+<td><code>AXON_WATCH_WORKER_RUN_STALE_SECONDS</code></td>
+<td><code>720</code></td>
+<td>Fail/cancel idle role-tagged shifts older than this</td>
+</tr>
+<tr>
+<td><code>AXON_WATCH_EMPLOYEE_RUN_RETENTION_PER_ROLE</code></td>
+<td><code>8</code></td>
+<td>Keep this many finished role-tagged runs per workspace/role</td>
+</tr>
+<tr>
+<td><code>AXON_WATCH_REVIEW_READY_STALE_SECONDS</code></td>
+<td><code>14400</code></td>
+<td>Auto-complete idle untagged <code>review_ready</code> checkpoints older than this</td>
+</tr>
+</tbody>
+</table>
+<p>Disable scheduler in tests: <code>AXON_WATCH_WORKER_SCHEDULER=0</code>.</p>
+<p>Staffing file override: <code>AXON_WATCH_WORKSPACE_AGENTS_FILE</code> (path to JSON).</p>
+<h4>Stale shifts and history retention</h4>
+<p>Hung role-tagged runs can block the next shift for that role. The control plane:</p>
+<ul>
+<li>Reaps idle employee runs on each scheduler tick and on startup</li>
+<li>Exposes <code>POST /api/runs/reconcile-stale</code> for an on-demand reap</li>
+<li>Drains finished employee-run history beyond the per-role retention window on
+  startup / <code>POST /api/runs/prune-employee-history</code> (scheduler ticks prune in
+  smaller batches so shifts stay responsive)</li>
+<li>Completes abandoned untagged <code>review_ready</code> checkpoints on startup, each
+  scheduler tick, and <code>POST /api/runs/reconcile-review-ready</code> so briefing stays
+  honest when review was never dismissed</li>
+</ul>
+<p>Approval waits are never auto-completed or pruned. Fresh review checkpoints stay
+until the idle TTL elapses.</p>
+<hr>
+<h3>How to know if employee agents are working</h3>
+<h4>1. Company roster (UI)</h4>
+<p>IDE mode → <strong>TEAM</strong> tab (or operator company panel). Each employee shows a status:
+<code>idle</code>, <code>watching</code>, <code>executing</code>, <code>planning</code>, <code>verifying</code>, etc.</p>
+<p><strong>Good sign:</strong> specialists (<code>frontend</code>, <code>backend</code>, …) move to <strong><code>executing</code></strong>
+when their shift is active, not only the lead mirroring any workspace run.</p>
+<h4>2. Mission Control / runs API</h4>
+<pre><code class="language-bash">curl -sS http://127.0.0.1:8787/api/runs | python3 -c &quot;
+import sys, json
+runs = json.load(sys.stdin)
+if isinstance(runs, dict): runs = runs.get('runs', runs.get('items', []))
+for r in runs:
+    if r.get('employee_role') and r.get('phase') not in ('completed','failed','cancelled'):
+        print(r['run_id'], r['workspace_id'], r['employee_role'], r['phase'], r.get('summary','')[:50])
+&quot;
+</code></pre>
+<p><strong>Good sign:</strong></p>
+<ul>
+<li><code>employee_role</code> is set (<code>watcher</code>, <code>frontend</code>, …)</li>
+<li><code>phase</code> is <code>executing</code> (or progresses to <code>completed</code> / <code>failed</code> with receipts)</li>
+<li>Summary mentions <code>continuous worker shift</code></li>
+</ul>
+<p><strong>Bad sign (phantom worker):</strong> <code>executing</code> forever with <strong>no</strong> <code>cursor-agent</code>
+process and <strong>no</strong> <code>runtime_dispatch</code> receipt on the run history.</p>
+<h4>3. Live CLI processes</h4>
+<pre><code class="language-bash">pgrep -af 'cursor-agent.*agent --print' | head
+</code></pre>
+<p>You should see prompts like <em>"You are Shell Craft, the frontend employee for
+workspace workspace_axon_watch…"</em> when dispatch is active.</p>
+<h4>4. Control plane health</h4>
+<pre><code class="language-bash">./scripts/dev/check-health.sh
+curl -sS http://127.0.0.1:8787/api/health
+</code></pre>
+<h4>5. Agent shift digests (optional)</h4>
+<p>When agents write them, receipts live under <strong><code>docs/ops/agent-reports/</code></strong>
+(untracked until committed). Use for human-readable "what this shift did."</p>
+<h4>6. Unit tests</h4>
+<pre><code class="language-bash">PYTHONPATH=services/control-plane python3 -B -m unittest \
+  tests.test_workspace_agent_scheduler \
+  tests.test_workspace_worker_prompt \
+  tests.test_workspace_agents -q
+</code></pre>
+<hr>
+<h3>How good are they? (honest assessment)</h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Today</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Visibility</strong></td>
+<td>Roster + runs show role and phase</td>
+<td>Same, plus ranked coaching in briefing (SA-2)</td>
+</tr>
+<tr>
+<td><strong>Autonomy</strong></td>
+<td>Bounded scheduled shifts with role prompts</td>
+<td>Continuous office cadence + checkpoint "meetings"</td>
+</tr>
+<tr>
+<td><strong>Continuity</strong></td>
+<td>One shift per role; tick every 45s</td>
+<td>Stale reaper + handoff memory across shifts</td>
+</tr>
+<tr>
+<td><strong>Quality of work</strong></td>
+<td>Depends on Lane B + workspace scope; can edit/run in bound repo</td>
+<td>Role-scoped playbooks (e.g. DashPro CI triage)</td>
+</tr>
+<tr>
+<td><strong>Safety</strong></td>
+<td>Debt caps, no auto-start for lead; dispatch uses controlled prompts</td>
+<td>Autonomy ladder per workspace (<code>observe</code> → <code>full</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>They are real workers when:</strong> Lane B dispatch is on, <code>cursor-agent</code> is running
+with the role prompt, and runs complete or fail with receipts — not when the
+scheduler only created an <code>executing</code> row.</p>
+<p><strong>They are not yet:</strong> a full autonomous company that manages its own PRs,
+branches, or SA-2 coaching — that is the next execution slices on <code>dev</code>.</p>
+<hr>
+<h3>Quick reference commands</h3>
+<pre><code class="language-bash">## CI locally
+npm run verify:contracts
+npm run verify:console-web
+
+## Open PR
+gh pr create --base dev --head feat/my-slice --title &quot;...&quot; --body &quot;...&quot;
+
+## PR checks
+gh pr checks
+
+## Worker scheduler tests
+PYTHONPATH=services/control-plane python3 -B -m unittest tests.test_workspace_agent_scheduler -q
+
+## Stale reconcile (when loaded on CP)
+curl -X POST http://127.0.0.1:8787/api/runs/reconcile-stale
+</code></pre>
+<p><strong>PDF:</strong> This chapter is bundled into <code>~/Desktop/Axon-X-How-To-Handbook.pdf</code> when you run
+<code>./scripts/docs/build-howto-handbook-pdf.sh</code> (rebuild after handbook edits).</p>
+<hr>
+<h2>Autonomy gates &amp; service identity (operator directives)</h2>
+<p><strong>Do this in order. Do not skip ahead.</strong></p>
+<p>This page is the short, directive companion to
+<a href="../AXON-X-AUTONOMY-MASTER-PLAN.md"><code>docs/AXON-X-AUTONOMY-MASTER-PLAN.md</code></a>.
+It tells you <strong>what to turn on</strong>, <strong>what to leave off</strong>, and <strong>how to prove it</strong>.</p>
+<p><strong>Last updated:</strong> 2026-07-22</p>
+<hr>
+<h3>1. Current gate status (what “done” means)</h3>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Status</th>
+<th>You must</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>0–1</strong></td>
+<td>Closed</td>
+<td>Keep a known-good commit; do not mix unrelated dirty trees into autonomy PRs</td>
+</tr>
+<tr>
+<td><strong>2 thin + residuals</strong></td>
+<td>Closed</td>
+<td>Use <code>local_token</code> on any non-loopback surface; set operator + internal tokens</td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td>Closed</td>
+<td>Continuous workers use disposable <code>worker/&lt;run_id&gt;</code> worktrees only</td>
+</tr>
+<tr>
+<td><strong>4</strong></td>
+<td>Closed</td>
+<td>Continuous workers only run from a <strong>leased task</strong>; scheduler stays <strong>off</strong> until you intentionally enable it</td>
+</tr>
+<tr>
+<td><strong>5</strong></td>
+<td>Closed</td>
+<td>Use Lead plan/fan-out/replan APIs; keep scheduler off until Gate 6 verification lands</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Scheduler rule (non-negotiable for now):</strong> keep continuous workers
+<code>effective_enabled: false</code> unless you are deliberately testing Gate 4 with a
+bounded task board and you are watching the machine.</p>
+<p>Check:</p>
+<pre><code class="language-bash">curl -sS http://127.0.0.1:8787/api/worker-scheduler | jq '{scheduler_enabled, effective_enabled, executing_count}'
+</code></pre>
+<p>Expect <code>effective_enabled: false</code> on the daily-driver host.</p>
+<hr>
+<h3>2. Gate 4 — Task ledger (how to use it)</h3>
+<h4>What it is</h4>
+<p>Every continuous worker shift must bind to one durable task with:</p>
+<ul>
+<li>goal + acceptance criteria</li>
+<li>owner role</li>
+<li>attempt budget</li>
+<li>lease holder + expiry</li>
+<li>terminal outcome (<code>completed</code> / <code>failed</code> / <code>cancelled</code>)</li>
+</ul>
+<p>Mission Control shows the board (open / leased / done / failed).</p>
+<h4>Operator actions</h4>
+<ol>
+<li><strong>Create a task</strong> (API or Mission Control task board):
+   - <code>POST /api/workspaces/{workspace_id}/tasks</code></li>
+<li><strong>Leave the scheduler off</strong> unless you mean to run continuous workers.</li>
+<li>When a worker claims work, the control plane <strong>leases</strong> the task, creates a run
+   with that <code>task_id</code>, and refuses dispatch without a leased task.</li>
+<li>Long shifts <strong>renew</strong> the lease at dispatch start so mid-run expiry does not
+   silently drop ownership.</li>
+<li>Dependencies must be <code>completed</code> before a dependent task can lease.</li>
+</ol>
+<h4>Do / Don’t</h4>
+<table>
+<thead>
+<tr>
+<th>Do</th>
+<th>Don’t</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Create explicit tasks before enabling continuous workers</td>
+<td>Let workers “pick something useful” without a task ID</td>
+</tr>
+<tr>
+<td>Keep attempt budgets small (default 3)</td>
+<td>Leave infinite retries</td>
+</tr>
+<tr>
+<td>Cancel obsolete open tasks when goals change</td>
+<td>Leave stale open tasks for the wrong role</td>
+</tr>
+<tr>
+<td>Verify with <code>tests.test_gate4_task_ledger</code></td>
+<td>Treat Gate 4 as done if only the UI exists</td>
+</tr>
+</tbody>
+</table>
+<p>Proof commands:</p>
+<pre><code class="language-bash">./scripts/dev/python.sh -m unittest tests.test_gate4_task_ledger -q
+curl -sS http://127.0.0.1:8787/api/workspaces/workspace_demo/tasks | jq .
+</code></pre>
+<hr>
+<h3>3. Gate 5 — Lead planner (how to use it)</h3>
+<h4>Operator actions</h4>
+<ol>
+<li>Preview a goal as an ordered DAG:
+   <code>POST /api/workspaces/{workspace_id}/lead/plan</code></li>
+<li>Materialize tasks and dependency-ready specialist runs:
+   <code>POST /api/workspaces/{workspace_id}/lead/fan-out</code></li>
+<li>When the goal changes, use:
+   <code>POST /api/workspaces/{workspace_id}/lead/replan</code>
+   — do not manually leave obsolete tasks open.</li>
+<li>After all specialist tasks are terminal, call:
+   <code>POST /api/lead/plans/{plan_id}/synthesize</code></li>
+</ol>
+<h4>Safety rules</h4>
+<ul>
+<li>Lead assigns only company-roster specialist roles.</li>
+<li>Exact and parent/child path overlaps cannot lease concurrently.</li>
+<li>Explicit replans stop/cancel obsolete active work and persist receipts.</li>
+<li>“Check with all teammates” creates one leased task/run per specialist; it never
+  picks one winner. It does not automatically open IDE tabs.</li>
+<li>Keep the continuous scheduler <strong>off</strong>. Gate 5 creates ready runs but does not
+  authorize unattended verification.</li>
+</ul>
+<p>Proof:</p>
+<pre><code class="language-bash">./scripts/dev/python.sh -m unittest \
+  tests.test_lead_task_plan \
+  tests.test_lead_fan_out \
+  tests.test_lead_replan -q
+</code></pre>
+<hr>
+<h3>4. Watch service identity (token + proxy mTLS)</h3>
+<p>Control-plane talks to watch on <code>/internal/watch/*</code>. That path must never be
+anonymous on a reachable host.</p>
+<h4>Minimum (required on remote)</h4>
+<p>Set the <strong>same</strong> shared token on control-plane and watch:</p>
+<pre><code class="language-bash">## ~/.config/axon-watch/deployment.env
+AXON_WATCH_INTERNAL_SERVICE_TOKEN=&lt;long random secret&gt;
+AXON_WATCH_REMOTELY_REACHABLE=1   # or a non-loopback AXON_WATCH_PUBLIC_BASE_URL
+</code></pre>
+<p><strong>Do:</strong> generate with <code>openssl rand -hex 24</code><br>
+<strong>Don’t:</strong> leave the token empty on a tunnel / public URL<br>
+<strong>Don’t:</strong> expose watch port <code>:8788</code> on the public internet</p>
+<p>When remotely reachable, watch <strong>refuses</strong> mutating internal routes if the token
+is missing (HTTP 503) or wrong (HTTP 401).</p>
+<h4>Proxy mTLS capability (deployment proof required)</h4>
+<p>Axon-X supports proxy-verified client certificates <strong>plus</strong> the shared token.
+This is not end-to-end proof by itself: the proxy must strip incoming
+verification headers, verify the certificate, and be the only network path to
+watch.</p>
+<ol>
+<li>Mint certs once:</li>
+</ol>
+<pre><code class="language-bash">./scripts/ops/mint-watch-mtls.sh
+## writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}
+</code></pre>
+<ol start="2">
+<li>Put this in <code>deployment.env</code> (both services):</li>
+</ol>
+<pre><code class="language-bash">AXON_WATCH_MTLS_REQUIRED=1
+AXON_WATCH_MTLS_CA_FILE=$HOME/.config/axon-watch/mtls/ca.crt
+AXON_WATCH_MTLS_CLIENT_CERT=$HOME/.config/axon-watch/mtls/client.crt
+AXON_WATCH_MTLS_CLIENT_KEY=$HOME/.config/axon-watch/mtls/client.key
+AXON_WATCH_MTLS_ALLOWED_CN=axon-control-plane
+</code></pre>
+<ol start="3">
+<li>Configure the reverse proxy in front of watch to verify the client cert and
+   forward:</li>
+</ol>
+<ul>
+<li><code>X-SSL-Client-Verify: SUCCESS</code></li>
+<li><code>X-SSL-Client-S-DN: CN=axon-control-plane</code></li>
+</ul>
+<ol start="4">
+<li>Restart: <code>axonrestart</code></li>
+</ol>
+<p><strong>Do:</strong> keep token <strong>and</strong> mTLS together<br>
+<strong>Don’t:</strong> enable <code>AXON_WATCH_MTLS_REQUIRED=1</code> without proxy verify headers (every
+mutating watch call will 401)<br>
+<strong>Don’t:</strong> commit private keys into git</p>
+<p>Proof:</p>
+<pre><code class="language-bash">./scripts/dev/python.sh -m unittest tests.test_gate2_auth_containment.Gate2WatchInternalTokenTests -q
+</code></pre>
+<hr>
+<h3>5. Control-plane operator auth (reminder)</h3>
+<p>On any remotely reachable console:</p>
+<pre><code class="language-bash">AXON_WATCH_AUTH_MODE=local_token
+AXON_WATCH_OPERATOR_TOKEN=&lt;strong secret&gt;
+AXON_WATCH_AUTH_ALLOW_LOOPBACK=0
+</code></pre>
+<p>Remote surfaces <strong>force</strong> <code>local_token</code> even if env still says <code>placeholder</code>.
+Full Access / exact-effect on remote also require step-up header
+<code>X-Axon-Step-Up</code> (<code>full-access</code> or <code>exact-effect</code>).</p>
+<hr>
+<h3>6. Verify before you claim a gate closed</h3>
+<pre><code class="language-bash">npm run verify:contracts
+npm run verify:console-web
+## then push and confirm Axon-X Fast Gate is green on GitHub
+</code></pre>
+<p>Evidence lives under <code>docs/ops/agent-reports/</code> and the roll-up log
+<code>docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md</code>.</p>
+<hr>
+<h3>7. What to build next</h3>
+<ol>
+<li>Gate 6 — mandatory verifier contract  </li>
+<li>Keep scheduler off until failed verification blocks completion  </li>
+<li>Do not expand mobile mutation until this page’s remote auth + mTLS steps are live on that host</li>
+</ol>
+<hr>
+</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">42</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-22<br>
+<strong>Audience:</strong> operators and agents who need plain-language “what changed and how to use it.”</p>
+<p>Companion to <a href="../HOW-TO-HANDBOOK.md"><code>docs/HOW-TO-HANDBOOK.md</code></a> and
+<a href="autonomy-gates-and-service-identity.md"><code>autonomy-gates-and-service-identity.md</code></a>.</p>
+<hr>
+<h3>1. Mission Control task board (Gate 4)</h3>
+<h4>Where it is (easy to miss)</h4>
+<p><strong>Mission Control</strong> is the Operator <strong>center panel</strong> — but only in <strong>Grid</strong> view.</p>
+<p>Your Brain Graph starfield (VAXON CORE / DashPro orbs) is Operator too; it <strong>replaces</strong>
+the Mission Control title, Fleet health, and Task board until you leave Graph.</p>
+<table>
+<thead>
+<tr>
+<th>You are here</th>
+<th>How to open Task board</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Top nav <strong>OPERATOR</strong> + Brain Graph</td>
+<td>Click <strong>Mission Control</strong> in the bottom status chips, <strong>or</strong> <strong>Mission Control · Task board</strong> in the right Intelligence panel</td>
+</tr>
+<tr>
+<td>Operator Grid already</td>
+<td>Scroll under <strong>Fleet health</strong> → section <strong>Task board</strong></td>
+</tr>
+<tr>
+<td>Top nav <strong>IDE</strong></td>
+<td>Click <strong>OPERATOR</strong> first, then use Grid / Mission Control as above</td>
+</tr>
+</tbody>
+</table>
+<p>On Grid you should see the heading <strong>Mission Control</strong>, then <strong>GRID | BRAIN</strong>, then
+<strong>Fleet health</strong>, then <strong>Task board</strong>.</p>
+<h4>What the task board is</h4>
+<p>A durable <strong>task ledger</strong>. Continuous workers may only start when they <strong>lease</strong> an
+open task. Chat in the IDE is separate (see “Talk vs do work” below).</p>
+<h4>How to use it</h4>
+<ol>
+<li>Top nav → <strong>OPERATOR</strong>.</li>
+<li>Leave Brain Graph: <strong>Mission Control</strong> chip (or Intelligence → <strong>Mission Control · Task board</strong>).</li>
+<li>Under <strong>Fleet health</strong>, use <strong>Task board</strong>.</li>
+<li>Create a goal + owner role (e.g. <code>integrations</code>).</li>
+<li>Leave the worker scheduler <strong>off</strong> unless you intentionally want continuous shifts.</li>
+</ol>
+<h4>Talk vs do work (IDE teammate modes)</h4>
+<p>In the IDE agent dock, open the mode chip (bottom-right, often <strong>Agent FULL ACCESS</strong>):</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ask</strong></td>
+<td>Simple conversation — “thanks”, questions, status — <strong>no</strong> edits/tools</td>
+</tr>
+<tr>
+<td><strong>Plan</strong></td>
+<td>Map steps before changing code</td>
+</tr>
+<tr>
+<td><strong>Agent</strong></td>
+<td>Do the task — tools, edits, approvals</td>
+</tr>
+<tr>
+<td><strong>Debug</strong></td>
+<td>Reproduce and fix with evidence</td>
+</tr>
+<tr>
+<td>Task board / Lead fan-out</td>
+<td>Durable assigned work across specialists (Gate 4–5)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Examples</strong></p>
+<ul>
+<li>“Thank you Dana!” / “I am thinking…” → stay on <strong>Ask</strong> (conversation).</li>
+<li>“Ok proceed with that.” / “Fix the payments race” → <strong>Agent</strong> (task).</li>
+<li>“Check with all sub-agents…” → Lead fan-out (N tasks/runs), not one specialty winner.</li>
+</ul>
+<h4>Example — seed work for Soren</h4>
+<pre><code class="language-bash">curl -sS -X POST http://127.0.0.1:8787/api/workspaces/workspace_dashpro/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{
+    &quot;goal&quot;: &quot;Verify quality-gate heap calc does not OOM CI&quot;,
+    &quot;acceptance_criteria&quot;: &quot;Targeted node-heap tests pass with receipts&quot;,
+    &quot;owner_role&quot;: &quot;integrations&quot;,
+    &quot;attempt_budget&quot;: 2
+  }' | jq '{task_id, status, owner_role}'
+</code></pre>
+<p>Expect <code>"status": "open"</code>. When the scheduler is enabled, that role claims/leases it
+before <code>create_run</code>.</p>
+<h4>Example — list open tasks</h4>
+<pre><code class="language-bash">curl -sS 'http://127.0.0.1:8787/api/workspaces/workspace_dashpro/tasks?status=open' \
+  | jq '.items[] | {task_id, goal, owner_role}'
+</code></pre>
+<hr>
+<h3>2. Concurrent IDE conversation tabs</h3>
+<h4>What changed</h4>
+<p>Switching conversation tabs <strong>no longer stops</strong> another teammate’s live stream.
+Each IDE thread keeps its own SSE session.</p>
+<h4>Example</h4>
+<ol>
+<li>Start an agent on <strong>Soren</strong>.</li>
+<li>Open <strong>Marco</strong> and start (or watch) another run.</li>
+<li>Switch back to Soren — his stream continues; the busy glow stays on both tabs.</li>
+</ol>
+<p>Stop still applies to the <strong>focused</strong> thread only.</p>
+<hr>
+<h3>3. Brain Graph workspace labels + colors</h3>
+<h4>What changed</h4>
+<p>Every <strong>named workspace</strong> orb shows a label (DashPro included). Orbs get a <strong>muted
+stable tint</strong> from <code>workspace_id</code> so they are easier to spot. Health tones
+(attention / critical) still override.</p>
+<h4>Example</h4>
+<p>Operator → Brain Graph → select DashPro in the left rail → the <strong>DASHPRO</strong> chip
+appears on its orb. Unlabeled spheres are usually signals/connectors/runs, not
+workspaces.</p>
+<hr>
+<h3>4. Lead planner + fan-out (Gate 5)</h3>
+<h4>What it is</h4>
+<p>Dana (Lead) turns one goal + company roster into ordered plan items, <strong>persists</strong>
+them as leased <code>workspace_tasks</code>, and for fan-out opens <strong>one run per ready
+specialist</strong> (not a single specialty-route winner).</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Module / API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pure plan</td>
+<td><code>build_lead_task_plan</code></td>
+</tr>
+<tr>
+<td>Persist</td>
+<td><code>persist_lead_task_plan</code> → Gate 4 ledger</td>
+</tr>
+<tr>
+<td>Materialize</td>
+<td><code>materialize_lead_fan_out</code> → tasks + ready runs</td>
+</tr>
+<tr>
+<td>HTTP</td>
+<td><code>POST /api/workspaces/{id}/lead/plan</code> · <code>.../lead/fan-out</code></td>
+</tr>
+</tbody>
+</table>
+<p>Continuous <strong>dispatch</strong> (Lane B) is still separate — fan-out creates leased tasks
+and runs with <code>lead_fan_out_assigned</code> receipts; the scheduler stays off.</p>
+<h4>Examples</h4>
+<p><strong>Fan-out</strong> (all specialists in parallel; path conflicts serialize / defer):</p>
+<pre><code class="language-text">Goal: &quot;Check with all sub-agents whether DashPro quality-gate heap calc is safe&quot;
+→ tasks for watcher, frontend, backend, integrations
+→ N ready runs with receipts (deferred if exclusive_paths overlap)
+</code></pre>
+<pre><code class="language-bash">curl -sS -X POST &quot;http://127.0.0.1:8787/api/workspaces/workspace_axon_watch/lead/fan-out&quot; \
+  -H 'content-type: application/json' \
+  -d '{&quot;goal&quot;:&quot;Check with all sub-agents whether Gate 5 fan-out is wired&quot;}' \
+  | jq '{mode, run_count:(.runs|length), deferred:(.deferred|length), receipt}'
+</code></pre>
+<p><strong>Sequential</strong> (then-chains → dependency task ids):</p>
+<pre><code class="language-text">Goal: &quot;Fix the API quality-gate heap calc then update the Expo confirmation screen&quot;
+→ backend task, then frontend task that depends on the backend task_id
+</code></pre>
+<p><strong>Specialty route stays single-winner</strong> for normal prompts; fan-out phrases return
+<code>reason=lead_fan_out</code> instead of picking one teammate.</p>
+<p>Proof:</p>
+<pre><code class="language-bash">./scripts/dev/python.sh -m unittest tests.test_lead_task_plan tests.test_lead_fan_out -q
+</code></pre>
+<hr>
+<h3>5. After every push — watch Fast Gate</h3>
+<h4>Why</h4>
+<p><code>feat/*</code> and PRs to <code>dev</code> must keep <strong>Axon-X Fast Gate</strong> green. A red push blocks
+merge and often means file-size ratchets or unit tests.</p>
+<h4>Operator / agent command</h4>
+<pre><code class="language-bash">## From repo root — polls the latest Fast Gate run for this branch
+./scripts/ops/watch-fast-gate.sh
+</code></pre>
+<p>Or manually:</p>
+<pre><code class="language-bash">gh run list --branch &quot;$(git branch --show-current)&quot; --workflow &quot;Axon-X Fast Gate&quot; --limit 3
+gh run watch   # follows the newest in-progress run
+gh run view --log-failed   # when red
+</code></pre>
+<h4>Who owns CI for which company</h4>
+<table>
+<thead>
+<tr>
+<th>Workspace</th>
+<th>Who watches CI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Axon-X</strong> (<code>workspace_axon_watch</code>)</td>
+<td><strong>Rowan</strong> (watcher) + <strong>Mira</strong> (Lead triage) — Fast Gate for this repo</td>
+</tr>
+<tr>
+<td><strong>DashPro</strong></td>
+<td><strong>Cass</strong> (watcher) + <strong>Soren</strong> (integrations / Actions)</td>
+</tr>
+<tr>
+<td>Child workspaces</td>
+<td>Watcher role for that company; escalate to Lead</td>
+</tr>
+</tbody>
+</table>
+<p>VAXON / the Axon-X watcher should treat <strong>this repository’s Fast Gate</strong> as part of
+runtime health after any push to <code>origin</code>.</p>
+<hr>
+<h3>6. Workspace company parity (vs DashPro)</h3>
+<p>DashPro is not a special UI — every bound workspace uses the same Team panel,
+Mission Control, and Task board. What differed was <strong>staffing</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Workspace</th>
+<th>Company</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DashPro / Axon-X / School</td>
+<td>Named companies in <code>config/workspace-agents.json</code></td>
+</tr>
+<tr>
+<td>TPS / Young Eagles / Axon Local</td>
+<td>Named companies (same shape as DashPro)</td>
+</tr>
+<tr>
+<td>Other bound projects</td>
+<td>Template staffing with <strong>workspace-stable</strong> names + voices (not Mira clones)</td>
+</tr>
+</tbody>
+</table>
+<p>After switching to <strong>TPS</strong> in IDE → Team, you should see <strong>Noor / Blair / Vera / Hugo / Tess</strong>,
+not Mira/Rowan. Mission Control → Grid always keeps the <strong>selected</strong> workspace on the fleet
+board even when many projects exist.</p>
+<hr>
+<h3>7. What is still off on purpose</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>State</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Continuous worker scheduler</td>
+<td><strong>Off</strong> by default</td>
+<td>Needs leased tasks + Lead/fan-out before unattended shifts</td>
+</tr>
+<tr>
+<td>Live-checkout continuous edits</td>
+<td><strong>Forbidden</strong></td>
+<td>Gate 3 isolation — workers use disposable worktrees</td>
+</tr>
+<tr>
+<td>Gate 5 full fan-out dispatch</td>
+<td><strong>Partial</strong></td>
+<td>Persist + ready runs land; Lane B auto-dispatch still manual / scheduler off</td>
+</tr>
+</tbody>
+</table>
+<p>Check scheduler:</p>
+<pre><code class="language-bash">curl -sS http://127.0.0.1:8787/api/worker-scheduler \
+  | jq '{scheduler_enabled, effective_enabled, executing_count}'
+</code></pre>
+<hr>
+<h3>VAXON Desktop</h3>
+<p>Packaged Linux desktop shell (Tauri 2) with frozen Watch + Control Plane sidecars on loopback <code>:8787</code>.</p>
+<h4>Verify</h4>
+<pre><code class="language-bash">npm run verify:desktop
+npm run prove:desktop:clean-install
+npm run prove:desktop:voice
+</code></pre>
+<p>Evidence: <a href="../VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a>.</p>
+<h4>Install</h4>
+<pre><code class="language-bash">npm run build:desktop:linux
+sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/deb/VAXON_*.deb
+</code></pre>
+<p>Requires Debian-family x86_64 + WebKitGTK 4.1; current sidecars need <strong>glibc ≥ 2.42</strong>. Full first-run / tray / update notes: <a href="../VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a> and <a href="../DUAL_RUNTIME_STARTUP_CONTRACT.md"><code>docs/DUAL_RUNTIME_STARTUP_CONTRACT.md</code></a>.</p>
+<hr>
+</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">44</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
+<p>Preferred → fallback order (matches the control-plane research path):</p>
+<ol>
+<li><strong>SearXNG</strong> when <code>AXON_WATCH_SEARXNG_URL</code> is set (recommended local path)</li>
+<li><strong>Google Custom Search</strong> (legacy) when <code>AXON_WATCH_GOOGLE_CSE_API_KEY</code> and
+   <code>AXON_WATCH_GOOGLE_CSE_CX</code> are set (DashPro aliases <code>EXPO_PUBLIC_GOOGLE_CSE_*</code>
+   still work)</li>
+<li><strong>DuckDuckGo Instant</strong> as the last resort (often sparse)</li>
+</ol>
+<h3>Preferred: local SearXNG</h3>
+<p>Start the local instance and point research at it:</p>
+<pre><code class="language-bash">./scripts/dev/run-searxng.sh
+## then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)
+</code></pre>
+<p><code>config/searxng/settings.yml</code> must keep <code>json</code> under <code>search.formats</code> (SearXNG
+returns <strong>403</strong> for <code>format=json</code> when JSON is disabled). Do not rely on public
+instances that disable the JSON API. After a successful search, capability /
+receipts should show <code>provider: searxng</code>.</p>
+<p>SearXNG Search API:
+https://docs.searxng.org/dev/search_api.html</p>
+<h3>Legacy: Google Custom Search 403</h3>
+<p>If SearXNG is not configured and live search reports <strong>403 — this project does
+not have access to Custom Search JSON API</strong> (reason often <code>forbidden</code>):</p>
+<ol>
+<li>Open <a href="https://console.cloud.google.com/apis/library">Google Cloud Console → APIs &amp; Services → Library</a>
+   for the project that owns that API key (DashPro’s Firebase/Cloud project is
+   often <code>edudashpro</code>).</li>
+<li>Find <strong>Custom Search API</strong> (<code>customsearch.googleapis.com</code>) and click <strong>Enable</strong>.</li>
+<li>In <strong>APIs &amp; Services → Enabled APIs / Dashboard</strong>, confirm Custom Search API
+   is listed as enabled for that same project (not a different Cloud project).</li>
+<li>Confirm the Programmable Search Engine ID (<code>cx</code>) still matches the engine in
+   the <a href="https://programmablesearchengine.google.com/">Programmable Search control panel</a>.</li>
+<li>Retry a search, or prefer local SearXNG instead of unblocking Google.</li>
+</ol>
+<p>If Enable was already clicked and the 403 persists, Google’s docs state the
+Custom Search JSON API is <strong>closed to new customers</strong> (existing customers only,
+through 2027). In that case, enabling the library toggle cannot grant access;
+use SearXNG (<code>./scripts/dev/run-searxng.sh</code>) rather than creating a new Google
+search project for Axon-X.</p>
+<p>Official Google overview (legacy path only):
+https://developers.google.com/custom-search/v1/overview</p></div></section>
+    </article>
+    <footer class="doc-footer">
+      <span>Axon-X How-To Handbook</span>
+      <span>docs/HOW-TO-HANDBOOK.md</span>
+    </footer>
+  </main>
+</body>
+</html>

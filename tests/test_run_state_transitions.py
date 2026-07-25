@@ -53,6 +53,7 @@ class RunStateTransitionTests(unittest.TestCase):
         self.assertTrue(can_transition("starting", "executing"))
         self.assertTrue(can_transition("executing", "completed"))
         self.assertTrue(can_transition("paused", "executing"))
+        self.assertTrue(can_transition("paused", "completed"))
 
     def test_stop_to_paused_transitions_match_accepted_amendment(self) -> None:
         for phase in ("queued", "starting", "planning", "executing", "waiting_external"):

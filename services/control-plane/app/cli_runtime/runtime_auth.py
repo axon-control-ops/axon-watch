@@ -1,0 +1,90 @@
+"""Auth error detection and env shaping for CLI runtime dispatch."""
+
+from __future__ import annotations
+
+import os
+
+
+def looks_like_auth_error(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "invalid api key",
+            "incorrect api key",
+            "401 unauthorized",
+            "authentication required",
+            "unauthorized",
+        )
+    )
+
+
+def summarize_auth_error(*, family: str, detail: str, had_api_key: bool = False) -> str:
+    trimmed = str(detail or "").strip()
+    if family == "cursor":
+        if looks_like_auth_error(trimmed):
+            if had_api_key:
+                return (
+                    "Cursor rejected CURSOR_API_KEY. Remove or fix the key in /vault, "
+                    "clear it from the control-plane shell env, or run `cursor agent login` "
+                    "to use your subscription."
+                )
+            return (
+                "Cursor authentication failed. Run `cursor agent login` on the host "
+                "or fix runtime auth in /vault."
+            )
+        return trimmed or "Cursor authentication failed."
+    if looks_like_auth_error(trimmed):
+        return (
+            "Codex/OpenAI API key was rejected. Fix keys in /vault or run `codex login`."
+        )
+    return trimmed or "Codex authentication failed."
+
+
+def env_without_api_keys(env: dict[str, str], *, family: str) -> dict[str, str]:
+    stripped = dict(env)
+    if family == "cursor":
+        stripped.pop("CURSOR_API_KEY", None)
+        return stripped
+    stripped.pop("CODEX_API_KEY", None)
+    stripped.pop("OPENAI_API_KEY", None)
+    return stripped
+
+
+def env_has_api_key(env: dict[str, str], *, family: str) -> bool:
+    if family == "cursor":
+        return bool(str(env.get("CURSOR_API_KEY", "")).strip())
+    return bool(str(env.get("CODEX_API_KEY", "")).strip() or str(env.get("OPENAI_API_KEY", "")).strip())
+
+
+def prefer_subscription_over_process_api_key() -> bool:
+    return os.environ.get("AXON_WATCH_CURSOR_PREFER_SUBSCRIPTION", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def cursor_subscription_ready(auth: dict[str, object] | None) -> bool:
+    """True when Cursor CLI subscription auth should win over a vault/shell API key."""
+    record = auth or {}
+    auth_method = str(record.get("auth_method") or "")
+    if auth_method == "oauth":
+        return True
+    message = str(record.get("message") or "").lower()
+    provider = str(record.get("provider_label") or "").lower()
+    return "subscription" in message or "subscription" in provider
+
+
+def cursor_dispatch_env(
+    env: dict[str, str],
+    *,
+    auth: dict[str, object] | None = None,
+) -> dict[str, str]:
+    """Shape subprocess env for Cursor CLI dispatch (subscription beats stale API keys)."""
+    if not str(env.get("CURSOR_API_KEY", "")).strip():
+        return env
+    if cursor_subscription_ready(auth) or prefer_subscription_over_process_api_key():
+        return env_without_api_keys(env, family="cursor")
+    return env

@@ -6,6 +6,10 @@ import os
 from pathlib import Path
 
 from app.workspace_catalog import WorkspaceNotFoundError, get_workspace_record
+from app.workspace_project_bindings import (
+    WorkspaceBindingError,
+    get_workspace_project_binding,
+)
 
 
 class WorkspaceRootError(ValueError):
@@ -33,6 +37,14 @@ def resolve_workspace_root(workspace_id: str) -> Path:
     workspace_id = workspace_id.strip()
     if not workspace_id:
         raise WorkspaceRootError("workspace_id is required")
+
+    try:
+        binding = get_workspace_project_binding(workspace_id)
+    except WorkspaceBindingError as exc:
+        raise WorkspaceRootError(str(exc)) from exc
+
+    if binding is not None:
+        return binding.project_root
 
     root = (workspace_roots_base() / workspace_id).resolve()
     try:
