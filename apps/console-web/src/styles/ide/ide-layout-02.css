@@ -111,8 +111,10 @@
 
 .kairo-sidebar-panel__body {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: 3.2rem minmax(0, 1fr);
   gap: 0.55rem;
+  min-height: 0;
   padding: 0 0.7rem 0.65rem;
 }
 
@@ -147,6 +149,9 @@
 }
 
 .kairo-sidebar-panel__copy {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   min-width: 0;
 }
 

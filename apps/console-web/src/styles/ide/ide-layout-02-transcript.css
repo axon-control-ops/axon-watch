@@ -1,13 +1,19 @@
 /* Left-rail Kairo card + spoken-agent speech chip (not AgentDock transcript). */
 
 .kairo-sidebar-panel--expanded {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
   min-height: 0;
   gap: 0.4rem;
 }
 
 .kairo-sidebar-panel__card {
-  display: block;
+  display: flex;
   flex: 1 1 52%;
+  flex-direction: column;
   min-height: 6.5rem;
   width: 100%;
   max-height: none;
