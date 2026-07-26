@@ -252,7 +252,7 @@ export function explainOperatorAlert(input: {
       agentDo: `Investigate the ${label} monitor alert (${status}). Check the linked service dashboard, confirm whether it is a real outage or a config gap, fix what is safe, and report back in plain English.`,
       spoken: askShapedSpoken(
         `${label} needs attention — something outside the app looked unhealthy`,
-        'Shall I investigate?',
+        `Open Attention for ${label}?`,
       ),
     };
   }

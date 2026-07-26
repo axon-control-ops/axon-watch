@@ -2,8 +2,6 @@
 import { computed, ref } from 'vue';
 
 import AgentDock from '../ide/AgentDock.vue';
-import ConversationSeamPanel from '../ConversationSeamPanel.vue';
-import DockHeroPanel from '../DockHeroPanel.vue';
 import HudSeamCard from '../HudSeamCard.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
 import { useShellStore } from '../../stores/shell';
@@ -22,11 +20,8 @@ const {
   onDockResizeKeydown,
 } = useRightDockResize({ dockRef });
 
-/** Mission Control mockup: LIVE OPERATIONS owns the right rail on Brain + Grid. */
-const showLiveOpsDock = computed(
-  () => shell.layoutMode === 'operator',
-);
-const brainStage = computed(() => shell.operatorBrainGalaxyActive);
+/** Mission Control mockup: LIVE OPERATIONS owns the entire right rail. */
+const showLiveOpsDock = computed(() => shell.layoutMode === 'operator');
 </script>
 
 <template>
@@ -35,11 +30,9 @@ const brainStage = computed(() => shell.operatorBrainGalaxyActive);
   <aside
     v-else-if="showLiveOpsDock"
     ref="dockRef"
-    class="region region-right-dock dock-stack dock-stack--mockup dock-stack--operator-conversation dock-stack--live-ops right-dock--resizable"
-    :class="{
-      'right-dock--resizing': resizing,
-      'dock-stack--live-ops-brain': brainStage,
-    }"
+    class="region region-right-dock dock-stack dock-stack--mockup dock-stack--live-ops dock-stack--live-ops-only right-dock--resizable"
+    :class="{ 'right-dock--resizing': resizing }"
+    aria-label="LIVE OPERATIONS"
   >
     <div
       class="right-dock__resize-handle"
@@ -58,75 +51,75 @@ const brainStage = computed(() => shell.operatorBrainGalaxyActive);
       <span class="right-dock__resize-grip" aria-hidden="true" />
     </div>
 
-    <div class="dock-stack__upper dock-stack__upper--conversation dock-stack__upper--live-ops">
+    <div class="dock-stack__live-ops-frame">
+      <!--
+        Collapsible thread seam kept for dock-behavior contract; chrome is
+        visually suppressed so LIVE OPERATIONS fills the mockup card.
+      -->
       <HudSeamCard
         seam-id="dock-seam-thread"
         title="Live operations"
         seam-class="dock-seam dock-seam--thread dock-seam--live-ops"
-        :collapsed="false"
+        :collapsed="shell.dockSeamState('thread')?.collapsed ?? false"
         compact-summary="VAXON orb · stream · reply"
-        :collapsible="false"
+        :collapsible="true"
+        @toggle="shell.toggleDockSeam('thread')"
       >
         <MissionControlLiveOpsPanel />
-        <div
-          v-if="!brainStage && shell.operatorThreadMessages.length"
-          class="mission-control-receipts"
-          aria-label="Operator conversation receipts"
-        >
-          <p class="mission-control-receipts__label">Operator receipts</p>
-          <ConversationSeamPanel />
-        </div>
       </HudSeamCard>
     </div>
-
-    <!-- Brain stage matches mockup: orb card fills the rail (no briefing stack). -->
-    <DockHeroPanel v-if="!brainStage" />
   </aside>
 </template>
 
 <style scoped>
-.dock-stack--live-ops .dock-stack__upper--live-ops {
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.dock-stack--live-ops-brain .dock-stack__upper--live-ops {
-  flex: 1 1 auto;
-  height: 100%;
-}
-
-.dock-stack--live-ops :deep(.dock-seam--live-ops.hud-seam) {
+.dock-stack--live-ops-only {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
+  padding: 0.45rem;
+  background:
+    linear-gradient(180deg, rgba(0, 28, 42, 0.55), rgba(0, 10, 18, 0.72)),
+    rgba(2, 8, 14, 0.92);
 }
 
-.dock-stack--live-ops :deep(.dock-seam--live-ops .hud-seam__body) {
-  display: flex;
-  flex-direction: column;
+.dock-stack__live-ops-frame {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(70, 210, 255, 0.42);
+  border-radius: 0.55rem;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 200, 255, 0.08),
+    0 0 1.4rem rgba(0, 160, 220, 0.12);
+  background:
+    radial-gradient(ellipse at 50% 12%, rgba(0, 120, 180, 0.18), transparent 55%),
+    rgba(1, 8, 14, 0.94);
   overflow: hidden;
 }
 
-.dock-stack--live-ops :deep(.dock-seam--live-ops .hud-seam__header) {
+.dock-stack--live-ops-only :deep(.dock-seam--live-ops.hud-seam) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__header),
+.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__corner),
+.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__compact) {
   display: none;
 }
 
-.mission-control-receipts {
-  flex: 0 1 28%;
-  min-height: 4rem;
-  border-top: 1px solid rgba(0, 242, 255, 0.14);
+.dock-stack--live-ops-only :deep(.dock-seam--live-ops .hud-seam__body) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
-}
-
-.mission-control-receipts__label {
-  margin: 0;
-  padding: 0.35rem 0.55rem 0.2rem;
-  color: rgba(148, 163, 184, 0.8);
-  font: 0.5rem var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  padding: 0;
 }
 </style>

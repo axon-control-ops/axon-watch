@@ -220,13 +220,18 @@
   min-height: 0;
 }
 
+/* Operator Mission Control: give LIVE OPERATIONS a mockup-width rail. */
+.console-shell--mockup.console-shell--operator {
+  --shell-agent-dock-width: min(26rem, 32vw);
+}
+
 /* Galaxy Mission Control: brain stage + LIVE OPERATIONS right rail (mockup).
    Left shell rail stays hidden; workspaces live inside the stage. */
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy {
   grid-template-columns:
     0
     minmax(0, 1fr)
-    minmax(17.5rem, var(--shell-agent-dock-width, 380px));
+    minmax(20rem, var(--shell-agent-dock-width, 26rem));
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-left-sidebar {

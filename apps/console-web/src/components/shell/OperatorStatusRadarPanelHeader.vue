@@ -33,20 +33,22 @@ const emit = defineEmits<{
         <button
           type="button"
           class="operator-center-view-switch__button"
-          :class="{ 'operator-center-view-switch__button--active': centerView === 'grid' }"
-          :aria-pressed="centerView === 'grid'"
-          @click="emit('setCenterView', 'grid')"
+          :class="{ 'operator-center-view-switch__button--active': centerView === 'graph' }"
+          :aria-pressed="centerView === 'graph'"
+          title="Brain graph + LIVE OPERATIONS (Mission Control home)"
+          @click="emit('setCenterView', 'graph')"
         >
-          GRID
+          STAGE
         </button>
         <button
           type="button"
           class="operator-center-view-switch__button"
-          :class="{ 'operator-center-view-switch__button--active': centerView === 'graph' }"
-          :aria-pressed="centerView === 'graph'"
-          @click="emit('setCenterView', 'graph')"
+          :class="{ 'operator-center-view-switch__button--active': centerView === 'grid' }"
+          :aria-pressed="centerView === 'grid'"
+          title="Fleet health and Task board"
+          @click="emit('setCenterView', 'grid')"
         >
-          BRAIN
+          FLEET
         </button>
       </div>
       <button

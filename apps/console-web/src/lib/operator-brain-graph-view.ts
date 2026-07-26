@@ -196,11 +196,9 @@ export type OperatorCenterView = 'grid' | 'graph';
 const CENTER_VIEW_STORAGE_KEY = 'axon.operator.center-view';
 
 export function readStoredOperatorCenterView(): OperatorCenterView {
-  if (typeof sessionStorage === 'undefined') {
-    return 'graph';
-  }
-  const stored = sessionStorage.getItem(CENTER_VIEW_STORAGE_KEY);
-  return stored === 'grid' ? 'grid' : 'graph';
+  // Mission Control mockup home is always the brain stage + LIVE OPERATIONS rail.
+  // Fleet mosaic remains available via the FLEET center-view switch.
+  return 'graph';
 }
 
 export function persistOperatorCenterView(view: OperatorCenterView): void {

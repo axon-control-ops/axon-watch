@@ -203,7 +203,7 @@ def explain_operator_alert(
             ),
             "spoken": _ask_shaped(
                 f"{label} needs attention — something outside the app looked unhealthy",
-                "Shall I investigate?",
+                f"Open Attention for {label}?",
             ),
         }
 

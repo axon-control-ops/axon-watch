@@ -116,8 +116,9 @@ function toggleMic(): void {
       :data-mode="modeChip"
     >
       <KairoGalaxyOrb placement-mode="embedded" />
-      <div class="mc-live-ops__orb-labels">
+      <div class="mc-live-ops__orb-labels" aria-hidden="true">
         <p class="mc-live-ops__orb-name">{{ OPERATOR_PERSONA_NAME }}</p>
+        <span class="mc-live-ops__orb-wave" />
         <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
       </div>
     </div>

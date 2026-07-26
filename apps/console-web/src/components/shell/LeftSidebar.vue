@@ -8,7 +8,6 @@ import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
 import IdeTeamPanel from '../ide/IdeTeamPanel.vue';
 import KairoSidebarPanel from '../ide/KairoSidebarPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
-import KairoVoiceDeckPanel from './KairoVoiceDeckPanel.vue';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
@@ -387,27 +386,12 @@ onBeforeUnmount(() => {
       <AttentionStackPanel variant="sidebar" sections="run-only" />
     </div>
 
+    <!-- LIVE OPERATIONS right rail owns VAXON voice on Mission Control (mockup). -->
     <div
       v-else-if="!isIdeMode && !shell.operatorBrainGalaxyActive"
-      class="left-sidebar-mockup__status-anchor"
+      class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--run-only"
     >
-      <div
-        class="voice-card-resize-handle"
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="Resize Voice card"
-        title="Drag or use arrow keys to resize. Enter or double-click to reset."
-        tabindex="0"
-        :aria-valuemin="voiceCardHeightMin"
-        :aria-valuemax="voiceCardHeightMax"
-        :aria-valuenow="voiceCardHeight"
-        @mousedown="startVoiceCardResize"
-        @keydown="onVoiceCardResizeKeydown"
-        @dblclick="resetVoiceCardHeight"
-      >
-        <span class="voice-card-resize-grip" aria-hidden="true" />
-      </div>
-      <KairoVoiceDeckPanel />
+      <AttentionStackPanel variant="sidebar" sections="run-only" />
     </div>
 
     <div
