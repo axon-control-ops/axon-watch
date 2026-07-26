@@ -35,7 +35,7 @@
         "monitor_status": "warning"
       }
     },
-    "expect_spoken_contains": ["DashPro", "Shall I investigate"],
+    "expect_spoken_contains": ["DashPro", "Open Attention for DashPro"],
     "expect_what_contains": ["DashPro"],
     "expect_agent_do_contains": ["Investigate the DashPro monitor"]
   },
