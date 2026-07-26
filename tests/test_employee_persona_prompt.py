@@ -30,8 +30,9 @@ class EmployeePersonaPromptTests(unittest.TestCase):
             role="integrations",
             owns="connectors, watch service, and cross-repo wiring",
         )
-        self.assertIn("You are Quinn, the integrations employee for workspace workspace_axon_watch.", line)
+        self.assertIn("You are Quinn. Your role is integrations for workspace workspace_axon_watch.", line)
         self.assertIn("You own: connectors, watch service, and cross-repo wiring.", line)
+        self.assertIn("Always speak in first person", line)
 
     def test_appendix_none_without_employee_id(self) -> None:
         self.assertIsNone(
@@ -105,7 +106,7 @@ class EmployeePersonaPromptTests(unittest.TestCase):
                 employee_role="lead",
             )
         assert appendix is not None
-        self.assertIn("You are Dana, the lead employee", appendix)
+        self.assertIn("You are Dana. Your role is lead", appendix)
         self.assertIn("never rediscover staffing by searching the tree", appendix)
         self.assertIn("Priya (Frontend / frontend)", appendix)
         self.assertIn("Do NOT Glob, Grep, or Read", appendix)
@@ -167,9 +168,10 @@ class EmployeePersonaPromptTests(unittest.TestCase):
                 ),
             )
         self.assertIn(
-            "You are Shell Craft, the frontend employee for workspace workspace_axon_watch.",
+            "You are Shell Craft. Your role is frontend for workspace workspace_axon_watch.",
             prompt,
         )
+        self.assertIn("Always speak in first person", prompt)
 
     def test_split_elevates_persona_and_keeps_memory(self) -> None:
         appendix = build_employee_persona_appendix(
@@ -194,9 +196,10 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         )
         original = "You are Axon-X Lane B in Agent mode with Full Access. Tool execution is allowed."
         adapted = adapt_lane_b_system_prompt_for_employee(original, appendix)
-        self.assertIn("employee named in the Employee persona block", adapted)
+        self.assertIn("named employee in the Employee persona block", adapted)
         self.assertNotIn("You are Axon-X Lane B in Agent mode with Full Access.", adapted)
         self.assertIn("Do not identify as VAXON", adapted)
+        self.assertIn("first person", adapted)
         unchanged = adapt_lane_b_system_prompt_for_employee(original, "no persona here")
         self.assertEqual(original, unchanged)
 
@@ -221,7 +224,7 @@ class EmployeePersonaPromptTests(unittest.TestCase):
             execution_tier="executing",
         )
         self.assertIn("You are Quinn", prompt)
-        self.assertIn("employee named in the Employee persona block", prompt)
+        self.assertIn("named employee in the Employee persona block", prompt)
         self.assertNotIn(
             "You are Axon-X Lane B in Agent mode with Full Access.",
             prompt,

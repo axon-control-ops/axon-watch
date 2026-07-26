@@ -15,9 +15,12 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-22 — Gate 5 closed (DAG, conflict serialization,
-fan-out, replans, synthesis, sibling stream preservation); Gate 4 closed;
-Mission Control task board. Scheduler still **off** by default. After every push run
+**Last verified:** 2026-07-25 — Gates 0–5 closed; Gate 6 verifier + draft-PR
+delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and
+file-size patrol plumbing landed. **Not yet a closed unattended auto-loop** —
+scheduler stays **off** by default; Mission Control still needs Retry / dig-in.
+Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first
+for status + Cursor credit budgets. After every push run
 `./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
@@ -38,6 +41,7 @@ Mission Control task board. Scheduler still **off** by default. After every push
 3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, roster; [Gate 9 CI remediation](how-to/ci-remediation-gate9.md)
 3.65. [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) — Gate 4 tasks, scheduler off, watch token + mTLS
 3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
+3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -66,7 +70,7 @@ Mission Control task board. Scheduler still **off** by default. After every push
 | **Teacher / reviewer** | [Teaching Axon-X](#teaching-axon-x-to-someone-else) | [Verification](#verification-commands), `docs/FINAL_PARITY_VERIFICATION.md` |
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
 | **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), `./scripts/ops/watch-fast-gate.sh` |
-| **Autonomy / remote host** | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) | [Recent operator features](how-to/recent-operator-features.md) |
+| **Autonomy / remote host** | [Auto-loop status & credits](how-to/auto-loop-and-credits.md) | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md), [Recent operator features](how-to/recent-operator-features.md) |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
 

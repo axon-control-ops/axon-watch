@@ -105,6 +105,51 @@ def mark_repair_outcome(
         },
     )
     ci_store.set_event_status(dedupe_key, "repaired" if success else "blocked")
+    if success:
+        try:
+            from app.ci_remediation.dispatch_repair import supersede_prior_repair_tasks
+            from app.persistence import task_store
+
+            event = ci_store.get_event(dedupe_key)
+            keep_task_id = str((event or {}).get("task_id") or "").strip() or None
+            cancelled = supersede_prior_repair_tasks(
+                workspace_id=workspace_id,
+                classified={
+                    "workflow_name": workflow_name,
+                    "head_branch": head_branch,
+                },
+                keep_task_id=keep_task_id,
+            )
+            if keep_task_id:
+                try:
+                    task_store.complete_task(
+                        keep_task_id,
+                        terminal_outcome="ci repair reported success",
+                    )
+                except task_store.TaskLedgerError:
+                    pass
+            if cancelled:
+                summary = f"{summary} Superseded {len(cancelled)} older repair task(s)."
+                record = ci_store.upsert_signal(
+                    signal_id=failure_signal_id(dedupe_key),
+                    dedupe_key=dedupe_key,
+                    workspace_id=workspace_id,
+                    title=title,
+                    summary=summary,
+                    severity=severity,
+                    status="resolved",
+                    html_url=html_url or draft_pr_url,
+                    meta={
+                        "signal_family": "ci_remediation",
+                        "workflow_name": workflow_name,
+                        "head_branch": head_branch,
+                        "phase": phase,
+                        "draft_pr_url": draft_pr_url,
+                        "superseded_task_count": len(cancelled),
+                    },
+                )
+        except Exception:  # noqa: BLE001 — outcome report must still return
+            pass
     reset_watch_inbox_cache()
     return record
 
@@ -117,7 +162,7 @@ def spoken_report_line(*, success: bool, workflow_name: str, detail: str) -> str
         )
     return (
         f"{workflow_name} is still red after repair attempts. "
-        f"{detail} Shall I dig in?".strip()
+        f"{detail} Shall I triage the repair?".strip()
     )
 
 

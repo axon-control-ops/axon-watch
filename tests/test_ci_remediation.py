@@ -198,6 +198,13 @@ class CiRemediationTests(unittest.TestCase):
             detail="Draft PR ready.",
         )
         self.assertIn("green again", spoken)
+        blocked = spoken_report_line(
+            success=False,
+            workflow_name="Axon-X Fast Gate",
+            detail="Attempt budget exhausted.",
+        )
+        self.assertIn("Shall I triage the repair?", blocked)
+        self.assertNotIn("Shall I dig in?", blocked)
 
     def test_worker_prompt_includes_gate9_clause(self) -> None:
         from app.workspace_agents.config_loader import EmployeeConfig

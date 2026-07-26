@@ -10,7 +10,11 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
-from app.workspace_agents.worker_prompt import build_continuous_worker_prompt  # noqa: E402
+from app.workspace_agents.worker_prompt import (  # noqa: E402
+    OUT_OF_SCOPE_GUARD_MARKER,
+    build_continuous_worker_prompt,
+    parse_out_of_scope_guard,
+)
 
 
 class WorkspaceWorkerPromptTests(unittest.TestCase):
@@ -155,6 +159,64 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
         self.assertIn("do not Glob/Grep/Read the tree to discover staffing", prompt)
         self.assertIn("Priya (Frontend / frontend)", prompt)
         self.assertIn("Do NOT Glob, Grep, or Read", prompt)
+
+    def test_prompt_includes_scope_guard_for_leased_tasks(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_young_eagles",
+                employee=EmployeeConfig(
+                    name="Lila",
+                    role="frontend",
+                    owns="letters, printable packs, and parent-facing layouts",
+                    schedule="always_on",
+                ),
+                task={
+                    "task_id": "task-readme",
+                    "goal": "Update `young_eagles_day_care/README.md` so the docs stay focused on the internal operations workspace.",
+                    "acceptance_criteria": "README only; no unrelated posters, event graphics, or marketing copy",
+                },
+            )
+        self.assertIn("Hard scope anchors", prompt)
+        self.assertIn("young_eagles_day_care/README.md", prompt)
+        self.assertIn("Do not drift into neighboring files", prompt)
+        self.assertIn(OUT_OF_SCOPE_GUARD_MARKER, prompt)
+
+    def test_parse_out_of_scope_guard_returns_detail(self) -> None:
+        detail = parse_out_of_scope_guard(
+            "OUT_OF_SCOPE_GUARD: outputs/posts/young-eagles-pj-party.jpg is not required for this leased task"
+        )
+        self.assertEqual(
+            "outputs/posts/young-eagles-pj-party.jpg is not required for this leased task",
+            detail,
+        )
+        self.assertIsNone(parse_out_of_scope_guard("Everything stayed on task."))
+
+    def test_prompt_surfaces_explicit_allowed_paths(self) -> None:
+        with patch(
+            "app.workspace_agents.worker_prompt.build_team_roster_context",
+            return_value="",
+        ):
+            prompt = build_continuous_worker_prompt(
+                workspace_id="workspace_axon_watch",
+                employee=EmployeeConfig(
+                    name="Rowan",
+                    role="watcher",
+                    owns="Fast Gate and file-size hygiene",
+                    schedule="continuous",
+                ),
+                task={
+                    "task_id": "task-patrol-1",
+                    "goal": "File-size patrol: lower stale ratchet",
+                    "acceptance_criteria": "manifest only",
+                    "allowed_paths": ["scripts/guardrails/hotspot_budgets.json"],
+                },
+            )
+        self.assertIn("Explicit allowed write paths", prompt)
+        self.assertIn("scripts/guardrails/hotspot_budgets.json", prompt)
+        self.assertNotIn("Hard scope anchors", prompt)
 
 
 if __name__ == "__main__":

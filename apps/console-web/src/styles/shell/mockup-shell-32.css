@@ -15,15 +15,10 @@
 }
 
 .company-roster--persona-dock .company-roster__dock-host {
-  flex: 1 1 auto;
-  min-height: 6rem;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  container-type: inline-size;
-  container-name: roster-dock;
+  display: grid; gap: 0.55rem; flex: 1 1 auto; min-height: 6rem;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  container-type: inline-size; container-name: roster-dock;
 }
-
 .company-roster__header-row {
   display: flex;
   align-items: flex-start;

@@ -23,7 +23,6 @@ const debugModeActive = computed(() => shell.ideDebugModeSelected);
 const activePersonaName = computed(
   () => shell.activeIdeEmployee?.name?.trim() || OPERATOR_PERSONA_NAME,
 );
-const activePersonaMark = computed(() => shell.activeIdeEmployee?.initials ?? null);
 const chipState = computed(() =>
   resolveIdeKairoChipState({
     profileState: shell.ideDisplayKairoPresenceState,
@@ -40,6 +39,21 @@ const surfaceEmployeeFailure = computed(() =>
     kairoSpeechActive: shell.kairoSpeechActive,
   }),
 );
+/** Kairo chrome is VAXON's surface unless highlighting an employee failure. */
+const presencePersonaName = computed(() => {
+  if (shell.kairoSpeechActive || speaker.value?.kind === 'vaxon') {
+    return OPERATOR_PERSONA_NAME;
+  }
+  if (surfaceEmployeeFailure.value && activePersonaName.value) {
+    return activePersonaName.value;
+  }
+  return OPERATOR_PERSONA_NAME;
+});
+const activePersonaMark = computed(() =>
+  presencePersonaName.value === OPERATOR_PERSONA_NAME
+    ? null
+    : shell.activeIdeEmployee?.initials ?? null,
+);
 const employeeFailureTooltip = computed(() => {
   const row = shell.activeIdeEmployeeRecord;
   if (!row) {
@@ -48,18 +62,18 @@ const employeeFailureTooltip = computed(() => {
   return employeeFailureDetailTooltip(row) ?? shell.activeIdeEmployeeFailureLine ?? undefined;
 });
 const presenceLabel = computed(() => {
-  if (!debugModeActive.value && surfaceEmployeeFailure.value) {
+  if (!debugModeActive.value && surfaceEmployeeFailure.value && !shell.kairoSpeechActive) {
     const hint = shell.activeIdeEmployeeShiftInterrupted
       ? 'shift interrupted'
       : 'last shift failed';
     return `${activePersonaName.value} · ${hint}`;
   }
   if (!debugModeActive.value) {
-    return kairoPresenceLabel(shell.kairoPresenceState, activePersonaName.value);
+    return kairoPresenceLabel(shell.kairoPresenceState, presencePersonaName.value);
   }
   const access = shell.agentExecutionAccess === 'full' ? ' FULL' : '';
   const activity = shell.agentStreamActive ? ' · RUNNING' : '';
-  return `${activePersonaName.value} · DEBUG${access}${activity}`;
+  return `${presencePersonaName.value} · DEBUG${access}${activity}`;
 });
 
 const showExpandedPanel = computed(() =>
@@ -84,7 +98,7 @@ const signalBadge = computed(
 );
 const showStopSpeech = computed(() => shell.kairoSpeechActive);
 const speechPersonaName = computed(
-  () => speaker.value?.name?.trim() || activePersonaName.value,
+  () => speaker.value?.name?.trim() || OPERATOR_PERSONA_NAME,
 );
 const agentLinkLabel = computed(() => {
   if (shell.kairoSpeechActive) {
@@ -159,13 +173,13 @@ function handleStopSpeech(event?: Event): void {
         'kairo-sidebar-panel--speaking': shell.kairoSpeechActive,
       },
     ]"
-    :aria-label="`${activePersonaName}. ${shell.briefingSummaryLine}`"
+    :aria-label="`${presencePersonaName}. ${shell.briefingSummaryLine}`"
   >
     <div
       class="kairo-sidebar-panel__card"
       role="button"
       tabindex="0"
-      :aria-label="`${activePersonaName}. ${shell.briefingSummaryLine}`"
+      :aria-label="`${presencePersonaName}. ${shell.briefingSummaryLine}`"
       @click="handleExpand"
       @keydown.enter.prevent="handleExpand"
       @keydown.space.prevent="handleExpand"

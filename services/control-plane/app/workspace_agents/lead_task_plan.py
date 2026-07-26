@@ -48,6 +48,7 @@ class LeadTaskPlanItem:
     dependencies: list[str] = field(default_factory=list)
     risk: str = "normal"
     exclusive_paths: list[str] = field(default_factory=list)
+    allowed_paths: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -207,6 +208,7 @@ def build_lead_task_plan(
             role_goal = (
                 f"[{member.role}] Review and report on: {cleaned_goal}"
             )
+            scoped = extract_exclusive_paths(cleaned_goal)
             items.append(
                 LeadTaskPlanItem(
                     plan_key=f"plan-{index:02d}-{member.role}",
@@ -214,7 +216,8 @@ def build_lead_task_plan(
                     owner_role=member.role,
                     acceptance_criteria=_acceptance_for(cleaned_goal, member.role),
                     dependencies=[],
-                    exclusive_paths=extract_exclusive_paths(cleaned_goal),
+                    exclusive_paths=scoped,
+                    allowed_paths=list(scoped),
                 )
             )
         # Fan-out: overlapping paths serialize so specialists don't race edits.
@@ -230,6 +233,7 @@ def build_lead_task_plan(
             owner = _best_owner_role(clause, specialists)
             plan_key = f"plan-{index:02d}-{owner}"
             deps = [previous_key] if previous_key else []
+            scoped = extract_exclusive_paths(clause)
             items.append(
                 LeadTaskPlanItem(
                     plan_key=plan_key,
@@ -237,7 +241,8 @@ def build_lead_task_plan(
                     owner_role=owner,
                     acceptance_criteria=_acceptance_for(clause, owner),
                     dependencies=deps,
-                    exclusive_paths=extract_exclusive_paths(clause),
+                    exclusive_paths=scoped,
+                    allowed_paths=list(scoped),
                 )
             )
             previous_key = plan_key

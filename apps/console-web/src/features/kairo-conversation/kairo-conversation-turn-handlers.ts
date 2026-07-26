@@ -19,6 +19,7 @@ export const CONTINUE_VOICE_RE = /\b(continue|pick up|resume|carry on)\b/i;
 type DeliverVoiceReply = (
   reply: string,
   voiceCaptureMode?: KairoVoiceCaptureMode,
+  options?: { spokenReply?: string | null },
 ) => Promise<void>;
 
 type SpeakReply = (line: string, operatorPrompt?: string) => Promise<void>;

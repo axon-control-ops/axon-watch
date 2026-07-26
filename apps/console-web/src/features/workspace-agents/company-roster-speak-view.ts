@@ -147,7 +147,7 @@ function employeeCallbackSpeakLine(
 
   if (failDetail) {
     const failedLines = [
-      `${name} again — that last shift still failed on ${failDetail}. Retry, or dig in with me?`,
+      `${name} again — that last shift still failed on ${failDetail}. Want a retry or a postmortem?`,
       `Yeah, it's ${name}. Failure still stands: ${failDetail}. Want a retry or a postmortem?`,
       `${name} here. ${owns} is quiet after a failed shift — ${failDetail}. Your move.`,
     ] as const;

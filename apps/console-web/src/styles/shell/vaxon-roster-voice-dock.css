@@ -99,11 +99,12 @@
 }
 
 .vaxon-roster-voice-dock__line {
-  max-height: 6.2rem;
+  max-height: 10.5rem;
   overflow-y: auto;
   color: rgba(220, 241, 247, 0.9);
   font-size: 0.66rem;
   line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .vaxon-roster-voice-dock__quick-actions,

@@ -37,8 +37,11 @@ _BRIEFING_SURFACE_OFFER_RE = re.compile(
 )
 # Ask-shaped spoken invites from explain_operator_alert / persona voice lines.
 _DIG_IN_OFFER_RE = re.compile(
-    r"\bshall\s+i\s+(?:dig\s+in|triage(?:\s+it)?|investigate(?:\s+it)?|"
-    r"diagnose(?:\s+it)?|take\s+a\s+look|look\s+into\s+it)\b",
+    r"(?:\bshall\s+i\s+(?:dig\s+in|triage(?:\s+(?:it|the\s+repair))?|"
+    r"investigate(?:\s+it)?|diagnose(?:\s+it)?|take\s+a\s+look|look\s+into\s+it|"
+    r"walk\s+you\s+through\s+it|guide\s+you\s+to\s+vault)\b|"
+    r"\bopen\s+attention\s+for\b|"
+    r"\bwant\s+me\s+to\s+(?:check(?:\s+it)?|open\s+attention)\b)",
     re.IGNORECASE,
 )
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 import AgentDock from '../ide/AgentDock.vue';
 import ConversationSeamPanel from '../ConversationSeamPanel.vue';
@@ -7,7 +7,7 @@ import DockHeroPanel from '../DockHeroPanel.vue';
 import HudSeamCard from '../HudSeamCard.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
 import { useShellStore } from '../../stores/shell';
-import MissionControlActivityPanel from './MissionControlActivityPanel.vue';
+import MissionControlLiveOpsPanel from './MissionControlLiveOpsPanel.vue';
 
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
@@ -21,16 +21,25 @@ const {
   startDockResize,
   onDockResizeKeydown,
 } = useRightDockResize({ dockRef });
+
+/** Mission Control mockup: LIVE OPERATIONS owns the right rail on Brain + Grid. */
+const showLiveOpsDock = computed(
+  () => shell.layoutMode === 'operator',
+);
+const brainStage = computed(() => shell.operatorBrainGalaxyActive);
 </script>
 
 <template>
   <AgentDock v-if="shell.layoutMode === 'ide'" />
 
   <aside
-    v-else-if="!shell.operatorBrainGalaxyActive"
+    v-else-if="showLiveOpsDock"
     ref="dockRef"
-    class="region region-right-dock dock-stack dock-stack--mockup dock-stack--operator-conversation right-dock--resizable"
-    :class="{ 'right-dock--resizing': resizing }"
+    class="region region-right-dock dock-stack dock-stack--mockup dock-stack--operator-conversation dock-stack--live-ops right-dock--resizable"
+    :class="{
+      'right-dock--resizing': resizing,
+      'dock-stack--live-ops-brain': brainStage,
+    }"
   >
     <div
       class="right-dock__resize-handle"
@@ -49,19 +58,18 @@ const {
       <span class="right-dock__resize-grip" aria-hidden="true" />
     </div>
 
-    <div class="dock-stack__upper dock-stack__upper--conversation">
+    <div class="dock-stack__upper dock-stack__upper--conversation dock-stack__upper--live-ops">
       <HudSeamCard
         seam-id="dock-seam-thread"
         title="Live operations"
-        seam-class="dock-seam dock-seam--thread"
-        :collapsed="shell.dockSeamState('thread')?.collapsed ?? false"
-        compact-summary="Autonomous workers, CI repairs, signals, and receipts"
-        :collapsible="true"
-        @toggle="shell.toggleDockSeam('thread')"
+        seam-class="dock-seam dock-seam--thread dock-seam--live-ops"
+        :collapsed="false"
+        compact-summary="VAXON orb · stream · reply"
+        :collapsible="false"
       >
-        <MissionControlActivityPanel />
+        <MissionControlLiveOpsPanel />
         <div
-          v-if="shell.operatorThreadMessages.length"
+          v-if="!brainStage && shell.operatorThreadMessages.length"
           class="mission-control-receipts"
           aria-label="Operator conversation receipts"
         >
@@ -71,14 +79,44 @@ const {
       </HudSeamCard>
     </div>
 
-    <DockHeroPanel />
+    <!-- Brain stage matches mockup: orb card fills the rail (no briefing stack). -->
+    <DockHeroPanel v-if="!brainStage" />
   </aside>
 </template>
 
 <style scoped>
+.dock-stack--live-ops .dock-stack__upper--live-ops {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.dock-stack--live-ops-brain .dock-stack__upper--live-ops {
+  flex: 1 1 auto;
+  height: 100%;
+}
+
+.dock-stack--live-ops :deep(.dock-seam--live-ops.hud-seam) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.dock-stack--live-ops :deep(.dock-seam--live-ops .hud-seam__body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dock-stack--live-ops :deep(.dock-seam--live-ops .hud-seam__header) {
+  display: none;
+}
+
 .mission-control-receipts {
-  flex: 0 1 35%;
-  min-height: 5rem;
+  flex: 0 1 28%;
+  min-height: 4rem;
   border-top: 1px solid rgba(0, 242, 255, 0.14);
   overflow: hidden;
 }

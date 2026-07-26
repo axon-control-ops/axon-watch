@@ -6,7 +6,12 @@ This page is the short, directive companion to
 [`docs/AXON-X-AUTONOMY-MASTER-PLAN.md`](../AXON-X-AUTONOMY-MASTER-PLAN.md).
 It tells you **what to turn on**, **what to leave off**, and **how to prove it**.
 
-**Last updated:** 2026-07-22
+**Last updated:** 2026-07-25
+
+**Are we on auto-loop?** **No.** See
+[`auto-loop-and-credits.md`](auto-loop-and-credits.md) for the operator brief
+and Cursor credit budgets. Plumbing for Gates 6/9 and task-scope guardrails is
+in; unattended multi-project overnight loops are not.
 
 ---
 
@@ -18,11 +23,15 @@ It tells you **what to turn on**, **what to leave off**, and **how to prove it**
 | **2 thin + residuals** | Closed | Use `local_token` on any non-loopback surface; set operator + internal tokens |
 | **3** | Closed | Continuous workers use disposable `worker/<run_id>` worktrees only |
 | **4** | Closed | Continuous workers only run from a **leased task**; scheduler stays **off** until you intentionally enable it |
-| **5** | Closed | Use Lead plan/fan-out/replan APIs; keep scheduler off until Gate 6 verification lands |
+| **5** | Closed | Use Lead plan/fan-out/replan APIs; keep scheduler off unless you are watching a drill |
+| **6** | Closed (thin) | Acceptance evidence / verifier must pass before completion/publish; task `allowed_paths` intersect contract scope |
+| **9** | Proven (Axon-X) | Fast Gate red → CI repair task → draft PR → re-watch; supersede old repair chains; no protected merge |
 
-**Scheduler rule (non-negotiable for now):** keep continuous workers
-`effective_enabled: false` unless you are deliberately testing Gate 4 with a
-bounded task board and you are watching the machine.
+**Scheduler rule (non-negotiable for daily driving):** keep continuous workers
+`effective_enabled: false` unless you are deliberately drilling with a bounded
+task board and you are watching the machine. Enabling the scheduler is **not**
+the same as claiming a closed auto-loop — RETRY SHIFT / Critical Review failures
+still need human attention.
 
 Check:
 
@@ -210,6 +219,8 @@ Evidence lives under `docs/ops/agent-reports/` and the roll-up log
 
 ## 7. What to build next
 
-1. Gate 6 — mandatory verifier contract  
-2. Keep scheduler off until failed verification blocks completion  
-3. Do not expand mobile mutation until this page’s remote auth + mTLS steps are live on that host
+1. Drive Critical Review + `Confidence: N/10` failure rate near zero (today’s biggest auto-loop blocker in Mission Control)
+2. Keep scheduler off by default; enable only for watched single-workspace drills
+3. Harden multi-workspace work sources (CI repair + file-size patrol) under credit/RAM caps
+4. Do not expand mobile mutation until this page’s remote auth + mTLS steps are live on that host
+5. Re-read [`auto-loop-and-credits.md`](auto-loop-and-credits.md) before buying Ultra / enabling 3+ projects

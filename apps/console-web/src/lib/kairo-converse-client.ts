@@ -80,6 +80,8 @@ export interface KairoConverseRequest {
 export interface KairoConverseResponse {
   turn_kind: KairoConverseTurnKind;
   reply: string;
+  /** Optional shorter line for TTS; UI should prefer `reply`. */
+  spoken_reply?: string | null;
   source: KairoConverseSource;
   command_content: string | null;
   requires_confirmation?: boolean | null;

@@ -220,10 +220,13 @@
   min-height: 0;
 }
 
-/* Galaxy mode (operator only): inspector lives inside the stage — never hide IDE AgentDock.
-   Full-bleed canvas: left shell rail hidden; mockup workspaces live inside the stage. */
+/* Galaxy Mission Control: brain stage + LIVE OPERATIONS right rail (mockup).
+   Left shell rail stays hidden; workspaces live inside the stage. */
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy {
-  grid-template-columns: 0 minmax(0, 1fr) 0;
+  grid-template-columns:
+    0
+    minmax(0, 1fr)
+    minmax(17.5rem, var(--shell-agent-dock-width, 380px));
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-left-sidebar {
@@ -231,11 +234,11 @@
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-right-dock {
-  display: none;
+  display: flex;
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-center-workbench {
-  grid-column: leftSidebar / rightDock;
+  grid-column: centerWorkbench;
 }
 
 @keyframes kairo-voice-pulse {

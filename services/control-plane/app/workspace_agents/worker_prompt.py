@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.workspace_agents.catalog import _DEFAULT_OWNS
@@ -10,6 +11,9 @@ from app.workspace_agents.critical_review_clause import append_critical_review_c
 from app.workspace_agents.employee_persona_prompt import build_employee_identity_line
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 from app.workspace_agents.team_roster_context import build_team_roster_context
+
+OUT_OF_SCOPE_GUARD_MARKER = "OUT_OF_SCOPE_GUARD:"
+_OUT_OF_SCOPE_GUARD_RE = re.compile(r"OUT_OF_SCOPE_GUARD:\s*(.+)", re.IGNORECASE)
 
 
 def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
@@ -26,6 +30,69 @@ def _prior_failure_clause(*, workspace_id: str, role: str) -> str:
         f" Prior shift failed{run_hint}: {detail}. "
         "Prefer fixing or clearing that failure before unrelated work. "
     )
+
+
+def _task_scope_anchors(*parts: str, limit: int = 8) -> list[str]:
+    anchors: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        text = str(part or "")
+        candidates = re.findall(r"`([^`]+)`", text)
+        candidates.extend(re.findall(r"\b[\w./-]*[./_-][\w./-]+\b", text))
+        for raw in candidates:
+            cleaned = str(raw).strip().strip(".,;:()[]{}")
+            if not cleaned or len(cleaned) < 3:
+                continue
+            lowered = cleaned.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            anchors.append(cleaned)
+            if len(anchors) >= limit:
+                return anchors
+    return anchors
+
+
+def _task_scope_clause(
+    *,
+    goal: str,
+    acceptance: str,
+    allowed_paths: list[str] | None = None,
+) -> str:
+    paths = [str(p).strip() for p in (allowed_paths or []) if str(p).strip()]
+    anchors = _task_scope_anchors(goal, acceptance)
+    anchor_clause = ""
+    if paths:
+        joined = ", ".join(f"`{path}`" for path in paths[:12])
+        anchor_clause = (
+            f" Explicit allowed write paths for this leased task: {joined}. "
+            "Do not modify any path outside that allowlist."
+        )
+    elif anchors:
+        joined = ", ".join(f"`{anchor}`" for anchor in anchors)
+        anchor_clause = f" Hard scope anchors from the task: {joined}. "
+    return (
+        " Scope guard: before you browse, edit, or summarize anything, lock onto the "
+        "leased task's exact goal and acceptance criteria."
+        f"{anchor_clause}"
+        "Only open, mention, or modify files and topics that directly serve that scope. "
+        "Do not drift into neighboring files, similarly named campaigns, prior tasks, or "
+        "semantically related artifacts just because they are nearby. "
+        "If the goal is about a README, docs, layout, bug, API, or specific deliverable, "
+        "treat unrelated posts, assets, illustrations, marketing copy, and old workspace "
+        "tasks as out of scope unless the goal explicitly asks for them. "
+        f"If the next file or topic is not clearly justified by the task, stop and reply "
+        f"with `{OUT_OF_SCOPE_GUARD_MARKER} <file-or-topic> is not required for this leased task` "
+        "instead of continuing."
+    )
+
+
+def parse_out_of_scope_guard(reply_text: str) -> str | None:
+    match = _OUT_OF_SCOPE_GUARD_RE.search(str(reply_text or ""))
+    if match is None:
+        return None
+    detail = " ".join(match.group(1).split()).strip()
+    return detail or "out-of-scope guard triggered"
 
 
 def build_continuous_worker_prompt(
@@ -52,6 +119,17 @@ def build_continuous_worker_prompt(
         f" Acceptance criteria: {acceptance}."
         if acceptance
         else " Use receipts to prove the goal is met."
+    )
+    allowed_paths_raw = task_payload.get("allowed_paths")
+    allowed_paths = (
+        [str(item).strip() for item in allowed_paths_raw if str(item).strip()]
+        if isinstance(allowed_paths_raw, list)
+        else []
+    )
+    scope_clause = _task_scope_clause(
+        goal=goal,
+        acceptance=acceptance,
+        allowed_paths=allowed_paths,
     )
     ci_clause = ""
     if role in {"watcher", "backend", "integrations"}:
@@ -110,6 +188,7 @@ def build_continuous_worker_prompt(
         f"Execute only this leased task — do not invent or self-select other work. "
         f"Goal: {goal}.{acceptance_clause} "
         "Do it with receipts and summarize what changed. Stay inside your role boundary."
+        f"{scope_clause}"
         f"{lead_clause}"
         f"{ci_clause}"
         f"{memory_clause}"

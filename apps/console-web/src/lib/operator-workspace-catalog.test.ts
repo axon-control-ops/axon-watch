@@ -44,6 +44,17 @@ describe('operator workspace catalog', () => {
     ]);
   });
 
+  it('keeps real operator workspaces when bindings load as isolated_root', () => {
+    const unboundOperatorItems: WorkspaceRecord[] = [
+      { workspace_id: 'workspace_axon_watch', connection_kind: 'isolated_root' },
+      { workspace_id: 'workspace_dashpro', connection_kind: 'isolated_root' },
+    ];
+    expect(workspaceCatalogMode(unboundOperatorItems)).toBe('production');
+    expect(
+      mergeOperatorWorkspaceCatalog(unboundOperatorItems).map((item) => item.workspace_id),
+    ).toEqual(['workspace_axon_watch', 'workspace_dashpro']);
+  });
+
   it('prefers axon-watch and axon-local when project bindings exist', () => {
     expect(workspaceCatalogMode(productionItems)).toBe('production');
     expect(mergeOperatorWorkspaceCatalog(productionItems).map((item) => item.workspace_id)).toEqual([

@@ -19,17 +19,31 @@ export function hasBoundProjectWorkspaces(items: WorkspaceRecord[]): boolean {
   return items.some((item) => item.connection_kind === 'project_path');
 }
 
+function isMockupWorkspaceRecord(item: WorkspaceRecord): boolean {
+  return MOCKUP_WORKSPACE_IDS.includes(
+    item.workspace_id as (typeof MOCKUP_WORKSPACE_IDS)[number],
+  );
+}
+
+/** True when the API only handed us the legacy demo fleet (or nothing). */
+export function isMockupOnlyCatalog(items: WorkspaceRecord[]): boolean {
+  return items.length === 0 || items.every(isMockupWorkspaceRecord);
+}
+
 export function isProductionOperatorCatalog(items: WorkspaceRecord[]): boolean {
-  return hasBoundProjectWorkspaces(items);
+  // Bound roots are definitive. Also treat non-mockup operator IDs as production
+  // even when bindings briefly load as isolated_root (packaged CP / cold start).
+  return hasBoundProjectWorkspaces(items) || !isMockupOnlyCatalog(items);
 }
 
 export function mergeOperatorWorkspaceCatalog(items: WorkspaceRecord[]): WorkspaceRecord[] {
-  if (!hasBoundProjectWorkspaces(items)) {
+  if (!isProductionOperatorCatalog(items)) {
     return mergeMockupWorkspaceCatalog(items);
   }
 
   const byId = new Map(items.map((item) => [item.workspace_id, item]));
   const orderedIds: string[] = [];
+  const bound = hasBoundProjectWorkspaces(items);
 
   for (const workspaceId of PRODUCTION_OPERATOR_WORKSPACE_IDS) {
     if (byId.has(workspaceId)) {
@@ -38,7 +52,8 @@ export function mergeOperatorWorkspaceCatalog(items: WorkspaceRecord[]): Workspa
   }
 
   for (const item of items) {
-    if (item.connection_kind !== 'project_path') {
+    // When real project bindings exist, drop stray demo isolated_root rows.
+    if (bound && item.connection_kind !== 'project_path') {
       continue;
     }
     if (!orderedIds.includes(item.workspace_id)) {

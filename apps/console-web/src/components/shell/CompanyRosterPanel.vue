@@ -263,6 +263,10 @@ async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKi
   await shell.openOrFocusEmployeeIdeThread(employee);
   const { mode, draft } = employeeComposerOpenPayload(employee, kind);
   requestIdeComposerMode(mode);
+  if (kind === 'retry') {
+    // Retry shift always needs tools — ignore consultative composer setting.
+    shell.setAgentExecutionAccess('full');
+  }
   if (draft) {
     shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
   } else {
@@ -456,7 +460,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :on-replied="vaxonVoiceDock.markReplied"
         />
         <AgentPersonaDock
-          v-else-if="selectedEmployee"
+          v-if="selectedEmployee"
           :key="selectedEmployee.employee_id"
           :employee="selectedEmployee"
           :actions="selectedActions"

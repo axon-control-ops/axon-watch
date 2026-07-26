@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   explainOperatorAlert,
   isBootstrapSummarySignal,
+  lastResortSpokenInvite,
   signalOperatorHint,
   watchRuleTooltip,
 } from './operator-signal-hints';
@@ -82,4 +83,20 @@ describe('operator-signal-hints', () => {
   it('explains observe mode is not a button', () => {
     expect(watchRuleTooltip('observe')).toContain('only watching');
   });
+
+  it('prefers Attention invites over dig-in for unknown alerts', () => {
+    expect(lastResortSpokenInvite('DashPro Sentry critical')).toBe(
+      'Open Attention for DashPro Sentry critical?',
+    );
+    expect(lastResortSpokenInvite('')).toBe('Want me to open Attention?');
+    expect(lastResortSpokenInvite('')).not.toMatch(/shall i dig in/i);
+    const explained = explainOperatorAlert({
+      signalId: 'signal_unknown_widget_anomaly',
+      title: 'Odd widget anomaly',
+      summary: 'Something unusual happened in a widget.',
+    });
+    expect(explained.spoken).toContain('Open Attention for Odd widget anomaly?');
+    expect(explained.spoken.toLowerCase()).not.toContain('shall i dig in');
+  });
 });
+

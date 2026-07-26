@@ -80,12 +80,8 @@ export function createDockLayoutSlice(input: CreateDockLayoutSliceInput) {
     };
     const openLoops = briefingHasOpenLoops(input.operatorBriefing.value, openLoopOptions);
     if (!input.dockThreadSeamTouched.value) {
-      if (openLoops || input.operatorThreadMessageCount.value === 0) {
-        // Prefer KAIRO Open loops; never dominate the dock with an empty thread.
-        next.delete('thread');
-      } else {
-        next.add('thread');
-      }
+      // LIVE OPERATIONS orb card lives in the thread seam — keep it expanded on Mission Control.
+      next.add('thread');
     }
     input.expandedDockSeams.value = next;
     if (!input.leftSidebarModeTouched.value) {

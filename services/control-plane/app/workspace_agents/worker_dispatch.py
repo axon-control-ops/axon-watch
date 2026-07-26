@@ -36,6 +36,7 @@ from app.workspace_agents.worker_isolation import (
     worker_agent_workspace,
 )
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt
+from app.workspace_agents.worker_prompt import parse_out_of_scope_guard
 from app.persistence import task_store
 
 logger = logging.getLogger(__name__)
@@ -225,13 +226,24 @@ def dispatch_continuous_worker_run(
             workspace_root=agent_root,
         )
         reply_text = str(lane_b_result.get("content") or "")
-        dispatched, finalized = finalize_lane_b_agent_run(
-            dispatch_run_id=run_id,
-            lane_b_result=lane_b_result,
-            reply_text=reply_text,
-            workspace_root=str(agent_root),
-            defer_complete=True,
-        )
+        scope_guard_detail = parse_out_of_scope_guard(reply_text)
+        if scope_guard_detail:
+            dispatched = False
+            finalized = _fail_worker_run(
+                run_id,
+                receipt_summary=(
+                    "Continuous worker scope guard tripped: "
+                    f"{scope_guard_detail}"
+                ),
+            )
+        else:
+            dispatched, finalized = finalize_lane_b_agent_run(
+                dispatch_run_id=run_id,
+                lane_b_result=lane_b_result,
+                reply_text=reply_text,
+                workspace_root=str(agent_root),
+                defer_complete=True,
+            )
         preserve_isolation = False
         if dispatched and finalized is not None:
             phase = str(finalized.get("phase") or "").strip().lower()

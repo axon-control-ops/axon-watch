@@ -29,7 +29,6 @@ const showExpandedPanel = computed(() =>
 const activePersonaName = computed(
   () => shell.activeIdeEmployee?.name?.trim() || OPERATOR_PERSONA_NAME,
 );
-const activePersonaMark = computed(() => shell.activeIdeEmployee?.initials ?? null);
 const chipState = computed(() =>
   resolveIdeKairoChipState({
     profileState: shell.ideDisplayKairoPresenceState,
@@ -45,6 +44,20 @@ const surfaceEmployeeFailure = computed(() =>
     agentStreamActive: shell.agentStreamActive,
     kairoSpeechActive: shell.kairoSpeechActive,
   }),
+);
+const presencePersonaName = computed(() => {
+  if (shell.kairoSpeechActive) {
+    return OPERATOR_PERSONA_NAME;
+  }
+  if (surfaceEmployeeFailure.value && activePersonaName.value) {
+    return activePersonaName.value;
+  }
+  return OPERATOR_PERSONA_NAME;
+});
+const activePersonaMark = computed(() =>
+  presencePersonaName.value === OPERATOR_PERSONA_NAME
+    ? null
+    : shell.activeIdeEmployee?.initials ?? null,
 );
 const chipEmployeeFailed = computed(() => surfaceEmployeeFailure.value);
 const chipPresenceHint = computed(() => {
@@ -73,7 +86,7 @@ function handleKairoPresenceOpen(): void {
 }
 
 const presenceStateLabel = computed(() =>
-  kairoPresenceLabel(shell.kairoPresenceState, activePersonaName.value),
+  kairoPresenceLabel(shell.kairoPresenceState, presencePersonaName.value),
 );
 
 const briefingHeadline = computed(() =>
@@ -95,7 +108,7 @@ const signalBadge = computed(
 </script>
 
 <template>
-  <footer class="ide-kairo-footer" :aria-label="`${activePersonaName} presence`">
+  <footer class="ide-kairo-footer" :aria-label="`${presencePersonaName} presence`">
     <KairoChip
       v-if="!showExpandedPanel"
       class="ide-kairo-footer__chip"

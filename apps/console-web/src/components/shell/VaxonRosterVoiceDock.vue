@@ -23,8 +23,22 @@ const { pending, submitTurn } = useKairoConversation();
 const reply = ref('');
 const avatarSrc = ref(resolveVaxonAvatarUrl());
 const asksForReply = computed(() =>
-  /\b(shall i|would you like me to|do you want me to)\b/i.test(props.line),
+  /\b(shall i|would you like me to|do you want me to|open attention for|want me to)\b/i.test(
+    props.line,
+  ),
 );
+const affirmCta = computed(() => {
+  if (/\bopen attention\b/i.test(props.line)) {
+    return 'Yes — open Attention';
+  }
+  if (/\btriage\b/i.test(props.line)) {
+    return 'Yes — triage';
+  }
+  if (/\bdiagnos/i.test(props.line)) {
+    return 'Yes — diagnose';
+  }
+  return 'Yes — continue';
+});
 
 function onAvatarError(): void {
   avatarSrc.value = resolveVaxonAvatarFallbackUrl();
@@ -96,7 +110,7 @@ function dismiss(): void {
 
     <div v-if="asksForReply" class="vaxon-roster-voice-dock__quick-actions">
       <button type="button" :disabled="pending" @click="void send('yes')">
-        Yes — dig in
+        {{ affirmCta }}
       </button>
       <button type="button" :disabled="pending" @click="void send('no')">
         Not now

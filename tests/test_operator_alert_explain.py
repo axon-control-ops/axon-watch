@@ -10,7 +10,10 @@ from pathlib import Path
 CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control-plane"
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
-from app.operator_alert_explain import explain_operator_alert  # noqa: E402
+from app.operator_alert_explain import (  # noqa: E402
+    explain_operator_alert,
+    last_resort_spoken_invite,
+)
 from app.spoken_alert_policy import resolve_spoken_alert  # noqa: E402
 
 GOLDENS_PATH = (
@@ -57,6 +60,22 @@ class OperatorAlertExplainGoldenTests(unittest.TestCase):
         assert isinstance(explained, dict)
         for key in ("what", "you_do", "agent_do", "spoken"):
             self.assertTrue(str(explained.get(key) or "").strip())
+
+    def test_generic_alert_prefers_attention_invite(self) -> None:
+        self.assertEqual(
+            last_resort_spoken_invite("DashPro Sentry critical"),
+            "Open Attention for DashPro Sentry critical?",
+        )
+        self.assertEqual(last_resort_spoken_invite(""), "Want me to open Attention?")
+        self.assertNotIn("dig in", last_resort_spoken_invite("").lower())
+        explained = explain_operator_alert(
+            signal_id="signal_unknown_widget_anomaly",
+            title="Odd widget anomaly",
+            summary="Something unusual happened in a widget.",
+        )
+        self.assertIn("Open Attention for Odd widget anomaly?", explained["spoken"])
+        self.assertNotIn("shall i dig in", explained["spoken"].lower())
+
 
 
 if __name__ == "__main__":

@@ -14,6 +14,11 @@ OPEN_DETAIL_RE = re.compile(
     r"\b(walk me through|explain|tell me about|in detail|step by step|compare|tradeoffs?|everything)\b",
     re.IGNORECASE,
 )
+STATUS_REPORT_RE = re.compile(
+    r"\b(handoff|status report|where things stand|roll.?up|brief(?:ing)? me|"
+    r"what each teammate|owns next|team status)\b",
+    re.IGNORECASE,
+)
 
 
 def runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
@@ -72,8 +77,10 @@ def build_runtime_context_block(
         "- Prefer: short status → what it means → optional next step. Do not dump menus, IDs, or path chrome unless asked.",
         "- No markdown, bullets, code fences, or raw path dumps unless they asked for implementation detail.",
         (
-            "- For walkthrough, explain, compare, or in-detail requests: use 3-6 short paragraphs."
-            if OPEN_DETAIL_RE.search(content)
+            "- For walkthrough/status/handoff reports: cover live state and each active teammate "
+            "ownership in short spoken sentences (up to 8). Do not defer with "
+            "'I'll wait then finalize' when current state is already known."
+            if OPEN_DETAIL_RE.search(content) or STATUS_REPORT_RE.search(content)
             else "- For quick questions: 1-3 short sentences."
         ),
         f"Voice session: {session_id}",

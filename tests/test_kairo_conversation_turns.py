@@ -130,11 +130,15 @@ class KairoConversationTurnTests(unittest.TestCase):
         kc._remember_entities("dig-in-offer-session", pending_dig_in="")
         note_dig_in_offer(
             "dig-in-offer-session",
-            "DashPro Sentry is critical. Shall I dig in?",
+            "DashPro Sentry is critical. Open Attention for DashPro Sentry critical?",
         )
         entity = kc._entity_context("dig-in-offer-session")
         self.assertEqual("1", entity.get("pending_dig_in"))
         self.assertNotEqual("1", entity.get("pending_briefing_surface"))
+
+        kc._remember_entities("dig-in-offer-fallback", pending_dig_in="")
+        note_dig_in_offer("dig-in-offer-fallback", "Something odd happened. Want me to open Attention?")
+        self.assertEqual("1", kc._entity_context("dig-in-offer-fallback").get("pending_dig_in"))
 
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
@@ -366,11 +370,15 @@ class KairoConversationTurnTests(unittest.TestCase):
             answer_tier="deep",
         )
         reply = str(payload["reply"])
+        spoken = str(payload.get("spoken_reply") or reply)
         artifact_body = str(payload["artifacts"][0]["body"])
-        self.assertLessEqual(len(reply), 280)
+        # Deep/runtime turns keep the full reply for UI; TTS may shorten.
+        self.assertLessEqual(len(spoken), 900)
+        self.assertGreaterEqual(len(reply), len(spoken))
         self.assertIn("DashPro spike", artifact_body)
+        self.assertIn("storage", reply.lower())
         self.assertEqual(artifact_body.count("If you are seeing a spike in Supabase or Axon quota"), 1)
-        self.assertTrue(reply.endswith((".", "!", "?")))
+        self.assertTrue(spoken.endswith((".", "!", "?")))
 
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)

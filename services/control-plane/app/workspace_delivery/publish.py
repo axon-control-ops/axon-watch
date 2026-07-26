@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from app.safe_improvement.isolated_executor import read_baseline_metadata
-from app.workspace_agents.diff_policy import evaluate_changed_paths, scan_text_for_secrets
+from app.workspace_agents.diff_policy import (
+    evaluate_changed_paths,
+    resolve_effective_allowed_paths,
+    scan_text_for_secrets,
+)
 from app.workspace_delivery.config import (
     WorkspaceDeliveryPolicy,
     get_workspace_delivery_policy,
@@ -90,6 +94,82 @@ def _derive_commit_message(paths: list[str], turn_subject: str | None) -> str:
         focus = f"{focus} (+{len(paths) - 2} more)"
     subject = f"Update {focus}"
     return subject[:72]
+
+
+def _task_allowed_paths(task_id: str | None) -> list[str]:
+    key = str(task_id or "").strip()
+    if not key:
+        return []
+    try:
+        from app.persistence import task_store
+
+        task = task_store.get_task(key)
+    except Exception:  # noqa: BLE001 — publish must not crash on ledger read
+        return []
+    if not isinstance(task, dict):
+        return []
+    raw = task.get("allowed_paths")
+    if not isinstance(raw, list):
+        return []
+    return [str(item).strip() for item in raw if str(item).strip()]
+
+
+def _contract_scope(isolation_root: Path) -> tuple[list[str], list[str]]:
+    try:
+        from app.workspace_agents.verifier_checks import load_repo_contract
+
+        contract = load_repo_contract(str(isolation_root))
+    except Exception:  # noqa: BLE001 — fall back to secret/forbidden defaults
+        return [], [
+            "**/.env",
+            "**/.env.*",
+            "**/id_rsa",
+            "**/*secret*",
+            "**/credentials.json",
+        ]
+    allowed = [
+        str(item).strip()
+        for item in (contract.get("allowed_paths") or [])
+        if str(item).strip()
+    ]
+    forbidden = [
+        str(item).strip()
+        for item in (contract.get("forbidden_path_globs") or [])
+        if str(item).strip()
+    ]
+    if not forbidden:
+        forbidden = [
+            "**/.env",
+            "**/.env.*",
+            "**/id_rsa",
+            "**/*secret*",
+            "**/credentials.json",
+        ]
+    return allowed, forbidden
+
+
+def _scan_publish_scope(
+    isolation_root: Path,
+    paths: list[str],
+    *,
+    task_id: str | None,
+) -> str | None:
+    """Mirror Gate 6 path policy so publish cannot be looser than acceptance."""
+    contract_allowed, forbidden = _contract_scope(isolation_root)
+    effective = resolve_effective_allowed_paths(
+        contract_allowed_paths=contract_allowed,
+        task_allowed_paths=_task_allowed_paths(task_id),
+    )
+    findings = evaluate_changed_paths(
+        paths,
+        allowed_paths=effective,
+        forbidden_path_globs=forbidden,
+        max_paths=120,
+    )
+    if findings:
+        first = findings[0]
+        return f"{first.code}: {first.path} ({first.detail})"
+    return None
 
 
 def _scan_secrets(isolation_root: Path, paths: list[str]) -> str | None:
@@ -285,6 +365,29 @@ def publish_worker_isolation(
         summary=f"{len(paths)} changed path(s) ready for delivery",
         refs=delivery_refs_from_record(delivery),
     )
+
+    scope_hit = _scan_publish_scope(isolation_root, paths, task_id=task_id)
+    if scope_hit:
+        delivery_store.update_delivery(
+            str(delivery["delivery_id"]),
+            stage="blocked",
+            blocker=scope_hit,
+            refs={"blocker": scope_hit},
+        )
+        emit_delivery_receipt(
+            run_id,
+            stage="blocked",
+            summary=scope_hit,
+            success=False,
+            refs={"blocker": scope_hit, "worker_branch": worker_branch},
+        )
+        return PublishResult(
+            ok=False,
+            stage="blocked",
+            delivery=delivery_store.get_delivery(str(delivery["delivery_id"])),
+            detail=scope_hit,
+            cleanup_isolation=False,
+        )
 
     secret_hit = _scan_secrets(isolation_root, paths)
     if secret_hit:

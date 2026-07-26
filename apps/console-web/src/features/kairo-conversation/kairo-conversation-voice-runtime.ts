@@ -16,6 +16,7 @@ import {
   mentionsBriefingSurfaceOffer,
   scheduleBriefingSurfaceOffer,
 } from './conversation-briefing-surface';
+import { recordVaxonBriefingInteraction } from '../../lib/vaxon-briefing-interaction';
 import { kairoConversationReply } from './kairo-conversation-state';
 import {
   RUNTIME_ASSISTANT_CUE_COPY,
@@ -96,10 +97,18 @@ export function createKairoVoiceDelivery(input: {
   async function deliverVoiceReply(
     reply: string,
     voiceCaptureMode?: KairoVoiceCaptureMode,
+    options?: { spokenReply?: string | null },
   ): Promise<void> {
     const displayReply = formatConversationDisplayReply(reply);
-    const spokenReply = sanitizeSpokenReply(reply);
+    const spokenReply = sanitizeSpokenReply(options?.spokenReply || reply);
     kairoConversationReply.value = normalizeKairoCopy(displayReply || spokenReply);
+    const workspaceId = input.shell.currentWorkspace?.workspace_id?.trim();
+    if (workspaceId && kairoConversationReply.value) {
+      recordVaxonBriefingInteraction({
+        workspaceId,
+        line: kairoConversationReply.value,
+      });
+    }
     if (mentionsBriefingSurfaceOffer(displayReply || spokenReply || reply)) {
       scheduleBriefingSurfaceOffer();
     }

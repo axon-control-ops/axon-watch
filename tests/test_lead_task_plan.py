@@ -74,6 +74,9 @@ class LeadTaskPlanTests(unittest.TestCase):
         for item in with_deps:
             for dep in item.dependencies:
                 self.assertIn(dep, keyed)
+        for item in plan.items:
+            if item.exclusive_paths:
+                self.assertEqual(item.exclusive_paths, item.allowed_paths)
 
     def test_empty_goal_raises(self) -> None:
         with self.assertRaises(ValueError):

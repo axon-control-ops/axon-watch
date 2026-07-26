@@ -33,6 +33,21 @@ def _ask_shaped(body: str, invite: str) -> str:
     return f"{base}. {ask}"
 
 
+def _clean_alert_title(title: str) -> str:
+    clean = str(title or "").strip()
+    if clean.upper().startswith("VAXON:"):
+        clean = clean.split(":", 1)[1].strip() or clean
+    return clean
+
+
+def last_resort_spoken_invite(title: str = "") -> str:
+    """Prefer a concrete Attention ask; never fall back to generic dig-in."""
+    clean = _clean_alert_title(title)
+    if clean and len(clean) <= 72:
+        return f"Open Attention for {clean}?"
+    return "Want me to open Attention?"
+
+
 def _workspace_label(meta: dict[str, Any] | None) -> str:
     if not isinstance(meta, dict):
         return "this project"
@@ -199,7 +214,10 @@ def explain_operator_alert(
         and override.get("you_do")
         and override.get("agent_do")
     ):
-        spoken = override.get("spoken") or _ask_shaped(f"Heads up — {title}", "Shall I dig in?")
+        spoken = override.get("spoken") or _ask_shaped(
+            f"Heads up — {_clean_alert_title(title)}",
+            last_resort_spoken_invite(title),
+        )
         return {
             "what": override["what"],
             "you_do": override["you_do"],
@@ -291,9 +309,7 @@ def explain_operator_alert(
         }
 
     detail = summary if summary and summary.lower() != title.lower() else title
-    clean_title = title
-    if clean_title.upper().startswith("VAXON:"):
-        clean_title = clean_title.split(":", 1)[1].strip() or title
+    clean_title = _clean_alert_title(title)
     severity = str((meta or {}).get("severity") or "").strip().lower()
     severity_hint = (
         "This looks urgent."
@@ -312,7 +328,7 @@ def explain_operator_alert(
     )
     spoken = (override or {}).get("spoken") or _ask_shaped(
         f"Heads up — {clean_title}",
-        "Shall I dig in?",
+        last_resort_spoken_invite(clean_title),
     )
     return {
         "what": what,

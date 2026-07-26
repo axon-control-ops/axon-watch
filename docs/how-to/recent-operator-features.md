@@ -233,9 +233,10 @@ board even when many projects exist.
 
 | Control | State | Why |
 | --- | --- | --- |
-| Continuous worker scheduler | **Off** by default | Needs leased tasks + Lead/fan-out before unattended shifts |
+| Continuous worker scheduler | **Off** by default | Unattended auto-loop not claimed yet — see [auto-loop-and-credits](auto-loop-and-credits.md) |
 | Live-checkout continuous edits | **Forbidden** | Gate 3 isolation — workers use disposable worktrees |
-| Gate 5 full fan-out dispatch | **Partial** | Persist + ready runs land; Lane B auto-dispatch still manual / scheduler off |
+| Gate 5 full fan-out dispatch | **Partial** | Persist + ready runs land; Lane B auto-dispatch still often needs Retry / scheduler |
+| Overnight multi-project loop | **Off** | Critical Review / dig-in / signal review still operator-gated |
 
 Check scheduler:
 

@@ -64,6 +64,28 @@ def build_acceptance(classified: dict[str, str], binding: CiRemediationBinding) 
     )
 
 
+def repair_goal_match_key(classified: dict[str, str]) -> str:
+    workflow = str(classified.get("workflow_name") or "").strip()
+    branch = str(classified.get("head_branch") or "unknown-branch").strip()
+    return f"CI repair: {workflow} failed on {branch}"
+
+
+def supersede_prior_repair_tasks(
+    *,
+    workspace_id: str,
+    classified: dict[str, str],
+    keep_task_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Finalize older open/leased repair tasks for the same workflow+branch."""
+    needle = repair_goal_match_key(classified)
+    return task_store.cancel_tasks_matching_goal_prefix(
+        workspace_id=workspace_id,
+        goal_substr=needle,
+        exclude_task_id=keep_task_id,
+        terminal_outcome="superseded by newer CI repair head",
+    )
+
+
 def create_and_lease_repair_task(
     *,
     binding: CiRemediationBinding,
@@ -72,6 +94,16 @@ def create_and_lease_repair_task(
     owner_role: str | None = None,
 ) -> dict[str, Any]:
     role = (owner_role or binding.owner_role).strip().lower() or "watcher"
+    superseded = supersede_prior_repair_tasks(
+        workspace_id=binding.workspace_id,
+        classified=classified,
+    )
+    if superseded:
+        logger.info(
+            "CI remediation superseded %s prior repair task(s) for %s",
+            len(superseded),
+            repair_goal_match_key(classified),
+        )
     opened = task_store.create_task(
         workspace_id=binding.workspace_id,
         goal=build_repair_goal(classified, binding, dedupe_key=dedupe_key),

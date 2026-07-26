@@ -206,7 +206,7 @@ export function useKairoConversation() {
       if (mentionsBriefingSurfaceOffer(response.reply)) {
         scheduleBriefingSurfaceOffer();
       }
-      await deliverVoiceReply(response.reply, options?.voiceCaptureMode);
+      await deliverVoiceReply(response.reply, options?.voiceCaptureMode, { spokenReply: response.spoken_reply });
     } catch (error) {
       clearRuntimeAssistantCue();
       kairoConversationError.value =

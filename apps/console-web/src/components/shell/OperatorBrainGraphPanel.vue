@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch, Transition } from 'vu
 
 import { useBrainGalaxy } from '../../features/brain-galaxy/use-brain-galaxy';
 import GalaxyWorkspacesRail from '../../features/brain-galaxy/GalaxyWorkspacesRail.vue';
-import GalaxyIntelligencePanel from '../../features/brain-galaxy/GalaxyIntelligencePanel.vue';
 import GalaxyPanelResizeHandle from '../../features/brain-galaxy/GalaxyPanelResizeHandle.vue';
 import GalaxyStatusBarActions from '../../features/brain-galaxy/GalaxyStatusBarActions.vue';
 import KairoConversationBar from '../../features/kairo-conversation/KairoConversationBar.vue';
@@ -11,7 +10,6 @@ import OperatorEvidencePanel from '../../features/operator-evidence/OperatorEvid
 import {
   isKairoConversationBusy,
   kairoLastActionTier,
-  kairoLastRoutingReceipt,
 } from '../../features/kairo-conversation/kairo-conversation-state';
 import { kairoCaptureCapturing } from '../../features/kairo-conversation/kairo-shared-speech-capture';
 import {
@@ -500,10 +498,7 @@ function handleEvidenceHandoff(signal: {
         @keydown="onGalaxyResizeKeydown('right', 'right', $event)"
         @dblclick="resetGalaxyWidth('right')"
       />
-      <GalaxyIntelligencePanel
-        :presence-phase="presence.phase"
-        :routing-receipt="kairoLastRoutingReceipt"
-      />
+      <!-- LIVE OPERATIONS orb card lives in the shell RightDock (Mission Control mockup). -->
       <button
         type="button"
         class="brain-galaxy-stage__legend-toggle"

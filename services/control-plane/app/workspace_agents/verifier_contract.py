@@ -185,6 +185,19 @@ def ensure_acceptance_before_publish(
     if not paths and root is not None:
         paths = list_changed_paths(root)
 
+    task_allowed_paths: list[str] = []
+    task_id = str(record.get("task_id") or "").strip()
+    if task_id:
+        from app.persistence import task_store
+
+        task = task_store.get_task(task_id)
+        if isinstance(task, dict):
+            raw_allowed = task.get("allowed_paths")
+            if isinstance(raw_allowed, list):
+                task_allowed_paths = [
+                    str(item).strip() for item in raw_allowed if str(item).strip()
+                ]
+
     if root is None:
         contract = inspect_fallback_contract()
         mode = "inspect_fallback_no_root"
@@ -208,6 +221,7 @@ def ensure_acceptance_before_publish(
         check_results=check_results,
         changed_paths=paths,
         path_to_text=path_to_text,
+        task_allowed_paths=task_allowed_paths,
     )
     payload = evaluation.to_dict()
     payload["summary"] = f"{evaluation.summary} · mode={mode} · paths={len(paths)}"

@@ -286,6 +286,26 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
     except Exception:  # noqa: BLE001 — never block scheduler on delivery poll
         logger.exception("workspace delivery poll failed")
 
+    try:
+        from app.workspace_agents.company_work_sources import run_scheduled_work_sources
+
+        work_source_result = run_scheduled_work_sources()
+        recovered = work_source_result.get("recovered_leases") or []
+        if recovered:
+            logger.info(
+                "continuous worker tick recovered %s orphaned leased task(s)",
+                len(recovered),
+            )
+        patrol = (work_source_result.get("sources") or {}).get("file_size_patrol") or {}
+        created = patrol.get("created_tasks") or []
+        if created:
+            logger.info(
+                "continuous worker tick enqueued %s file-size patrol task(s)",
+                len(created),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on work sources
+        logger.exception("scheduled company work sources failed")
+
     if not scheduler_enabled():
         return []
 
