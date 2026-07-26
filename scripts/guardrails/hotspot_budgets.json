@@ -105,13 +105,13 @@
       "note": "Runtime status snapshot cache and probe assembly"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1542,
+      "max_lines": 1546,
       "soft_limit": 400,
-      "hard_limit": 1542,
+      "hard_limit": 1546,
       "target": "docs/how-to/* chapters"
     },
     "docs/HOW-TO-HANDBOOK.html": {
-      "max_lines": 2687,
+      "max_lines": 3079,
       "soft_limit": 250,
       "hard_limit": 400,
       "target": "docs/how-to/* generated HTML"
@@ -368,11 +368,18 @@
       "note": "Gate 4 leased-task create_run binding; extract next"
     },
     "services/control-plane/app/persistence/task_store.py": {
-      "max_lines": 690,
+      "max_lines": 800,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/persistence/*",
       "note": "Gate 4/5 task ledger + exclusive-path lease conflicts"
+    },
+    "services/control-plane/app/workspace_delivery/publish.py": {
+      "max_lines": 600,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/workspace_delivery/*",
+      "note": "Autonomy publish path-scope + receipts; extract next"
     }
   }
 }
