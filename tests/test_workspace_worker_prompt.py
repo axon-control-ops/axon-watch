@@ -154,7 +154,7 @@ class WorkspaceWorkerPromptTests(unittest.TestCase):
                     "goal": "Coordinate July fee reconciliation handoffs",
                 },
             )
-        self.assertIn("You are Dana, the lead employee", prompt)
+        self.assertIn("You are Dana. Your role is lead", prompt)
         self.assertIn("treat the company team roster block as authoritative", prompt)
         self.assertIn("do not Glob/Grep/Read the tree to discover staffing", prompt)
         self.assertIn("Priya (Frontend / frontend)", prompt)
