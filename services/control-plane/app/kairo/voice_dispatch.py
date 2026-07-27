@@ -32,6 +32,7 @@ VoiceDispatchLane = Literal[
     "bounded_command",
     "vaxon_runtime",
     "ide_handoff",
+    "deterministic_report",
 ]
 VoiceRoutingMode = Literal["template_first", "runtime_on_deep", "runtime_aggressive"]
 ConversationAnswerTier = Literal["fast", "deep"]
@@ -242,6 +243,40 @@ def route_voice_turn(
     """Route a classified turn into a VAXON lane with autonomy + model receipts."""
     mode = normalize_voice_routing_mode(voice_routing_mode)
 
+    from app.kairo.operator_deterministic_report import (
+        build_operator_report_snapshot,
+        compose_operator_report,
+        is_operator_report_request,
+    )
+
+    # Dedicated REPORT lane — never Lane B / runtime; roster + verified handoffs only.
+    if is_operator_report_request(content):
+        snapshot = build_operator_report_snapshot(
+            workspace_id=workspace_id,
+            pack=pack,
+            force_refresh=True,
+        )
+        composed = compose_operator_report(snapshot)
+        reply = str(composed.get("text") or "").strip()
+        spoken = str(composed.get("spoken") or reply).strip()
+        receipt = VoiceModelReceipt(
+            selected_model=None,
+            runtime_id=None,
+            runtime_label=None,
+            lane="deterministic_report",
+            reason=f"fingerprint={composed.get('fingerprint') or 'none'}",
+            fallback=False,
+        )
+        remember_top_signal(session_id, pack, fallback_workspace_id=workspace_id)
+        return VoiceDispatchDecision(
+            lane="deterministic_report",
+            turn_kind="status_question",
+            source="template",
+            reply=reply,
+            spoken_reply=spoken or reply,
+            model_receipt=receipt,
+        )
+
     if turn_kind == "command":
         normalized = expand_command_shortcuts(content)
         requires_confirmation = command_requires_confirmation(normalized)
@@ -367,6 +402,9 @@ def route_voice_turn(
         selected_label = str(payload.get("runtime_label") or runtime_label or "") or None
         selected_model = str(payload.get("runtime_model") or model or "") or None
         reason = str(payload.get("reason") or ("dispatched" if dispatched else "runtime_unavailable"))
+        failure_phase = str(payload.get("failure_phase") or "").strip()
+        if failure_phase and failure_phase not in reason:
+            reason = f"{failure_phase};{reason}"
         receipt = VoiceModelReceipt(
             selected_model=selected_model,
             runtime_id=selected_runtime,

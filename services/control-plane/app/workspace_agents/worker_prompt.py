@@ -180,6 +180,13 @@ def build_continuous_worker_prompt(
             " As Lead, treat the company team roster block as authoritative for "
             "teammates, roles, and owns — do not Glob/Grep/Read the tree to discover "
             "staffing before planning or delegating."
+            " Reporting chain: specialists → you → VAXON → operator Decide."
+            " After specialist completions, post a short Lead rollup (done / verified / next)."
+        )
+    else:
+        lead_clause = (
+            " Reporting chain: finish with a Lead handoff (what changed, verified, "
+            "Blockers / Lead next). Do not escalate straight to the operator — Lead owns that."
         )
     return append_critical_review_clause(
         f"{identity} "

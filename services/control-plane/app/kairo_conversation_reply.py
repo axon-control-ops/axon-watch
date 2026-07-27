@@ -20,6 +20,7 @@ QuestionFocus = Literal[
     "runtime",
     "health",
     "degraded",
+    "status_report",
     "general",
     "followup",
 ]
@@ -57,6 +58,13 @@ _ACTIVITY_RE = re.compile(
     r"\b(just did|just do|doing|latest|recent|recently|last thing|last run|activity)\b",
     re.IGNORECASE,
 )
+_STATUS_REPORT_RE = re.compile(
+    r"\b(status report|stand[\s-]?up|where things stand|roll.?up|brief(?:ing)? me|"
+    r"what each teammate|owns next|team status|single best next move|"
+    r"^report$|^status$|^update$)\b",
+    re.IGNORECASE,
+)
+
 
 def is_open_style_question(content: str) -> bool:
     return bool(_OPEN_QUESTION_RE.search(content.strip()))
@@ -67,6 +75,8 @@ def detect_question_focus(content: str, *, recent_user_turns: list[str]) -> Ques
     lower = trimmed.lower()
     if recent_user_turns and _FOLLOWUP_RE.search(lower):
         return "followup"
+    if _STATUS_REPORT_RE.search(lower) or lower in {"report", "status", "update", "standup", "stand-up"}:
+        return "status_report"
     if _APPROVAL_RE.search(lower):
         return "approvals"
     if _ATTENTION_RE.search(lower):

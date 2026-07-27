@@ -45,9 +45,11 @@ def _format_employee_line(row: dict[str, Any], *, detail: bool) -> str:
         if employee_id:
             bits.append(f"; id: {employee_id}")
         if last_outcome == "failed" and last_detail:
-            bits.append(f"; last shift failed: {last_detail}")
+            bits.append(f"; last job failed: {last_detail}")
         elif last_outcome:
             bits.append(f"; last outcome: {last_outcome}")
+            if last_detail:
+                bits.append(f" ({last_detail})")
     return "".join(bits)
 
 

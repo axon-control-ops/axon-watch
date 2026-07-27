@@ -179,6 +179,34 @@ def _strip_forbidden_listener_address(text: str) -> str:
     return cleaned.strip()
 
 
+def _prepare_counts_for_speech(text: str) -> str:
+    """Stop TTS from gluing '4 Lead' into 'forlead'."""
+    number_words = {
+        "0": "zero",
+        "1": "one",
+        "2": "two",
+        "3": "three",
+        "4": "four",
+        "5": "five",
+        "6": "six",
+        "7": "seven",
+        "8": "eight",
+        "9": "nine",
+        "10": "ten",
+        "11": "eleven",
+        "12": "twelve",
+    }
+
+    def _replace(match: re.Match[str]) -> str:
+        digits = match.group(1)
+        word = match.group(2)
+        spoken = number_words.get(digits, digits)
+        # Keep a clear pause before capitalized role words (Lead, Sentry, …).
+        return f"{spoken} {word}"
+
+    return re.sub(r"\b(\d{1,2})\s+([A-Z][A-Za-z-]+)\b", _replace, text)
+
+
 def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> str:
     """Convert agent/model text into concise operator-facing speech."""
     original = str(raw or "").strip()
@@ -199,6 +227,7 @@ def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> st
         flags=re.IGNORECASE,
     )
     text = _strip_forbidden_listener_address(text)
+    text = _prepare_counts_for_speech(text)
     text = _soften_symbols_for_speech(text)
     text = strip_literal_symbol_words(text)
     text = re.sub(r"\s+", " ", text).strip()

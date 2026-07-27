@@ -1,10 +1,14 @@
 # Recent operator features (Gate 3–5 + console UX)
 
-**Updated:** 2026-07-22  
+**Updated:** 2026-07-27  
 **Audience:** operators and agents who need plain-language “what changed and how to use it.”
 
 Companion to [`docs/HOW-TO-HANDBOOK.md`](../HOW-TO-HANDBOOK.md) and
 [`autonomy-gates-and-service-identity.md`](autonomy-gates-and-service-identity.md).
+
+**Mission Control second brain (2026-07-27):** Transmission card, open vs focus workspace,
+fleet busy presence, and **`REPORT`** hotword — see
+[`mission-control-transmission-and-report.md`](mission-control-transmission-and-report.md).
 
 ---
 

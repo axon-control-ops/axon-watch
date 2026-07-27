@@ -89,6 +89,24 @@ role-owned tasks on the clock.
 
 ---
 
+## Continuous specialist → Lead → VAXON
+
+When a specialist finishes an IDE or continuous job (even without a Lead plan):
+
+1. **Specialist** ends with a short handoff: what changed, verified, Blockers / Lead next.
+2. **Lead** gets an automatic takeover note in the Lead IDE tab + a follow-up task.
+3. **VAXON** gets a short operator-thread flash so `REPORT` / update has live fleet memory.
+4. Full Lead **plans** still synthesize into a richer VAXON handoff when all plan tasks finish.
+
+```text
+Specialist finishes
+  → Lead takeover (Dana tab)
+  → VAXON flash (operator thread)
+  → You ask REPORT → VAXON uses roster + those handoffs
+```
+
+---
+
 ## Close-out checklist — monitoring mode with Axon-X in play
 
 Use this when shifting from build/ship into supervised monitoring:

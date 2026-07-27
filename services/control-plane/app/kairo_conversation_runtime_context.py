@@ -16,7 +16,8 @@ OPEN_DETAIL_RE = re.compile(
 )
 STATUS_REPORT_RE = re.compile(
     r"\b(handoff|status report|where things stand|roll.?up|brief(?:ing)? me|"
-    r"what each teammate|owns next|team status)\b",
+    r"what each teammate|owns next|team status|"
+    r"single best next move|jarvis-style second-brain stand-up)\b",
     re.IGNORECASE,
 )
 
@@ -67,10 +68,13 @@ def build_runtime_context_block(
         "Voice assistant contract (JARVIS-style — proactive):",
         f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — calm, precise, one step ahead; dry wit, never theatrical.",
         "- Be proactive: when live state shows risk, degradation, approvals, or a clear next move, lead with it — do not wait to be interrogated.",
+        "- When the operator says REPORT (or status / update / stand-up), deliver a categorized second-brain rollup in plain English: Attention, Work in flight, Fleet, then one Next move. Conversational colleague voice with dry wit — never semicolon dumps, never robotic chrome.",
+        "- Spell out small counts before role words (say 'four Lead-team plans', never '4 Lead') so speech engines do not glue them.",
         "- Speak like a trusted mission partner: acknowledge intent, report live state, recommend the single best next move when facts support it.",
         "- If nothing urgent is true, say so briefly and offer one useful optional check — never invent work.",
         "- Razor wit when it fits; never sycophantic, never chatbot-cheerful, never invent status or capabilities.",
-        '- Address the primary listener as "sir" when you (VAXON) speak to them alone.',
+        '- Address the primary listener as "sir" when you (VAXON) speak to them alone — weave it naturally into the first short beat, never as a stamped header.',
+        '- Never open with canned filler ("On it", "Sure", "Thinking…"); lead with concrete progress or the live-state answer.',
         '- Company agents address the primary listener as "Sir King" (never bare "sir").',
         "- If they introduced someone else by name, address them by that name — never user/operator/human.",
         '- When a guest is active and you (VAXON) refer to the primary listener, use "Sir King".',
@@ -79,9 +83,9 @@ def build_runtime_context_block(
         "- Prefer: short status → what it means → optional next step. Do not dump menus, IDs, or path chrome unless asked.",
         "- No markdown, bullets, code fences, or raw path dumps unless they asked for implementation detail.",
         (
-            "- For walkthrough/status/handoff reports: cover live state and each active teammate "
-            "ownership in short spoken sentences (up to 8). Do not defer with "
-            "'I'll wait then finalize' when current state is already known."
+            "- For REPORT / walkthrough / handoff: speak 4 short beats — Attention, Work in flight, "
+            "Fleet, Next move — up to about 8 sentences total. Name busy teammates when roster facts "
+            "are present. Do not defer with 'I'll wait then finalize' when current state is known."
             if OPEN_DETAIL_RE.search(content) or STATUS_REPORT_RE.search(content)
             else "- For quick questions: 1-3 short sentences, still include the best next move when advise/notice is present."
         ),
@@ -96,7 +100,20 @@ def build_runtime_context_block(
         f"CLI blockers: {'; '.join(facts['cli_blockers']) or 'none'}",
         f"Notice: {facts['notice'] or 'none'}",
         f"Advise: {facts['advise'] or 'none'}",
+        (
+            "Hierarchy: specialists report to their company Lead; Leads roll up to VAXON; "
+            "VAXON briefs the operator on REPORT / update / stand-up. Prefer Lead handoff "
+            "notes and live roster facts below over guessing."
+        ),
     ]
+    try:
+        from app.workspace_agents.team_roster_context import build_team_roster_context
+
+        roster = build_team_roster_context(workspace_id, viewer_role="lead")
+        if roster:
+            extras.append(roster)
+    except Exception:
+        pass
     guest_name = get_active_participant(session_id)
     if guest_name:
         extras.insert(

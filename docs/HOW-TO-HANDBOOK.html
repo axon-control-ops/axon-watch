@@ -25,8 +25,8 @@
     </div>
     <div class="cover-footer">
       <div class="cover-meta">
-        <strong>Last verified</strong> · 2026-07-25 — Gates 0–5 closed; Gate 6 verifier + draft-PR delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and file-size patrol plumbing landed. **Not yet a closed unattended auto-loop** — scheduler stays **off** by default; Mission Control still needs Retry / dig-in. Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first for status + Cursor credit budgets. After every push run `./scripts/ops/watch-fast-gate.sh`.<br/>
-        Generated 25 Jul 2026
+        <strong>Last verified</strong> · 2026-07-27 — Mission Control Live Ops **Transmission** card, workspace open vs focus intents, fleet busy presence, and **REPORT** hotword for second-brain stand-ups. Gates 0–5 closed; Gate 6 verifier + draft-PR delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and file-size patrol plumbing landed. **Not yet a closed unattended auto-loop** — scheduler stays **off** by default; Mission Control still needs Retry / dig-in. Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first for status + Cursor credit budgets. After every push run `./scripts/ops/watch-fast-gate.sh`.<br/>
+        Generated 27 Jul 2026
       </div>
       <div class="cover-chips">
         <span class="cover-chip">console-web</span>
@@ -43,7 +43,7 @@
     <div class="toc-kicker">Field guide</div>
     <h2>16 chapters</h2>
   </div>
-  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-auto-loop-status-credits-budget-operator-brief">Auto-loop status & credits budget (operator brief)</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">46</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">47</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
+  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-auto-loop-status-credits-budget-operator-brief">Auto-loop status & credits budget (operator brief)</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-mission-control-transmission-and-report-second-brain">Mission Control, Transmission, and REPORT (second brain)</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">46</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">47</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">48</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
 </nav>
 
     
@@ -67,7 +67,8 @@
 3.6. <a href="how-to/ci-merge-and-worker-agents.md">CI, merge, and worker agents</a> — Fast Gate, <code>dev</code>, roster; <a href="how-to/ci-remediation-gate9.md">Gate 9 CI remediation</a>
 3.65. <a href="how-to/autonomy-gates-and-service-identity.md">Autonomy gates &amp; service identity</a> — Gate 4 tasks, scheduler off, watch token + mTLS
 3.66. <a href="how-to/recent-operator-features.md">Recent operator features</a> — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
-3.67. <a href="how-to/auto-loop-and-credits.md">Auto-loop status &amp; credits</a> — are we autonomous yet? Cursor / API budget for multi-project
+3.67. <a href="how-to/mission-control-transmission-and-report.md">Mission Control Transmission &amp; REPORT</a> — second brain dock, hotword, open vs focus
+3.68. <a href="how-to/auto-loop-and-credits.md">Auto-loop status &amp; credits</a> — are we autonomous yet? Cursor / API budget for multi-project
 3.7. <a href="#vaxon-desktop">VAXON Desktop</a> — packaged Linux install</li>
 <li><a href="#teaching-axon-x-to-someone-else">Teaching Axon-X</a> — explain it to others</li>
 <li><a href="#codebase-in-plain-english">Codebase in plain English</a> — what happens under the hood</li>
@@ -100,7 +101,7 @@
 <tr>
 <td><strong>Operator (daily use)</strong></td>
 <td><a href="#quick-start">Quick Start</a></td>
-<td><a href="#runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a>, <a href="#vaxon-desktop">VAXON Desktop</a>, <a href="#operator-manual">Operator manual</a></td>
+<td><a href="how-to/mission-control-transmission-and-report.md">Mission Control Transmission &amp; REPORT</a>, <a href="#runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a>, <a href="#vaxon-desktop">VAXON Desktop</a>, <a href="#operator-manual">Operator manual</a></td>
 </tr>
 <tr>
 <td><strong>Teacher / reviewer</strong></td>
@@ -120,7 +121,7 @@
 <tr>
 <td><strong>Autonomy / remote host</strong></td>
 <td><a href="how-to/auto-loop-and-credits.md">Auto-loop status &amp; credits</a></td>
-<td><a href="how-to/autonomy-gates-and-service-identity.md">Autonomy gates &amp; service identity</a>, <a href="how-to/recent-operator-features.md">Recent operator features</a></td>
+<td><a href="how-to/autonomy-gates-and-service-identity.md">Autonomy gates &amp; service identity</a>, <a href="how-to/recent-operator-features.md">Recent operator features</a>, <a href="how-to/mission-control-transmission-and-report.md">Mission Control Transmission &amp; REPORT</a></td>
 </tr>
 <tr>
 <td><strong>Debugger</strong></td>
@@ -211,17 +212,17 @@ they are two views over the same workspace, runs, and APIs.</p>
 </tr>
 <tr>
 <td><strong>Right dock</strong></td>
-<td>Conversation transcript + Command/KAIRO hero</td>
+<td><strong>Live Ops</strong> on Mission Control (orb + Transmission + talk) — Brain Graph uses evidence instead</td>
 <td>Resizable agent dock (conversation + composer)</td>
 </tr>
 <tr>
 <td><strong>Best for</strong></td>
-<td>“What is running? What needs me? Run this command.”</td>
+<td>“What is running? What needs me? REPORT stand-up.”</td>
 <td>“Edit files, use terminal, review code.”</td>
 </tr>
 <tr>
 <td><strong>Input style</strong></td>
-<td><strong>Exact commands</strong> in the Command seam (see footer <strong>Commands</strong>)</td>
+<td>Talk to VAXON in Live Ops (<code>REPORT</code>, focus/open workspace) + Command seam</td>
 <td>Same command seam in agent dock + full editor/terminal</td>
 </tr>
 </tbody>
@@ -232,21 +233,25 @@ they are two views over the same workspace, runs, and APIs.</p>
 <h3>What you can do in Axon-X today (v1)</h3>
 <p>Real and verified today:</p>
 <ul>
-<li>Select <strong>axon-watch</strong> or <strong>axon-local</strong> workspace</li>
-<li>View <strong>runtime summary</strong>, <strong>inbox signals</strong>, and <strong>KAIRO briefing</strong> from live APIs</li>
+<li>Select <strong>axon-watch</strong>, <strong>axon-local</strong>, <strong>DashPro</strong>, or other bound workspaces</li>
+<li>View <strong>runtime summary</strong>, <strong>inbox signals</strong>, and <strong>VAXON briefing</strong> from live APIs</li>
 <li>Track <strong>run phase</strong> in mission control (stop/resume/review-ready flows)</li>
-<li>Send <strong>supported commands</strong> (not free-form chat) via the Command seam</li>
+<li><strong>Mission Control Live Ops</strong>: talk to VAXON; replies land in the <strong>Transmission</strong> card</li>
+<li>Say <strong><code>REPORT</code></strong> for a second-brain stand-up (teammates, risks, next move)</li>
+<li><strong><code>Show me DashPro</code></strong> focuses Mission Control; <strong><code>Open DashPro workspace</code></strong> enters IDE</li>
+<li>Send <strong>supported commands</strong> via the Command seam</li>
 <li>Run <strong>git status</strong> against the bound repo root</li>
 <li><strong>IDE mode</strong>: open workspace files in Monaco, PTY terminal in repo root</li>
 <li><strong>Attention sidebar</strong>: connector/signal/delivery visibility</li>
 </ul>
-<p>Still thin or deferred (use axon-local <code>:7734</code> fallback if needed):</p>
+<p>Still thin or deferred:</p>
 <ul>
-<li>General conversational chat (“Hi”, “explain this repo”)</li>
-<li>Full agent tool loop parity with classic Axon</li>
-<li>Child-project connectors and legacy integration surfaces</li>
+<li>Timed auto-REPORT cadence while Mission Control is focused (hotword exists; timer does not yet)</li>
+<li>Full unattended auto-loop (scheduler off by default — see auto-loop how-to)</li>
+<li>Child-project connectors and some legacy integration surfaces</li>
 <li>Native tray notifications beyond hide-on-close packaging</li>
 </ul>
+<p>Deep dive: <a href="how-to/mission-control-transmission-and-report.md"><code>how-to/mission-control-transmission-and-report.md</code></a></p>
 <h3>Supported commands (Operator mode)</h3>
 <p>The conversation/command seam accepts <strong>exact commands</strong> only. Natural language
 will return “unsupported command”.</p>
@@ -2069,7 +2074,190 @@ drills before buying more seats.</p>
 <li><a href="../AXON-X-AUTONOMY-READINESS.md"><code>docs/AXON-X-AUTONOMY-READINESS.md</code></a></li>
 </ul>
 <hr>
-</div></section><section class="chapter" id="chapter-ci-merge-workflow-and-worker-agents"><div class="chapter-header"><span class="chapter-num">31</span><h2 id="ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-mission-control-transmission-and-report-second-brain"><div class="chapter-header"><span class="chapter-num">31</span><h2 id="mission-control-transmission-and-report-second-brain">Mission Control, Transmission, and REPORT (second brain)</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-27<br>
+<strong>Audience:</strong> operators who want Axon-X as an active second brain — not a quiet dashboard.</p>
+<p>Companion to <a href="../HOW-TO-HANDBOOK.md"><code>docs/HOW-TO-HANDBOOK.md</code></a> and
+<a href="recent-operator-features.md"><code>recent-operator-features.md</code></a>.</p>
+<hr>
+<h3>Confirm what shipped (operator view)</h3>
+<table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Status</th>
+<th>How to check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mission Control <strong>right dock</strong> = Live Ops (orb + Transmission + talk box)</td>
+<td>Shipped</td>
+<td>OPERATOR → Mission Control (grid). Brain Graph hides this dock.</td>
+</tr>
+<tr>
+<td><strong>Transmission</strong> card holds VAXON replies while you stay on Mission Control</td>
+<td>Shipped</td>
+<td>Speak/type in the Live Ops box; reply appears under the orb (not only the left chip).</td>
+</tr>
+<tr>
+<td><strong>Open DashPro workspace</strong> enters <strong>IDE</strong></td>
+<td>Shipped</td>
+<td>Type <code>Open DashPro workspace</code> → layout flips to IDE. Reply: <code>Opening DashPro.</code></td>
+</tr>
+<tr>
+<td><strong>Show me / focus DashPro</strong> stays on Mission Control</td>
+<td>Shipped</td>
+<td>Type <code>Show me DashPro</code> → Focus · DashPro, reply <code>DashPro is on deck.</code></td>
+</tr>
+<tr>
+<td>Fleet tiles pulse / say <strong>live</strong> when runs or busy agents exist</td>
+<td>Shipped (data-dependent)</td>
+<td>Needs active runs or mid-shift teammates; otherwise tiles stay Nominal.</td>
+</tr>
+<tr>
+<td>Agent “thinking I’ll…” rewritten to action copy</td>
+<td>Shipped (UI sanitize)</td>
+<td>Captions/chips show e.g. <code>Reading…</code> / <code>Checking…</code> when thinking leads with that filler.</td>
+</tr>
+<tr>
+<td><strong>REPORT</strong> hotword → stand-up rollup</td>
+<td>Shipped (2026-07-27)</td>
+<td>Type or say <code>REPORT</code> in Live Ops / conversation bar.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Confidence on the above table:</strong> <strong>7/10</strong> — code + unit tests + Fast Gate on HEAD verified; live console walkthrough after hard-refresh still recommended.</p>
+<hr>
+<h3>How to use Axon-X to the fullest (daily)</h3>
+<h4>1. Stay on Mission Control for command</h4>
+<ol>
+<li>Top nav → <strong>OPERATOR</strong>.</li>
+<li>Bottom chips → <strong>Mission Control</strong> (leave Brain Graph).</li>
+<li>Right dock = your second brain surface: orb, <strong>Transmission</strong>, stream, talk box.</li>
+<li>Footer workspace should match what you care about (<code>workspace_dashpro</code>, <code>workspace_axon_watch</code>, …).</li>
+</ol>
+<h4>2. Talk like a mission partner</h4>
+<table>
+<thead>
+<tr>
+<th>You say</th>
+<th>What VAXON should do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>REPORT</code> / <code>status report</code> / <code>standup</code> / <code>where do we stand</code></td>
+<td>Deep stand-up: risks, busy teammates, approvals, one next move → <strong>Transmission</strong></td>
+</tr>
+<tr>
+<td><code>Show me DashPro</code></td>
+<td>Focus DashPro on Mission Control; keep Live Ops open</td>
+</tr>
+<tr>
+<td><code>Open DashPro workspace</code></td>
+<td>Enter the IDE for DashPro (coding surface)</td>
+</tr>
+<tr>
+<td><code>Open attention</code></td>
+<td>Jump Attention sidebar for signals</td>
+</tr>
+<tr>
+<td><code>Open VAXON briefing</code></td>
+<td>Open briefing surface</td>
+</tr>
+<tr>
+<td>“What is Dana doing?”</td>
+<td>Prefer <code>REPORT</code> instead — VAXON should name busy leads/specialists from live roster</td>
+</tr>
+</tbody>
+</table>
+<h4>3. Turn on voice presence (so VAXON is less quiet)</h4>
+<p>In <strong>Settings → Operator presence</strong>:</p>
+<ul>
+<li>Enable <strong>spoken alerts</strong> for high/critical signals.</li>
+<li>Enable <strong>JARVIS duplex</strong> (<code>proactive_duplex_enabled</code>) if you want speak → listen loops.</li>
+<li>Unlock voice / hands-free when the orb offers it.</li>
+</ul>
+<p>Without spoken alerts + duplex, Mission Control looks “quiet” even when the fleet is busy — the stream still ticks, but VAXON will not interrupt you.</p>
+<h4>4. Company work vs chat</h4>
+<ul>
+<li><strong>Task board</strong> = durable leased work (Gate 4). Create goals; workers claim when scheduler is on.</li>
+<li><strong>IDE Ask/Agent</strong> = conversation vs tool work with a named teammate.</li>
+<li><strong>Lead fan-out</strong> = “check with all sub-agents…” creates multiple tasks/runs — then use <strong>REPORT</strong> for the rollup.</li>
+</ul>
+<h4>5. Fast Gate / signals (example from a live session)</h4>
+<p>When Attention shows many <strong>Axon-X Fast Gate failed on feat/mission-control-holographic</strong>:</p>
+<ol>
+<li>Do not panic-click every signal.</li>
+<li>Say <strong>REPORT</strong> — get the rollup + next move.</li>
+<li>Or open the failed run URL from the signal DETAILS, fix, push, then <code>./scripts/ops/watch-fast-gate.sh</code>.</li>
+</ol>
+<hr>
+<h3>Examples (copy-paste)</h3>
+<p><strong>Stand-up without interrogating each person</strong></p>
+<pre><code class="language-text">REPORT
+</code></pre>
+<p>Expanded under the hood to a status-report prompt so VAXON covers teammates and next move.</p>
+<p><strong>Focus then dig in</strong></p>
+<pre><code class="language-text">Show me DashPro
+REPORT
+</code></pre>
+<p><strong>Leave Mission Control into code</strong></p>
+<pre><code class="language-text">Open DashPro workspace
+</code></pre>
+<p>Then work in IDE; return with top nav <strong>OPERATOR</strong> → Mission Control.</p>
+<hr>
+<h3>Where we can improve (honest backlog)</h3>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Why it hurts</th>
+<th>Suggested next slice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No <strong>timed</strong> auto-REPORT</td>
+<td>You still must ask or wait for alerts</td>
+<td>Cadence: every N minutes while OPERATOR+Mission Control focused, if material_change or busy agents &gt; 0, speak a short rollup into Transmission</td>
+</tr>
+<tr>
+<td>Quiet when fleet is Nominal</td>
+<td>Busy <em>work</em> without signals looks idle</td>
+<td>Surface Lead check-in / open task counts on fleet tiles even without Sentry</td>
+</tr>
+<tr>
+<td>Brain Graph evidence panel ≠ Transmission</td>
+<td>Replies feel “lost” on Graph</td>
+<td>Mirror last Transmission line onto Galaxy speech captions / evidence header</td>
+</tr>
+<tr>
+<td>Open-workspace leaves Live Ops</td>
+<td><code>Opening DashPro.</code> never paints Transmission</td>
+<td>Optional: speak reply before IDE switch, or keep a 2s Transmission hold</td>
+</tr>
+<tr>
+<td>Scheduler off by default</td>
+<td>Task board stays “No live work”</td>
+<td>Document when to enable continuous workers; optional one-click “engage Lead plans”</td>
+</tr>
+<tr>
+<td>Stale Fast Gate signals</td>
+<td>Attention floods</td>
+<td>Auto-dismiss or collapse duplicate branch failures once HEAD is green</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3>Design opinion: REPORT vs constant chatter</h3>
+<p><strong>REPORT as a hotword is the right primary control</strong> — you stay in charge of when VAXON talks.</p>
+<p><strong>Proactive duplex + spoken alerts</strong> should cover interrupts (critical Sentry, approvals, Fast Gate red).</p>
+<p><strong>Cadenced auto-REPORT</strong> (optional setting, e.g. every 10–15 min while Mission Control is focused and something changed) is the missing middle: second-brain energy without becoming a chatterbox. Prefer “material change or busy teammate” gates over a dumb timer.</p>
+<p>Until cadence lands: use <strong>REPORT</strong> whenever you would otherwise ask “what are we doing / what is Dana doing.”</p>
+<hr>
+</div></section><section class="chapter" id="chapter-ci-merge-workflow-and-worker-agents"><div class="chapter-header"><span class="chapter-num">32</span><h2 id="ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</h2></div><div class="chapter-body">
 <p><strong>Updated:</strong> 2026-07-22</p>
 <p>This chapter explains how Axon-X lands code through GitHub CI, how that relates
 to the <code>dev</code> branch, and how <strong>company employee agents</strong> (the roster in IDE /
@@ -2415,7 +2603,7 @@ curl -X POST http://127.0.0.1:8787/api/runs/reconcile-stale
 <p><strong>PDF:</strong> This chapter is bundled into <code>~/Desktop/Axon-X-How-To-Handbook.pdf</code> when you run
 <code>./scripts/docs/build-howto-handbook-pdf.sh</code> (rebuild after handbook edits).</p>
 <hr>
-</div></section><section class="chapter" id="chapter-gate-9-ci-remediation-unaware-operator-loop"><div class="chapter-header"><span class="chapter-num">39</span><h2 id="gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-gate-9-ci-remediation-unaware-operator-loop"><div class="chapter-header"><span class="chapter-num">40</span><h2 id="gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</h2></div><div class="chapter-body">
 <p><strong>Updated:</strong> 2026-07-24</p>
 <p>When <strong>Axon-X Fast Gate</strong> goes red, control-plane can ingest the GitHub
 <code>workflow_run</code> event, raise an inbox signal, lease a repair task to Rowan
@@ -2472,12 +2660,55 @@ watching the Actions tab.</p>
 <li>Confirm delivery with a red Fast Gate push; inbox should show
    <code>Axon-X Fast Gate failed on &lt;branch&gt;</code>.</li>
 </ol>
+<h3>Local poll fallback (when public tunnel/DNS is down)</h3>
+<p>GitHub webhook deliveries fail with <code>connection_error</code> if
+<code>axon.edudashpro.org.za</code> does not resolve or the tunnel is degraded.
+Config alone cannot auto-fix CI in that state — Rowan never sees the event.</p>
+<p>Use the local poller (HMAC to control-plane on localhost):</p>
+<pre><code class="language-bash">CONTROL_PLANE_URL=http://127.0.0.1:8787 \
+  ./scripts/ops/poll-fast-gate-remediation.sh
+</code></pre>
+<p>Always-on timer (user systemd):</p>
+<pre><code class="language-bash">mkdir -p ~/.config/systemd/user
+cp scripts/ops/systemd/axon-fast-gate-remediation-poll.{service,timer} \
+  ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now axon-fast-gate-remediation-poll.timer
+</code></pre>
+<p>Public webhook remains preferred; the timer only covers tunnel/DNS outages.</p>
 <h3>Operator surfaces</h3>
 <ul>
 <li><strong>Attention / inbox</strong> — CI failure and repair/blocked updates</li>
 <li><strong>Task board</strong> — leased <code>CI repair:</code> task for Rowan (escalate role Quinn)</li>
 <li><strong>Voice</strong> — report-outcome returns a <code>spoken</code> line; ask-shaped dig-in on budget exhaustion</li>
+<li><strong>Stale clear</strong> — when Fast Gate goes green again (webhook/poller) or on the
+  worker scheduler tick, Axon-X confirms and resolves drill / superseded failure
+  alerts so VAXON stops re-speaking them. Say <strong>“clear stale alerts”</strong> to VAXON
+  to run the same confirmation sweep on demand.</li>
 </ul>
+<h4>What counts as confirmed-stale</h4>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Cleared when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>drill/...</code> Fast Gate failure</td>
+<td>Always (drill / useless after the exercise)</td>
+</tr>
+<tr>
+<td>Real branch failure</td>
+<td>Latest Fast Gate on that branch is <strong>success</strong> (via <code>gh</code> or green webhook)</td>
+</tr>
+<tr>
+<td>Operator ack</td>
+<td>Attention clear / acknowledge resolves Gate 9 CI store rows (not watch-only)</td>
+</tr>
+</tbody>
+</table>
 <h3>Enabled workspaces</h3>
 <ul>
 <li>Axon-X: <code>Axon-X Fast Gate</code></li>
@@ -2725,11 +2956,14 @@ npm run verify:console-web
 <li>Re-read <a href="auto-loop-and-credits.md"><code>auto-loop-and-credits.md</code></a> before buying Ultra / enabling 3+ projects</li>
 </ol>
 <hr>
-</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">44</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
-<p><strong>Updated:</strong> 2026-07-22<br>
+</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">45</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-27<br>
 <strong>Audience:</strong> operators and agents who need plain-language “what changed and how to use it.”</p>
 <p>Companion to <a href="../HOW-TO-HANDBOOK.md"><code>docs/HOW-TO-HANDBOOK.md</code></a> and
 <a href="autonomy-gates-and-service-identity.md"><code>autonomy-gates-and-service-identity.md</code></a>.</p>
+<p><strong>Mission Control second brain (2026-07-27):</strong> Transmission card, open vs focus workspace,
+fleet busy presence, and <strong><code>REPORT</code></strong> hotword — see
+<a href="mission-control-transmission-and-report.md"><code>mission-control-transmission-and-report.md</code></a>.</p>
 <hr>
 <h3>1. Mission Control task board (Gate 4)</h3>
 <h4>Where it is (easy to miss)</h4>
@@ -2904,7 +3138,37 @@ promotes queued fan-out runs into Lane B; keep it off until Gate 6 is solid.</p>
 <pre><code class="language-bash">./scripts/dev/python.sh -m unittest tests.test_lead_task_plan tests.test_lead_fan_out -q
 </code></pre>
 <hr>
-<h3>5. After every push — watch Fast Gate</h3>
+<h3>4b. Continuous Lead takeover (specialist → Dana)</h3>
+<p>When a specialist shift ends (continuous worker <strong>or</strong> IDE Lane B), Dana now
+posts a <strong>Lead takeover</strong> rollup in the Lead IDE tab even if the shift was not
+linked to a formal Lead fan-out plan. Missing <code>task_id</code> no longer drops the
+handoff.</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Takeover report</td>
+<td><code>lead_takeover.post_lead_takeover_report</code></td>
+</tr>
+<tr>
+<td>Notify hook</td>
+<td><code>notify_lead_after_worker_task</code> (+ Lane B finalize)</td>
+</tr>
+<tr>
+<td>Follow-up</td>
+<td>Open <code>Lead follow-up after …</code> task for Decide / next assign</td>
+</tr>
+</tbody>
+</table>
+<p>Full multi-specialist synthesis still waits until every plan task is terminal;
+single specialist completions get an immediate Dana report so the loop stays
+continuous.</p>
+<hr>
 <h4>Why</h4>
 <p><code>feat/*</code> and PRs to <code>dev</code> must keep <strong>Axon-X Fast Gate</strong> green. A red push blocks
 merge and often means file-size ratchets or unit tests.</p>
@@ -2947,6 +3211,37 @@ runtime health after any push to <code>origin</code>.</p>
 (HMAC webhook), raise an inbox signal, lease a repair task to <strong>Rowan</strong>, and
 report the outcome. See <a href="ci-remediation-gate9.md"><code>ci-remediation-gate9.md</code></a>.
 Fallback poller: <code>./scripts/ops/poll-fast-gate-remediation.sh</code>.</p>
+<hr>
+<h3>5b. Lead team check-in scheduler (clocked)</h3>
+<p>Company Leads run a <strong>cooldown-gated check-in</strong> on the continuous worker clock
+(same tick family as file-size patrol — axon-local-style interval work).</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Work source</td>
+<td><code>lead_team_checkin</code> in <code>config/autonomy-work-sources.json</code></td>
+</tr>
+<tr>
+<td>Logic</td>
+<td><code>services/control-plane/app/workspace_agents/lead_team_checkin.py</code></td>
+</tr>
+<tr>
+<td>Hierarchy + close-out</td>
+<td><a href="company-hierarchy-and-lead-checkin.md"><code>company-hierarchy-and-lead-checkin.md</code></a></td>
+</tr>
+</tbody>
+</table>
+<p>Failed shifts and degraded monitors/connectors become <code>Lead assigned:</code> tasks for
+the matching specialist. Usage/auth/restart failures escalate to the Lead IDE
+only (no bogus repair task).</p>
+<p>External HTTP health probes: <code>http_health</code> checks in
+<code>config/axon-x-monitor-slice.json</code> and <code>config/dashpro-monitor-slice.json</code>.</p>
 <hr>
 <h3>6. Workspace company parity (vs DashPro)</h3>
 <p>DashPro is not a special UI — every bound workspace uses the same Team panel,
@@ -3028,7 +3323,7 @@ sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/d
 </code></pre>
 <p>Requires Debian-family x86_64 + WebKitGTK 4.1; current sidecars need <strong>glibc ≥ 2.42</strong>. Full first-run / tray / update notes: <a href="../VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a> and <a href="../DUAL_RUNTIME_STARTUP_CONTRACT.md"><code>docs/DUAL_RUNTIME_STARTUP_CONTRACT.md</code></a>.</p>
 <hr>
-</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">46</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">47</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
 <p>Preferred → fallback order (matches the control-plane research path):</p>
 <ol>
 <li><strong>SearXNG</strong> when <code>AXON_WATCH_SEARXNG_URL</code> is set (recommended local path)</li>

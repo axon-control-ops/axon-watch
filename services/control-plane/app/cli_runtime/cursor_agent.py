@@ -23,6 +23,12 @@ class CursorAgentReply:
     generated_image_paths: tuple[str, ...] = ()
 
 
+def is_recursion_depth_error(detail: str | None) -> bool:
+    """True when Cursor/CLI failed with Python's recursion-depth message."""
+    text = " ".join(str(detail or "").lower().split())
+    return "maximum recursion depth exceeded" in text
+
+
 def _cursor_mode_flag(composer_mode: str, execution_tier: str) -> str:
     """Cursor CLI only accepts --mode plan|ask; full agent mode is the default (no flag).
 
@@ -94,6 +100,7 @@ def run_cursor_local(
     run_id: str = "",
     on_chunk: Callable[[str, str], None] | None = None,
     trust_policy: str = "operator",
+    research_available: bool | None = None,
 ) -> CursorAgentReply:
     # stream-json is the only print format that reliably carries assistant text;
     # `--output-format text` returns an empty body for plan/tool-heavy replies.
@@ -105,6 +112,7 @@ def run_cursor_local(
         execution_tier=execution_tier,
         model=model,
         trust_policy=trust_policy,
+        research_available=research_available,
     )
 
     assembler = CursorStreamAssembler(

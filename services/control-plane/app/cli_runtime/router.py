@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import time
@@ -19,7 +20,11 @@ from app.cli_runtime.codex_agent import run_codex_local
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.recovery import ordered_runtime_candidates
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
-from app.cli_runtime.cursor_agent import CursorAgentReply, run_cursor_local
+from app.cli_runtime.cursor_agent import (
+    CursorAgentReply,
+    is_recursion_depth_error,
+    run_cursor_local,
+)
 from app.cli_runtime.runtime_auth import (
     cursor_dispatch_env,
     env_has_api_key,
@@ -42,6 +47,8 @@ from app.research.availability import format_capability_line, research_capabilit
 from app.persistence.operator_presence_settings_store import load_settings
 from app.runs.service import RunNotFoundError, get_run
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
+
+logger = logging.getLogger(__name__)
 
 
 _REPLY_STYLE = (
@@ -262,8 +269,22 @@ def _runtime_unready_reason(record: dict[str, object]) -> str:
     return f"{label} unavailable"
 
 
-def _fallback_reply(*, composer_mode: str, user_prompt: str, context_block: str, reason: str) -> str:
+def _fallback_reply(
+    *,
+    composer_mode: str,
+    user_prompt: str,
+    context_block: str,
+    reason: str,
+    failure_phase: str = "not_ready",
+    runtime_label: str = "",
+) -> str:
     del user_prompt, context_block
+    if failure_phase == "run_error":
+        label = (runtime_label or "the selected CLI runtime").strip()
+        return (
+            f"Lane B ({composer_mode}) failed on {label}: {reason}. "
+            "Open Runtime or `/vault` if auth looks wrong, then retry."
+        )
     return (
         f"Lane B ({composer_mode}) cannot start because no CLI runtime is ready: {reason}. "
         "Open Runtime or `/vault`, then retry."
@@ -396,6 +417,8 @@ def dispatch_ide_composer(
         execution_access=execution_access,
     )
     errors: list[str] = []
+    ready_run_errors: list[str] = []
+    last_ready_runtime_label = ""
 
     for record in _ordered_candidates_for_dispatch(snapshot, runtime_target):
         runtime_id = str(record.get("id") or "")
@@ -406,6 +429,7 @@ def dispatch_ide_composer(
         family = str(record.get("family") or "")
         target_type = str(record.get("target_type") or "local")
         model = _effective_cli_model(family, str(runtime_model or ""))
+        runtime_label = str(record.get("label") or runtime_id)
         dispatch_env = subprocess_env
         if family == "cursor":
             dispatch_env = cursor_dispatch_env(
@@ -416,24 +440,56 @@ def dispatch_ide_composer(
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
             if family == "cursor":
-                cursor_reply = run_cursor_local(
-                    binary=binary,
-                    prompt=prompt,
-                    workspace_root=workspace_root,
-                    composer_mode=composer_mode,
-                    execution_tier=execution_tier,
-                    model=model,
-                    subprocess_env=dispatch_env,
-                    run_id=run_id,
-                    on_chunk=on_chunk,
-                    trust_policy=cursor_trust_policy,
-                )
+                started = time.perf_counter()
+                try:
+                    cursor_reply = run_cursor_local(
+                        binary=binary,
+                        prompt=prompt,
+                        workspace_root=workspace_root,
+                        composer_mode=composer_mode,
+                        execution_tier=execution_tier,
+                        model=model,
+                        subprocess_env=dispatch_env,
+                        run_id=run_id,
+                        on_chunk=on_chunk,
+                        trust_policy=cursor_trust_policy,
+                    )
+                except RuntimeError as first_exc:
+                    if isinstance(first_exc, RuntimeProcessStoppedError):
+                        raise
+                    # One bounded retry without research MCP for recursion crashes.
+                    if is_recursion_depth_error(str(first_exc)):
+                        logger.exception(
+                            "lane_b_dispatch_recursion runtime_id=%s family=%s "
+                            "composer_mode=%s workspace_id=%s elapsed_ms=%.0f; "
+                            "retrying without research MCP",
+                            runtime_id,
+                            family,
+                            composer_mode,
+                            workspace_id,
+                            (time.perf_counter() - started) * 1000,
+                        )
+                        cursor_reply = run_cursor_local(
+                            binary=binary,
+                            prompt=prompt,
+                            workspace_root=workspace_root,
+                            composer_mode=composer_mode,
+                            execution_tier=execution_tier,
+                            model=model,
+                            subprocess_env=dispatch_env,
+                            run_id=run_id,
+                            on_chunk=on_chunk,
+                            trust_policy=cursor_trust_policy,
+                            research_available=False,
+                        )
+                    else:
+                        raise
                 content = _cursor_reply_content(cursor_reply, approval_notice)
                 return _finish({
                     "content": content,
                     "dispatched": True,
                     "runtime_id": runtime_id,
-                    "runtime_label": str(record.get("label") or runtime_id),
+                    "runtime_label": runtime_label,
                     "reason": "",
                     "execution_tier": execution_tier,
                     "generated_image_paths": list(cursor_reply.generated_image_paths),
@@ -456,7 +512,7 @@ def dispatch_ide_composer(
                     "content": content,
                     "dispatched": True,
                     "runtime_id": runtime_id,
-                    "runtime_label": str(record.get("label") or runtime_id),
+                    "runtime_label": runtime_label,
                     "reason": "",
                     "execution_tier": execution_tier,
                 })
@@ -468,14 +524,26 @@ def dispatch_ide_composer(
                         user_prompt=user_prompt,
                         context_block=context_block,
                         reason=str(exc),
+                        failure_phase="run_error",
+                        runtime_label=runtime_label,
                     ),
                     "dispatched": False,
                     "runtime_id": runtime_id,
-                    "runtime_label": str(record.get("label") or runtime_id),
+                    "runtime_label": runtime_label,
                     "reason": str(exc),
                     "stopped": True,
+                    "failure_phase": "run_error",
                 })
             detail = str(exc)
+            logger.exception(
+                "lane_b_dispatch_failed runtime_id=%s family=%s composer_mode=%s "
+                "workspace_id=%s exc_type=%s",
+                runtime_id,
+                family,
+                composer_mode,
+                workspace_id,
+                type(exc).__name__,
+            )
             if looks_like_auth_error(detail) and env_has_api_key(dispatch_env, family=family):
                 retry_env = env_without_api_keys(dispatch_env, family=family)
                 if retry_env != dispatch_env:
@@ -512,7 +580,7 @@ def dispatch_ide_composer(
                             "content": content,
                             "dispatched": True,
                             "runtime_id": runtime_id,
-                            "runtime_label": str(record.get("label") or runtime_id),
+                            "runtime_label": runtime_label,
                             "reason": "",
                             "execution_tier": execution_tier,
                         }
@@ -521,26 +589,36 @@ def dispatch_ide_composer(
                         return _finish(payload)
                     except RuntimeError as retry_exc:
                         detail = str(retry_exc)
-            errors.append(
-                summarize_auth_error(
-                    family=family,
-                    detail=detail,
-                    had_api_key=env_has_api_key(dispatch_env, family=family),
-                )
+                        logger.exception(
+                            "lane_b_dispatch_auth_retry_failed runtime_id=%s family=%s",
+                            runtime_id,
+                            family,
+                        )
+            summarized = summarize_auth_error(
+                family=family,
+                detail=detail,
+                had_api_key=env_has_api_key(dispatch_env, family=family),
             )
+            errors.append(summarized)
+            ready_run_errors.append(summarized)
+            last_ready_runtime_label = runtime_label
 
     reason = "; ".join(item for item in errors if item) or "no CLI runtime is installed"
+    failure_phase = "run_error" if ready_run_errors else "not_ready"
     return _finish({
         "content": _fallback_reply(
             composer_mode=composer_mode,
             user_prompt=user_prompt,
             context_block=context_block,
             reason=reason,
+            failure_phase=failure_phase,
+            runtime_label=last_ready_runtime_label,
         ),
         "dispatched": False,
         "runtime_id": "",
         "runtime_label": "",
         "reason": reason,
+        "failure_phase": failure_phase,
     })
 
 

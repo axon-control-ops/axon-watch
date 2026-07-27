@@ -305,6 +305,51 @@ def list_receipts(plan_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def list_receipts_by_kind(
+    kind: str,
+    *,
+    workspace_id: str | None = None,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    cleaned_kind = str(kind or "").strip()
+    if not cleaned_kind:
+        return []
+    max_limit = max(1, min(200, int(limit or 40)))
+    scoped = str(workspace_id or "").strip()
+    with _connection() as connection:
+        if scoped:
+            rows = connection.execute(
+                """
+                SELECT * FROM lead_plan_receipts
+                WHERE kind = ? AND workspace_id = ?
+                ORDER BY created_at DESC, receipt_id DESC
+                LIMIT ?
+                """,
+                (cleaned_kind, scoped, max_limit),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                """
+                SELECT * FROM lead_plan_receipts
+                WHERE kind = ?
+                ORDER BY created_at DESC, receipt_id DESC
+                LIMIT ?
+                """,
+                (cleaned_kind, max_limit),
+            ).fetchall()
+    return [
+        {
+            "receipt_id": row["receipt_id"],
+            "plan_id": row["plan_id"],
+            "workspace_id": row["workspace_id"],
+            "kind": row["kind"],
+            "payload": json.loads(str(row["payload_json"] or "{}")),
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
 def reset_store() -> None:
     with _connection() as connection:
         connection.execute("DELETE FROM lead_plan_receipts")
@@ -319,6 +364,7 @@ __all__ = [
     "latest_active_plan",
     "list_plans_by_status",
     "list_receipts",
+    "list_receipts_by_kind",
     "persist_plan",
     "plan_id_for_task",
     "plan_task_links",

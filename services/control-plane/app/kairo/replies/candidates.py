@@ -229,41 +229,98 @@ def fleet_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
 
 
 def general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
-    prefix = "Still " if followup else ""
-    if not facts["cli_dispatch_ready"]:
-        blockers = facts["cli_blockers"]
-        lead = blockers[0] if blockers else "CLI runtime is not dispatch-ready"
-        return [
-            f"{prefix}Not nominal on my side — {lead}. I'd fix that before new agent work.".strip(),
-            f"{prefix}Agent dispatch is blocked — {lead}. Check Runtime or /vault.".strip(),
-        ]
-    chunks: list[str] = []
-    if facts["degraded"]:
-        chunks.append(
-            "public tunnel health is degraded (local control-plane up — local work continues)"
-        )
-    if facts["notice"]:
-        chunks.append(facts["notice"])
-    if int(facts["pending_approvals"]) > 0:
-        chunks.append(f"{facts['pending_approvals']} approval(s) waiting")
+    """Conversational second-brain brief — never semicolon dumps."""
+    return status_report_candidates(facts, followup=followup)
+
+
+def status_report_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
+    """Categorized JARVIS-style stand-up in plain English."""
+    prefix = "Still on it — " if followup else ""
+    attention_bits: list[str] = []
+    work_bits: list[str] = []
+    next_bits: list[str] = []
+
+    pending = int(facts["pending_approvals"])
+    if pending > 0:
+        noun = "approval" if pending == 1 else "approvals"
+        attention_bits.append(f"{pending} {noun} waiting for your yes or no")
+
+    notice = str(facts.get("notice") or "").strip().rstrip(".")
+    if notice:
+        attention_bits.append(notice)
+
     if facts["top_signal_title"]:
-        chunks.append(f"top signal {facts['top_signal_title']}")
-    elif int(facts["active_run_count"]) > 0:
-        chunks.append(f"{facts['active_run_count']} active run(s)")
-    if facts["advise"] and facts["advise"] not in " ".join(chunks):
-        chunks.append(facts["advise"])
-    if not chunks:
+        title = str(facts["top_signal_title"]).strip()
+        severity = str(facts.get("top_signal_severity") or "").strip().lower()
+        if severity in {"high", "critical"}:
+            attention_bits.append(f"the loud one is {title}")
+        else:
+            attention_bits.append(f"inbox is waving {title}")
+
+    if facts["degraded"]:
+        attention_bits.append("public tunnel health is soft, but local control is up")
+
+    active = int(facts["active_run_count"])
+    if active > 0:
+        summary = facts["primary_run_summary"] or "a live run"
+        phase = str(facts.get("primary_run_phase") or "").replace("_", " ").strip()
+        if phase:
+            work_bits.append(f"{summary} is {phase}")
+        else:
+            work_bits.append(f"{summary} is in flight")
+        if active > 1:
+            work_bits.append(f"{active - 1} more run{'s' if active > 2 else ''} behind it")
+
+    review_ready = int(facts.get("review_ready_count") or 0)
+    if review_ready > 0:
+        work_bits.append(
+            f"{review_ready} run{'s' if review_ready != 1 else ''} ready for your review"
+        )
+
+    advise = str(facts.get("advise") or "").strip().rstrip(".")
+    if advise:
+        next_bits.append(advise)
+    elif facts["top_signal_title"]:
+        next_bits.append(f"I'd open Attention and inspect {facts['top_signal_title']}")
+    elif pending > 0:
+        next_bits.append("I'd clear Approvals before starting anything new")
+    elif not facts["cli_dispatch_ready"]:
+        blockers = facts.get("cli_blockers") or []
+        lead = blockers[0] if blockers else "CLI runtime is not dispatch-ready"
+        next_bits.append(f"I'd unblock agent dispatch first — {lead}")
+    else:
+        next_bits.append("Nothing urgent — I can roll the fleet, check DashPro, or take your next order")
+
+    if not attention_bits and not work_bits:
         return [
-            f"{prefix}All quiet on the board — I'm watching. Want a fleet rollup or shall we pick a workspace?".strip(),
-            f"{prefix}Nothing urgent from my scan — I can brief leads, check DashPro CI, or take your next order.".strip(),
-            f"{prefix}Systems look nominal — standing by like Jarvis. What shall we tackle?".strip(),
+            (
+                f"{prefix}Quiet board, sir. Systems look nominal from here. "
+                f"{next_bits[0]}."
+            ).strip(),
+            (
+                f"{prefix}Nothing I'd interrupt you for. "
+                f"{next_bits[0]}."
+            ).strip(),
         ]
-    body = "; ".join(chunks[:3])
+
+    attention = (
+        f"Attention: {', '.join(attention_bits[:3])}."
+        if attention_bits
+        else "Attention: nothing screaming."
+    )
+    work = (
+        f" Work in flight: {', '.join(work_bits[:3])}."
+        if work_bits
+        else " Work in flight: idle."
+    )
+    nxt = f" Next: {next_bits[0]}."
+    body = f"{attention}{work}{nxt}"
     return [
-        f"{prefix}{body}.".strip(),
-        f"{prefix}Quick read: {body}.".strip(),
-        f"{prefix}I'd act on this first — {body}.".strip(),
+        f"{prefix}Here's the stand-up. {body}".strip(),
+        f"{prefix}Quick second-brain pass. {body}".strip(),
+        f"{prefix}Plain English, sir — {body}".strip(),
     ]
+
 
 CANDIDATE_BUILDERS = {
     "approvals": approval_candidates,
@@ -275,6 +332,7 @@ CANDIDATE_BUILDERS = {
     "runtime": runtime_candidates,
     "health": health_candidates,
     "degraded": lambda f, *, followup: general_candidates(f, followup=followup),
+    "status_report": status_report_candidates,
     "general": general_candidates,
     "followup": general_candidates,
 }

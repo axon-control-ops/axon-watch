@@ -20,6 +20,24 @@ def _review_ready_runs(active_runs: list[dict[str, object]]) -> list[dict[str, o
     return [run for run in active_runs if run.get("phase") == "review_ready"]
 
 
+def _count_words(count: int) -> str:
+    words = {
+        1: "One",
+        2: "Two",
+        3: "Three",
+        4: "Four",
+        5: "Five",
+        6: "Six",
+        7: "Seven",
+        8: "Eight",
+        9: "Nine",
+        10: "Ten",
+        11: "Eleven",
+        12: "Twelve",
+    }
+    return words.get(int(count), str(int(count)))
+
+
 def build_briefing_notice(
     *,
     active_runs: list[dict[str, object]],
@@ -44,8 +62,11 @@ def build_briefing_notice(
         return f"{len(review_ready)} runs are ready for your review."
 
     if lead_awaiting_engagement_count > 0:
-        noun = "Lead plan" if lead_awaiting_engagement_count == 1 else "Lead plans"
-        return f"{lead_awaiting_engagement_count} {noun} awaiting engagement in VAXON."
+        # Spell the count and hyphenate Lead-team so TTS does not say "forlead".
+        count_word = _count_words(lead_awaiting_engagement_count)
+        if lead_awaiting_engagement_count == 1:
+            return f"{count_word} Lead-team plan is waiting for you to engage in VAXON."
+        return f"{count_word} Lead-team plans are waiting for you to engage in VAXON."
 
     cli = cli_runtime if isinstance(cli_runtime, dict) else {}
     if not bool(cli.get("dispatch_ready", True)):

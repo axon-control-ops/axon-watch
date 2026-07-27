@@ -19,11 +19,12 @@ class LeadTakeoverTests(unittest.TestCase):
         self._saved = prepare_control_plane_imports()
         self.addCleanup(self._restore)
         from app.persistence import chat_store, run_store, task_store
-        from app.workspace_agents import lead_plan_store
+        from app.workspace_agents import lead_adhoc_receipt_store, lead_plan_store
 
         isolate_control_plane_db(self, run_store)
         task_store.reset_store()
         lead_plan_store.reset_store()
+        lead_adhoc_receipt_store.reset_store()
         chat_store.reset_store()
 
     def _restore(self) -> None:
@@ -45,6 +46,7 @@ class LeadTakeoverTests(unittest.TestCase):
 
     def test_ad_hoc_specialist_completion_posts_dana_takeover(self) -> None:
         from app.persistence import chat_store, task_store
+        from app.workspace_agents import lead_adhoc_receipt_store
         from app.workspace_agents.lead_replan import notify_lead_after_worker_task
 
         reply = (
@@ -75,13 +77,45 @@ class LeadTakeoverTests(unittest.TestCase):
         self.assertTrue(
             any("Priya" in str(m.get("content") or "") for m in agent_msgs)
         )
+        vaxon = (takeover.get("vaxon_flash") or {})
+        self.assertIn(vaxon.get("status"), {"posted", "already_posted"})
+        self.assertTrue(vaxon.get("receipt_id"))
+        self.assertTrue(vaxon.get("synthesis_receipt_id") or (vaxon.get("synthesis") or {}).get("receipt_id"))
+
+        synthesis = lead_adhoc_receipt_store.find_receipt_for_run(
+            run_id="run_priya_grad_1",
+            kind=lead_adhoc_receipt_store.KIND_LEAD_SYNTHESIS,
+        )
+        self.assertIsNotNone(synthesis)
+        assert synthesis is not None
+        payload = synthesis.get("payload") or {}
+        self.assertEqual("Priya", payload.get("employee_name"))
+        self.assertIn("graduation", str(payload.get("lead_summary") or "").lower())
+        # Raw specialist dump must not be stored as the Lead summary whole cloth.
+        self.assertNotIn("Confidence: 9/10", str(payload.get("lead_summary") or ""))
+
+        operator = chat_store.get_latest_thread_for_workspace(
+            "workspace_dashpro",
+            thread_kind="operator",
+        )
+        self.assertIsNotNone(operator)
+        op_msgs = chat_store.list_thread_messages(str(operator["thread_id"]))
+        self.assertTrue(
+            any(
+                str(m.get("content") or "").startswith("VAXON:")
+                and "run_priya_grad_1" in str(m.get("content") or "")
+                and "Lead summary:" in str(m.get("content") or "")
+                for m in op_msgs
+                if m.get("role") == "agent"
+            )
+        )
 
         follow = task_store.get_task(str(takeover.get("follow_up_task_id")))
         assert follow is not None
         self.assertEqual("lead", follow.get("owner_role"))
         self.assertIn("Lead follow-up", follow.get("goal") or "")
 
-        # Idempotent for the same run.
+        # Idempotent for the same run — takeover stays already_posted; VAXON receipt too.
         with patch("app.live_events.broadcast_material_change"):
             again = notify_lead_after_worker_task(
                 workspace_id="workspace_dashpro",
@@ -93,6 +127,8 @@ class LeadTakeoverTests(unittest.TestCase):
                 reply_text=reply,
             )
         self.assertEqual("already_posted", (again.get("takeover") or {}).get("status"))
+        again_vaxon = (again.get("takeover") or {}).get("vaxon_flash") or {}
+        self.assertEqual("already_posted", again_vaxon.get("status"))
 
 
 if __name__ == "__main__":

@@ -162,9 +162,12 @@ def converse_turn(
     resolved_workspace_id = (
         context_workspace_id or workspace_id or inferred_workspace_id or entity_workspace_id
     )
+    from app.kairo.operator_deterministic_report import is_operator_report_request
+
+    # REPORT always needs a fresh briefing/roster snapshot — ignore cache TTL.
     pack = build_conversation_context_pack(
         workspace_id=resolved_workspace_id,
-        force_refresh=force_refresh,
+        force_refresh=force_refresh or is_operator_report_request(trimmed),
     )
     presence_settings = load_presence_settings()
     voice_routing_mode = normalize_voice_routing_mode(

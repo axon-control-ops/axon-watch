@@ -51,7 +51,23 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
             lead_awaiting_engagement_count=1,
         )
 
-        self.assertEqual("1 Lead plan awaiting engagement in VAXON.", notice)
+        self.assertEqual("One Lead-team plan is waiting for you to engage in VAXON.", notice)
+
+    def test_notice_surfaces_multiple_lead_plans_tts_safe(self) -> None:
+        notice = build_briefing_notice(
+            active_runs=[],
+            top_signals=[],
+            pending_approvals_count=0,
+            degraded={"active": False, "reasons": []},
+            watch_connected=True,
+            lead_awaiting_engagement_count=4,
+        )
+
+        self.assertEqual(
+            "Four Lead-team plans are waiting for you to engage in VAXON.",
+            notice,
+        )
+        self.assertNotRegex(notice, r"\b\d+\s+Lead\b")
 
     def test_idle_rhythm_stays_quiet_instead_of_inventing_status_copy(self) -> None:
         rhythm = build_operator_briefing_rhythm(

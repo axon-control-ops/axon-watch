@@ -133,8 +133,10 @@ class EmployeePersonaPromptTests(unittest.TestCase):
                 employee_role="frontend",
             )
         assert appendix is not None
-        self.assertIn("report outcomes back to Lead", appendix)
+        self.assertIn("report finished work to your company Lead", appendix)
         self.assertIn("Never announce your name or role mid-reply", appendix)
+        self.assertIn("Sir King", appendix)
+        self.assertIn("On it", appendix)
         self.assertIn("I am doing this as Priya", appendix)
         self.assertIn("I am wiring Copy Link", appendix)
 

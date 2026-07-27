@@ -59,12 +59,50 @@ def extract_lead_next(reply_text: str | None) -> str:
     # Prefer explicit Lead: decision lines from the specialist report.
     for line in body.splitlines():
         cleaned = line.strip().lstrip("-*• ").strip()
-        if cleaned.lower().startswith("lead:"):
-            return _truncate(cleaned[5:].strip(), max_len=280)
+        if not cleaned:
+            continue
+        lead_match = re.match(r"^lead\s*:?\s*\*{0,2}\s*(.+)$", cleaned, flags=re.IGNORECASE)
+        if lead_match:
+            return _truncate(lead_match.group(1).strip().lstrip("*").strip(), max_len=280)
     match = _LEAD_NEXT_RE.search(body)
     if not match:
         return ""
-    return _truncate(match.group(1), max_len=280)
+    candidate = match.group(1).strip()
+    # Inline "Blockers / Lead next: Lead: …" — peel nested Lead: prefix.
+    nested = re.match(r"^lead\s*:?\s*\*{0,2}\s*(.+)$", candidate, flags=re.IGNORECASE)
+    if nested:
+        return _truncate(nested.group(1).strip().lstrip("*").strip(), max_len=280)
+    return _truncate(candidate, max_len=280)
+
+
+def extract_blockers(reply_text: str | None) -> str:
+    """Capture specialist-authored blockers excluding the Lead decision line."""
+    body = _strip_thinking(reply_text or "")
+    if len(body) > 4000:
+        body = body[-4000:]
+    bits: list[str] = []
+    in_blockers = False
+    for line in body.splitlines():
+        cleaned = line.strip().lstrip("-*• ").strip()
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if "blockers" in lowered and ("lead next" in lowered or lowered.startswith("blockers")):
+            in_blockers = True
+            # Inline form: "Blockers / Lead next: Marco …"
+            after = cleaned.split(":", 1)
+            if len(after) == 2 and after[1].strip() and not after[1].strip().lower().startswith("lead:"):
+                inline = after[1].strip()
+                if not inline.lower().startswith("lead"):
+                    bits.append(_truncate(inline, max_len=200))
+            continue
+        if in_blockers:
+            if lowered.startswith("confidence:"):
+                break
+            if lowered.startswith("lead:"):
+                continue
+            bits.append(_truncate(cleaned, max_len=200))
+    return _truncate("; ".join(bits), max_len=280)
 
 
 def _ensure_lead_ide_thread(workspace_id: str) -> dict[str, Any] | None:
@@ -153,7 +191,7 @@ def build_lead_takeover_message(
         )
     else:
         lines.append(
-            f"{name}'s shift {status}. I will triage blockers and reassign if needed."
+            f"{name}'s job {status}. I will triage blockers and reassign if needed."
         )
     if lead_next:
         lines.extend(["", f"Lead next (from specialist): {lead_next}"])
@@ -217,6 +255,23 @@ def enqueue_lead_follow_up_task(
         return None
 
 
+def _lead_summary_from_reply(reply_text: str | None) -> str:
+    """One short Lead-facing summary line — never a full specialist dump."""
+    body = _strip_thinking(reply_text or "")
+    if not body:
+        return ""
+    # Prefer the first substantive non-header line from the specialist report.
+    for line in body.splitlines():
+        cleaned = line.strip().lstrip("-*• ").strip()
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if lowered.startswith(("what changed", "verified", "blockers", "confidence:", "lead:")):
+            continue
+        return _truncate(cleaned, max_len=280)
+    return _truncate(body, max_len=280)
+
+
 def post_lead_takeover_report(
     *,
     workspace_id: str,
@@ -244,7 +299,32 @@ def post_lead_takeover_report(
         return {"status": "skipped_no_lead"}
     thread_id = str(thread["thread_id"])
     if _already_posted_takeover(thread_id, cleaned_run):
-        return {"status": "already_posted", "thread_id": thread_id, "run_id": cleaned_run}
+        # Takeover is idempotent, but a missing VAXON receipt can still be filled
+        # from Lead-verified fields without duplicating Dana's message or follow-up.
+        vaxon_flash: dict[str, Any] | None = None
+        try:
+            from app.workspace_agents.lead_vaxon_handoff import post_ad_hoc_lead_takeover_to_vaxon
+
+            vaxon_flash = post_ad_hoc_lead_takeover_to_vaxon(
+                workspace_id=workspace_id,
+                run_id=cleaned_run,
+                employee_role=role,
+                employee_name=employee_name,
+                phase=phase if phase in {"completed", "failed"} else phase,
+                lead_next=extract_lead_next(reply_text),
+                lead_summary=_lead_summary_from_reply(reply_text),
+                lead_thread_id=thread_id,
+                blockers=extract_blockers(reply_text),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("ad-hoc VAXON takeover flash (already_posted path) failed: %s", exc)
+            vaxon_flash = {"status": "error", "detail": str(exc)}
+        return {
+            "status": "already_posted",
+            "thread_id": thread_id,
+            "run_id": cleaned_run,
+            "vaxon_flash": vaxon_flash,
+        }
 
     content = build_lead_takeover_message(
         employee_name=employee_name,
@@ -290,6 +370,26 @@ def post_lead_takeover_report(
             lead_next=lead_next,
             run_id=cleaned_run,
         )
+    vaxon_flash: dict[str, Any] | None = None
+    try:
+        from app.workspace_agents.lead_vaxon_handoff import post_ad_hoc_lead_takeover_to_vaxon
+
+        # Publish only Lead-verified fields — never the raw specialist transcript.
+        vaxon_flash = post_ad_hoc_lead_takeover_to_vaxon(
+            workspace_id=workspace_id,
+            run_id=cleaned_run,
+            employee_role=role,
+            employee_name=employee_name,
+            phase=phase if phase in {"completed", "failed"} else phase,
+            lead_next=lead_next,
+            lead_summary=_lead_summary_from_reply(reply_text),
+            lead_thread_id=thread_id,
+            lead_message_id=str(agent_message.get("message_id") or "") or None,
+            blockers=extract_blockers(reply_text),
+        )
+    except Exception as exc:  # noqa: BLE001 — Lead takeover must not fail closed on VAXON flash
+        logger.warning("ad-hoc VAXON takeover flash failed: %s", exc)
+        vaxon_flash = {"status": "error", "detail": str(exc)}
     try:
         from app.live_events import broadcast_material_change
 
@@ -304,12 +404,14 @@ def post_lead_takeover_report(
         "run_id": cleaned_run,
         "lead_next": lead_next,
         "follow_up_task_id": (follow_up or {}).get("task_id"),
+        "vaxon_flash": vaxon_flash,
     }
 
 
 __all__ = [
     "build_lead_takeover_message",
     "enqueue_lead_follow_up_task",
+    "extract_blockers",
     "extract_lead_next",
     "post_lead_takeover_report",
 ]
