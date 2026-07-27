@@ -15,20 +15,25 @@
   text-align: left;
 }
 
+/*
+ * Mission Control mosaic: pin chip to bottom-left of the CENTER workbench.
+ * Do NOT use --galaxy-* insets here — those belong to Brain Graph and leave
+ * the chip floating mid-board on Mission Control.
+ */
 .galaxy-speech-captions--operator {
-  left: calc(var(--galaxy-left-width, min(16.5rem, 24vw)) + 1.25rem);
-  bottom: calc(var(--galaxy-bottom-reserve, 6.5rem) + 0.35rem);
-  width: min(28rem, 42vw);
-  max-width: calc(
-    100% - var(--galaxy-left-width, min(16.5rem, 24vw)) -
-      var(--galaxy-right-width, clamp(13rem, 24vw, 16rem)) - 2.5rem
-  );
+  left: 0.85rem !important;
+  right: auto !important;
+  bottom: 0.75rem !important;
+  top: auto !important;
+  width: min(26rem, 42vw);
+  max-width: calc(100% - 1.7rem);
+  transform: none;
 }
 
-/* Brain Graph: full-bleed stage — no LIVE OPS dock reserve; sit near floating orb. */
+/* Brain Graph: sit near floating orb / workspaces rail. */
 .console-shell--brain-galaxy .galaxy-speech-captions--operator {
-  left: calc(var(--galaxy-left-width, 2.75rem) + 1.1rem);
-  bottom: calc(var(--galaxy-bottom-reserve, 6.5rem) + 0.55rem);
+  left: calc(var(--galaxy-left-width, 2.75rem) + 1.1rem) !important;
+  bottom: calc(var(--galaxy-bottom-reserve, 6.5rem) + 0.55rem) !important;
   width: min(32rem, 52vw);
   max-width: calc(100% - var(--galaxy-left-width, 2.75rem) - 2.25rem);
 }
@@ -152,6 +157,11 @@
   animation: galaxy-speech-caption-float 10s ease-in-out forwards;
 }
 
+/* Mission Control: keep lines stacked above the chip (no mid-board drift). */
+.console-shell--operator:not(.console-shell--brain-galaxy) .galaxy-speech-captions__line {
+  animation-name: galaxy-speech-caption-float-compact;
+}
+
 @keyframes galaxy-speech-speaker-in {
   from {
     opacity: 0;
@@ -195,13 +205,36 @@
   }
 }
 
+@keyframes galaxy-speech-caption-float-compact {
+  0% {
+    opacity: 0;
+    transform: translateY(0.35rem);
+    filter: blur(0.6px);
+  }
+  10% {
+    opacity: 0.95;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  70% {
+    opacity: 0.78;
+    transform: translateY(-0.85rem);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-1.4rem);
+    filter: blur(0.3px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .galaxy-speech-captions__speaker,
   .galaxy-speech-captions__speaker[data-speaking='true'] .galaxy-speech-captions__face {
     animation: none;
   }
 
-  .galaxy-speech-captions__line {
+  .galaxy-speech-captions__line,
+  .console-shell--operator:not(.console-shell--brain-galaxy) .galaxy-speech-captions__line {
     animation: galaxy-speech-caption-fade 10s ease-out forwards;
   }
 

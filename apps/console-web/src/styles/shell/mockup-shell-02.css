@@ -197,7 +197,10 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 0.55rem;
+  padding-bottom: 0.85rem;
+  padding-right: 0.35rem;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .attention-stack--sidebar .hud-seam {
@@ -275,6 +278,10 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  padding-bottom: 0.85rem;
+  padding-right: 0.35rem;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .workspace-status-card {
