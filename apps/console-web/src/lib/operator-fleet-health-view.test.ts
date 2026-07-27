@@ -88,6 +88,22 @@ describe('operator-fleet-health-view', () => {
     expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.summary).toContain(
       'review',
     );
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.isBusy).toBe(true);
+    expect(cells.find((cell) => cell.workspaceId === 'workspace_dashpro')?.summary).toContain(
+      'active',
+    );
+  });
+
+  it('surfaces busy agents and live jobs in the headline', () => {
+    expect(fleetHealthHeadline(snapshot)).toContain('live');
+    expect(
+      buildFleetHealthGridCells({
+        snapshot,
+        workspaces: [{ workspace_id: 'workspace_dashpro', connection_kind: 'project_path' }],
+        selectedWorkspaceId: null,
+        busyEmployeeCountByWorkspace: { workspace_dashpro: 2 },
+      }).find((cell) => cell.workspaceId === 'workspace_dashpro')?.summary,
+    ).toContain('2 agents busy');
   });
 
   it('always keeps the selected workspace on the grid even past the cap', () => {

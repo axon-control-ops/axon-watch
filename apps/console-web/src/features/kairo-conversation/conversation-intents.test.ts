@@ -30,11 +30,19 @@ describe('resolveConversationNavigationIntent', () => {
     });
   });
 
-  it('focuses a workspace by display name', () => {
+  it('enters a workspace coding surface on open', () => {
+    expect(resolveConversationNavigationIntent('Open DashPro workspace', WORKSPACES)).toEqual({
+      kind: 'enter_workspace',
+      workspaceId: 'workspace_dashpro',
+      reply: 'Opening DashPro.',
+    });
+  });
+
+  it('focuses a workspace on Mission Control without entering IDE', () => {
     expect(resolveConversationNavigationIntent('show me DashPro', WORKSPACES)).toEqual({
       kind: 'focus_workspace',
       workspaceId: 'workspace_dashpro',
-      reply: 'Focusing DashPro.',
+      reply: 'DashPro is on deck.',
     });
   });
 

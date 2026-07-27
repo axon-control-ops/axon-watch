@@ -9,9 +9,10 @@ import {
   type HudHoloSignal,
   type HudHoloTone,
 } from '../../features/hud-holo/hud-holo-tones';
+import { companyBusyEmployees } from '../../features/workspace-agents/company-roster-busy';
 import {
   buildFleetHealthGridCells,
-  fleetHealthHeadline,
+  fleetHealthHeadlineWithCompanyBusy,
 } from '../../lib/operator-fleet-health-view';
 import { useShellStore } from '../../stores/shell';
 
@@ -20,15 +21,41 @@ const rootEl = ref<HTMLElement | null>(null);
 
 useOrbFieldReactiveHost({ root: rootEl });
 
+const busyEmployeeCountByWorkspace = computed(() => {
+  const counts: Record<string, number> = {};
+  for (const employee of companyBusyEmployees(shell.companyEmployeesFleet)) {
+    const workspaceId = employee.workspace_id?.trim();
+    if (!workspaceId) {
+      continue;
+    }
+    counts[workspaceId] = (counts[workspaceId] ?? 0) + 1;
+  }
+  return counts;
+});
+
+const companyBusyTotal = computed(() =>
+  Object.values(busyEmployeeCountByWorkspace.value).reduce((sum, count) => sum + count, 0),
+);
+
 const cells = computed(() =>
   buildFleetHealthGridCells({
     snapshot: shell.operatorFleetHealth,
     workspaces: shell.workspaces,
     selectedWorkspaceId: shell.currentWorkspace?.workspace_id ?? null,
+    busyEmployeeCountByWorkspace: busyEmployeeCountByWorkspace.value,
   }),
 );
 
-const headline = computed(() => fleetHealthHeadline(shell.operatorFleetHealth));
+const headline = computed(() =>
+  fleetHealthHeadlineWithCompanyBusy(shell.operatorFleetHealth, companyBusyTotal.value),
+);
+
+const anyBusy = computed(
+  () =>
+    cells.value.some((cell) => cell.isBusy) ||
+    companyBusyTotal.value > 0 ||
+    shell.agentStreamActive,
+);
 
 const holoTone = computed<HudHoloTone>(() =>
   worstHudHoloTone(cells.value.map((cell) => fleetHealthToHoloTone(cell.health))),
@@ -39,7 +66,7 @@ const holoSignals = computed<HudHoloSignal[]>(() =>
     id: cell.workspaceId,
     tone: fleetHealthToHoloTone(cell.health),
     selected: cell.isSelected,
-    weight: cell.isSelected ? 1 : cell.health === 'nominal' ? 0.55 : 0.9,
+    weight: cell.isSelected ? 1 : cell.isBusy ? 0.95 : cell.health === 'nominal' ? 0.55 : 0.9,
   })),
 );
 
@@ -52,10 +79,14 @@ function selectWorkspace(workspaceId: string): void {
   <div
     ref="rootEl"
     class="operator-fleet-grid-host"
-    :class="{ 'operator-fleet-grid-host--orb-live': shell.voiceOrbDragging }"
+    :class="{
+      'operator-fleet-grid-host--orb-live': shell.voiceOrbDragging,
+      'operator-fleet-grid-host--busy': anyBusy,
+    }"
   >
     <HudHoloPanelShell
       class="operator-fleet-grid"
+      :class="{ 'operator-fleet-grid--busy': anyBusy }"
       label="fleet-health"
       variant="module"
       :tone="holoTone"
@@ -82,7 +113,10 @@ function selectWorkspace(workspaceId: string): void {
           data-orb-field
           :class="[
             `operator-fleet-grid__item--${cell.health}`,
-            { 'operator-fleet-grid__item--selected': cell.isSelected },
+            {
+              'operator-fleet-grid__item--selected': cell.isSelected,
+              'operator-fleet-grid__item--busy': cell.isBusy,
+            },
           ]"
         >
           <button
@@ -93,6 +127,9 @@ function selectWorkspace(workspaceId: string): void {
             <span class="operator-fleet-grid__label">
               {{ cell.label }}
               <span v-if="cell.isBoundProject" class="operator-fleet-grid__badge">project</span>
+              <span v-if="cell.isBusy" class="operator-fleet-grid__badge operator-fleet-grid__badge--live">
+                live
+              </span>
             </span>
             <span class="operator-fleet-grid__summary">{{ cell.summary }}</span>
             <span class="operator-fleet-grid__detail">{{ cell.detail }}</span>

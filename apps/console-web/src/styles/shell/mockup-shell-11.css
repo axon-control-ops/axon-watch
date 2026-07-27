@@ -326,6 +326,45 @@
   box-shadow: 0 0 0 1px rgba(72, 196, 255, 0.45);
 }
 
+.operator-fleet-grid__item--busy {
+  border-color: rgba(0, 242, 255, 0.42);
+  background:
+    linear-gradient(165deg, rgba(0, 242, 255, 0.12), transparent 48%),
+    rgba(4, 22, 32, 0.88);
+  box-shadow:
+    0 0 0 1px rgba(0, 220, 255, 0.18),
+    0 0 18px rgba(0, 200, 255, 0.16);
+  animation: operator-fleet-busy-pulse 2.4s ease-in-out infinite;
+}
+
+.operator-fleet-grid--busy .operator-fleet-grid__headline {
+  color: rgba(140, 235, 255, 0.95);
+}
+
+.operator-fleet-grid-host--busy .operator-fleet-grid.hud-holo-shell {
+  box-shadow: 0 0 28px rgba(0, 200, 255, 0.12);
+}
+
+@keyframes operator-fleet-busy-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(0, 220, 255, 0.16),
+      0 0 12px rgba(0, 200, 255, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(0, 242, 255, 0.42),
+      0 0 22px rgba(0, 220, 255, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .operator-fleet-grid__item--busy {
+    animation: none;
+  }
+}
+
 .operator-fleet-grid__button {
   display: flex;
   flex-direction: column;
@@ -357,6 +396,12 @@
   font-size: 0.58rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.operator-fleet-grid__badge--live {
+  background: rgba(0, 242, 255, 0.22);
+  color: rgba(180, 250, 255, 0.98);
+  box-shadow: 0 0 0.4rem rgba(0, 220, 255, 0.35);
 }
 
 .operator-fleet-grid__summary {

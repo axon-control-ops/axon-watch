@@ -11,6 +11,7 @@ import { isToolCapableComposerMode } from './composer-tool-modes';
 import { createKairoProgressNarrator } from './kairo-progress-narrator';
 import {
   isWaitProgressThinking,
+  sanitizeAgentThinkingForOperator,
   stripAgentStreamFenceMarkers,
   thinkingSpeechSimilarity,
 } from './agent-live-line-view';
@@ -120,7 +121,9 @@ export function createChatStreamVoiceNarration(input: {
   }
 
   function maybeSpeakThinkingBlock(spokenBlock: string): boolean {
-    const cleaned = stripAgentStreamFenceMarkers(spokenBlock);
+    const cleaned =
+      sanitizeAgentThinkingForOperator(spokenBlock) ||
+      stripAgentStreamFenceMarkers(spokenBlock);
     if (!toolNarrationEnabled || !cleaned) {
       return false;
     }

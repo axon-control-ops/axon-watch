@@ -160,27 +160,119 @@ export function stripAgentStreamFenceMarkers(text: string): string {
 /** Operator-facing fallback when thinking has no usable body. */
 export const THINKING_SPEECH_FALLBACK = 'On it…';
 
+const THINKING_LEAD_RE = /^(?:i\s+am\s+)?thinking(?:[,.…\s]{0,3}|\.\.\.)?$/i;
+const THINKING_PREFIX_IAM_RE = /^i\s+am\s+thinking(?:[,.…\s]{1,3}|\.\.\.)?\s*/i;
+const THINKING_PREFIX_RE = /^thinking(?:[,.…\s]{1,3}|\.\.\.)?\s*/i;
+const FUTURE_INTENT_RE =
+  /^(?:i(?:['’]ll|\s+will)|i(?:['’]m)\s+(?:going\s+to|about\s+to))\s+(\w+)([\s\S]*)$/i;
+const PRESENT_PROGRESS_RE = /^i(?:['’]m)\s+(\w+ing)([\s\S]*)$/i;
+
+const GERUND_EXCEPTIONS: Record<string, string> = {
+  be: 'Working on',
+  begin: 'Beginning',
+  get: 'Getting',
+  put: 'Putting',
+  run: 'Running',
+  set: 'Setting',
+  sit: 'Sitting',
+  scan: 'Scanning',
+  plan: 'Planning',
+  stop: 'Stopping',
+  trip: 'Tripping',
+  wrap: 'Wrapping',
+};
+
+function capitalizeWord(word: string): string {
+  if (!word) {
+    return word;
+  }
+  return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+}
+
+function verbToGerund(verb: string): string {
+  const lower = verb.toLowerCase();
+  const exception = GERUND_EXCEPTIONS[lower];
+  if (exception) {
+    return exception;
+  }
+  if (lower.endsWith('ie')) {
+    return capitalizeWord(`${lower.slice(0, -2)}ying`);
+  }
+  if (lower.endsWith('e') && !lower.endsWith('ee')) {
+    return capitalizeWord(`${lower.slice(0, -1)}ing`);
+  }
+  // Double final consonant only for short CVC stems (plan → planning).
+  if (
+    lower.length <= 4 &&
+    /^[b-df-hj-np-tv-z]+[aeiou][b-df-hj-np-tv-z]$/i.test(lower)
+  ) {
+    return capitalizeWord(`${lower}${lower.slice(-1)}ing`);
+  }
+  return capitalizeWord(`${lower}ing`);
+}
+
 /**
- * Prefer short "On it…" chrome over bare "Thinking…" / "I am thinking…" labels
- * (milestones, model lead-ins, and OCR-prone transcript chips).
+ * Turn future-intent monologue ("I'll read X", "I will check Y") into present
+ * progress copy operators can skim ("Reading X", "Checking Y").
+ */
+export function rewriteFutureIntentToPresent(text: string): string | null {
+  const flattened = flattenLiveLineText(text);
+  if (!flattened) {
+    return null;
+  }
+  const future = flattened.match(FUTURE_INTENT_RE);
+  if (future) {
+    const gerund = verbToGerund(future[1] ?? '');
+    const rest = (future[2] ?? '').replace(/\s+/g, ' ');
+    if (gerund === 'Working on') {
+      return flattenLiveLineText(`Working on${rest}`);
+    }
+    return flattenLiveLineText(`${gerund}${rest}`);
+  }
+  const present = flattened.match(PRESENT_PROGRESS_RE);
+  if (present) {
+    return flattenLiveLineText(`${capitalizeWord(present[1] ?? '')}${present[2] ?? ''}`);
+  }
+  return null;
+}
+
+/**
+ * Drop "Thinking…" / "thinking I'll…" filler and prefer concrete progress lines
+ * (milestones, model lead-ins, transcript chips, Galaxy captions).
  */
 export function normalizeThinkingSpeechLead(text: string): string {
   const flattened = flattenLiveLineText(text);
   if (!flattened) {
     return '';
   }
-  if (/^(?:i\s+am\s+)?thinking(?:[.…]{1,3}|\.\.\.)?$/i.test(flattened)) {
+  if (THINKING_LEAD_RE.test(flattened)) {
     return THINKING_SPEECH_FALLBACK;
   }
+
+  let strippedThinking = false;
+  let rest = flattened;
   if (/^i\s+am\s+thinking\b/i.test(flattened)) {
-    const rest = flattened.replace(/^i\s+am\s+thinking(?:[.…]{1,3}|\.\.\.)?\s*/i, '').trim();
-    return rest ? `On it — ${rest}` : THINKING_SPEECH_FALLBACK;
+    strippedThinking = true;
+    rest = flattened.replace(THINKING_PREFIX_IAM_RE, '').trim();
+  } else if (/^thinking\b/i.test(flattened)) {
+    strippedThinking = true;
+    rest = flattened.replace(THINKING_PREFIX_RE, '').trim();
   }
-  if (/^thinking\b/i.test(flattened)) {
-    const rest = flattened.replace(/^thinking(?:[.…]{1,3}|\.\.\.)?\s*/i, '').trim();
-    return rest ? `On it — ${rest}` : THINKING_SPEECH_FALLBACK;
+  if (!strippedThinking) {
+    return flattened;
   }
-  return flattened;
+  if (!rest) {
+    return THINKING_SPEECH_FALLBACK;
+  }
+
+  const action = rewriteFutureIntentToPresent(rest);
+  if (action) {
+    return action;
+  }
+  if (/^about\s+/i.test(rest)) {
+    return flattenLiveLineText(`Working on ${rest.replace(/^about\s+/i, '')}`);
+  }
+  return capitalizeWord(rest);
 }
 
 export function sanitizeAgentThinkingForOperator(text: string): string {

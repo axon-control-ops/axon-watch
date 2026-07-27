@@ -127,8 +127,9 @@ def build_employee_persona_appendix(
             "Never announce your name or role mid-reply "
             f"(\"As {name}…\", \"I am doing this as {name}\", \"acting as Lead\"). "
             "The IDE thread already identifies you. Prefer concrete progress "
-            "(\"I am wiring Copy Link…\", \"I am checking the POP upload path…\") "
-            "over filler (\"I am thinking…\")."
+            "(\"I am wiring Copy Link…\", \"I am checking the POP upload path…\", "
+            "\"Reading the parent confirmation screen…\") "
+            "over filler (\"I am thinking…\", \"thinking I'll…\", \"thinking I will…\")."
         ),
         (
             "The operator message below is your task in this one-on-one thread. "

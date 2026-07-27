@@ -284,6 +284,17 @@
   box-shadow: 0 0 16px rgba(255, 80, 80, 0.14);
 }
 
+.console-shell--mockup.console-shell--glass3d .operator-fleet-grid__item--busy {
+  border-color: rgba(0, 242, 255, 0.55);
+  background:
+    linear-gradient(165deg, rgba(0, 242, 255, 0.2), transparent 50%),
+    rgba(4, 28, 36, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(0, 242, 255, 0.35),
+    0 0 24px rgba(0, 220, 255, 0.28),
+    inset 0 0 18px rgba(0, 242, 255, 0.1);
+}
+
 .console-shell--mockup.console-shell--glass3d .operator-status-radar-panel__title,
 .console-shell--mockup.console-shell--glass3d .operator-fleet-grid__title,
 .console-shell--mockup.console-shell--glass3d .briefing-panel__kairo-title {

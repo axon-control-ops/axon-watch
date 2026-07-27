@@ -18,6 +18,10 @@ export type GalaxyPresenceInput = {
   speechCapturing: boolean;
   kairoSpeechActive: boolean;
   agentStreamActive: boolean;
+  /** Company teammates mid-shift across the fleet. */
+  companyBusyCount?: number;
+  /** Active runs visible in runtime / briefing. */
+  fleetActiveRuns?: number;
   pendingApprovals: number;
   criticalSignals: number;
   highSignals: number;
@@ -49,7 +53,11 @@ export function resolveGalaxyPresence(input: GalaxyPresenceInput): GalaxyPresenc
   } else if (input.conversationPhase === 'listening') {
     // Manual PTT only — shared capture sets this phase exclusively for mode=manual.
     phase = 'listening';
-  } else if (input.conversationPhase === 'thinking') {
+  } else if (
+    input.conversationPhase === 'thinking' ||
+    (input.companyBusyCount ?? 0) > 0 ||
+    (input.fleetActiveRuns ?? 0) > 0
+  ) {
     phase = 'thinking';
   } else if (
     input.pendingApprovals > 0 ||

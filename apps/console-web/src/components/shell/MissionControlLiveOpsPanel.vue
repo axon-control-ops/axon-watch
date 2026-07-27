@@ -8,18 +8,35 @@ import {
 } from '../../lib/operator-persona-name';
 import {
   kairoConversationPhase,
+  kairoConversationReply,
   kairoLastRoutingReceipt,
 } from '../../features/kairo-conversation/kairo-conversation-state';
 import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
 import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
 import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presence-state';
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
+import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
+import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
+import {
+  vaxonAffirmReplyCta,
+  vaxonLineAsksForReply,
+} from '../../lib/vaxon-reply-prompt';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
 const reply = ref('');
+
+const companyBusyCount = computed(() =>
+  companyBusyEmployeesCount(shell.companyEmployeesFleet),
+);
+const fleetActiveRuns = computed(
+  () =>
+    shell.runtimeSummary?.active_runs?.length ??
+    shell.operatorBriefing?.active_runs?.length ??
+    0,
+);
 
 const presence = computed(() =>
   resolveGalaxyPresence({
@@ -29,6 +46,8 @@ const presence = computed(() =>
     speechCapturing: false,
     kairoSpeechActive: shell.kairoSpeechActive,
     agentStreamActive: shell.agentStreamActive,
+    companyBusyCount: companyBusyCount.value,
+    fleetActiveRuns: fleetActiveRuns.value,
     pendingApprovals:
       shell.runtimeSummary?.approvals.pending_count ??
       shell.operatorBriefing?.pending_approvals.count ??
@@ -51,14 +70,18 @@ const streamItems = computed(() =>
   }),
 );
 
-const spokenLine = computed(
-  () => spokenText.value?.trim() || shell.operatorBriefing?.notice?.trim() || '',
+const transmission = computed(() =>
+  resolveVaxonTransmissionView({
+    spokenText: spokenText.value,
+    conversationReply: kairoConversationReply.value,
+    speaking: shell.kairoSpeechActive || presencePhase.value === 'speaking',
+    pending: pending.value || presencePhase.value === 'thinking',
+  }),
 );
-const asksForReply = computed(() =>
-  /\b(shall i|would you like me to|do you want me to|open attention for|want me to|triage)\b/i.test(
-    spokenLine.value,
-  ),
-);
+
+const spokenLine = computed(() => transmission.value.body);
+const asksForReply = computed(() => vaxonLineAsksForReply(spokenLine.value));
+const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
 
 const modeChip = computed(() => {
   if (presencePhase.value === 'speaking') return 'speaking';
@@ -71,12 +94,24 @@ const liveBadge = computed(
     shell.kairoSpeechActive ||
     presencePhase.value === 'listening' ||
     presencePhase.value === 'speaking' ||
-    Boolean(shell.primaryActiveRun),
+    presencePhase.value === 'thinking' ||
+    presencePhase.value === 'autonomous' ||
+    Boolean(shell.primaryActiveRun) ||
+    companyBusyCount.value > 0 ||
+    fleetActiveRuns.value > 0,
 );
 
 const micLive = computed(
   () => speechCapture.capturing.value && speechCapture.captureMode.value === 'manual',
 );
+
+const focusedWorkspaceLabel = computed(() => {
+  const ws = shell.currentWorkspace;
+  if (!ws) {
+    return null;
+  }
+  return ws.display_name?.trim() || ws.workspace_id;
+});
 
 async function sendReply(content?: string): Promise<void> {
   const message = (content ?? reply.value).trim();
@@ -100,7 +135,14 @@ function toggleMic(): void {
 </script>
 
 <template>
-  <section class="mc-live-ops" aria-label="VAXON live operations">
+  <section
+    class="mc-live-ops"
+    :class="{
+      'mc-live-ops--busy': liveBadge,
+      'mc-live-ops--transmitting': transmission.mode === 'transmitting',
+    }"
+    aria-label="VAXON live operations"
+  >
     <header class="mc-live-ops__header">
       <div class="mc-live-ops__title-row">
         <p class="mc-live-ops__eyebrow">Live operations</p>
@@ -108,6 +150,9 @@ function toggleMic(): void {
           {{ liveBadge ? '● Live' : 'Standby' }}
         </span>
       </div>
+      <p v-if="focusedWorkspaceLabel" class="mc-live-ops__focus">
+        Focus · {{ focusedWorkspaceLabel }}
+      </p>
     </header>
 
     <div
@@ -122,6 +167,33 @@ function toggleMic(): void {
         <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
       </div>
     </div>
+
+    <article
+      class="mc-transmission"
+      :data-mode="transmission.mode"
+      :aria-live="transmission.mode === 'transmitting' ? 'polite' : 'off'"
+      aria-label="VAXON transmission"
+    >
+      <header class="mc-transmission__header">
+        <span class="mc-transmission__pulse" aria-hidden="true" />
+        <p class="mc-transmission__eyebrow">{{ transmission.eyebrow }}</p>
+        <span class="mc-transmission__badge">{{ transmission.mode }}</span>
+      </header>
+      <p
+        class="mc-transmission__body"
+        :data-empty="transmission.empty ? 'true' : 'false'"
+      >
+        {{ transmission.body }}
+      </p>
+      <div v-if="asksForReply && !transmission.empty" class="mc-transmission__actions">
+        <button type="button" :disabled="pending" @click="void sendReply('yes')">
+          {{ affirmCta }}
+        </button>
+        <button type="button" :disabled="pending" @click="void sendReply('not now')">
+          Not now
+        </button>
+      </div>
+    </article>
 
     <div class="mc-live-ops__modes" role="status" aria-label="Voice mode">
       <span
@@ -159,15 +231,6 @@ function toggleMic(): void {
     </ul>
 
     <div class="mc-live-ops__reply">
-      <p v-if="spokenLine && asksForReply" class="mc-live-ops__reply-line">{{ spokenLine }}</p>
-      <div v-if="asksForReply" class="mc-live-ops__reply-actions">
-        <button type="button" :disabled="pending" @click="void sendReply('yes')">
-          Yes
-        </button>
-        <button type="button" :disabled="pending" @click="void sendReply('not now')">
-          Not now
-        </button>
-      </div>
       <form class="mc-live-ops__reply-form" @submit.prevent="void sendReply()">
         <button
           type="button"

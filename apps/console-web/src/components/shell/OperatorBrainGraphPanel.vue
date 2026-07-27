@@ -23,6 +23,7 @@ import type { GalaxyMockupRailItem } from '../../features/brain-galaxy/galaxy-mo
 import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
 import { resolveBrainGalaxyNodeSelection } from '../../features/brain-galaxy/brain-galaxy-node-selection';
 import { useGalaxySpeechWorkspaceCollapse } from '../../features/brain-galaxy/use-galaxy-speech-workspace-collapse';
+import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
 import {
   brainGraphHeadline,
   type BrainGraphNode,
@@ -139,6 +140,15 @@ const highSignals = computed(
 const speechCapturing = kairoCaptureCapturing;
 const kairoSpeechActive = computed(() => shell.kairoSpeechActive);
 const agentStreamActive = computed(() => shell.agentStreamActive);
+const companyBusyCount = computed(() =>
+  companyBusyEmployeesCount(shell.companyEmployeesFleet),
+);
+const fleetActiveRuns = computed(
+  () =>
+    shell.runtimeSummary?.active_runs?.length ??
+    shell.operatorBriefing?.active_runs?.length ??
+    0,
+);
 const streamWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 useGalaxySpeechWorkspaceCollapse({
   kairoSpeechActive,
@@ -175,6 +185,8 @@ const {
   kairoSpeechActive,
   agentStreamActive,
   streamWorkspaceId,
+  companyBusyCount,
+  fleetActiveRuns,
   pendingApprovals,
   criticalSignals,
   highSignals,

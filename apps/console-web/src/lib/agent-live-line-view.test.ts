@@ -26,14 +26,19 @@ describe('sanitizeAgentThinkingForOperator', () => {
     ).toBe('Checking the image preview path.');
   });
 
-  it('rewrites bare Thinking… lead-ins to On it…', () => {
+  it('rewrites Thinking… lead-ins into concrete progress copy', () => {
     expect(sanitizeAgentThinkingForOperator('Thinking…')).toBe('On it…');
     expect(sanitizeAgentThinkingForOperator('Thinking...')).toBe('On it…');
     expect(sanitizeAgentThinkingForOperator("thinking I'll check Sentry next.")).toBe(
-      "On it — I'll check Sentry next.",
+      'Checking Sentry next.',
     );
+    expect(
+      sanitizeAgentThinkingForOperator(
+        "thinking I'll read the parent confirmation screen next.",
+      ),
+    ).toBe('Reading the parent confirmation screen next.');
     expect(sanitizeAgentThinkingForOperator('I am thinking about the next step.')).toBe(
-      'On it — about the next step.',
+      'Working on the next step.',
     );
   });
 

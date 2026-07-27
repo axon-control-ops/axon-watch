@@ -23,6 +23,8 @@ export type UseBrainGalaxyOptions = {
   kairoSpeechActive?: Ref<boolean>;
   agentStreamActive?: Ref<boolean>;
   streamWorkspaceId?: Ref<string | null>;
+  companyBusyCount?: Ref<number>;
+  fleetActiveRuns?: Ref<number>;
   pendingApprovals?: Ref<number>;
   criticalSignals?: Ref<number>;
   highSignals?: Ref<number>;
@@ -54,6 +56,8 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       speechCapturing: options.speechCapturing?.value ?? false,
       kairoSpeechActive: options.kairoSpeechActive?.value ?? false,
       agentStreamActive: options.agentStreamActive?.value ?? false,
+      companyBusyCount: options.companyBusyCount?.value ?? 0,
+      fleetActiveRuns: options.fleetActiveRuns?.value ?? 0,
       pendingApprovals: options.pendingApprovals?.value ?? 0,
       criticalSignals: options.criticalSignals?.value ?? 0,
       highSignals: options.highSignals?.value ?? 0,
@@ -110,7 +114,9 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     }
     scene.setVaxonCoreMode(presence.value.coreOrbMode);
     scene.setAgentStream(
-      options.agentStreamActive?.value ?? false,
+      (options.agentStreamActive?.value ?? false) ||
+        (options.companyBusyCount?.value ?? 0) > 0 ||
+        (options.fleetActiveRuns?.value ?? 0) > 0,
       options.streamWorkspaceId?.value ?? null,
     );
   }
@@ -204,7 +210,12 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
   );
 
   watch(
-    [() => options.agentStreamActive?.value, () => options.streamWorkspaceId?.value],
+    [
+      () => options.agentStreamActive?.value,
+      () => options.streamWorkspaceId?.value,
+      () => options.companyBusyCount?.value,
+      () => options.fleetActiveRuns?.value,
+    ],
     () => {
       syncPresenceToScene();
     },
