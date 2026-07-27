@@ -262,7 +262,10 @@ async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKi
   // Talk / Status / Assign / Retry all land on that teammate's owned IDE thread.
   await shell.openOrFocusEmployeeIdeThread(employee);
   const { mode, draft } = employeeComposerOpenPayload(employee, kind);
-  requestIdeComposerMode(mode);
+  // Status is voice + focus only — never flip Ask/consultative (or any mode).
+  if (mode) {
+    requestIdeComposerMode(mode);
+  }
   if (kind === 'retry') {
     // Retry shift always needs tools — ignore consultative composer setting.
     shell.setAgentExecutionAccess('full');

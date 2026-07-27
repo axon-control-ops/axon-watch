@@ -62,13 +62,17 @@ case "${service_name}" in
     cd "${AXON_WATCH_REPO_ROOT}/services/axon-watch"
     exec "${AXON_WATCH_PYTHON}" -m uvicorn app.main:app \
       --host "${AXON_WATCH_BIND_HOST}" \
-      --port "${AXON_WATCH_WATCH_SERVICE_PORT}"
+      --port "${AXON_WATCH_WATCH_SERVICE_PORT}" \
+      --timeout-graceful-shutdown 5
     ;;
   control-plane)
     cd "${AXON_WATCH_REPO_ROOT}/services/control-plane"
+    # Cap graceful drain so speak/SSE clients cannot hold :8787 closed for ~90s
+    # during systemctl restart (Vite then spam-logs ECONNREFUSED).
     exec "${AXON_WATCH_PYTHON}" -m uvicorn app.main:app \
       --host "${AXON_WATCH_BIND_HOST}" \
-      --port "${AXON_WATCH_CONTROL_PLANE_PORT}"
+      --port "${AXON_WATCH_CONTROL_PLANE_PORT}" \
+      --timeout-graceful-shutdown 5
     ;;
   console-web)
     # Always use vite preview so /api proxies to control-plane (same-origin operator UI).

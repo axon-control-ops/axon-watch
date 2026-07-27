@@ -27,6 +27,7 @@ export function resolveIdeInterruptHeadline(input: {
   topSignal: IdeInterruptTopSignal | null | undefined;
   watchConnected: boolean;
   degradedActive: boolean;
+  remoteIngressAttention?: boolean;
   primaryRunPhase: string | null | undefined;
 }): string {
   if (input.pendingApprovalsCount > 0) {
@@ -40,6 +41,10 @@ export function resolveIdeInterruptHeadline(input: {
 
   if (input.degradedActive) {
     return 'Runtime degraded — attention required';
+  }
+
+  if (input.remoteIngressAttention) {
+    return 'Remote ingress unhealthy — local Axon-X is up';
   }
 
   if (isActionableInterruptSignal(input.topSignal)) {
@@ -58,6 +63,7 @@ export function resolveIdeInterruptDetailLine(input: {
   topSignal: IdeInterruptTopSignal | null | undefined;
   watchConnected: boolean;
   degradedActive: boolean;
+  remoteIngressAttention?: boolean;
   primaryRunCurrentStep: string | null | undefined;
 }): string {
   if (input.pendingApprovalsCount > 0) {
@@ -70,6 +76,10 @@ export function resolveIdeInterruptDetailLine(input: {
 
   if (input.degradedActive) {
     return 'Review the status strip and briefing before continuing.';
+  }
+
+  if (input.remoteIngressAttention) {
+    return 'Public tunnel or DNS is unhealthy. Local IDE and control-plane work can continue.';
   }
 
   if (isActionableInterruptSignal(input.topSignal)) {

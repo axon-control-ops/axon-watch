@@ -30,10 +30,12 @@ system units:
 ./scripts/ops/install-user-always-on.sh --takeover   # hand ports to systemd
 ```
 
-Units live under `infra/systemd/user/` (`axon-watch`, `control-plane`, `console-web`)
-and install to `~/.config/systemd/user/`. This keeps all three stack services
-restarting on failure. Legacy axon-local **:7734** is not started — run
-`./scripts/ops/disable-legacy-7734-autostart.sh` (also invoked by the installer).
+Units live under `infra/systemd/user/` (`axon-watch`, `control-plane`,
+`console-web`, `axon-public-origin-proxy`) and install to
+`~/.config/systemd/user/`. This keeps the stack and Cloudflare's compatibility
+origin (`:7734` → Axon-X `:4173`) restarting on failure. Legacy axon-local runs
+on the rollback port `:7735`, not the public origin port; the installer disables
+its old `:7734` autostart.
 
 Memory caps (user units) stop one runaway service from freezing the desktop:
 control-plane MemoryMax=5G, console-web 1G, axon-watch 800M.

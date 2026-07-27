@@ -167,6 +167,11 @@ import {
   streamingThreadIdsFromUiMap,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
+import { listStaleIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
+import {
+  localRuntimeDegradedActive,
+  remoteIngressAttentionActive,
+} from '../lib/runtime-degraded-scope';
 import { resolveKairoPresenceClickTarget } from '../lib/kairo-presence-action';
 import { isBootstrapSummarySignal } from '../lib/operator-signal-hints';
 import {
@@ -741,18 +746,18 @@ export const useShellStore = defineStore('shell', () => {
     return ideComposerActivity.value?.label ?? null;
   });
 
-  const kairoBriefingAttention = computed(() =>
-    resolveKairoBriefingAttention({
+  const kairoBriefingAttention = computed(() => {
+    const degraded =
+      operatorBriefing.value?.degraded ?? runtimeSummary.value?.degraded ?? null;
+    return resolveKairoBriefingAttention({
       pendingApprovals: pendingApprovalsCount.value,
       criticalSignals: runtimeSummary.value?.signals.critical_count ?? 0,
       highSignals: runtimeSummary.value?.signals.high_count ?? 0,
-      degraded:
-        operatorBriefing.value?.degraded.active ??
-        runtimeSummary.value?.degraded.active ??
-        false,
+      degraded: Boolean(degraded?.active),
+      remoteIngressOnly: remoteIngressAttentionActive(degraded),
       briefingLoaded: briefingLoadState.value === 'loaded',
-    }),
-  );
+    });
+  });
 
   const showKairoBriefingAttention = computed(() =>
     shouldShowBriefingAttentionInCommandMode(dockHeroMode.value, kairoBriefingAttention.value),
@@ -771,7 +776,7 @@ export const useShellStore = defineStore('shell', () => {
       criticalSignals: summary?.signals.critical_count ?? 0,
       highSignals: summary?.signals.high_count ?? 0,
       watchConnected: Boolean(summary?.watch.connected),
-      degradedActive: Boolean(summary?.degraded.active),
+      degradedActive: localRuntimeDegradedActive(summary?.degraded),
       primaryRunPhase: primaryActiveRun.value?.phase,
       agentStreamActive: agentStreamActive.value,
       voiceSessionActive:
@@ -3100,6 +3105,31 @@ export const useShellStore = defineStore('shell', () => {
     dispatchIdeComposerMessage,
   });
 
+  function clearStaleIdeStreamUi(): void {
+    const runPhaseById: Record<string, string | undefined> = {};
+    for (const run of runs.value) {
+      runPhaseById[run.run_id] = run.phase;
+    }
+    const staleThreadIds = listStaleIdeStreamThreadIds({
+      streamUiByThreadId: workspaceStreamUiById.value,
+      liveSessionThreadIds: chatStreamSessionsByWorkspace.keys(),
+      runPhaseById,
+      runsLoaded: runsLoadState.value === 'loaded',
+    });
+    if (!staleThreadIds.length) {
+      return;
+    }
+    for (const threadId of staleThreadIds) {
+      disconnectChatStreamSession(threadId);
+      setWorkspaceStreamUi(threadId, {
+        active: false,
+        messageId: null,
+        activity: null,
+        ideAgentRunId: null,
+      });
+    }
+  }
+
   async function refreshRunSurfaces(options?: { light?: boolean; forceFull?: boolean }): Promise<void> {
     // During an active stream/run, full surface refresh (CLI status + briefing +
     // fleet + brain) routinely takes 5–8s and trips Chrome "Page Unresponsive".
@@ -3117,6 +3147,7 @@ export const useShellStore = defineStore('shell', () => {
       // Live SSE ticks must stay cheap: skip CLI status/summary AND watch inbox
       // (inbox watch probe regularly hits a ~5s timeout and freezes the console).
       await loadRuns({ sync: false });
+      clearStaleIdeStreamUi();
       await autoContinueInterruptedIdeRun();
       await flushIdeComposerQueueIfIdle();
       return;
@@ -3136,6 +3167,7 @@ export const useShellStore = defineStore('shell', () => {
         loadRuns({ sync: false }),
         loadInbox({ background: true }),
       ]);
+      clearStaleIdeStreamUi();
       await loadRunHistory(
         resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
       );
@@ -3155,6 +3187,7 @@ export const useShellStore = defineStore('shell', () => {
         ? loadOperatorBrainGraph({ background: true })
         : Promise.resolve(),
     ]);
+    clearStaleIdeStreamUi();
     await loadRunHistory(
       resolveRunHistoryRunId(workspaceRuns.value, ideAgentRunId.value),
     );

@@ -31,13 +31,67 @@ export function connectorRailTone(status: string): ConnectorRailTone {
   if (status === 'ok') {
     return 'ok';
   }
-  if (status === 'degraded') {
+  if (status === 'degraded' || status === 'remote') {
     return 'degraded';
   }
   if (status === 'unavailable') {
     return 'unavailable';
   }
   return 'unknown';
+}
+
+/** Soften optional tunnel public-health failures so the rail does not look like local death. */
+export function connectorRailDisplayStatus(item: {
+  connector_id?: string | null;
+  status?: string | null;
+  tunnel?: {
+    process_running?: boolean | null;
+    public_health_ok?: boolean | null;
+  } | null;
+}): string {
+  const status = String(item.status ?? 'unknown').trim() || 'unknown';
+  const connectorId = String(item.connector_id ?? '').trim();
+  if (connectorId !== 'cloudflare_tunnel') {
+    return status;
+  }
+  if (status !== 'degraded') {
+    return status;
+  }
+  const tunnel = item.tunnel;
+  if (tunnel?.process_running && tunnel.public_health_ok === false) {
+    return 'remote';
+  }
+  return status;
+}
+
+/** Prefer operator-readable remote-ingress copy for tunnel public-health failures. */
+export function connectorRailDisplayDetail(item: {
+  connector_id?: string | null;
+  detail?: string | null;
+  tunnel?: {
+    process_running?: boolean | null;
+    public_health_ok?: boolean | null;
+    public_health_detail?: string | null;
+  } | null;
+}): string {
+  const detail = String(item.detail ?? '').trim();
+  const connectorId = String(item.connector_id ?? '').trim();
+  if (connectorId !== 'cloudflare_tunnel') {
+    return detail;
+  }
+  const tunnel = item.tunnel;
+  if (tunnel?.process_running && tunnel.public_health_ok === false) {
+    const publicDetail = String(tunnel.public_health_detail ?? '').trim();
+    if (publicDetail) {
+      return `remote ingress unhealthy (${publicDetail}); local Axon-X unaffected`;
+    }
+    if (detail.toLowerCase().includes('public health')) {
+      return detail.includes('local Axon-X unaffected')
+        ? detail
+        : `${detail}; local Axon-X unaffected`;
+    }
+  }
+  return detail;
 }
 
 /** Header summary for the Mission Control connectors rail. */
@@ -99,13 +153,14 @@ export function buildConnectorRailRows(items: ConnectorProbeRecord[]): Connector
     const tunnelRunning = Boolean(tunnelMeta?.process_running);
     const tunnelManaged = Boolean(tunnelMeta?.managed_process);
     const tunnelStartAllowed = isTunnel && Boolean(tunnelMeta?.auth_ready) && !tunnelRunning;
+    const displayStatus = connectorRailDisplayStatus(item);
     return {
       connectorId,
       label: String(item.display_name ?? connectorId),
-      status: String(item.status ?? 'unknown'),
-      tone: connectorRailTone(String(item.status ?? '')),
+      status: displayStatus,
+      tone: connectorRailTone(displayStatus),
       required: Boolean(item.required),
-      detail: String(item.detail ?? '').trim(),
+      detail: connectorRailDisplayDetail(item),
       isLegacyFallback: isLegacy,
       fallbackUrl: isLegacy ? LEGACY_AXON_LOCAL_FALLBACK_URL : null,
       isTunnelConnector: isTunnel,

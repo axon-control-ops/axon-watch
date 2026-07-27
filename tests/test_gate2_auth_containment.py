@@ -102,6 +102,37 @@ class Gate2OriginGuardTests(unittest.TestCase):
             )
             self.assertIsNone(reject_cross_origin_mutation(make([])))
 
+    def test_allows_loopback_operator_console_origin_when_public_tunnel_configured(
+        self,
+    ) -> None:
+        from app.auth.origin_guard import reject_cross_origin_mutation
+        from starlette.requests import Request
+
+        request = Request(
+            {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "POST",
+                "scheme": "http",
+                "path": "/api/chat/messages",
+                "raw_path": b"/api/chat/messages",
+                "query_string": b"",
+                "headers": [(b"origin", b"http://127.0.0.1:5173")],
+                "client": ("127.0.0.1", 5173),
+                "server": ("127.0.0.1", 8787),
+            }
+        )
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.edudashpro.org.za",
+                "AXON_WATCH_REMOTELY_REACHABLE": "",
+            },
+            clear=False,
+        ):
+            self.assertIsNone(reject_cross_origin_mutation(request))
+
 
 class Gate2AuthSettingsTests(unittest.TestCase):
     def test_remotely_reachable_from_public_base_url(self) -> None:

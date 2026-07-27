@@ -141,8 +141,17 @@ export function employeeChatDraft(
   return employeeTalkDraft(employee);
 }
 
-export function employeeChatComposerMode(kind: TeamMemberChatKind): IdeComposerRestoreMode {
-  if (kind === 'status' || kind === 'receipts') {
+/**
+ * Composer mode to open for a roster chat action.
+ * `null` = keep the current mode (Status is voice + focus only).
+ */
+export function employeeChatComposerMode(
+  kind: TeamMemberChatKind,
+): IdeComposerRestoreMode | null {
+  if (kind === 'status') {
+    return null;
+  }
+  if (kind === 'receipts') {
     return 'ask';
   }
   return 'agent';
@@ -151,7 +160,7 @@ export function employeeChatComposerMode(kind: TeamMemberChatKind): IdeComposerR
 export function employeeComposerOpenPayload(
   employee: CompanyEmployeeRecord,
   kind: TeamMemberChatKind,
-): { mode: IdeComposerRestoreMode; draft: string } {
+): { mode: IdeComposerRestoreMode | null; draft: string } {
   return {
     mode: employeeChatComposerMode(kind),
     draft: employeeChatDraft(employee, kind).trim(),
@@ -218,7 +227,7 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
       label: 'Status',
       kind: 'chat',
       chatKind: 'status',
-      composerMode: 'ask',
+      // No composerMode — Status speaks locally and must not demote Full Access to Ask.
     },
     {
       id: 'assign',

@@ -1,8 +1,9 @@
 [Unit]
 Description=Axon-X Console Web :4173 (user always-on)
 After=network.target control-plane.service
-Wants=network-online.target
-Requires=control-plane.service
+Wants=network-online.target control-plane.service
+# Wants (not Requires): a control-plane bounce must not take :4173 down with it.
+# Requires= caused Vite :5173 proxy spam + a stuck IDE whenever CP restarted.
 
 [Service]
 Type=simple

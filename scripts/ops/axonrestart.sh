@@ -8,10 +8,20 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-echo "Restarting Axon-X user services (axon-watch, control-plane, console-web)..."
-systemctl --user restart axon-watch.service control-plane.service console-web.service
+echo "Restarting Axon-X user services (watch, control-plane, console, public origin)..."
+# Soft restart is safe now: uvicorn --timeout-graceful-shutdown 5 + TimeoutStopSec=12
+# prevent speak/SSE from holding :8787 dead for ~90s (Vite ECONNREFUSED spam).
+systemctl --user restart \
+  axon-watch.service \
+  control-plane.service \
+  console-web.service \
+  axon-public-origin-proxy.service
 
 echo
-systemctl --user --no-pager --full is-active axon-watch.service control-plane.service console-web.service
+systemctl --user --no-pager --full is-active \
+  axon-watch.service \
+  control-plane.service \
+  console-web.service \
+  axon-public-origin-proxy.service
 echo
 exec "${repo_root}/scripts/dev/check-health.sh"

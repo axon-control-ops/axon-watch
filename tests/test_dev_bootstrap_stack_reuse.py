@@ -9,6 +9,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMMON_SH = REPO_ROOT / "scripts" / "dev" / "lib" / "common.sh"
 UP_SH = REPO_ROOT / "scripts" / "dev" / "up.sh"
+SOFT_CUTOVER_SH = REPO_ROOT / "scripts" / "ops" / "soft-public-cutover.sh"
+PROXY_SCRIPT = REPO_ROOT / "scripts" / "ops" / "public-origin-proxy.py"
+PROXY_UNIT = REPO_ROOT / "infra" / "systemd" / "user" / "axon-public-origin-proxy.service"
 
 
 class DevBootstrapStackReuseContractTests(unittest.TestCase):
@@ -30,6 +33,18 @@ class DevBootstrapStackReuseContractTests(unittest.TestCase):
             'echo "Ensuring sibling axon-local server on :7734..."',
             up_script,
         )
+
+    def test_soft_cutover_prefers_restartable_systemd_proxy(self) -> None:
+        cutover = SOFT_CUTOVER_SH.read_text(encoding="utf-8")
+        proxy = PROXY_SCRIPT.read_text(encoding="utf-8")
+        unit = PROXY_UNIT.read_text(encoding="utf-8")
+
+        self.assertIn("axon-public-origin-proxy.service", cutover)
+        self.assertIn("systemctl --user restart", cutover)
+        self.assertIn("Restart=always", unit)
+        self.assertIn("After=network.target console-web.service", unit)
+        self.assertIn("socket.AF_INET6", proxy)
+        self.assertIn("socket.IPV6_V6ONLY, 0", proxy)
 
     def test_common_sh_skips_systemd_listeners_during_orphan_cleanup(self) -> None:
         common_script = COMMON_SH.read_text(encoding="utf-8")

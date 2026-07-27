@@ -85,7 +85,11 @@ def resolve_spoken_alert(
     if degraded_active:
         detail = str(degraded_reason or "").strip() or "runtime health check failed"
         public_only = bool(
-            re.search(r"public health|host unreachable|axon\.edudashpro", detail, re.I)
+            re.search(
+                r"public health|host unreachable|axon\.edudashpro|remote ingress",
+                detail,
+                re.I,
+            )
         )
         explained = explain_operator_alert(
             title="Runtime degraded",

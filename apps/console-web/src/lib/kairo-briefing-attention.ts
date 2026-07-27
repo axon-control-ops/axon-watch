@@ -14,6 +14,7 @@ export function resolveKairoBriefingAttention(input: {
   criticalSignals: number;
   highSignals: number;
   degraded: boolean;
+  remoteIngressOnly?: boolean;
   briefingLoaded: boolean;
 }): KairoBriefingAttention {
   if (!input.briefingLoaded) {
@@ -54,7 +55,9 @@ export function resolveKairoBriefingAttention(input: {
     return {
       active: true,
       severity: 'warning',
-      message: 'Runtime degraded — review briefing',
+      message: input.remoteIngressOnly
+        ? 'Remote ingress unhealthy — local stack is up'
+        : 'Runtime degraded — review briefing',
       badgeCount: 1,
     };
   }

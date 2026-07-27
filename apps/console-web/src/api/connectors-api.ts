@@ -19,6 +19,8 @@ export interface ConnectorProbeRecord {
     control_backend?: string;
     managed_process?: boolean;
     managed_pid?: number | null;
+    public_health_ok?: boolean;
+    public_health_detail?: string;
   };
 }
 

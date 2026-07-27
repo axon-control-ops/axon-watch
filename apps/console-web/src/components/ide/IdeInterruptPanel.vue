@@ -11,6 +11,10 @@ import {
   shouldShowIdeInterruptAttentionAction,
   shouldShowIdeInterruptStop,
 } from '../../lib/ide-interrupt-panel-view';
+import {
+  localRuntimeDegradedActive,
+  remoteIngressAttentionActive,
+} from '../../lib/runtime-degraded-scope';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 
@@ -27,7 +31,8 @@ const headline = computed(() =>
     pendingApprovalsCount: shell.pendingApprovalsCount,
     topSignal: topSignal.value,
     watchConnected: Boolean(shell.runtimeSummary?.watch.connected),
-    degradedActive: Boolean(shell.runtimeSummary?.degraded.active),
+    degradedActive: localRuntimeDegradedActive(shell.runtimeSummary?.degraded),
+    remoteIngressAttention: remoteIngressAttentionActive(shell.runtimeSummary?.degraded),
     primaryRunPhase: shell.primaryActiveRun?.phase,
   }),
 );
@@ -37,7 +42,8 @@ const detailLine = computed(() =>
     pendingApprovalsCount: shell.pendingApprovalsCount,
     topSignal: topSignal.value,
     watchConnected: Boolean(shell.runtimeSummary?.watch.connected),
-    degradedActive: Boolean(shell.runtimeSummary?.degraded.active),
+    degradedActive: localRuntimeDegradedActive(shell.runtimeSummary?.degraded),
+    remoteIngressAttention: remoteIngressAttentionActive(shell.runtimeSummary?.degraded),
     primaryRunCurrentStep: shell.primaryActiveRun?.current_step,
   }),
 );
@@ -54,7 +60,7 @@ const showAttentionAction = computed(() =>
   shouldShowIdeInterruptAttentionAction({
     pendingApprovalsCount: shell.pendingApprovalsCount,
     topSignals: shell.operatorBriefing?.top_signals ?? [],
-    degradedActive: Boolean(shell.runtimeSummary?.degraded.active),
+    degradedActive: localRuntimeDegradedActive(shell.runtimeSummary?.degraded),
   }),
 );
 

@@ -11,6 +11,9 @@ WorkingDirectory=/opt/axon-watch
 ExecStart=/opt/axon-watch/scripts/ops/run-service.sh control-plane
 Restart=on-failure
 RestartSec=3
+TimeoutStopSec=12
+KillMode=mixed
+KillSignal=SIGTERM
 
 [Install]
 WantedBy=multi-user.target

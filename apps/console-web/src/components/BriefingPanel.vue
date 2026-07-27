@@ -16,6 +16,10 @@ import {
 } from '../lib/briefing-panel-view';
 import { OPERATOR_PERSONA_NAME } from '../lib/operator-persona-name';
 import { buildPersonaVoiceLineFallback } from '../lib/persona-voice-line';
+import {
+  localRuntimeDegradedActive,
+  remoteIngressAttentionActive,
+} from '../lib/runtime-degraded-scope';
 import { useShellStore } from '../stores/shell';
 import BriefingOpenLoopsStrip from './BriefingOpenLoopsStrip.vue';
 
@@ -73,10 +77,19 @@ const voiceLine = computed(() => {
     topSignalTitle: topSignal?.title,
     topSignalWorkspaceId: topSignal?.workspace_id,
     topSignalSummary: topSignal?.summary,
-    degradedActive: Boolean(props.briefing?.degraded.active),
+    degradedActive: localRuntimeDegradedActive(props.briefing?.degraded),
     loadState: props.loadState,
     personaEnabled: personaEnabled.value,
   });
+});
+
+const showDegradedBanner = computed(() => Boolean(props.briefing?.degraded.active));
+const degradedBannerLabel = computed(() => {
+  const reasons = props.briefing?.degraded.reasons?.join(', ') ?? '';
+  if (remoteIngressAttentionActive(props.briefing?.degraded)) {
+    return `Remote ingress · ${reasons}`;
+  }
+  return `Degraded state · ${reasons}`;
 });
 
 const spokenTranscript = computed(() => props.spokenTranscript ?? []);
@@ -102,8 +115,8 @@ function transcriptTimeLabel(value: string): string {
       <p v-if="summaryLine" class="briefing-panel__summary-line">{{ summaryLine }}</p>
       <p class="briefing-panel__galaxy-compact-copy">{{ heroAdvise || heroNotice }}</p>
       <BriefingOpenLoopsStrip :briefing="briefing" compact />
-      <p v-if="briefing?.degraded.active" class="region-copy region-copy--degraded">
-        Degraded state · {{ briefing.degraded.reasons.join(', ') }}
+      <p v-if="showDegradedBanner" class="region-copy region-copy--degraded">
+        {{ degradedBannerLabel }}
       </p>
       <button type="button" class="briefing-panel__galaxy-compact-link" @click="emit('openChat')">
         Full briefing →
@@ -130,8 +143,8 @@ function transcriptTimeLabel(value: string): string {
           <p class="briefing-panel__section-label briefing-panel__section-label--hero">Advise</p>
           <p class="briefing-panel__kairo-advise">{{ heroAdvise }}</p>
           <BriefingOpenLoopsStrip :briefing="briefing" />
-          <p v-if="briefing?.degraded.active" class="region-copy region-copy--degraded">
-            Degraded state · {{ briefing.degraded.reasons.join(', ') }}
+          <p v-if="showDegradedBanner" class="region-copy region-copy--degraded">
+            {{ degradedBannerLabel }}
           </p>
         </div>
       </div>
@@ -290,8 +303,8 @@ function transcriptTimeLabel(value: string): string {
         </ul>
       </div>
 
-      <p v-if="briefing?.degraded.active" class="region-copy region-copy--degraded">
-        Degraded state · {{ briefing.degraded.reasons.join(', ') }}
+      <p v-if="showDegradedBanner" class="region-copy region-copy--degraded">
+        {{ degradedBannerLabel }}
       </p>
 
       <button type="button" class="briefing-panel__cta" @click="emit('openChat')">

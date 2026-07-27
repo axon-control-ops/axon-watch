@@ -54,7 +54,9 @@ function openComposerDraft(
   options?: { forceFullAccess?: boolean },
 ): void {
   const { mode, draft } = employeeComposerOpenPayload(row, kind);
-  requestIdeComposerMode(mode);
+  if (mode) {
+    requestIdeComposerMode(mode);
+  }
   if (options?.forceFullAccess) {
     shell.setAgentExecutionAccess('full');
   }

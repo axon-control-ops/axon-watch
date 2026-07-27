@@ -45,9 +45,11 @@ describe('company-roster-actions', () => {
   });
 
   it('picks composer mode by chat kind', () => {
-    expect(employeeChatComposerMode('status')).toBe('ask');
+    // Status is voice + focus only — must not demote Full Access into Ask/consultative.
+    expect(employeeChatComposerMode('status')).toBeNull();
     expect(employeeChatComposerMode('talk')).toBe('agent');
     expect(employeeChatComposerMode('assign')).toBe('agent');
+    expect(employeeChatComposerMode('receipts')).toBe('ask');
   });
 
   it('bundles composer mode and draft for roster and dock open flows', () => {
@@ -69,6 +71,16 @@ describe('company-roster-actions', () => {
       mode: 'agent',
       draft: '',
     });
+    expect(employeeComposerOpenPayload(failed, 'status')).toEqual({
+      mode: null,
+      draft: '',
+    });
+  });
+
+  it('does not attach Ask composerMode on the Status quick action', () => {
+    const statusAction = employeeQuickActions(employee()).find((action) => action.id === 'status');
+    expect(statusAction?.chatKind).toBe('status');
+    expect(statusAction?.composerMode).toBeUndefined();
   });
 
   it('maps lead to briefing and watcher to signals', () => {

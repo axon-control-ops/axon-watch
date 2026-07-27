@@ -241,7 +241,9 @@ export function openEmployeeShiftRetry(input: {
 
   input.showAgentDock();
   const { mode, draft } = employeeComposerOpenPayload(employee, 'retry');
-  requestIdeComposerMode(mode);
+  if (mode) {
+    requestIdeComposerMode(mode);
+  }
   // Retry shift always needs tools — force Full Access even if composer was consultative.
   input.shell.setAgentExecutionAccess('full');
   if (draft) {

@@ -83,10 +83,17 @@ export async function fetchJson<T>(
   try {
     const response = await fetch(apiUrl(path), { ...init, signal });
     if (!response.ok) {
-      throw new ApiRequestError(
-        errorLabel ?? `request failed with status ${response.status}`,
-        response.status,
-      );
+      const fallback = errorLabel ?? `request failed with status ${response.status}`;
+      let detail = '';
+      try {
+        const payload = (await response.json()) as { detail?: unknown };
+        if (typeof payload?.detail === 'string' && payload.detail.trim()) {
+          detail = payload.detail.trim();
+        }
+      } catch {
+        // Keep the labeled fallback when the body is not JSON.
+      }
+      throw new ApiRequestError(detail ? `${fallback}: ${detail}` : fallback, response.status);
     }
     return (await response.json()) as T;
   } catch (error) {
