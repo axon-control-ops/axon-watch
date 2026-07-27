@@ -110,6 +110,7 @@ import {
   subscribeKairoVoiceSpeaking,
   isKairoVoiceSpeaking,
 } from '../lib/kairo-voice-playback';
+import { employeeVoiceSpeaker } from '../lib/kairo-voice-utterance';
 import {
   flushKairoSpeechQueue,
   interruptKairoSpeechQueue,
@@ -1689,6 +1690,10 @@ export const useShellStore = defineStore('shell', () => {
       layoutMode: () => layoutMode.value,
       idePresenceProfile: () => idePresenceProfile.value,
       azureVoiceId: () => activeIdeEmployee.value?.azure_voice_id ?? null,
+      speaker: () => {
+        const employee = activeIdeEmployee.value;
+        return employee ? employeeVoiceSpeaker(employee) : null;
+      },
     });
     chatStreamSessionsByWorkspace.set(
       threadId,

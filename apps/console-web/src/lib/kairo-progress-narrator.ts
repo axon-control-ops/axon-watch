@@ -4,6 +4,7 @@ import { shouldNarrateProgressMilestone } from './kairo-narration-policy';
 import { progressFallbackLine } from './kairo-progress-fallback';
 import { postKairoSpeak } from './kairo-speak-client';
 import { deliverSpokenOperatorAlert } from './spoken-alert-delivery';
+import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
 
 export interface KairoProgressMilestone {
   eventKey: string;
@@ -18,6 +19,7 @@ interface CreateKairoProgressNarratorOptions {
   narration: () => KairoNarrationLevel;
   voiceDeliveryAllowed: () => boolean;
   azureVoiceId?: () => string | null | undefined;
+  speaker?: () => KairoVoiceSpeaker | null | undefined;
 }
 
 const TERMINAL_RANK: Record<string, number> = {
@@ -114,6 +116,7 @@ export function createKairoProgressNarrator(options: CreateKairoProgressNarrator
           {
             priority: 'narration',
             azureVoiceId: options.azureVoiceId?.() ?? null,
+            speaker: options.speaker?.() ?? null,
           },
         );
       })

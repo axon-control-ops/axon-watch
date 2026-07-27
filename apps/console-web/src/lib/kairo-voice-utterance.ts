@@ -74,11 +74,6 @@ export function notifyKairoVoiceUtterance(
     return;
   }
   currentUtterance = { text: nextText, speaker: nextSpeaker };
-  // #region agent log
-  if (typeof fetch === 'function') {
-
-  }
-  // #endregion
   for (const listener of utteranceListeners) {
     listener(currentUtterance);
   }

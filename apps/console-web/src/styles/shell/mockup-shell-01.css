@@ -199,6 +199,22 @@
 
 .console-shell--mockup .region-right-dock.agent-dock {
   overflow: visible;
+  gap: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+/* IDE: pin composer flush against the status-bar seam. */
+.console-shell--mockup.console-shell--ide .region-right-dock.agent-dock > .agent-dock__composer {
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.console-shell--mockup.console-shell--ide
+  .region-right-dock.agent-dock
+  .agent-dock-composer__card {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .console-shell--mockup .region-center-workbench.center-workbench--mockup {

@@ -49,4 +49,15 @@ describe('resolveIdePresencePersonaName', () => {
       }),
     ).toBe('Marco');
   });
+
+  it('replaces azure-voice Teammate stubs with the open teammate name', () => {
+    expect(
+      resolveIdePresencePersonaName({
+        speaker: { kind: 'employee', id: 'voice:en-US-GuyNeural', name: 'Teammate' },
+        kairoSpeechActive: true,
+        surfaceEmployeeFailure: false,
+        activeEmployeeName: 'Marco',
+      }),
+    ).toBe('Marco');
+  });
 });
