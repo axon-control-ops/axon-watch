@@ -3,6 +3,7 @@ import {
   firstSpeakableAgentLiveBlock,
   isAgentLiveLineTruncated,
   sanitizeAgentThinkingForOperator,
+  THINKING_SPEECH_FALLBACK,
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
 import type { NarrationMilestone, StreamingActivityView } from './kairo-agent-narration';
@@ -141,7 +142,7 @@ export function createAgentStreamIncrementalState(options?: {
       currentThinkingBody = '';
       if (!thinkingMilestoneEmitted) {
         thinkingMilestoneEmitted = true;
-        milestones.push({ key: 'thinking:0', message: 'I am thinking…' });
+        milestones.push({ key: 'thinking:0', message: THINKING_SPEECH_FALLBACK });
       }
       return milestones;
     }

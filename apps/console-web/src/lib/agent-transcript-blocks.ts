@@ -1,6 +1,6 @@
 /** Parse block-annotated agent transcripts (:::thinking / :::edit / :::tool / :::terminal). */
 
-import { sanitizeAgentThinkingForOperator } from './agent-live-line-view';
+import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from './agent-live-line-view';
 
 export type {
   AgentTranscriptSegment,
@@ -140,7 +140,7 @@ export function diffLineTone(line: string): DiffLineTone {
 
 export function thinkingPreview(text: string, maxLength = 90): string {
   const sanitized = sanitizeAgentThinkingForOperator(text);
-  const flattened = (sanitized || 'I am thinking…').replace(/\s+/g, ' ').trim();
+  const flattened = (sanitized || THINKING_SPEECH_FALLBACK).replace(/\s+/g, ' ').trim();
   if (flattened.length <= maxLength) {
     return flattened;
   }

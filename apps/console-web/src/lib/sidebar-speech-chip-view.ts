@@ -13,7 +13,8 @@ export function sidebarSpeechCanExpand(text: string): boolean {
   if (!normalized) {
     return false;
   }
-  return normalized.length > 180 || normalized.split(/\r?\n/).length > 4;
+  // Collapsed chip now shows ~14 lines; only offer More for longer stand-ups.
+  return normalized.length > 420 || normalized.split(/\r?\n/).length > 12;
 }
 
 export function resolveSidebarSpeechChipView(input: {

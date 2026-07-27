@@ -3,6 +3,7 @@ import {
   firstSpeakableAgentLiveBlock,
   isAgentLiveLineTruncated,
   sanitizeAgentThinkingForOperator,
+  THINKING_SPEECH_FALLBACK,
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
 import { personaThreadPrefix } from './operator-persona-name';
@@ -123,7 +124,7 @@ export function narrationMilestonesForDelta(
   if (thinking > previousThinking && previousThinking === 0) {
     milestones.push({
       key: 'thinking:0',
-      message: 'I am thinking…',
+      message: THINKING_SPEECH_FALLBACK,
     });
   }
 

@@ -102,6 +102,18 @@ def build_employee_persona_appendix(
             "As Lead, you already know your company team from the roster block below. "
             "Plan, prioritize, and hand off using those names/roles/owns — "
             "never rediscover staffing by searching the tree.\n"
+            "After every substantive job (yours or a teammate outcome you are synthesizing), "
+            "close with a short Lead stand-up summary. Lead with a line like "
+            "\"Here's where things stand and what I changed.\" then cover: done, verified, "
+            "open risks, and next step. Do not dump raw specialist transcripts — "
+            "synthesize into that Lead report.\n"
+        )
+    else:
+        lead_clause = (
+            "You report outcomes back to Lead. End finished work with a short handoff summary: "
+            "what changed, what you verified, blockers, and what Lead should decide next. "
+            f"Do not narrate identity (\"as Frontend…\", \"I am doing this as {name}\") — "
+            "the thread already shows who you are.\n"
         )
     parts = [
         EMPLOYEE_PERSONA_MARKER,
@@ -110,6 +122,13 @@ def build_employee_persona_appendix(
         (
             f"Stay inside this role boundary. Speak and act as {name} in first person — "
             "not as a generic assistant, not as VAXON, and never in third person about yourself."
+        ),
+        (
+            "Never announce your name or role mid-reply "
+            f"(\"As {name}…\", \"I am doing this as {name}\", \"acting as Lead\"). "
+            "The IDE thread already identifies you. Prefer concrete progress "
+            "(\"I am wiring Copy Link…\", \"I am checking the POP upload path…\") "
+            "over filler (\"I am thinking…\")."
         ),
         (
             "The operator message below is your task in this one-on-one thread. "

@@ -11,6 +11,7 @@ import {
   systemMessagePreview,
 } from '../lib/thread-message-view';
 import { thinkingPreview } from '../lib/agent-transcript-blocks';
+import { THINKING_SPEECH_FALLBACK } from '../lib/agent-live-line-view';
 import AgentMarkdownBlock from './ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from './ide/AgentFileReadBlock.vue';
 import ConversationAgentStructuredBlock from './ide/ConversationAgentStructuredBlock.vue';
@@ -282,7 +283,7 @@ const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(convers
           class="conversation-seam__content conversation-seam__content--agent conversation-seam__content--typing"
         >
           <span class="conversation-seam__typing-dot" aria-hidden="true" />
-          I am thinking…
+          {{ THINKING_SPEECH_FALLBACK }}
         </p>
 
         <div
@@ -311,7 +312,7 @@ const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(convers
                   {{ isThinkingExpanded(segmentKey(item.message.message_id, segmentIndex), segment.open) ? '▾' : '▸' }}
                 </span>
                 <span v-if="segment.open && isStreamingMessage(item.message.message_id)">
-                  {{ segment.text.trim() ? thinkingPreview(segment.text, 120) : 'I am thinking…' }}
+                  {{ segment.text.trim() ? thinkingPreview(segment.text, 120) : THINKING_SPEECH_FALLBACK }}
                 </span>
                 <span v-else class="agent-block__thinking-preview">
                   Thought — {{ thinkingPreview(segment.text) }}

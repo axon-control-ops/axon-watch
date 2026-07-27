@@ -16,7 +16,7 @@ import { operatorArtifactRecords } from '../../lib/operator-artifact-view';
 import type { OperatorThreadEntry, ThreadMessageAttachment } from '../../lib/operator-thread';
 import { agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
 import { createTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
-import { sanitizeAgentThinkingForOperator } from '../../lib/agent-live-line-view';
+import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from '../../lib/agent-live-line-view';
 import { prepareAgentTerminalOpen } from '../../lib/agent-terminal-open';
 import {
   shouldShowAgentTerminalBackgroundControl,
@@ -67,7 +67,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
       );
     }
     if (shell.agentStreamActive) {
-      return 'I am thinking…';
+      return THINKING_SPEECH_FALLBACK;
     }
     return shell.ideComposerActivity?.label ?? 'Agent is working…';
   });
@@ -164,7 +164,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   }
 
   function thinkingBodyText(text: string): string {
-    return sanitizeAgentThinkingForOperator(text) || 'I am thinking…';
+    return sanitizeAgentThinkingForOperator(text) || THINKING_SPEECH_FALLBACK;
   }
 
   async function copyTerminalOutput(output: string): Promise<void> {

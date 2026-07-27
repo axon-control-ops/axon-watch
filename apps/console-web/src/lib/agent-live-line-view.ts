@@ -158,10 +158,10 @@ export function stripAgentStreamFenceMarkers(text: string): string {
 }
 
 /** Operator-facing fallback when thinking has no usable body. */
-export const THINKING_SPEECH_FALLBACK = 'I am thinking…';
+export const THINKING_SPEECH_FALLBACK = 'On it…';
 
 /**
- * Prefer first-person "I am thinking…" over bare "Thinking…" labels
+ * Prefer short "On it…" chrome over bare "Thinking…" / "I am thinking…" labels
  * (milestones, model lead-ins, and OCR-prone transcript chips).
  */
 export function normalizeThinkingSpeechLead(text: string): string {
@@ -169,12 +169,16 @@ export function normalizeThinkingSpeechLead(text: string): string {
   if (!flattened) {
     return '';
   }
-  if (/^thinking(?:[.…]{1,3}|\.\.\.)?$/i.test(flattened)) {
+  if (/^(?:i\s+am\s+)?thinking(?:[.…]{1,3}|\.\.\.)?$/i.test(flattened)) {
     return THINKING_SPEECH_FALLBACK;
   }
-  // "Thinking I'll…" / "thinking I'll…" → "I am thinking I'll…"
-  if (/^thinking\b/i.test(flattened) && !/^i\s+am\s+thinking\b/i.test(flattened)) {
-    return flattened.replace(/^thinking(?:[.…]{1,3}|\.\.\.)?\s*/i, 'I am thinking ').trim();
+  if (/^i\s+am\s+thinking\b/i.test(flattened)) {
+    const rest = flattened.replace(/^i\s+am\s+thinking(?:[.…]{1,3}|\.\.\.)?\s*/i, '').trim();
+    return rest ? `On it — ${rest}` : THINKING_SPEECH_FALLBACK;
+  }
+  if (/^thinking\b/i.test(flattened)) {
+    const rest = flattened.replace(/^thinking(?:[.…]{1,3}|\.\.\.)?\s*/i, '').trim();
+    return rest ? `On it — ${rest}` : THINKING_SPEECH_FALLBACK;
   }
   return flattened;
 }
@@ -196,11 +200,6 @@ export function sanitizeAgentThinkingForOperator(text: string): string {
   if (!out || /^(?:the\s+)?user\b/i.test(out) || /^(?:whether|if)\s*$/i.test(out)) {
     return '';
   }
-  // #region agent log
-  if (/^i am thinking\b/i.test(out) || /^thinking\b/i.test(flattenLiveLineText(text))) {
-
-  }
-  // #endregion
   return out;
 }
 

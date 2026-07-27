@@ -88,7 +88,8 @@
   flex: 0 1 auto;
   flex-direction: column;
   min-height: 0;
-  max-height: 7.5rem;
+  /* Operator needs to read Lead/agent stand-ups without hunting More. */
+  max-height: min(42vh, 18rem);
   margin: 0 0.35rem 0.35rem;
   padding: 0.4rem 0.45rem 0.45rem;
   border: 1px solid rgba(0, 242, 255, 0.22);
@@ -100,18 +101,23 @@
   overflow: hidden;
   transition:
     flex-grow 180ms ease,
+    max-height 180ms ease,
     border-color 180ms ease,
     box-shadow 180ms ease;
 }
 
 .kairo-sidebar-speech--expanded {
   flex-grow: 0;
-  max-height: 11rem;
+  max-height: min(62vh, 32rem);
 }
 
 .kairo-sidebar-panel-host--team .kairo-sidebar-speech {
-  max-height: 6.5rem;
+  max-height: min(38vh, 16rem);
   margin-inline: 0;
+}
+
+.kairo-sidebar-panel-host--team .kairo-sidebar-speech--expanded {
+  max-height: min(58vh, 28rem);
 }
 
 .kairo-sidebar-speech[data-speaking='true'] {
@@ -245,7 +251,7 @@
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 14;
 }
 
 .kairo-sidebar-speech__empty {
@@ -282,7 +288,12 @@
   }
 
   .kairo-sidebar-speech {
-    min-height: 4rem;
+    min-height: 6rem;
+    max-height: min(48vh, 14rem);
+  }
+
+  .kairo-sidebar-speech--expanded {
+    max-height: min(64vh, 24rem);
   }
 }
 

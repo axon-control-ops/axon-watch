@@ -52,7 +52,7 @@ describe('resolveStreamingActivity', () => {
 describe('narrationMilestonesForDelta', () => {
   it('emits structured milestones without speakable copy', () => {
     const first = narrationMilestonesForDelta('', STAGE_1);
-    expect(first).toEqual([{ key: 'thinking:0', message: 'I am thinking…' }]);
+    expect(first).toEqual([{ key: 'thinking:0', message: 'On it…' }]);
 
     const second = narrationMilestonesForDelta(STAGE_1, STAGE_2);
     expect(second[0]).toMatchObject({ key: 'tool:0', toolLabel: 'Read README.md' });
