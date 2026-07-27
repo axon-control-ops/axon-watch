@@ -62,6 +62,18 @@ Public webhook remains preferred; the timer only covers tunnel/DNS outages.
 - **Attention / inbox** — CI failure and repair/blocked updates
 - **Task board** — leased `CI repair:` task for Rowan (escalate role Quinn)
 - **Voice** — report-outcome returns a `spoken` line; ask-shaped dig-in on budget exhaustion
+- **Stale clear** — when Fast Gate goes green again (webhook/poller) or on the
+  worker scheduler tick, Axon-X confirms and resolves drill / superseded failure
+  alerts so VAXON stops re-speaking them. Say **“clear stale alerts”** to VAXON
+  to run the same confirmation sweep on demand.
+
+### What counts as confirmed-stale
+
+| Signal | Cleared when |
+| --- | --- |
+| `drill/...` Fast Gate failure | Always (drill / useless after the exercise) |
+| Real branch failure | Latest Fast Gate on that branch is **success** (via `gh` or green webhook) |
+| Operator ack | Attention clear / acknowledge resolves Gate 9 CI store rows (not watch-only) |
 
 ## Enabled workspaces
 

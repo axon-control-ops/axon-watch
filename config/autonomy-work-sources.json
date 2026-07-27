@@ -32,6 +32,16 @@
       "min_interval_seconds": 900,
       "max_assignments_per_workspace": 2,
       "task_goal_prefix": "Lead assigned:"
+    },
+    {
+      "id": "ci_stale_signal_sweep",
+      "label": "Clear confirmed-stale CI / Fast Gate alerts",
+      "enabled": true,
+      "trigger": "scheduler_tick",
+      "owner_role": "watcher",
+      "include_drills": true,
+      "confirm_with_gh": true,
+      "max_resolve": 40
     }
   ]
 }

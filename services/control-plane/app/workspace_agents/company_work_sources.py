@@ -119,6 +119,19 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 logger.exception("lead_team_checkin work source failed")
                 results["sources"][source_id] = {"error": "lead_team_checkin_failed"}
             continue
+        if source_id == "ci_stale_signal_sweep" and "scheduler" in trigger:
+            from app.ci_remediation.stale_sweep import sweep_stale_ci_signals
+
+            try:
+                results["sources"][source_id] = sweep_stale_ci_signals(
+                    include_drills=bool(source.get("include_drills", True)),
+                    confirm_with_gh=bool(source.get("confirm_with_gh", True)),
+                    max_resolve=int(source.get("max_resolve") or 40),
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("ci_stale_signal_sweep work source failed")
+                results["sources"][source_id] = {"error": "ci_stale_signal_sweep_failed"}
+            continue
     return results
 
 

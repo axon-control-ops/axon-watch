@@ -267,3 +267,65 @@ def list_open_signals() -> list[dict[str, Any]]:
             item["meta"] = {}
         out.append(item)
     return out
+
+
+def resolve_signal(
+    signal_id: str,
+    *,
+    reason: str = "acknowledged",
+    status: str = "resolved",
+) -> dict[str, Any] | None:
+    """Mark one CI remediation signal resolved (drops it from inbox/interrupts)."""
+    cleaned = str(signal_id or "").strip()
+    if not cleaned:
+        return None
+    now = _utc_now_iso()
+    with _managed() as conn:
+        row = conn.execute(
+            "SELECT * FROM ci_remediation_signals WHERE signal_id = ?",
+            (cleaned,),
+        ).fetchone()
+        if row is None:
+            return None
+        meta: dict[str, Any]
+        try:
+            meta = json.loads(str(row["meta_json"] or "{}"))
+        except json.JSONDecodeError:
+            meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+        meta["resolved_reason"] = str(reason or "acknowledged").strip() or "acknowledged"
+        meta["phase"] = "resolved"
+        conn.execute(
+            """
+            UPDATE ci_remediation_signals
+            SET status = ?, meta_json = ?, updated_at = ?
+            WHERE signal_id = ?
+            """,
+            (status, json.dumps(meta), now, cleaned),
+        )
+        updated = conn.execute(
+            "SELECT * FROM ci_remediation_signals WHERE signal_id = ?",
+            (cleaned,),
+        ).fetchone()
+    if updated is None:
+        return None
+    item = dict(updated)
+    try:
+        item["meta"] = json.loads(str(item.get("meta_json") or "{}"))
+    except json.JSONDecodeError:
+        item["meta"] = {}
+    return item
+
+
+def resolve_signals(
+    signal_ids: list[str],
+    *,
+    reason: str = "acknowledged",
+) -> list[dict[str, Any]]:
+    resolved: list[dict[str, Any]] = []
+    for signal_id in signal_ids:
+        row = resolve_signal(signal_id, reason=reason)
+        if row is not None:
+            resolved.append(row)
+    return resolved
