@@ -110,8 +110,8 @@
   min-height: 0;
   height: var(--agent-dock-composer-height, auto);
   max-height: var(--agent-dock-composer-height, none);
-  /* Menus open upward over the transcript — must not clip or sit under threads. */
-  overflow: hidden;
+  /* Menus / typeahead open upward over the transcript — never clip them. */
+  overflow: visible;
   position: relative;
   z-index: 200;
   isolation: isolate;
@@ -126,6 +126,15 @@
 .agent-dock--composer-resizing .agent-dock__composer {
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.agent-dock__composer:has(.agent-dock-composer__menu),
+.agent-dock__composer:has(.agent-dock-composer__typeahead),
+.agent-dock--composer-user-sized .agent-dock__composer:has(.agent-dock-composer__menu),
+.agent-dock--composer-user-sized .agent-dock__composer:has(.agent-dock-composer__typeahead),
+.agent-dock--composer-resizing .agent-dock__composer:has(.agent-dock-composer__menu),
+.agent-dock--composer-resizing .agent-dock__composer:has(.agent-dock-composer__typeahead) {
+  overflow: visible;
 }
 
 .agent-dock__composer > .agent-dock-composer {

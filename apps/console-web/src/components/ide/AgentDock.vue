@@ -43,15 +43,8 @@ const dockEmployeeInterrupted = computed(() =>
 const reopenTitle = computed(() => agentDockReopenTitle(reopenState.value));
 const reopenAriaLabel = computed(() => agentDockReopenAriaLabel(reopenState.value));
 
-const {
-  dockWidth,
-  resizing,
-  ariaValueMin,
-  ariaValueMax,
-  resetDockWidth,
-  startDockResize,
-  onDockResizeKeydown,
-} = useRightDockResize({
+// Keep dock width sync / persistence; the vertical edge grip is intentionally omitted.
+useRightDockResize({
   dockRef,
   collapsed: computed(() => shell.agentDockCollapsed),
 });
@@ -101,30 +94,12 @@ onMounted(() => {
     ref="dockRef"
     class="region region-right-dock agent-dock"
     :class="{
-      'agent-dock--resizing': resizing,
       'agent-dock--composer-resizing': composerResizing,
       'agent-dock--composer-user-sized': composerUserSized,
       'agent-dock--alive': dockAlive,
       'agent-dock--streaming': shell.agentStreamActive,
     }"
   >
-    <div
-      class="agent-dock__resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize agent dock"
-      title="Drag or use arrow keys to resize. Enter or double-click to reset."
-      tabindex="0"
-      :aria-valuemin="ariaValueMin"
-      :aria-valuemax="ariaValueMax"
-      :aria-valuenow="dockWidth"
-      @mousedown="startDockResize"
-      @keydown="onDockResizeKeydown"
-      @dblclick="resetDockWidth"
-    >
-      <span class="agent-dock__resize-grip" aria-hidden="true" />
-    </div>
-
     <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide">
       <div class="agent-dock__head-row">
         <div class="agent-dock__head-main">

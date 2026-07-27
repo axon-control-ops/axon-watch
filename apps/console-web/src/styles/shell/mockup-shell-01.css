@@ -204,17 +204,25 @@
   margin-bottom: 0;
 }
 
-/* IDE: pin composer flush against the status-bar seam. */
+/* IDE: keep composer near the AgentDock bottom border, with a slim gap so the card edge shows. */
 .console-shell--mockup.console-shell--ide .region-right-dock.agent-dock > .agent-dock__composer {
-  padding-bottom: 0;
-  margin-bottom: 0;
+  padding: 0.35rem 0.45rem 0.45rem;
+  margin: 0;
 }
 
 .console-shell--mockup.console-shell--ide
   .region-right-dock.agent-dock
   .agent-dock-composer__card {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0.45rem;
+  border-bottom-right-radius: 0.45rem;
+  border-bottom-width: 1px;
+  margin-bottom: 0;
+}
+
+.console-shell--mockup.console-shell--ide
+  .region-right-dock.agent-dock
+  .agent-dock-composer__footer {
+  padding-bottom: 0.28rem;
 }
 
 .console-shell--mockup .region-center-workbench.center-workbench--mockup {

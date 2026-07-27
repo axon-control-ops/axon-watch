@@ -373,8 +373,8 @@
 .agent-dock-composer__tool-group:has(.agent-dock-composer__tool--mode) .agent-dock-composer__menu {
   right: 0;
   left: auto;
-  width: 16.5rem;
-  max-height: min(24rem, 60vh);
+  width: 17.5rem;
+  max-height: min(32rem, 72vh);
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -392,6 +392,19 @@
   text-transform: uppercase;
 }
 
+.agent-dock-composer__menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(138, 154, 173, 0.16);
+}
+
+.agent-dock-composer__menu-section > .agent-dock-composer__menu-caption {
+  margin-bottom: 0.35rem;
+}
+
 .agent-dock-composer__menu-item {
   display: flex;
   width: 100%;
@@ -405,6 +418,16 @@
   color: rgba(233, 239, 245, 0.96);
   text-align: left;
   cursor: pointer;
+}
+
+.agent-dock-composer__menu-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .agent-dock-composer__menu-item:hover,

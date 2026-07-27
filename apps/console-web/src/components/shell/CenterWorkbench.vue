@@ -404,7 +404,7 @@ function syncShellColumnHeights(): void {
   }
 
   const statusTop = statusBar.getBoundingClientRect().top;
-  const footerGapPx = readShellFooterGapPx(shellRoot);
+  const shellFooterGapPx = readShellFooterGapPx(shellRoot);
   const columns = [
     workbench,
     document.querySelector('.region-right-dock'),
@@ -421,6 +421,11 @@ function syncShellColumnHeights(): void {
       continue;
     }
 
+    // IDE AgentDock only: drop the gutter so the composer can sit on the dock's bottom border.
+    const footerGapPx =
+      shell.layoutMode === 'ide' && column.classList.contains('region-right-dock')
+        ? 0
+        : shellFooterGapPx;
     const target = Math.round(computeShellColumnMinHeight(columnTop, statusTop, footerGapPx));
     const maxReasonable = window.innerHeight * 1.25;
     if (target <= 0 || target > maxReasonable) {
