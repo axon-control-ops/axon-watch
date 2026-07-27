@@ -49,7 +49,7 @@ describe('left sidebar mode', () => {
     ).toBe('workspaces');
   });
 
-  it('counts attention badge from approvals and high signals', () => {
+  it('counts attention badge from approvals, high signals, and awaiting engagement', () => {
     expect(
       leftSidebarAttentionBadgeCount({
         pendingApprovals: 1,
@@ -66,6 +66,17 @@ describe('left sidebar mode', () => {
               severity: 'info',
             },
           ],
+        } as OperatorBriefing,
+      }),
+    ).toBe(2);
+
+    expect(
+      leftSidebarAttentionBadgeCount({
+        pendingApprovals: 0,
+        briefing: {
+          ...briefing,
+          top_signals: [],
+          awaiting_engagement_count: 2,
         } as OperatorBriefing,
       }),
     ).toBe(2);

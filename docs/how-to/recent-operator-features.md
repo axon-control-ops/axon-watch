@@ -131,7 +131,9 @@ specialist** (not a single specialty-route winner).
 | HTTP | `POST /api/workspaces/{id}/lead/plan` · `.../lead/fan-out` |
 
 Continuous **dispatch** (Lane B) is still separate — fan-out creates leased tasks
-and runs with `lead_fan_out_assigned` receipts; the scheduler stays off.
+and **queued** runs with `lead_fan_out_assigned` receipts (not fake-executing).
+Assignment is posted into each specialist IDE thread. The scheduler (when on)
+promotes queued fan-out runs into Lane B; keep it off until Gate 6 is solid.
 
 ### Examples
 
@@ -201,6 +203,13 @@ gh run view --log-failed   # when red
 VAXON / the Axon-X watcher should treat **this repository’s Fast Gate** as part of
 runtime health after any push to `origin`.
 
+### Gate 9 — unaware-operator remediation (Axon-X)
+
+When Fast Gate fails, control-plane can ingest GitHub `workflow_run` events
+(HMAC webhook), raise an inbox signal, lease a repair task to **Rowan**, and
+report the outcome. See [`ci-remediation-gate9.md`](ci-remediation-gate9.md).
+Fallback poller: `./scripts/ops/poll-fast-gate-remediation.sh`.
+
 ---
 
 ## 6. Workspace company parity (vs DashPro)
@@ -224,9 +233,10 @@ board even when many projects exist.
 
 | Control | State | Why |
 | --- | --- | --- |
-| Continuous worker scheduler | **Off** by default | Needs leased tasks + Lead/fan-out before unattended shifts |
+| Continuous worker scheduler | **Off** by default | Unattended auto-loop not claimed yet — see [auto-loop-and-credits](auto-loop-and-credits.md) |
 | Live-checkout continuous edits | **Forbidden** | Gate 3 isolation — workers use disposable worktrees |
-| Gate 5 full fan-out dispatch | **Partial** | Persist + ready runs land; Lane B auto-dispatch still manual / scheduler off |
+| Gate 5 full fan-out dispatch | **Partial** | Persist + ready runs land; Lane B auto-dispatch still often needs Retry / scheduler |
+| Overnight multi-project loop | **Off** | Critical Review / dig-in / signal review still operator-gated |
 
 Check scheduler:
 

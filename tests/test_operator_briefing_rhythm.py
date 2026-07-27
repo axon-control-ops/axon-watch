@@ -41,6 +41,18 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
 
         self.assertEqual("Smoke run is ready for your review.", notice)
 
+    def test_notice_surfaces_lead_awaiting_engagement(self) -> None:
+        notice = build_briefing_notice(
+            active_runs=[],
+            top_signals=[],
+            pending_approvals_count=0,
+            degraded={"active": False, "reasons": []},
+            watch_connected=True,
+            lead_awaiting_engagement_count=1,
+        )
+
+        self.assertEqual("1 Lead plan awaiting engagement in VAXON.", notice)
+
     def test_idle_rhythm_stays_quiet_instead_of_inventing_status_copy(self) -> None:
         rhythm = build_operator_briefing_rhythm(
             active_runs=[],

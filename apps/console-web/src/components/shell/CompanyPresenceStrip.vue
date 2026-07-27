@@ -45,40 +45,6 @@ const items = computed(() => {
       optionId: presenceStripOptionId(employee.employee_id),
     };
   });
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'fc0b35',
-    },
-    body: JSON.stringify({
-      sessionId: 'fc0b35',
-      runId: 'avatar-restore',
-      hypothesisId: 'AV1',
-      location: 'CompanyPresenceStrip.vue:items',
-      message: 'presence strip lead/busy chrome',
-      data: {
-        count: next.length,
-        leads: next.filter((row) => row.avatar.lead).map((row) => row.employee.name),
-        busy: next.filter((row) => row.working).map((row) => row.employee.name),
-        liveBusyIds: [...liveBusySet.value],
-        presenceByName: Object.fromEntries(
-          next.map((row) => [
-            row.employee.name,
-            {
-              presence: row.avatar.presence,
-              working: row.working,
-              liveBusy: liveBusySet.value.has(row.employee.employee_id),
-              failed: row.failed,
-            },
-          ]),
-        ),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   return next;
 });
 

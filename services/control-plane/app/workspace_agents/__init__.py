@@ -137,6 +137,35 @@ def build_company_roster(
             row["active_run_id"] = active_run
         employee_rows.append(row)
 
+    try:
+        from app.workspace_delivery import store as delivery_store
+
+        delivery = delivery_store.latest_workspace_delivery(normalized_id)
+    except Exception:  # noqa: BLE001 — roster must not fail closed on delivery store
+        delivery = None
+    if delivery is not None:
+        stage = str(delivery.get("stage") or "").strip()
+        detail_bits = [
+            bit
+            for bit in (
+                str(delivery.get("worker_branch") or "").strip(),
+                str(delivery.get("draft_pr_url") or "").strip(),
+                str(delivery.get("ci_conclusion") or "").strip(),
+                str(delivery.get("blocker") or "").strip(),
+            )
+            if bit
+        ]
+        pipeline_detail = " · ".join(detail_bits) if detail_bits else stage
+        draft_pr = str(delivery.get("draft_pr_url") or "").strip() or None
+        ci_status = str(delivery.get("ci_conclusion") or stage or "").strip() or None
+        for row in employee_rows:
+            role = str(row.get("role") or "").strip().lower()
+            if role in {"watcher", "integrations", "lead", "backend"}:
+                row["pipeline_stage"] = stage or None
+                row["pipeline_detail"] = pipeline_detail or None
+                row["draft_pr_url"] = draft_pr
+                row["ci_status"] = ci_status
+
     if primary_employee_id is None and employee_rows:
         employee_rows[0]["primary"] = True
         primary_employee_id = str(employee_rows[0]["employee_id"])

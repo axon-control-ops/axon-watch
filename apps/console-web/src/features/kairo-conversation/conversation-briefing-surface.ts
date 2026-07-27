@@ -10,7 +10,8 @@ const AFFIRMATIVE_RE = /^(yes|yeah|yep|yup|do it|confirm|go ahead|sure|please)\.
 const AFFIRMATIVE_PHRASE_RE =
   /\b(pull\s+(?:it\s+)?(?:to\s+the\s+front|up)|bring\s+(?:it\s+)?(?:up|forward)|show\s+(?:me\s+)?(?:the\s+)?briefing|open\s+(?:the\s+)?briefing)\b/i;
 
-export const BRIEFING_SURFACE_OFFER_WINDOW_MS = 30_000;
+/** Keep decision prompts open long enough for an operator to act. */
+export const BRIEFING_SURFACE_OFFER_WINDOW_MS = 90_000;
 
 export const briefingSurfaceOfferExpiresAt = ref<number | null>(null);
 

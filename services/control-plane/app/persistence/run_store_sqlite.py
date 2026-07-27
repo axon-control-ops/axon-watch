@@ -13,10 +13,18 @@ def _repo_root() -> Path:
 
 
 def resolve_db_path(configured_path: str | None) -> Path:
+    import os
+
     raw_path = (configured_path or _DEFAULT_DB).strip() or _DEFAULT_DB
     path = Path(raw_path)
     if path.is_absolute():
         return path
+    # Packaged/frozen sidecars often have a bogus repo root; prefer STATE_DIR.
+    state_dir = (os.environ.get("AXON_WATCH_STATE_DIR") or "").strip()
+    if state_dir:
+        if raw_path in {_DEFAULT_DB, ".local/state/control-plane.sqlite3"}:
+            return (Path(state_dir) / "control-plane.sqlite3").resolve()
+        return (Path(state_dir) / path.name).resolve()
     return (_repo_root() / path).resolve()
 
 

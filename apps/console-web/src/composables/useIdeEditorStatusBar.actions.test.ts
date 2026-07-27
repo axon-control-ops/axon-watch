@@ -121,12 +121,16 @@ describe('openEmployeeShiftRetry', () => {
     openEmployeeShiftRetry({ shell: shell as never, showAgentDock });
 
     expect(showAgentDock).toHaveBeenCalledOnce();
+    expect(shell.setAgentExecutionAccess).toHaveBeenCalledWith('full');
     expect(shell.openIdeComposerWithDraft).toHaveBeenCalledOnce();
     const draft = vi.mocked(shell.openIdeComposerWithDraft).mock.calls[0]?.[0] ?? '';
     expect(draft).toContain('Jules');
+    expect(draft).toMatch(/I am Jules/i);
     expect(draft).toContain('vitest assertion failed');
+    expect(draft.toLowerCase()).toContain('first person');
   });
 });
+
 
 describe('handleIdeLayoutShortcutAction', () => {
   it('opens Search through the shared sidebar entry point and retries failed file loads', () => {

@@ -69,7 +69,7 @@ class KairoConversationEndpointTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         expected = {
-            "turn_kind", "reply", "source", "command_content",
+            "turn_kind", "reply", "spoken_reply", "source", "command_content",
             "requires_confirmation", "action", "artifacts", "active_participant",
             "action_tier", "dispatch_lane", "voice_routing_mode",
             "model_receipt", "routing_receipt",

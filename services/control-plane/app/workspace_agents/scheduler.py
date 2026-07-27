@@ -10,6 +10,7 @@ from typing import Any
 
 from app.domain.run_state import is_terminal_phase
 from app.persistence import task_store, worker_scheduler_settings_store
+from app.runs.begin_execution import begin_execution
 from app.runs.service import (
     RunLifecycleError,
     create_run,
@@ -186,6 +187,79 @@ def _dispatch_worker_run(
             logger.exception("could not mark worker run failed: %s", run_id)
 
 
+def _employee_for_role(
+    companies: dict[str, Any],
+    workspace_id: str,
+    role: str,
+) -> EmployeeConfig | None:
+    company = companies.get(workspace_id)
+    if company is None:
+        return None
+    want = role.strip().lower()
+    for employee in company.employees:
+        if str(employee.role or "").strip().lower() == want:
+            return employee
+    return None
+
+
+def _dispatch_queued_lead_fan_out_runs(
+    *,
+    companies: dict[str, Any],
+    starts_bound: int,
+    active_bound: int,
+) -> list[dict[str, Any]]:
+    """Promote Lead fan-out queued runs into Lane B without creating duplicate runs."""
+    if not worker_dispatch_enabled() or starts_bound <= 0:
+        return []
+    started: list[dict[str, Any]] = []
+    queued = [
+        run
+        for run in list_runs()
+        if str(run.get("phase") or "").strip() == "queued"
+        and str(run.get("employee_role") or "").strip()
+        and str(run.get("task_id") or "").strip()
+        and not is_terminal_phase(str(run.get("phase") or "").strip())
+    ]
+    queued.sort(key=lambda run: str(run.get("started_at") or run.get("updated_at") or ""))
+    for run in queued:
+        if len(started) >= starts_bound:
+            break
+        if _executing_run_count() + len(started) >= active_bound:
+            break
+        workspace_id = str(run.get("workspace_id") or "").strip()
+        role = str(run.get("employee_role") or "").strip().lower()
+        employee = _employee_for_role(companies, workspace_id, role)
+        if employee is None:
+            continue
+        if not worker_scheduler_settings_store.is_employee_enabled(
+            workspace_id,
+            role,
+            file_enabled=bool(employee.enabled),
+        ):
+            continue
+        try:
+            advanced = begin_execution(
+                str(run["run_id"]),
+                actor="workspace_scheduler",
+                receipt_summary="Queued fan-out run entered execution for dispatch",
+            )
+        except RunLifecycleError:
+            logger.exception("could not advance queued fan-out run %s", run.get("run_id"))
+            continue
+        started.append(advanced)
+        threading.Thread(
+            target=_dispatch_worker_run,
+            kwargs={
+                "workspace_id": workspace_id,
+                "employee": employee,
+                "run_record": advanced,
+            },
+            daemon=True,
+            name=f"worker-dispatch-queued-{advanced.get('run_id')}",
+        ).start()
+    return started
+
+
 def run_continuous_worker_tick() -> list[dict[str, Any]]:
     """Reconcile hung shifts, then start bounded role-tagged runs when enabled."""
     reaped = reap_stale_employee_runs()
@@ -203,6 +277,35 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
     if pruned:
         logger.info("continuous worker tick pruned %s terminal employee run(s)", len(pruned))
 
+    try:
+        from app.workspace_delivery.poll import poll_pending_deliveries
+
+        timed_out = poll_pending_deliveries()
+        if timed_out:
+            logger.info("workspace delivery poll updated %s delivery(ies)", len(timed_out))
+    except Exception:  # noqa: BLE001 — never block scheduler on delivery poll
+        logger.exception("workspace delivery poll failed")
+
+    try:
+        from app.workspace_agents.company_work_sources import run_scheduled_work_sources
+
+        work_source_result = run_scheduled_work_sources()
+        recovered = work_source_result.get("recovered_leases") or []
+        if recovered:
+            logger.info(
+                "continuous worker tick recovered %s orphaned leased task(s)",
+                len(recovered),
+            )
+        patrol = (work_source_result.get("sources") or {}).get("file_size_patrol") or {}
+        created = patrol.get("created_tasks") or []
+        if created:
+            logger.info(
+                "continuous worker tick enqueued %s file-size patrol task(s)",
+                len(created),
+            )
+    except Exception:  # noqa: BLE001 — never block scheduler on work sources
+        logger.exception("scheduled company work sources failed")
+
     if not scheduler_enabled():
         return []
 
@@ -216,10 +319,18 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
         return []
 
     starts_bound = max_starts_per_tick()
-    started: list[dict[str, Any]] = []
+    started: list[dict[str, Any]] = _dispatch_queued_lead_fan_out_runs(
+        companies=companies,
+        starts_bound=starts_bound,
+        active_bound=active_bound,
+    )
+    if len(started) >= starts_bound:
+        return started
     for workspace_id, company in companies.items():
         for employee in company.employees:
             if len(started) >= starts_bound:
+                return started
+            if _executing_run_count() + len(started) >= active_bound:
                 return started
             role = str(employee.role or "").strip().lower()
             if not worker_scheduler_settings_store.is_employee_enabled(

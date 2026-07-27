@@ -1,3 +1,6 @@
+@import './ide-layout-02-transcript.css';
+@import './ide-kairo-live-agent.css';
+
 .kairo-sidebar-panel {
   display: block;
   width: 100%;
@@ -108,8 +111,10 @@
 
 .kairo-sidebar-panel__body {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: 3.2rem minmax(0, 1fr);
   gap: 0.55rem;
+  min-height: 0;
   padding: 0 0.7rem 0.65rem;
 }
 
@@ -144,36 +149,10 @@
 }
 
 .kairo-sidebar-panel__copy {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   min-width: 0;
-}
-
-.kairo-sidebar-panel__transcript {
-  grid-column: 1 / -1;
-  max-height: 5.5rem;
-  margin-top: 0.15rem;
-  padding: 0.4rem 0.45rem;
-  overflow-y: auto;
-  border-left: 2px solid rgba(0, 242, 255, 0.38);
-  background: rgba(0, 242, 255, 0.045);
-  color: var(--text-primary);
-  font-size: 0.62rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.kairo-sidebar-panel__transcript-label {
-  display: block;
-  margin-bottom: 0.18rem;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.52rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.kairo-sidebar-panel__transcript p {
-  margin: 0;
 }
 
 .kairo-sidebar-panel__state,
@@ -403,6 +382,9 @@
 }
 
 .agent-dock__header {
+  /* Above .agent-dock__thread so the workspace picker can overhang the transcript. */
+  position: relative;
+  z-index: 30;
   flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
@@ -468,5 +450,22 @@
   flex: 0 1 auto;
   min-width: 0;
   max-width: 13rem;
+}
+
+.agent-dock-workspace-menu:has(.agent-dock-workspace-menu__panel) {
+  z-index: 80;
+}
+
+/* glass3d flattens dock children to z-index:1 — restore chrome above transcript. */
+.console-shell--mockup.console-shell--glass3d
+  .region-right-dock.agent-dock
+  > .agent-dock__header {
+  z-index: 30;
+}
+
+.console-shell--mockup.console-shell--glass3d
+  .region-right-dock.agent-dock
+  > .agent-dock__composer {
+  z-index: 40;
 }
 

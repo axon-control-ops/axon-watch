@@ -228,6 +228,8 @@ export function useAgentDockComposerSetup() {
   }
 
   const {
+    acceptPlanSoftSwitchOffer,
+    declinePlanSoftSwitchOffer,
     dismissPlanSoftSwitch,
     dismissTeammateRoute,
     handleApproveRun,
@@ -464,6 +466,8 @@ export function useAgentDockComposerSetup() {
     typeaheadOpen,
     typeaheadRows,
     typeaheadSelectedIndex,
+    acceptPlanSoftSwitchOffer,
+    declinePlanSoftSwitchOffer,
     undoPlanSoftSwitch,
     undoTeammateRoute,
     updateComposerDraft,

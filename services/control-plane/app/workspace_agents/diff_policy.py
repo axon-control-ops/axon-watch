@@ -35,6 +35,58 @@ def path_allowed(path: str, allowed_paths: Iterable[str]) -> bool:
     )
 
 
+def normalize_path_prefixes(paths: Iterable[str]) -> list[str]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in paths:
+        prefix = str(raw or "").strip().lstrip("./")
+        if not prefix:
+            continue
+        key = prefix.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(prefix)
+    return cleaned
+
+
+def resolve_effective_allowed_paths(
+    *,
+    contract_allowed_paths: Iterable[str] | None = None,
+    task_allowed_paths: Iterable[str] | None = None,
+) -> list[str]:
+    """Intersect repo contract scope with per-task write scope.
+
+    Missing task scope falls back to the contract (or empty = unrestricted by
+    path allowlist). When both are present, a path must satisfy both prefixes.
+    """
+    contract = normalize_path_prefixes(contract_allowed_paths or [])
+    task = normalize_path_prefixes(task_allowed_paths or [])
+    if not task:
+        return contract
+    if not contract:
+        return task
+    effective: list[str] = []
+    seen: set[str] = set()
+    for left in task:
+        for right in contract:
+            if path_allowed(left, [right]):
+                candidate = left
+            elif path_allowed(right, [left]):
+                candidate = right
+            else:
+                continue
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            effective.append(candidate)
+    if not effective:
+        # Both scopes present but disjoint — deny all paths (never fail open).
+        return ["__axon_deny_all__"]
+    return effective
+
+
 def path_forbidden(path: str, forbidden_globs: Iterable[str]) -> bool:
     normalized = path.lstrip("./")
     for pattern in forbidden_globs:

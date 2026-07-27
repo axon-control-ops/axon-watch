@@ -10,6 +10,7 @@ from app.workspace_agents.diff_policy import (
     DiffPolicyFinding,
     evaluate_changed_paths,
     evaluate_diff_texts,
+    resolve_effective_allowed_paths,
 )
 
 VERIFIER_IDENTITY = "verifier"
@@ -102,6 +103,7 @@ def evaluate_acceptance(
     check_results: dict[str, dict[str, Any]],
     changed_paths: Iterable[str] | None = None,
     path_to_text: dict[str, str] | None = None,
+    task_allowed_paths: Iterable[str] | None = None,
     actor: str = VERIFIER_IDENTITY,
 ) -> AcceptanceEvaluation:
     assert_verifier_identity(actor)
@@ -109,10 +111,14 @@ def evaluate_acceptance(
     checks = evaluate_check_outputs(plan, results_by_name=check_results, actor=actor)
     findings: list[DiffPolicyFinding] = []
     if changed_paths is not None:
+        effective_allowed = resolve_effective_allowed_paths(
+            contract_allowed_paths=contract.get("allowed_paths") or [],
+            task_allowed_paths=task_allowed_paths or [],
+        )
         findings.extend(
             evaluate_changed_paths(
                 changed_paths,
-                allowed_paths=contract.get("allowed_paths") or [],
+                allowed_paths=effective_allowed,
                 forbidden_path_globs=contract.get("forbidden_path_globs") or [],
             )
         )

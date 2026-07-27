@@ -74,6 +74,7 @@ def _write_sidecar_baseline(
     baseline_commit: str,
     isolation_kind: str,
     worker_branch: str,
+    baseline_branch: str | None = None,
 ) -> None:
     sidecar = _sidecar(root)
     sidecar.mkdir(parents=True, exist_ok=True)
@@ -88,6 +89,7 @@ def _write_sidecar_baseline(
                 "proposal_id": proposal_id,
                 "bound_project_root": str(bound_project_root.resolve()),
                 "baseline_commit": baseline_commit,
+                "baseline_branch": baseline_branch,
                 "isolation_kind": isolation_kind,
                 "isolation_root": str(root.resolve()),
                 "worker_branch": worker_branch,
@@ -154,6 +156,10 @@ def create_isolation_root(*, proposal_id: str, bound_project_root: Path) -> Path
         raise IsolationError(f"bound project root is not a directory: {bound}")
 
     baseline_commit = _resolve_baseline_commit(bound)
+    branch_ref = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=bound)
+    baseline_branch = (branch_ref.stdout or "").strip() or None
+    if baseline_branch == "HEAD":
+        baseline_branch = None
     branch = worker_branch_name(proposal_id)
     parent = Path(tempfile.mkdtemp(prefix=f"axon-si-{proposal_id[:12]}-"))
     checkout = parent / "checkout"
@@ -188,6 +194,7 @@ def create_isolation_root(*, proposal_id: str, bound_project_root: Path) -> Path
         baseline_commit=baseline_commit,
         isolation_kind=isolation_kind,
         worker_branch=branch,
+        baseline_branch=baseline_branch,
     )
     return checkout
 

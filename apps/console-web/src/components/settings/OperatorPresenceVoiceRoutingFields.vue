@@ -66,7 +66,10 @@ function onVoiceRoutingChange(event: Event): void {
   <label class="operator-settings-form__row operator-settings-form__row--select">
     <span class="operator-settings-form__copy">
       <strong>VAXON voice routing</strong>
-      <small>Independent from IDE Composer. Template-first keeps voice local.</small>
+      <small>
+        Independent from IDE Composer. Prefer Runtime on deep for conversational
+        answers; Template first is the low-credit local fallback.
+      </small>
     </span>
     <select
       class="operator-settings-form__select"
@@ -74,9 +77,9 @@ function onVoiceRoutingChange(event: Event): void {
       :disabled="saving"
       @change="onVoiceRoutingChange"
     >
-      <option value="template_first">Template first</option>
-      <option value="runtime_on_deep">Runtime on deep</option>
+      <option value="runtime_on_deep">Runtime on deep (recommended)</option>
       <option value="runtime_aggressive">Runtime aggressive</option>
+      <option value="template_first">Template first (low credit)</option>
     </select>
   </label>
 </template>

@@ -86,7 +86,7 @@
   position: absolute;
   top: calc(100% + 0.35rem);
   left: 0;
-  z-index: 60;
+  z-index: 1200;
   display: flex;
   flex-direction: column;
   gap: 0.14rem;
@@ -95,9 +95,10 @@
   padding: 0.32rem;
   border: 1px solid rgba(138, 154, 173, 0.16);
   border-radius: 10px;
-  background: rgba(10, 14, 20, 0.98);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  background: #0a0e14;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   overflow: auto;
+  isolation: isolate;
 }
 
 .agent-dock-workspace-menu__item {
@@ -278,9 +279,7 @@
   animation: agent-dock-tab-busy-dot 1.1s ease-in-out infinite;
 }
 
-/* Busy glow wins over a stale last-shift failure while the thread is streaming.
-   `.hud-active-chip` nulls background/box-shadow with !important — override that so
-   the whole tab fill pulses, not just the busy dot. */
+/* Busy glow wins over stale failure; override hud-active-chip !important fill. */
 .agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy {
   border: 1px solid rgba(70, 230, 180, 0.72) !important;
   background: rgba(12, 78, 58, 0.72) !important;
@@ -306,7 +305,6 @@
   color: rgba(190, 255, 230, 0.98);
 }
 
-/* Keep the thin cyan “active” hairline from fighting the busy fill. */
 .agent-dock-thread-tabbar__tab.hud-active-chip.agent-dock-thread-tabbar__tab--busy.hud-active-chip--active::before {
   background: rgba(90, 240, 190, 0.55);
   box-shadow: 0 0 8px rgba(70, 230, 180, 0.45);

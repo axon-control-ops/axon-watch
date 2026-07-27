@@ -75,6 +75,46 @@ def latest_role_run_outcome(workspace_id: str, role: str) -> dict[str, str] | No
         if str(run.get("workspace_id", "")).strip() == normalized_workspace
         and str(run.get("employee_role") or "").strip().lower() == cleaned_role
     ]
+    # Employee IDE retries historically omitted employee_role — recover via thread link.
+    try:
+        from app.persistence import chat_store
+
+        seen = {str(run.get("run_id") or "") for run in tagged}
+        for thread in chat_store.list_threads_for_workspace(
+            normalized_workspace,
+            thread_kind="ide",
+            limit=50,
+        ):
+            if str(thread.get("employee_role") or "").strip().lower() != cleaned_role:
+                continue
+            linked_run_id = str(thread.get("run_id") or "").strip()
+            if not linked_run_id or linked_run_id in seen:
+                continue
+            try:
+                linked = run_store.get_run(linked_run_id)
+            except Exception:  # noqa: BLE001 — roster must stay fail-open
+                linked = None
+            if not isinstance(linked, dict):
+                continue
+            if str(linked.get("workspace_id") or "").strip() != normalized_workspace:
+                continue
+            # Heal untagged IDE completions so roster stops clinging to older failures.
+            if cleaned_role and not str(linked.get("employee_role") or "").strip():
+                linked = dict(linked)
+                linked["employee_role"] = cleaned_role
+                # Thread updated_at is a reliable "this was the latest IDE work" clock.
+                thread_updated = str(thread.get("updated_at") or "").strip()
+                run_updated = str(linked.get("updated_at") or "").strip()
+                if thread_updated and thread_updated > run_updated:
+                    linked["updated_at"] = thread_updated
+                try:
+                    linked = run_store.save_run(linked)
+                except Exception:  # noqa: BLE001 — roster must stay fail-open
+                    pass
+            tagged.append(linked)
+            seen.add(linked_run_id)
+    except Exception:  # noqa: BLE001 — roster must stay fail-open
+        pass
     if not tagged:
         return None
 
@@ -89,10 +129,16 @@ def latest_role_run_outcome(workspace_id: str, role: str) -> dict[str, str] | No
     candidates = [run for run in candidates if not _is_restart_interrupt_run(run)]
     if not candidates:
         return None
-    candidates.sort(
-        key=lambda run: str(run.get("updated_at") or run.get("ended_at") or run.get("started_at") or ""),
-        reverse=True,
-    )
+    def _sort_key(run: dict[str, Any]) -> tuple[str, int, str]:
+        stamp = str(
+            run.get("updated_at") or run.get("ended_at") or run.get("started_at") or ""
+        )
+        phase = str(run.get("phase") or "").strip()
+        # Same-second ties: prefer completed IDE retries over older failed tags.
+        phase_rank = 2 if phase == "completed" else (0 if phase == "failed" else 1)
+        return (stamp, phase_rank, str(run.get("run_id") or ""))
+
+    candidates.sort(key=_sort_key, reverse=True)
     run = candidates[0]
     phase = str(run.get("phase") or "").strip()
     outcome = "failed" if phase == "failed" else ("completed" if phase == "completed" else phase)

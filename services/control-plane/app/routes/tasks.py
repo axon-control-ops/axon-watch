@@ -19,6 +19,7 @@ class TaskCreateRequest(BaseModel):
     owner_role: str = ""
     dependencies: list[str] = Field(default_factory=list)
     exclusive_paths: list[str] = Field(default_factory=list)
+    allowed_paths: list[str] = Field(default_factory=list)
     attempt_budget: int = Field(default=task_store.DEFAULT_ATTEMPT_BUDGET, ge=1, le=32)
 
 
@@ -85,6 +86,7 @@ def create_workspace_task(workspace_id: str, body: TaskCreateRequest) -> dict[st
             owner_role=body.owner_role,
             dependencies=body.dependencies,
             exclusive_paths=body.exclusive_paths,
+            allowed_paths=body.allowed_paths,
             attempt_budget=body.attempt_budget,
         )
     except task_store.TaskLedgerError as exc:

@@ -143,9 +143,6 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
 
     const probe = probeWebGlAvailability();
     if (!probe.ok) {
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy WebGL unavailable — SVG flat ring',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight,nodeCount:options.snapshot.value?.nodes.length??0},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       webglFailed.value = true;
       return;
     }
@@ -162,9 +159,6 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
     );
     const ok = scene.init();
     if (!ok) {
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy scene.init failed — SVG flat ring',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       webglFailed.value = true;
       scene.dispose();
       return;
@@ -177,9 +171,6 @@ export function useBrainGalaxy(options: UseBrainGalaxyOptions): {
       scene.setSelectedNode(selectedNode.value.node_id);
     }
     webglReady.value = true;
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'graph-original-look',hypothesisId:'H1',location:'use-brain-galaxy.ts:mountScene',message:'galaxy WebGL ready — original 3D path',data:{probe,clientWidth:container.clientWidth,clientHeight:container.clientHeight,nodeCount:options.snapshot.value?.nodes.length??0,hasCanvas:Boolean(container.querySelector('canvas')),labelsHiddenByInspectorCss:false},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }
 
   onMounted(() => {

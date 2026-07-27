@@ -10,11 +10,10 @@ import {
 } from '../../features/workspace-agents/active-ide-employee';
 import { employeeIsActivelyBusy } from '../../features/workspace-agents/company-roster-view';
 import {
-  ideThreadMenuLabel,
   ideThreadMenuMeta,
   sortIdeThreadsNewestFirst,
 } from '../../lib/ide-thread-picker-view';
-import { ideThreadTabTitle } from '../../lib/ide-thread-tabs-view';
+import { currentEmployeeIdeThreadTitle } from '../../features/workspace-agents/employee-thread';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -68,29 +67,6 @@ const busyThreadIds = computed(() =>
 watch(
   busyThreadIds,
   (ids) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'fc0b35',
-      },
-      body: JSON.stringify({
-        sessionId: 'fc0b35',
-        runId: 'tab-busy-glow',
-        hypothesisId: 'H7',
-        location: 'AgentDockThreadTabbar.vue:busyThreadIds',
-        message: 'conversation tabs busy glow set',
-        data: {
-          busyCount: ids.size,
-          busyThreadIds: [...ids].slice(0, 8),
-          liveBusyEmployeeIds: liveBusyEmployeeIds.value.slice(0, 8),
-          openTabCount: openTabs.value.length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   },
   { immediate: true },
 );
@@ -102,8 +78,16 @@ const activeThreadId = computed(() => shell.activeIdeThreadId);
 const canCloseTab = computed(() => openTabs.value.length > 1);
 const showScrollControls = computed(() => canScrollLeft.value || canScrollRight.value);
 
+function threadDisplayTitle(thread: {
+  employee_id?: string | null;
+  preview_label?: string | null;
+}): string {
+  return currentEmployeeIdeThreadTitle(thread, shell.companyEmployeesForCurrentWorkspace);
+}
+
 function selectThread(threadId: string): void {
-  void shell.selectIdeThread(threadId);
+  // Fan-out / continuous workers update specialist threads out-of-band.
+  void shell.selectIdeThread(threadId, { forceRefresh: true });
   historyOpen.value = false;
 }
 
@@ -274,17 +258,17 @@ onUnmounted(() => {
         :aria-selected="activeThreadId === thread.thread_id"
         :aria-label="
           busyThreadIds.has(thread.thread_id)
-            ? `Busy — ${ideThreadTabTitle(thread.preview_label)}`
+            ? `Busy — ${threadDisplayTitle(thread)}`
             : threadFailureHintById.get(thread.thread_id)
-              ? `Last shift failed — ${ideThreadTabTitle(thread.preview_label)}`
-              : ideThreadTabTitle(thread.preview_label)
+              ? `Last shift failed — ${threadDisplayTitle(thread)}`
+              : threadDisplayTitle(thread)
         "
         :title="
           threadFailureHoverTitle(
             thread.thread_id,
             busyThreadIds.has(thread.thread_id)
-              ? `Busy — ${ideThreadTabTitle(thread.preview_label)}`
-              : ideThreadTabTitle(thread.preview_label),
+              ? `Busy — ${threadDisplayTitle(thread)}`
+              : threadDisplayTitle(thread),
           )
         "
         @click="selectThread(thread.thread_id)"
@@ -307,14 +291,14 @@ onUnmounted(() => {
           !
         </span>
         <span class="editor-tabbar__label agent-dock-thread-tabbar__tab-label">
-          {{ ideThreadTabTitle(thread.preview_label) }}
+          {{ threadDisplayTitle(thread) }}
         </span>
         <span
           v-if="canCloseTab"
           role="button"
           tabindex="-1"
           class="agent-dock-thread-tabbar__tab-close"
-          :aria-label="`Close ${ideThreadTabTitle(thread.preview_label)}`"
+          :aria-label="`Close ${threadDisplayTitle(thread)}`"
           @click="closeTab($event, thread.thread_id)"
         >
           <WorkbenchIcon name="close" class="editor-tabbar__close-icon" :size="11" />
@@ -380,13 +364,13 @@ onUnmounted(() => {
             :aria-selected="activeThreadId === thread.thread_id"
             :aria-label="
               threadFailureHintById.get(thread.thread_id)
-                ? `Last shift failed — ${ideThreadMenuLabel(thread)}`
+                ? `Last shift failed — ${threadDisplayTitle(thread)}`
                 : busyThreadIds.has(thread.thread_id)
-                  ? `Busy — ${ideThreadMenuLabel(thread)}`
-                  : ideThreadMenuLabel(thread)
+                  ? `Busy — ${threadDisplayTitle(thread)}`
+                  : threadDisplayTitle(thread)
             "
             :title="
-              threadFailureHoverTitle(thread.thread_id, ideThreadMenuLabel(thread))
+              threadFailureHoverTitle(thread.thread_id, threadDisplayTitle(thread))
             "
             @click="selectThread(thread.thread_id)"
           >
@@ -400,7 +384,7 @@ onUnmounted(() => {
                   !
                 </span>
                 <span class="agent-dock-thread-tabbar__history-label">
-                  {{ ideThreadMenuLabel(thread) }}
+                  {{ threadDisplayTitle(thread) }}
                 </span>
               </span>
               <span class="agent-dock-thread-tabbar__history-meta">

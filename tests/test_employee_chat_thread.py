@@ -264,7 +264,7 @@ class EmployeeChatThreadRouteTests(unittest.TestCase):
         prompt = captured["prompt"]
         self.assertIn(EMPLOYEE_PERSONA_MARKER, prompt)
         self.assertIn("You are Quinn", prompt)
-        self.assertIn("employee named in the Employee persona block", prompt)
+        self.assertIn("named employee in the Employee persona block", prompt)
         self.assertNotIn("You are Axon-X Lane B in Agent mode with Full Access.", prompt)
         self.assertLess(prompt.index(EMPLOYEE_PERSONA_MARKER), prompt.index("Workspace context:"))
         self.assertIn("You are Quinn", captured["context_block"])

@@ -48,29 +48,38 @@ export function employeeAssignDraft(employee: CompanyEmployeeRecord): string {
 }
 
 export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
-  const name = employee.name.trim() || 'this teammate';
+  const name = employee.name.trim() || 'Teammate';
   const owns = ownsSnippet(employee);
   const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
+  const voiceLock =
+    `Speak in first person as ${name} only — never say you are "acting as" a role, ` +
+    `Lane B, or VAXON.`;
   if (isShiftContinuationFailure(detail)) {
     return (
-      `${name} (${owns}): ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
-      `Summarize what changed and include receipts.`
+      `I am ${name} (${owns}). ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
+      `${voiceLock} Summarize what I changed and include receipts.`
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
     return (
-      `${name} (${owns}): Usage limits blocked the last shift. Once limits are restored, ` +
-      `retry the bounded continuous shift. Summarize what changed and include receipts.`
+      `I am ${name} (${owns}). Usage limits blocked my last shift. Once limits are restored, ` +
+      `I will retry my bounded continuous shift. ${voiceLock} ` +
+      `Summarize what I changed and include receipts.`
     );
   }
   if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
     return (
-      `${name} (${owns}): Runtime auth blocked the last shift. Run \`cursor agent login\` on the host ` +
-      `or unlock /vault, then retry the bounded continuous shift. Summarize what changed and include receipts.`
+      `I am ${name} (${owns}). Runtime auth blocked my last shift. After \`cursor agent login\` ` +
+      `on the host or /vault unlock, I will retry my bounded continuous shift. ${voiceLock} ` +
+      `Summarize what I changed and include receipts.`
     );
   }
   const errorHint = detail ? ` Last error: ${detail}` : '';
-  return `Retry the last failed shift for ${name} (${owns}).${errorHint} Summarize what changed and include receipts.`;
+  return (
+    `I am ${name} (${owns}). My last continuous shift failed.${errorHint} ` +
+    `Retry that bounded shift now as me. ${voiceLock} ` +
+    `Summarize what I changed and include receipts.`
+  );
 }
 
 export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
@@ -191,7 +200,7 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
   };
   const receiptsAction: TeamMemberQuickAction = {
     id: 'receipts',
-    label: 'View receipts',
+    label: 'Explain receipts',
     kind: 'chat',
     chatKind: 'receipts',
     composerMode: 'ask',

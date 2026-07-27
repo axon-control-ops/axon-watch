@@ -10,6 +10,7 @@ export type EditorDocumentLanguage =
   | 'shell'
   | 'html'
   | 'css'
+  | 'csv'
   | 'image';
 
 export interface WorkspaceDocumentDescriptor {
@@ -24,6 +25,8 @@ export interface WorkspaceDocumentDescriptor {
   dirty?: boolean;
   /** Durable plan id when this draft is a View Plan artifact. */
   planId?: string;
+  /** Direct image/PDF preview URL (chat attachment or raw file) for canvas tabs. */
+  previewUrl?: string;
 }
 
 interface BuildWorkspaceDocumentsInput {

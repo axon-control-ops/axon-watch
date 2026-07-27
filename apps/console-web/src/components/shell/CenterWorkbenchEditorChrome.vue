@@ -3,6 +3,10 @@ import { computed, ref } from 'vue';
 
 import WorkbenchIcon from '../WorkbenchIcon.vue';
 import {
+  editorFileIconLabelForTone,
+  editorFileIconToneForDocument,
+} from '../../lib/editor-file-icon';
+import {
   editorTabLabelForDocument,
   editorTabLabelsForDocuments,
 } from '../../lib/editor-tab-labels';
@@ -38,6 +42,24 @@ function editorTabLabel(documentId: string, document: { title: string }): string
       source: 'draft',
     },
     editorTabLabels.value,
+  );
+}
+
+function editorTabIconTone(document: WorkspaceDocumentDescriptor): string {
+  return editorFileIconToneForDocument({
+    title: document.title,
+    filePath: document.filePath,
+    language: document.language,
+  });
+}
+
+function editorTabIconLabel(document: WorkspaceDocumentDescriptor): string {
+  return editorFileIconLabelForTone(
+    editorFileIconToneForDocument({
+      title: document.title,
+      filePath: document.filePath,
+      language: document.language,
+    }),
   );
 }
 
@@ -87,7 +109,11 @@ function handleEditorTabsWheel(event: WheelEvent): void {
             class="editor-tabbar__tab-select"
             @click="emit('selectDocument', document.id)"
           >
-            <WorkbenchIcon name="file" class="editor-tabbar__file-icon" />
+            <span
+              class="editor-tabbar__file-icon editor-tabbar__file-icon--typed"
+              :class="`editor-tabbar__file-icon--${editorTabIconTone(document)}`"
+              aria-hidden="true"
+            >{{ editorTabIconLabel(document) }}</span>
             <span class="editor-tabbar__label">{{ editorTabLabel(document.id, document) }}</span>
           </button>
           <button

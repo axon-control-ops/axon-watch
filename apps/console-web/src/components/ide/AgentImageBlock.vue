@@ -17,13 +17,18 @@ const props = defineProps<{
 const shell = useShellStore();
 const enlarged = ref(false);
 
-const resolvedPath = computed(() => normalizeGeneratedImagePath(props.path));
+const projectRoot = computed(() => shell.currentWorkspace?.project_root ?? null);
+
+const resolvedPath = computed(() =>
+  normalizeGeneratedImagePath(props.path, projectRoot.value),
+);
 
 const fileName = computed(() => resolvedPath.value.split('/').pop() || resolvedPath.value);
 
 const imageUrl = computed(() =>
   resolveThreadImageUrl(props.path, {
     workspaceId: shell.currentWorkspace?.workspace_id ?? null,
+    projectRoot: projectRoot.value,
     attachmentUrl: props.attachmentUrl,
   }),
 );
@@ -50,7 +55,14 @@ const enlargedPreview = computed(() => {
 });
 
 function openInCanvas(): void {
-  void shell.openWorkspaceFile(resolvedPath.value);
+  const url = imageUrl.value.trim();
+  const attachmentUrl =
+    String(props.attachmentUrl ?? '').trim() ||
+    (url.includes('/api/chat/attachments/') ? url : '');
+  void shell.openImageInCanvas({
+    path: props.path,
+    attachmentUrl: attachmentUrl || null,
+  });
 }
 </script>
 

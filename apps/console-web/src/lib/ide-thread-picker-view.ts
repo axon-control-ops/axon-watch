@@ -24,7 +24,7 @@ export function ideThreadMenuMeta(thread: IdeThreadListItem): string {
   return updated.replace('T', ' ').replace('Z', ' UTC');
 }
 
-export function sortIdeThreadsNewestFirst(threads: IdeThreadListItem[]): IdeThreadListItem[] {
+export function sortIdeThreadsNewestFirst<T extends IdeThreadListItem>(threads: T[]): T[] {
   return [...threads].sort((left, right) => {
     const leftStamp = left.updated_at || left.created_at;
     const rightStamp = right.updated_at || right.created_at;

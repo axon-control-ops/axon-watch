@@ -13,6 +13,7 @@ import {
   type BriefingVoiceTranscriptEntry,
 } from '../../../lib/briefing-voice-transcript';
 import type { KairoPresenceState } from '../../../lib/kairo-presence';
+import { unlockKairoAudioPlayback } from '../../../lib/kairo-audio-unlock';
 import { deliverSpokenOperatorAlert } from '../../../lib/spoken-alert-delivery';
 import {
   type KairoVoiceSpeaker,
@@ -249,6 +250,8 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     const context: Record<string, unknown> = {
       fallback: alert.message,
       pending_approvals: input.pendingApprovalsCount.value,
+      signal_id: alert.signal_id ?? topSignal?.signal_id ?? '',
+      top_signal_id: alert.signal_id ?? topSignal?.signal_id ?? '',
       top_signal_title: topSignal?.title ?? '',
       top_signal_workspace_id: topSignal?.workspace_id ?? '',
       top_signal_summary: topSignal?.summary ?? '',
@@ -303,7 +306,12 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       return;
     }
 
+    // Same gesture unlocks WebKit/Tauri audio so we do not queue silently.
+    await unlockKairoAudioPlayback();
+
     try {
+      // Explicit Speak briefing should be snappy: use deterministic notice/advise
+      // copy instead of waiting on the Cursor runtime paraphrase path.
       const response = await postKairoSpeak({
         event_type: 'briefing',
         context: {
@@ -316,17 +324,25 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
         session_id: kairoSpeechSessionId(),
         workspace_id: input.currentWorkspace.value?.workspace_id ?? '',
         narration: input.effectiveKairoNarrationLevel.value,
-        use_runtime: true,
+        use_runtime: false,
       });
       if (response.source === 'skipped' || !response.line?.trim()) {
         return;
       }
-      const channel = await deliverSpokenOperatorAlert({
-        eligible: true,
-        reason: 'operator_briefing_spoken',
-        signal_id: null,
-        message: response.line.trim(),
-      }, sessionStorage, { dedupe: false, speaker: vaxonVoiceSpeaker() });
+      const channel = await deliverSpokenOperatorAlert(
+        {
+          eligible: true,
+          reason: 'operator_briefing_spoken',
+          signal_id: null,
+          message: response.line.trim(),
+        },
+        sessionStorage,
+        {
+          dedupe: false,
+          speaker: vaxonVoiceSpeaker(),
+          queueUntilUnlock: false,
+        },
+      );
       if (channel !== 'skipped') {
         input.briefingVoiceTranscript.value = appendBriefingVoiceTranscriptEntry({
           message: response.line.trim(),

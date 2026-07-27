@@ -16,9 +16,22 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const expanded = ref(false);
 
-const editSummaries = computed(() =>
-  // Stream-safe: path/count metadata only. Diff bodies are resolved on click.
-  collectIdeAgentEditSummariesFromThread(shell.threadMessages, { includeDiff: false }),
+const editSummaries = computed(() => {
+  // During an active stream, avoid full-transcript rescans — use incremental edit count.
+  if (shell.agentStreamActive) {
+    return [];
+  }
+  return collectIdeAgentEditSummariesFromThread(shell.threadMessages, { includeDiff: false });
+});
+
+const streamedEditCount = computed(
+  () => shell.ideComposerActivity?.streamCounts?.edit ?? 0,
+);
+
+const editedFileCount = computed(() =>
+  shell.agentStreamActive
+    ? Math.max(streamedEditCount.value, editSummaries.value.length)
+    : editSummaries.value.length,
 );
 
 const reviewReadyCount = computed(
@@ -36,7 +49,7 @@ const showReviewStrip = computed(() =>
     agentStreamActive: shell.agentStreamActive,
     composerAgentBusy: shell.composerAgentBusy,
     reviewReadyCount: reviewReadyCount.value,
-    editedFileCount: editSummaries.value.length,
+    editedFileCount: editedFileCount.value,
     latestAgentTurnFailed: latestIdeAgentTurnFailed(shell.threadMessages),
   }) || shell.canResumeIdeAgentRun,
 );
@@ -54,7 +67,7 @@ const reviewBar = computed(() =>
       continueLabel: 'Continue',
       resumeLabel: 'Resume',
     }),
-    editedFileCount: editSummaries.value.length,
+    editedFileCount: editedFileCount.value,
     reviewReadyCount: reviewReadyCount.value,
     completing: shell.runMutationState === 'completing',
   }),
@@ -66,7 +79,7 @@ const statusLabel = computed(() =>
   buildIdeAgentReviewComposerLabel({
     agentStreamActive: shell.agentStreamActive,
     executionAccess: shell.ideComposerActivity?.executionAccess ?? 'consultative',
-    editedFileCount: editSummaries.value.length,
+    editedFileCount: editedFileCount.value,
     reviewReadyCount: reviewReadyCount.value,
     expanded: expanded.value,
     mode: shell.ideComposerActivity?.mode,

@@ -124,9 +124,14 @@ describe('company-roster-actions', () => {
     expect(employeeQuickActions(failed).find((action) => action.id === 'retry')?.label).toBe(
       'Retry shift',
     );
-    expect(employeeRetryDraft(failed)).toContain('Retry the last failed shift');
+    expect(employeeQuickActions(failed).find((action) => action.id === 'receipts')?.label).toBe(
+      'Explain receipts',
+    );
+    expect(employeeRetryDraft(failed)).toMatch(/I am .+\. My last continuous shift failed/);
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
+    expect(employeeRetryDraft(failed).toLowerCase()).toContain('first person');
     expect(employeeChatDraft(failed, 'retry')).toBe(employeeRetryDraft(failed));
+
     expect(employeeReceiptsDraft(failed)).toContain('run_failed_abc123');
     expect(employeeReceiptsDraft(failed)).toContain('vitest: assertion failed');
     expect(employeeChatComposerMode('receipts')).toBe('ask');
@@ -186,9 +191,10 @@ describe('company-roster-actions', () => {
         "Lane B agent fallback reply generated (ActionRequiredError: You're out of usage.)",
       last_run_id: 'run_7ae605411d4d',
     });
-    expect(employeeRetryDraft(failed)).toContain('Usage limits blocked the last shift');
+    expect(employeeRetryDraft(failed)).toContain('Usage limits blocked my last shift');
     expect(employeeRetryDraft(failed)).toContain('Once limits are restored');
     expect(employeeRetryDraft(failed)).not.toContain('ActionRequiredError');
+
     expect(employeeReceiptsDraft(failed)).toContain('run_7ae605411d4d');
     expect(employeeReceiptsDraft(failed)).toContain('usage limits blocked the agent runtime');
     expect(employeeReceiptsDraft(failed)).not.toContain('ActionRequiredError');
@@ -202,9 +208,10 @@ describe('company-roster-actions', () => {
         'Lane B agent fallback reply generated (Cursor is installed but not signed in. Run `cursor agent login` or unlock /vault.; Cursor Cloud Agent unavailable)',
       last_run_id: 'run_43ca086d22d4',
     });
-    expect(employeeRetryDraft(failed)).toContain('Runtime auth blocked the last shift');
+    expect(employeeRetryDraft(failed)).toContain('Runtime auth blocked my last shift');
     expect(employeeRetryDraft(failed)).toContain('cursor agent login');
     expect(employeeRetryDraft(failed)).not.toContain('Lane B agent fallback');
+
     expect(employeeReceiptsDraft(failed)).toContain('run_43ca086d22d4');
     expect(employeeReceiptsDraft(failed)).toContain('runtime auth is not ready');
   });

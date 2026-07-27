@@ -3,7 +3,8 @@ import { clampSidebarWidth } from './sidebar-width-split';
 
 export const LAYOUT_MODE_KEY = 'axon-x-layout-mode-v1';
 export const IDE_EXPLORER_COLLAPSED_KEY = 'axon-x-ide-explorer-collapsed-v1';
-export const AGENT_DOCK_COLLAPSED_KEY = 'axon-x-agent-dock-collapsed-v1';
+/** v2: default collapsed for quiet IDE coding (v1 force-expanded on every IDE entry). */
+export const AGENT_DOCK_COLLAPSED_KEY = 'axon-x-agent-dock-collapsed-v2';
 /** Activity bar width when the IDE explorer panel is fully collapsed (matches --ide-activity-width). */
 export const IDE_COLLAPSED_SIDEBAR_WIDTH_PX = 42;
 
@@ -28,6 +29,9 @@ export type IdeActivityView =
   | 'team'
   | 'terminal'
   | 'agent';
+
+/** Boot default for the IDE left activity panel (Team, not Explorer). */
+export const DEFAULT_IDE_ACTIVITY_VIEW: IdeActivityView = 'team';
 
 export function readStoredLayoutMode(): LayoutMode | null {
   if (typeof window === 'undefined') {
@@ -66,12 +70,18 @@ export function persistIdeExplorerCollapsed(collapsed: boolean): void {
   window.localStorage.setItem(IDE_EXPLORER_COLLAPSED_KEY, collapsed ? '1' : '0');
 }
 
+/** Missing key defaults to collapsed — IDE coding keeps the editor wide until the operator opens Agent. */
 export function readStoredAgentDockCollapsed(): boolean {
   if (typeof window === 'undefined') {
-    return false;
+    return true;
   }
 
-  return window.localStorage.getItem(AGENT_DOCK_COLLAPSED_KEY) === '1';
+  const raw = window.localStorage.getItem(AGENT_DOCK_COLLAPSED_KEY);
+  if (raw === null) {
+    return true;
+  }
+
+  return raw === '1';
 }
 
 export function persistAgentDockCollapsed(collapsed: boolean): void {

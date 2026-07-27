@@ -5,6 +5,8 @@ export type AgentDockReopenState = {
   employeeFailureLine?: string | null;
   /** Restart or session cut — retry continues the shift rather than a hard failure. */
   employeeShiftInterrupted?: boolean;
+  /** TTS / narration active — surface on status bar instead of editor overlay. */
+  speaking?: boolean;
 };
 
 function approvalPhrase(count: number): string {
@@ -64,16 +66,24 @@ function employeeFailureAriaHintParts(state: AgentDockReopenState): string[] {
 
 function activityHintParts(state: AgentDockReopenState): string[] {
   const parts: string[] = [];
+  if (state.speaking) {
+    parts.push('Speaking');
+  }
   if (state.streaming) {
     parts.push('Agent is responding');
   }
   if (state.pendingApprovals > 0) {
     parts.push(approvalPhrase(state.pendingApprovals));
   }
-  if (!state.streaming && state.pendingApprovals <= 0) {
+  if (!state.streaming && state.pendingApprovals <= 0 && !state.speaking) {
     parts.push(...runPhaseHintParts(state.runPhase));
   }
-  if (!state.streaming && state.pendingApprovals <= 0 && parts.length === 0) {
+  if (
+    !state.streaming &&
+    state.pendingApprovals <= 0 &&
+    !state.speaking &&
+    parts.length === 0
+  ) {
     parts.push(...employeeFailureHintParts(state));
   }
   return parts;
@@ -81,16 +91,24 @@ function activityHintParts(state: AgentDockReopenState): string[] {
 
 function activityAriaHintParts(state: AgentDockReopenState): string[] {
   const parts: string[] = [];
+  if (state.speaking) {
+    parts.push('speaking');
+  }
   if (state.streaming) {
     parts.push('agent is responding');
   }
   if (state.pendingApprovals > 0) {
     parts.push(approvalPhrase(state.pendingApprovals));
   }
-  if (!state.streaming && state.pendingApprovals <= 0) {
+  if (!state.streaming && state.pendingApprovals <= 0 && !state.speaking) {
     parts.push(...runPhaseAriaHintParts(state.runPhase));
   }
-  if (!state.streaming && state.pendingApprovals <= 0 && parts.length === 0) {
+  if (
+    !state.streaming &&
+    state.pendingApprovals <= 0 &&
+    !state.speaking &&
+    parts.length === 0
+  ) {
     parts.push(...employeeFailureAriaHintParts(state));
   }
   return parts;
@@ -123,7 +141,7 @@ export function agentDockActivityBarAriaLabel(
 
 /** Whether the collapsed agent dock should show a live-attention treatment. */
 export function agentDockReopenAlive(state: AgentDockReopenState): boolean {
-  if (state.streaming || state.pendingApprovals > 0) {
+  if (state.speaking || state.streaming || state.pendingApprovals > 0) {
     return true;
   }
 

@@ -48,6 +48,8 @@ def ensure_lead_plan_schema(connection: Any) -> None:
             task_id TEXT NOT NULL,
             PRIMARY KEY(plan_id, plan_key)
         );
+        CREATE INDEX IF NOT EXISTS idx_lead_plan_tasks_task
+            ON lead_plan_tasks(task_id);
         CREATE TABLE IF NOT EXISTS lead_plan_receipts (
             receipt_id TEXT PRIMARY KEY,
             plan_id TEXT NOT NULL,
@@ -169,9 +171,68 @@ def plan_task_links(plan_id: str) -> list[dict[str, str]]:
     return [{"plan_key": row["plan_key"], "task_id": row["task_id"]} for row in rows]
 
 
+def plan_id_for_task(task_id: str) -> str | None:
+    """Reverse-lookup which Lead plan owns a workspace task (if any)."""
+    cleaned = str(task_id or "").strip()
+    if not cleaned:
+        return None
+    with _connection() as connection:
+        row = connection.execute(
+            """
+            SELECT plan_id
+            FROM lead_plan_tasks
+            WHERE task_id = ?
+            ORDER BY plan_id DESC
+            LIMIT 1
+            """,
+            (cleaned,),
+        ).fetchone()
+    if row is None:
+        return None
+    plan_id = str(row["plan_id"] or "").strip()
+    return plan_id or None
+
+
+def list_plans_by_status(
+    status: str,
+    *,
+    workspace_id: str | None = None,
+) -> list[dict[str, Any]]:
+    cleaned = str(status or "").strip().lower()
+    scoped = str(workspace_id or "").strip()
+    with _connection() as connection:
+        if scoped:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM lead_plans
+                WHERE status = ? AND workspace_id = ?
+                ORDER BY updated_at DESC, rowid DESC
+                """,
+                (cleaned, scoped),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM lead_plans
+                WHERE status = ?
+                ORDER BY updated_at DESC, rowid DESC
+                """,
+                (cleaned,),
+            ).fetchall()
+    return [_decode_plan(row) for row in rows]
+
+
 def set_plan_status(plan_id: str, status: str) -> dict[str, Any]:
     cleaned = status.strip().lower()
-    if cleaned not in {"active", "superseded", "completed", "cancelled"}:
+    if cleaned not in {
+        "active",
+        "superseded",
+        "completed",
+        "cancelled",
+        "awaiting_engagement",
+    }:
         raise ValueError(f"invalid lead plan status: {status}")
     with _connection() as connection:
         connection.execute(
@@ -256,8 +317,10 @@ __all__ = [
     "append_receipt",
     "get_plan",
     "latest_active_plan",
+    "list_plans_by_status",
     "list_receipts",
     "persist_plan",
+    "plan_id_for_task",
     "plan_task_links",
     "reset_store",
     "set_plan_status",

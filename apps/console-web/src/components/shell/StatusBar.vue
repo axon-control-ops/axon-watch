@@ -20,7 +20,7 @@ function updateClock(): void {
   });
   // #region agent log
   if (now.getSeconds() === 0) {
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fc0b35'},body:JSON.stringify({sessionId:'fc0b35',runId:'post-fix',hypothesisId:'H5',location:'StatusBar.vue:updateClock',message:'status bar local clock tick',data:{label:clockLabel.value,utcHours:now.getUTCHours(),localHours:now.getHours(),clockNodeCount:typeof document!=='undefined'?document.querySelectorAll('.status-bar-mockup__clock').length:-1},timestamp:Date.now()})}).catch(()=>{});
+
   }
   // #endregion
 }
@@ -85,7 +85,6 @@ onUnmounted(() => {
 <template>
   <footer
     class="region region-status-bar status-bar-mockup"
-    :class="{ 'status-bar-mockup--kairo-cta': shell.showKairoBriefingAttention }"
     aria-label="Persistent runtime status"
   >
     <div class="status-bar-mockup__grid">
@@ -182,6 +181,28 @@ onUnmounted(() => {
           <span class="status-bar-mockup__chip-label">{{ operatorZone?.label }}</span>
         </div>
 
+        <button
+          v-if="shell.showKairoBriefingAttention"
+          type="button"
+          class="status-bar-mockup__chip status-bar-mockup__chip--kairo-briefing"
+          :class="{
+            'status-bar-mockup__chip--kairo-warning':
+              shell.kairoBriefingAttention.severity === 'warning',
+          }"
+          :aria-label="`${shell.kairoBriefingAttentionLabel}. Open operator briefing.`"
+          :title="shell.kairoBriefingAttentionLabel"
+          @click="shell.focusKairoBriefing()"
+        >
+          <span class="status-bar-mockup__kairo-pulse" aria-hidden="true" />
+          <span class="status-bar-mockup__icon status-bar-mockup__icon--kairo" aria-hidden="true" />
+          <span class="status-bar-mockup__chip-label">
+            Open <PersonaTitle suffix="Briefing" mark-size="xs" />
+          </span>
+          <span class="status-bar-mockup__chip-badge" aria-hidden="true">
+            {{ shell.kairoBriefingAttention.badgeCount }}
+          </span>
+        </button>
+
         <div
           id="status-bar-galaxy-actions"
           class="status-bar-mockup__galaxy-actions"
@@ -197,25 +218,6 @@ onUnmounted(() => {
             ⛨<span class="status-bar-mockup__shield-mark">✓</span>
           </span>
         </div>
-      </div>
-
-      <div class="status-bar-mockup__hero-rail">
-        <button
-          v-if="shell.showKairoBriefingAttention"
-          type="button"
-          class="status-bar-mockup__kairo-cta"
-          :class="`status-bar-mockup__kairo-cta--${shell.kairoBriefingAttention.severity}`"
-          :aria-label="`${shell.kairoBriefingAttentionLabel}. Open operator briefing.`"
-          @click="shell.focusKairoBriefing()"
-        >
-          <span class="status-bar-mockup__kairo-cta-glow" aria-hidden="true" />
-          <span class="status-bar-mockup__kairo-cta-label">
-            Open <PersonaTitle suffix="Briefing" mark-size="xs" />
-          </span>
-          <span class="status-bar-mockup__kairo-cta-badge" aria-hidden="true">
-            {{ shell.kairoBriefingAttention.badgeCount }}
-          </span>
-        </button>
       </div>
     </div>
   </footer>

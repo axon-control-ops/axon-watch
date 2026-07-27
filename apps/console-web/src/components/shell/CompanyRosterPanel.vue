@@ -3,6 +3,8 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import AgentPersonaDock from './AgentPersonaDock.vue';
 import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
+import VaxonRosterVoiceDock from './VaxonRosterVoiceDock.vue';
+import { useVaxonRosterVoiceDock } from '../../features/kairo-conversation/use-vaxon-roster-voice-dock';
 import { resolveRosterSelectionForIdeThread } from '../../features/workspace-agents/active-ide-employee';
 import {
   buildCompanyRosterAlertBadge,
@@ -40,6 +42,10 @@ import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
+const vaxonVoiceDock = useVaxonRosterVoiceDock(
+  computed(() => shell.kairoSpeechActive),
+  currentWorkspaceId,
+);
 /** Single roster source of truth — shell owns the poll; do not dual-poll here (causes IDE flicker). */
 const employees = computed(() => shell.companyEmployeesForCurrentWorkspace);
 const loadState = computed<'idle' | 'loading' | 'loaded'>(() => {
@@ -174,38 +180,15 @@ const liveBusyEmployeeIds = computed(() => {
   if (shell.agentStreamActive) {
     const threadEmployeeId = shell.activeIdeThread?.employee_id?.trim();
     const recordEmployeeId = shell.activeIdeEmployeeRecord?.employee_id?.trim();
-    const streamOwnerId = threadEmployeeId || recordEmployeeId;
+    const primaryId =
+      employees.value.find((row) => row.primary)?.employee_id?.trim() ||
+      employees.value.find((row) => row.role === 'lead')?.employee_id?.trim() ||
+      null;
+    const streamOwnerId = threadEmployeeId || recordEmployeeId || primaryId;
     if (streamOwnerId) {
       ids.add(streamOwnerId);
     }
   }
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'fc0b35',
-    },
-    body: JSON.stringify({
-      sessionId: 'fc0b35',
-      runId: 'busy-owner',
-      hypothesisId: 'H9',
-      location: 'CompanyRosterPanel.vue:liveBusyEmployeeIds',
-      message: 'team busy owners resolved',
-      data: {
-        busyIds: [...ids],
-        streamActive: Boolean(shell.agentStreamActive),
-        threadEmployeeId: shell.activeIdeThread?.employee_id ?? null,
-        recordEmployeeId: shell.activeIdeEmployeeRecord?.employee_id ?? null,
-        rosterBusy: employees.value
-          .filter((row) => employeeIsActivelyBusy(row))
-          .map((row) => ({ id: row.employee_id, name: row.name, status: row.status })),
-        leadStatus: employees.value.find((row) => row.role === 'lead')?.status ?? null,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   return [...ids];
 });
 
@@ -280,6 +263,10 @@ async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKi
   await shell.openOrFocusEmployeeIdeThread(employee);
   const { mode, draft } = employeeComposerOpenPayload(employee, kind);
   requestIdeComposerMode(mode);
+  if (kind === 'retry') {
+    // Retry shift always needs tools — ignore consultative composer setting.
+    shell.setAgentExecutionAccess('full');
+  }
   if (draft) {
     shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
   } else {
@@ -372,10 +359,10 @@ async function focusFailedEmployee(): Promise<void> {
 
 async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> {
   selectEmployee(employee);
-  if (employeeFailureLine(employee)) {
-    await shell.openOrFocusEmployeeIdeThread(employee);
-    scrollDockIntoView();
-  }
+  // Busy fan-out specialists write into their own IDE thread — selecting them must
+  // open/refetch that dock, not leave the operator on Dana's stale conversation.
+  await shell.openOrFocusEmployeeIdeThread(employee);
+  scrollDockIntoView();
 }
 </script>
 
@@ -464,6 +451,15 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
       />
 
       <div :id="COMPANY_ROSTER_DOCK_ID" ref="dockRootRef" class="company-roster__dock-host">
+        <!-- IDE: KairoSidebarPanel owns VAXON speech — avoid a second speaking dock. -->
+        <VaxonRosterVoiceDock
+          v-if="shell.layoutMode !== 'ide' && vaxonVoiceDock.visible.value"
+          :speaking="vaxonVoiceDock.speaking.value"
+          :line="vaxonVoiceDock.line.value"
+          :remaining-seconds="vaxonVoiceDock.remainingSeconds.value"
+          :on-dismiss="vaxonVoiceDock.dismiss"
+          :on-replied="vaxonVoiceDock.markReplied"
+        />
         <AgentPersonaDock
           v-if="selectedEmployee"
           :key="selectedEmployee.employee_id"

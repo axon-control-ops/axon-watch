@@ -22,10 +22,35 @@ _HANDOFF_ACTION_RE = re.compile(
     r"\b(hand\s*it\s*off|hand\s*off|handoff|continue in ide|investigate in ide|open in ide)\b",
     re.IGNORECASE,
 )
-_CONFIRM_RE = re.compile(r"^(yes|yeah|yep|do it|confirm|go ahead)\.?$", re.IGNORECASE)
+_CONFIRM_RE = re.compile(
+    r"^(?:yes|yeah|yep|yup|do it|confirm|go ahead|dig in|please dig in|"
+    r"yes[,.]?\s*dig in|"
+    r"(?:please\s+)?(?:pull|fetch|get|show)\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs)\.?$",
+    re.IGNORECASE,
+)
+_DECLINE_RE = re.compile(
+    r"^(no|nope|not now|later|cancel|leave it)\.?$",
+    re.IGNORECASE,
+)
 _BRIEFING_SURFACE_OFFER_RE = re.compile(
     r"\b(pull\s+(?:it\s+)?to\s+the\s+front|bring\s+(?:it\s+)?(?:up|forward)|"
     r"open\s+the\s+briefing|shall\s+i\s+(?:pull|show|open))\b",
+    re.IGNORECASE,
+)
+# Ask-shaped spoken invites from explain_operator_alert / persona voice lines.
+_DIG_IN_OFFER_RE = re.compile(
+    r"(?:\bshall\s+i\s+(?:dig\s+in|triage(?:\s+(?:it|the\s+repair))?|"
+    r"investigate(?:\s+it)?|diagnose(?:\s+it)?|take\s+a\s+look|look\s+into\s+it|"
+    r"walk\s+you\s+through\s+it|guide\s+you\s+to\s+vault|"
+    r"pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs)\b|"
+    r"\bi\s+can\s+pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs\b|"
+    r"\bopen\s+attention\s+for\b|"
+    r"\bwant\s+me\s+to\s+(?:check(?:\s+it)?|open\s+attention|"
+    r"pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs)\b)",
+    re.IGNORECASE,
+)
+_PULL_LOGS_OFFER_RE = re.compile(
+    r"\b(?:i\s+can|shall\s+i|want\s+me\s+to)\s+pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs\b",
     re.IGNORECASE,
 )
 
@@ -159,16 +184,110 @@ def remember_top_signal(
 
 def note_briefing_surface_offer(session_id: str, reply: str) -> None:
     if _BRIEFING_SURFACE_OFFER_RE.search(str(reply or "")):
-        remember_entities(session_id, pending_briefing_surface="1")
+        remember_entities(
+            session_id,
+            pending_briefing_surface="1",
+            pending_dig_in="",
+        )
+
+
+def note_dig_in_offer(session_id: str, reply: str) -> None:
+    """Arm yes→IDE handoff after VAXON asks 'Shall I dig in?' (or triage/investigate)."""
+    text = str(reply or "")
+    if not _DIG_IN_OFFER_RE.search(text):
+        return
+    fields: dict[str, str] = {
+        "pending_dig_in": "1",
+        "pending_briefing_surface": "",
+    }
+    if _PULL_LOGS_OFFER_RE.search(text):
+        entity = entity_context(session_id)
+        existing_task = str(entity.get("task") or "").strip()
+        log_task = "Pull failed CI logs with `gh run view <run_id> --log-failed`"
+        if existing_task and "log" not in existing_task.lower():
+            fields["task"] = f"{existing_task} — {log_task}"
+        elif not existing_task:
+            fields["task"] = log_task
+    remember_entities(session_id, **fields)
+
+
+def note_followup_offers(session_id: str, reply: str) -> None:
+    """Arm yes-followups from ask-shaped spoken/converse replies."""
+    note_briefing_surface_offer(session_id, reply)
+    note_dig_in_offer(session_id, reply)
+
+
+def remember_signal_from_speak_context(
+    session_id: str,
+    context: dict[str, Any] | None,
+    *,
+    fallback_workspace_id: str | None = None,
+) -> None:
+    """Capture top-signal ids from /api/kairo/speak alert context for dig-in yes."""
+    payload = context if isinstance(context, dict) else {}
+    signal_id = str(
+        payload.get("signal_id")
+        or payload.get("top_signal_id")
+        or ""
+    ).strip()
+    if not signal_id:
+        return
+    workspace_id = (
+        str(payload.get("top_signal_workspace_id") or payload.get("workspace_id") or "").strip()
+        or str(fallback_workspace_id or "").strip()
+    )
+    title = str(payload.get("top_signal_title") or "").strip()
+    summary = str(payload.get("top_signal_summary") or "").strip()
+    task = f'Investigate signal "{title}"' if title else f"Investigate signal {signal_id}"
+    if summary:
+        task = f"{task}: {summary}"
+    fields: dict[str, str] = {
+        "signal_id": signal_id,
+        "task": task,
+    }
+    if workspace_id:
+        fields["target_workspace_id"] = workspace_id
+    if title:
+        fields["signal_title"] = title
+    remember_entities(session_id, **fields)
 
 
 def resolve_followup_action(content: str, session_id: str) -> dict[str, object] | None:
     trimmed = content.strip()
     entity = entity_context(session_id)
+    if _DECLINE_RE.match(trimmed) and (
+        entity.get("pending_dig_in") == "1"
+        or entity.get("pending_briefing_surface") == "1"
+    ):
+        remember_entities(
+            session_id,
+            pending_dig_in="",
+            pending_briefing_surface="",
+        )
     if _CONFIRM_RE.match(trimmed):
         pending_command = entity.get("pending_command", "")
         if pending_command:
             return {"type": "dispatch_command", "content": pending_command}
+        if entity.get("pending_dig_in") == "1":
+            signal_id = entity.get("signal_id", "")
+            target_workspace_id = entity.get("target_workspace_id", "")
+            task = entity.get("task", "")
+            # Full signal handoff when all fields are present.
+            if signal_id and target_workspace_id and task:
+                return {
+                    "type": "handoff_signal",
+                    "signal_id": signal_id,
+                    "target_workspace_id": target_workspace_id,
+                    "task": task,
+                }
+            # Pull-logs / soft dig-in: allow workspace + task without a signal id.
+            if target_workspace_id and task:
+                return {
+                    "type": "handoff_signal",
+                    "signal_id": signal_id or "signal_followup_logs",
+                    "target_workspace_id": target_workspace_id,
+                    "task": task,
+                }
         if entity.get("pending_briefing_surface") == "1":
             return {"type": "focus_briefing"}
     if _HANDOFF_ACTION_RE.search(trimmed):
@@ -204,8 +323,11 @@ __all__ = [
     "clear_memory_for_tests",
     "entity_context",
     "note_briefing_surface_offer",
+    "note_dig_in_offer",
+    "note_followup_offers",
     "recent_turns",
     "remember_entities",
+    "remember_signal_from_speak_context",
     "remember_top_signal",
     "remember_turn",
     "resolve_followup_action",

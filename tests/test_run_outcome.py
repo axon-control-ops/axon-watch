@@ -199,6 +199,49 @@ class RunOutcomeTests(unittest.TestCase):
         self.assertIn("assertion failed", outcome["detail"])
         self.assertEqual(real_failure["run_id"], outcome["run_id"])
 
+    def test_latest_role_outcome_recovers_untagged_ide_completion_via_thread(self) -> None:
+        from app.persistence import chat_store
+        from app.runs.service import complete_run
+
+        chat_store.reset_store()
+        self.addCleanup(chat_store.reset_store)
+
+        failed = create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Marco: continuous worker shift",
+            employee_role="backend",
+        )
+        fail_run(
+            failed["run_id"],
+            receipt_summary="Critical Review Clause missing: Confidence: N/10",
+        )
+
+        # Successful IDE retry historically omitted employee_role on the run row.
+        completed = create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Marco: bounded shift retry",
+            employee_role=None,
+        )
+        complete_run(completed["run_id"])
+        chat_store.create_thread(
+            workspace_id="workspace_axon_watch",
+            run_id=completed["run_id"],
+            created_at="2026-07-26T10:00:16Z",
+            thread_kind="ide",
+            employee_id="employee-workspace_axon_watch-backend-3",
+            employee_role="backend",
+        )
+
+        outcome = latest_role_run_outcome("workspace_axon_watch", "backend")
+        assert outcome is not None
+        self.assertEqual("completed", outcome["outcome"])
+        self.assertEqual(completed["run_id"], outcome["run_id"])
+        healed = run_store.get_run(completed["run_id"])
+        assert healed is not None
+        self.assertEqual("backend", healed.get("employee_role"))
+
 
 class RunOutcomeRosterApiTests(unittest.TestCase):
     def setUp(self) -> None:

@@ -25,6 +25,14 @@
   );
 }
 
+/* Brain Graph: full-bleed stage — no LIVE OPS dock reserve; sit near floating orb. */
+.console-shell--brain-galaxy .galaxy-speech-captions--operator {
+  left: calc(var(--galaxy-left-width, 2.75rem) + 1.1rem);
+  bottom: calc(var(--galaxy-bottom-reserve, 6.5rem) + 0.55rem);
+  width: min(32rem, 52vw);
+  max-width: calc(100% - var(--galaxy-left-width, 2.75rem) - 2.25rem);
+}
+
 .galaxy-speech-captions--ide {
   left: 1rem;
   bottom: calc(var(--workbench-terminal-height, 12rem) + 2.75rem);

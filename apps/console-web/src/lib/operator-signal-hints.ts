@@ -28,6 +28,20 @@ export function askShapedSpoken(body: string, invite: string): string {
   return `${base}. ${ask}`;
 }
 
+function cleanAlertTitle(title: string): string {
+  const trimmed = String(title ?? '').trim();
+  return trimmed.replace(/^VAXON:\s*/i, '').trim() || trimmed;
+}
+
+/** Prefer a concrete Attention ask; never fall back to generic dig-in. */
+export function lastResortSpokenInvite(title = ''): string {
+  const clean = cleanAlertTitle(title);
+  if (clean && clean.length <= 72) {
+    return `Open Attention for ${clean}?`;
+  }
+  return 'Want me to open Attention?';
+}
+
 /** Normalize control-plane snake_case explanation into the console view shape. */
 export function normalizeServerAlertExplanation(
   raw: ServerAlertExplanation | Record<string, unknown> | null | undefined,
@@ -238,7 +252,7 @@ export function explainOperatorAlert(input: {
       agentDo: `Investigate the ${label} monitor alert (${status}). Check the linked service dashboard, confirm whether it is a real outage or a config gap, fix what is safe, and report back in plain English.`,
       spoken: askShapedSpoken(
         `${label} needs attention — something outside the app looked unhealthy`,
-        'Shall I investigate?',
+        `Open Attention for ${label}?`,
       ),
     };
   }
@@ -251,7 +265,7 @@ export function explainOperatorAlert(input: {
       agentDo: override.agentDo,
       spoken:
         override.spoken ||
-        askShapedSpoken(`Heads up — ${title.replace(/^VAXON:\s*/i, '')}`, 'Shall I dig in?'),
+        askShapedSpoken(`Heads up — ${cleanAlertTitle(title)}`, lastResortSpokenInvite(title)),
     };
   }
 
@@ -336,7 +350,7 @@ export function explainOperatorAlert(input: {
     agentDo,
     spoken:
       override?.spoken ||
-      askShapedSpoken(`Heads up — ${title.replace(/^VAXON:\s*/i, '')}`, 'Shall I dig in?'),
+      askShapedSpoken(`Heads up — ${cleanAlertTitle(title)}`, lastResortSpokenInvite(title)),
   };
 }
 

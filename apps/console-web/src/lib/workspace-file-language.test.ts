@@ -21,6 +21,11 @@ describe('workspace-file-language', () => {
     expect(languageForFilePath('Button.tsx')).toBe('typescript');
   });
 
+  it('maps csv and yaml extensions', () => {
+    expect(languageForFilePath('reports/july.csv')).toBe('csv');
+    expect(languageForFilePath('config/app.yaml')).toBe('yaml');
+  });
+
   it('detects image and pdf canvas paths', () => {
     expect(isImageFilePath('output/signs/young-eagles-parent-gate-sign.svg')).toBe(true);
     expect(isPdfFilePath('output/signs/young-eagles-parent-gate-sign.pdf')).toBe(true);

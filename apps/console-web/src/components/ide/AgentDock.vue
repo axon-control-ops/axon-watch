@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 
 import ConversationSeamPanel from '../ConversationSeamPanel.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
+import { useVerticalPanelResize } from '../../composables/useVerticalPanelResize';
 import {
   agentDockCollapseTitle,
   agentDockReopenAlive,
@@ -20,43 +21,24 @@ import { useShellStore } from '../../stores/shell';
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
 
-const dockAlive = computed(() =>
-  agentDockReopenAlive({
-    streaming: shell.agentStreamActive,
-    pendingApprovals: shell.pendingApprovalsCount,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
-    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-  }),
-);
-
-const dockEmployeeFailure = computed(() =>
-  agentDockReopenEmployeeFailure({
-    streaming: shell.agentStreamActive,
-    pendingApprovals: shell.pendingApprovalsCount,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
-    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-  }),
-);
-
-const dockEmployeeInterrupted = computed(() =>
-  agentDockReopenEmployeeInterrupted({
-    streaming: shell.agentStreamActive,
-    pendingApprovals: shell.pendingApprovalsCount,
-    runPhase: shell.primaryActiveRun?.phase ?? null,
-    employeeFailureLine: shell.activeIdeEmployeeFailureLine,
-    employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
-  }),
-);
-
 const reopenState = computed(() => ({
   streaming: shell.agentStreamActive,
   pendingApprovals: shell.pendingApprovalsCount,
   runPhase: shell.primaryActiveRun?.phase ?? null,
   employeeFailureLine: shell.activeIdeEmployeeFailureLine,
   employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
+  speaking: shell.kairoSpeechActive,
 }));
+
+const dockAlive = computed(() => agentDockReopenAlive(reopenState.value));
+
+const dockEmployeeFailure = computed(() =>
+  agentDockReopenEmployeeFailure(reopenState.value),
+);
+
+const dockEmployeeInterrupted = computed(() =>
+  agentDockReopenEmployeeInterrupted(reopenState.value),
+);
 
 const reopenTitle = computed(() => agentDockReopenTitle(reopenState.value));
 const reopenAriaLabel = computed(() => agentDockReopenAriaLabel(reopenState.value));
@@ -72,6 +54,25 @@ const {
 } = useRightDockResize({
   dockRef,
   collapsed: computed(() => shell.agentDockCollapsed),
+});
+
+const {
+  panelSize: composerHeight,
+  userSized: composerUserSized,
+  resizing: composerResizing,
+  ariaValueMin: composerHeightMin,
+  ariaValueMax: composerHeightMax,
+  resetSize: resetComposerHeight,
+  startResize: startComposerResize,
+  onResizeKeydown: onComposerResizeKeydown,
+} = useVerticalPanelResize({
+  rootRef: dockRef,
+  cssVariable: '--agent-dock-composer-height',
+  storageKey: 'axon-shell-agent-dock-composer-height',
+  defaultSize: (height) => Math.min(Math.round(height * 0.34), 280),
+  minSize: 160,
+  maxSize: (height) => Math.round(height * 0.62),
+  growsUp: true,
 });
 
 function collapseDock(): void {
@@ -101,6 +102,8 @@ onMounted(() => {
     class="region region-right-dock agent-dock"
     :class="{
       'agent-dock--resizing': resizing,
+      'agent-dock--composer-resizing': composerResizing,
+      'agent-dock--composer-user-sized': composerUserSized,
       'agent-dock--alive': dockAlive,
       'agent-dock--streaming': shell.agentStreamActive,
     }"
@@ -158,6 +161,23 @@ onMounted(() => {
         <ConversationSeamPanel />
       </div>
     </section>
+
+    <div
+      class="agent-dock__composer-resize-handle"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize agent composer"
+      title="Drag the top of the composer up or down. Double-click to reset."
+      tabindex="0"
+      :aria-valuemin="composerHeightMin"
+      :aria-valuemax="composerHeightMax"
+      :aria-valuenow="composerHeight"
+      @mousedown="startComposerResize"
+      @keydown="onComposerResizeKeydown"
+      @dblclick="resetComposerHeight"
+    >
+      <span class="agent-dock__composer-resize-grip" aria-hidden="true" />
+    </div>
 
     <footer class="agent-dock__composer">
       <IdeAgentReviewStrip />

@@ -14,7 +14,7 @@ defineProps<{
 const emit = defineEmits<{
   reveal: [segment: TerminalSegment];
   background: [segment: TerminalSegment];
-  continueInBash: [command: string];
+  continueInBackground: [command: string];
   copyOutput: [output: string];
 }>();
 </script>
@@ -57,11 +57,11 @@ const emit = defineEmits<{
         v-if="!segment.open && segment.command.trim()"
         type="button"
         class="agent-block__terminal-background"
-        title="Re-run this command in the interactive bash terminal"
-        aria-label="Continue command in bash terminal"
-        @click="emit('continueInBash', segment.command)"
+        title="Continue this command in the vaxon agent terminal so you can watch it while the agent keeps working"
+        aria-label="Continue command in background agent terminal"
+        @click="emit('continueInBackground', segment.command)"
       >
-        Continue in bash
+        Continue in background
       </button>
       <button
         v-if="segment.output"

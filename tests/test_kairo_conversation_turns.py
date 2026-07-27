@@ -101,6 +101,86 @@ class KairoConversationTurnTests(unittest.TestCase):
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
     @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    def test_followup_yes_after_dig_in_offer_hands_off_to_ide(
+        self,
+        *_mocks: object,
+    ) -> None:
+        import app.kairo_conversation as kc
+
+        kc._remember_entities(
+            "dig-in-session",
+            signal_id="signal_monitor_dashpro_sentry_recent_issues_warning",
+            target_workspace_id="workspace_dashpro",
+            task='Investigate signal "Sentry spike in DashPro": 3 unresolved issues',
+            pending_dig_in="1",
+        )
+        payload = converse_turn(content="yes", session_id="dig-in-session")
+        self.assertEqual("action", payload["turn_kind"])
+        action = payload["action"]
+        assert isinstance(action, dict)
+        self.assertEqual("handoff_signal", action.get("type"))
+        self.assertEqual("workspace_dashpro", action.get("target_workspace_id"))
+        self.assertIn("handing this off", str(payload["reply"]).lower())
+        self.assertNotEqual("1", kc._entity_context("dig-in-session").get("pending_dig_in"))
+
+    def test_note_dig_in_offer_sets_pending_dig_in(self) -> None:
+        import app.kairo_conversation as kc
+        from app.kairo.turn_memory import note_dig_in_offer
+
+        kc._remember_entities("dig-in-offer-session", pending_dig_in="")
+        note_dig_in_offer(
+            "dig-in-offer-session",
+            "DashPro Sentry is critical. Open Attention for DashPro Sentry critical?",
+        )
+        entity = kc._entity_context("dig-in-offer-session")
+        self.assertEqual("1", entity.get("pending_dig_in"))
+        self.assertNotEqual("1", entity.get("pending_briefing_surface"))
+
+        kc._remember_entities("dig-in-offer-fallback", pending_dig_in="")
+        note_dig_in_offer("dig-in-offer-fallback", "Something odd happened. Want me to open Attention?")
+        self.assertEqual("1", kc._entity_context("dig-in-offer-fallback").get("pending_dig_in"))
+
+        kc._remember_entities(
+            "pull-logs-offer-session",
+            pending_dig_in="",
+            target_workspace_id="workspace_axon_watch",
+            task='Investigate signal "Axon-X Fast Gate"',
+        )
+        note_dig_in_offer(
+            "pull-logs-offer-session",
+            "Fast Gate failed on drill-9. I can pull the failed logs.",
+        )
+        pull_entity = kc._entity_context("pull-logs-offer-session")
+        self.assertEqual("1", pull_entity.get("pending_dig_in"))
+        self.assertIn("log", str(pull_entity.get("task", "")).lower())
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    def test_followup_pull_failed_logs_hands_off_to_ide(
+        self,
+        *_mocks: object,
+    ) -> None:
+        import app.kairo_conversation as kc
+
+        kc._remember_entities(
+            "pull-logs-session",
+            signal_id="signal_ci_fast_gate",
+            target_workspace_id="workspace_axon_watch",
+            task='Investigate signal "Axon-X Fast Gate" — Pull failed CI logs',
+            pending_dig_in="1",
+        )
+        payload = converse_turn(content="Pull the failed logs", session_id="pull-logs-session")
+        self.assertEqual("action", payload["turn_kind"])
+        action = payload["action"]
+        assert isinstance(action, dict)
+        self.assertEqual("handoff_signal", action.get("type"))
+        self.assertEqual("workspace_axon_watch", action.get("target_workspace_id"))
+        self.assertIn("log", str(action.get("task", "")).lower())
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
     def test_followup_yes_opens_briefing_surface(
         self,
         *_mocks: object,
@@ -328,11 +408,15 @@ class KairoConversationTurnTests(unittest.TestCase):
             answer_tier="deep",
         )
         reply = str(payload["reply"])
+        spoken = str(payload.get("spoken_reply") or reply)
         artifact_body = str(payload["artifacts"][0]["body"])
-        self.assertLessEqual(len(reply), 280)
+        # Deep/runtime turns keep the full reply for UI; TTS may shorten.
+        self.assertLessEqual(len(spoken), 900)
+        self.assertGreaterEqual(len(reply), len(spoken))
         self.assertIn("DashPro spike", artifact_body)
+        self.assertIn("storage", reply.lower())
         self.assertEqual(artifact_body.count("If you are seeing a spike in Supabase or Axon quota"), 1)
-        self.assertTrue(reply.endswith((".", "!", "?")))
+        self.assertTrue(spoken.endswith((".", "!", "?")))
 
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)

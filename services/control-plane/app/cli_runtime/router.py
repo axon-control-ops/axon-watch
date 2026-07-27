@@ -32,6 +32,7 @@ from app.cli_runtime.research_mcp import ensure_workspace_research_mcp
 from app.chat.scanned_workbook_gate import assignment_workbook_policy_appendix
 from app.debug_prompt import build_debug_system_prompt
 from app.kairo_ask_prompt import build_ask_system_prompt
+from app.cli_runtime.long_running_shell_prompt import LONG_RUNNING_SHELL_CLAUSE
 from app.cli_runtime.plan_system_prompt import (
     ask_fence_instruction,
     build_plan_system_prompt,
@@ -201,7 +202,7 @@ def _system_prompt(
             "workspace-relative paths such as README.md — never edit Cursor metadata "
             "directories. Do the work first, then reply with a short summary "
             f"of what changed. {ask_fence_instruction()}"
-            f"{_INSTRUCTION_TAKING} {research_clause}{research_line} {_REPLY_STYLE}"
+            f"{_INSTRUCTION_TAKING} {LONG_RUNNING_SHELL_CLAUSE} {research_clause}{research_line} {_REPLY_STYLE}"
         )
     return append_critical_review_clause(
         "You are Axon-X Lane B in Agent mode (consultative slice). Answer using the "

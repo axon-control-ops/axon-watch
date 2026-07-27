@@ -43,6 +43,7 @@ def persist_lead_task_plan(
             owner_role=item.owner_role,
             dependencies=dep_task_ids,
             exclusive_paths=item.exclusive_paths,
+            allowed_paths=item.allowed_paths or item.exclusive_paths,
         )
         plan_key_to_task_id[plan_key] = str(created["task_id"])
         tasks.append(
@@ -50,6 +51,7 @@ def persist_lead_task_plan(
                 **created,
                 "plan_key": plan_key,
                 "exclusive_paths": list(item.exclusive_paths),
+                "allowed_paths": list(item.allowed_paths or item.exclusive_paths),
             }
         )
 

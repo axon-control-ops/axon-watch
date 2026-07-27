@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import uuid
-from typing import Any
+from typing import Any, Iterable
 
 from app.persistence import run_store_sqlite
 
@@ -25,6 +25,7 @@ _TASK_COLUMNS = (
     "owner_role",
     "dependencies_json",
     "exclusive_paths_json",
+    "allowed_paths_json",
     "status",
     "lease_holder",
     "lease_expires_at",
@@ -93,6 +94,7 @@ def ensure_task_ledger_schema(connection: Any) -> None:
             owner_role TEXT NOT NULL DEFAULT '',
             dependencies_json TEXT NOT NULL DEFAULT '[]',
             exclusive_paths_json TEXT NOT NULL DEFAULT '[]',
+            allowed_paths_json TEXT NOT NULL DEFAULT '[]',
             status TEXT NOT NULL,
             lease_holder TEXT,
             lease_expires_at TEXT,
@@ -114,6 +116,11 @@ def ensure_task_ledger_schema(connection: Any) -> None:
             "ALTER TABLE workspace_tasks "
             "ADD COLUMN exclusive_paths_json TEXT NOT NULL DEFAULT '[]'"
         )
+    if "allowed_paths_json" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_tasks "
+            "ADD COLUMN allowed_paths_json TEXT NOT NULL DEFAULT '[]'"
+        )
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_workspace_tasks_workspace_status
@@ -129,23 +136,27 @@ def ensure_task_ledger_schema(connection: Any) -> None:
     connection.commit()
 
 
+def _parse_path_list(raw: Any) -> list[str]:
+    try:
+        parsed = json.loads(raw or "[]")
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(item).strip() for item in parsed if str(item).strip()]
+
+
 def _row_to_record(row: Any) -> dict[str, Any]:
     dependencies_raw = row["dependencies_json"] if "dependencies_json" in row.keys() else "[]"
     exclusive_paths_raw = (
         row["exclusive_paths_json"] if "exclusive_paths_json" in row.keys() else "[]"
     )
-    try:
-        dependencies = json.loads(dependencies_raw or "[]")
-    except json.JSONDecodeError:
-        dependencies = []
-    try:
-        exclusive_paths = json.loads(exclusive_paths_raw or "[]")
-    except json.JSONDecodeError:
-        exclusive_paths = []
-    if not isinstance(dependencies, list):
-        dependencies = []
-    if not isinstance(exclusive_paths, list):
-        exclusive_paths = []
+    allowed_paths_raw = (
+        row["allowed_paths_json"] if "allowed_paths_json" in row.keys() else "[]"
+    )
+    dependencies = _parse_path_list(dependencies_raw)
+    exclusive_paths = _parse_path_list(exclusive_paths_raw)
+    allowed_paths = _parse_path_list(allowed_paths_raw)
     return {
         "task_id": row["task_id"],
         "workspace_id": row["workspace_id"],
@@ -153,10 +164,9 @@ def _row_to_record(row: Any) -> dict[str, Any]:
         "acceptance_criteria": row["acceptance_criteria"] or "",
         "risk": row["risk"] or "normal",
         "owner_role": row["owner_role"] or "",
-        "dependencies": [str(item).strip() for item in dependencies if str(item).strip()],
-        "exclusive_paths": [
-            str(item).strip() for item in exclusive_paths if str(item).strip()
-        ],
+        "dependencies": dependencies,
+        "exclusive_paths": exclusive_paths,
+        "allowed_paths": allowed_paths,
         "status": row["status"],
         "lease_holder": row["lease_holder"],
         "lease_expires_at": row["lease_expires_at"],
@@ -234,6 +244,7 @@ def create_task(
     owner_role: str = "",
     dependencies: list[str] | None = None,
     exclusive_paths: list[str] | None = None,
+    allowed_paths: list[str] | None = None,
     attempt_budget: int = DEFAULT_ATTEMPT_BUDGET,
 ) -> dict[str, Any]:
     workspace = workspace_id.strip()
@@ -245,6 +256,7 @@ def create_task(
     budget = max(1, min(int(attempt_budget), 32))
     deps = [str(item).strip() for item in (dependencies or []) if str(item).strip()]
     paths = [str(item).strip() for item in (exclusive_paths or []) if str(item).strip()]
+    allowed = [str(item).strip() for item in (allowed_paths or []) if str(item).strip()]
     timestamp = _utc_now_iso()
     record = {
         "task_id": f"task-{uuid.uuid4().hex[:16]}",
@@ -255,6 +267,7 @@ def create_task(
         "owner_role": owner_role.strip().lower(),
         "dependencies_json": json.dumps(deps),
         "exclusive_paths_json": json.dumps(paths),
+        "allowed_paths_json": json.dumps(allowed),
         "status": "open",
         "lease_holder": None,
         "lease_expires_at": None,
@@ -640,6 +653,103 @@ def bind_task_run(task_id: str, run_id: str) -> dict[str, Any]:
     bound = get_task(task_key)
     assert bound is not None
     return bound
+
+
+def reopen_orphaned_leased_tasks(
+    *,
+    terminal_run_ids: Iterable[str],
+    terminal_outcome: str = "run terminal; lease recovered",
+) -> list[dict[str, Any]]:
+    """Reopen leased tasks whose bound run already reached a terminal phase.
+
+    Prevents canceled/failed/paused worker runs from leaving leased zombies that
+    block claim_open_task_for_role until the lease TTL expires.
+    """
+    run_keys = {
+        str(run_id).strip()
+        for run_id in terminal_run_ids
+        if str(run_id).strip()
+    }
+    if not run_keys:
+        return []
+    recovered: list[dict[str, Any]] = []
+    updated_at = _utc_now_iso()
+    outcome = (terminal_outcome or "run terminal; lease recovered").strip()
+    with _managed_connection() as connection:
+        ensure_task_ledger_schema(connection)
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM workspace_tasks
+            WHERE status = 'leased'
+              AND run_id IS NOT NULL
+            """
+        ).fetchall()
+        for row in rows:
+            record = _row_to_record(row)
+            run_id = str(record.get("run_id") or "").strip()
+            if run_id not in run_keys:
+                continue
+            connection.execute(
+                """
+                UPDATE workspace_tasks
+                SET status = 'open',
+                    lease_holder = NULL,
+                    lease_expires_at = NULL,
+                    run_id = NULL,
+                    terminal_outcome = ?,
+                    updated_at = ?
+                WHERE task_id = ? AND status = 'leased'
+                """,
+                (outcome, updated_at, record["task_id"]),
+            )
+            if connection.total_changes:
+                recovered.append(
+                    {
+                        **record,
+                        "status": "open",
+                        "lease_holder": None,
+                        "lease_expires_at": None,
+                        "run_id": None,
+                        "terminal_outcome": outcome,
+                        "updated_at": updated_at,
+                    }
+                )
+        connection.commit()
+    return recovered
+
+
+def cancel_tasks_matching_goal_prefix(
+    *,
+    workspace_id: str,
+    goal_substr: str,
+    exclude_task_id: str | None = None,
+    terminal_outcome: str = "superseded",
+) -> list[dict[str, Any]]:
+    """Cancel open/leased tasks whose goal contains ``goal_substr``."""
+    workspace = workspace_id.strip()
+    needle = goal_substr.strip().lower()
+    if not workspace or not needle:
+        return []
+    exclude = (exclude_task_id or "").strip()
+    cancelled: list[dict[str, Any]] = []
+    for record in list_tasks(workspace_id=workspace, limit=500):
+        status = str(record.get("status") or "").strip().lower()
+        if status not in {"open", "leased"}:
+            continue
+        task_id = str(record.get("task_id") or "").strip()
+        if exclude and task_id == exclude:
+            continue
+        goal = str(record.get("goal") or "").lower()
+        if needle not in goal:
+            continue
+        try:
+            cancelled.append(
+                cancel_task(task_id, terminal_outcome=terminal_outcome)
+            )
+        except TaskLedgerError:
+            continue
+    return cancelled
 
 
 def claim_open_task_for_role(

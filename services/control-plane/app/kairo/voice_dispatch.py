@@ -24,7 +24,7 @@ from app.kairo_conversation_reply import (
     compose_conversation_reply,
     compose_smalltalk_reply,
 )
-from app.kairo_conversation_runtime_context import OPEN_DETAIL_RE
+from app.kairo_conversation_runtime_context import OPEN_DETAIL_RE, STATUS_REPORT_RE
 from app.kairo_voice import normalize_spoken_line
 
 VoiceDispatchLane = Literal[
@@ -48,7 +48,12 @@ _DEFAULT_VAXON_MODEL_POOL = (
 )
 
 
-def _short_spoken_summary(reply: str, *, max_chars: int = 280) -> str:
+def _short_spoken_summary(
+    reply: str,
+    *,
+    max_chars: int = 280,
+    max_sentences: int = 2,
+) -> str:
     import re
 
     trimmed = re.sub(r"\s+", " ", reply.strip())
@@ -56,6 +61,7 @@ def _short_spoken_summary(reply: str, *, max_chars: int = 280) -> str:
         return ""
     sentences = re.split(r"(?<=[.!?])\s+", trimmed)
     summary = ""
+    sentence_count = 0
     for sentence in sentences:
         candidate = sentence.strip()
         if not candidate:
@@ -64,7 +70,8 @@ def _short_spoken_summary(reply: str, *, max_chars: int = 280) -> str:
         if len(next_summary) > max_chars:
             break
         summary = next_summary
-        if summary.count(".") + summary.count("!") + summary.count("?") >= 2:
+        sentence_count += 1
+        if sentence_count >= max_sentences:
             break
     if summary:
         return summary
@@ -72,6 +79,13 @@ def _short_spoken_summary(reply: str, *, max_chars: int = 280) -> str:
         return trimmed
     shortened = trimmed[: max_chars - 1].rstrip(" ,;:")
     return f"{shortened}…"
+
+
+def _spoken_delivery_summary(reply: str, *, deep: bool) -> str:
+    """TTS may be shorter than the UI reply; deep/status reports keep more detail."""
+    if deep:
+        return _short_spoken_summary(reply, max_chars=900, max_sentences=6)
+    return _short_spoken_summary(reply, max_chars=280, max_sentences=2)
 
 
 @dataclass(frozen=True)
@@ -112,6 +126,7 @@ class VoiceDispatchDecision:
     turn_kind: ConversationTurnKind
     source: ConversationSource
     reply: str
+    spoken_reply: str | None = None
     command_content: str | None = None
     requires_confirmation: bool | None = None
     action_tier: str | None = None
@@ -370,14 +385,20 @@ def route_voice_turn(
                 workspace_id=workspace_id,
             )
         ]
-        # Keep spoken reply short; full body stays on the artifact.
-        spoken = _short_spoken_summary(reply)
+        # UI/transcript keep the full reply; TTS may use a shorter spoken_reply.
+        deep = (
+            answer_tier == "deep"
+            or bool(OPEN_DETAIL_RE.search(content))
+            or bool(STATUS_REPORT_RE.search(content))
+        )
+        spoken = _spoken_delivery_summary(reply, deep=deep)
         remember_top_signal(session_id, pack, fallback_workspace_id=workspace_id)
         return VoiceDispatchDecision(
             lane="vaxon_runtime",
             turn_kind=turn_kind,
             source=source,
-            reply=spoken or reply,
+            reply=reply,
+            spoken_reply=spoken or reply,
             artifacts=artifacts,
             runtime_dispatched=source == "model",
             model_receipt=receipt,

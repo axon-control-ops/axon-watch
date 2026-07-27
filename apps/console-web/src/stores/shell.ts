@@ -55,6 +55,7 @@ import {
   handleAgentStreamVoiceDelta,
 } from '../lib/agent-stream-voice-session';
 import { createRafStreamUiBatcher } from '../lib/stream-ui-raf-batch';
+import { createStreamMessageContentBatcher } from '../lib/stream-message-content-batch';
 import {
   resolveBootstrapIdeThreadId,
   shouldApplyWorkspaceThreadLoad,
@@ -230,16 +231,11 @@ import {
   writeOpenEditorFilePathsForWorkspace,
 } from '../lib/editor-open-tabs-prefs';
 import { formatAgentDraftTitle } from '../lib/editor-tab-labels';
-import type { IdeAgentEditSummary } from '../lib/ide-agent-center-view';
 import {
-  agentEditReviewDocumentId,
-  agentEditReviewDocumentTitle,
-  formatAgentEditReviewContent,
   isAgentEditReviewDocumentId,
   isMarkdownAgentEditPath,
-  shouldOpenWorkspaceFileForEditReview,
 } from '../lib/ide-agent-edit-review';
-import { normalizeEditedFilePath } from '../lib/agent-transcript-blocks';
+import { createShellAgentCanvasOps } from '../lib/shell-agent-canvas-ops';
 import {
   resolveRunHistoryRunId,
   selectRunSeamDisplayRun,
@@ -278,13 +274,17 @@ import {
   defaultOperatorWorkspaceId,
 } from '../lib/operator-workspace-catalog';
 import {
-  type IdeActivityView,
+  DEFAULT_IDE_ACTIVITY_VIEW,
   persistAgentDockCollapsed,
   persistLayoutMode,
   readStoredAgentDockCollapsed,
   readStoredIdeExplorerCollapsed,
   readStoredLayoutMode,
 } from '../lib/ide-layout-prefs';
+import {
+  openIdeComposerSurface,
+  openIdeComposerSurfaceWithDraft,
+} from './shell/open-ide-composer';
 import { createCatalogLoadersSlice } from './shell/slices/create-catalog-loaders-slice';
 import { createComposerRuntimePrefsSlice } from './shell/slices/create-composer-runtime-prefs-slice';
 import { createConnectorsSlice } from './shell/slices/create-connectors-slice';
@@ -302,6 +302,7 @@ import { createRuntimeSummarySlice } from './shell/slices/create-runtime-summary
 import { createShellDisplaySlice } from './shell/slices/create-shell-display-slice';
 import { createThreadSurfaceSlice } from './shell/slices/create-thread-surface-slice';
 import { createCompanyRosterSlice } from './shell/slices/create-company-roster-slice';
+import { createBusyEmployeeIdeStreamSlice } from './shell/slices/create-busy-employee-ide-stream-slice';
 import { createWorkspaceTasksSlice } from './shell/slices/create-workspace-tasks-slice';
 import { createViewportCompactSlice } from './shell/slices/create-viewport-compact-slice';
 import { createKairoVoiceSlice } from './shell/slices/create-kairo-voice-slice';
@@ -326,11 +327,8 @@ import {
   type WorkspacesLoadState,
 } from './shell/types';
 export type { LayoutMode, RuntimeSummaryLoadState, RuntimeStatusLoadState, InboxLoadState, RunsLoadState, WorkspacesLoadState, BriefingLoadState, WorkspaceFilesLoadState, RunMutationState } from './shell/types';
-
 export const useShellStore = defineStore('shell', () => {
   const layoutMode = ref<LayoutMode>(readStoredLayoutMode() ?? 'operator');
-
-  // Backend-owned state stays on shared canonical DTO seams.
   const workspaces = ref<WorkspaceRecord[]>([]);
   const currentWorkspace = ref<WorkspaceRecord | null>(null);
   const operatorPinnedWorkspaceId = ref<string | null>(readStoredOperatorWorkspaceId());
@@ -507,7 +505,7 @@ export const useShellStore = defineStore('shell', () => {
   const commandFocusToken = ref(0);
   const leftSidebarMode = ref<LeftSidebarMode>(readStoredLeftSidebarMode() ?? 'workspaces');
   const leftSidebarModeTouched = ref(Boolean(readStoredLeftSidebarMode()));
-  const ideActivityView = ref<IdeActivityView>('explorer');
+  const ideActivityView = ref(DEFAULT_IDE_ACTIVITY_VIEW);
   const ideExplorerCollapsed = ref(readStoredIdeExplorerCollapsed());
   const ideAttentionPanelOpen = ref(false);
   const ideBriefingPanelOpen = ref(false);
@@ -1278,7 +1276,9 @@ export const useShellStore = defineStore('shell', () => {
       );
       if (existing?.thread_id) {
         flushIdeComposerDraft();
-        await selectIdeThread(existing.thread_id);
+        // Continuous-worker / fan-out writes the teammate thread out-of-band — always
+        // refetch so AgentDock does not show a stale pre-shift cache.
+        await selectIdeThread(existing.thread_id, { forceRefresh: true });
         openIdeComposer({ keepActivityView: true });
         return existing.thread_id;
       }
@@ -1299,7 +1299,7 @@ export const useShellStore = defineStore('shell', () => {
         ]),
       };
       flushIdeComposerDraft();
-      await selectIdeThread(created.thread_id);
+      await selectIdeThread(created.thread_id, { forceRefresh: true });
       ideComposerDraft.value = '';
       persistIdeComposerDraft(workspaceId, '', created.thread_id);
       openIdeComposer({ keepActivityView: true });
@@ -1311,19 +1311,23 @@ export const useShellStore = defineStore('shell', () => {
     }
   }
 
-  async function selectIdeThread(threadId: string): Promise<void> {
+  async function selectIdeThread(
+    threadId: string,
+    options?: { forceRefresh?: boolean },
+  ): Promise<void> {
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (!workspaceId) {
       return;
     }
 
+    const forceRefresh = options?.forceRefresh === true;
     const previousThreadId = activeIdeThreadId.value;
-    if (previousThreadId === threadId) {
+    if (previousThreadId === threadId && !forceRefresh) {
       ensureIdeThreadTabOpen(threadId);
       return;
     }
 
-    if (previousThreadId) {
+    if (previousThreadId && previousThreadId !== threadId) {
       flushIdeComposerDraft();
       // Keep the previous thread's live SSE + message cache — do not disconnect.
       workspaceIdeThreadMessagesById.value = {
@@ -1348,12 +1352,18 @@ export const useShellStore = defineStore('shell', () => {
       ideAgentRunId.value = getWorkspaceStreamUi(threadId).ideAgentRunId;
     }
 
-    const cached = workspaceIdeThreadMessagesById.value[threadId];
-    if (cached?.length) {
-      threadMessages.value = cached;
-      commandMutationState.value = 'idle';
-      commandMutationError.value = null;
-      return;
+    if (forceRefresh) {
+      const nextCache = { ...workspaceIdeThreadMessagesById.value };
+      delete nextCache[threadId];
+      workspaceIdeThreadMessagesById.value = nextCache;
+    } else {
+      const cached = workspaceIdeThreadMessagesById.value[threadId];
+      if (cached?.length) {
+        threadMessages.value = cached;
+        commandMutationState.value = 'idle';
+        commandMutationError.value = null;
+        return;
+      }
     }
 
     if (layoutMode.value === 'ide') {
@@ -1557,6 +1567,8 @@ export const useShellStore = defineStore('shell', () => {
     briefingSeamEmphasized,
     operatorCenterView,
     dockHeroMode,
+    expandedDockSeams,
+    dockThreadSeamTouched,
     setLeftSidebarMode,
     setDockHeroMode,
     restoreComposerDraft,
@@ -1598,23 +1610,45 @@ export const useShellStore = defineStore('shell', () => {
     focusKairoBriefing,
   });
 
-  function attachChatStream(workspaceId: string, threadId: string, messageId: string): void {
-    const attachedRunId = ideAgentRunId.value;
+  function attachChatStream(
+    workspaceId: string,
+    threadId: string,
+    messageId: string,
+    options?: {
+      activity?: IdeComposerActivity | null;
+      ideAgentRunId?: string | null;
+      /** Seed this thread's cache (background follow). Prefer over copying the focused transcript. */
+      seedMessages?: OperatorThreadEntry[];
+      /** Keep an existing cache entry instead of overwriting from the focused transcript. */
+      preserveMessageCache?: boolean;
+    },
+  ): void {
+    const streamActivity = options?.activity !== undefined ? options.activity : ideComposerActivity.value;
+    const streamRunId =
+      options?.ideAgentRunId !== undefined ? options.ideAgentRunId : ideAgentRunId.value;
+    const attachedRunId = streamRunId;
     // Only replace this thread's session — leave sibling teammate streams running.
     disconnectChatStreamSession(threadId);
     setWorkspaceStreamUi(threadId, {
       active: true,
       messageId,
-      activity: ideComposerActivity.value,
-      ideAgentRunId: ideAgentRunId.value,
+      activity: streamActivity,
+      ideAgentRunId: streamRunId,
     });
-    workspaceIdeThreadMessagesById.value = {
-      ...workspaceIdeThreadMessagesById.value,
-      [threadId]: [...threadMessages.value],
-    };
-    const composerMode = ideComposerActivity.value?.mode;
-    const fullAccessNarration = ideComposerActivity.value?.executionAccess === 'full';
-    const operatorPrompt = ideComposerActivity.value?.operatorPrompt?.trim() ?? '';
+    if (options?.seedMessages) {
+      workspaceIdeThreadMessagesById.value = {
+        ...workspaceIdeThreadMessagesById.value,
+        [threadId]: [...options.seedMessages],
+      };
+    } else if (!options?.preserveMessageCache) {
+      workspaceIdeThreadMessagesById.value = {
+        ...workspaceIdeThreadMessagesById.value,
+        [threadId]: [...threadMessages.value],
+      };
+    }
+    const composerMode = streamActivity?.mode;
+    const fullAccessNarration = streamActivity?.executionAccess === 'full';
+    const operatorPrompt = streamActivity?.operatorPrompt?.trim() ?? '';
     let streamedContent = '';
     let terminalAutoRevealSeen = false;
     const streamIncremental = createAgentStreamIncrementalState({
@@ -1623,6 +1657,23 @@ export const useShellStore = defineStore('shell', () => {
     const streamUiBatcher = createRafStreamUiBatcher<Partial<WorkspaceStreamUiState>>(
       (streamThreadId, partial) => setWorkspaceStreamUi(streamThreadId, partial),
     );
+    const contentBatcher = createStreamMessageContentBatcher(patchThreadMessageContent);
+    const settleStreamUi = (clearRunId = false) => {
+      streamUiBatcher.flushNow(threadId);
+      contentBatcher.flushNow(threadId);
+      setWorkspaceStreamUi(threadId, {
+        active: false,
+        messageId: null,
+        activity: null,
+        ...(clearRunId ? { ideAgentRunId: null } : {}),
+      });
+      streamUiBatcher.cancel(threadId);
+      contentBatcher.cancel(threadId);
+      disconnectChatStreamSession(threadId);
+      void refreshRunSurfaces().finally(() => {
+        void flushIdeComposerQueueIfIdle();
+      });
+    };
     const voiceContext = kairoVoiceContext();
     const voiceNarration = createAgentStreamVoiceSession({
       composerMode,
@@ -1646,7 +1697,7 @@ export const useShellStore = defineStore('shell', () => {
         messageId,
         onDelta: (content) => {
           streamedContent = content;
-          patchThreadMessageContent(threadId, messageId, content);
+          contentBatcher.schedule(threadId, { messageId, content });
           const activity = getWorkspaceStreamUi(threadId).activity as IdeComposerActivity | null;
           handleAgentStreamVoiceDelta({
             voiceNarration,
@@ -1685,6 +1736,7 @@ export const useShellStore = defineStore('shell', () => {
         },
         onDone: (payload) => {
           try {
+            contentBatcher.flushNow(threadId);
             clearIdeRunRecovery(attachedRunId ?? undefined);
             if (payload.system_message_id && payload.system_content) {
               patchThreadMessageContent(
@@ -1737,18 +1789,7 @@ export const useShellStore = defineStore('shell', () => {
               }
             }
           } finally {
-            streamUiBatcher.flushNow(threadId);
-            setWorkspaceStreamUi(threadId, {
-              active: false,
-              messageId: null,
-              activity: null,
-              ideAgentRunId: null,
-            });
-            streamUiBatcher.cancel(threadId);
-            disconnectChatStreamSession(threadId);
-            void refreshRunSurfaces().finally(() => {
-              void flushIdeComposerQueueIfIdle();
-            });
+            settleStreamUi(true);
           }
         },
         onError: (message, payload) => {
@@ -1768,51 +1809,44 @@ export const useShellStore = defineStore('shell', () => {
           ) {
             commandMutationError.value = message;
           }
-          streamUiBatcher.flushNow(threadId);
-          setWorkspaceStreamUi(threadId, {
-            active: false,
-            messageId: null,
-            activity: null,
-          });
-          streamUiBatcher.cancel(threadId);
-          disconnectChatStreamSession(threadId);
-          void refreshRunSurfaces().finally(() => {
-            void flushIdeComposerQueueIfIdle();
-          });
+          settleStreamUi();
         },
       }),
     );
   }
 
+  createBusyEmployeeIdeStreamSlice({
+    currentWorkspaceId: computed(() => currentWorkspace.value?.workspace_id ?? null),
+    layoutMode,
+    companyEmployees: companyEmployeesForCurrentWorkspace,
+    ideThreadsByWorkspaceId,
+    workspaceIdeThreadMessagesById,
+    loadIdeThreads,
+    ensureIdeThreadTabOpen,
+    getWorkspaceStreamUi,
+    attachChatStream,
+  });
   function clearIdeAgentRunLink(): void {
     ideAgentRunId.value = null;
   }
-
   function setIdeDebugModeSelected(selected: boolean): void {
     ideDebugModeSelected.value = selected;
   }
 
-  /** Open the IDE chat dock without changing the draft. Keep Team (or other) left panel when requested. */
   function openIdeComposer(options: { keepActivityView?: boolean } = {}): void {
-    commandMutationError.value = null;
-    if (layoutMode.value !== 'ide') {
-      setLayoutMode('ide');
-    }
-    agentDockCollapsed.value = false;
-    persistAgentDockCollapsed(false);
-    if (!options.keepActivityView) {
-      ideActivityView.value = 'agent';
-    }
-    commandFocusToken.value += 1;
+    openIdeComposerSurface({
+      layoutMode: layoutMode.value, setLayoutMode, agentDockCollapsed,
+      persistAgentDockCollapsed, ideActivityView, commandFocusToken, commandMutationError,
+      keepActivityView: options.keepActivityView,
+    });
   }
 
-  /** Open the IDE chat dock with a draft. Keep Team (or other) left panel when requested. */
-  function openIdeComposerWithDraft(
-    content: string,
-    options: { keepActivityView?: boolean } = {},
-  ): void {
-    ideComposerDraft.value = content.trim();
-    openIdeComposer(options);
+  function openIdeComposerWithDraft(content: string, options: { keepActivityView?: boolean } = {}): void {
+    openIdeComposerSurfaceWithDraft({
+      content, ideComposerDraft, layoutMode: layoutMode.value, setLayoutMode,
+      agentDockCollapsed, persistAgentDockCollapsed, ideActivityView, commandFocusToken,
+      commandMutationError, keepActivityView: options.keepActivityView,
+    });
   }
 
   function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {
@@ -2249,10 +2283,11 @@ export const useShellStore = defineStore('shell', () => {
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
     applyOperatorDockDefaults();
+    // Operator entry keeps the persisted center view (default: Mission Control fleet).
     if (mode === 'ide') {
-      // Galaxy hide-right-dock CSS must not leave AgentDock collapsed/gone after IDE entry.
-      agentDockCollapsed.value = false;
-      persistAgentDockCollapsed(false);
+      // Quiet IDE: restore persisted collapse (default collapsed). Operator galaxy CSS
+      // only hides the right dock in Operator mode, so IDE entry no longer force-expands.
+      agentDockCollapsed.value = readStoredAgentDockCollapsed();
     }
     const workspaceId = currentWorkspace.value?.workspace_id;
     if (workspaceId) {
@@ -2310,6 +2345,7 @@ export const useShellStore = defineStore('shell', () => {
     createVaxonTerminalSession,
     loadTerminalSessions,
     renameTerminalSession,
+    runCommandInAgentBackgroundTerminal,
     runCommandInOperatorTerminal,
     setActiveTerminalSession,
     splitTerminalSession,
@@ -2599,74 +2635,16 @@ export const useShellStore = defineStore('shell', () => {
     return id;
   }
 
-  function openAgentEditReview(edit: Pick<IdeAgentEditSummary, 'path' | 'diff' | 'added' | 'removed' | 'open'>): void {
-    const path = normalizeEditedFilePath(edit.path);
-    if (shouldOpenWorkspaceFileForEditReview(edit)) {
-      if (layoutMode.value !== 'ide') {
-        setLayoutMode('ide');
-      }
-      // Completed edits are already on disk — open the real file (Preview / canvas).
-      if (languageForFilePath(path) === 'markdown') {
-        persistEditorMarkdownPreviewEnabled(workspaceFileDocumentId(path), true);
-      }
-      void openWorkspaceFile(path);
-      return;
-    }
-
-    if (layoutMode.value !== 'ide') {
-      setLayoutMode('ide');
-    }
-
-    if (!openedFilePaths.value.includes(path)) {
-      openedFilePaths.value = [...openedFilePaths.value, path];
-      void ensureWorkspaceFileLoaded(path);
-    }
-
-    const id = agentEditReviewDocumentId(path);
-    const title = agentEditReviewDocumentTitle(path);
-    const content = formatAgentEditReviewContent(edit);
-    const language = (
-      languageForFilePath(path) === 'markdown' ? 'markdown' : 'plaintext'
-    ) as EditorDocumentLanguage;
-    const existing = draftDocuments.value.find((document) => document.id === id);
-
-    if (existing) {
-      draftDocuments.value = draftDocuments.value.map((document) =>
-        document.id === id
-          ? {
-              ...document,
-              title,
-              language,
-              value: content,
-              dirty: document.value !== content,
-            }
-          : document,
-      );
-    } else {
-      draftDocuments.value = [
-        ...draftDocuments.value,
-        {
-          id,
-          title,
-          language,
-          value: content,
-          description:
-            language === 'markdown'
-              ? 'Agent markdown review (Preview/Raw). Diff markers are stripped for readable rendering.'
-              : 'Agent proposed changes from the transcript diff (read-only review).',
-          source: 'draft',
-          readOnly: true,
-          dirty: false,
-          filePath: path,
-        },
-      ];
-    }
-
-    if (language === 'markdown') {
-      persistEditorMarkdownPreviewEnabled(id, true);
-    }
-    activeEditorDocumentId.value = id;
-  }
+  const { openImageInCanvas, openAgentEditReview } = createShellAgentCanvasOps({
+    layoutMode,
+    setLayoutMode,
+    currentWorkspace,
+    draftDocuments,
+    openedFilePaths,
+    activeEditorDocumentId,
+    openWorkspaceFile,
+    ensureWorkspaceFileLoaded,
+  });
 
   function recordAgentReportEditorLink(
     messageId: string,
@@ -3664,6 +3642,7 @@ export const useShellStore = defineStore('shell', () => {
     loadRuntimeStatus,
     loadRuntimeSummary,
     loadWorkspaceThread,
+    refreshOperatorThreadMessages,
     loadIdeThreads,
     hydrateWorkspaceIdeChat,
     createIdeThread,
@@ -3675,6 +3654,7 @@ export const useShellStore = defineStore('shell', () => {
     createTerminalSession,
     createVaxonTerminalSession,
     backgroundIdeAgentRun,
+    runCommandInAgentBackgroundTerminal,
     runCommandInOperatorTerminal,
     splitTerminalSession,
     renameTerminalSession,
@@ -3820,6 +3800,7 @@ export const useShellStore = defineStore('shell', () => {
     loadWorkspaceFiles,
     openAgentContentInEditor,
     openAgentEditReview,
+    openImageInCanvas,
     openWorkspaceFile,
     openResearchInEditor,
     proveResearchSource,

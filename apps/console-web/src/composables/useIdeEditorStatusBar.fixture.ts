@@ -20,6 +20,7 @@ export function mockShell(overrides: Record<string, unknown> = {}) {
     focusWatchConnectors: vi.fn(),
     openIdeComposerWithDraft: vi.fn(),
     openIdeComposer: vi.fn(),
+    setAgentExecutionAccess: vi.fn(),
     focusIdeSidebarView: vi.fn(),
     toggleIdeTerminalPanel: vi.fn(),
     companyEmployeesForCurrentWorkspace: [],

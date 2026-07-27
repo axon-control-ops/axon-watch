@@ -28,11 +28,16 @@ class Gate4TaskLedgerTests(unittest.TestCase):
             owner_role="integrations",
             risk="normal",
             attempt_budget=2,
+            allowed_paths=["apps/console-web/src/", "scripts/guardrails/"],
         )
         self.assertTrue(created["task_id"].startswith("task-"))
         self.assertEqual("open", created["status"])
         self.assertEqual(0, created["attempts_used"])
         self.assertEqual(2, created["attempt_budget"])
+        self.assertEqual(
+            ["apps/console-web/src/", "scripts/guardrails/"],
+            created["allowed_paths"],
+        )
 
         listed = task_store.list_tasks(
             workspace_id="workspace_dashpro",
@@ -40,6 +45,32 @@ class Gate4TaskLedgerTests(unittest.TestCase):
         )
         self.assertEqual(1, len(listed))
         self.assertEqual(created["task_id"], listed[0]["task_id"])
+        self.assertEqual(
+            ["apps/console-web/src/", "scripts/guardrails/"],
+            listed[0]["allowed_paths"],
+        )
+
+    def test_reopen_orphaned_leased_tasks_for_terminal_runs(self) -> None:
+        created = task_store.create_task(
+            workspace_id="workspace_axon_watch",
+            goal="CI repair: Axon-X Fast Gate failed on feat/x",
+            owner_role="watcher",
+        )
+        leased = task_store.lease_task(
+            created["task_id"],
+            lease_holder="ci-remediation",
+            run_id="run_terminal_zombie",
+        )
+        self.assertEqual("leased", leased["status"])
+        recovered = task_store.reopen_orphaned_leased_tasks(
+            terminal_run_ids=["run_terminal_zombie"],
+        )
+        self.assertEqual(1, len(recovered))
+        again = task_store.get_task(created["task_id"])
+        assert again is not None
+        self.assertEqual("open", again["status"])
+        self.assertIsNone(again["lease_holder"])
+        self.assertIsNone(again["run_id"])
 
     def test_lease_contention_only_one_winner(self) -> None:
         created = task_store.create_task(

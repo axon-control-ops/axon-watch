@@ -24,6 +24,7 @@ from app.persistence.operator_presence_settings_store import load_settings as lo
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
     note_briefing_surface_offer as _note_briefing_surface_offer,
+    note_followup_offers as _note_followup_offers,
     recent_turns as _recent_turns,
     remember_entities as _remember_entities,
     remember_top_signal as _remember_top_signal,
@@ -189,6 +190,7 @@ def converse_turn(
                 "Handing this off to the IDE now.",
                 guest_name,
             )
+            _remember_entities(session_id, pending_dig_in="")
             _remember_turn(session_id, "user", trimmed)
             _remember_turn(session_id, "assistant", reply)
             return _log_voice_turn(
@@ -355,18 +357,21 @@ def converse_turn(
     )
 
     reply = decision.reply
+    spoken_reply = decision.spoken_reply
     source = decision.source
     command_content = decision.command_content
     artifacts = decision.artifacts
     runtime_dispatched = decision.runtime_dispatched
     requires_confirmation = decision.requires_confirmation
     model_receipt = decision.model_receipt.as_dict() if decision.model_receipt else None
+    listener = guest_name or get_active_participant(session_id)
 
     if reply:
-        reply = normalize_spoken_line(reply)
-        reply = apply_participant_address(reply, guest_name or get_active_participant(session_id))
+        reply = apply_participant_address(normalize_spoken_line(reply), listener)
+    if spoken_reply:
+        spoken_reply = apply_participant_address(normalize_spoken_line(spoken_reply), listener)
 
-    _note_briefing_surface_offer(session_id, reply)
+    _note_followup_offers(session_id, reply)
     _remember_turn(session_id, "user", trimmed)
     _remember_turn(session_id, "assistant", reply)
 
@@ -378,6 +383,7 @@ def converse_turn(
         payload={
             "turn_kind": decision.turn_kind,
             "reply": reply,
+            "spoken_reply": spoken_reply,
             "source": source,
             "command_content": command_content,
             "requires_confirmation": requires_confirmation if decision.turn_kind == "command" else None,
@@ -388,7 +394,7 @@ def converse_turn(
             "routing_receipt": decision.model_receipt.as_line() if decision.model_receipt else None,
             "action": decision.action,
             "artifacts": artifacts,
-            "active_participant": guest_name or get_active_participant(session_id),
+            "active_participant": listener,
         },
         duration_ms=round((time.perf_counter() - started_at) * 1000),
         runtime_dispatched=runtime_dispatched,

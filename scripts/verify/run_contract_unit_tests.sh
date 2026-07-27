@@ -40,6 +40,7 @@ main_tests=(
   tests.test_control_plane_chat_health
   tests.test_employee_chat_thread
   tests.test_employee_persona_prompt
+  tests.test_team_roster_context
   tests.test_teammate_route
   tests.test_command_executor
   tests.test_workspace_agent_scheduler
@@ -121,6 +122,7 @@ main_tests=(
   tests.test_lead_replan
   tests.test_gate6_verifier_contract
   tests.test_gate6_project_contract
+  tests.test_ci_remediation
   tests.test_safe_improvement
   tests.test_safe_improvement_gate
 )

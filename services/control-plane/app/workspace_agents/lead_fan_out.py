@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
-from app.persistence import task_store
+from app.persistence import chat_store, task_store
 from app.runs.service import append_run_execution_receipt, create_run
 from app.workspace_agents import build_company_roster
 from app.workspace_agents import lead_plan_store
@@ -19,6 +21,15 @@ from app.workspace_agents.lead_task_plan import (
 
 class LeadFanOutError(ValueError):
     """Operator-facing fan-out / plan materialize failure."""
+
+
+def _utc_now_iso() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def _roster_from_company(workspace_id: str) -> list[LeadPlanRosterMember]:
@@ -43,6 +54,21 @@ def _roster_from_company(workspace_id: str) -> list[LeadPlanRosterMember]:
     return members
 
 
+def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
+    company = build_company_roster(workspace_id)
+    rows = company.get("employees") if isinstance(company, dict) else None
+    if not isinstance(rows, list):
+        return None
+    want = role.strip().lower()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("role") or "").strip().lower() == want:
+            employee_id = str(row.get("employee_id") or "").strip()
+            return employee_id or None
+    return None
+
+
 def _deps_completed(task: dict[str, Any]) -> bool:
     deps = task.get("dependencies")
     if not isinstance(deps, list) or not deps:
@@ -56,6 +82,72 @@ def _deps_completed(task: dict[str, Any]) -> bool:
     return True
 
 
+def _post_assignment_to_employee_thread(
+    *,
+    workspace_id: str,
+    owner_role: str,
+    run_id: str,
+    task_id: str,
+    goal: str,
+) -> str | None:
+    """Surface fan-out assignment in the specialist IDE thread (not silent busy)."""
+    employee_id = _employee_id_for_role(workspace_id, owner_role)
+    if not employee_id:
+        return None
+    created_at = _utc_now_iso()
+    thread = chat_store.find_thread_for_employee(
+        workspace_id,
+        employee_id=employee_id,
+        thread_kind="ide",
+    )
+    if thread is None:
+        name = owner_role.replace("_", " ").title()
+        thread = chat_store.create_thread(
+            workspace_id=workspace_id,
+            run_id=run_id,
+            created_at=created_at,
+            thread_kind="ide",
+            title=f"{name} · assigned",
+            employee_id=employee_id,
+            employee_role=owner_role,
+        )
+    thread_id = str(thread["thread_id"])
+    goal_line = " ".join(str(goal or "").split())
+    if len(goal_line) > 220:
+        goal_line = f"{goal_line[:219].rstrip()}…"
+    chat_store.save_message(
+        {
+            "message_id": f"message_system_{uuid4().hex}",
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": run_id,
+            "role": "system",
+            "content": (
+                f"Lead fan-out assigned task {task_id} → run {run_id} "
+                f"(queued — waiting for worker dispatch)."
+            ),
+            "created_at": created_at,
+        }
+    )
+    chat_store.save_message(
+        {
+            "message_id": f"message_agent_{uuid4().hex}",
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": run_id,
+            "role": "agent",
+            "content": (
+                f"Assigned by Lead fan-out.\n"
+                f"Goal: {goal_line or '(no goal text)'}\n"
+                f"Status: queued until continuous worker dispatch starts Lane B. "
+                f"Open this thread after dispatch to follow the shift transcript."
+            ),
+            "created_at": created_at,
+        }
+    )
+    return thread_id
+
+
 def materialize_lead_fan_out(
     *,
     workspace_id: str,
@@ -67,7 +159,8 @@ def materialize_lead_fan_out(
     """Build plan, persist tasks, and open leased runs for dependency-ready items.
 
     Does **not** start Lane B dispatch or enable the continuous scheduler.
-    Ready runs appear on the task board / run list for operators and workers.
+    Ready runs stay **queued** (not fake-executing) so the operator sees assignment
+    in specialist threads and the scheduler can dispatch without slot deadlock.
     """
     workspace = workspace_id.strip()
     cleaned_goal = " ".join((goal or "").strip().split())
@@ -135,6 +228,7 @@ def materialize_lead_fan_out(
                 employee_role=owner_role,
                 task_id=task_id,
                 require_leased_task=True,
+                enter_execution=False,
             )
             append_run_execution_receipt(
                 str(run["run_id"]),
@@ -145,6 +239,13 @@ def materialize_lead_fan_out(
                 ),
                 actor="lead_planner",
             )
+            thread_id = _post_assignment_to_employee_thread(
+                workspace_id=workspace,
+                owner_role=owner_role,
+                run_id=str(run["run_id"]),
+                task_id=task_id,
+                goal=str(leased.get("goal") or cleaned_goal),
+            )
             runs.append(
                 {
                     "run_id": run["run_id"],
@@ -152,6 +253,7 @@ def materialize_lead_fan_out(
                     "plan_key": row.get("plan_key"),
                     "owner_role": owner_role,
                     "phase": run.get("phase"),
+                    "thread_id": thread_id,
                 }
             )
             tasks_by_id[task_id] = task_store.get_task(task_id) or leased
@@ -165,6 +267,9 @@ def materialize_lead_fan_out(
             "task_count": len(persisted["tasks"]),
             "run_ids": [str(run["run_id"]) for run in runs],
             "deferred_task_ids": [str(row["task_id"]) for row in deferred],
+            "thread_ids": [
+                str(run["thread_id"]) for run in runs if run.get("thread_id")
+            ],
         },
     )
     return {
@@ -183,7 +288,7 @@ def materialize_lead_fan_out(
             "type": receipt["kind"],
             "summary": (
                 f"Lead materialized {len(persisted['tasks'])} tasks; "
-                f"started {len(runs)} ready runs; deferred {len(deferred)}"
+                f"queued {len(runs)} ready runs; deferred {len(deferred)}"
             ),
             "mode": plan.mode,
             "run_count": len(runs),

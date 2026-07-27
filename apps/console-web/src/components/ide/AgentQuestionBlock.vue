@@ -240,7 +240,15 @@ async function continueWithSelection(): Promise<void> {
             class="agent-block__question-radio"
             aria-hidden="true"
           />
-          <span class="agent-block__question-id">{{ option.id }}</span>
+          <span
+            v-if="!isAgentQuestionOtherOption(option)"
+            class="agent-block__question-id"
+          >{{ option.id }}</span>
+          <span
+            v-else
+            class="agent-block__question-id"
+            aria-hidden="true"
+          />
           <span
             class="agent-block__question-label"
             :title="option.label"

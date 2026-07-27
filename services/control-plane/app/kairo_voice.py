@@ -20,6 +20,10 @@ from app.kairo_voice_prompt import (
     build_speak_user_prompt,
     filter_speak_context,
 )
+from app.kairo.turn_memory import (
+    note_dig_in_offer,
+    remember_signal_from_speak_context,
+)
 from app.kairo_voice_text import normalize_spoken_line
 from app.kairo.voice_fallback import fallback_for_event
 from app.persistence.voice_transcript_store import list_recent_spoken_lines
@@ -198,6 +202,13 @@ def generate_spoken_line(
     line = apply_participant_address(line, guest_name, speaker_kind=speaker_kind)
     if line:
         _remember_line(session_id, line)
+        if event_type in {"alert", "briefing", "conversation_reply"}:
+            remember_signal_from_speak_context(
+                session_id,
+                payload,
+                fallback_workspace_id=str(workspace_id or payload.get("workspace_id") or ""),
+            )
+            note_dig_in_offer(session_id, line)
     return {"line": line, "source": source}
 
 

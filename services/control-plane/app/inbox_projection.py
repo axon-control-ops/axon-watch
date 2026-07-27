@@ -67,13 +67,47 @@ def project_watch_inbox(
     }
 
 
+def _merge_ci_remediation_items(
+    projected: dict[str, object],
+) -> dict[str, object]:
+    """Overlay Gate 9 CI signals stored in control-plane onto watch inbox."""
+    try:
+        from app.ci_remediation.report import ci_inbox_items
+    except Exception:  # noqa: BLE001 — inbox must stay available if module fails
+        return projected
+    ci_items = ci_inbox_items()
+    if not ci_items:
+        return projected
+    existing = projected.get("items")
+    items = [row for row in existing if isinstance(row, dict)] if isinstance(existing, list) else []
+    seen = {
+        str(row.get("signal_id") or "").strip()
+        for row in items
+        if str(row.get("signal_id") or "").strip()
+    }
+    merged = list(items)
+    for raw in ci_items:
+        projected_item = project_inbox_item(raw)
+        signal_id = str(projected_item.get("signal_id") or "").strip()
+        if signal_id and signal_id in seen:
+            continue
+        if signal_id:
+            seen.add(signal_id)
+        merged.insert(0, projected_item)
+    out = dict(projected)
+    out["items"] = merged
+    out["count"] = len(merged)
+    return out
+
+
 def build_inbox_response(
     *,
     inbox_fetcher: WatchInboxFetcher | None = None,
     allow_empty_unavailable: bool = False,
 ) -> dict[str, object]:
     fetcher = inbox_fetcher or fetch_watch_inbox
-    return project_watch_inbox(
+    projected = project_watch_inbox(
         fetcher(),
         allow_empty_unavailable=allow_empty_unavailable,
     )
+    return _merge_ci_remediation_items(projected)

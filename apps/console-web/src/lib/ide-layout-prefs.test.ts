@@ -51,10 +51,17 @@ describe('ide layout prefs', () => {
     expect(window.localStorage.getItem(IDE_EXPLORER_COLLAPSED_KEY)).toBe('1');
   });
 
+  it('defaults agent dock to collapsed when unset', () => {
+    expect(readStoredAgentDockCollapsed()).toBe(true);
+  });
+
   it('persists agent dock collapse', () => {
     persistAgentDockCollapsed(true);
     expect(readStoredAgentDockCollapsed()).toBe(true);
     expect(window.localStorage.getItem(AGENT_DOCK_COLLAPSED_KEY)).toBe('1');
+    persistAgentDockCollapsed(false);
+    expect(readStoredAgentDockCollapsed()).toBe(false);
+    expect(window.localStorage.getItem(AGENT_DOCK_COLLAPSED_KEY)).toBe('0');
   });
 
   it('resolves collapsed IDE sidebar width to the activity bar width', () => {

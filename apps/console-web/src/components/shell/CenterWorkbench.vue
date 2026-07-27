@@ -6,6 +6,7 @@ import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
 import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
 import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
+import EditorCsvToolbar from './EditorCsvToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
 import CenterWorkbenchEditorChrome from './CenterWorkbenchEditorChrome.vue';
 import CenterWorkbenchEditorFooter from './CenterWorkbenchEditorFooter.vue';
@@ -29,7 +30,8 @@ import { useShellStore } from '../../stores/shell';
 import { renderAgentMessageMarkdown } from '../../lib/agent-message-markdown';
 import { handleMarkdownContainerClick } from '../../lib/markdown-link-click';
 import { isBinaryFilePath, isImageFilePath, isPdfFilePath } from '../../lib/workspace-file-language';
-import { resolveThreadImageUrl } from '../../lib/thread-image-url';
+import { useEditorCsvPreview } from '../../lib/use-editor-csv-preview';
+import { resolveEditorImagePreviewUrl } from '../../lib/thread-image-url';
 import { useEditorPdfPreview } from '../../lib/use-editor-pdf-preview';
 import { useEditorBreadcrumbSegments } from '../../lib/use-editor-breadcrumb-segments';
 import {
@@ -78,6 +80,7 @@ const agentDockReopenState = computed(() => ({
   runPhase: shell.primaryActiveRun?.phase ?? null,
   employeeFailureLine: shell.activeIdeEmployeeFailureLine,
   employeeShiftInterrupted: shell.activeIdeEmployeeShiftInterrupted,
+  speaking: shell.kairoSpeechActive,
 }));
 const {
   ideEditorStatusTerminalChip,
@@ -117,14 +120,19 @@ const editorBreadcrumbSegments = useEditorBreadcrumbSegments({
 const isMarkdownEditorDocument = computed(
   () => shell.activeEditorDocument?.language === 'markdown',
 );
+const {
+  isCsvEditorDocument,
+  csvTablePreviewEnabled,
+  editorCsvTableHtml,
+  setCsvTablePreviewMode,
+} = useEditorCsvPreview({
+  activeDocument: computed(() => shell.activeEditorDocument),
+  activeEditorValue,
+});
 const isImageEditorDocument = computed(() => {
   const document = shell.activeEditorDocument;
-  if (!document) {
-    return false;
-  }
-  if (document.language === 'image') {
-    return true;
-  }
+  if (!document) return false;
+  if (document.language === 'image') return true;
   return document.source === 'file' && isImageFilePath(document.filePath ?? document.title);
 });
 const { isPdfEditorDocument, editorPdfPreviewUrl } = useEditorPdfPreview({
@@ -183,13 +191,13 @@ const editorPreviewHtml = computed(() => {
 });
 
 const editorImagePreviewUrl = computed(() => {
-  const document = shell.activeEditorDocument;
-  const workspaceId = shell.currentWorkspace?.workspace_id;
-  if (!document || !workspaceId || !isImageEditorDocument.value || document.source !== 'file') {
-    return '';
-  }
-  const filePath = document.filePath ?? document.title;
-  return resolveThreadImageUrl(filePath, { workspaceId });
+  const doc = shell.activeEditorDocument;
+  const ws = shell.currentWorkspace;
+  return resolveEditorImagePreviewUrl({
+    workspaceId: ws?.workspace_id, projectRoot: ws?.project_root,
+    filePath: doc?.filePath, title: doc?.title, previewUrl: doc?.previewUrl,
+    isImageDocument: isImageEditorDocument.value, source: doc?.source,
+  });
 });
 
 function handleEditorPreviewClick(event: MouseEvent): void {
@@ -319,8 +327,8 @@ function showAgentDock(): void {
   if (!shell.agentDockCollapsed) {
     return;
   }
-
-  shell.setIdeActivityView('agent');
+  // Expand the right dock only — do not swap the left sidebar off Team/Explorer.
+  shell.toggleAgentDock();
 }
 
 useWorkbenchPanelAutoPeek({
@@ -539,7 +547,13 @@ watch(
         @breadcrumb-click="handleBreadcrumbSegmentClick"
       />
 
-      <section class="center-workbench__editor" :class="{ 'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled }">
+      <section
+        class="center-workbench__editor"
+        :class="{
+          'center-workbench__editor--markdown-preview': isMarkdownEditorDocument && editorPreviewEnabled,
+          'center-workbench__editor--csv-table-preview': isCsvEditorDocument && csvTablePreviewEnabled,
+        }"
+      >
         <CenterWorkbenchIdeQuickGuide
           v-if="ideQuickGuideSticky"
           :guide="ideQuickGuideSticky"
@@ -557,15 +571,21 @@ watch(
           @set-preview="setEditorPreviewMode"
           @build-plan="buildActivePlan"
         />
+        <EditorCsvToolbar
+          v-if="isCsvEditorDocument && shell.activeEditorDocument"
+          :table-enabled="csvTablePreviewEnabled"
+          @set-table="setCsvTablePreviewMode"
+        />
         <AgentEditReviewViewer
           v-if="shell.activeEditorDocument && showAgentDiffReviewViewer"
           :content="shell.activeEditorDocument.value"
         />
         <EditorHost
-          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
+          v-else-if="shell.activeEditorDocument && (!isMarkdownEditorDocument || !editorPreviewEnabled) && (!isCsvEditorDocument || !csvTablePreviewEnabled) && !isImageEditorDocument && !isPdfEditorDocument && !isBinaryEditorDocument"
           :key="shell.activeEditorDocument.id"
           :document-key="shell.activeEditorDocument.id"
           variant="mockup"
+          :theme-profile="isIdeMode ? 'cursor' : 'mockup'"
           :title="shell.activeEditorDocument.title"
           :value="shell.activeEditorDocument.value"
           :language="shell.activeEditorDocument.language"
@@ -597,9 +617,13 @@ watch(
           v-html="editorPreviewHtml"
           @click="handleEditorPreviewClick"
         />
+        <div
+          v-else-if="shell.activeEditorDocument && isCsvEditorDocument && csvTablePreviewEnabled"
+          class="editor-csv-preview conversation-seam__content conversation-seam__content--markdown"
+          v-html="editorCsvTableHtml"
+        />
         <CenterWorkbenchEditorFooter
           :is-ide-mode="isIdeMode"
-          :terminal-panel-visible="terminalPanelVisible"
           :show-minimap-toggle="!showAgentDiffReviewViewer"
           :editor-minimap-enabled="editorMinimapEnabled"
           :editor-cursor-line="editorCursorLine"
@@ -608,7 +632,6 @@ watch(
           :editor-eol="editorEol"
           :editor-language-label="editorLanguageLabel"
           :editor-access-status="editorAccessStatus"
-          :run-phase="shell.primaryActiveRun?.phase ?? null"
           :terminal-chip="ideEditorStatusTerminalChip"
           :connector-chip="ideEditorStatusConnectorChip"
           :git-chip="ideEditorStatusGitChip"
@@ -627,8 +650,8 @@ watch(
     </section>
 
     <OperatorStatusRadarPanel v-if="hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
-    <!-- Speaker face + captions: OPERATOR galaxy and IDE — who is talking (VAXON / any agent). -->
-    <GalaxySpeechCaptions />
+    <!-- Speaker HUD stays Operator-only — IDE keeps the editor clear (presence lives in left rail / status bar). -->
+    <GalaxySpeechCaptions v-if="!isIdeMode" />
     <WorkbenchTerminalDock v-if="showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
   </main>
 </template>

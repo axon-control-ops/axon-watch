@@ -37,12 +37,20 @@ export type {
   VoiceRoutingMode,
 } from './presence';
 export type {
+  RunHistoryReceipt,
   RunMode,
   RunPhase,
   RunRecord,
   RunStatus,
+  WorkerDeliveryRefs,
+  WorkerDeliveryStage,
 } from './run';
-export { RUN_MODES, RUN_PHASES, RUN_STATUSES } from './run';
+export {
+  RUN_MODES,
+  RUN_PHASES,
+  RUN_STATUSES,
+  WORKER_DELIVERY_STAGES,
+} from './run';
 export type {
   DeliveryChannel,
   DeliveryReceipt,

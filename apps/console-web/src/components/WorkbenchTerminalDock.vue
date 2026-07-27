@@ -11,9 +11,14 @@ import {
   agentShellMirrorForcedText,
   armAgentShellMirror,
   clearAgentShellMirror,
+  pendingAgentBackgroundCommand,
   pendingOperatorTerminalCommand,
-  takePendingOperatorTerminalCommand,
 } from '../lib/agent-shell-mirror-state';
+import {
+  flushPendingAgentBackgroundTerminalCommand,
+  flushPendingOperatorTerminalCommand,
+  focusSessionForPendingCommand,
+} from '../lib/workbench-terminal-pending-commands';
 import { terminalSessionTabLabel } from '../lib/terminal-session-view';
 import {
   resolveActiveVisibleTerminalSessionIds,
@@ -160,50 +165,60 @@ function setTerminalHostRef(sessionId: string, host: TerminalHostInstance | null
       syncAgentTerminalMirror();
     }
   }
-  flushPendingOperatorCommand(sessionId);
+  flushPendingOperatorTerminalCommand(pendingDeps(), sessionId);
+  flushPendingAgentBackgroundTerminalCommand(pendingDeps(), sessionId);
 }
 
-function flushPendingOperatorCommand(sessionId?: string): void {
-  const command = pendingOperatorTerminalCommand.value;
-  if (!command) {
-    return;
-  }
-  const operatorSession = shell.terminalSessions.find((session) => session.role === 'operator');
-  if (!operatorSession) {
-    return;
-  }
-  if (sessionId && sessionId !== operatorSession.id) {
-    return;
-  }
-  if (shell.activeTerminalSessionId !== operatorSession.id) {
-    return;
-  }
-  const host = terminalHostRefs.value[operatorSession.id];
-  if (!host?.writeInput) {
-    return;
-  }
-  takePendingOperatorTerminalCommand();
-  visibleTerminalSessionIds.value = [operatorSession.id];
-  // Give the PTY a tick to finish ready handshake when freshly focused.
-  requestAnimationFrame(() => {
-    host.writeInput(`${command}\r`);
-  });
+function pendingDeps() {
+  return {
+    sessions: shell.terminalSessions,
+    activeSessionId: shell.activeTerminalSessionId,
+    hosts: terminalHostRefs.value,
+    setVisibleSessionIds: (ids: string[]) => {
+      visibleTerminalSessionIds.value = ids;
+    },
+  };
 }
 
 watch(pendingOperatorTerminalCommand, (command) => {
   if (!command) {
     return;
   }
-  const operatorSession = shell.terminalSessions.find((session) => session.role === 'operator');
-  if (!operatorSession) {
+  const session = focusSessionForPendingCommand({
+    role: 'operator',
+    sessions: shell.terminalSessions,
+    activeSessionId: shell.activeTerminalSessionId,
+    setActiveSessionId: (id) => shell.setActiveTerminalSession(id),
+    setVisibleSessionIds: (ids) => {
+      visibleTerminalSessionIds.value = ids;
+    },
+  });
+  if (!session) {
     return;
   }
-  visibleTerminalSessionIds.value = [operatorSession.id];
-  if (shell.activeTerminalSessionId !== operatorSession.id) {
-    shell.setActiveTerminalSession(operatorSession.id);
+  requestAnimationFrame(() => {
+    flushPendingOperatorTerminalCommand(pendingDeps(), session.id);
+  });
+});
+
+watch(pendingAgentBackgroundCommand, (command) => {
+  if (!command) {
+    return;
+  }
+  const session = focusSessionForPendingCommand({
+    role: 'agent',
+    sessions: shell.terminalSessions,
+    activeSessionId: shell.activeTerminalSessionId,
+    setActiveSessionId: (id) => shell.setActiveTerminalSession(id),
+    setVisibleSessionIds: (ids) => {
+      visibleTerminalSessionIds.value = ids;
+    },
+  });
+  if (!session) {
+    return;
   }
   requestAnimationFrame(() => {
-    flushPendingOperatorCommand(operatorSession.id);
+    flushPendingAgentBackgroundTerminalCommand(pendingDeps(), session.id);
   });
 });
 

@@ -6,6 +6,7 @@ from typing import Any
 
 from app.workspace_agents.catalog import ROLE_CATALOG, _DEFAULT_OWNS, _DEFAULT_ROLE_NAMES
 from app.workspace_agents.config_loader import _role_label
+from app.workspace_agents.team_roster_context import build_team_roster_context
 
 EMPLOYEE_PERSONA_MARKER = "Employee persona (authoritative for this thread):"
 
@@ -22,8 +23,10 @@ def build_employee_identity_line(
     cleaned_owns = " ".join(str(owns or "").strip().split()) or "assigned workspace work"
     cleaned_workspace = " ".join(str(workspace_id or "").strip().split()) or "workspace"
     return (
-        f"You are {cleaned_name}, the {cleaned_role} employee for workspace {cleaned_workspace}. "
-        f"You own: {cleaned_owns}."
+        f"You are {cleaned_name}. Your role is {cleaned_role} for workspace {cleaned_workspace}. "
+        f"You own: {cleaned_owns}. "
+        "Always speak in first person as yourself. "
+        "Never say you are 'acting as' a role, teammate, Lane B, or VAXON."
     )
 
 
@@ -92,18 +95,40 @@ def build_employee_persona_appendix(
         role=role,
         owns=owns,
     )
-    return (
-        f"{EMPLOYEE_PERSONA_MARKER}\n"
-        f"{identity}\n"
-        f"Role label: {role_label}.\n"
-        f"Stay inside this role boundary. Speak and act as {name} — "
-        "not as a generic assistant and not as VAXON.\n"
-        "The operator message below is your task in this one-on-one thread. "
-        "Prefer work that advances what you own. "
-        "When the ask is clearly outside your role, do not invent ownership — "
-        "say which role should own it (frontend, backend, integrations, watcher, or lead) "
-        "and stop; the operator will open that teammate."
-    )
+    roster_block = build_team_roster_context(workspace_id, viewer_role=role)
+    lead_clause = ""
+    if role.strip().lower() == "lead":
+        lead_clause = (
+            "As Lead, you already know your company team from the roster block below. "
+            "Plan, prioritize, and hand off using those names/roles/owns — "
+            "never rediscover staffing by searching the tree.\n"
+        )
+    parts = [
+        EMPLOYEE_PERSONA_MARKER,
+        identity,
+        f"Role label: {role_label}.",
+        (
+            f"Stay inside this role boundary. Speak and act as {name} in first person — "
+            "not as a generic assistant, not as VAXON, and never in third person about yourself."
+        ),
+        (
+            "The operator message below is your task in this one-on-one thread. "
+            "Prefer work that advances what you own. "
+            "When the ask is clearly outside your role, do not invent ownership — "
+            "say which role should own it (frontend, backend, integrations, watcher, or lead) "
+            "and stop; the operator will open that teammate."
+        ),
+        (
+            "If the operator asks you to retry a failed shift, own the retry as yourself: "
+            f"'I will retry my last shift…' — never 'I am acting as {name}' or "
+            "'retry the shift for the backend employee'."
+        ),
+    ]
+    if lead_clause:
+        parts.append(lead_clause.rstrip())
+    if roster_block:
+        parts.append(roster_block)
+    return "\n".join(parts)
 
 
 def context_has_employee_persona(context_block: str | None) -> bool:
@@ -149,19 +174,20 @@ def adapt_lane_b_system_prompt_for_employee(
     adapted = adapted.replace(
         "You are Axon-X Lane B in Agent mode with Full Access.",
         (
-            "You are the employee named in the Employee persona block "
-            "(Axon-X Lane B tooling, Full Access)."
+            "You are the named employee in the Employee persona block "
+            "(Axon-X tooling with Full Access). Reply in first person as that employee."
         ),
     )
     adapted = adapted.replace(
         "You are Axon-X Lane B in Agent mode (consultative slice).",
         (
-            "You are the employee named in the Employee persona block "
-            "(Axon-X Lane B consultative tooling)."
+            "You are the named employee in the Employee persona block "
+            "(Axon-X consultative tooling). Reply in first person as that employee."
         ),
     )
     return (
         f"{adapted} "
         "Treat the Employee persona block as authoritative for your name, role, owns, "
-        "and boundary. Do not identify as VAXON or as a generic Lane B assistant."
+        "and boundary. Speak only as that employee in first person. "
+        "Do not identify as VAXON, Lane B, or say you are 'acting as' anyone."
     )

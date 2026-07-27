@@ -247,6 +247,15 @@ def build_operator_briefing(
         focused_workspace_id=scoped_workspace_id,
         scope_mode=scope_mode,
     )
+    lead_awaiting_engagement_count = 0
+    try:
+        from app.workspace_agents.lead_vaxon_handoff import count_awaiting_engagement_plans
+
+        lead_awaiting_engagement_count = count_awaiting_engagement_plans(
+            workspace_id=scoped_workspace_id,
+        )
+    except Exception:  # noqa: BLE001 — briefing must stay available
+        lead_awaiting_engagement_count = 0
     rhythm = build_operator_briefing_rhythm(
         active_runs=active_runs,
         top_signals=top_signals,
@@ -257,6 +266,7 @@ def build_operator_briefing(
         cli_runtime=runtime_summary.get("cli_runtime"),
         fleet_advice_pack=fleet_advice_pack,
         display_names=display_names,
+        lead_awaiting_engagement_count=lead_awaiting_engagement_count,
     )
 
     scope: dict[str, object] = (
@@ -288,6 +298,8 @@ def build_operator_briefing(
         },
         "active_runs": active_runs,
         "next_safe_actions": next_safe_actions,
+        "awaiting_engagement_count": lead_awaiting_engagement_count
+        + sum(1 for run in active_runs if run.get("phase") == "review_ready"),
         "degraded": runtime_summary["degraded"],
         "cli_runtime": runtime_summary.get("cli_runtime", {}),
         "connectivity": {

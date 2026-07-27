@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
 import {
+  BRIEFING_SURFACE_OFFER_WINDOW_MS,
   clearBriefingSurfaceOffer,
   isBriefingSurfaceOfferActive,
   mentionsBriefingSurfaceOffer,
@@ -24,9 +25,15 @@ describe('conversation-briefing-surface', () => {
     expect(shouldOpenBriefingFromFollowup('pull it to the front', 2_000)).toBe(true);
   });
 
+  it('keeps the offer open long enough for the operator to decide', () => {
+    scheduleBriefingSurfaceOffer(1_000);
+    expect(isBriefingSurfaceOfferActive(41_000)).toBe(true);
+  });
+
   it('ignores yes after the offer window expires', () => {
     scheduleBriefingSurfaceOffer(1_000);
-    expect(isBriefingSurfaceOfferActive(40_000)).toBe(false);
-    expect(shouldOpenBriefingFromFollowup('yes', 40_000)).toBe(false);
+    const expired = 1_000 + BRIEFING_SURFACE_OFFER_WINDOW_MS;
+    expect(isBriefingSurfaceOfferActive(expired)).toBe(false);
+    expect(shouldOpenBriefingFromFollowup('yes', expired)).toBe(false);
   });
 });

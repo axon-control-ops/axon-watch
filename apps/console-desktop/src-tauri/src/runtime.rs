@@ -2,9 +2,11 @@
 
 use std::fs;
 use std::io::Write;
+use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use serde::Serialize;
 use uuid::Uuid;
@@ -183,8 +185,19 @@ fn resolve_console_dist() -> Option<PathBuf> {
 }
 
 fn apply_common_env(cmd: &mut Command, paths: &DesktopPaths, service: &str, port: u16) {
+    // Frozen PyInstaller sidecars can see HOME as empty; force XDG roots and absolute DB paths.
+    if let Some(home) = paths
+        .config_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+    {
+        cmd.env("HOME", &home);
+    }
+    let control_plane_db = paths.state_dir.join("control-plane.sqlite3");
     cmd.env("AXON_WATCH_BIND_HOST", "127.0.0.1")
         .env("AXON_WATCH_STATE_DIR", &paths.state_dir)
+        .env("AXON_WATCH_CONTROL_PLANE_DB", &control_plane_db)
         .env(
             "AXON_WATCH_WATCH_SERVICE_BASE_URL",
             format!("http://127.0.0.1:{WATCH_PORT}"),
@@ -291,9 +304,30 @@ fn spawn_service(
     ))
 }
 
+fn localhost_port_open(port: u16) -> bool {
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok()
+}
+
+/// True when always-on / another stack already owns the desktop sidecar ports.
+/// Spawning packaged sidecars anyway steals :8787 and swaps the operator onto the
+/// isolated XDG desktop DB — the browser brain then looks "wrong"/empty.
+pub fn sidecar_ports_occupied() -> bool {
+    localhost_port_open(CONTROL_PLANE_PORT) || localhost_port_open(WATCH_PORT)
+}
+
 pub fn start_sidecars(paths: &DesktopPaths) -> Result<(), String> {
     let mut guard = SIDECARS.lock().map_err(|e| e.to_string())?;
     if guard.is_some() {
+        return Ok(());
+    }
+
+    if sidecar_ports_occupied() {
+        eprintln!(
+            "VAXON: :{CONTROL_PLANE_PORT}/:{WATCH_PORT} already in use — \
+not starting packaged sidecars (keeps always-on / repo runtime intact). \
+Stop control-plane.service + axon-watch.service before a clean packaged desktop run."
+        );
         return Ok(());
     }
 

@@ -8,10 +8,11 @@ import IdeExplorerPanel from '../ide/IdeExplorerPanel.vue';
 import IdeTeamPanel from '../ide/IdeTeamPanel.vue';
 import KairoSidebarPanel from '../ide/KairoSidebarPanel.vue';
 import AttentionStackPanel from './AttentionStackPanel.vue';
-import KairoVoiceDeckPanel from './KairoVoiceDeckPanel.vue';
 import WorkspaceAddForm from './WorkspaceAddForm.vue';
 import WorkspaceIcon from '../WorkspaceIcon.vue';
 import WorkbenchIcon from '../WorkbenchIcon.vue';
+import HudHoloPanelShell from '../../features/hud-holo/HudHoloPanelShell.vue';
+import type { HudHoloTone } from '../../features/hud-holo/hud-holo-tones';
 import {
   workspaceDisplayLabel,
 } from '../../lib/operator-workspace-catalog';
@@ -22,6 +23,7 @@ import { workspaceStatusLine } from '../../lib/mockup-shell-view';
 import { isActiveRun } from '../../stores/shell-run-selection';
 import {
   clampSidebarWidth,
+  MIN_SIDEBAR_WIDTH,
   readStoredSidebarWidth,
   SIDEBAR_WIDTH_KEY,
 } from '../../lib/sidebar-width-split';
@@ -29,6 +31,7 @@ import { useShellStore } from '../../stores/shell';
 import {
   resolveIdeSidebarWidthPx,
 } from '../../lib/ide-layout-prefs';
+import { useVerticalPanelResize } from '../../composables/useVerticalPanelResize';
 
 const shell = useShellStore();
 const workspaceFilter = ref('');
@@ -36,6 +39,43 @@ const showAddWorkspaceForm = ref(false);
 const sidebarRef = ref<HTMLElement | null>(null);
 const expandedSidebarWidth = ref(readStoredSidebarWidth() ?? 280);
 const resizing = ref(false);
+const {
+  panelSize: voiceCardHeight,
+  userSized: voiceCardUserSized,
+  resizing: voiceCardResizing,
+  ariaValueMin: voiceCardHeightMin,
+  ariaValueMax: voiceCardHeightMax,
+  resetSize: resetVoiceCardHeight,
+  startResize: startVoiceCardResize,
+  onResizeKeydown: onVoiceCardResizeKeydown,
+} = useVerticalPanelResize({
+  rootRef: sidebarRef,
+  cssVariable: '--voice-card-height',
+  storageKey: 'axon-shell-voice-card-height',
+  // Auto-height until the operator drags; this is the initial resize target.
+  defaultSize: (height) => Math.min(Math.round(height * 0.38), 280),
+  minSize: 152,
+  maxSize: (height) => Math.round(height * 0.55),
+});
+
+const {
+  panelSize: ideKairoPanelHeight,
+  userSized: ideKairoPanelUserSized,
+  resizing: ideKairoPanelResizing,
+  ariaValueMin: ideKairoPanelHeightMin,
+  ariaValueMax: ideKairoPanelHeightMax,
+  resetSize: resetIdeKairoPanelHeight,
+  startResize: startIdeKairoPanelResize,
+  onResizeKeydown: onIdeKairoPanelResizeKeydown,
+} = useVerticalPanelResize({
+  rootRef: sidebarRef,
+  cssVariable: '--ide-kairo-panel-height',
+  storageKey: 'axon-shell-ide-kairo-panel-height',
+  // Leave headroom above default so dragging the bottom card up/down is always possible.
+  defaultSize: (height) => Math.min(Math.round(height * 0.28), 240),
+  minSize: 120,
+  maxSize: (height) => Math.round(height * 0.72),
+});
 
 const catalogWorkspaces = computed(() => shell.workspaces);
 
@@ -63,6 +103,9 @@ const runCountsByWorkspace = computed(() => {
 
 const showSidebarModeToggle = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
+const workspacesHoloTone = computed<HudHoloTone>(() =>
+  shell.leftSidebarAttentionBadgeCount > 0 ? 'attention' : 'nominal',
+);
 
 function isActiveWorkspace(workspaceId: string): boolean {
   return shell.currentWorkspace?.workspace_id === workspaceId;
@@ -109,7 +152,17 @@ function startSidebarResize(event: MouseEvent): void {
 
   const onMove = (moveEvent: MouseEvent): void => {
     const shellRoot = sidebarRef.value?.closest('.console-shell--mockup') as HTMLElement | null;
-    const clamped = clampSidebarWidth(startWidth + (moveEvent.clientX - startX), window.innerWidth);
+    const rightDockWidth =
+      shellRoot?.querySelector('.region-right-dock')?.getBoundingClientRect().width ?? 0;
+    const centerMinimum = Math.min(320, Math.max(220, window.innerWidth * 0.28));
+    const maximumWithCenter = Math.max(
+      MIN_SIDEBAR_WIDTH,
+      window.innerWidth - rightDockWidth - centerMinimum - 32,
+    );
+    const clamped = Math.min(
+      clampSidebarWidth(startWidth + (moveEvent.clientX - startX), window.innerWidth),
+      maximumWithCenter,
+    );
     expandedSidebarWidth.value = clamped;
     shellRoot?.style.setProperty('--shell-left-sidebar-width', `${clamped}px`);
   };
@@ -134,7 +187,13 @@ onMounted(() => {
 });
 
 watch(
-  () => [shell.layoutMode, shell.ideExplorerCollapsed] as const,
+  () =>
+    [
+      shell.layoutMode,
+      shell.ideExplorerCollapsed,
+      shell.leftSidebarMode,
+      shell.ideActivityView,
+    ] as const,
   () => {
     syncShellSidebarWidth();
   },
@@ -154,9 +213,13 @@ onBeforeUnmount(() => {
     class="region region-left-sidebar left-sidebar-mockup"
     :class="{
       'left-sidebar-mockup--resizing': resizing,
+      'left-sidebar-mockup--voice-resizing': voiceCardResizing,
+      'left-sidebar-mockup--voice-user-sized': voiceCardUserSized,
+      'left-sidebar-mockup--ide-kairo-resizing': ideKairoPanelResizing,
+      'left-sidebar-mockup--ide-kairo-user-sized': ideKairoPanelUserSized,
       'left-sidebar-mockup--ide': isIdeMode,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
-      'left-sidebar-mockup--galaxy': shell.operatorBrainGalaxyActive,
+      'left-sidebar-mockup--galaxy': !isIdeMode && shell.operatorBrainGalaxyActive,
     }"
   >
     <template v-if="isIdeMode">
@@ -170,12 +233,32 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--ide">
+        <div
+          class="ide-kairo-panel-resize-handle"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize agent card"
+          title="Drag the top of this card up or down. Team panel resizes with it. Double-click to reset."
+          tabindex="0"
+          :aria-valuemin="ideKairoPanelHeightMin"
+          :aria-valuemax="ideKairoPanelHeightMax"
+          :aria-valuenow="ideKairoPanelHeight"
+          @mousedown="startIdeKairoPanelResize"
+          @keydown="onIdeKairoPanelResizeKeydown"
+          @dblclick="resetIdeKairoPanelHeight"
+        >
+          <span class="ide-kairo-panel-resize-grip" aria-hidden="true" />
+        </div>
         <KairoSidebarPanel />
       </div>
     </template>
 
     <template v-else>
-      <div class="left-sidebar-mockup__workspaces-panel hud-panel-frame">
+      <HudHoloPanelShell
+        class="left-sidebar-mockup__workspaces-panel"
+        label="workspaces"
+        :tone="workspacesHoloTone"
+      >
         <div
           v-if="showSidebarModeToggle"
           class="left-sidebar-mockup__mode-header panel-heading panel-heading--toggle"
@@ -293,7 +376,7 @@ onBeforeUnmount(() => {
           v-show="shell.leftSidebarMode === 'attention'"
           variant="sidebar"
         />
-      </div>
+      </HudHoloPanelShell>
     </template>
 
     <div
@@ -303,11 +386,12 @@ onBeforeUnmount(() => {
       <AttentionStackPanel variant="sidebar" sections="run-only" />
     </div>
 
+    <!-- LIVE OPERATIONS right rail owns VAXON voice on Mission Control (mockup). -->
     <div
       v-else-if="!isIdeMode && !shell.operatorBrainGalaxyActive"
-      class="left-sidebar-mockup__status-anchor"
+      class="left-sidebar-mockup__status-anchor left-sidebar-mockup__status-anchor--run-only"
     >
-      <KairoVoiceDeckPanel />
+      <AttentionStackPanel variant="sidebar" sections="run-only" />
     </div>
 
     <div

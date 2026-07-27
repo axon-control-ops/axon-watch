@@ -13,7 +13,17 @@ Native shell around `apps/console-web` with frozen Watch + Control Plane sidecar
 | Host sensors / MPRIS / file index | stub / not implemented |
 | Signed CP pairing / keyring | not implemented |
 
-Browser `:4173` remains the preferred day-to-day development path.
+Browser `:4173` / `:5173` remains the preferred day-to-day development path.
+
+**Do not run packaged VAXON while always-on services own `:8787`/`:8788`.**  
+Packaged sidecars use a separate XDG state DB under `~/.local/share/axon-watch/state/`. If they steal those ports, the browser brain talks to the wrong runtime/DB. Stop always-on first:
+
+```bash
+systemctl --user stop control-plane.service axon-watch.service
+axon-console-desktop
+# when done:
+systemctl --user start axon-watch.service control-plane.service
+```
 
 ## Packaged install
 

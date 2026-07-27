@@ -35,7 +35,7 @@
         "monitor_status": "warning"
       }
     },
-    "expect_spoken_contains": ["DashPro", "Shall I investigate"],
+    "expect_spoken_contains": ["DashPro", "Open Attention for DashPro"],
     "expect_what_contains": ["DashPro"],
     "expect_agent_do_contains": ["Investigate the DashPro monitor"]
   },
@@ -66,7 +66,7 @@
       "title": "Unusual queue backlog",
       "summary": "Queue depth exceeded soft limit"
     },
-    "expect_spoken_contains": ["Unusual queue backlog", "Shall I dig in"],
+    "expect_spoken_contains": ["Unusual queue backlog", "Open Attention for Unusual queue backlog"],
     "expect_what_contains": ["Queue depth exceeded soft limit"],
     "expect_agent_do_contains": ["Do not assume a category"]
   },
@@ -94,7 +94,7 @@
       "title": "Nightly health summary ready",
       "summary": "Scheduled health digest posted"
     },
-    "expect_spoken_contains": ["Nightly health summary", "Shall I dig in"],
+    "expect_spoken_contains": ["Nightly health summary", "Open Attention for Nightly health summary"],
     "expect_what_contains": ["Scheduled health digest"],
     "expect_agent_do_contains": ["Do not assume a category"]
   }

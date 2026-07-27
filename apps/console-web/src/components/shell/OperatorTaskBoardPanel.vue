@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
-import { buildOperatorTaskBoardView } from '../../lib/operator-task-board-view';
+import {
+  buildOperatorTaskBoardView,
+  filterTaskBoardRows,
+  type TaskBoardFilter,
+} from '../../lib/operator-task-board-view';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -9,9 +13,24 @@ const shell = useShellStore();
 const goalDraft = ref('');
 const ownerRoleDraft = ref('backend');
 const acceptanceDraft = ref('');
+const showCreate = ref(false);
+const filter = ref<TaskBoardFilter>('active');
+const expandedId = ref<string | null>(null);
 
 const boardView = computed(() =>
   buildOperatorTaskBoardView(shell.workspaceTasksForCurrentWorkspace),
+);
+
+watch(
+  () => boardView.value.defaultFilter,
+  (next) => {
+    filter.value = next;
+  },
+  { immediate: true },
+);
+
+const visibleRows = computed(() =>
+  filterTaskBoardRows(boardView.value.rows, filter.value),
 );
 
 const roleOptions = [
@@ -28,6 +47,25 @@ const canCreate = computed(
     !shell.workspaceTasksMutating,
 );
 
+const chips = computed(() => {
+  const c = boardView.value.counts;
+  return [
+    { id: 'active' as const, label: 'Active', count: c.open + c.leased },
+    { id: 'done' as const, label: 'Done', count: c.completed },
+    { id: 'failed' as const, label: 'Failed', count: c.failed },
+    { id: 'cancelled' as const, label: 'Cancelled', count: c.cancelled },
+  ];
+});
+
+function setFilter(next: TaskBoardFilter): void {
+  filter.value = next;
+  expandedId.value = null;
+}
+
+function toggleExpanded(taskId: string): void {
+  expandedId.value = expandedId.value === taskId ? null : taskId;
+}
+
 async function submitTask(): Promise<void> {
   if (!canCreate.value) {
     return;
@@ -40,6 +78,8 @@ async function submitTask(): Promise<void> {
   if (created) {
     goalDraft.value = '';
     acceptanceDraft.value = '';
+    showCreate.value = false;
+    filter.value = 'active';
   }
 }
 
@@ -49,31 +89,55 @@ async function cancelTask(taskId: string): Promise<void> {
 </script>
 
 <template>
-  <section class="operator-task-board" aria-label="Task ledger">
-    <header class="operator-task-board__header">
-      <div>
-        <p class="operator-task-board__eyebrow">Durable ledger</p>
+  <section
+    class="operator-task-board operator-task-board-host"
+    data-orb-obstacle="mission"
+    aria-label="Task ledger"
+  >
+    <header class="operator-task-board__header" data-orb-field>
+      <div class="operator-task-board__titles">
+        <p class="operator-task-board__eyebrow">Specialist work queue</p>
         <h3 class="operator-task-board__title">Task board</h3>
+        <p class="operator-task-board__purpose">{{ boardView.purpose }}</p>
       </div>
-      <span class="operator-task-board__headline">{{ boardView.headline }}</span>
+      <div class="operator-task-board__header-actions">
+        <span class="operator-task-board__headline">{{ boardView.headline }}</span>
+        <button
+          type="button"
+          class="operator-task-board__add"
+          :aria-expanded="showCreate ? 'true' : 'false'"
+          @click="showCreate = !showCreate"
+        >
+          {{ showCreate ? 'Hide form' : 'Add task' }}
+        </button>
+      </div>
     </header>
 
-    <div class="operator-task-board__counts" aria-label="Task counts">
-      <span class="operator-task-board__count operator-task-board__count--open">
-        {{ boardView.counts.open }} open
-      </span>
-      <span class="operator-task-board__count operator-task-board__count--leased">
-        {{ boardView.counts.leased }} leased
-      </span>
-      <span class="operator-task-board__count operator-task-board__count--done">
-        {{ boardView.counts.completed }} done
-      </span>
-      <span class="operator-task-board__count operator-task-board__count--failed">
-        {{ boardView.counts.failed }} failed
-      </span>
+    <div class="operator-task-board__filters" role="tablist" aria-label="Task filters" data-orb-field>
+      <button
+        v-for="chip in chips"
+        :key="chip.id"
+        type="button"
+        role="tab"
+        class="operator-task-board__filter"
+        :class="{
+          'operator-task-board__filter--active': filter === chip.id,
+          [`operator-task-board__filter--${chip.id}`]: true,
+        }"
+        :aria-selected="filter === chip.id"
+        @click="setFilter(chip.id)"
+      >
+        <span class="operator-task-board__filter-count">{{ chip.count }}</span>
+        {{ chip.label }}
+      </button>
     </div>
 
-    <form class="operator-task-board__form" @submit.prevent="submitTask">
+    <form
+      v-if="showCreate"
+      class="operator-task-board__form"
+      data-orb-field
+      @submit.prevent="submitTask"
+    >
       <label class="operator-task-board__field">
         <span class="operator-task-board__field-label">Goal</span>
         <input
@@ -81,12 +145,12 @@ async function cancelTask(taskId: string): Promise<void> {
           class="operator-task-board__input"
           type="text"
           maxlength="240"
-          placeholder="Seed an open task for a specialist"
+          placeholder="What should this specialist finish?"
           :disabled="shell.workspaceTasksMutating"
         />
       </label>
       <label class="operator-task-board__field operator-task-board__field--role">
-        <span class="operator-task-board__field-label">Owner role</span>
+        <span class="operator-task-board__field-label">Role</span>
         <select
           v-model="ownerRoleDraft"
           class="operator-task-board__select"
@@ -98,7 +162,7 @@ async function cancelTask(taskId: string): Promise<void> {
         </select>
       </label>
       <label class="operator-task-board__field operator-task-board__field--wide">
-        <span class="operator-task-board__field-label">Acceptance</span>
+        <span class="operator-task-board__field-label">Done when</span>
         <input
           v-model="acceptanceDraft"
           class="operator-task-board__input"
@@ -108,11 +172,7 @@ async function cancelTask(taskId: string): Promise<void> {
           :disabled="shell.workspaceTasksMutating"
         />
       </label>
-      <button
-        type="submit"
-        class="operator-task-board__submit"
-        :disabled="!canCreate"
-      >
+      <button type="submit" class="operator-task-board__submit" :disabled="!canCreate">
         Create task
       </button>
     </form>
@@ -121,20 +181,28 @@ async function cancelTask(taskId: string): Promise<void> {
       {{ shell.workspaceTasksError }}
     </p>
 
-    <ul v-if="boardView.rows.length" class="operator-task-board__list">
+    <ul v-if="visibleRows.length" class="operator-task-board__list">
       <li
-        v-for="row in boardView.rows"
+        v-for="row in visibleRows"
         :key="row.taskId"
         class="operator-task-board__item"
-        :class="`operator-task-board__item--${row.bucket}`"
+        data-orb-field
+        :class="[
+          `operator-task-board__item--${row.bucket}`,
+          { 'operator-task-board__item--expanded': expandedId === row.taskId },
+        ]"
       >
-        <div class="operator-task-board__item-main">
+        <button
+          type="button"
+          class="operator-task-board__item-main"
+          @click="toggleExpanded(row.taskId)"
+        >
           <span class="operator-task-board__item-status">{{ row.status }}</span>
           <span class="operator-task-board__item-goal">{{ row.goal }}</span>
           <span class="operator-task-board__item-meta">
-            {{ row.meta }} · attempts {{ row.attemptsLabel }}
+            {{ row.ownerRole }} · attempts {{ row.attemptsLabel }}
           </span>
-        </div>
+        </button>
         <button
           v-if="row.canCancel"
           type="button"
@@ -144,8 +212,18 @@ async function cancelTask(taskId: string): Promise<void> {
         >
           Cancel
         </button>
+        <div v-if="expandedId === row.taskId" class="operator-task-board__detail">
+          <p><strong>Role</strong> {{ row.ownerRole }}</p>
+          <p v-if="row.acceptance"><strong>Done when</strong> {{ row.acceptance }}</p>
+          <p v-if="row.runId"><strong>Run</strong> {{ row.runId }}</p>
+          <p><strong>Meta</strong> {{ row.meta || '—' }}</p>
+          <p><strong>Updated</strong> {{ row.updatedAt }}</p>
+          <p class="operator-task-board__detail-hint">
+            Cancelled ≠ failed. Failed needs a new task. Done means acceptance landed.
+          </p>
+        </div>
       </li>
     </ul>
-    <p v-else class="operator-task-board__empty">{{ boardView.emptyCopy }}</p>
+    <p v-else class="operator-task-board__empty" data-orb-field>{{ boardView.emptyCopy }}</p>
   </section>
 </template>

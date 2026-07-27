@@ -2,10 +2,15 @@ export type LiveEventType =
   | 'connected'
   | 'runtime_refresh'
   | 'presence_refresh'
-  | 'spoken_briefing';
+  | 'spoken_briefing'
+  /** Material event invalidation — proactive advise, not timer heartbeats. */
+  | 'material_change';
 
 export interface LiveEventPayload {
   type: LiveEventType;
+  /** Optional receipt / signal id for proactive speech dedupe. */
+  receipt_id?: string;
+  signal_id?: string;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
@@ -32,7 +37,13 @@ export function parseLiveEventData(raw: string): LiveEventPayload | null {
 
   try {
     const parsed = JSON.parse(trimmed) as LiveEventPayload;
-    if (parsed.type === 'connected' || parsed.type === 'runtime_refresh' || parsed.type === 'presence_refresh' || parsed.type === 'spoken_briefing') {
+    if (
+      parsed.type === 'connected' ||
+      parsed.type === 'runtime_refresh' ||
+      parsed.type === 'presence_refresh' ||
+      parsed.type === 'spoken_briefing' ||
+      parsed.type === 'material_change'
+    ) {
       return parsed;
     }
   } catch {
@@ -43,14 +54,15 @@ export function parseLiveEventData(raw: string): LiveEventPayload | null {
 }
 
 export function shouldTriggerRefresh(event: LiveEventPayload): boolean {
-  return event.type === 'runtime_refresh';
+  return event.type === 'runtime_refresh' || event.type === 'material_change';
 }
 
 export function shouldTriggerPresenceRefresh(event: LiveEventPayload): boolean {
-  return event.type === 'presence_refresh';
+  return event.type === 'presence_refresh' || event.type === 'material_change';
 }
 
 export function shouldTriggerSpokenBriefing(event: LiveEventPayload): boolean {
+  // Spoken interrupts are explicit only. material_change refreshes quietly.
   return event.type === 'spoken_briefing';
 }
 
@@ -58,6 +70,8 @@ export interface LiveEventsSessionOptions {
   onRefresh: () => void | Promise<void>;
   onPresenceRefresh?: () => void | Promise<void>;
   onSpokenBriefing?: () => void | Promise<void>;
+  /** Lead rollups / review_ready — refresh engagement surfaces without speaking. */
+  onMaterialChange?: () => void | Promise<void>;
   pollIntervalMs?: number;
   EventSourceImpl?: typeof EventSource;
   documentRef?: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>;
@@ -82,6 +96,7 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let refreshInFlight = false;
   let presenceRefreshInFlight = false;
+  let materialChangeInFlight = false;
   let disconnected = false;
 
   async function invokeRefresh(): Promise<void> {
@@ -115,6 +130,24 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
     }
   }
 
+  async function invokeMaterialChange(): Promise<void> {
+    if (
+      materialChangeInFlight ||
+      disconnected ||
+      !options.onMaterialChange ||
+      !isDocumentVisible(documentRef)
+    ) {
+      return;
+    }
+
+    materialChangeInFlight = true;
+    try {
+      await options.onMaterialChange();
+    } finally {
+      materialChangeInFlight = false;
+    }
+  }
+
   function stopPolling(): void {
     if (pollTimer !== null) {
       clearInterval(pollTimer);
@@ -143,9 +176,12 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
       void options.onSpokenBriefing?.();
       return;
     }
+    if (event.type === 'material_change' && options.onMaterialChange) {
+      void invokeMaterialChange();
+      return;
+    }
     if (shouldTriggerPresenceRefresh(event)) {
       void invokePresenceRefresh();
-      return;
     }
     if (shouldTriggerRefresh(event)) {
       void invokeRefresh();

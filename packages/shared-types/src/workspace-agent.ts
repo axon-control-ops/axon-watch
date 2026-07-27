@@ -12,6 +12,7 @@ export type WorkspaceAgentRole = (typeof WORKSPACE_AGENT_ROLES)[number];
 export const WORKSPACE_AGENT_STATUSES = [
   'idle',
   'watching',
+  'assigned',
   'planning',
   'executing',
   'verifying',
@@ -74,6 +75,11 @@ export interface CompanyEmployeeRecord {
   active_run_id?: string | null;
   /** Optional Azure neural voice for Talk / teammate TTS (falls back to operator voice). */
   azure_voice_id?: string | null;
+  /** Latest worker delivery stage for this role (git/PR/CI pipeline). */
+  pipeline_stage?: string | null;
+  pipeline_detail?: string | null;
+  draft_pr_url?: string | null;
+  ci_status?: string | null;
 }
 
 export interface CompanyRosterRecord {

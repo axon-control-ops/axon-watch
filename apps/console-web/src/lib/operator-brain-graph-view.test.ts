@@ -1,10 +1,35 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   brainGraphHeadline,
   layoutBrainGraph,
+  readStoredOperatorCenterView,
   type BrainGraphSnapshot,
 } from './operator-brain-graph-view';
+
+function memorySessionStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.has(key) ? store.get(key)! : null;
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, String(value));
+    },
+  };
+}
 
 const snapshot: BrainGraphSnapshot = {
   generated_at: '2026-07-07T21:00:00Z',
@@ -110,5 +135,21 @@ describe('operator-brain-graph-view', () => {
     expect(
       brainGraphHeadline({ ...snapshot, watch_connected: false }),
     ).toContain('disconnected');
+  });
+
+  it('defaults Mission Control fleet when no center view is stored', () => {
+    vi.stubGlobal('sessionStorage', memorySessionStorage());
+    expect(readStoredOperatorCenterView()).toBe('grid');
+  });
+
+  it('restores Brain Graph when sessionStorage says graph', () => {
+    const storage = memorySessionStorage();
+    storage.setItem('axon.operator.center-view', 'graph');
+    vi.stubGlobal('sessionStorage', storage);
+    expect(readStoredOperatorCenterView()).toBe('graph');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 });

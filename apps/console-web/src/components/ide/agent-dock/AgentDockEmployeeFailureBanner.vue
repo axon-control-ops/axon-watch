@@ -48,9 +48,16 @@ const retryActionLabel = computed(() =>
 );
 const actionsDisabled = computed(() => shell.composerAgentBusy);
 
-function openComposerDraft(row: CompanyEmployeeRecord, kind: 'retry' | 'receipts'): void {
+function openComposerDraft(
+  row: CompanyEmployeeRecord,
+  kind: 'retry' | 'receipts',
+  options?: { forceFullAccess?: boolean },
+): void {
   const { mode, draft } = employeeComposerOpenPayload(row, kind);
   requestIdeComposerMode(mode);
+  if (options?.forceFullAccess) {
+    shell.setAgentExecutionAccess('full');
+  }
   if (draft) {
     shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
   } else {
@@ -64,7 +71,7 @@ function handleRetry(): void {
   if (!row) {
     return;
   }
-  openComposerDraft(row, 'retry');
+  openComposerDraft(row, 'retry', { forceFullAccess: true });
 }
 
 function handleReceipts(): void {
@@ -111,7 +118,7 @@ function handleOpenTeam(): void {
         :disabled="actionsDisabled"
         @click="handleReceipts"
       >
-        View receipts
+        Explain receipts
       </button>
       <button
         type="button"

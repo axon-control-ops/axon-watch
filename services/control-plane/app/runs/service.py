@@ -12,7 +12,6 @@ from app.domain.run_transitions import can_transition
 from app.chat.command_intent import humanize_run_summary, is_auto_complete_run_summary
 from app.persistence import run_store
 
-
 def _actor_or_operator() -> str:
     identity = get_request_identity()
     return identity if identity and identity != "anonymous" else "operator"
@@ -25,7 +24,6 @@ _RESUME_TARGETS = {
     "awaiting_input": ("planning", "Run resumed after operator input"),
     "review_ready": ("executing", "Run resumed for follow-up work"),
 }
-
 
 class RunLifecycleError(ValueError):
     pass
@@ -162,6 +160,7 @@ def create_run(
     employee_role: str | None = None,
     task_id: str | None = None,
     require_leased_task: bool = False,
+    enter_execution: bool = True,
 ) -> dict[str, Any]:
     cleaned_role = str(employee_role or "").strip() or None
     cleaned_task = str(task_id or "").strip() or None
@@ -187,6 +186,8 @@ def create_run(
         employee_role=cleaned_role,
         task_id=cleaned_task,
     )
+    if not enter_execution:
+        record["current_step"] = "Assigned — waiting for worker dispatch"
     run_store.save_run(record)
     run_store.append_transition(
         record["history_ref"],
@@ -210,6 +211,9 @@ def create_run(
             task_store.bind_task_run(cleaned_task, record["run_id"])
         except task_store.TaskLedgerError as exc:
             raise RunLifecycleError(str(exc)) from exc
+
+    if not enter_execution:
+        return _apply_capabilities(record)
 
     record = _transition_record(
         record,
@@ -488,8 +492,6 @@ def append_run_execution_receipt(
     )
     record["updated_at"] = now
     return run_store.save_run(record)
-
-
 
 from app.runs.acceptance_transitions import mark_review_ready
 from app.runs.queries import (

@@ -74,6 +74,8 @@ export interface OperatorBriefing {
   pending_approvals: OperatorBriefingPendingApprovals;
   active_runs: RuntimeSummaryActiveRun[];
   next_safe_actions: BriefingAction[];
+  /** review_ready runs + Lead plans awaiting VAXON engagement */
+  awaiting_engagement_count?: number;
   degraded: RuntimeSummaryDegradedState;
   cli_runtime?: CliRuntimeReadiness;
   connectivity: OperatorBriefingConnectivity;

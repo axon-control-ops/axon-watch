@@ -444,6 +444,21 @@
   letter-spacing: 0.05em;
 }
 
+.status-bar-mockup__chip--kairo-briefing .status-bar-mockup__chip-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: rgba(255, 159, 0, 0.28);
+  color: #ffe6b5;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 @keyframes status-bar-kairo-pulse {
   0%, 100% {
     box-shadow: 0 0 0 rgba(255, 159, 0, 0);

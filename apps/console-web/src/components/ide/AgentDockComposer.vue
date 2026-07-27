@@ -43,6 +43,8 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
     @reject-run="composer.handleRejectRun()"
     @undo-plan-soft-switch="composer.undoPlanSoftSwitch()"
     @dismiss-plan-soft-switch="composer.dismissPlanSoftSwitch()"
+    @accept-plan-soft-switch-offer="composer.acceptPlanSoftSwitchOffer()"
+    @decline-plan-soft-switch-offer="composer.declinePlanSoftSwitchOffer()"
     @undo-teammate-route="composer.undoTeammateRoute()"
     @dismiss-teammate-route="composer.dismissTeammateRoute()"
   />

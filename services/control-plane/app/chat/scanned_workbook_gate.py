@@ -3,12 +3,36 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
+
+_ASSIGNMENT_RULE_PATH = (
+    Path(__file__).resolve().parents[4]
+    / "config"
+    / "agent-rules"
+    / "assignment-document-quality.md"
+)
+
+
+def _load_assignment_document_quality_rule() -> str:
+    try:
+        return _ASSIGNMENT_RULE_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        return (
+            "# Assignment and printable-document quality\n"
+            "Inspect the named reference, inventory every prompt, verify generated images, "
+            "and inspect the rendered output before claiming completion."
+        )
+
+
+ASSIGNMENT_DOCUMENT_QUALITY_RULE = _load_assignment_document_quality_rule()
 
 _WORKBOOK_SIGNALS = re.compile(
-    r"\b(?:workbook|assignment|worksheet|question\s+paper|learning\s+unit|unit\s+\d{4,5})\b",
+    r"\b(?:workbook|assignment|worksheet|question\s+paper|learning\s+unit|unit\s+\d{4,5}|"
+    r"evidence\s+pack|submission\s+pack|printable\s+document)\b",
     re.I,
 )
 _PDF_SIGNALS = re.compile(r"\.pdf\b", re.I)
+_PRINTABLE_SIGNALS = re.compile(r"\b(?:printable|print-ready|render(?:ed|ing)?)\b", re.I)
 _SCANNED_SIGNALS = re.compile(
     r"\b(?:pdftotext|image-only|scanned|ocr|tesseract|pdftoppm|page-\d+\.(?:png|jpg)|"
     r"near-empty|empty\s+text)\b",
@@ -44,7 +68,11 @@ def assignment_workbook_context(*texts: str) -> bool:
         return False
     if not _WORKBOOK_SIGNALS.search(combined):
         return False
-    return bool(_PDF_SIGNALS.search(combined) or _SCANNED_SIGNALS.search(combined))
+    return bool(
+        _PDF_SIGNALS.search(combined)
+        or _SCANNED_SIGNALS.search(combined)
+        or _PRINTABLE_SIGNALS.search(combined)
+    )
 
 
 def scanned_workbook_context(*texts: str) -> bool:
@@ -55,9 +83,12 @@ def scanned_workbook_context(*texts: str) -> bool:
 
 
 def assignment_workbook_policy_appendix(user_prompt: str, context_block: str = "") -> str:
+    if not assignment_workbook_context(user_prompt, context_block):
+        return ""
+    parts = [ASSIGNMENT_DOCUMENT_QUALITY_RULE]
     if scanned_workbook_context(user_prompt, context_block):
-        return _POLICY_APPENDIX
-    return ""
+        parts.append(_POLICY_APPENDIX)
+    return "\n\n".join(parts)
 
 
 def scan_scanned_workbook_completion_risks(

@@ -32,4 +32,22 @@ describe('workspaceAgentLabel', () => {
       }),
     ).toBe('DashPro Workspace Agent · executing');
   });
+
+  it('does not surface thought or status-dump prose as picker meta', () => {
+    expect(
+      workspaceAgentLabel({
+        agent_id: 'workspace-agent-workspace_axon_local',
+        workspace_id: 'workspace_axon_local',
+        agent_name: 'Axon Local Workspace Agent',
+        agent_key: 'axon_local_workspace_agent',
+        role: 'workspace_agent',
+        // Runtime payloads can be polluted; picker must ignore prose.
+        status:
+          'Thought — All tests pass. A critical review summary follows. Locked the graduation confirmation aut' as
+            'executing',
+        owns: 'axon-local work',
+        enabled: true,
+      }),
+    ).toBe('Axon Local Workspace Agent');
+  });
 });

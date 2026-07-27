@@ -10,6 +10,7 @@ from app.routes import (
     desktop,
     email_reply,
     email_settings,
+    github_ci_webhook,
     health,
     host,
     inbox_watch,
@@ -45,6 +46,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(tasks.router)
     app.include_router(lead_planner.router)
     app.include_router(skills.router)
+    app.include_router(github_ci_webhook.router)
     # Session toggle is always mounted; proposal routes stay 404 until enabled.
     app.include_router(safe_improvement.router)
     # Desktop API + optional SPA catch-all (must be last).

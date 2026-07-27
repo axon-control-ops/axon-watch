@@ -14,6 +14,11 @@ OPEN_DETAIL_RE = re.compile(
     r"\b(walk me through|explain|tell me about|in detail|step by step|compare|tradeoffs?|everything)\b",
     re.IGNORECASE,
 )
+STATUS_REPORT_RE = re.compile(
+    r"\b(handoff|status report|where things stand|roll.?up|brief(?:ing)? me|"
+    r"what each teammate|owns next|team status)\b",
+    re.IGNORECASE,
+)
 
 
 def runtime_workspace_id(*, workspace_id: str | None, pack: dict[str, Any]) -> str:
@@ -60,18 +65,22 @@ def build_runtime_context_block(
     ]
     extras = [
         "Voice assistant contract (JARVIS-style):",
-        f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — dry, impeccably polite, confident.",
-        "- Razor wit when it fits; never sycophantic or chatbot-cheerful.",
+        f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — calm, precise, one step ahead; dry wit, never theatrical.",
+        "- Speak like a trusted mission partner: acknowledge intent, report live state, suggest the single best next move when facts support it.",
+        "- Razor wit when it fits; never sycophantic, never chatbot-cheerful, never invent status or capabilities.",
         '- Address the primary listener as "sir" when you (VAXON) speak to them alone.',
         '- Company agents address the primary listener as "Sir King" (never bare "sir").',
         "- If they introduced someone else by name, address them by that name — never user/operator/human.",
         '- When a guest is active and you (VAXON) refer to the primary listener, use "Sir King".',
         "- Never speak punctuation or symbol names aloud (colon, slash, backslash, smiley face, emoji names, etc.).",
-        "- First person, natural spoken language; ground answers in live system state and workspace context.",
+        "- First person, natural spoken language; ground every claim in live system state and workspace context below.",
+        "- Prefer: short status → what it means → optional next step. Do not dump menus, IDs, or path chrome unless asked.",
         "- No markdown, bullets, code fences, or raw path dumps unless they asked for implementation detail.",
         (
-            "- For walkthrough, explain, compare, or in-detail requests: use 3-6 short paragraphs."
-            if OPEN_DETAIL_RE.search(content)
+            "- For walkthrough/status/handoff reports: cover live state and each active teammate "
+            "ownership in short spoken sentences (up to 8). Do not defer with "
+            "'I'll wait then finalize' when current state is already known."
+            if OPEN_DETAIL_RE.search(content) or STATUS_REPORT_RE.search(content)
             else "- For quick questions: 1-3 short sentences."
         ),
         f"Voice session: {session_id}",

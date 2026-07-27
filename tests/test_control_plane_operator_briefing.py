@@ -67,6 +67,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "pending_approvals",
                 "active_runs",
                 "next_safe_actions",
+                "awaiting_engagement_count",
                 "degraded",
                 "connectivity",
                 "memory_highlights",

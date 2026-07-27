@@ -81,6 +81,11 @@
   flex-direction: column;
   gap: 0;
   z-index: 20;
+  transition: width 180ms ease;
+}
+
+.brain-galaxy-stage--mockup .brain-galaxy-stage__hud--left-collapsed {
+  width: var(--galaxy-left-width, 2.75rem);
 }
 
 .brain-galaxy-stage--mockup .brain-galaxy-stage__hud--inspector {

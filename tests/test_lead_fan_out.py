@@ -81,6 +81,7 @@ class LeadFanOutMaterializeTests(unittest.TestCase):
             self.assertIsNotNone(stored)
             assert stored is not None
             self.assertEqual(run["task_id"], stored.get("task_id"))
+            self.assertEqual("queued", stored.get("phase"))
             history = run_store.list_history(stored["history_ref"])
             types = [
                 str(item.get("receipt", {}).get("type") or "") for item in history
