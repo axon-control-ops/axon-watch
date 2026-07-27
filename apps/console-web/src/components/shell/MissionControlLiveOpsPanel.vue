@@ -262,3 +262,4 @@ function toggleMic(): void {
 </template>
 
 <style scoped src="./mission-control-live-ops.css"></style>
+<style scoped src="./mission-control-transmission.css"></style>

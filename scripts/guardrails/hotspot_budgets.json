@@ -326,11 +326,11 @@
       "note": "Terminal dock; pending command flush extracted to workbench-terminal-pending-commands.ts"
     },
     "apps/console-web/src/components/shell/OperatorBrainGraphPanel.vue": {
-      "max_lines": 569,
+      "max_lines": 562,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/*",
-      "note": "Brain graph panel; extract next"
+      "note": "Brain graph panel; presence inputs extracted to use-operator-brain-galaxy-presence.ts"
     },
     "apps/console-web/src/features/brain-galaxy/brain-galaxy-scene.ts": {
       "max_lines": 565,
