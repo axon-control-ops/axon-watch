@@ -1,0 +1,11 @@
+[Unit]
+Description=Axon-X Fast Gate CI remediation poll (webhook fallback)
+After=network-online.target control-plane.service
+Wants=control-plane.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/axon-watch/deployment.env
+Environment=CONTROL_PLANE_URL=http://127.0.0.1:8787
+WorkingDirectory=%h/axon-nvme/repos/axon-watch
+ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/poll-fast-gate-remediation.sh

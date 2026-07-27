@@ -32,6 +32,31 @@ watching the Actions tab.
 3. Confirm delivery with a red Fast Gate push; inbox should show
    `Axon-X Fast Gate failed on <branch>`.
 
+## Local poll fallback (when public tunnel/DNS is down)
+
+GitHub webhook deliveries fail with `connection_error` if
+`axon.edudashpro.org.za` does not resolve or the tunnel is degraded.
+Config alone cannot auto-fix CI in that state — Rowan never sees the event.
+
+Use the local poller (HMAC to control-plane on localhost):
+
+```bash
+CONTROL_PLANE_URL=http://127.0.0.1:8787 \
+  ./scripts/ops/poll-fast-gate-remediation.sh
+```
+
+Always-on timer (user systemd):
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp scripts/ops/systemd/axon-fast-gate-remediation-poll.{service,timer} \
+  ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now axon-fast-gate-remediation-poll.timer
+```
+
+Public webhook remains preferred; the timer only covers tunnel/DNS outages.
+
 ## Operator surfaces
 
 - **Attention / inbox** — CI failure and repair/blocked updates

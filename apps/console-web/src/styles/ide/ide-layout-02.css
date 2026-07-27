@@ -335,6 +335,52 @@
   }
 }
 
+.agent-dock__resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.35rem;
+  z-index: 4;
+  width: 0.7rem;
+  cursor: col-resize;
+}
+
+.agent-dock__resize-grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: rgba(138, 154, 173, 0.28);
+  transform: translate(-50%, -50%);
+  transition: background 120ms ease, height 120ms ease;
+}
+
+.agent-dock__resize-handle:hover .agent-dock__resize-grip,
+.agent-dock__resize-handle:focus-visible .agent-dock__resize-grip,
+.agent-dock--resizing .agent-dock__resize-grip {
+  height: 3rem;
+  background: rgba(0, 245, 212, 0.72);
+}
+
+.agent-dock__resize-handle:focus-visible {
+  outline: none;
+}
+
+.agent-dock__resize-handle:focus-visible::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.55rem;
+  height: 3.4rem;
+  border: 1px solid rgba(0, 245, 212, 0.55);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 .agent-dock__header {
   /* Above .agent-dock__thread so the workspace picker can overhang the transcript. */
   position: relative;

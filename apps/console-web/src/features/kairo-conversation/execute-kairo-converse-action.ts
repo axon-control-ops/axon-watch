@@ -65,5 +65,9 @@ export async function executeKairoConverseAction(
       },
       action,
     );
+    // Keep Mission Control selection chrome in sync with VAXON "open workspace".
+    if (shell.layoutMode === 'operator') {
+      shell.focusMissionControl();
+    }
   }
 }

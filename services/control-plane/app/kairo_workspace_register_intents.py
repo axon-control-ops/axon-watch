@@ -36,7 +36,8 @@ _ADD_WORKSPACE_RE = re.compile(
     r"\b(?:add|create|register|bind|set\s*up|spin\s*up|use|assign)\b.{0,100}\b(?:new\s+)?workspace\b"
     r"|\bnew\s+workspace\b"
     r"|\bconvert\b.{0,100}\bworkspace\b.{0,60}\bto\b"
-    r"|\b(?:edu\s*pro|aftercare|preschool|school of excellence)\b",
+    r"|\b(?:add|create|register|bind|set\s*up|spin\s*up|use|assign|convert)\b"
+    r".{0,120}\b(?:edu\s*pro|aftercare|preschool|school of excellence|edp\s+excellence)\b",
     re.IGNORECASE | re.DOTALL,
 )
 _NAME_PATTERNS = (

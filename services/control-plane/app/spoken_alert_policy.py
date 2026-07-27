@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 INTERRUPTIVE_MODES = frozenset({"approval", "execute"})
 
 from app.operator_alert_explain import explain_operator_alert
@@ -82,11 +84,26 @@ def resolve_spoken_alert(
 
     if degraded_active:
         detail = str(degraded_reason or "").strip() or "runtime health check failed"
+        public_only = bool(
+            re.search(r"public health|host unreachable|axon\.edudashpro", detail, re.I)
+        )
         explained = explain_operator_alert(
             title="Runtime degraded",
             summary=detail,
             reason="runtime_degraded",
         )
+        if public_only:
+            explained = {
+                **explained,
+                "spoken": (
+                    "Sir, public tunnel health is degraded, but local Axon-X is up. "
+                    "Local charters can continue. Want me to repair the tunnel, or proceed?"
+                ),
+                "you_do": (
+                    "You can keep working locally. Optional: repair Cloudflare DNS/tunnel "
+                    "for axon.edudashpro.org.za, or ask VAXON to proceed with a charter."
+                ),
+            }
         return {
             "eligible": True,
             "reason": "runtime_degraded",

@@ -257,13 +257,15 @@ onMounted(() => {
     void shell.loadWorkspaceTasks(shell.currentWorkspace.workspace_id);
   }
   // Park the Brain Graph floating orb after stage chrome exists in the DOM.
+  // Skip when the operator pinned a custom placement (persisted across refresh).
   window.setTimeout(() => {
     if (
       shell.layoutMode === 'operator' &&
       shell.operatorBrainGalaxyActive &&
-      shell.voiceOrbVisible
+      shell.voiceOrbVisible &&
+      !shell.voiceOrbUserPinned
     ) {
-      shell.requestVoiceOrbSmartDodge({ force: true, preferredDock: 'bottom-left' });
+      shell.requestVoiceOrbSmartDodge({ preferredDock: 'bottom-left' });
     }
   }, 80);
 });

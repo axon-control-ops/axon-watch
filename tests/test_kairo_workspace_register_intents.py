@@ -38,6 +38,15 @@ class WorkspaceRegisterIntentTests(unittest.TestCase):
             )
         )
         self.assertFalse(is_register_workspace_utterance("are all workspaces healthy?"))
+        self.assertFalse(
+            is_register_workspace_utterance(
+                "Lindi, what's the aftercare lead plan status?"
+            )
+        )
+        self.assertFalse(is_register_workspace_utterance("tell me about Edu Pro aftercare"))
+        self.assertTrue(
+            is_register_workspace_utterance("assign aftercare to the school workspace")
+        )
 
     def test_edu_pro_maps_to_school_of_excellence(self) -> None:
         self.assertEqual(

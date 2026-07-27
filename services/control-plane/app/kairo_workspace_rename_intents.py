@@ -51,15 +51,14 @@ def is_rename_workspace_utterance(content: str) -> bool:
 
 
 def is_workspace_fleet_exempt_utterance(content: str) -> bool:
+    from app.kairo_lead_charter_intents import is_lead_charter_utterance
     from app.kairo_workspace_register_intents import is_register_workspace_utterance
 
-    return is_rename_workspace_utterance(content) or is_register_workspace_utterance(content)
-
-
-def is_workspace_fleet_exempt_utterance(content: str) -> bool:
-    from app.kairo_workspace_register_intents import is_register_workspace_utterance
-
-    return is_rename_workspace_utterance(content) or is_register_workspace_utterance(content)
+    return (
+        is_rename_workspace_utterance(content)
+        or is_register_workspace_utterance(content)
+        or is_lead_charter_utterance(content)
+    )
 
 
 def extract_rename_display_name(content: str) -> str | None:

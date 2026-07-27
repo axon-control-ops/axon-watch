@@ -18,10 +18,12 @@ function parkOrbForBrainGraph(): void {
   if (!showFloatingOrb.value) {
     return;
   }
-  if (!shell.voiceOrbUserPinned) {
-    shell.setVoiceOrbDock('bottom-left');
+  // Respect a user-dragged (pinned) placement across refresh / remount.
+  if (shell.voiceOrbUserPinned) {
+    return;
   }
-  shell.requestVoiceOrbSmartDodge({ force: true, preferredDock: 'bottom-left' });
+  shell.setVoiceOrbDock('bottom-left');
+  shell.requestVoiceOrbSmartDodge({ preferredDock: 'bottom-left' });
 }
 
 // Closing in IDE should not permanently lose the orb on operator return.

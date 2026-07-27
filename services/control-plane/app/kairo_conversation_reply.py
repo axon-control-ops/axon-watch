@@ -315,7 +315,6 @@ def build_converse_speak_context(
         "degraded_active": facts["degraded"],
         "recent_turns": recent_turns[-4:],
     }
-
 __all__ = [
     "build_conversation_facts",
     "build_converse_speak_context",

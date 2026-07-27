@@ -25,7 +25,7 @@ import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
-const { draft, pending, thinkingLine, canSubmit, submitTurn, handleFocus, handleBlur, speechCapture } =
+const { draft, pending, thinkingLine, canSubmit, submitTurn, handleFocus, handleBlur, handleHistoryKeydown, speechCapture } =
   useKairoConversation();
 
 const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
@@ -102,6 +102,14 @@ function dismissTeammateRoute(): void {
 
 function handleInputFocus(): void {
   handleFocus();
+}
+
+function handleInputKeydown(event: KeyboardEvent): void {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  handleHistoryKeydown(event, target);
 }
 
 const micDisabled = computed(
@@ -320,6 +328,7 @@ onUnmounted(() => {
           :disabled="inputDisabled"
           @focus="handleInputFocus"
           @blur="handleBlur"
+          @keydown="handleInputKeydown"
         />
         <button
           v-if="showInterrupt"

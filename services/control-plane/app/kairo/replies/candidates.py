@@ -156,31 +156,34 @@ def health_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
             f"{prefix}No — agent dispatch is blocked: {lead}.".strip(),
             f"{prefix}Not nominal — {lead}.".strip(),
         ]
+    note = ""
     if facts["degraded"]:
-        return [
-            f"{prefix}Not fully nominal — runtime is degraded.".strip(),
-            f"{prefix}We're degraded — check watch/runtime health first.".strip(),
-        ]
+        note = " Public tunnel health is degraded, but local control-plane is up — local work can continue."
     pending = int(facts["pending_approvals"])
     if pending > 0:
         noun = "job" if pending == 1 else "jobs"
         return [
-            f"{prefix}Not fully clear — {pending} {noun} waiting for your yes or no.".strip(),
+            f"{prefix}Not fully clear — {pending} {noun} waiting for your yes or no.{note}".strip(),
         ]
     severity = facts["top_signal_severity"]
     if facts["top_signal_title"] and severity in {"high", "critical"}:
         return [
-            f"{prefix}Mostly fine, but heads up on {facts['top_signal_title']}.".strip(),
+            f"{prefix}Mostly fine, but heads up on {facts['top_signal_title']}.{note}".strip(),
         ]
     review_ready = int(facts.get("review_ready_count") or 0)
     if review_ready > 0:
         suffix = "" if review_ready == 1 else "s"
         return [
-            f"{prefix}CLI is ready, but {review_ready} run{suffix} still need review in Mission Control.".strip(),
+            f"{prefix}CLI is ready, but {review_ready} run{suffix} still need review in Mission Control.{note}".strip(),
         ]
     if int(facts["active_run_count"]) > 0:
         return [
-            f"{prefix}Yes — operational with {facts['active_run_count']} active run(s); nothing critical flagged.".strip(),
+            f"{prefix}Yes — operational with {facts['active_run_count']} active run(s).{note}".strip(),
+        ]
+    if facts["degraded"]:
+        return [
+            f"{prefix}Local systems are up; public tunnel health is degraded — local charters and IDE work can proceed.{note}".strip(),
+            f"{prefix}Not fully green publicly, but I'm operational locally — ready for your next order.{note}".strip(),
         ]
     return [
         f"{prefix}Yes — systems look nominal from my side.".strip(),
@@ -190,30 +193,34 @@ def health_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
 
 def fleet_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     prefix = "Still " if followup else ""
-    if facts["degraded"]:
-        return [
-            f"{prefix}Fleet view is up, but runtime is degraded — I'd clear health before trusting green lights.".strip(),
-            f"{prefix}Not clean yet — degraded runtime is the priority over workspace counts.".strip(),
-        ]
     critical = int(facts["critical_workspaces"])
     attention = int(facts["attention_workspaces"])
     total = int(facts["workspace_count"])
+    tunnel_note = (
+        " Public tunnel is degraded (local fleet still operable)."
+        if facts["degraded"]
+        else ""
+    )
     if critical > 0:
         suffix = "" if critical == 1 else "s"
         return [
-            f"{prefix}{critical} workspace{suffix} in critical state across {total} bound — I'd start there.".strip(),
-            f"{prefix}Fleet scan: {critical} critical workspace{suffix} need you.".strip(),
+            f"{prefix}{critical} workspace{suffix} in critical state across {total} bound — I'd start there.{tunnel_note}".strip(),
+            f"{prefix}Fleet scan: {critical} critical workspace{suffix} need you.{tunnel_note}".strip(),
         ]
     if attention > 0:
         suffix = "" if attention == 1 else "s"
         return [
-            f"{prefix}{attention} workspace{suffix} need attention; nothing critical — want me to prioritize?".strip(),
-            f"{prefix}Fleet is stable-ish — {attention} workspace{suffix} flagged.".strip(),
+            f"{prefix}{attention} workspace{suffix} need attention; nothing critical — want me to prioritize?{tunnel_note}".strip(),
+            f"{prefix}Fleet is stable-ish — {attention} workspace{suffix} flagged.{tunnel_note}".strip(),
         ]
     suffix = "" if total == 1 else "s"
     if facts["advise"]:
         return [
-            f"{prefix}Fleet looks healthy across {total} workspace{suffix}. Next: {facts['advise']}".strip(),
+            f"{prefix}Fleet looks healthy across {total} workspace{suffix}. Next: {facts['advise']}{tunnel_note}".strip(),
+        ]
+    if facts["degraded"]:
+        return [
+            f"{prefix}Fleet is operable locally across {total} workspace{suffix}; public tunnel health is degraded — I can still take charters.{tunnel_note}".strip(),
         ]
     return [
         f"{prefix}Fleet nominal — {total} workspace{suffix} look healthy. I'm watching; say if you want a deeper pass.".strip(),
@@ -230,12 +237,11 @@ def general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
             f"{prefix}Not nominal on my side — {lead}. I'd fix that before new agent work.".strip(),
             f"{prefix}Agent dispatch is blocked — {lead}. Check Runtime or /vault.".strip(),
         ]
-    if facts["degraded"]:
-        return [
-            f"{prefix}Runtime is degraded — I'd fix connectivity before dispatching more. Want me to walk it?".strip(),
-            f"{prefix}We're in degraded mode — check watch/runtime health first.".strip(),
-        ]
     chunks: list[str] = []
+    if facts["degraded"]:
+        chunks.append(
+            "public tunnel health is degraded (local control-plane up — local work continues)"
+        )
     if facts["notice"]:
         chunks.append(facts["notice"])
     if int(facts["pending_approvals"]) > 0:

@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue';
 
 import ConversationSeamPanel from '../ConversationSeamPanel.vue';
 import { useRightDockResize } from '../../composables/useRightDockResize';
-import { useVerticalPanelResize } from '../../composables/useVerticalPanelResize';
 import {
   agentDockCollapseTitle,
   agentDockReopenAlive,
@@ -43,29 +42,17 @@ const dockEmployeeInterrupted = computed(() =>
 const reopenTitle = computed(() => agentDockReopenTitle(reopenState.value));
 const reopenAriaLabel = computed(() => agentDockReopenAriaLabel(reopenState.value));
 
-// Keep dock width sync / persistence; the vertical edge grip is intentionally omitted.
-useRightDockResize({
+const {
+  dockWidth,
+  resizing,
+  ariaValueMin,
+  ariaValueMax,
+  resetDockWidth,
+  startDockResize,
+  onDockResizeKeydown,
+} = useRightDockResize({
   dockRef,
   collapsed: computed(() => shell.agentDockCollapsed),
-});
-
-const {
-  panelSize: composerHeight,
-  userSized: composerUserSized,
-  resizing: composerResizing,
-  ariaValueMin: composerHeightMin,
-  ariaValueMax: composerHeightMax,
-  resetSize: resetComposerHeight,
-  startResize: startComposerResize,
-  onResizeKeydown: onComposerResizeKeydown,
-} = useVerticalPanelResize({
-  rootRef: dockRef,
-  cssVariable: '--agent-dock-composer-height',
-  storageKey: 'axon-shell-agent-dock-composer-height',
-  defaultSize: (height) => Math.min(Math.round(height * 0.34), 280),
-  minSize: 160,
-  maxSize: (height) => Math.round(height * 0.62),
-  growsUp: true,
 });
 
 function collapseDock(): void {
@@ -94,12 +81,28 @@ onMounted(() => {
     ref="dockRef"
     class="region region-right-dock agent-dock"
     :class="{
-      'agent-dock--composer-resizing': composerResizing,
-      'agent-dock--composer-user-sized': composerUserSized,
+      'agent-dock--resizing': resizing,
       'agent-dock--alive': dockAlive,
       'agent-dock--streaming': shell.agentStreamActive,
     }"
   >
+    <div
+      class="agent-dock__resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize agent dock"
+      title="Drag or use arrow keys to resize. Enter or double-click to reset."
+      tabindex="0"
+      :aria-valuemin="ariaValueMin"
+      :aria-valuemax="ariaValueMax"
+      :aria-valuenow="dockWidth"
+      @mousedown="startDockResize"
+      @keydown="onDockResizeKeydown"
+      @dblclick="resetDockWidth"
+    >
+      <span class="agent-dock__resize-grip" aria-hidden="true" />
+    </div>
+
     <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide">
       <div class="agent-dock__head-row">
         <div class="agent-dock__head-main">
@@ -136,23 +139,6 @@ onMounted(() => {
         <ConversationSeamPanel />
       </div>
     </section>
-
-    <div
-      class="agent-dock__composer-resize-handle"
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label="Resize agent composer"
-      title="Drag the top of the composer up or down. Double-click to reset."
-      tabindex="0"
-      :aria-valuemin="composerHeightMin"
-      :aria-valuemax="composerHeightMax"
-      :aria-valuenow="composerHeight"
-      @mousedown="startComposerResize"
-      @keydown="onComposerResizeKeydown"
-      @dblclick="resetComposerHeight"
-    >
-      <span class="agent-dock__composer-resize-grip" aria-hidden="true" />
-    </div>
 
     <footer class="agent-dock__composer">
       <IdeAgentReviewStrip />

@@ -7,6 +7,7 @@ from typing import Any
 from app.chat.move_voice_orb import move_voice_orb_ack, parse_move_voice_orb_ui_action
 from app.kairo_memory_intents import maybe_handle_memory_intent
 from app.kairo_participant_memory import apply_participant_address, get_active_participant
+from app.kairo_lead_charter_intents import maybe_handle_lead_charter_intent
 from app.kairo_workspace_register_intents import maybe_handle_register_workspace_intent
 from app.kairo_workspace_rename_intents import maybe_handle_rename_workspace_intent
 
@@ -40,6 +41,14 @@ def maybe_handle_early_converse_intent(
             "active_participant": participant,
             "action_tier": "reversible_auto",
         }
+
+    charter_intent = maybe_handle_lead_charter_intent(
+        content=content,
+        workspace_id=workspace_id,
+        guest_name=guest_name,
+    )
+    if charter_intent is not None:
+        return charter_intent
 
     rename_intent = maybe_handle_rename_workspace_intent(
         content=content,

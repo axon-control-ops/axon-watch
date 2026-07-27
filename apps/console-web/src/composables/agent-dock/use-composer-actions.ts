@@ -145,6 +145,7 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     }
     if (composerMode.value === 'kairo') {
       await submitKairoTurn(draft);
+      recordComposerHistoryIfSent(draft);
       return;
     }
     let modeForSubmit: IdeComposerMode = composerMode.value;

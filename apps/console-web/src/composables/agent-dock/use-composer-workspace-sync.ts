@@ -24,6 +24,7 @@ type UseComposerWorkspaceSyncOptions = {
   closeMenus: () => void;
   syncComposerHeight: () => void;
   syncContextFromDraft: () => void;
+  getActiveDraft: () => string;
   loadComposerHistoryForWorkspace: (workspaceId: string | null) => void;
   loadComposerImagesForWorkspace: (
     workspaceId: string | null,
@@ -48,6 +49,7 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
     closeMenus,
     syncComposerHeight,
     syncContextFromDraft,
+    getActiveDraft,
     loadComposerHistoryForWorkspace,
     loadComposerImagesForWorkspace,
     disposeComposerImagesPersistTimer,
@@ -65,7 +67,7 @@ export function useComposerWorkspaceSync(options: UseComposerWorkspaceSyncOption
   }
 
   watch(
-    () => shell.ideComposerDraft,
+    () => getActiveDraft(),
     () => {
       const fromHistory = applyingHistoryDraft.value;
       if (fromHistory) {

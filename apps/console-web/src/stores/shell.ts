@@ -1882,11 +1882,15 @@ export const useShellStore = defineStore('shell', () => {
       ideComposerDraftPersistTimer = null;
     }
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    const threadId = activeIdeThreadId.value;
-    if (!workspaceId || !threadId) {
+    if (!workspaceId) {
       return;
     }
-    persistIdeComposerDraft(workspaceId, ideComposerDraft.value, threadId);
+    // Prefer thread scope; fall back to workspace so drafts survive before thread hydration.
+    persistIdeComposerDraft(
+      workspaceId,
+      ideComposerDraft.value,
+      activeIdeThreadId.value || null,
+    );
   }
 
   function schedulePersistIdeComposerDraft(): void {
@@ -1899,11 +1903,14 @@ export const useShellStore = defineStore('shell', () => {
     ideComposerDraftPersistTimer = setTimeout(() => {
       ideComposerDraftPersistTimer = null;
       const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-      const threadId = activeIdeThreadId.value;
-      if (!workspaceId || !threadId) {
+      if (!workspaceId) {
         return;
       }
-      persistIdeComposerDraft(workspaceId, ideComposerDraft.value, threadId);
+      persistIdeComposerDraft(
+        workspaceId,
+        ideComposerDraft.value,
+        activeIdeThreadId.value || null,
+      );
     }, 140);
   }
 

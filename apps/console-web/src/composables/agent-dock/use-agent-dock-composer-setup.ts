@@ -144,11 +144,19 @@ export function useAgentDockComposerSetup() {
     handleHistory,
     recordComposerHistoryIfSent,
   } = useComposerHistory({
-    shell,
     inputRef,
     syncComposerHeight,
     clearComposerImages,
     composerImages,
+    getDraft: () =>
+      composerMode.value === 'kairo' ? kairoDraft.value : shell.ideComposerDraft,
+    setDraft: (value) => {
+      if (composerMode.value === 'kairo') {
+        kairoDraft.value = value;
+        return;
+      }
+      shell.ideComposerDraft = value;
+    },
   });
 
   const {
@@ -326,6 +334,8 @@ export function useAgentDockComposerSetup() {
     },
     syncComposerHeight,
     syncContextFromDraft,
+    getActiveDraft: () =>
+      composerMode.value === 'kairo' ? kairoDraft.value : shell.ideComposerDraft,
     loadComposerHistoryForWorkspace,
     loadComposerImagesForWorkspace,
     disposeComposerImagesPersistTimer,
