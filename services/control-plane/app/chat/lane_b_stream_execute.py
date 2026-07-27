@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -35,6 +36,8 @@ from app.workspace_agents.critical_review_clause import (
     MISSING_CONFIDENCE_DETAIL,
     parse_confidence,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -208,7 +211,61 @@ def finalize_lane_b_agent_run(
                 intent="lane_b_agent",
             )
             dispatched = False
+    _maybe_notify_lead_after_lane_b(
+        dispatch_run_id=dispatch_run_id,
+        run_record=run_record,
+        reply_text=reply_text,
+    )
     return dispatched, run_record
+
+
+def _maybe_notify_lead_after_lane_b(
+    *,
+    dispatch_run_id: str,
+    run_record: dict[str, object] | None,
+    reply_text: str,
+) -> None:
+    """Continuous Lead takeover for IDE specialist shifts (no worker task required)."""
+    if not isinstance(run_record, dict):
+        return
+    phase = str(run_record.get("phase") or "").strip().lower()
+    if phase not in {"completed", "failed"}:
+        return
+    role = str(run_record.get("employee_role") or "").strip().lower()
+    if not role or role in {"lead", "overview_agent"}:
+        return
+    # Continuous workers already notify after task ledger finalize.
+    if str(run_record.get("task_id") or "").strip():
+        return
+    workspace_id = str(run_record.get("workspace_id") or "").strip()
+    if not workspace_id:
+        return
+    try:
+        from app.workspace_agents import build_company_roster
+        from app.workspace_agents.lead_replan import notify_lead_after_worker_task
+
+        name = role
+        company = build_company_roster(workspace_id)
+        for row in company.get("employees") or []:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("role") or "").strip().lower() == role:
+                name = str(row.get("name") or role).strip() or role
+                break
+        notify_lead_after_worker_task(
+            workspace_id=workspace_id,
+            task_id="",
+            run_id=str(run_record.get("run_id") or dispatch_run_id),
+            employee_role=role,
+            employee_name=name,
+            phase=phase,
+            reply_text=reply_text,
+        )
+    except Exception:  # noqa: BLE001 — never block Lane B finalize on Lead notify
+        logger.exception(
+            "lead notify after Lane B specialist shift failed for %s",
+            dispatch_run_id,
+        )
 
 
 def execute_lane_b_stream(job: LaneBStreamJob) -> None:

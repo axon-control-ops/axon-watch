@@ -275,18 +275,51 @@ def notify_lead_after_worker_task(
     phase: str,
     reply_text: str | None = None,
 ) -> dict[str, Any]:
-    """Specialist → Dana status, then auto-synthesize when the plan is fully terminal."""
-    task = task_store.get_task(task_id)
-    if task is None:
-        return {"status": "skipped_missing_task"}
-    task_status = str(task.get("status") or "").strip().lower()
-    if task_status not in _TERMINAL_TASK_STATUSES:
+    """Specialist → Lead takeover (always), then plan status + auto-synthesize when terminal.
+
+    Works for continuous-worker tasks and ad-hoc IDE specialist shifts. Lead plans are
+    optional — missing plan links no longer drop the Dana report.
+    """
+    role = str(employee_role or "").strip().lower()
+    from app.workspace_agents.lead_checkin_assign import SPECIALIST_ROLES
+
+    if role not in SPECIALIST_ROLES:
+        return {"status": "skipped_not_specialist", "employee_role": role}
+
+    task = task_store.get_task(task_id) if str(task_id or "").strip() else None
+    task_status = str((task or {}).get("status") or "").strip().lower()
+    if task is not None and task_status not in _TERMINAL_TASK_STATUSES:
         # fail_task may reopen when attempt budget remains.
         return {"status": "skipped_task_not_terminal", "task_status": task_status}
 
-    plan_id = lead_plan_store.plan_id_for_task(task_id)
+    plan_id = lead_plan_store.plan_id_for_task(task_id) if task else None
+    goal = str((task or {}).get("goal") or "")
+    outcome = str((task or {}).get("terminal_outcome") or "")
+
+    from app.workspace_agents.lead_takeover import post_lead_takeover_report
+
+    takeover = post_lead_takeover_report(
+        workspace_id=workspace_id,
+        run_id=run_id,
+        employee_role=role,
+        employee_name=employee_name,
+        phase=phase if phase in {"completed", "failed"} else (task_status or phase),
+        goal=goal,
+        outcome=outcome,
+        reply_text=reply_text,
+        plan_id=plan_id,
+        task_id=str(task_id or "").strip() or None,
+        create_follow_up_task=True,
+    )
+
     if not plan_id:
-        return {"status": "skipped_not_lead_plan"}
+        return {
+            "status": "ok_ad_hoc",
+            "plan_id": None,
+            "takeover": takeover,
+            "specialist_status": {"status": "skipped_not_lead_plan"},
+            "synthesis": None,
+        }
 
     plan_key = None
     for link in lead_plan_store.plan_task_links(plan_id):
@@ -305,14 +338,15 @@ def notify_lead_after_worker_task(
         employee_role=employee_role,
         employee_name=employee_name,
         phase=phase if phase in {"completed", "failed"} else task_status,
-        goal=str(task.get("goal") or ""),
-        outcome=str(task.get("terminal_outcome") or ""),
+        goal=goal,
+        outcome=outcome,
         reply_excerpt=(reply_text or "")[:400],
     )
     synthesis = maybe_synthesize_lead_plan_for_task(task_id)
     return {
         "status": "ok",
         "plan_id": plan_id,
+        "takeover": takeover,
         "specialist_status": status_post,
         "synthesis": synthesis,
     }

@@ -170,7 +170,24 @@ Proof:
 
 ---
 
-## 5. After every push — watch Fast Gate
+## 4b. Continuous Lead takeover (specialist → Dana)
+
+When a specialist shift ends (continuous worker **or** IDE Lane B), Dana now
+posts a **Lead takeover** rollup in the Lead IDE tab even if the shift was not
+linked to a formal Lead fan-out plan. Missing `task_id` no longer drops the
+handoff.
+
+| Piece | Location |
+| --- | --- |
+| Takeover report | `lead_takeover.post_lead_takeover_report` |
+| Notify hook | `notify_lead_after_worker_task` (+ Lane B finalize) |
+| Follow-up | Open `Lead follow-up after …` task for Decide / next assign |
+
+Full multi-specialist synthesis still waits until every plan task is terminal;
+single specialist completions get an immediate Dana report so the loop stays
+continuous.
+
+---
 
 ### Why
 

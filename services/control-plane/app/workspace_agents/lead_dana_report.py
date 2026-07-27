@@ -271,7 +271,10 @@ def post_specialist_status_to_dana(
     excerpt = _truncate(reply_excerpt or "", max_len=280)
     if excerpt:
         lines.append(f"Excerpt: {excerpt}")
-    lines.append("I will synthesize a full operator rollup when every specialist is terminal.")
+    lines.append(
+        "Lead takeover started — I posted a rollup in my Lead tab. "
+        "Full team synthesis still waits until every specialist on this plan is terminal."
+    )
 
     agent_message = chat_store.save_message(
         {
