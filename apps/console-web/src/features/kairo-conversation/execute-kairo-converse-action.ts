@@ -54,5 +54,16 @@ export async function executeKairoConverseAction(
       },
       action,
     );
+    return;
+  }
+  if (action.type === 'switch_workspace') {
+    await shell.loadWorkspaces({ sync: false });
+    applyChatUiAction(
+      {
+        setCurrentWorkspace: shell.setCurrentWorkspace,
+        openWorkspaceFile: shell.openWorkspaceFile,
+      },
+      action,
+    );
   }
 }

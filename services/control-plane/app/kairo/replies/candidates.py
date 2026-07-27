@@ -190,25 +190,34 @@ def health_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
 
 def fleet_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
     prefix = "Still " if followup else ""
+    if facts["degraded"]:
+        return [
+            f"{prefix}Fleet view is up, but runtime is degraded — I'd clear health before trusting green lights.".strip(),
+            f"{prefix}Not clean yet — degraded runtime is the priority over workspace counts.".strip(),
+        ]
     critical = int(facts["critical_workspaces"])
     attention = int(facts["attention_workspaces"])
     total = int(facts["workspace_count"])
     if critical > 0:
         suffix = "" if critical == 1 else "s"
         return [
-            f"{prefix}{critical} workspace{suffix} in critical state across {total} bound.".strip(),
+            f"{prefix}{critical} workspace{suffix} in critical state across {total} bound — I'd start there.".strip(),
             f"{prefix}Fleet scan: {critical} critical workspace{suffix} need you.".strip(),
         ]
     if attention > 0:
         suffix = "" if attention == 1 else "s"
         return [
-            f"{prefix}{attention} workspace{suffix} need attention; nothing critical.".strip(),
+            f"{prefix}{attention} workspace{suffix} need attention; nothing critical — want me to prioritize?".strip(),
             f"{prefix}Fleet is stable-ish — {attention} workspace{suffix} flagged.".strip(),
         ]
     suffix = "" if total == 1 else "s"
+    if facts["advise"]:
+        return [
+            f"{prefix}Fleet looks healthy across {total} workspace{suffix}. Next: {facts['advise']}".strip(),
+        ]
     return [
-        f"{prefix}Fleet nominal — {total} workspace{suffix} look healthy.".strip(),
-        f"{prefix}All bound workspaces look green from here.".strip(),
+        f"{prefix}Fleet nominal — {total} workspace{suffix} look healthy. I'm watching; say if you want a deeper pass.".strip(),
+        f"{prefix}Bound workspaces look green from here — standing by.".strip(),
     ]
 
 
@@ -218,12 +227,12 @@ def general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
         blockers = facts["cli_blockers"]
         lead = blockers[0] if blockers else "CLI runtime is not dispatch-ready"
         return [
-            f"{prefix}Not nominal on my side — {lead}.".strip(),
+            f"{prefix}Not nominal on my side — {lead}. I'd fix that before new agent work.".strip(),
             f"{prefix}Agent dispatch is blocked — {lead}. Check Runtime or /vault.".strip(),
         ]
     if facts["degraded"]:
         return [
-            f"{prefix}Runtime is degraded — I'd fix connectivity before dispatching more.".strip(),
+            f"{prefix}Runtime is degraded — I'd fix connectivity before dispatching more. Want me to walk it?".strip(),
             f"{prefix}We're in degraded mode — check watch/runtime health first.".strip(),
         ]
     chunks: list[str] = []
@@ -239,15 +248,15 @@ def general_candidates(facts: dict[str, Any], *, followup: bool) -> list[str]:
         chunks.append(facts["advise"])
     if not chunks:
         return [
-            f"{prefix}All quiet on the board — standing by for your next move.".strip(),
-            f"{prefix}Nothing urgent from my scan — what shall we tackle?".strip(),
-            f"{prefix}Systems look nominal — I'm here when you need me.".strip(),
+            f"{prefix}All quiet on the board — I'm watching. Want a fleet rollup or shall we pick a workspace?".strip(),
+            f"{prefix}Nothing urgent from my scan — I can brief leads, check DashPro CI, or take your next order.".strip(),
+            f"{prefix}Systems look nominal — standing by like Jarvis. What shall we tackle?".strip(),
         ]
     body = "; ".join(chunks[:3])
     return [
         f"{prefix}{body}.".strip(),
         f"{prefix}Quick read: {body}.".strip(),
-        f"{prefix}From the briefing — {body}.".strip(),
+        f"{prefix}I'd act on this first — {body}.".strip(),
     ]
 
 CANDIDATE_BUILDERS = {

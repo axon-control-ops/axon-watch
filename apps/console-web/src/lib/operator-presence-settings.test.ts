@@ -55,12 +55,12 @@ describe('operator-presence-settings', () => {
       kairo_narration: 'conversational',
       ide_voice_strip_enabled: false,
       hands_free_enabled: false,
-      proactive_duplex_enabled: false,
+      proactive_duplex_enabled: true,
       speech_rate: 1.0,
       speech_pitch: 1.04,
       azure_voice_id: 'en-GB-RyanNeural',
       stt_mode: 'cloud',
-      voice_routing_mode: 'template_first',
+      voice_routing_mode: 'runtime_on_deep',
       narrate_tool_progress: false,
     });
     expect(storage.getItem(OPERATOR_PRESENCE_SETTINGS_KEY)).toContain('"operator_persona_enabled":false');
@@ -75,12 +75,12 @@ describe('operator-presence-settings', () => {
       kairo_narration: 'conversational',
       ide_voice_strip_enabled: false,
       hands_free_enabled: false,
-      proactive_duplex_enabled: false,
+      proactive_duplex_enabled: true,
       speech_rate: 1.0,
       speech_pitch: 1.04,
       azure_voice_id: 'en-GB-RyanNeural',
       stt_mode: 'cloud',
-      voice_routing_mode: 'template_first',
+      voice_routing_mode: 'runtime_on_deep',
       narrate_tool_progress: false,
     });
   });

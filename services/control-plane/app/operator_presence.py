@@ -54,6 +54,11 @@ def build_operator_presence(
     )
     degraded = briefing.get("degraded")
     degraded_active = bool(degraded.get("active")) if isinstance(degraded, dict) else False
+    degraded_reason = None
+    if isinstance(degraded, dict):
+        reasons = degraded.get("reasons")
+        if isinstance(reasons, list) and reasons:
+            degraded_reason = str(reasons[0] or "").strip() or None
     connectivity = briefing.get("connectivity")
     watch_connected = (
         bool(connectivity.get("watch_connected"))
@@ -76,6 +81,8 @@ def build_operator_presence(
         settings=resolved_settings,
         pending_approvals=pending_approvals,
         top_signal=top_signal,
+        degraded_active=degraded_active,
+        degraded_reason=degraded_reason,
     )
     top_meta = top_signal.get("meta") if top_signal else None
     voice_line = build_persona_voice_line(

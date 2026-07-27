@@ -113,6 +113,20 @@ describe('parseAgentTranscriptBlocks', () => {
     ]);
   });
 
+  it('compacts legacy oversized terminal output before rendering', () => {
+    const output = `HEAD\n${'x'.repeat(30_000)}\nTAIL`;
+    const segments = parseAgentTranscriptBlocks(
+      [':::terminal cat big.log', output, ':::'].join('\n'),
+    );
+    const terminal = segments[0];
+    expect(terminal?.kind).toBe('terminal');
+    if (terminal?.kind !== 'terminal') throw new Error('expected terminal segment');
+    expect(terminal.output).toContain('HEAD');
+    expect(terminal.output).toContain('TAIL');
+    expect(terminal.output).toContain('characters compacted to keep the IDE responsive');
+    expect(terminal.output.length).toBeLessThan(16_000);
+  });
+
   it('marks streaming terminal blocks as open', () => {
     const segments = parseAgentTranscriptBlocks(':::terminal git status');
     expect(segments).toEqual([

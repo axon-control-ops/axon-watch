@@ -66,7 +66,7 @@ export function useKairoAppVoice(): void {
     }
     scheduleKairoVoiceFollowupWindowAfterSpeech();
     await speakKairoLine(
-      'VAXON online. I am listening. After I speak, answer naturally — or say VAXON anytime.',
+      'VAXON online. Eyes on the fleet. After I speak, answer naturally — or say VAXON anytime.',
       { priority: 'conversation' },
     );
   }

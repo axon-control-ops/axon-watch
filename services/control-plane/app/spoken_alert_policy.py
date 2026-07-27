@@ -16,14 +16,16 @@ def default_operator_presence_settings() -> dict[str, bool | str | float]:
         "mobile_compact_preferred": True,
         "kairo_narration": "conversational",
         "ide_voice_strip_enabled": False,
+        # Hands-free stays opt-in (mic permission). Duplex = speak then listen like JARVIS.
         "hands_free_enabled": False,
-        "proactive_duplex_enabled": False,
+        "proactive_duplex_enabled": True,
         # axon-local parity defaults (desktop voice deck).
         "speech_rate": 1.0,
         "speech_pitch": 1.04,
         "azure_voice_id": "en-GB-RyanNeural",
         "stt_mode": "cloud",
-        "voice_routing_mode": "template_first",
+        # Prefer runtime for deep status/open asks; keep templates for quick facts.
+        "voice_routing_mode": "runtime_on_deep",
         "narrate_tool_progress": False,
     }
 
@@ -42,6 +44,8 @@ def resolve_spoken_alert(
     settings: dict[str, bool],
     pending_approvals: int,
     top_signal: dict[str, object] | None,
+    degraded_active: bool = False,
+    degraded_reason: str | None = None,
 ) -> dict[str, object]:
     persona_enabled = bool(settings.get("operator_persona_enabled", True))
 
@@ -71,6 +75,21 @@ def resolve_spoken_alert(
         return {
             "eligible": True,
             "reason": "operator_approval_required",
+            "signal_id": None,
+            "message": _spoken_message(explained["spoken"], persona_enabled=persona_enabled),
+            "explanation": explained,
+        }
+
+    if degraded_active:
+        detail = str(degraded_reason or "").strip() or "runtime health check failed"
+        explained = explain_operator_alert(
+            title="Runtime degraded",
+            summary=detail,
+            reason="runtime_degraded",
+        )
+        return {
+            "eligible": True,
+            "reason": "runtime_degraded",
             "signal_id": None,
             "message": _spoken_message(explained["spoken"], persona_enabled=persona_enabled),
             "explanation": explained,

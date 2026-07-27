@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Per-workspace automatic worker delivery (commit → push → draft PR → CI).",
+  "description": "Per-workspace automatic worker delivery (commit \u2192 push \u2192 draft PR \u2192 CI).",
   "defaults": {
     "enabled": true,
     "push_policy": "draft_pr",
@@ -9,7 +9,13 @@
     "escalate_role": "integrations",
     "lead_role": "lead",
     "ci_poll_timeout_seconds": 1800,
-    "protected_branches": ["main", "master", "dev", "production", "release"]
+    "protected_branches": [
+      "main",
+      "master",
+      "dev",
+      "production",
+      "release"
+    ]
   },
   "workspaces": [
     {
@@ -18,14 +24,16 @@
       "base_branch": "dev",
       "github_owner": "axon-control-ops",
       "github_repo": "axon-watch",
-      "workflow_names": ["Axon-X Fast Gate"],
+      "workflow_names": [
+        "Axon-X Fast Gate"
+      ],
       "attempt_budget": 3,
       "push_policy": "draft_pr"
     },
     {
       "workspace_id": "workspace_dashpro",
       "enabled": true,
-      "base_branch": "dev",
+      "base_branch": "development",
       "github_owner": "axon-control-ops",
       "github_repo": "dashpro",
       "workflow_names": [
@@ -36,7 +44,8 @@
         "Security Scan"
       ],
       "attempt_budget": 3,
-      "push_policy": "draft_pr"
+      "push_policy": "draft_pr",
+      "notes": "Worker delivery opens draft PRs into development. Production web (Vercel) tracks main \u2014 merge development\u2192preview\u2192main only after CI green; production OTA/Play remain hard-gated."
     }
   ]
 }

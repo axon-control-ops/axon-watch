@@ -11,7 +11,7 @@ export const DEFAULT_SPEECH_RATE = 1.0;
 export const DEFAULT_SPEECH_PITCH = 1.04;
 export const DEFAULT_AZURE_VOICE_ID = 'en-GB-RyanNeural';
 export const DEFAULT_STT_MODE: SttMode = 'cloud';
-export const DEFAULT_VOICE_ROUTING_MODE: VoiceRoutingMode = 'template_first';
+export const DEFAULT_VOICE_ROUTING_MODE: VoiceRoutingMode = 'runtime_on_deep';
 
 export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
   return {
@@ -22,7 +22,8 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     kairo_narration: 'conversational',
     ide_voice_strip_enabled: false,
     hands_free_enabled: false,
-    proactive_duplex_enabled: false,
+    // JARVIS duplex: after VAXON speaks, listen for a natural reply.
+    proactive_duplex_enabled: true,
     speech_rate: DEFAULT_SPEECH_RATE,
     speech_pitch: DEFAULT_SPEECH_PITCH,
     azure_voice_id: DEFAULT_AZURE_VOICE_ID,

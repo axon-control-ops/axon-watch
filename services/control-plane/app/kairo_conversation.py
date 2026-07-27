@@ -19,7 +19,7 @@ from app.cli_runtime.router import dispatch_ide_composer
 from app.kairo.context_pack_cache import get_cached_context_pack
 from app.kairo.voice_dispatch import VoiceModelReceipt, normalize_voice_routing_mode, route_voice_turn
 from app.kairo.voice_autonomy import resolve_voice_action_tier
-from app.kairo_memory_intents import maybe_handle_memory_intent
+from app.kairo_early_intents import maybe_handle_early_converse_intent
 from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
 from app.kairo.turn_memory import (
     entity_context as _entity_context,
@@ -277,58 +277,34 @@ def converse_turn(
                 duration_ms=round((time.perf_counter() - started_at) * 1000),
             )
 
-    memory_intent = maybe_handle_memory_intent(
+    early_intent = maybe_handle_early_converse_intent(
         content=trimmed,
         session_id=session_id,
         workspace_id=resolved_workspace_id,
         guest_name=guest_name,
     )
-    if memory_intent is not None:
-        reply = str(memory_intent.get("reply") or "")
+    if early_intent is not None:
+        reply = str(early_intent.get("reply") or "")
+        participant = early_intent.get("active_participant") or guest_name
         _remember_turn(session_id, "user", trimmed)
         _remember_turn(session_id, "assistant", reply)
+        payload = {
+            "turn_kind": str(early_intent.get("turn_kind") or "action"),
+            "reply": reply,
+            "source": str(early_intent.get("source") or "template"),
+            "command_content": early_intent.get("command_content"),
+            "action": early_intent.get("action"),
+            "artifacts": list(early_intent.get("artifacts") or []),
+            "active_participant": participant,
+        }
+        if early_intent.get("action_tier"):
+            payload["action_tier"] = early_intent.get("action_tier")
         return _log_voice_turn(
             session_id=session_id,
             workspace_id=workspace_id,
             raw_content=raw_content,
             normalized_content=trimmed,
-            payload={
-                "turn_kind": str(memory_intent.get("turn_kind") or "action"),
-                "reply": reply,
-                "source": str(memory_intent.get("source") or "template"),
-                "command_content": memory_intent.get("command_content"),
-                "action": memory_intent.get("action"),
-                "artifacts": list(memory_intent.get("artifacts") or []),
-                "active_participant": guest_name,
-            },
-            duration_ms=round((time.perf_counter() - started_at) * 1000),
-        )
-
-    from app.chat.move_voice_orb import move_voice_orb_ack, parse_move_voice_orb_ui_action
-
-    move_orb_action = parse_move_voice_orb_ui_action(trimmed)
-    if move_orb_action is not None:
-        reply = apply_participant_address(
-            move_voice_orb_ack(move_orb_action),
-            guest_name or get_active_participant(session_id),
-        )
-        _remember_turn(session_id, "user", trimmed)
-        _remember_turn(session_id, "assistant", reply)
-        return _log_voice_turn(
-            session_id=session_id,
-            workspace_id=workspace_id,
-            raw_content=raw_content,
-            normalized_content=trimmed,
-            payload={
-                "turn_kind": "action",
-                "reply": reply,
-                "source": "template",
-                "command_content": None,
-                "action": move_orb_action,
-                "artifacts": [],
-                "active_participant": guest_name or get_active_participant(session_id),
-                "action_tier": "reversible_auto",
-            },
+            payload=payload,
             duration_ms=round((time.perf_counter() - started_at) * 1000),
         )
 

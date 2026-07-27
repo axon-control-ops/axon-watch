@@ -45,6 +45,11 @@ export type KairoConverseAction =
       type: 'move_voice_orb';
       dock?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
       mode?: 'smart_dodge';
+    }
+  | {
+      type: 'switch_workspace';
+      workspace_id: string;
+      open_file_path?: string | null;
     };
 
 export interface KairoConverseArtifactAction {

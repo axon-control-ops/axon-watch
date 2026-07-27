@@ -36,6 +36,22 @@ def workspace_aliases(workspace_id: str, display_name: str | None) -> set[str]:
                 "young eagles daycare",
             }
         )
+    if workspace_id == "workspace_edudashpro_school":
+        aliases.update(
+            {
+                "edu pro",
+                "edupro",
+                "edu-pro",
+                "edudash pro",
+                "edudashpro",
+                "edu dash pro",
+                "school of excellence",
+                "aftercare",
+                "preschool",
+                "edp excellence",
+                "edpexcellence",
+            }
+        )
     return {alias for alias in aliases if alias}
 
 

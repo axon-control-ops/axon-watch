@@ -19,6 +19,7 @@ import AgentImageBlock from './ide/AgentImageBlock.vue';
 import IdeActivityIcon from './ide/IdeActivityIcon.vue';
 import IdeAgentThreadStatusStrip from './ide/IdeAgentThreadStatusStrip.vue';
 import ConversationSeamTerminalBlock from './conversation/ConversationSeamTerminalBlock.vue';
+import ConversationSeamHistoryNav from './conversation/ConversationSeamHistoryNav.vue';
 import OperatorMessageActions from './conversation/OperatorMessageActions.vue';
 import ConversationSeamAttachmentLightbox from './conversation/ConversationSeamAttachmentLightbox.vue';
 import ConversationSeamMessageAttachments from './conversation/ConversationSeamMessageAttachments.vue';
@@ -36,6 +37,7 @@ const { handleWheel, handleContentChange } = useConversationSeamScroll({
 const {
   shell,
   conversationDisplayItems,
+  ideMessageWindow,
   conversationDockHint,
   showAgentWorking,
   agentWorkingLabel,
@@ -68,6 +70,9 @@ const {
   closeAttachmentLightbox,
   compactCommandSummary,
   isEmptyStreamingAgent,
+  showEarlierMessages,
+  showNewerMessages,
+  showLatestMessages,
   transcriptSegments,
 } = useConversationSeamPanel(rootRef, listRef, handleContentChange);
 
@@ -76,6 +81,16 @@ const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(convers
 <template>
   <div ref="rootRef" class="conversation-seam" @wheel.capture="handleWheel">
     <p v-if="conversationDockHint" class="conversation-seam__dock-hint">{{ conversationDockHint }}</p>
+    <ConversationSeamHistoryNav
+      v-if="
+        shell.layoutMode === 'ide' &&
+        (ideMessageWindow.olderCount > 0 || ideMessageWindow.newerCount > 0)
+      "
+      :window="ideMessageWindow"
+      @earlier="showEarlierMessages"
+      @newer="showNewerMessages"
+      @latest="showLatestMessages"
+    />
     <ul
       v-if="conversationDisplayItems.length"
       ref="listRef"

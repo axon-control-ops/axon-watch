@@ -14,6 +14,7 @@ from app.cli_runtime.cursor_stream_events import (  # noqa: E402
     tool_block_from_event,
 )
 from app.cli_runtime.stream_blocks.terminal_blocks import (  # noqa: E402
+    terminal_close_body,
     terminal_started_block_from_event,
 )
 
@@ -58,11 +59,22 @@ class CursorStreamTerminalBlockTests(unittest.TestCase):
         self.assertIn(":::terminal mkdir -p build", block)
         self.assertTrue(block.rstrip().endswith(":::"))
 
-    def test_long_output_is_preserved_in_full(self) -> None:
-        output = "x" * 9000
+    def test_long_output_is_compacted_with_head_and_tail(self) -> None:
+        output = "HEAD\n" + ("x" * 20_000) + "\nTAIL"
         block = tool_block_from_event(_shell_event("cat big.log", output), "")
-        self.assertIn(output, block)
-        self.assertNotIn("(output truncated)", block)
+        self.assertIn("HEAD", block)
+        self.assertIn("TAIL", block)
+        self.assertIn("characters compacted to keep the IDE responsive", block)
+        self.assertLess(len(block), 13_000)
+        self.assertNotIn(output, block)
+
+    def test_streaming_terminal_close_compacts_long_output(self) -> None:
+        output = "START\n" + ("z" * 30_000) + "\nEND"
+        body = terminal_close_body(output)
+        self.assertIn("START", body)
+        self.assertIn("END", body)
+        self.assertIn("characters compacted to keep the IDE responsive", body)
+        self.assertLess(len(body), 13_000)
 
     def test_read_tool_call_keeps_tool_block(self) -> None:
         event = {

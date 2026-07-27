@@ -7,6 +7,7 @@ import re
 from typing import Any, Literal
 
 from app.kairo_smalltalk import self_intro_candidates
+from app.kairo_workspace_rename_intents import is_workspace_fleet_exempt_utterance
 from app.operator_briefing_signals import is_bootstrap_signal
 
 QuestionFocus = Literal[
@@ -80,12 +81,11 @@ def detect_question_focus(content: str, *, recent_user_turns: list[str]) -> Ques
         return "runtime"
     if _HEALTH_RE.search(lower):
         return "health"
-    if _FLEET_RE.search(lower):
+    if _FLEET_RE.search(lower) and not is_workspace_fleet_exempt_utterance(trimmed):
         return "fleet"
     if "degraded" in lower or "connectivity" in lower or "offline" in lower:
         return "degraded"
     return "general"
-
 
 def build_conversation_facts(pack: dict[str, Any]) -> dict[str, Any]:
     briefing = pack["briefing"]
@@ -315,6 +315,7 @@ def build_converse_speak_context(
         "degraded_active": facts["degraded"],
         "recent_turns": recent_turns[-4:],
     }
+
 __all__ = [
     "build_conversation_facts",
     "build_converse_speak_context",

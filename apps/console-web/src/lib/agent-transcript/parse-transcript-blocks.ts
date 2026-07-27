@@ -22,6 +22,24 @@ import {
   TOOL_HEADER_RE,
 } from './transcript-regex';
 
+const TERMINAL_DISPLAY_MAX_CHARS = 16_000;
+const TERMINAL_DISPLAY_HEAD_CHARS = 10_000;
+const TERMINAL_DISPLAY_TAIL_CHARS = 5_000;
+
+function compactTerminalOutputForDisplay(output: string): string {
+  const trimmed = output.replace(/^\n+|\n+$/g, '');
+  if (trimmed.length <= TERMINAL_DISPLAY_MAX_CHARS) {
+    return trimmed;
+  }
+  const omitted =
+    trimmed.length - TERMINAL_DISPLAY_HEAD_CHARS - TERMINAL_DISPLAY_TAIL_CHARS;
+  return [
+    trimmed.slice(0, TERMINAL_DISPLAY_HEAD_CHARS).trimEnd(),
+    `… [${omitted.toLocaleString('en-US')} characters compacted to keep the IDE responsive; showing output head and tail] …`,
+    trimmed.slice(-TERMINAL_DISPLAY_TAIL_CHARS).trimStart(),
+  ].join('\n\n');
+}
+
 function upgradeClarifyingTextSegments(
   segments: AgentTranscriptSegment[],
 ): AgentTranscriptSegment[] {
@@ -274,7 +292,7 @@ export function parseAgentTranscriptBlocksUncached(
       segments.push({
         kind: 'terminal',
         command: terminalMatch[1].trim(),
-        output: body.join('\n').replace(/^\n+|\n+$/g, ''),
+        output: compactTerminalOutputForDisplay(body.join('\n')),
         open: !closed,
       });
       continue;

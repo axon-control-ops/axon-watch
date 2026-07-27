@@ -432,8 +432,9 @@ defineExpose({
           <span class="operator-settings-form__copy">
             <strong>JARVIS duplex (proactive speak → listen)</strong>
             <small>
-              After VAXON speaks an alert, stay listening for ~30s so you can answer without the wake
-              word. Turns on hands-free + spoken alerts. Cold ambient still needs “VAXON”.
+              Default on for JARVIS-style presence: after VAXON speaks, stay listening for ~30s so you
+              can answer without the wake word. Turns on spoken alerts. Cold ambient still needs
+              “VAXON”. Allow microphone permission for this site.
             </small>
           </span>
         </label>

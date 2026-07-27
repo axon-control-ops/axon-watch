@@ -11,6 +11,7 @@ import {
   prepareOperatorConversationDock,
   type ConversationDisplayItem,
 } from '../../lib/operator-conversation-view';
+import { conversationMessageWindow } from '../../lib/conversation-message-window';
 import { operatorArtifactRecords } from '../../lib/operator-artifact-view';
 import type { OperatorThreadEntry, ThreadMessageAttachment } from '../../lib/operator-thread';
 import { agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
@@ -32,9 +33,13 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   const conversationMessages = computed(() =>
     shell.layoutMode === 'ide' ? shell.threadMessages : shell.operatorThreadMessages,
   );
+  const ideHistoryPage = ref(0);
+  const ideMessageWindow = computed(() =>
+    conversationMessageWindow(conversationMessages.value, ideHistoryPage.value),
+  );
   const conversationDisplayItems = computed((): ConversationDisplayItem[] => {
     if (shell.layoutMode === 'ide') {
-      return conversationMessages.value.map((message: OperatorThreadEntry) => ({
+      return ideMessageWindow.value.items.map((message: OperatorThreadEntry) => ({
         kind: 'message' as const,
         message,
       }));
@@ -239,17 +244,57 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     return message.role === 'agent' && !message.content.trim() && isStreamingMessage(message.message_id);
   }
 
+  function showEarlierMessages(): void {
+    if (ideMessageWindow.value.olderCount > 0) {
+      ideHistoryPage.value += 1;
+    }
+  }
+
+  function showNewerMessages(): void {
+    ideHistoryPage.value = Math.max(0, ideHistoryPage.value - 1);
+  }
+
+  function showLatestMessages(): void {
+    ideHistoryPage.value = 0;
+  }
+
   watch(
-    conversationDisplayItems,
+    () => shell.activeIdeThreadId,
+    () => {
+      ideHistoryPage.value = 0;
+    },
+  );
+
+  const conversationContentRevision = computed(() => {
+    const items = conversationDisplayItems.value;
+    const last = items.at(-1);
+    if (!last) {
+      return 'empty';
+    }
+    if (last.kind === 'message') {
+      return `${items.length}:${last.message.message_id}:${last.message.content.length}`;
+    }
+    if (last.kind === 'command_turn') {
+      return `${items.length}:${last.messageId}:${last.execution.output.length}`;
+    }
+    if (last.kind === 'artifact') {
+      return `${items.length}:${last.messageId}:${last.artifact.body.length}`;
+    }
+    return `${items.length}:${last.messageId}:${last.text.length}`;
+  });
+
+  watch(
+    conversationContentRevision,
     () => {
       handleContentChange();
     },
-    { immediate: true, deep: true },
+    { immediate: true },
   );
 
   return {
     shell,
     conversationDisplayItems,
+    ideMessageWindow,
     conversationDockHint,
     showAgentWorking,
     agentWorkingLabel,
@@ -282,6 +327,9 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     closeAttachmentLightbox,
     compactCommandSummary,
     isEmptyStreamingAgent,
+    showEarlierMessages,
+    showNewerMessages,
+    showLatestMessages,
     transcriptSegments,
     rootRef,
     listRef,
