@@ -130,4 +130,10 @@ describe('sanitizeSpokenReply', () => {
     expect(cleaned).not.toMatch(/^\s*2\.\s+/m);
     expect(cleaned).not.toContain('Listen for numbered steps');
   });
+
+  it('keeps digit+role phrases speakable (4 Lead → four Lead)', () => {
+    const spoken = sanitizeSpokenReply('4 Lead plans awaiting engagement in VAXON.');
+    expect(spoken.toLowerCase()).toContain('four lead');
+    expect(spoken).not.toMatch(/\b4\s+Lead\b/);
+  });
 });

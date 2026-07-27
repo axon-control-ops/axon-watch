@@ -42,7 +42,7 @@ describe('employeeSpeakLine', () => {
 
     const intro = employeeSpeakLine(failed, 'talk', { talkMode: 'intro' });
     expect(intro).toContain('vitest: assertion failed');
-    expect(intro).toMatch(/retry|Retry shift/i);
+    expect(intro).toMatch(/retry|Try again/i);
 
     const callback = employeeSpeakLine(failed, 'talk', { talkMode: 'callback', entropy: '1' });
     expect(callback).toMatch(/failed|retry/i);

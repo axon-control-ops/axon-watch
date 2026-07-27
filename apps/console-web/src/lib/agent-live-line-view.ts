@@ -157,8 +157,11 @@ export function stripAgentStreamFenceMarkers(text: string): string {
     .trim();
 }
 
-/** Operator-facing fallback when thinking has no usable body. */
-export const THINKING_SPEECH_FALLBACK = 'On it…';
+/**
+ * Neutral UI placeholder when thinking has no usable body yet.
+ * Never spoken as a model reply — real thinking/reply text replaces this.
+ */
+export const THINKING_SPEECH_FALLBACK = 'Working…';
 
 const THINKING_LEAD_RE = /^(?:i\s+am\s+)?thinking(?:[,.…\s]{0,3}|\.\.\.)?$/i;
 const THINKING_PREFIX_IAM_RE = /^i\s+am\s+thinking(?:[,.…\s]{1,3}|\.\.\.)?\s*/i;
@@ -246,7 +249,7 @@ export function normalizeThinkingSpeechLead(text: string): string {
     return '';
   }
   if (THINKING_LEAD_RE.test(flattened)) {
-    return THINKING_SPEECH_FALLBACK;
+    return '';
   }
 
   let strippedThinking = false;
@@ -262,7 +265,7 @@ export function normalizeThinkingSpeechLead(text: string): string {
     return flattened;
   }
   if (!rest) {
-    return THINKING_SPEECH_FALLBACK;
+    return '';
   }
 
   const action = rewriteFutureIntentToPresent(rest);

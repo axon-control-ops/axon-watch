@@ -24,6 +24,7 @@ import {
   applyKairoConversationNavigationIntent,
   resolveKairoConversationNavigationIntent,
 } from './conversation-navigation-handler';
+import { expandReportHotword } from './conversation-report-hotword';
 import { dispatchKairoConverseOutcome } from './kairo-conversation-dispatch';
 import {
   mentionsBriefingSurfaceOffer,
@@ -122,10 +123,11 @@ export function useKairoConversation() {
     rawContent?: string,
     options?: { voiceCaptureMode?: KairoVoiceCaptureMode },
   ): Promise<void> {
-    const content = normalizeVoiceTranscript((rawContent ?? draft.value).trim());
-    if (!content || pending.value) {
+    const raw = normalizeVoiceTranscript((rawContent ?? draft.value).trim());
+    if (!raw || pending.value) {
       return;
     }
+    const content = expandReportHotword(raw) ?? raw;
     lastOperatorPrompt = content;
     recordSharedKairoHistoryEntry(content);
     const answerTier = determineAnswerTier(content);

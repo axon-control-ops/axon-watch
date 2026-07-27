@@ -1,6 +1,10 @@
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 
 import {
+  OPERATOR_FAILURE_RETRY_LABEL,
+  operatorFailureRetryLabel,
+} from '../../lib/operator-failure-copy';
+import {
   employeeResolvedFailureDetail,
   isAgentSessionInterruptedFailure,
   isOperatorStoppedFailure,
@@ -8,6 +12,7 @@ import {
   isRuntimeAuthFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
+  looksLikeSuccessfulOutcomeDetail,
   truncateFailureDetail,
 } from './employee-failure-detail';
 import { employeeIsWorking } from './company-roster-status';
@@ -19,17 +24,21 @@ export function employeeFailureLine(employee: CompanyEmployeeRecord): string | n
   if (outcome !== 'failed') {
     return null;
   }
-  // Active shifts supersede the last failure banner.
+  // Active jobs supersede the last failure banner.
   if (employeeIsWorking(employee.status)) {
     return null;
   }
   const detail = employeeResolvedFailureDetail(employee);
+  // Stale failed tags with a success detail must not keep the red banner up.
+  if (looksLikeSuccessfulOutcomeDetail(detail)) {
+    return null;
+  }
   if (detail) {
     if (isRestartInterruptedFailure(detail)) {
-      return 'Last shift interrupted by server restart — use Continue shift to pick up where you left off.';
+      return 'Last job was interrupted when the server restarted — tap Continue to pick up where they left off.';
     }
     if (isOperatorStoppedFailure(detail)) {
-      return 'Last shift was stopped early — use Continue shift to pick up where you left off.';
+      return 'Last job was stopped early — tap Continue to pick up where they left off.';
     }
     if (isAgentSessionInterruptedFailure(detail)) {
       if (
@@ -37,22 +46,22 @@ export function employeeFailureLine(employee: CompanyEmployeeRecord): string | n
         /exited with status 137/i.test(detail) ||
         /exited with status -?9\b/i.test(detail)
       ) {
-        return 'Last shift was stopped to free memory — use Continue shift when the machine has headroom.';
+        return 'Last job was stopped to free memory — tap Continue when the machine has headroom.';
       }
-      return 'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.';
+      return 'Last job was interrupted before it could finish — tap Continue to pick up where they left off.';
     }
     if (isUsageLimitFailure(employee.last_outcome_detail)) {
-      return 'Last shift could not start — usage limits blocked the agent runtime. Restore limits, then use Retry shift.';
+      return 'Last job could not start — usage limits blocked the agent. Restore limits, then tap Try again.';
     }
     if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
-      return 'Last shift could not run — runtime auth is not ready. Run `cursor agent login` on the host or unlock /vault, then use Retry shift.';
+      return 'Last job could not run — login is not ready. Run `cursor agent login` on the host or unlock /vault, then tap Try again.';
     }
-    return `Last shift failed: ${truncateFailureDetail(detail)}`;
+    return `Last job failed: ${truncateFailureDetail(detail)}`;
   }
-  return 'Last shift failed — open the run for receipts.';
+  return 'Last job failed — open the run for details.';
 }
 
-/** Stable dedupe key for auto-peeking the agent dock after a failed shift. */
+/** Stable dedupe key for auto-peeking the agent dock after a failed job. */
 export function employeeFailurePeekKey(employee: CompanyEmployeeRecord): string | null {
   if (!employeeFailureLine(employee)) {
     return null;
@@ -149,15 +158,15 @@ export function employeeShiftNeedsContinuation(employee: CompanyEmployeeRecord):
   return isShiftContinuationFailure(employee.last_outcome_detail);
 }
 
-/** Primary recovery action label for failed or interrupted teammate shifts. */
+/** Primary recovery action label for failed or interrupted teammate jobs. */
 export function employeeFailureRetryActionLabel(employee: CompanyEmployeeRecord): string {
   if (!employeeFailureLine(employee)) {
-    return 'Retry shift';
+    return OPERATOR_FAILURE_RETRY_LABEL;
   }
-  return employeeShiftNeedsContinuation(employee) ? 'Continue shift' : 'Retry shift';
+  return operatorFailureRetryLabel(employeeShiftNeedsContinuation(employee));
 }
 
-/** Status chip value: surfaces failed when the last shift failed and the teammate is idle. */
+/** Status chip value: surfaces failed when the last job failed and the teammate is idle. */
 export function employeeDisplayStatus(employee: CompanyEmployeeRecord): string {
   if (employeeFailureLine(employee)) {
     return employeeShiftNeedsContinuation(employee) ? 'interrupted' : 'failed';
@@ -192,9 +201,9 @@ export function companyFailedEmployeesHint(
     if (line) {
       return `${name} — ${line}`;
     }
-    return `${name}'s last shift failed — select them for Retry shift, or click to talk it through.`;
+    return `${name}'s last job failed — select them and tap Try again, or click to talk it through.`;
   }
-  return `${failed.length} teammates need attention after a failed shift — select one for Retry shift, or click to talk it through.`;
+  return `${failed.length} teammates need attention after a failed job — select one and tap Try again, or click to talk it through.`;
 }
 
 /** Hover title for the roster alert hint when a single teammate failed with truncated detail. */
@@ -224,7 +233,7 @@ export type CompanyRosterAlertBadge = {
   tone: CompanyRosterAlertBadgeTone;
 };
 
-/** Compact roster headline badge when teammates need attention after a failed or interrupted shift. */
+/** Compact roster headline badge when teammates need attention after a failed or interrupted job. */
 export function buildCompanyRosterAlertBadge(
   employees: readonly CompanyEmployeeRecord[] | null | undefined,
 ): CompanyRosterAlertBadge | null {
@@ -243,7 +252,7 @@ export function buildCompanyRosterAlertBadge(
     if (interruptedCount === 1) {
       return {
         label: '1 interrupted',
-        title: '1 teammate has an interrupted shift — select them for Continue shift',
+        title: '1 teammate has an interrupted job — select them and tap Continue',
         ariaLabel: 'Jump to 1 interrupted teammate',
         tone: 'interrupted',
       };
@@ -251,7 +260,7 @@ export function buildCompanyRosterAlertBadge(
 
     return {
       label: '1 failed',
-      title: '1 teammate needs attention after a failed shift',
+      title: '1 teammate needs attention after a failed job',
       ariaLabel: 'Jump to 1 failed teammate',
       tone: 'failure',
     };
@@ -260,7 +269,7 @@ export function buildCompanyRosterAlertBadge(
   if (failedCount === 0) {
     return {
       label: `${count} interrupted`,
-      title: `${count} teammates have interrupted shifts — select one for Continue shift`,
+      title: `${count} teammates have interrupted jobs — select one and tap Continue`,
       ariaLabel: `Jump to ${count} interrupted teammates`,
       tone: 'interrupted',
     };
@@ -269,7 +278,7 @@ export function buildCompanyRosterAlertBadge(
   if (interruptedCount === 0) {
     return {
       label: `${count} failed`,
-      title: `${count} teammates need attention after a failed shift`,
+      title: `${count} teammates need attention after a failed job`,
       ariaLabel: `Jump to ${count} failed teammates`,
       tone: 'failure',
     };
@@ -277,7 +286,7 @@ export function buildCompanyRosterAlertBadge(
 
   return {
     label: `${count} need attention`,
-    title: `${count} teammates need attention after a failed or interrupted shift`,
+    title: `${count} teammates need attention after a failed or interrupted job`,
     ariaLabel: `Jump to ${count} teammates needing attention`,
     tone: 'mixed',
   };

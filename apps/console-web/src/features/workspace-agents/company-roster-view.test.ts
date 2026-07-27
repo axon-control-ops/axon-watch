@@ -59,8 +59,8 @@ describe('company-roster-view', () => {
       }),
     ).toBe('Always on (24/7)');
     expect(employeeStatusLabel('waiting_approval')).toBe('waiting approval');
-    expect(employeeStatusLabel('failed')).toBe('last shift failed');
-    expect(employeeStatusLabel('interrupted')).toBe('shift interrupted');
+    expect(employeeStatusLabel('failed')).toBe('last job failed');
+    expect(employeeStatusLabel('interrupted')).toBe('job interrupted');
   });
 
   it('builds company headline with employee count', () => {
@@ -171,11 +171,11 @@ describe('company-roster-view', () => {
       last_outcome: 'failed',
       last_outcome_detail: 'timeout',
     });
-    expect(employeePresenceContextPhrase(failed)).toBe('Last shift failed: timeout');
+    expect(employeePresenceContextPhrase(failed)).toBe('Last job failed: timeout');
     expect(employeePresenceSelectLabel(failed)).toBe(
-      'Select Jules, Last shift failed: timeout',
+      'Select Jules, Last job failed: timeout',
     );
-    expect(employeePresenceStripTitle(failed)).toBe('Jules — Last shift failed: timeout');
+    expect(employeePresenceStripTitle(failed)).toBe('Jules — Last job failed: timeout');
     expect(employeePresenceSelectLabel(employee({ name: 'Jules', enabled: false }))).toBe(
       'Select Jules, paused',
     );
@@ -200,7 +200,7 @@ describe('company-roster-view', () => {
     expect(selectedPresenceStripEmployee(rows, null)).toBeNull();
   });
 
-  it('uses failure-aware callback speak when idle after a failed shift', () => {
+  it('uses failure-aware callback speak when idle after a failed job', () => {
     const failed = employee({
       status: 'idle',
       last_outcome: 'failed',
@@ -231,7 +231,7 @@ describe('company-roster-view', () => {
     const status = employeeSpeakLine(bridge, 'status');
     expect(status).toContain('reporting in');
     expect(status).toContain('cursor agent unavailable');
-    expect(status).toMatch(/retry|receipts/i);
+    expect(status).toMatch(/try again|explain what happened/i);
   });
 
   it('maps working status, glow tone, and talk lines', () => {

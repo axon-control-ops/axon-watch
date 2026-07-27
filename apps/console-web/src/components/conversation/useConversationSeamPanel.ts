@@ -17,6 +17,10 @@ import type { OperatorThreadEntry, ThreadMessageAttachment } from '../../lib/ope
 import { agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
 import { createTranscriptSegmentCache } from '../../lib/conversation-transcript-segment-cache';
 import { sanitizeAgentThinkingForOperator, THINKING_SPEECH_FALLBACK } from '../../lib/agent-live-line-view';
+import {
+  addressFormForSpeaker,
+  buildStreamingAckLine,
+} from '../../lib/agent-streaming-ack';
 import { prepareAgentTerminalOpen } from '../../lib/agent-terminal-open';
 import {
   shouldShowAgentTerminalBackgroundControl,
@@ -67,9 +71,30 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
       );
     }
     if (shell.agentStreamActive) {
-      return THINKING_SPEECH_FALLBACK;
+      return streamingAckLine.value;
     }
     return shell.ideComposerActivity?.label ?? 'Agent is working…';
+  });
+
+  const lastOperatorPrompt = computed(() => {
+    const messages = conversationMessages.value;
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.role === 'operator') {
+        return String(message.content ?? '').trim();
+      }
+    }
+    return '';
+  });
+
+  const streamingAckLine = computed(() => {
+    const address = shell.activeIdeEmployee
+      ? addressFormForSpeaker('employee')
+      : addressFormForSpeaker('vaxon');
+    return buildStreamingAckLine({
+      operatorPrompt: lastOperatorPrompt.value,
+      address,
+    });
   });
 
   const expandedErrorByMessageId = ref<Record<string, boolean>>({});
@@ -164,7 +189,11 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   }
 
   function thinkingBodyText(text: string): string {
-    return sanitizeAgentThinkingForOperator(text) || THINKING_SPEECH_FALLBACK;
+    return sanitizeAgentThinkingForOperator(text) || streamingAckLine.value || THINKING_SPEECH_FALLBACK;
+  }
+
+  function emptyStreamingAck(): string {
+    return streamingAckLine.value || THINKING_SPEECH_FALLBACK;
   }
 
   async function copyTerminalOutput(output: string): Promise<void> {
@@ -315,6 +344,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     showTerminalBackgroundControl,
     terminalMirrorBadge,
     thinkingBodyText,
+    emptyStreamingAck,
     copyTerminalOutput,
     isThinkingExpanded,
     toggleThinking,

@@ -64,21 +64,21 @@ describe('buildIdeAgentSidebarStub', () => {
   });
 
   it('surfaces failed teammate shift guidance when the dock is collapsed', () => {
-    const failureLine = 'Last shift failed: vitest assertion failed';
+    const failureLine = 'Last job failed: vitest assertion failed';
     const panel = buildIdeAgentSidebarStub({
       agentDockCollapsed: true,
       streaming: false,
       pendingApprovals: 0,
       runPhase: null,
       employeeFailureLine: failureLine,
-      employeeRetryActionLabel: 'Retry shift',
+      employeeRetryActionLabel: 'Try again',
     });
 
     expect(panel.tone).toBe('failure');
     expect(panel.lines[0]).toBe(failureLine);
-    expect(panel.lines.join(' ')).toContain('Retry shift');
+    expect(panel.lines.join(' ')).toContain('Try again');
     expect(panel.actionLabel).toBe('Expand agent dock');
-    expect(panel.secondaryActionLabel).toBe('Retry shift');
+    expect(panel.secondaryActionLabel).toBe('Try again');
   });
 
   it('surfaces interrupted teammate shift guidance when the dock is collapsed', () => {
@@ -88,15 +88,15 @@ describe('buildIdeAgentSidebarStub', () => {
       pendingApprovals: 0,
       runPhase: null,
       employeeFailureLine:
-        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+        'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
       employeeShiftInterrupted: true,
-      employeeRetryActionLabel: 'Continue shift',
+      employeeRetryActionLabel: 'Continue',
     });
 
     expect(panel.tone).toBe('interrupted');
-    expect(panel.lines.join(' ')).toContain('Continue shift');
-    expect(panel.lines.join(' ')).not.toContain('Retry shift in the failure banner');
-    expect(panel.secondaryActionLabel).toBe('Continue shift');
+    expect(panel.lines.join(' ')).toContain('Continue');
+    expect(panel.lines.join(' ')).not.toContain('Try again in the failure banner');
+    expect(panel.secondaryActionLabel).toBe('Continue');
   });
 
   it('keeps failure guidance below approvals and streaming', () => {
@@ -106,7 +106,7 @@ describe('buildIdeAgentSidebarStub', () => {
         streaming: false,
         pendingApprovals: 1,
         runPhase: null,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       }).lines[0],
     ).toContain('approval');
     expect(
@@ -115,7 +115,7 @@ describe('buildIdeAgentSidebarStub', () => {
         streaming: true,
         pendingApprovals: 0,
         runPhase: null,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       }).lines[0],
     ).toContain('responding');
   });
@@ -188,8 +188,8 @@ describe('ideSidebarStubActionAriaLabel', () => {
   it('expands agent and terminal stub button labels for screen readers', () => {
     expect(ideSidebarStubActionAriaLabel('Expand agent dock', 'agent')).toContain('right edge');
     expect(ideSidebarStubActionAriaLabel('Show terminal', 'terminal')).toContain('below the editor');
-    expect(ideSidebarStubActionAriaLabel('Retry shift', 'agent')).toContain('agent dock composer');
-    expect(ideSidebarStubActionAriaLabel('Continue shift', 'agent')).toContain('agent dock composer');
+    expect(ideSidebarStubActionAriaLabel('Try again', 'agent')).toContain('agent dock composer');
+    expect(ideSidebarStubActionAriaLabel('Continue', 'agent')).toContain('agent dock composer');
     expect(ideSidebarStubActionAriaLabel('Custom action', 'agent')).toBe('Custom action');
   });
 });

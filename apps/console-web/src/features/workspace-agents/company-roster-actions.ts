@@ -8,6 +8,7 @@ import {
   isRuntimeAuthFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
+  looksLikeSuccessfulOutcomeDetail,
   normalizeOperatorFailureDetail,
 } from './company-roster-view';
 
@@ -86,39 +87,51 @@ export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
   const name = employee.name.trim() || 'this teammate';
   const runId = employeeDockReceiptRunId(employee);
   const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
-  if (isShiftContinuationFailure(detail)) {
-    const runHint = runId ? ` (${runId})` : '';
+  const outcome = (employee.last_outcome ?? '').trim().toLowerCase();
+  const runHint = runId ? ` (${runId})` : '';
+  const completed =
+    outcome === 'completed' ||
+    outcome === 'done' ||
+    outcome === 'succeeded' ||
+    looksLikeSuccessfulOutcomeDetail(detail);
+
+  if (completed) {
     return (
-      `Walk me through what was in progress when the server restarted for ${name}'s shift${runHint}. ` +
+      `Walk me through what ${name} shipped on their last job${runHint}. ` +
+      `This run completed successfully — do not treat it as a failure. ` +
+      `Summarize what changed, what was verified, any blockers or Lead next items, and suggest the next move.`
+    );
+  }
+  if (isShiftContinuationFailure(detail)) {
+    return (
+      `Walk me through what was in progress when the server restarted for ${name}'s job${runHint}. ` +
       `${SERVER_RESTART_CONTINUATION_PROMPT} Summarize what was incomplete, cite commands, and suggest next steps.`
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
-    const runHint = runId ? ` (${runId})` : '';
     return (
-      `Walk me through receipts for ${name}'s last shift${runHint}. ` +
-      `The shift never started because usage limits blocked the agent runtime. ` +
+      `Walk me through what happened on ${name}'s last job${runHint}. ` +
+      `The job never started because usage limits blocked the agent. ` +
       `Summarize what was attempted and suggest next steps once limits are restored.`
     );
   }
   if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
-    const runHint = runId ? ` (${runId})` : '';
     return (
-      `Walk me through receipts for ${name}'s last shift${runHint}. ` +
-      `The shift could not run because runtime auth is not ready. ` +
+      `Walk me through what happened on ${name}'s last job${runHint}. ` +
+      `The job could not run because login is not ready. ` +
       `Summarize what was attempted and suggest next steps once auth is fixed.`
     );
   }
-  const detailHint = detail ? ` Error: ${detail}` : '';
+  const detailHint = detail ? ` Reported issue: ${detail}.` : '';
   if (runId) {
     return (
-      `Walk me through receipts for ${name}'s last shift (${runId}).${detailHint} ` +
-      `Summarize what failed, cite commands or assertions, and suggest next steps.`
+      `Walk me through what happened on ${name}'s last job (${runId}).${detailHint} ` +
+      `Summarize what went wrong, cite commands or checks, and suggest next steps.`
     );
   }
   return (
-    `Walk me through receipts for ${name}'s last failed shift.${detailHint} ` +
-    `Summarize what failed and suggest next steps.`
+    `Walk me through what happened on ${name}'s last failed job.${detailHint} ` +
+    `Summarize what went wrong and suggest next steps.`
   );
 }
 
@@ -209,7 +222,7 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
   };
   const receiptsAction: TeamMemberQuickAction = {
     id: 'receipts',
-    label: 'Explain receipts',
+    label: 'Explain what happened',
     kind: 'chat',
     chatKind: 'receipts',
     composerMode: 'ask',
@@ -247,7 +260,7 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
   if (employee.active_run_id) {
     actions.push({
       id: 'stop',
-      label: 'Stop shift',
+      label: 'Stop',
       kind: 'control',
       control: 'stop',
     });

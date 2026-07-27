@@ -1679,6 +1679,11 @@ export const useShellStore = defineStore('shell', () => {
       void refreshRunSurfaces().finally(() => {
         void flushIdeComposerQueueIfIdle();
       });
+      // Refresh roster immediately so failure banners clear when the backend
+      // already shows the latest completed outcome (do not wait for the 20s poll).
+      if (workspaceId) {
+        void loadCompanyEmployees(workspaceId);
+      }
     };
     const voiceContext = kairoVoiceContext();
     const voiceNarration = createAgentStreamVoiceSession({

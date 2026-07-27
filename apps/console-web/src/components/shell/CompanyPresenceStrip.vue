@@ -214,7 +214,7 @@ function onKeydown(event: KeyboardEvent): void {
             v-if="item.interrupted"
             class="company-presence-strip__interrupt-mark"
             aria-hidden="true"
-            title="Shift interrupted — retry to continue"
+            title="Job interrupted — retry to continue"
           >
             ↻
           </span>
@@ -222,7 +222,7 @@ function onKeydown(event: KeyboardEvent): void {
             v-else-if="item.failed"
             class="company-presence-strip__fail-mark"
             aria-hidden="true"
-            title="Last shift failed"
+            title="Last job failed"
           >
             !
           </span>

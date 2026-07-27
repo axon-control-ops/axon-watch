@@ -260,7 +260,7 @@ onUnmounted(() => {
           busyThreadIds.has(thread.thread_id)
             ? `Busy — ${threadDisplayTitle(thread)}`
             : threadFailureHintById.get(thread.thread_id)
-              ? `Last shift failed — ${threadDisplayTitle(thread)}`
+              ? `Last job failed — ${threadDisplayTitle(thread)}`
               : threadDisplayTitle(thread)
         "
         :title="
@@ -286,7 +286,7 @@ onUnmounted(() => {
           v-else-if="threadFailureHintById.has(thread.thread_id)"
           class="agent-dock-thread-tabbar__tab-fail-mark"
           aria-hidden="true"
-          title="Last shift failed"
+          title="Last job failed"
         >
           !
         </span>
@@ -364,7 +364,7 @@ onUnmounted(() => {
             :aria-selected="activeThreadId === thread.thread_id"
             :aria-label="
               threadFailureHintById.get(thread.thread_id)
-                ? `Last shift failed — ${threadDisplayTitle(thread)}`
+                ? `Last job failed — ${threadDisplayTitle(thread)}`
                 : busyThreadIds.has(thread.thread_id)
                   ? `Busy — ${threadDisplayTitle(thread)}`
                   : threadDisplayTitle(thread)

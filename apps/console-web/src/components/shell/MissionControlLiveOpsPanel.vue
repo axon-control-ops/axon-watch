@@ -247,7 +247,7 @@ function toggleMic(): void {
           v-model="reply"
           type="text"
           autocomplete="off"
-          :placeholder="`Talk to ${OPERATOR_PERSONA_NAME}…`"
+          :placeholder="`Talk to ${OPERATOR_PERSONA_NAME}… or REPORT`"
           :disabled="pending"
         >
         <span class="mc-live-ops__wave" aria-hidden="true">

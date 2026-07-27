@@ -147,7 +147,7 @@ const displayActions = computed(() =>
     </p>
 
     <section v-if="receiptDetail || receiptRunId" class="agent-persona-dock__receipt">
-      <p class="agent-persona-dock__receipt-label">Last shift</p>
+      <p class="agent-persona-dock__receipt-label">Last job</p>
       <p v-if="receiptDetail" class="agent-persona-dock__receipt-detail">
         {{ receiptDetail }}
       </p>
@@ -160,7 +160,7 @@ const displayActions = computed(() =>
           type="button"
           class="agent-persona-dock__receipt-run-btn"
           :title="receiptRunId"
-          :aria-label="`Explain receipts for ${receiptRunLabel || receiptRunId}`"
+          :aria-label="`Explain what happened for ${receiptRunLabel || receiptRunId}`"
           @click="emit('action', receiptsAction)"
         >
           {{ receiptRunLabel || receiptRunId }}

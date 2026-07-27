@@ -52,37 +52,37 @@ describe('buildIdeQuickGuide', () => {
   });
 
   it('prioritizes failed teammate shift guidance when the dock is collapsed', () => {
-    const failureLine = 'Last shift failed: vitest assertion failed';
+    const failureLine = 'Last job failed: vitest assertion failed';
     const guide = buildIdeQuickGuide({
       ...base,
       employeeFailureLine: failureLine,
-      employeeRetryActionLabel: 'Retry shift',
+      employeeRetryActionLabel: 'Try again',
     });
 
-    expect(guide?.title).toContain('Last shift failed');
+    expect(guide?.title).toContain('Last job failed');
     expect(guide?.tone).toBe('failure');
     expect(guide?.steps[0]).toBe(failureLine);
-    expect(guide?.steps.join(' ')).toContain('Retry shift');
+    expect(guide?.steps.join(' ')).toContain('Try again');
     expect(guide?.actions).toEqual([
       { id: 'expand-agent-dock', label: 'Expand agent dock' },
-      { id: 'retry-employee-shift', label: 'Retry shift' },
+      { id: 'retry-employee-shift', label: 'Try again' },
     ]);
   });
 
-  it('uses Continue shift in interrupted quick-guide steps', () => {
+  it('uses Continue in interrupted quick-guide steps', () => {
     const guide = buildIdeQuickGuide({
       ...base,
       employeeFailureLine:
-        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+        'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
       employeeShiftInterrupted: true,
-      employeeRetryActionLabel: 'Continue shift',
+      employeeRetryActionLabel: 'Continue',
     });
 
-    expect(guide?.steps.join(' ')).toContain('Continue shift');
-    expect(guide?.steps.join(' ')).not.toContain('Retry shift in the failure banner');
+    expect(guide?.steps.join(' ')).toContain('Continue');
+    expect(guide?.steps.join(' ')).not.toContain('Try again in the failure banner');
     expect(guide?.actions).toContainEqual({
       id: 'retry-employee-shift',
-      label: 'Continue shift',
+      label: 'Continue',
     });
   });
 
@@ -90,31 +90,31 @@ describe('buildIdeQuickGuide', () => {
     const guide = buildIdeQuickGuide({
       ...base,
       employeeFailureLine:
-        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+        'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
       employeeShiftInterrupted: true,
     });
 
-    expect(guide?.title).toContain('Shift interrupted');
+    expect(guide?.title).toContain('Job interrupted');
     expect(guide?.tone).toBe('interrupted');
-    expect(guide?.steps.join(' ')).toContain('Continue shift');
+    expect(guide?.steps.join(' ')).toContain('Continue');
   });
 
   it('guides retry from the dock banner when a teammate failed with the dock already open', () => {
-    const failureLine = 'Last shift failed: vitest assertion failed';
+    const failureLine = 'Last job failed: vitest assertion failed';
     const guide = buildIdeQuickGuide({
       ...base,
       agentDockCollapsed: false,
       terminalVisible: true,
       employeeFailureLine: failureLine,
-      employeeRetryActionLabel: 'Retry shift',
+      employeeRetryActionLabel: 'Try again',
     });
 
-    expect(guide?.title).toContain('Last shift failed');
+    expect(guide?.title).toContain('Last job failed');
     expect(guide?.tone).toBe('failure');
     expect(guide?.steps[0]).toBe(failureLine);
-    expect(guide?.steps.join(' ')).toContain('Retry shift');
+    expect(guide?.steps.join(' ')).toContain('Try again');
     expect(guide?.steps.join(' ')).toContain('agent dock composer');
-    expect(guide?.actions).toEqual([{ id: 'retry-employee-shift', label: 'Retry shift' }]);
+    expect(guide?.actions).toEqual([{ id: 'retry-employee-shift', label: 'Try again' }]);
   });
 
   it('offers terminal reopen when the dock is open and a shift was interrupted', () => {
@@ -123,15 +123,15 @@ describe('buildIdeQuickGuide', () => {
       agentDockCollapsed: false,
       terminalVisible: false,
       employeeFailureLine:
-        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+        'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
       employeeShiftInterrupted: true,
-      employeeRetryActionLabel: 'Continue shift',
+      employeeRetryActionLabel: 'Continue',
     });
 
-    expect(guide?.title).toContain('Shift interrupted');
+    expect(guide?.title).toContain('Job interrupted');
     expect(guide?.tone).toBe('interrupted');
     expect(guide?.actions).toEqual([
-      { id: 'retry-employee-shift', label: 'Continue shift' },
+      { id: 'retry-employee-shift', label: 'Continue' },
       { id: 'show-terminal', label: 'Show terminal' },
     ]);
   });
@@ -141,14 +141,14 @@ describe('buildIdeQuickGuide', () => {
       buildIdeQuickGuide({
         ...base,
         pendingApprovals: 1,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       })?.title,
     ).toContain('Approval waiting');
     expect(
       buildIdeQuickGuide({
         ...base,
         streaming: true,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       })?.title,
     ).toContain('responding');
   });
@@ -259,32 +259,32 @@ describe('buildIdeQuickGuide', () => {
     const guide = buildIdeQuickGuide({
       ...base,
       failedEmployeeCount: 1,
-      failedEmployeesHint: 'Alex — Last shift failed: timeout',
+      failedEmployeesHint: 'Alex — Last job failed: timeout',
       rosterAlertTone: 'failure',
     });
 
     expect(guide?.tone).toBe('failure');
-    expect(guide?.title).toContain('Teammate shift failed');
-    expect(guide?.steps[0]).toBe('Alex — Last shift failed: timeout');
-    expect(guide?.steps.join(' ')).toContain('Retry shift');
+    expect(guide?.title).toContain("Teammate's last job failed");
+    expect(guide?.steps[0]).toBe('Alex — Last job failed: timeout');
+    expect(guide?.steps.join(' ')).toContain('Try again');
     expect(guide?.actions.map((action) => action.id)).toEqual(['open-team', 'show-terminal']);
   });
 
-  it('uses interrupted styling when another teammate has an interrupted shift', () => {
+  it('uses interrupted styling when another teammate has an interrupted job', () => {
     const guide = buildIdeQuickGuide({
       ...base,
       failedEmployeeCount: 1,
       failedEmployeesHint:
-        'Alex — Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+        'Alex — Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
       rosterAlertTone: 'interrupted',
     });
 
     expect(guide?.tone).toBe('interrupted');
-    expect(guide?.title).toContain('Teammate shift interrupted');
-    expect(guide?.steps.join(' ')).toContain('Continue shift');
+    expect(guide?.title).toContain("Teammate's job was interrupted");
+    expect(guide?.steps.join(' ')).toContain('Continue');
   });
 
-  it('uses mixed roster copy when teammates have both failed and interrupted shifts', () => {
+  it('uses mixed roster copy when teammates have both failed and interrupted jobs', () => {
     const guide = buildIdeQuickGuide({
       ...base,
       failedEmployeeCount: 2,
@@ -293,7 +293,7 @@ describe('buildIdeQuickGuide', () => {
 
     expect(guide?.tone).toBe('failure');
     expect(guide?.title).toContain('2 teammates need attention');
-    expect(guide?.steps.join(' ')).toContain('Continue shift or Retry shift');
+    expect(guide?.steps.join(' ')).toContain('Continue or Try again');
   });
 
   it('shows roster failure guidance even when agent dock and terminal are both open', () => {
@@ -303,7 +303,7 @@ describe('buildIdeQuickGuide', () => {
       terminalVisible: true,
       failedEmployeeCount: 2,
       failedEmployeesHint:
-        '2 teammates need attention after a failed shift — select one for Retry shift, or click to talk it through.',
+        '2 teammates need attention after a failed job — select one and tap Try again, or click to talk it through.',
     });
 
     expect(guide?.tone).toBe('failure');
@@ -315,10 +315,10 @@ describe('buildIdeQuickGuide', () => {
     expect(
       buildIdeQuickGuide({
         ...base,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
         failedEmployeeCount: 2,
       })?.title,
-    ).toContain('Last shift failed');
+    ).toContain('Last job failed');
   });
 
   it('surfaces unsaved-file guidance when Source Control is collapsed', () => {
@@ -389,7 +389,7 @@ describe('buildIdeQuickGuide', () => {
         dirtyFileCount: 3,
         failedEmployeeCount: 1,
       })?.title,
-    ).toContain('Teammate shift failed');
+    ).toContain("Teammate's last job failed");
   });
 });
 
@@ -397,7 +397,7 @@ describe('ideQuickGuideActionIsSecondary', () => {
   it('emphasizes retry when expand is also offered', () => {
     const actions = [
       { id: 'expand-agent-dock' as const, label: 'Expand agent dock' },
-      { id: 'retry-employee-shift' as const, label: 'Retry shift' },
+      { id: 'retry-employee-shift' as const, label: 'Try again' },
     ];
 
     expect(ideQuickGuideActionIsSecondary('retry-employee-shift', actions)).toBe(true);
@@ -405,7 +405,7 @@ describe('ideQuickGuideActionIsSecondary', () => {
   });
 
   it('keeps a lone retry action fully emphasized', () => {
-    const actions = [{ id: 'retry-employee-shift' as const, label: 'Retry shift' }];
+    const actions = [{ id: 'retry-employee-shift' as const, label: 'Try again' }];
 
     expect(ideQuickGuideActionIsSecondary('retry-employee-shift', actions)).toBe(false);
   });
@@ -423,7 +423,7 @@ describe('ideQuickGuideActionAriaLabel', () => {
       ideQuickGuideActionAriaLabel({ id: 'show-terminal', label: 'Show terminal' }),
     ).toContain('below the editor');
     expect(
-      ideQuickGuideActionAriaLabel({ id: 'retry-employee-shift', label: 'Continue shift' }),
+      ideQuickGuideActionAriaLabel({ id: 'retry-employee-shift', label: 'Continue' }),
     ).toContain('agent dock composer');
     expect(
       ideQuickGuideActionAriaLabel({ id: 'open-team', label: 'Open Team' }),

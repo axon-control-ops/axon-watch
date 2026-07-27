@@ -362,7 +362,7 @@ describe('buildIdeEditorStatusAgentChip', () => {
         streaming: false,
         pendingApprovals: 0,
         runPhase: null,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       },
     });
 
@@ -371,7 +371,7 @@ describe('buildIdeEditorStatusAgentChip', () => {
       failure: true,
       interrupted: false,
     });
-    expect(chip?.title).toContain('Last shift failed');
+    expect(chip?.title).toContain('Last job failed');
   });
 
   it('surfaces interrupted styling when a teammate shift was cut short', () => {
@@ -382,7 +382,7 @@ describe('buildIdeEditorStatusAgentChip', () => {
         pendingApprovals: 0,
         runPhase: null,
         employeeFailureLine:
-          'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+          'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
         employeeShiftInterrupted: true,
       },
     });
@@ -392,7 +392,7 @@ describe('buildIdeEditorStatusAgentChip', () => {
       failure: false,
       interrupted: true,
     });
-    expect(chip?.title).toContain('Shift interrupted');
+    expect(chip?.title).toContain('Job interrupted');
   });
 
   it('surfaces SPEAKING when narration is active with the dock collapsed', () => {

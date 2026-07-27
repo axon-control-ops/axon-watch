@@ -3,6 +3,7 @@ import type {
   OperatorBriefing,
   RunRecord,
 } from '../../contracts/canonical';
+import { employeeFailureLine } from '../workspace-agents/company-roster-view';
 import { getKairoVoiceUtteranceState } from '../../lib/kairo-voice-utterance';
 import type { GalaxyPresencePhase } from './galaxy-presence-state';
 
@@ -122,14 +123,11 @@ export function projectLiveOperationsStream(input: {
       continue;
     }
     const agent = name.split(/\s+/)[0]?.toUpperCase() || 'TEAM';
-    if (employee.last_outcome === 'failed') {
+    const failureLine = employeeFailureLine(employee);
+    if (failureLine) {
       pushItem(items, {
         id: `emp-fail-${employee.employee_id}`,
-        text: truncate(
-          `Last shift failed${
-            employee.last_outcome_detail ? `: ${employee.last_outcome_detail}` : ''
-          }`,
-        ),
+        text: truncate(failureLine),
         tone: 'critical',
         kind: 'employee',
         agent,

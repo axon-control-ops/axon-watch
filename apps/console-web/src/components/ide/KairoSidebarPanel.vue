@@ -183,8 +183,8 @@ const presenceLabel = computed(() => {
   }
   if (!debugModeActive.value && surfaceEmployeeFailure.value) {
     const hint = shell.activeIdeEmployeeShiftInterrupted
-      ? 'shift interrupted'
-      : 'last shift failed';
+      ? 'job interrupted'
+      : 'last job failed';
     return `${activePersonaName.value} · ${hint}`;
   }
   if (!debugModeActive.value) {

@@ -244,7 +244,7 @@ export function openEmployeeShiftRetry(input: {
   if (mode) {
     requestIdeComposerMode(mode);
   }
-  // Retry shift always needs tools — force Full Access even if composer was consultative.
+  // Try again always needs tools — force Full Access even if composer was consultative.
   input.shell.setAgentExecutionAccess('full');
   if (draft) {
     input.shell.openIdeComposerWithDraft(draft, { keepActivityView: true });

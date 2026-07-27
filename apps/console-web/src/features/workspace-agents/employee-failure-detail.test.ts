@@ -12,6 +12,7 @@ import {
   isRuntimeAuthFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
+  looksLikeSuccessfulOutcomeDetail,
   normalizeOperatorFailureDetail,
 } from './employee-failure-detail';
 
@@ -117,5 +118,13 @@ describe('employee-failure-detail', () => {
         }),
       ),
     ).toBe('Cursor CLI exited with status 143.');
+  });
+
+  it('detects success-like outcome details that should clear failure banners', () => {
+    expect(looksLikeSuccessfulOutcomeDetail('Run completed')).toBe(true);
+    expect(looksLikeSuccessfulOutcomeDetail('completed')).toBe(true);
+    expect(looksLikeSuccessfulOutcomeDetail('succeeded')).toBe(true);
+    expect(looksLikeSuccessfulOutcomeDetail('vitest: assertion failed')).toBe(false);
+    expect(looksLikeSuccessfulOutcomeDetail('')).toBe(false);
   });
 });

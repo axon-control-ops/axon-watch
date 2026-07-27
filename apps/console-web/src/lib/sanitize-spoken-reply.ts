@@ -82,6 +82,29 @@ function softenSymbolsForSpeech(text: string): string {
   return out.replace(/\s+/g, ' ').trim();
 }
 
+/** Stop TTS from gluing "4 Lead" into "forlead". */
+function prepareCountsForSpeech(text: string): string {
+  const numberWords: Record<string, string> = {
+    '0': 'zero',
+    '1': 'one',
+    '2': 'two',
+    '3': 'three',
+    '4': 'four',
+    '5': 'five',
+    '6': 'six',
+    '7': 'seven',
+    '8': 'eight',
+    '9': 'nine',
+    '10': 'ten',
+    '11': 'eleven',
+    '12': 'twelve',
+  };
+  return text.replace(/\b(\d{1,2})\s+([A-Z][A-Za-z-]+)\b/g, (_full, digits: string, word: string) => {
+    const spoken = numberWords[digits] ?? digits;
+    return `${spoken} ${word}`;
+  });
+}
+
 function stripPersonaPrefix(text: string): string {
   return text
     .replace(/^["'`]+|["'`]+$/g, '')
@@ -166,6 +189,7 @@ export function formatConversationDisplayReply(raw: string, maxChars = MAX_DISPL
 export function sanitizeSpokenReply(raw: string, maxChars = MAX_SPOKEN_CHARS): string {
   const display = formatConversationDisplayReply(raw, maxChars);
   let spoken = softenSymbolsForSpeech(display.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim());
+  spoken = prepareCountsForSpeech(spoken);
   spoken = stripLiteralSymbolWords(spoken);
   if (spoken && !/[.!?]$/.test(spoken)) {
     spoken = `${spoken}.`;

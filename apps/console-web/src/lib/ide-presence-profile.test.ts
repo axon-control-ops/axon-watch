@@ -90,7 +90,7 @@ describe('ide presence profile', () => {
     expect(
       resolveIdeKairoChipState({
         profileState: 'idle',
-        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        employeeFailureLine: 'Last job failed: npm test exited 1',
         agentStreamActive: false,
         kairoSpeechActive: false,
       }),
@@ -101,7 +101,7 @@ describe('ide presence profile', () => {
     expect(
       resolveIdeKairoChipState({
         profileState: 'idle',
-        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        employeeFailureLine: 'Last job failed: npm test exited 1',
         agentStreamActive: true,
         kairoSpeechActive: false,
       }),
@@ -110,7 +110,7 @@ describe('ide presence profile', () => {
     expect(
       resolveIdeKairoChipState({
         profileState: 'idle',
-        employeeFailureLine: 'Last shift failed: npm test exited 1',
+        employeeFailureLine: 'Last job failed: npm test exited 1',
         agentStreamActive: false,
         kairoSpeechActive: true,
       }),
@@ -120,7 +120,7 @@ describe('ide presence profile', () => {
   it('gates composer failure chrome on the same alerting rules as the Kairo chip', () => {
     const failureInput = {
       profileState: 'idle' as const,
-      employeeFailureLine: 'Last shift failed: npm test exited 1',
+      employeeFailureLine: 'Last job failed: npm test exited 1',
       agentStreamActive: false,
       kairoSpeechActive: false,
     };

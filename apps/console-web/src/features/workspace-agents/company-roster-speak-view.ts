@@ -84,8 +84,8 @@ function employeeStatusSpeakLine(employee: CompanyEmployeeRecord): string {
 
   if (failDetail) {
     return (
-      `${name} reporting in. ${beat}. Last shift failed on: ${failDetail}. ` +
-      `I can retry that shift, or walk the receipts with you — your call.`
+      `${name} reporting in. ${beat}. Last job failed on: ${failDetail}. ` +
+      `I can try again, or explain what happened — your call.`
     );
   }
   if (employeeIsWorking(employee.status)) {
@@ -96,12 +96,12 @@ function employeeStatusSpeakLine(employee: CompanyEmployeeRecord): string {
   }
   if (!employee.enabled) {
     return (
-      `${name} here — paused. I still own ${hook}, but I won't take continuous shifts until you enable me again.`
+      `${name} here — paused. I still own ${hook}, but I won't take continuous jobs until you enable me again.`
     );
   }
   return (
     `${name} reporting in. ${beat}. Quiet for now on ${hook}. ` +
-    `Ask me a question, assign work, or send me on a shift.`
+    `Ask me a question, assign work, or send me on a job.`
   );
 }
 
@@ -113,8 +113,8 @@ function employeeIntroSpeakLine(employee: CompanyEmployeeRecord): string {
 
   if (failDetail) {
     return (
-      `Hey — ${name}. I own ${hook}. ${beat}, and the last shift failed: ${failDetail}. ` +
-      `Hit Retry shift when you want another go, or talk me through what broke.`
+      `Hey — ${name}. I own ${hook}. ${beat}, and the last job failed: ${failDetail}. ` +
+      `Hit Try again when you want another go, or talk me through what broke.`
     );
   }
   if (employeeIsWorking(employee.status)) {
@@ -125,7 +125,7 @@ function employeeIntroSpeakLine(employee: CompanyEmployeeRecord): string {
   }
   if (!employee.enabled) {
     return (
-      `Hey — ${name}. I own ${hook}, but I'm paused from continuous shifts. ` +
+      `Hey — ${name}. I own ${hook}, but I'm paused from continuous jobs. ` +
       `Enable me when you want me back on the roster.`
     );
   }
@@ -147,9 +147,9 @@ function employeeCallbackSpeakLine(
 
   if (failDetail) {
     const failedLines = [
-      `${name} again — that last shift still failed on ${failDetail}. Want a retry or a postmortem?`,
+      `${name} again — that last job still failed on ${failDetail}. Want a retry or a postmortem?`,
       `Yeah, it's ${name}. Failure still stands: ${failDetail}. Want a retry or a postmortem?`,
-      `${name} here. ${owns} is quiet after a failed shift — ${failDetail}. Your move.`,
+      `${name} here. ${owns} is quiet after a failed job — ${failDetail}. Your move.`,
     ] as const;
     return failedLines[stablePickIndex(seed, failedLines.length)];
   }

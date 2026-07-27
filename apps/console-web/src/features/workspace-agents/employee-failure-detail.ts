@@ -34,6 +34,27 @@ const LANE_B_FALLBACK_NORMALIZE_RE =
   /^Lane B (?:agent fallback reply generated|plan fallback failed)\s*\((.*)\)\s*$/i;
 const DISPATCH_FAILURE_PREFIX = 'continuous worker dispatch failed:';
 
+/** True when outcome detail is a success receipt, not a failure root cause. */
+export function looksLikeSuccessfulOutcomeDetail(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (
+    normalized === 'run completed' ||
+    normalized === 'completed' ||
+    normalized === 'success' ||
+    normalized === 'succeeded'
+  ) {
+    return true;
+  }
+  return (
+    normalized.startsWith('run completed') ||
+    /^completed\b/.test(normalized) ||
+    /\bsucceeded\b/.test(normalized)
+  );
+}
+
 /** Strip Lane B fallback wrappers so dock and retry drafts show the root cause. */
 export function normalizeOperatorFailureDetail(detail: string | null | undefined): string {
   const cleaned = (detail ?? '').replace(/\s+/g, ' ').trim();

@@ -44,7 +44,7 @@ const interruptedShift = computed(() =>
   employee.value ? employeeShiftNeedsContinuation(employee.value) : false,
 );
 const retryActionLabel = computed(() =>
-  employee.value ? employeeFailureRetryActionLabel(employee.value) : 'Retry shift',
+  employee.value ? employeeFailureRetryActionLabel(employee.value) : 'Try again',
 );
 const actionsDisabled = computed(() => shell.composerAgentBusy);
 
@@ -117,10 +117,11 @@ function handleOpenTeam(): void {
         v-if="showReceiptsAction"
         type="button"
         class="agent-dock-composer__employee-failure-btn agent-dock-composer__employee-failure-btn--receipts"
+        title="Opens Ask (read-only) so they explain what happened without changing code"
         :disabled="actionsDisabled"
         @click="handleReceipts"
       >
-        Explain receipts
+        Explain what happened
       </button>
       <button
         type="button"

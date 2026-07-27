@@ -27,8 +27,8 @@ describe('sanitizeAgentThinkingForOperator', () => {
   });
 
   it('rewrites Thinking… lead-ins into concrete progress copy', () => {
-    expect(sanitizeAgentThinkingForOperator('Thinking…')).toBe('On it…');
-    expect(sanitizeAgentThinkingForOperator('Thinking...')).toBe('On it…');
+    expect(sanitizeAgentThinkingForOperator('Thinking…')).toBe('');
+    expect(sanitizeAgentThinkingForOperator('Thinking...')).toBe('');
     expect(sanitizeAgentThinkingForOperator("thinking I'll check Sentry next.")).toBe(
       'Checking Sentry next.',
     );

@@ -1,4 +1,5 @@
 import type { CompanyEmployeeRecord } from '../../contracts/canonical';
+import { OPERATOR_FAILURE_STATUS_LABEL } from '../../lib/operator-failure-copy';
 
 import { employeeFailureDetailTooltip, employeeFailureLine } from './company-roster-failure-view';
 import { employeeIsWorking } from './company-roster-status';
@@ -13,6 +14,7 @@ export {
   isShiftContinuationFailure,
   isRuntimeAuthFailure,
   isUsageLimitFailure,
+  looksLikeSuccessfulOutcomeDetail,
   normalizeOperatorFailureDetail,
 } from './employee-failure-detail';
 
@@ -63,10 +65,10 @@ export function employeeStatusLabel(status: string | null | undefined): string {
     return 'idle';
   }
   if (value === 'failed') {
-    return 'last shift failed';
+    return OPERATOR_FAILURE_STATUS_LABEL;
   }
   if (value === 'interrupted') {
-    return 'shift interrupted';
+    return 'job interrupted';
   }
   return value.replace(/_/g, ' ');
 }

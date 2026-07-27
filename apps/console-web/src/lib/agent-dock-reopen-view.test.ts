@@ -72,31 +72,31 @@ describe('agent dock reopen view', () => {
     expect(
       agentDockReopenTitle({
         ...idle,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       }),
-    ).toBe('Expand agent dock (Ctrl/Cmd+\\) · Last shift failed');
+    ).toBe('Expand agent dock (Ctrl/Cmd+\\) · Last job failed');
     expect(
       agentDockReopenAriaLabel({
         ...idle,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       }),
-    ).toBe('Expand agent dock, last shift failed');
+    ).toBe('Expand agent dock, last job failed');
     expect(
       agentDockReopenAlive({
         ...idle,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       }),
     ).toBe(true);
     expect(
       agentDockReopenEmployeeFailure({
         ...idle,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       }),
     ).toBe(true);
     expect(
       agentDockReopenEmployeeInterrupted({
         ...idle,
-        employeeFailureLine: 'Last shift failed: timeout',
+        employeeFailureLine: 'Last job failed: timeout',
       }),
     ).toBe(false);
   });
@@ -105,24 +105,24 @@ describe('agent dock reopen view', () => {
     const interrupted = {
       ...idle,
       employeeFailureLine:
-        'Last shift interrupted before it could finish — use Continue shift to pick up where you left off.',
+        'Last job was interrupted before it could finish — tap Continue to pick up where they left off.',
       employeeShiftInterrupted: true,
     };
     expect(agentDockReopenTitle(interrupted)).toBe(
-      'Expand agent dock (Ctrl/Cmd+\\) · Shift interrupted',
+      'Expand agent dock (Ctrl/Cmd+\\) · Job interrupted',
     );
     expect(agentDockReopenAriaLabel(interrupted)).toBe(
-      'Expand agent dock, shift interrupted',
+      'Expand agent dock, job interrupted',
     );
     expect(agentDockReopenEmployeeFailure(interrupted)).toBe(false);
     expect(agentDockReopenEmployeeInterrupted(interrupted)).toBe(true);
     expect(
       agentDockActivityBarTitle(interrupted, false),
-    ).toBe('Agent dock (Ctrl/Cmd+\\) · Shift interrupted');
+    ).toBe('Agent dock (Ctrl/Cmd+\\) · Job interrupted');
   });
 
   it('defers failure chrome while streaming, approvals, or active runs take priority', () => {
-    const failed = { ...idle, employeeFailureLine: 'Last shift failed: timeout' };
+    const failed = { ...idle, employeeFailureLine: 'Last job failed: timeout' };
     expect(agentDockReopenEmployeeFailure({ ...failed, streaming: true })).toBe(false);
     expect(agentDockReopenEmployeeFailure({ ...failed, pendingApprovals: 1 })).toBe(false);
     expect(agentDockReopenEmployeeFailure({ ...failed, runPhase: 'executing' })).toBe(false);

@@ -267,7 +267,7 @@ async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKi
     requestIdeComposerMode(mode);
   }
   if (kind === 'retry') {
-    // Retry shift always needs tools — ignore consultative composer setting.
+    // Try again always needs tools — ignore consultative composer setting.
     shell.setAgentExecutionAccess('full');
   }
   if (draft) {
@@ -323,7 +323,7 @@ async function onControlAction(
       await stopRun(runId);
       await loadCompany();
     } catch (error) {
-      controlError.value = error instanceof Error ? error.message : 'Could not stop shift';
+      controlError.value = error instanceof Error ? error.message : 'Could not stop job';
     } finally {
       controlBusyId.value = null;
     }

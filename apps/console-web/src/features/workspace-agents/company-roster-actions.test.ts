@@ -134,10 +134,10 @@ describe('company-roster-actions', () => {
       'toggle_enabled',
     ]);
     expect(employeeQuickActions(failed).find((action) => action.id === 'retry')?.label).toBe(
-      'Retry shift',
+      'Try again',
     );
     expect(employeeQuickActions(failed).find((action) => action.id === 'receipts')?.label).toBe(
-      'Explain receipts',
+      'Explain what happened',
     );
     expect(employeeRetryDraft(failed)).toMatch(/I am .+\. My last continuous shift failed/);
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
@@ -146,7 +146,34 @@ describe('company-roster-actions', () => {
 
     expect(employeeReceiptsDraft(failed)).toContain('run_failed_abc123');
     expect(employeeReceiptsDraft(failed)).toContain('vitest: assertion failed');
+    expect(employeeReceiptsDraft(failed)).toContain('what happened');
+    expect(employeeReceiptsDraft(failed)).not.toContain('Error: Run completed');
     expect(employeeChatComposerMode('receipts')).toBe('ask');
+  });
+
+  it('explains completed jobs without calling them failures', () => {
+    const completed = employee({
+      status: 'idle',
+      last_outcome: 'completed',
+      last_outcome_detail: 'Run completed',
+      last_run_id: 'run_133bac69735e',
+    });
+    const draft = employeeReceiptsDraft(completed);
+    expect(draft).toContain('run_133bac69735e');
+    expect(draft).toContain('completed successfully');
+    expect(draft).not.toMatch(/what failed|Error:/i);
+  });
+
+  it('treats success-like detail as completed even when outcome tag is stale failed', () => {
+    const stale = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'Run completed',
+      last_run_id: 'run_133bac69735e',
+    });
+    const draft = employeeReceiptsDraft(stale);
+    expect(draft).toContain('completed successfully');
+    expect(draft).not.toMatch(/what failed|Error:/i);
   });
 
   it('uses continuation prompt when the last failure was a SIGTERM agent session', () => {
@@ -160,7 +187,7 @@ describe('company-roster-actions', () => {
     expect(retry).toContain('Continue the interrupted run from after the server restart');
     expect(retry).not.toContain('status 143');
     expect(employeeQuickActions(interrupted).find((action) => action.id === 'retry')?.label).toBe(
-      'Continue shift',
+      'Continue',
     );
   });
 
@@ -208,7 +235,7 @@ describe('company-roster-actions', () => {
     expect(employeeRetryDraft(failed)).not.toContain('ActionRequiredError');
 
     expect(employeeReceiptsDraft(failed)).toContain('run_7ae605411d4d');
-    expect(employeeReceiptsDraft(failed)).toContain('usage limits blocked the agent runtime');
+    expect(employeeReceiptsDraft(failed)).toContain('usage limits blocked the agent');
     expect(employeeReceiptsDraft(failed)).not.toContain('ActionRequiredError');
   });
 
@@ -225,7 +252,7 @@ describe('company-roster-actions', () => {
     expect(employeeRetryDraft(failed)).not.toContain('Lane B agent fallback');
 
     expect(employeeReceiptsDraft(failed)).toContain('run_43ca086d22d4');
-    expect(employeeReceiptsDraft(failed)).toContain('runtime auth is not ready');
+    expect(employeeReceiptsDraft(failed)).toContain('login is not ready');
   });
 
   it('hides duplicate view receipts in the dock when the run link is shown', () => {
@@ -246,7 +273,7 @@ describe('company-roster-actions', () => {
     ]);
   });
 
-  it('omits view receipts when a failed shift has no run id', () => {
+  it('omits view receipts when a failed job has no run id', () => {
     const failed = employee({
       status: 'idle',
       last_outcome: 'failed',

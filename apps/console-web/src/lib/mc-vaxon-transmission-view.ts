@@ -25,7 +25,7 @@ export function resolveVaxonTransmissionView(input: {
       eyebrow: input.pending ? 'Channel open' : 'Awaiting transmission',
       body: input.pending
         ? 'VAXON is working that request…'
-        : 'Ask VAXON here — replies land in this dock.',
+        : 'Ask VAXON here — or say REPORT for a stand-up.',
       empty: true,
     };
   }

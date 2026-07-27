@@ -34,6 +34,26 @@ describe('projectLiveOperationsStream', () => {
     expect(items.some((item) => item.text.includes('Sentry'))).toBe(true);
     expect(items.some((item) => item.agent === 'MARCO')).toBe(true);
     expect(items.some((item) => item.tone === 'critical')).toBe(true);
+    expect(items.some((item) => item.text.includes('Last job failed'))).toBe(true);
+  });
+
+  it('does not surface success-like stale failed tags as critical employee events', () => {
+    const items = projectLiveOperationsStream({
+      briefing: null,
+      primaryActiveRun: null,
+      employees: [
+        {
+          employee_id: 'employee-priya',
+          name: 'Priya',
+          role: 'frontend',
+          status: 'idle',
+          last_outcome: 'failed',
+          last_outcome_detail: 'Run completed',
+        },
+      ] as never,
+      presencePhase: 'idle',
+    });
+    expect(items.some((item) => item.id === 'emp-fail-employee-priya')).toBe(false);
   });
 
   it('falls back to standby when there is nothing live', () => {

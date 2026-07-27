@@ -3,7 +3,6 @@ import {
   firstSpeakableAgentLiveBlock,
   isAgentLiveLineTruncated,
   sanitizeAgentThinkingForOperator,
-  THINKING_SPEECH_FALLBACK,
   truncateAgentLiveLineForDisplay,
 } from './agent-live-line-view';
 import { personaThreadPrefix } from './operator-persona-name';
@@ -30,7 +29,6 @@ export type NarrationMilestone = {
 };
 
 const THINKING_BLOCK_RE = /:::thinking\n([\s\S]*?)(?:\n:::|$)/;
-const THINKING_OPEN_RE = /^:::thinking$/gm;
 const TOOL_RE = /^:::tool\s+(.+)$/gm;
 const EDIT_RE = /^:::edit\s+(.+?)\s+\+(\d+)\s+-(\d+)\s*$/gm;
 
@@ -119,14 +117,8 @@ export function narrationMilestonesForDelta(
 ): NarrationMilestone[] {
   const milestones: NarrationMilestone[] = [];
 
-  const previousThinking = matchAll(previousContent, THINKING_OPEN_RE).length;
-  const thinking = matchAll(content, THINKING_OPEN_RE).length;
-  if (thinking > previousThinking && previousThinking === 0) {
-    milestones.push({
-      key: 'thinking:0',
-      message: THINKING_SPEECH_FALLBACK,
-    });
-  }
+  // Open thinking alone is not a speakable milestone — live thinking speech waits
+  // for a complete sanitized body so we never voice a canned "On it…".
 
   const previousTools = matchAll(previousContent, TOOL_RE).length;
   const tools = matchAll(content, TOOL_RE);

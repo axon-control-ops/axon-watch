@@ -7,7 +7,7 @@ describe('resolveVaxonTransmissionView', () => {
     expect(resolveVaxonTransmissionView({})).toEqual({
       mode: 'standby',
       eyebrow: 'Awaiting transmission',
-      body: 'Ask VAXON here — replies land in this dock.',
+      body: 'Ask VAXON here — or say REPORT for a stand-up.',
       empty: true,
     });
   });
