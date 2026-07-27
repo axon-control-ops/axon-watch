@@ -8,6 +8,7 @@ import {
 import type { IdePresenceProfile } from './ide-presence-profile';
 import { consumeIdeNarrationOverrideHint } from './ide-narration-override-hint';
 import type { StreamingActivityView } from './kairo-agent-narration';
+import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
 
 export { createAgentStreamIncrementalState } from './agent-stream-incremental';
 
@@ -25,6 +26,8 @@ export function createAgentStreamVoiceSession(input: {
   idePresenceProfile: () => IdePresenceProfile;
   /** Employee neural voice for this IDE thread, when present. */
   azureVoiceId?: () => string | null | undefined;
+  /** Named employee speaker so the left-rail chip does not fall back to "Teammate"/VAXON. */
+  speaker?: () => KairoVoiceSpeaker | null | undefined;
 }): ChatStreamVoiceNarration {
   const voiceNarration = createChatStreamVoiceNarration({
     composerMode: input.composerMode,
@@ -37,6 +40,7 @@ export function createAgentStreamVoiceSession(input: {
     operatorPrompt: input.operatorPrompt,
     fullAccess: input.fullAccess,
     azureVoiceId: input.azureVoiceId,
+    speaker: input.speaker,
   });
 
   if (voiceNarration.toolNarrationEnabled) {

@@ -8,6 +8,7 @@ import {
 import { agentMilestoneFallbackLine } from './kairo-progress-fallback';
 import { postKairoSpeak } from './kairo-speak-client';
 import { deliverSpokenOperatorAlert } from './spoken-alert-delivery';
+import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
 
 interface CreateKairoAgentMilestoneNarratorOptions {
   messageId: string;
@@ -19,6 +20,7 @@ interface CreateKairoAgentMilestoneNarratorOptions {
   operatorPrompt: () => string;
   fullAccess: () => boolean;
   azureVoiceId?: () => string | null | undefined;
+  speaker?: () => KairoVoiceSpeaker | null | undefined;
 }
 
 const SPEAK_TIMEOUT_MS = 12_000;
@@ -131,6 +133,7 @@ export function createKairoAgentMilestoneNarrator(
           {
             priority: 'narration',
             azureVoiceId: options.azureVoiceId?.() ?? null,
+            speaker: options.speaker?.() ?? null,
           },
         );
       })

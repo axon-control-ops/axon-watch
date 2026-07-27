@@ -11,28 +11,37 @@ export function resolveIdePresencePersonaName(input: {
   stickySpeakerName?: string | null;
   stickyFollowupActive?: boolean;
 }): string {
+  const active = input.activeEmployeeName?.trim() || null;
   const employeeFromSpeaker =
     input.speaker?.kind === 'employee' ? input.speaker.name?.trim() || null : null;
-  if (employeeFromSpeaker) {
+  // Azure-voice-only stubs used to ship as "Teammate" — prefer the open teammate.
+  if (employeeFromSpeaker && employeeFromSpeaker.toLowerCase() !== 'teammate') {
     return employeeFromSpeaker;
+  }
+  if (employeeFromSpeaker && active) {
+    return active;
   }
   if (input.speaker?.kind === 'vaxon') {
     return OPERATOR_PERSONA_NAME;
   }
   const sticky = input.stickySpeakerName?.trim() || null;
-  if (sticky && (input.kairoSpeechActive || input.stickyFollowupActive)) {
+  if (
+    sticky &&
+    sticky.toLowerCase() !== 'teammate' &&
+    (input.kairoSpeechActive || input.stickyFollowupActive)
+  ) {
     return sticky;
   }
+  if (sticky && sticky.toLowerCase() === 'teammate' && active && input.stickyFollowupActive) {
+    return active;
+  }
   if (input.kairoSpeechActive) {
-    // Speech active but speaker unknown — prefer the open teammate over VAXON.
-    const active = input.activeEmployeeName?.trim();
     if (active) {
       return active;
     }
     return OPERATOR_PERSONA_NAME;
   }
   if (input.surfaceEmployeeFailure) {
-    const active = input.activeEmployeeName?.trim();
     if (active) {
       return active;
     }

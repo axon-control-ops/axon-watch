@@ -24,6 +24,7 @@ import {
   TOOL_MILESTONE_INTERVAL_MS,
 } from './kairo-narration-throttle';
 import { dropWaitingKairoNarration } from './kairo-voice-queue';
+import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
 
 type Narrator = ReturnType<typeof createKairoAgentMilestoneNarrator>;
 type ProgressNarrator = ReturnType<typeof createKairoProgressNarrator>;
@@ -58,12 +59,14 @@ export function createChatStreamVoiceNarration(input: {
   operatorPrompt: () => string;
   fullAccess: () => boolean;
   azureVoiceId?: () => string | null | undefined;
+  speaker?: () => KairoVoiceSpeaker | null | undefined;
 }): ChatStreamVoiceNarration {
   const toolNarrationEnabled = isToolCapableComposerMode(input.composerMode);
   const answerMode = isAnswerNarrationComposerMode(input.composerMode);
   const thinkingThrottle = createKairoThinkingSpeechThrottle();
   const toolThrottle = createKairoIntervalThrottle({ intervalMs: TOOL_MILESTONE_INTERVAL_MS });
   const azureVoiceId = input.azureVoiceId;
+  const speaker = input.speaker;
   /** Once live thinking speaks, prefer it over canned tool/edit lines for this turn. */
   let thinkingCarriesUpdate = false;
   let lastSpokenThinking = '';
@@ -77,6 +80,7 @@ export function createChatStreamVoiceNarration(input: {
         narration: input.narration,
         voiceDeliveryAllowed: input.voiceDeliveryAllowed,
         azureVoiceId,
+        speaker,
       })
     : null;
 
@@ -91,6 +95,7 @@ export function createChatStreamVoiceNarration(input: {
         operatorPrompt: input.operatorPrompt,
         fullAccess: input.fullAccess,
         azureVoiceId,
+        speaker,
       })
     : null;
 
@@ -104,6 +109,7 @@ export function createChatStreamVoiceNarration(input: {
         operatorPrompt: input.operatorPrompt,
         fullAccess: input.fullAccess,
         azureVoiceId,
+        speaker,
       })
     : null;
 
@@ -169,11 +175,6 @@ export function createChatStreamVoiceNarration(input: {
         thinkingCarriesUpdate,
       })
     ) {
-      // #region agent log
-      if (milestone.key.startsWith('tool:') || milestone.key.startsWith('edit:')) {
-
-      }
-      // #endregion
       return;
     }
     if (milestone.key.startsWith('tool:') && !toolThrottle.canSpeak()) {

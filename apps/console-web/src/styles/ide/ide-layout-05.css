@@ -115,7 +115,9 @@
   position: relative;
   z-index: 200;
   isolation: isolate;
-  padding: 0.55rem 0.8rem 0.8rem;
+  /* Flush to dock bottom / status bar — no floating bottom gutter. */
+  padding: 0.45rem 0.55rem 0;
+  margin: 0;
   border-top: 1px solid rgba(138, 154, 173, 0.1);
   background: rgba(6, 10, 16, 0.72);
 }

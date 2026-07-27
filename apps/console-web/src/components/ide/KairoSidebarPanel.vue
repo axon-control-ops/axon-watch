@@ -48,9 +48,13 @@ watch(
       return;
     }
     stickySpokenText.value = next;
+    const speakerName = name?.trim() || '';
+    const activeEmployee = shell.activeIdeEmployee?.name?.trim() || '';
     stickySpeakerName.value =
-      name?.trim() ||
-      (kind === 'vaxon' ? OPERATOR_PERSONA_NAME : shell.activeIdeEmployee?.name?.trim()) ||
+      (speakerName && speakerName.toLowerCase() !== 'teammate'
+        ? speakerName
+        : null) ||
+      (kind === 'vaxon' ? OPERATOR_PERSONA_NAME : activeEmployee) ||
       OPERATOR_PERSONA_NAME;
     const needsDecision = kind === 'vaxon' && DECISION_PROMPT_RE.test(next);
     stickyNeedsDecision.value = needsDecision;
