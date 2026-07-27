@@ -129,11 +129,7 @@
 }
 
 .agent-dock__composer:has(.agent-dock-composer__menu),
-.agent-dock__composer:has(.agent-dock-composer__typeahead),
-.agent-dock--composer-user-sized .agent-dock__composer:has(.agent-dock-composer__menu),
-.agent-dock--composer-user-sized .agent-dock__composer:has(.agent-dock-composer__typeahead),
-.agent-dock--composer-resizing .agent-dock__composer:has(.agent-dock-composer__menu),
-.agent-dock--composer-resizing .agent-dock__composer:has(.agent-dock-composer__typeahead) {
+.agent-dock__composer:has(.agent-dock-composer__typeahead) {
   overflow: visible;
 }
 

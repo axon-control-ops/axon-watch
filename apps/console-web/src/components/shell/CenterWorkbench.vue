@@ -421,25 +421,20 @@ function syncShellColumnHeights(): void {
       continue;
     }
 
-    // IDE AgentDock only: drop the gutter so the composer can sit on the dock's bottom border.
     const footerGapPx =
       shell.layoutMode === 'ide' && column.classList.contains('region-right-dock')
         ? 0
         : shellFooterGapPx;
     const target = Math.round(computeShellColumnMinHeight(columnTop, statusTop, footerGapPx));
     const maxReasonable = window.innerHeight * 1.25;
-    if (target <= 0 || target > maxReasonable) {
-      continue;
-    }
+    if (target <= 0 || target > maxReasonable) continue;
 
     const nextHeight = `${target}px`;
     if (
       column.style.minHeight === nextHeight &&
       column.style.height === nextHeight &&
       column.style.maxHeight === nextHeight
-    ) {
-      continue;
-    }
+    ) continue;
     column.style.minHeight = nextHeight;
     column.style.height = nextHeight;
     column.style.maxHeight = nextHeight;

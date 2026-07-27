@@ -439,8 +439,6 @@
 }
 
 .agent-dock-composer__access-status {
-  position: relative;
-  z-index: 0;
   display: flex;
   align-items: flex-start;
   gap: 0.4rem;
@@ -450,7 +448,6 @@
   font-family: var(--font-mono);
   font-size: 0.54rem;
   letter-spacing: 0.03em;
-  line-height: 1.35;
   color: rgba(203, 213, 225, 0.92);
 }
 
