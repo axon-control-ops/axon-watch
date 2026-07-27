@@ -2283,10 +2283,7 @@ export const useShellStore = defineStore('shell', () => {
     dockHeroModeTouched.value = false;
     leftSidebarModeTouched.value = false;
     applyOperatorDockDefaults();
-    if (mode === 'operator') {
-      // Mission Control mockup home: brain stage + LIVE OPERATIONS rail.
-      setOperatorCenterView('graph');
-    }
+    // Operator entry keeps the persisted center view (default: Mission Control fleet).
     if (mode === 'ide') {
       // Quiet IDE: restore persisted collapse (default collapsed). Operator galaxy CSS
       // only hides the right dock in Operator mode, so IDE entry no longer force-expands.

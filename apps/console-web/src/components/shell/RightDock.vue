@@ -20,8 +20,10 @@ const {
   onDockResizeKeydown,
 } = useRightDockResize({ dockRef });
 
-/** Mission Control mockup: LIVE OPERATIONS owns the entire right rail. */
-const showLiveOpsDock = computed(() => shell.layoutMode === 'operator');
+/** Mission Control owns LIVE OPERATIONS; Brain Graph uses a floating orb instead. */
+const showLiveOpsDock = computed(
+  () => shell.layoutMode === 'operator' && !shell.operatorBrainGalaxyActive,
+);
 </script>
 
 <template>

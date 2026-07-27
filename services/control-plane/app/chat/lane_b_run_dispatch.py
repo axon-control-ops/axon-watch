@@ -37,8 +37,10 @@ def resolve_lane_b_agent_run(
     linked_run_id: str | None,
     execution_access: str | None,
     composer_mode: str | None = None,
+    employee_role: str | None = None,
 ) -> dict[str, object]:
     run_mode = _run_mode_for_composer(composer_mode)
+    cleaned_role = str(employee_role or "").strip().lower() or None
     if linked_run_id:
         try:
             existing = get_run(linked_run_id)
@@ -48,6 +50,12 @@ def resolve_lane_b_agent_run(
             existing_mode = str(existing.get("mode") or "agent").strip().lower()
             # Switching Agent ↔ Debug must start a fresh run, not resume the other mode.
             if existing_mode == run_mode:
+                # Backfill role onto employee IDE runs that were created before tagging.
+                if cleaned_role and not str(existing.get("employee_role") or "").strip():
+                    existing["employee_role"] = cleaned_role
+                    from app.persistence import run_store
+
+                    existing = run_store.save_run(existing)
                 phase = str(existing.get("phase") or "")
                 if phase in {"review_ready", "paused"}:
                     try:
@@ -77,6 +85,7 @@ def resolve_lane_b_agent_run(
         mode=run_mode,
         summary=lane_b_run_summary(content),
         detail=detail,
+        employee_role=cleaned_role,
         requires_approval=(
             False if run_mode == "plan" else lane_b_agent_requires_approval(execution_access)
         ),

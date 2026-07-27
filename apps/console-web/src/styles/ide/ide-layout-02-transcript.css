@@ -1,20 +1,70 @@
 /* Left-rail Kairo card + spoken-agent speech chip (not AgentDock transcript). */
 
+.kairo-sidebar-panel-host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.kairo-sidebar-panel-host--team {
+  gap: 0.25rem;
+}
+
+.kairo-sidebar-panel-compact-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.kairo-sidebar-panel-compact-row .kairo-sidebar-panel--compact {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.kairo-sidebar-panel__compact-stop {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid rgba(255, 120, 120, 0.42);
+  border-radius: 0.35rem;
+  background: rgba(40, 12, 16, 0.92);
+  color: rgba(255, 210, 210, 0.95);
+  font: inherit;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.kairo-sidebar-panel__compact-stop:hover,
+.kairo-sidebar-panel__compact-stop:focus-visible {
+  border-color: rgba(255, 140, 140, 0.7);
+  outline: none;
+}
+
 .kairo-sidebar-panel--expanded {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
-  min-height: 0;
+  height: auto;
+  max-height: 100%;
   gap: 0.4rem;
+  overflow: hidden;
 }
 
 .kairo-sidebar-panel__card {
   display: flex;
-  flex: 1 1 52%;
+  flex: 1 1 auto;
   flex-direction: column;
-  min-height: 6.5rem;
+  min-height: 0;
   width: 100%;
   max-height: none;
   margin: 0;
@@ -35,11 +85,12 @@
 
 .kairo-sidebar-speech {
   display: flex;
-  flex: 1 1 48%;
+  flex: 0 1 auto;
   flex-direction: column;
-  min-height: 4.75rem;
-  margin: 0 0.45rem 0.45rem;
-  padding: 0.45rem 0.5rem 0.55rem;
+  min-height: 0;
+  max-height: 7.5rem;
+  margin: 0 0.35rem 0.35rem;
+  padding: 0.4rem 0.45rem 0.45rem;
   border: 1px solid rgba(0, 242, 255, 0.22);
   border-radius: 0.45rem;
   background:
@@ -54,7 +105,13 @@
 }
 
 .kairo-sidebar-speech--expanded {
-  flex-grow: 1.8;
+  flex-grow: 0;
+  max-height: 11rem;
+}
+
+.kairo-sidebar-panel-host--team .kairo-sidebar-speech {
+  max-height: 6.5rem;
+  margin-inline: 0;
 }
 
 .kairo-sidebar-speech[data-speaking='true'] {
@@ -132,7 +189,8 @@
 }
 
 .kairo-sidebar-speech__expand,
-.kairo-sidebar-speech__stop {
+.kairo-sidebar-speech__stop,
+.kairo-sidebar-speech__dismiss {
   margin: 0;
   padding: 0.14rem 0.4rem;
   border: 1px solid rgba(255, 140, 120, 0.42);
@@ -144,6 +202,12 @@
   font-size: 0.52rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.kairo-sidebar-speech__dismiss {
+  border-color: rgba(125, 235, 255, 0.32);
+  background: rgba(0, 180, 220, 0.1);
+  color: rgba(210, 245, 255, 0.96);
 }
 
 .kairo-sidebar-speech__expand {

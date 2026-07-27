@@ -29,10 +29,10 @@ const emit = defineEmits<{
     <button
       type="button"
       class="status-bar-mockup__chip status-bar-mockup__chip--galaxy"
-      title="Open Fleet mosaic — health cards and Task board"
+      title="Open Mission Control — fleet health and Task board"
       @click="emit('switchGrid')"
     >
-      <span class="status-bar-mockup__chip-label">Fleet</span>
+      <span class="status-bar-mockup__chip-label">Mission Control</span>
     </button>
     <button
       type="button"

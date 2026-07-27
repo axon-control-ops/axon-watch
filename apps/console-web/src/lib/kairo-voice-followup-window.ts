@@ -2,8 +2,8 @@ import { ref } from 'vue';
 
 import { isKairoVoiceSpeaking, onKairoVoiceIdle } from './kairo-voice-playback';
 
-/** How long hands-free follow-ups stay open after VAXON finishes speaking. */
-export const KAIRO_VOICE_FOLLOWUP_WINDOW_MS = 30_000;
+/** How long decision/follow-up surfaces stay open after speech ends. */
+export const KAIRO_VOICE_FOLLOWUP_WINDOW_MS = 90_000;
 
 export const kairoVoiceFollowupExpiresAt = ref<number | null>(null);
 const followupPendingAfterSpeech = ref(false);

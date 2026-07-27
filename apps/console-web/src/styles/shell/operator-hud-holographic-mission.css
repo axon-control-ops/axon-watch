@@ -70,12 +70,18 @@
   padding-top: 0.85rem;
 }
 
-.console-shell--mockup.console-shell--glass3d .voice-card-resize-handle {
+.console-shell--mockup.console-shell--glass3d .left-sidebar-mockup__status-anchor--ide {
+  padding-top: 0.85rem;
+}
+
+.console-shell--mockup.console-shell--glass3d .voice-card-resize-handle,
+.console-shell--mockup.console-shell--glass3d .ide-kairo-panel-resize-handle {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 0.85rem;
+  height: 0.95rem;
+  z-index: 40;
 }
 
 @media (prefers-reduced-motion: reduce) {

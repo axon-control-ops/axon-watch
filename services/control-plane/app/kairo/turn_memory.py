@@ -23,7 +23,9 @@ _HANDOFF_ACTION_RE = re.compile(
     re.IGNORECASE,
 )
 _CONFIRM_RE = re.compile(
-    r"^(yes|yeah|yep|yup|do it|confirm|go ahead|dig in|please dig in|yes[,.]?\s*dig in)\.?$",
+    r"^(?:yes|yeah|yep|yup|do it|confirm|go ahead|dig in|please dig in|"
+    r"yes[,.]?\s*dig in|"
+    r"(?:please\s+)?(?:pull|fetch|get|show)\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs)\.?$",
     re.IGNORECASE,
 )
 _DECLINE_RE = re.compile(
@@ -39,9 +41,16 @@ _BRIEFING_SURFACE_OFFER_RE = re.compile(
 _DIG_IN_OFFER_RE = re.compile(
     r"(?:\bshall\s+i\s+(?:dig\s+in|triage(?:\s+(?:it|the\s+repair))?|"
     r"investigate(?:\s+it)?|diagnose(?:\s+it)?|take\s+a\s+look|look\s+into\s+it|"
-    r"walk\s+you\s+through\s+it|guide\s+you\s+to\s+vault)\b|"
+    r"walk\s+you\s+through\s+it|guide\s+you\s+to\s+vault|"
+    r"pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs)\b|"
+    r"\bi\s+can\s+pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs\b|"
     r"\bopen\s+attention\s+for\b|"
-    r"\bwant\s+me\s+to\s+(?:check(?:\s+it)?|open\s+attention)\b)",
+    r"\bwant\s+me\s+to\s+(?:check(?:\s+it)?|open\s+attention|"
+    r"pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs)\b)",
+    re.IGNORECASE,
+)
+_PULL_LOGS_OFFER_RE = re.compile(
+    r"\b(?:i\s+can|shall\s+i|want\s+me\s+to)\s+pull\s+(?:(?:the|those)\s+)?(?:failed\s+)?logs\b",
     re.IGNORECASE,
 )
 
@@ -184,12 +193,22 @@ def note_briefing_surface_offer(session_id: str, reply: str) -> None:
 
 def note_dig_in_offer(session_id: str, reply: str) -> None:
     """Arm yes→IDE handoff after VAXON asks 'Shall I dig in?' (or triage/investigate)."""
-    if _DIG_IN_OFFER_RE.search(str(reply or "")):
-        remember_entities(
-            session_id,
-            pending_dig_in="1",
-            pending_briefing_surface="",
-        )
+    text = str(reply or "")
+    if not _DIG_IN_OFFER_RE.search(text):
+        return
+    fields: dict[str, str] = {
+        "pending_dig_in": "1",
+        "pending_briefing_surface": "",
+    }
+    if _PULL_LOGS_OFFER_RE.search(text):
+        entity = entity_context(session_id)
+        existing_task = str(entity.get("task") or "").strip()
+        log_task = "Pull failed CI logs with `gh run view <run_id> --log-failed`"
+        if existing_task and "log" not in existing_task.lower():
+            fields["task"] = f"{existing_task} — {log_task}"
+        elif not existing_task:
+            fields["task"] = log_task
+    remember_entities(session_id, **fields)
 
 
 def note_followup_offers(session_id: str, reply: str) -> None:
@@ -253,10 +272,19 @@ def resolve_followup_action(content: str, session_id: str) -> dict[str, object] 
             signal_id = entity.get("signal_id", "")
             target_workspace_id = entity.get("target_workspace_id", "")
             task = entity.get("task", "")
+            # Full signal handoff when all fields are present.
             if signal_id and target_workspace_id and task:
                 return {
                     "type": "handoff_signal",
                     "signal_id": signal_id,
+                    "target_workspace_id": target_workspace_id,
+                    "task": task,
+                }
+            # Pull-logs / soft dig-in: allow workspace + task without a signal id.
+            if target_workspace_id and task:
+                return {
+                    "type": "handoff_signal",
+                    "signal_id": signal_id or "signal_followup_logs",
                     "target_workspace_id": target_workspace_id,
                     "task": task,
                 }

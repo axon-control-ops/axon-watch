@@ -22,6 +22,7 @@ import {
 import type { GalaxyMockupRailItem } from '../../features/brain-galaxy/galaxy-mockup-rail-view';
 import { setBrainGalaxyConversationFocus } from '../../features/brain-galaxy/brain-galaxy-focus';
 import { resolveBrainGalaxyNodeSelection } from '../../features/brain-galaxy/brain-galaxy-node-selection';
+import { useGalaxySpeechWorkspaceCollapse } from '../../features/brain-galaxy/use-galaxy-speech-workspace-collapse';
 import {
   brainGraphHeadline,
   type BrainGraphNode,
@@ -54,6 +55,9 @@ let bottomHudObserver: ResizeObserver | null = null;
 const {
   widths: galaxyPanelWidths,
   resizing: galaxyResizing,
+  leftCollapsed: galaxyWorkspacesCollapsed,
+  toggleLeftCollapsed: toggleGalaxyWorkspacesCollapsed,
+  setSpeechCollapseActive: setGalaxySpeechCollapseActive,
   startResize: startGalaxyResize,
   onResizeKeydown: onGalaxyResizeKeydown,
   resetWidth: resetGalaxyWidth,
@@ -66,7 +70,10 @@ function syncGalaxyBottomReserve(): void {
     return;
   }
   const reservePx = Math.max(hud?.offsetHeight ?? 0, 92);
-  stage.style.setProperty('--galaxy-bottom-reserve', `${reservePx}px`);
+  const value = `${reservePx}px`;
+  stage.style.setProperty('--galaxy-bottom-reserve', value);
+  const workbench = stage.closest('.region-center-workbench') as HTMLElement | null;
+  workbench?.style.setProperty('--galaxy-bottom-reserve', value);
 }
 
 const snapshot = computed(() => shell.operatorBrainGraph);
@@ -133,7 +140,10 @@ const speechCapturing = kairoCaptureCapturing;
 const kairoSpeechActive = computed(() => shell.kairoSpeechActive);
 const agentStreamActive = computed(() => shell.agentStreamActive);
 const streamWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
-
+useGalaxySpeechWorkspaceCollapse({
+  kairoSpeechActive,
+  setSpeechCollapseActive: setGalaxySpeechCollapseActive,
+});
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
 
 const terminalDockAlive = computed(
@@ -175,18 +185,6 @@ const showLoading = computed(() => !webglReady.value && !webglFailed.value);
 const showSvgFallback = computed(() => webglFailed.value);
 const vaxonBusy = computed(() => isKairoConversationBusy() || presence.value.busy);
 const stagePresenceClass = computed(() => presence.value.stageClass);
-
-watch(
-  [showSvgFallback, layout],
-  ([svg, next]) => {
-    if (!svg || next.nodes.length === 0) {
-      return;
-    }
-    const ys = next.nodes.map((node) => node.y);
-    const ySpan = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
-  },
-  { immediate: true },
-);
 
 function onEscapeClear(event: KeyboardEvent): void {
   if (event.key !== 'Escape' || !selectedNode.value) {
@@ -295,7 +293,10 @@ function handleEvidenceHandoff(signal: {
   <section
     ref="galaxyStage"
     class="brain-galaxy-stage brain-galaxy-stage--mockup"
-    :class="[stagePresenceClass, { 'brain-galaxy-stage--vaxon-busy': vaxonBusy }]"
+    :class="[stagePresenceClass, {
+      'brain-galaxy-stage--vaxon-busy': vaxonBusy,
+      'brain-galaxy-stage--workspaces-collapsed': galaxyWorkspacesCollapsed,
+    }]"
     :data-galaxy-presence="presence.phase"
     aria-label="Brain galaxy mission control"
   >
@@ -427,8 +428,12 @@ function handleEvidenceHandoff(signal: {
       </div>
     </header>
 
-    <div class="brain-galaxy-stage__hud brain-galaxy-stage__hud--left">
+    <div
+      class="brain-galaxy-stage__hud brain-galaxy-stage__hud--left"
+      :class="{ 'brain-galaxy-stage__hud--left-collapsed': galaxyWorkspacesCollapsed }"
+    >
       <GalaxyPanelResizeHandle
+        v-if="!galaxyWorkspacesCollapsed"
         edge="right"
         label="Resize workspaces rail"
         :value-min="180"
@@ -444,8 +449,10 @@ function handleEvidenceHandoff(signal: {
         :selected-id="selectedNode?.node_id ?? null"
         :current-workspace-id="shell.currentWorkspace?.workspace_id ?? null"
         :fleet-health="shell.operatorFleetHealth"
+        :collapsed="galaxyWorkspacesCollapsed"
         @select="handleRailSelect"
         @open="handleRailOpen"
+        @toggle-collapse="toggleGalaxyWorkspacesCollapsed"
       />
     </div>
 
@@ -498,7 +505,7 @@ function handleEvidenceHandoff(signal: {
         @keydown="onGalaxyResizeKeydown('right', 'right', $event)"
         @dblclick="resetGalaxyWidth('right')"
       />
-      <!-- LIVE OPERATIONS orb card lives in the shell RightDock (Mission Control mockup). -->
+      <!-- Floating VAXON orb is hosted by VoiceOrbHost on Brain Graph. -->
       <button
         type="button"
         class="brain-galaxy-stage__legend-toggle"

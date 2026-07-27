@@ -14,8 +14,18 @@ import {
   GALAXY_CAPTION_MAX_VISIBLE,
   type GalaxySpeechCaption,
 } from './galaxy-speech-captions-view';
+import { setGalaxySpeechOverlayActive } from './galaxy-speech-overlay-state';
 
 let nextCaptionId = 0;
+
+function syncOverlayActive(
+  utteranceActive: boolean,
+  captionCount: number,
+  speakerPresent: boolean,
+): void {
+  setGalaxySpeechOverlayActive(utteranceActive || captionCount > 0 || speakerPresent);
+}
+
 
 export function useGalaxySpeechCaptions() {
   const shell = useShellStore();
@@ -71,6 +81,11 @@ export function useGalaxySpeechCaptions() {
 
   function pruneCaption(id: string): void {
     captions.value = captions.value.filter((caption) => caption.id !== id);
+    syncOverlayActive(
+      utteranceActive,
+      captions.value.length,
+      Boolean(activeSpeaker.value),
+    );
   }
 
   function pushCaption(text: string, gen: number): void {
@@ -83,6 +98,7 @@ export function useGalaxySpeechCaptions() {
       bornAt: Date.now(),
     };
     captions.value = [...captions.value, caption].slice(-GALAXY_CAPTION_MAX_VISIBLE);
+    syncOverlayActive(true, captions.value.length, Boolean(activeSpeaker.value));
     const removeTimer = window.setTimeout(() => {
       pruneCaption(caption.id);
     }, GALAXY_CAPTION_FLOAT_MS);
@@ -120,6 +136,7 @@ export function useGalaxySpeechCaptions() {
     clearTimers();
     captions.value = [];
     generation += 1;
+    syncOverlayActive(true, 0, Boolean(speaker));
   }
 
   function endUtterance(): void {
@@ -128,6 +145,18 @@ export function useGalaxySpeechCaptions() {
     activeSpeaker.value = null;
     generation += 1;
     clearTimers();
+    const remaining = captions.value.length;
+    if (remaining === 0) {
+      setGalaxySpeechOverlayActive(false);
+      return;
+    }
+    // Keep stage space for floating caption CSS; then release Workspaces collapse.
+    syncOverlayActive(false, remaining, false);
+    const releaseTimer = window.setTimeout(() => {
+      captions.value = [];
+      setGalaxySpeechOverlayActive(false);
+    }, GALAXY_CAPTION_FLOAT_MS);
+    timers.push(releaseTimer);
   }
 
   onMounted(() => {
@@ -152,6 +181,7 @@ export function useGalaxySpeechCaptions() {
     captions.value = [];
     activeUtteranceText.value = null;
     activeSpeaker.value = null;
+    setGalaxySpeechOverlayActive(false);
   });
 
   return { captions, speakerAvatar, layoutMode: computed(() => shell.layoutMode) };

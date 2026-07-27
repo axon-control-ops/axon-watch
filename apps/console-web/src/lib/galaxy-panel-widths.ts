@@ -1,4 +1,7 @@
 export const GALAXY_PANEL_WIDTHS_KEY = 'axon-x-galaxy-panel-widths-v1';
+export const GALAXY_WORKSPACES_COLLAPSED_KEY = 'axon-x-galaxy-workspaces-collapsed-v1';
+/** Narrow strip width when the Brain Graph workspaces rail is collapsed. */
+export const GALAXY_LEFT_COLLAPSED_WIDTH_PX = 44;
 
 export type GalaxyPanelKind = 'left' | 'right' | 'inspector';
 
@@ -95,6 +98,25 @@ export function persistGalaxyPanelWidths(widths: GalaxyPanelWidths): void {
     return;
   }
   window.localStorage.setItem(GALAXY_PANEL_WIDTHS_KEY, JSON.stringify(widths));
+}
+
+/** Default expanded so existing Brain Graph users keep the full rail. */
+export function readStoredGalaxyWorkspacesCollapsed(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const raw = window.localStorage.getItem(GALAXY_WORKSPACES_COLLAPSED_KEY);
+  return raw === '1' || raw === 'true';
+}
+
+export function persistGalaxyWorkspacesCollapsed(collapsed: boolean): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.setItem(
+    GALAXY_WORKSPACES_COLLAPSED_KEY,
+    collapsed ? '1' : '0',
+  );
 }
 
 export type GalaxyPanelResizeKeyAction =

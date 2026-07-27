@@ -29,26 +29,30 @@ const emit = defineEmits<{
       <h2 class="operator-status-radar-panel__title">Mission Control</h2>
     </div>
     <div class="operator-status-radar-panel__header-actions">
-      <div class="operator-center-view-switch" role="group" aria-label="Center view">
-        <button
-          type="button"
-          class="operator-center-view-switch__button"
-          :class="{ 'operator-center-view-switch__button--active': centerView === 'graph' }"
-          :aria-pressed="centerView === 'graph'"
-          title="Brain graph + LIVE OPERATIONS (Mission Control home)"
-          @click="emit('setCenterView', 'graph')"
-        >
-          STAGE
-        </button>
+      <div
+        class="operator-center-view-switch"
+        role="group"
+        aria-label="Mission Control or Brain Graph"
+      >
         <button
           type="button"
           class="operator-center-view-switch__button"
           :class="{ 'operator-center-view-switch__button--active': centerView === 'grid' }"
           :aria-pressed="centerView === 'grid'"
-          title="Fleet health and Task board"
+          title="Mission Control — fleet health and Task board"
           @click="emit('setCenterView', 'grid')"
         >
-          FLEET
+          Mission Control
+        </button>
+        <button
+          type="button"
+          class="operator-center-view-switch__button"
+          :class="{ 'operator-center-view-switch__button--active': centerView === 'graph' }"
+          :aria-pressed="centerView === 'graph'"
+          title="Brain Graph — dependency graph + LIVE OPERATIONS"
+          @click="emit('setCenterView', 'graph')"
+        >
+          Brain Graph
         </button>
       </div>
       <button

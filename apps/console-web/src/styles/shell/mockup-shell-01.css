@@ -1,5 +1,6 @@
 .console-shell--mockup {
   display: grid;
+  position: relative;
   column-gap: var(--shell-gutter);
   row-gap: 0;
   gap: 0 var(--shell-gutter);
@@ -11,7 +12,8 @@
     "topbar topbar topbar"
     "leftSidebar centerWorkbench rightDock"
     "statusBar statusBar statusBar";
-  grid-template-rows: var(--topbar-height) minmax(0, 1fr) var(--statusbar-height);
+  /* auto status row keeps the footer at the bottom even when chips need >30px */
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr) auto;
 }
 
 .console-shell--mockup.console-shell--mobile-compact {
@@ -163,7 +165,12 @@
   background: transparent;
   border: 0;
   box-shadow: none;
-  align-self: start;
+}
+
+.console-shell--mockup .region-status-bar {
+  grid-area: statusBar;
+  align-self: stretch;
+  z-index: 40;
 }
 
 .console-shell--mockup .region-left-sidebar {
@@ -196,10 +203,10 @@
 
 .console-shell--mockup .region-center-workbench.center-workbench--mockup {
   grid-area: centerWorkbench;
-  align-self: start;
+  align-self: stretch;
   min-height: 0;
-  height: auto;
-  max-height: none;
+  height: 100%;
+  max-height: 100%;
   padding: 0;
   overflow: hidden;
   display: grid;
@@ -215,6 +222,17 @@
   border-top: 1px solid var(--border-hud);
   background: rgba(0, 8, 14, 0.98);
   margin-top: 0;
+}
+
+/* Glass3d sets position:relative on all shell children — keep atmosphere out of grid flow. */
+.console-shell--mockup > .hud-holo-atmosphere {
+  position: absolute !important;
+  inset: 0;
+  grid-area: unset;
+  width: auto;
+  height: auto;
+  pointer-events: none;
+  z-index: 0;
 }
 
 body:has(.console-shell--mockup) {

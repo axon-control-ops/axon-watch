@@ -52,7 +52,8 @@
   white-space: nowrap;
 }
 
-@container composer-footer (max-width: 21rem) {
+/* Collapse to icons before labels truncate into "Co… / Inst…". */
+@container composer-footer (max-width: 28rem) {
   .agent-dock-composer__tools > .agent-dock-composer__tool-group,
   .agent-dock-composer__tools > .agent-dock-composer__tool-group:nth-child(4),
   .agent-dock-composer__tools > .agent-dock-composer__tool-group:nth-child(5) {

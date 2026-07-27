@@ -256,10 +256,14 @@ onMounted(() => {
   if (shell.currentWorkspace?.workspace_id) {
     void shell.loadWorkspaceTasks(shell.currentWorkspace.workspace_id);
   }
-  // Park the floating orb off fleet/task after mosaic obstacles exist in the DOM.
+  // Park the Brain Graph floating orb after stage chrome exists in the DOM.
   window.setTimeout(() => {
-    if (shell.layoutMode === 'operator' && shell.voiceOrbVisible) {
-      shell.requestVoiceOrbSmartDodge({ force: true });
+    if (
+      shell.layoutMode === 'operator' &&
+      shell.operatorBrainGalaxyActive &&
+      shell.voiceOrbVisible
+    ) {
+      shell.requestVoiceOrbSmartDodge({ force: true, preferredDock: 'bottom-left' });
     }
   }, 80);
 });

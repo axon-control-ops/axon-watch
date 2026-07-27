@@ -12,25 +12,41 @@ const props = defineProps<{
   speaker: KairoVoiceSpeaker | null;
   speaking: boolean;
   fallbackPersonaName: string;
+  stickyText?: string;
+  stickySpeakerName?: string;
+  showDismiss?: boolean;
 }>();
 
 const emit = defineEmits<{
   stopSpeech: [];
+  dismiss: [];
 }>();
 
-const stickyText = ref('');
-const stickySpeakerName = ref('');
+const localStickyText = ref('');
+const localStickySpeakerName = ref('');
 const expanded = ref(false);
 
 watch(
-  () => [props.spokenText, props.speaker?.name, props.fallbackPersonaName] as const,
-  ([text, name, fallback]) => {
+  () =>
+    [
+      props.spokenText,
+      props.speaker?.name,
+      props.fallbackPersonaName,
+      props.stickyText,
+      props.stickySpeakerName,
+    ] as const,
+  ([text, name, fallback, parentSticky, parentSpeaker]) => {
     const next = text?.trim() ?? '';
-    if (!next) {
+    if (next) {
+      localStickyText.value = next;
+      localStickySpeakerName.value = name?.trim() || fallback.trim() || 'Agent';
       return;
     }
-    stickyText.value = next;
-    stickySpeakerName.value = name?.trim() || fallback.trim() || 'Agent';
+    if (parentSticky?.trim()) {
+      localStickyText.value = parentSticky.trim();
+      localStickySpeakerName.value =
+        parentSpeaker?.trim() || fallback.trim() || localStickySpeakerName.value || 'Agent';
+    }
   },
   { immediate: true },
 );
@@ -41,8 +57,8 @@ const view = computed(() =>
     speaker: props.speaker,
     speaking: props.speaking,
     fallbackPersonaName: props.fallbackPersonaName,
-    stickyText: stickyText.value,
-    stickySpeakerName: stickySpeakerName.value,
+    stickyText: props.stickyText?.trim() || localStickyText.value,
+    stickySpeakerName: props.stickySpeakerName?.trim() || localStickySpeakerName.value,
   }),
 );
 const canExpand = computed(() => sidebarSpeechCanExpand(view.value.displayText));
@@ -93,6 +109,14 @@ function toggleExpanded(): void {
           @click="emit('stopSpeech')"
         >
           Stop
+        </button>
+        <button
+          v-else-if="showDismiss"
+          type="button"
+          class="kairo-sidebar-speech__dismiss"
+          @click="emit('dismiss')"
+        >
+          Dismiss
         </button>
       </span>
     </header>

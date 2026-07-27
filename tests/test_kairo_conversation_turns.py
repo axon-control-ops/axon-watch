@@ -140,6 +140,44 @@ class KairoConversationTurnTests(unittest.TestCase):
         note_dig_in_offer("dig-in-offer-fallback", "Something odd happened. Want me to open Attention?")
         self.assertEqual("1", kc._entity_context("dig-in-offer-fallback").get("pending_dig_in"))
 
+        kc._remember_entities(
+            "pull-logs-offer-session",
+            pending_dig_in="",
+            target_workspace_id="workspace_axon_watch",
+            task='Investigate signal "Axon-X Fast Gate"',
+        )
+        note_dig_in_offer(
+            "pull-logs-offer-session",
+            "Fast Gate failed on drill-9. I can pull the failed logs.",
+        )
+        pull_entity = kc._entity_context("pull-logs-offer-session")
+        self.assertEqual("1", pull_entity.get("pending_dig_in"))
+        self.assertIn("log", str(pull_entity.get("task", "")).lower())
+
+    @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
+    @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
+    @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
+    def test_followup_pull_failed_logs_hands_off_to_ide(
+        self,
+        *_mocks: object,
+    ) -> None:
+        import app.kairo_conversation as kc
+
+        kc._remember_entities(
+            "pull-logs-session",
+            signal_id="signal_ci_fast_gate",
+            target_workspace_id="workspace_axon_watch",
+            task='Investigate signal "Axon-X Fast Gate" — Pull failed CI logs',
+            pending_dig_in="1",
+        )
+        payload = converse_turn(content="Pull the failed logs", session_id="pull-logs-session")
+        self.assertEqual("action", payload["turn_kind"])
+        action = payload["action"]
+        assert isinstance(action, dict)
+        self.assertEqual("handoff_signal", action.get("type"))
+        self.assertEqual("workspace_axon_watch", action.get("target_workspace_id"))
+        self.assertIn("log", str(action.get("task", "")).lower())
+
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
     @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)

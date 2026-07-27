@@ -22,8 +22,9 @@ CRITICAL_REVIEW_INSTRUCTION = (
     "Runs cannot complete without that confidence line."
 )
 
+# Accept "Confidence: 8/10" and the common miss "Confidence 8/10".
 _CONFIDENCE_RE = re.compile(
-    r"Confidence:\s*([1-9]|10)\s*/\s*10\b",
+    r"Confidence:?\s*([1-9]|10)\s*/\s*10\b",
     re.IGNORECASE,
 )
 

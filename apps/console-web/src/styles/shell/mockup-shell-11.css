@@ -225,13 +225,13 @@
   --shell-agent-dock-width: min(26rem, 32vw);
 }
 
-/* Galaxy Mission Control: brain stage + LIVE OPERATIONS right rail (mockup).
-   Left shell rail stays hidden; workspaces live inside the stage. */
+/* Brain Graph: full-bleed galaxy stage. Left shell rail stays hidden
+   (workspaces live inside the stage); LIVE OPERATIONS dock is off. */
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy {
   grid-template-columns:
     0
     minmax(0, 1fr)
-    minmax(20rem, var(--shell-agent-dock-width, 26rem));
+    0;
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-left-sidebar {
@@ -239,7 +239,7 @@
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-right-dock {
-  display: flex;
+  display: none;
 }
 
 .console-shell--mockup.console-shell--operator.console-shell--brain-galaxy .region-center-workbench {

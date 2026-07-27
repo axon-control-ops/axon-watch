@@ -14,11 +14,13 @@ const props = defineProps<{
   selectedId: string | null;
   currentWorkspaceId: string | null;
   fleetHealth?: FleetHealthSnapshot | null;
+  collapsed?: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [item: GalaxyMockupRailItem];
   open: [item: GalaxyMockupRailItem];
+  toggleCollapse: [];
 }>();
 
 const query = ref('');
@@ -58,10 +60,25 @@ function onOpen(event: Event, item: GalaxyMockupRailItem): void {
 </script>
 
 <template>
-  <aside class="galaxy-workspaces-rail" aria-label="Workspaces">
+  <aside
+    class="galaxy-workspaces-rail"
+    :class="{ 'galaxy-workspaces-rail--collapsed': collapsed }"
+    aria-label="Workspaces"
+  >
     <header class="galaxy-workspaces-rail__header">
-      <p class="galaxy-workspaces-rail__title">Workspaces</p>
       <button
+        type="button"
+        class="galaxy-workspaces-rail__collapse"
+        :aria-expanded="!collapsed"
+        :title="collapsed ? 'Expand workspaces' : 'Collapse workspaces'"
+        :aria-label="collapsed ? 'Expand workspaces' : 'Collapse workspaces'"
+        @click="emit('toggleCollapse')"
+      >
+        <span class="galaxy-workspaces-rail__collapse-chevron" aria-hidden="true" />
+      </button>
+      <p v-if="!collapsed" class="galaxy-workspaces-rail__title">Workspaces</p>
+      <button
+        v-if="!collapsed"
         type="button"
         class="galaxy-workspaces-rail__add-icon"
         title="New workspace"
@@ -72,79 +89,92 @@ function onOpen(event: Event, item: GalaxyMockupRailItem): void {
       </button>
     </header>
 
-    <label class="galaxy-workspaces-rail__search">
-      <span class="galaxy-workspaces-rail__search-icon" aria-hidden="true">⌕</span>
-      <input
-        v-model="query"
-        type="search"
-        placeholder="Search workspaces…"
-        autocomplete="off"
-      />
-    </label>
+    <button
+      v-if="collapsed"
+      type="button"
+      class="galaxy-workspaces-rail__collapsed-label"
+      title="Expand workspaces"
+      aria-label="Expand workspaces"
+      @click="emit('toggleCollapse')"
+    >
+      Workspaces
+    </button>
 
-    <ul class="galaxy-workspaces-rail__list">
-      <li v-for="item in items" :key="item.id">
-        <div
-          class="galaxy-workspaces-rail__row"
-          :class="{ 'galaxy-workspaces-rail__row--active': isActive(item) }"
-        >
-          <button
-            type="button"
-            class="galaxy-workspaces-rail__item"
-            :class="[
-              `galaxy-workspaces-rail__item--${item.tone}`,
-              { 'galaxy-workspaces-rail__item--active': isActive(item) },
-            ]"
-            @click="emit('select', item)"
+    <template v-if="!collapsed">
+      <label class="galaxy-workspaces-rail__search">
+        <span class="galaxy-workspaces-rail__search-icon" aria-hidden="true">⌕</span>
+        <input
+          v-model="query"
+          type="search"
+          placeholder="Search workspaces…"
+          autocomplete="off"
+        />
+      </label>
+
+      <ul class="galaxy-workspaces-rail__list">
+        <li v-for="item in items" :key="item.id">
+          <div
+            class="galaxy-workspaces-rail__row"
+            :class="{ 'galaxy-workspaces-rail__row--active': isActive(item) }"
           >
-            <span
-              class="galaxy-workspaces-rail__glyph"
-              :class="`galaxy-workspaces-rail__glyph--${item.icon}`"
-              aria-hidden="true"
-            />
-            <span class="galaxy-workspaces-rail__copy">
-              <strong>{{ item.label }}</strong>
-              <span>{{ item.detail }}</span>
-              <span v-if="item.chips.length" class="galaxy-workspaces-rail__chips">
-                <span
-                  v-for="chip in item.chips"
-                  :key="chip.id"
-                  class="galaxy-workspaces-rail__chip"
-                  :class="`galaxy-workspaces-rail__chip--${chip.tone}`"
-                >
-                  {{ chip.label }}
+            <button
+              type="button"
+              class="galaxy-workspaces-rail__item"
+              :class="[
+                `galaxy-workspaces-rail__item--${item.tone}`,
+                { 'galaxy-workspaces-rail__item--active': isActive(item) },
+              ]"
+              @click="emit('select', item)"
+            >
+              <span
+                class="galaxy-workspaces-rail__glyph"
+                :class="`galaxy-workspaces-rail__glyph--${item.icon}`"
+                aria-hidden="true"
+              />
+              <span class="galaxy-workspaces-rail__copy">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.detail }}</span>
+                <span v-if="item.chips.length" class="galaxy-workspaces-rail__chips">
+                  <span
+                    v-for="chip in item.chips"
+                    :key="chip.id"
+                    class="galaxy-workspaces-rail__chip"
+                    :class="`galaxy-workspaces-rail__chip--${chip.tone}`"
+                  >
+                    {{ chip.label }}
+                  </span>
                 </span>
               </span>
-            </span>
-            <span class="galaxy-workspaces-rail__dot" aria-hidden="true" />
-          </button>
-          <button
-            v-if="item.kind === 'workspace'"
-            type="button"
-            class="galaxy-workspaces-rail__open"
-            :class="{ 'galaxy-workspaces-rail__open--visible': isActive(item) }"
-            title="Open workspace"
-            :aria-label="`Open ${item.label}`"
-            @click="onOpen($event, item)"
-          >
-            Open
-          </button>
-        </div>
-      </li>
-    </ul>
+              <span class="galaxy-workspaces-rail__dot" aria-hidden="true" />
+            </button>
+            <button
+              v-if="item.kind === 'workspace'"
+              type="button"
+              class="galaxy-workspaces-rail__open"
+              :class="{ 'galaxy-workspaces-rail__open--visible': isActive(item) }"
+              title="Open workspace"
+              :aria-label="`Open ${item.label}`"
+              @click="onOpen($event, item)"
+            >
+              Open
+            </button>
+          </div>
+        </li>
+      </ul>
 
-    <WorkspaceAddForm
-      v-if="showAddForm"
-      @registered="showAddForm = false"
-      @cancel="showAddForm = false"
-    />
-    <button
-      v-else
-      type="button"
-      class="galaxy-workspaces-rail__new"
-      @click="showAddForm = true"
-    >
-      + New Workspace
-    </button>
+      <WorkspaceAddForm
+        v-if="showAddForm"
+        @registered="showAddForm = false"
+        @cancel="showAddForm = false"
+      />
+      <button
+        v-else
+        type="button"
+        class="galaxy-workspaces-rail__new"
+        @click="showAddForm = true"
+      >
+        + New Workspace
+      </button>
+    </template>
   </aside>
 </template>

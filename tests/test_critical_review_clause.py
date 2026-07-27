@@ -34,6 +34,7 @@ class CriticalReviewClauseHelperTests(unittest.TestCase):
     def test_parse_confidence_reads_last_valid_score(self) -> None:
         self.assertEqual(parse_confidence("Confidence: 7/10"), 7)
         self.assertEqual(parse_confidence("Draft.\nConfidence: 3/10\nRewrite.\nConfidence: 9/10"), 9)
+        self.assertEqual(parse_confidence("Done.\nConfidence 8/10"), 8)
         self.assertIsNone(parse_confidence("no score here"))
         self.assertIsNone(parse_confidence("Confidence: 0/10"))
         self.assertIsNone(parse_confidence("Confidence: 11/10"))

@@ -175,6 +175,9 @@ def post_lane_b_message(
             linked_run_id=run_id,
             execution_access=execution_access,
             composer_mode=composer_mode,
+            employee_role=(
+                str(early_thread.get("employee_role") or "").strip() or None
+            ),
         )
         dispatch_run_id = str(run_record["run_id"])
         if is_tool_capable_composer_mode(composer_mode):

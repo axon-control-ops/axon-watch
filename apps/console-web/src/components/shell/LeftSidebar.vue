@@ -71,9 +71,9 @@ const {
   rootRef: sidebarRef,
   cssVariable: '--ide-kairo-panel-height',
   storageKey: 'axon-shell-ide-kairo-panel-height',
-  // Leave headroom above default so dragging the bottom card up is always possible.
-  defaultSize: (height) => Math.min(Math.round(height * 0.34), 300),
-  minSize: 180,
+  // Leave headroom above default so dragging the bottom card up/down is always possible.
+  defaultSize: (height) => Math.min(Math.round(height * 0.28), 240),
+  minSize: 120,
   maxSize: (height) => Math.round(height * 0.72),
 });
 
@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
       'left-sidebar-mockup--ide-kairo-user-sized': ideKairoPanelUserSized,
       'left-sidebar-mockup--ide': isIdeMode,
       'left-sidebar-mockup--explorer-collapsed': isIdeMode && shell.ideExplorerCollapsed,
-      'left-sidebar-mockup--galaxy': shell.operatorBrainGalaxyActive,
+      'left-sidebar-mockup--galaxy': !isIdeMode && shell.operatorBrainGalaxyActive,
     }"
   >
     <template v-if="isIdeMode">

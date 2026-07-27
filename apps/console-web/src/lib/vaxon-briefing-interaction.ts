@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue';
+import { readonly, ref, watch } from 'vue';
 
 export type VaxonBriefingInteraction = {
   workspaceId: string;
@@ -11,6 +11,9 @@ const STORAGE_KEY = 'axon-vaxon-briefing-interaction';
 
 const pendingByWorkspace = ref<Record<string, VaxonBriefingInteraction>>({});
 const dismissedKeys = ref<Set<string>>(new Set());
+
+/** Reactive map for IDE speech chips / roster docks that must stay until dismissed. */
+export const vaxonBriefingPendingByWorkspace = readonly(pendingByWorkspace);
 
 function loadFromStorage(): void {
   if (typeof sessionStorage === 'undefined') {

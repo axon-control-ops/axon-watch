@@ -451,8 +451,9 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
       />
 
       <div :id="COMPANY_ROSTER_DOCK_ID" ref="dockRootRef" class="company-roster__dock-host">
+        <!-- IDE: KairoSidebarPanel owns VAXON speech — avoid a second speaking dock. -->
         <VaxonRosterVoiceDock
-          v-if="vaxonVoiceDock.visible.value"
+          v-if="shell.layoutMode !== 'ide' && vaxonVoiceDock.visible.value"
           :speaking="vaxonVoiceDock.speaking.value"
           :line="vaxonVoiceDock.line.value"
           :remaining-seconds="vaxonVoiceDock.remainingSeconds.value"

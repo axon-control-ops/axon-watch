@@ -162,7 +162,7 @@ def spoken_report_line(*, success: bool, workflow_name: str, detail: str) -> str
         )
     return (
         f"{workflow_name} is still red after repair attempts. "
-        f"{detail} Shall I triage the repair?".strip()
+        f"{detail} Shall I triage the repair? I can pull the failed logs — say pull the failed logs.".strip()
     )
 
 

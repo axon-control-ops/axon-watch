@@ -85,8 +85,8 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
   }
 
   function focusMissionControl(): void {
-    // Mockup home: brain stage + LIVE OPERATIONS rail (not the fleet mosaic).
-    setOperatorCenterView('graph');
+    // Mission Control = fleet mosaic (Brain Graph is a separate center view).
+    setOperatorCenterView('grid');
     input.missionControlEmphasized.value = true;
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {

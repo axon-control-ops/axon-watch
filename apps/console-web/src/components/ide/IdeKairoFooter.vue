@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import KairoChip from '../KairoChip.vue';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
 import AgentLiveLineHeadline from './AgentLiveLineHeadline.vue';
+import { useSpokenUtteranceText } from '../../composables/useSpokenUtteranceText';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import {
   briefingAdvise,
@@ -16,11 +17,13 @@ import {
   resolveIdeKairoChipState,
   shouldSurfaceIdeEmployeeFailure,
 } from '../../lib/ide-presence-profile';
+import { resolveIdePresencePersonaName } from '../../lib/ide-presence-persona';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
 import { useShellStore } from '../../stores/shell';
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
 
 const shell = useShellStore();
+const { speaker } = useSpokenUtteranceText();
 
 const showExpandedPanel = computed(() =>
   ideShowKairoSidebarExpanded(shell.idePresenceProfile),
@@ -45,15 +48,14 @@ const surfaceEmployeeFailure = computed(() =>
     kairoSpeechActive: shell.kairoSpeechActive,
   }),
 );
-const presencePersonaName = computed(() => {
-  if (shell.kairoSpeechActive) {
-    return OPERATOR_PERSONA_NAME;
-  }
-  if (surfaceEmployeeFailure.value && activePersonaName.value) {
-    return activePersonaName.value;
-  }
-  return OPERATOR_PERSONA_NAME;
-});
+const presencePersonaName = computed(() =>
+  resolveIdePresencePersonaName({
+    speaker: speaker.value,
+    kairoSpeechActive: shell.kairoSpeechActive,
+    surfaceEmployeeFailure: surfaceEmployeeFailure.value,
+    activeEmployeeName: shell.activeIdeEmployee?.name,
+  }),
+);
 const activePersonaMark = computed(() =>
   presencePersonaName.value === OPERATOR_PERSONA_NAME
     ? null

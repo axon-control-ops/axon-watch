@@ -1,11 +1,21 @@
-import { onBeforeUnmount, onMounted, reactive, ref, type Ref } from 'vue';
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  type Ref,
+} from 'vue';
 
 import {
   applyGalaxyPanelResizeKeyAction,
   clampGalaxyPanelWidth,
   defaultGalaxyPanelWidths,
+  GALAXY_LEFT_COLLAPSED_WIDTH_PX,
   persistGalaxyPanelWidths,
+  persistGalaxyWorkspacesCollapsed,
   readStoredGalaxyPanelWidths,
+  readStoredGalaxyWorkspacesCollapsed,
   resolveGalaxyPanelResizeKey,
   type GalaxyPanelKind,
   type GalaxyPanelWidths,
@@ -39,18 +49,51 @@ export function useGalaxyPanelResize(options: UseGalaxyPanelResizeOptions) {
     ),
   });
   const resizing = ref<GalaxyPanelKind | null>(null);
+  /** Persisted operator preference (default expanded). */
+  const userLeftCollapsed = ref(readStoredGalaxyWorkspacesCollapsed());
+  /** Temporary collapse while VAXON speaks — does not overwrite preference. */
+  const speechCollapseActive = ref(false);
+  /** Operator expanded the rail while speech is forcing collapse. */
+  const holdOpenDuringSpeech = ref(false);
+
+  const leftCollapsed = computed(
+    () =>
+      userLeftCollapsed.value ||
+      (speechCollapseActive.value && !holdOpenDuringSpeech.value),
+  );
 
   function applyCssVars(): void {
     const stage = options.stageRef.value;
-    if (!stage) {
-      return;
+    const leftWidth = leftCollapsed.value
+      ? GALAXY_LEFT_COLLAPSED_WIDTH_PX
+      : widths.left;
+    const vars: Array<[string, string]> = [
+      ['--galaxy-left-width', `${leftWidth}px`],
+      ['--galaxy-right-width', `${widths.right}px`],
+      ['--galaxy-inspector-width', `${widths.inspector}px`],
+    ];
+    if (stage) {
+      for (const [name, value] of vars) {
+        stage.style.setProperty(name, value);
+      }
     }
-    stage.style.setProperty('--galaxy-left-width', `${widths.left}px`);
-    stage.style.setProperty('--galaxy-right-width', `${widths.right}px`);
-    stage.style.setProperty('--galaxy-inspector-width', `${widths.inspector}px`);
+    // Mirror onto the center workbench so floating captions share insets.
+    const workbench =
+      (stage?.closest('.region-center-workbench') as HTMLElement | null) ??
+      (typeof document !== 'undefined'
+        ? (document.querySelector('.region-center-workbench') as HTMLElement | null)
+        : null);
+    if (workbench) {
+      for (const [name, value] of vars) {
+        workbench.style.setProperty(name, value);
+      }
+    }
   }
 
   function setWidth(kind: GalaxyPanelKind, next: number, persist = true): void {
+    if (kind === 'left' && leftCollapsed.value) {
+      return;
+    }
     widths[kind] = clampGalaxyPanelWidth(kind, next, viewportWidth.value);
     applyCssVars();
     if (persist) {
@@ -59,11 +102,48 @@ export function useGalaxyPanelResize(options: UseGalaxyPanelResizeOptions) {
   }
 
   function resetWidth(kind: GalaxyPanelKind): void {
+    if (kind === 'left' && leftCollapsed.value) {
+      setLeftCollapsed(false);
+    }
     setWidth(kind, defaultGalaxyPanelWidths(viewportWidth.value)[kind]);
+  }
+
+  function setLeftCollapsed(collapsed: boolean): void {
+    userLeftCollapsed.value = collapsed;
+    persistGalaxyWorkspacesCollapsed(collapsed);
+    if (!collapsed && speechCollapseActive.value) {
+      holdOpenDuringSpeech.value = true;
+    }
+    if (collapsed) {
+      holdOpenDuringSpeech.value = false;
+    }
+    applyCssVars();
+  }
+
+  function toggleLeftCollapsed(): void {
+    if (speechCollapseActive.value && !userLeftCollapsed.value) {
+      // Speech is forcing collapse: toggle hold-open without changing preference.
+      holdOpenDuringSpeech.value = !holdOpenDuringSpeech.value;
+      applyCssVars();
+      return;
+    }
+    setLeftCollapsed(!userLeftCollapsed.value);
+  }
+
+  /** Collapse workspaces while VAXON speaks; restore preference when speech ends. */
+  function setSpeechCollapseActive(active: boolean): void {
+    speechCollapseActive.value = active;
+    if (!active) {
+      holdOpenDuringSpeech.value = false;
+    }
+    applyCssVars();
   }
 
   function startResize(kind: GalaxyPanelKind, edge: 'left' | 'right', event: MouseEvent): void {
     if (event.button !== 0) {
+      return;
+    }
+    if (kind === 'left' && leftCollapsed.value) {
       return;
     }
     event.preventDefault();
@@ -99,6 +179,9 @@ export function useGalaxyPanelResize(options: UseGalaxyPanelResizeOptions) {
     edge: 'left' | 'right',
     event: KeyboardEvent,
   ): void {
+    if (kind === 'left' && leftCollapsed.value) {
+      return;
+    }
     const action = resolveGalaxyPanelResizeKey(event.key, event.shiftKey, edge);
     if (!action) {
       return;
@@ -142,6 +225,10 @@ export function useGalaxyPanelResize(options: UseGalaxyPanelResizeOptions) {
   return {
     widths,
     resizing,
+    leftCollapsed,
+    setLeftCollapsed,
+    toggleLeftCollapsed,
+    setSpeechCollapseActive,
     startResize,
     onResizeKeydown,
     resetWidth,
