@@ -12,6 +12,18 @@
       "required": true,
       "workspace_id": "workspace_axon_watch"
     },
+    "github_api": {
+      "display_name": "GitHub API",
+      "health_url": "https://api.github.com/zen",
+      "required": false,
+      "workspace_id": "workspace_axon_watch"
+    },
+    "edudashpro_site": {
+      "display_name": "EduDash Pro site",
+      "health_url": "https://edudashpro.org.za",
+      "required": false,
+      "workspace_id": "workspace_dashpro"
+    },
     "axon_local": {
       "display_name": "axon-local (legacy)",
       "health_url": "http://127.0.0.1:7734/api/health",

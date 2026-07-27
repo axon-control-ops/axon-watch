@@ -212,6 +212,26 @@ Fallback poller: `./scripts/ops/poll-fast-gate-remediation.sh`.
 
 ---
 
+## 5b. Lead team check-in scheduler (clocked)
+
+Company Leads run a **cooldown-gated check-in** on the continuous worker clock
+(same tick family as file-size patrol — axon-local-style interval work).
+
+| Piece | Location |
+| --- | --- |
+| Work source | `lead_team_checkin` in `config/autonomy-work-sources.json` |
+| Logic | `services/control-plane/app/workspace_agents/lead_team_checkin.py` |
+| Hierarchy + close-out | [`company-hierarchy-and-lead-checkin.md`](company-hierarchy-and-lead-checkin.md) |
+
+Failed shifts and degraded monitors/connectors become `Lead assigned:` tasks for
+the matching specialist. Usage/auth/restart failures escalate to the Lead IDE
+only (no bogus repair task).
+
+External HTTP health probes: `http_health` checks in
+`config/axon-x-monitor-slice.json` and `config/dashpro-monitor-slice.json`.
+
+---
+
 ## 6. Workspace company parity (vs DashPro)
 
 DashPro is not a special UI — every bound workspace uses the same Team panel,

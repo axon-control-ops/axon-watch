@@ -104,6 +104,21 @@ def run_scheduled_work_sources(*, root: Path | None = None) -> dict[str, Any]:
                 "work_source": "ci_remediation",
                 "mode": "recover_only",
             }
+            continue
+        if source_id == "lead_team_checkin" and "scheduler" in trigger:
+            from app.workspace_agents.lead_team_checkin import run_lead_team_checkin
+
+            min_interval = float(source.get("min_interval_seconds") or 900)
+            max_assign = int(source.get("max_assignments_per_workspace") or 2)
+            try:
+                results["sources"][source_id] = run_lead_team_checkin(
+                    min_interval_seconds=min_interval,
+                    max_assignments_per_workspace=max_assign,
+                )
+            except Exception:  # noqa: BLE001 — never block the scheduler tick
+                logger.exception("lead_team_checkin work source failed")
+                results["sources"][source_id] = {"error": "lead_team_checkin_failed"}
+            continue
     return results
 
 

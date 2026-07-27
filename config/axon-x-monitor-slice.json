@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "workspace_id": "workspace_axon_watch",
+  "workspace_label": "Axon-X",
+  "project_root": "/home/edp/axon-nvme/repos/axon-watch",
+  "checks": [
+    {
+      "id": "axon_x_public_origin_health",
+      "type": "http_health",
+      "service": "Public origin",
+      "url": "${AXON_WATCH_PUBLIC_BASE_URL}/api/health",
+      "expect_status": 200,
+      "expect_json_status": "ok",
+      "timeout_seconds": 5
+    },
+    {
+      "id": "axon_x_control_plane_health",
+      "type": "http_health",
+      "service": "Control plane",
+      "url": "${AXON_WATCH_CONTROL_PLANE_BASE_URL}/api/health",
+      "expect_status": 200,
+      "expect_json_status": "ok",
+      "timeout_seconds": 3
+    },
+    {
+      "id": "axon_x_github_api_health",
+      "type": "http_health",
+      "service": "GitHub API",
+      "url": "https://api.github.com/zen",
+      "expect_status": 200,
+      "timeout_seconds": 5
+    }
+  ]
+}
