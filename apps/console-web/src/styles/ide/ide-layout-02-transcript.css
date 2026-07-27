@@ -254,6 +254,77 @@
   -webkit-line-clamp: 14;
 }
 
+.kairo-sidebar-speech--awaiting-reply {
+  max-height: min(58vh, 28rem);
+}
+
+.kairo-sidebar-speech--awaiting-reply .kairo-sidebar-speech__text {
+  display: block;
+  overflow: auto;
+  -webkit-line-clamp: unset;
+}
+
+.kairo-sidebar-speech__reply {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(0, 242, 255, 0.16);
+}
+
+.kairo-sidebar-speech__reply-hint {
+  margin: 0;
+  color: rgba(170, 220, 235, 0.82);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kairo-sidebar-speech__reply-actions,
+.kairo-sidebar-speech__reply-form {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.kairo-sidebar-speech__reply-actions button,
+.kairo-sidebar-speech__reply-form button,
+.kairo-sidebar-speech__reply-form input {
+  min-width: 0;
+  border: 1px solid rgba(70, 225, 255, 0.28);
+  border-radius: 0.35rem;
+  color: rgba(230, 249, 255, 0.96);
+  background: rgba(4, 18, 28, 0.86);
+}
+
+.kairo-sidebar-speech__reply-actions button,
+.kairo-sidebar-speech__reply-form button {
+  padding: 0.34rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.58rem;
+}
+
+.kairo-sidebar-speech__reply-form {
+  align-items: stretch;
+}
+
+.kairo-sidebar-speech__reply-form input {
+  flex: 1 1 auto;
+  padding: 0.34rem 0.45rem;
+  font-size: 0.68rem;
+}
+
+.kairo-sidebar-speech__reply-form input:focus {
+  outline: 1px solid rgba(0, 242, 255, 0.45);
+  border-color: rgba(0, 242, 255, 0.45);
+}
+
+.kairo-sidebar-speech__reply-form button:disabled,
+.kairo-sidebar-speech__reply-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .kairo-sidebar-speech__empty {
   margin: 0.2rem 0;
   color: rgba(148, 163, 184, 0.82);

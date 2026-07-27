@@ -21,6 +21,7 @@ import {
   vaxonBriefingInteractionKey,
   vaxonBriefingPendingByWorkspace,
 } from '../../lib/vaxon-briefing-interaction';
+import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
 import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
@@ -28,9 +29,6 @@ import AgentLiveLineHeadline from './AgentLiveLineHeadline.vue';
 import KairoSidebarSpeechChip from './KairoSidebarSpeechChip.vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import BriefingSurfaceFollowupPrompt from '../../features/kairo-conversation/BriefingSurfaceFollowupPrompt.vue';
-
-const DECISION_PROMPT_RE =
-  /\b(shall i|would you like me to|do you want me to|want me to|open attention for|confirm|approve|retry)\b/i;
 
 const shell = useShellStore();
 const { spokenText, speaker } = useSpokenUtteranceText();
@@ -56,7 +54,7 @@ watch(
         : null) ||
       (kind === 'vaxon' ? OPERATOR_PERSONA_NAME : activeEmployee) ||
       OPERATOR_PERSONA_NAME;
-    const needsDecision = kind === 'vaxon' && DECISION_PROMPT_RE.test(next);
+    const needsDecision = kind === 'vaxon' && vaxonLineAsksForReply(next);
     stickyNeedsDecision.value = needsDecision;
     // Only questions awaiting an operator answer persist; plain narration expires.
     if (needsDecision) {
@@ -104,7 +102,7 @@ onMounted(() => {
   }
   stickySpokenText.value = pending.line.trim();
   stickySpeakerName.value = OPERATOR_PERSONA_NAME;
-  stickyNeedsDecision.value = DECISION_PROMPT_RE.test(pending.line);
+  stickyNeedsDecision.value = vaxonLineAsksForReply(pending.line);
 });
 
 onBeforeUnmount(() => {
@@ -249,6 +247,10 @@ function dismissSpeechChip(): void {
   followupTick.value += 1;
 }
 
+function onSpeechChipReplied(): void {
+  dismissSpeechChip();
+}
+
 const briefingHeadline = computed(() =>
   briefingPanelHeadline(shell.operatorBriefing, shell.briefingLoadState),
 );
@@ -284,6 +286,25 @@ const speechChipText = computed(
     pendingVaxonDecision.value?.line.trim() ||
     null,
 );
+const showSpeechReplyBlock = computed(() => {
+  const line = speechChipText.value?.trim() ?? '';
+  if (!line) {
+    return false;
+  }
+  const isVaxonSurface =
+    speaker.value?.kind === 'vaxon' ||
+    stickySpeakerName.value === OPERATOR_PERSONA_NAME ||
+    Boolean(pendingVaxonDecision.value);
+  if (!isVaxonSurface) {
+    return false;
+  }
+  // VAXON questions / invites always get a reply surface in IDE.
+  if (vaxonLineAsksForReply(line)) {
+    return true;
+  }
+  // Duplex follow-up window after VAXON finishes speaking.
+  return stickyDecisionActive.value;
+});
 const agentLinkLabel = computed(() => {
   if (shell.kairoSpeechActive) {
     return 'Voice live';
@@ -459,8 +480,10 @@ function handleStopSpeech(event?: Event): void {
       :sticky-text="stickySpokenText"
       :sticky-speaker-name="stickySpeakerName"
       :show-dismiss="showSpeechDismiss"
+      :awaiting-reply="showSpeechReplyBlock"
       @stop-speech="handleStopSpeech()"
       @dismiss="dismissSpeechChip()"
+      @replied="onSpeechChipReplied()"
     />
   </div>
 </template>

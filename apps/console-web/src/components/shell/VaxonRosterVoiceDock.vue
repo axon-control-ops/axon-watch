@@ -8,6 +8,7 @@ import {
   resolveVaxonAvatarFallbackUrl,
   resolveVaxonAvatarUrl,
 } from '../../lib/vaxon-avatar-view';
+import { vaxonAffirmReplyCta, vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import { useShellStore } from '../../stores/shell';
 
 const props = defineProps<{
@@ -22,23 +23,8 @@ const shell = useShellStore();
 const { pending, submitTurn } = useKairoConversation();
 const reply = ref('');
 const avatarSrc = ref(resolveVaxonAvatarUrl());
-const asksForReply = computed(() =>
-  /\b(shall i|would you like me to|do you want me to|open attention for|want me to)\b/i.test(
-    props.line,
-  ),
-);
-const affirmCta = computed(() => {
-  if (/\bopen attention\b/i.test(props.line)) {
-    return 'Yes — open Attention';
-  }
-  if (/\btriage\b/i.test(props.line)) {
-    return 'Yes — triage';
-  }
-  if (/\bdiagnos/i.test(props.line)) {
-    return 'Yes — diagnose';
-  }
-  return 'Yes — continue';
-});
+const asksForReply = computed(() => vaxonLineAsksForReply(props.line));
+const affirmCta = computed(() => vaxonAffirmReplyCta(props.line));
 
 function onAvatarError(): void {
   avatarSrc.value = resolveVaxonAvatarFallbackUrl();

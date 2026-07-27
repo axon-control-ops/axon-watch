@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
+import { useKairoConversation } from '../../features/kairo-conversation/use-kairo-conversation';
 import type { KairoVoiceSpeaker } from '../../lib/kairo-voice-utterance';
+import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import {
   resolveSidebarSpeechChipView,
   sidebarSpeechCanExpand,
 } from '../../lib/sidebar-speech-chip-view';
+import { vaxonAffirmReplyCta, vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 
 const props = defineProps<{
   spokenText: string | null;
@@ -15,16 +18,22 @@ const props = defineProps<{
   stickyText?: string;
   stickySpeakerName?: string;
   showDismiss?: boolean;
+  /** Show text/voice reply controls so the operator can continue the flow. */
+  awaitingReply?: boolean;
 }>();
 
 const emit = defineEmits<{
   stopSpeech: [];
   dismiss: [];
+  replied: [];
 }>();
 
 const localStickyText = ref('');
 const localStickySpeakerName = ref('');
 const expanded = ref(false);
+const reply = ref('');
+const replyInputRef = ref<HTMLInputElement | null>(null);
+const { pending, submitTurn } = useKairoConversation();
 
 watch(
   () =>
@@ -62,6 +71,11 @@ const view = computed(() =>
   }),
 );
 const canExpand = computed(() => sidebarSpeechCanExpand(view.value.displayText));
+const showReplyBlock = computed(
+  () => Boolean(props.awaitingReply) && !view.value.empty,
+);
+const asksForQuickReply = computed(() => vaxonLineAsksForReply(view.value.displayText));
+const affirmCta = computed(() => vaxonAffirmReplyCta(view.value.displayText));
 
 watch(
   () => view.value.displayText,
@@ -70,15 +84,39 @@ watch(
   },
 );
 
+watch(
+  showReplyBlock,
+  async (active) => {
+    if (!active) {
+      return;
+    }
+    await nextTick();
+    replyInputRef.value?.focus();
+  },
+);
+
 function toggleExpanded(): void {
   expanded.value = !expanded.value;
+}
+
+async function send(content?: string): Promise<void> {
+  const message = (content ?? reply.value).trim();
+  if (!message || pending.value) {
+    return;
+  }
+  reply.value = '';
+  emit('replied');
+  await submitTurn(message);
 }
 </script>
 
 <template>
   <section
     class="kairo-sidebar-speech"
-    :class="{ 'kairo-sidebar-speech--expanded': expanded }"
+    :class="{
+      'kairo-sidebar-speech--expanded': expanded || showReplyBlock,
+      'kairo-sidebar-speech--awaiting-reply': showReplyBlock,
+    }"
     :data-speaking="speaking ? 'true' : 'false'"
     :aria-label="view.statusLabel"
     @click.stop
@@ -94,7 +132,7 @@ function toggleExpanded(): void {
       </span>
       <span class="kairo-sidebar-speech__actions">
         <button
-          v-if="canExpand"
+          v-if="canExpand && !showReplyBlock"
           type="button"
           class="kairo-sidebar-speech__expand"
           :aria-expanded="expanded"
@@ -128,6 +166,34 @@ function toggleExpanded(): void {
       <p v-else class="kairo-sidebar-speech__empty">
         Spoken replies from the agent who is talking appear here.
       </p>
+    </div>
+
+    <div v-if="showReplyBlock" class="kairo-sidebar-speech__reply" @click.stop>
+      <p class="kairo-sidebar-speech__reply-hint">
+        Reply to {{ OPERATOR_PERSONA_NAME }} — text or voice
+      </p>
+      <div v-if="asksForQuickReply" class="kairo-sidebar-speech__reply-actions">
+        <button type="button" :disabled="pending" @click="void send('yes')">
+          {{ affirmCta }}
+        </button>
+        <button type="button" :disabled="pending" @click="void send('no')">
+          Not now
+        </button>
+      </div>
+      <form class="kairo-sidebar-speech__reply-form" @submit.prevent="void send()">
+        <input
+          ref="replyInputRef"
+          v-model="reply"
+          type="text"
+          autocomplete="off"
+          :placeholder="`Reply to ${OPERATOR_PERSONA_NAME}…`"
+          :disabled="pending"
+          aria-label="Reply to VAXON"
+        >
+        <button type="submit" :disabled="pending || !reply.trim()">
+          {{ pending ? 'Sending…' : 'Reply' }}
+        </button>
+      </form>
     </div>
   </section>
 </template>
