@@ -37,6 +37,13 @@ class HttpHealthMonitorTests(unittest.TestCase):
             sys.path.remove(_WATCH_PATH)
         sys.modules.update(self._saved_modules)
 
+    def test_unresolved_placeholder_skipped(self) -> None:
+        status, detail = self.http_health.check_http_health(
+            url="${AXON_WATCH_PUBLIC_BASE_URL}/api/health"
+        )
+        self.assertEqual("skipped", status)
+        self.assertIn("unresolved", detail)
+
     def test_missing_url_skipped(self) -> None:
         status, detail = self.http_health.check_http_health(url="")
         self.assertEqual("skipped", status)

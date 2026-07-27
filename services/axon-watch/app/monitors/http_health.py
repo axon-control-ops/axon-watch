@@ -23,6 +23,10 @@ def check_http_health(
     target = str(url or "").strip()
     if not target:
         return "skipped", "HTTP health check skipped: url missing"
+    if "${" in target or target.startswith("$"):
+        return "skipped", f"HTTP health check skipped: unresolved url placeholder ({target})"
+    if "://" not in target:
+        return "skipped", f"HTTP health check skipped: invalid url ({target})"
 
     request_headers = {"Accept": "*/*", "User-Agent": "Axon-Watch-Monitor/1.0"}
     if headers:
@@ -39,7 +43,7 @@ def check_http_health(
         if status_code >= 500:
             return "critical", f"HTTP {status_code} from {target}"
         return "warning", f"HTTP {status_code} from {target}"
-    except (TimeoutError, URLError, OSError) as exc:
+    except (TimeoutError, URLError, OSError, ValueError) as exc:
         return "critical", f"HTTP health probe failed: {exc}"
 
     expected = int(expect_status)
