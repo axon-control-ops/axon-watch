@@ -6,6 +6,8 @@ import { speakKairoLine, stopKairoPlayback } from './kairo-voice-playback';
 
 vi.mock('./kairo-tts-client', () => ({
   postKairoTts: vi.fn(),
+  isAzureTtsBlocked: vi.fn(() => false),
+  azureTtsBlockedReasonValue: vi.fn(() => null),
 }));
 
 function stubBrowserSpeech() {
