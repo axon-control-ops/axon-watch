@@ -73,6 +73,7 @@ class KairoConversationEndpointTests(unittest.TestCase):
             "requires_confirmation", "action", "artifacts", "active_participant",
             "action_tier", "dispatch_lane", "voice_routing_mode",
             "model_receipt", "routing_receipt",
+            "report", "vaxon_model_id",
         }
         self.assertEqual(expected, set(payload))
         self.assertEqual("status_question", payload["turn_kind"])

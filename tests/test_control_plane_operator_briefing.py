@@ -75,6 +75,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "host_artifacts",
                 "operator_presence",
                 "cli_runtime",
+                "production_readiness",
             },
             set(payload),
         )

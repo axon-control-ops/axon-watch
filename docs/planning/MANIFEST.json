@@ -2,7 +2,7 @@
   "schema_version": 1,
   "canonical_home": "docs/planning/",
   "legacy_mirror": "axon-local/Plans/Axon-Watch/",
-  "generated_on": "2026-07-25",
+  "generated_on": "2026-07-28",
   "file_count": 44,
   "files": {
     "ADR-001-greenfield-repo.md": {
@@ -30,8 +30,8 @@
       "bytes": 2894
     },
     "AGENT_SHELL_BACKGROUND_DETACH.md": {
-      "sha256": "beff208a91621b4daba2ebdbe51ca7f3c5f3d440da749db03f0cd34270ecfa60",
-      "bytes": 2988
+      "sha256": "44110460c5f1c7bde1faf43ddd623addb161f18aa5a649f36823942e42ea9444",
+      "bytes": 3270
     },
     "ARCHITECTURE.md": {
       "sha256": "5e5a9430ba1c4110209ddbd43e831a7a6f89ccb9001041c85657078c0b417710",
