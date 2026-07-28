@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
-import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -19,11 +17,15 @@ from app.cli_runtime.catalog import runtime_status_snapshot
 from app.cli_runtime.codex_agent import run_codex_local
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
 from app.cli_runtime.recovery import ordered_runtime_candidates
+from app.cli_runtime.runtime_failure import (
+    fallback_reply as _fallback_reply,
+    runtime_unready_reason as _runtime_unready_reason,
+)
+from app.cli_runtime.runtime_debug import record_sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.cursor_agent import (
     CursorAgentReply,
-    is_recursion_depth_error,
-    run_cursor_local,
+    run_cursor_local_with_recursion_retry,
 )
 from app.cli_runtime.runtime_auth import (
     cursor_dispatch_env,
@@ -125,34 +127,11 @@ def _sentry_monitor_context(user_prompt: str) -> str:
             "do not claim the Sentry token is absent."
         )
 
-    # region agent log
-    try:
-        with open(
-            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-fc0b35.log",
-            "a",
-            encoding="utf-8",
-        ) as debug_log:
-            debug_log.write(
-                json.dumps(
-                    {
-                        "sessionId": "fc0b35",
-                        "runId": "post-fix",
-                        "hypothesisId": "SENTRY1",
-                        "location": "cli_runtime/router.py:_sentry_monitor_context",
-                        "message": "Sentry request received trusted monitor context",
-                        "data": {
-                            "monitorAvailable": bool(record),
-                            "status": status,
-                            "issueCount": issue_count,
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except OSError:
-        pass
-    # endregion
+    record_sentry_monitor_context(
+        monitor_available=bool(record),
+        status=status,
+        issue_count=issue_count,
+    )
 
     return "\n".join(lines)
 
@@ -251,43 +230,6 @@ def _build_prompt(
         f"Workspace context:\n{workspace_body}\n\n"
         f"{sentry_section}\n\n"
         f"Operator request:\n{user_prompt.strip()}"
-    )
-
-
-def _runtime_unready_reason(record: dict[str, object]) -> str:
-    runtime_id = str(record.get("id") or "runtime")
-    label = str(record.get("label") or runtime_id)
-    target_type = str(record.get("target_type") or "local")
-    if target_type == "cloud" or not record.get("available"):
-        return f"{label} unavailable"
-    auth = record.get("auth") if isinstance(record.get("auth"), dict) else {}
-    message = str(auth.get("message") or "").strip()
-    if message and not auth.get("logged_in"):
-        return message
-    if message and auth.get("logged_in"):
-        return f"{label} unavailable"
-    return f"{label} unavailable"
-
-
-def _fallback_reply(
-    *,
-    composer_mode: str,
-    user_prompt: str,
-    context_block: str,
-    reason: str,
-    failure_phase: str = "not_ready",
-    runtime_label: str = "",
-) -> str:
-    del user_prompt, context_block
-    if failure_phase == "run_error":
-        label = (runtime_label or "the selected CLI runtime").strip()
-        return (
-            f"Lane B ({composer_mode}) failed on {label}: {reason}. "
-            "Open Runtime or `/vault` if auth looks wrong, then retry."
-        )
-    return (
-        f"Lane B ({composer_mode}) cannot start because no CLI runtime is ready: {reason}. "
-        "Open Runtime or `/vault`, then retry."
     )
 
 
@@ -440,50 +382,20 @@ def dispatch_ide_composer(
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
             if family == "cursor":
-                started = time.perf_counter()
-                try:
-                    cursor_reply = run_cursor_local(
-                        binary=binary,
-                        prompt=prompt,
-                        workspace_root=workspace_root,
-                        composer_mode=composer_mode,
-                        execution_tier=execution_tier,
-                        model=model,
-                        subprocess_env=dispatch_env,
-                        run_id=run_id,
-                        on_chunk=on_chunk,
-                        trust_policy=cursor_trust_policy,
-                    )
-                except RuntimeError as first_exc:
-                    if isinstance(first_exc, RuntimeProcessStoppedError):
-                        raise
-                    # One bounded retry without research MCP for recursion crashes.
-                    if is_recursion_depth_error(str(first_exc)):
-                        logger.exception(
-                            "lane_b_dispatch_recursion runtime_id=%s family=%s "
-                            "composer_mode=%s workspace_id=%s elapsed_ms=%.0f; "
-                            "retrying without research MCP",
-                            runtime_id,
-                            family,
-                            composer_mode,
-                            workspace_id,
-                            (time.perf_counter() - started) * 1000,
-                        )
-                        cursor_reply = run_cursor_local(
-                            binary=binary,
-                            prompt=prompt,
-                            workspace_root=workspace_root,
-                            composer_mode=composer_mode,
-                            execution_tier=execution_tier,
-                            model=model,
-                            subprocess_env=dispatch_env,
-                            run_id=run_id,
-                            on_chunk=on_chunk,
-                            trust_policy=cursor_trust_policy,
-                            research_available=False,
-                        )
-                    else:
-                        raise
+                cursor_reply = run_cursor_local_with_recursion_retry(
+                    runtime_id=runtime_id,
+                    workspace_id=workspace_id,
+                    binary=binary,
+                    prompt=prompt,
+                    workspace_root=workspace_root,
+                    composer_mode=composer_mode,
+                    execution_tier=execution_tier,
+                    model=model,
+                    subprocess_env=dispatch_env,
+                    run_id=run_id,
+                    on_chunk=on_chunk,
+                    trust_policy=cursor_trust_policy,
+                )
                 content = _cursor_reply_content(cursor_reply, approval_notice)
                 return _finish({
                     "content": content,

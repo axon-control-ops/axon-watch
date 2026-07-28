@@ -128,7 +128,7 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                     return_value=True,
                 ),
                 patch(
-                    "app.cli_runtime.router.run_cursor_local",
+                    "app.cli_runtime.cursor_agent.run_cursor_local",
                     side_effect=fake_run_cursor_local,
                 ),
             ):
@@ -164,7 +164,7 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
                     return_value=True,
                 ),
                 patch(
-                    "app.cli_runtime.router.run_cursor_local",
+                    "app.cli_runtime.cursor_agent.run_cursor_local",
                     side_effect=always_recurse,
                 ),
             ):

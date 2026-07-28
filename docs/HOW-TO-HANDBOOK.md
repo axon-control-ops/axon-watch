@@ -15,18 +15,13 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-27 — Mission Control Live Ops **Transmission** card,
-workspace open vs focus intents, fleet busy presence, and **REPORT** hotword for
-second-brain stand-ups. Gates 0–5 closed; Gate 6 verifier + draft-PR delivery +
-Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and file-size
-patrol plumbing landed. **Not yet a closed unattended auto-loop** — scheduler
-stays **off** by default; Mission Control still needs Retry / dig-in. Read
-[`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first for
-status + Cursor credit budgets. After every push run
+**Last verified:** 2026-07-25 — Gates 0–5 closed; Gate 6 verifier + draft-PR
+delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and
+file-size patrol plumbing landed. **Not yet a closed unattended auto-loop** —
+scheduler stays **off** by default; Mission Control still needs Retry / dig-in.
+Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first
+for status + Cursor credit budgets. After every push run
 `./scripts/ops/watch-fast-gate.sh`.
-
-**Second brain (Mission Control):** [`how-to/mission-control-transmission-and-report.md`](how-to/mission-control-transmission-and-report.md)
-— Transmission dock, `REPORT`, open vs focus workspace, voice presence, improvement backlog.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
@@ -46,8 +41,7 @@ status + Cursor credit budgets. After every push run
 3.6. [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) — Fast Gate, `dev`, roster; [Gate 9 CI remediation](how-to/ci-remediation-gate9.md)
 3.65. [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) — Gate 4 tasks, scheduler off, watch token + mTLS
 3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
-3.67. [Mission Control Transmission & REPORT](how-to/mission-control-transmission-and-report.md) — second brain dock, hotword, open vs focus
-3.68. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
+3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -72,11 +66,11 @@ status + Cursor credit budgets. After every push run
 
 | Audience | Start here | Then read |
 |---|---|---|
-| **Operator (daily use)** | [Quick Start](#quick-start) | [Mission Control Transmission & REPORT](how-to/mission-control-transmission-and-report.md), [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [VAXON Desktop](#vaxon-desktop), [Operator manual](#operator-manual) |
+| **Operator (daily use)** | [Quick Start](#quick-start) | [Runtime auth, CLI, and tools](#runtime-auth-cli-and-tools), [VAXON Desktop](#vaxon-desktop), [Operator manual](#operator-manual) |
 | **Teacher / reviewer** | [Teaching Axon-X](#teaching-axon-x-to-someone-else) | [Verification](#verification-commands), `docs/FINAL_PARITY_VERIFICATION.md` |
 | **Developer** | [Codebase in plain English](#codebase-in-plain-english) | [Source index](#source-index), [Common working patterns](#common-working-patterns) |
 | **Integrator / merge** | [CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md) | [`docs/CI_GATES.md`](CI_GATES.md), `./scripts/ops/watch-fast-gate.sh` |
-| **Autonomy / remote host** | [Auto-loop status & credits](how-to/auto-loop-and-credits.md) | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md), [Recent operator features](how-to/recent-operator-features.md), [Mission Control Transmission & REPORT](how-to/mission-control-transmission-and-report.md) |
+| **Autonomy / remote host** | [Auto-loop status & credits](how-to/auto-loop-and-credits.md) | [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md), [Recent operator features](how-to/recent-operator-features.md) |
 | **Debugger** | [Debugging playbook](#debugging-playbook) | [Troubleshooting](#troubleshooting) |
 | **Upgrader** | [Upgrading & updating](#upgrading-and-updating) | `./scripts/ops/sync_planning_mirror_to_axon_local.py` |
 
@@ -137,9 +131,9 @@ they are two views over the same workspace, runs, and APIs.
 | **Purpose** | Run oversight, signals, approvals, command execution | Files, editor, terminal, agent dock |
 | **Center** | Mission control — run phase, live feed, resume/complete | Monaco editor + bottom terminal dock |
 | **Left sidebar** | Workspaces + **Attention** (signals, inbox, receipts) | Explorer / search / git activity bar |
-| **Right dock** | **Live Ops** on Mission Control (orb + Transmission + talk) — Brain Graph uses evidence instead | Resizable agent dock (conversation + composer) |
-| **Best for** | “What is running? What needs me? REPORT stand-up.” | “Edit files, use terminal, review code.” |
-| **Input style** | Talk to VAXON in Live Ops (`REPORT`, focus/open workspace) + Command seam | Same command seam in agent dock + full editor/terminal |
+| **Right dock** | Conversation transcript + Command/KAIRO hero | Resizable agent dock (conversation + composer) |
+| **Best for** | “What is running? What needs me? Run this command.” | “Edit files, use terminal, review code.” |
+| **Input style** | **Exact commands** in the Command seam (see footer **Commands**) | Same command seam in agent dock + full editor/terminal |
 
 **Operator mode** is the default production surface for day-to-day oversight.
 
@@ -151,25 +145,20 @@ Switch modes anytime — workspace selection, runs, and conversation thread pers
 
 Real and verified today:
 
-- Select **axon-watch**, **axon-local**, **DashPro**, or other bound workspaces
-- View **runtime summary**, **inbox signals**, and **VAXON briefing** from live APIs
+- Select **axon-watch** or **axon-local** workspace
+- View **runtime summary**, **inbox signals**, and **KAIRO briefing** from live APIs
 - Track **run phase** in mission control (stop/resume/review-ready flows)
-- **Mission Control Live Ops**: talk to VAXON; replies land in the **Transmission** card
-- Say **`REPORT`** for a second-brain stand-up (teammates, risks, next move)
-- **`Show me DashPro`** focuses Mission Control; **`Open DashPro workspace`** enters IDE
-- Send **supported commands** via the Command seam
+- Send **supported commands** (not free-form chat) via the Command seam
 - Run **git status** against the bound repo root
 - **IDE mode**: open workspace files in Monaco, PTY terminal in repo root
 - **Attention sidebar**: connector/signal/delivery visibility
 
-Still thin or deferred:
+Still thin or deferred (use axon-local `:7734` fallback if needed):
 
-- Timed auto-REPORT cadence while Mission Control is focused (hotword exists; timer does not yet)
-- Full unattended auto-loop (scheduler off by default — see auto-loop how-to)
-- Child-project connectors and some legacy integration surfaces
+- General conversational chat (“Hi”, “explain this repo”)
+- Full agent tool loop parity with classic Axon
+- Child-project connectors and legacy integration surfaces
 - Native tray notifications beyond hide-on-close packaging
-
-Deep dive: [`how-to/mission-control-transmission-and-report.md`](how-to/mission-control-transmission-and-report.md)
 
 ### Supported commands (Operator mode)
 

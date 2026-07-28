@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import logging
 from pathlib import Path
+import time
 
 from app.cli_runtime.cursor_stream_events import CursorStreamAssembler
 from app.cli_runtime.research_mcp import ensure_workspace_research_mcp
@@ -15,6 +17,8 @@ from app.cli_runtime.subprocess_runner import (
     raise_if_operator_stopped,
     stream_registered_process,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -164,3 +168,59 @@ def run_cursor_local(
         content=reply,
         generated_image_paths=assembler.generated_image_paths,
     )
+
+
+def run_cursor_local_with_recursion_retry(
+    *,
+    runtime_id: str,
+    workspace_id: str,
+    binary: str,
+    prompt: str,
+    workspace_root: Path,
+    composer_mode: str,
+    execution_tier: str,
+    model: str,
+    subprocess_env: dict[str, str] | None,
+    run_id: str,
+    on_chunk: Callable[[str, str], None] | None,
+    trust_policy: str,
+) -> CursorAgentReply:
+    """Run Cursor once, retrying recursion crashes without research MCP."""
+    started = time.perf_counter()
+    try:
+        return run_cursor_local(
+            binary=binary,
+            prompt=prompt,
+            workspace_root=workspace_root,
+            composer_mode=composer_mode,
+            execution_tier=execution_tier,
+            model=model,
+            subprocess_env=subprocess_env,
+            run_id=run_id,
+            on_chunk=on_chunk,
+            trust_policy=trust_policy,
+        )
+    except RuntimeError as exc:
+        if isinstance(exc, RuntimeProcessStoppedError) or not is_recursion_depth_error(str(exc)):
+            raise
+        logger.exception(
+            "lane_b_dispatch_recursion runtime_id=%s composer_mode=%s "
+            "workspace_id=%s elapsed_ms=%.0f; retrying without research MCP",
+            runtime_id,
+            composer_mode,
+            workspace_id,
+            (time.perf_counter() - started) * 1000,
+        )
+        return run_cursor_local(
+            binary=binary,
+            prompt=prompt,
+            workspace_root=workspace_root,
+            composer_mode=composer_mode,
+            execution_tier=execution_tier,
+            model=model,
+            subprocess_env=subprocess_env,
+            run_id=run_id,
+            on_chunk=on_chunk,
+            trust_policy=trust_policy,
+            research_available=False,
+        )

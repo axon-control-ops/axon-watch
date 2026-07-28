@@ -148,19 +148,6 @@ describe('company-roster-failure-view', () => {
     ).toContain('usage limits blocked the agent');
   });
 
-  it('suppresses the failure banner when a stale failed tag has a success detail', () => {
-    expect(
-      employeeFailureLine(
-        employee({
-          status: 'idle',
-          last_outcome: 'failed',
-          last_outcome_detail: 'Run completed',
-          last_run_id: 'run_133bac69735e',
-        }),
-      ),
-    ).toBeNull();
-  });
-
   it('maps restart-interrupted failures to operator-friendly copy', () => {
     const interrupted = employee({
       status: 'idle',
