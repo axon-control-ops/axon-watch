@@ -62,11 +62,8 @@ export function useVaxonConversationAttachments() {
   }
 
   function handlePaste(event: ClipboardEvent): boolean {
-    if (!shouldInterceptComposerImagePaste(event)) {
-      return false;
-    }
     const images = readClipboardImages(event);
-    if (!images.length) {
+    if (!shouldInterceptComposerImagePaste(images)) {
       return false;
     }
     event.preventDefault();
