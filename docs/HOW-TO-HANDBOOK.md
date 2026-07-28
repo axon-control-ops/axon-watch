@@ -1202,7 +1202,7 @@ Symptom-specific fixes continue in the sections below.
 2. Remotely reachable hosts **require** a shared `AXON_WATCH_INTERNAL_SERVICE_TOKEN` on both control-plane and axon-watch (same value in `~/.config/axon-watch/deployment.env`).
 3. If that token is missing, control-plane → watch **mutating** calls (vault unlock, tunnel start) return **HTTP 503**.
 4. Vault stays **locked** → tunnel token cannot resolve from encrypted vault secrets → managed `cloudflared` will not start → public health returns Cloudflare **1033** → required `console_web` stays down.
-5. Auto-unlock keyfile may show as “enabled” on `/vault`, but **auto-unlock is refused** when remotely reachable (by design). You must unlock manually after the internal token is fixed.
+5. Auto-unlock keyfile may show as enabled on `/vault`, but **auto-unlock is refused by default** when remotely reachable. On this trusted always-on host set `AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1` in `~/.config/axon-watch/deployment.env`, then `axonrestart` (or Enable auto-unlock in `/vault`).
 
 Also see [`docs/how-to/autonomy-gates-and-service-identity.md`](how-to/autonomy-gates-and-service-identity.md) and [`docs/NATIVE_TUNNEL_CONTROL.md`](NATIVE_TUNNEL_CONTROL.md).
 
@@ -1222,7 +1222,7 @@ axonfixconnectors --ensure-internal-token --restart
 axonfixconnectors
 ```
 
-**Do not** restart `axon-watch` after a successful vault unlock unless you are ready to unlock again. Vault unlock is **in-process** on the watch service; a watch restart drops the session, and on this remotely reachable host auto-unlock will not restore it. Managed `cloudflared` can also stop with the watch unit.
+**Do not** restart `axon-watch` after a successful vault unlock unless auto-unlock is permitted on this host (`AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1` + keyfile) or you are ready to unlock again. Vault unlock is **in-process** on the watch service; without auto-unlock a watch restart drops the session. Managed `cloudflared` can also stop with the watch unit.
 
 Other facts for this host:
 
@@ -1231,8 +1231,34 @@ Other facts for this host:
   (forced when the public URL is non-loopback). `axonfixconnectors` loads that
   token from `~/.config/axon-watch/deployment.env`. Mission Control can mutate
   via a desktop session cookie instead.
-- Auto-unlock may show enabled in the UI, but **auto-unlock is refused** while
-  remotely reachable.
+- Auto-unlock is refused by default while remotely reachable. Trusted always-on host override:
+  `AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1` in `deployment.env`, then `axonrestart`.
+  Confirm `/vault` no longer shows the remote-disable banner after Enable.
+- Soft cutover (`remote=http://localhost:7734` via public-origin-proxy) is healthy but not final.
+  To point Cloudflare directly at Axon-X `:4173`:
+
+```bash
+# Needs Cloudflare API token with Account → Cloudflare Tunnel → Edit
+# Store as CF_API_TOKEN in deployment.env or vault, then:
+./scripts/ops/set-tunnel-ingress-4173.sh
+# Reprobe Cloudflare tunnel — expect ingress_matches_axon (no soft-cutover chip)
+```
+
+### Voice says “open Runtime or vault” but the job failed for everyone
+
+That line was a **misclassified Cursor usage-limit failure**. Lane B used to append
+“Open Runtime or `/vault`” on every CLI failure, so VAXON treated usage blocks as vault
+problems. Copy now distinguishes:
+
+| Real cause | Spoken / roster next step |
+| --- | --- |
+| `ActionRequiredError` / hit usage limit | Raise Cursor limit or switch model |
+| Auth probe timeout | Check `cursor agent status` |
+| Not signed in / vault locked | Login or unlock `/vault` |
+
+Guard-rails: continuous scheduler skips the whole workspace after any role hits usage
+limits (Cursor quota is account-wide). Pause Fleet Controls when burning quota on a
+known limit.
 - `cloudflare_tunnel` is **optional** (`required: false`). **REQUIRED CONNECTOR DOWN**
   is driven by required probes — here `console_web` → public `/api/health`.
 - Soft cutover is normal: remote ingress may still target `http://localhost:7734`

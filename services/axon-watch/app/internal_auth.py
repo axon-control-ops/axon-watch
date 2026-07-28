@@ -43,6 +43,22 @@ def is_remotely_reachable() -> bool:
     return not _host_is_loopback(host)
 
 
+def vault_auto_unlock_allowed() -> bool:
+    """
+    Whether vault auto-unlock may run on this host.
+
+    Default: refused when remotely reachable (Gate 2). Trusted always-on
+    operator hosts may opt in with AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1 without
+    disabling the rest of remote auth containment.
+    """
+    raw = os.environ.get("AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK", "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return not is_remotely_reachable()
+
+
 def mtls_required() -> bool:
     """
     Require a verified client certificate (or proxy-verified equivalent).

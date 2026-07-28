@@ -118,6 +118,11 @@ def _usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
     return is_usage_limit_failure(detail)
 
 
+def _workspace_usage_limit_blocks_auto_start(workspace_id: str, roles: list[str]) -> bool:
+    """Cursor usage is account-wide — one role's limit failure blocks every continuous start."""
+    return any(_usage_limit_blocks_auto_start(workspace_id, role) for role in roles)
+
+
 def _runtime_auth_blocks_auto_start(workspace_id: str, role: str) -> bool:
     """Skip auto-schedule when the last shift failed on missing CLI/vault auth."""
     outcome = latest_role_run_outcome(workspace_id, role)
@@ -371,9 +376,15 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
                 continue
             if _active_role_run_exists(workspace_id, role):
                 continue
-            if _usage_limit_blocks_auto_start(workspace_id, role):
+            workspace_roles = [
+                str(item.role or "").strip().lower()
+                for item in company.employees
+                if str(item.role or "").strip()
+            ]
+            if _workspace_usage_limit_blocks_auto_start(workspace_id, workspace_roles):
                 logger.info(
-                    "continuous worker tick skipped role=%s workspace=%s: usage limits blocked last shift",
+                    "continuous worker tick skipped role=%s workspace=%s: "
+                    "Cursor usage limits blocked a recent shift (account-wide)",
                     role,
                     workspace_id,
                 )

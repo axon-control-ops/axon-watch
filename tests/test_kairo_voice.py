@@ -148,8 +148,31 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertNotIn("all set", payload["line"].lower())
         self.assertNotIn("review when", payload["line"].lower())
         self.assertIn("couldn't start", payload["line"].lower())
+        self.assertIn("usage", payload["line"].lower())
+        self.assertNotIn("vault", payload["line"].lower())
         self.assertNotIn("all set", done_with_flag["line"].lower())
         self.assertIn("couldn't start", done_with_flag["line"].lower())
+        self.assertIn("vault", done_with_flag["line"].lower())
+
+    def test_failed_outcome_ignores_vault_advice_suffix_for_usage(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="failed",
+                context={
+                    "operator_prompt": "retry Mira",
+                    "outcome": "failed",
+                    "failure_summary": (
+                        "Lane B (agent) failed on Cursor CLI (local): "
+                        "ActionRequiredError: You've hit your usage limit. "
+                        "Open Runtime or `/vault` if auth looks wrong, then retry."
+                    ),
+                },
+                session_id="failed-usage-vault-suffix",
+                use_runtime=False,
+            )
+        self.assertIn("usage", payload["line"].lower())
+        self.assertNotIn("vault", payload["line"].lower())
+        self.assertIn("couldn't start", payload["line"].lower())
 
     def test_approval_literal_bypasses_runtime(self) -> None:
         with patch("app.kairo_voice._try_runtime_line", return_value="Model paraphrase."):

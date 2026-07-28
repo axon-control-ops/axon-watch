@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from app.workspace_agents.failure_detail import (
+    is_runtime_auth_failure,
+    is_usage_limit_failure,
+)
+
 
 def runtime_unready_reason(record: dict[str, object]) -> str:
     runtime_id = str(record.get("id") or "runtime")
@@ -16,6 +21,21 @@ def runtime_unready_reason(record: dict[str, object]) -> str:
     return f"{label} unavailable"
 
 
+def _operator_next_step(reason: str) -> str:
+    """Advice must match the real blocker — never default every failure to vault."""
+    lowered = reason.lower()
+    if is_usage_limit_failure(reason):
+        return "Raise the Cursor usage limit or switch model, then retry."
+    # Auth-probe timeouts are host CLI health, not vault unlock.
+    if "auth probe" in lowered:
+        return "Check `cursor agent status` on the host, then retry."
+    if is_runtime_auth_failure(reason):
+        return "Run `cursor agent login` on the host or unlock `/vault`, then retry."
+    if "timed out" in lowered:
+        return "Check `cursor agent status` on the host, then retry."
+    return "Check Runtime status, then retry."
+
+
 def fallback_reply(
     *,
     composer_mode: str,
@@ -26,15 +46,26 @@ def fallback_reply(
     runtime_label: str = "",
 ) -> str:
     del user_prompt, context_block
+    next_step = _operator_next_step(reason)
     if failure_phase == "run_error":
         label = (runtime_label or "the selected CLI runtime").strip()
+        if is_usage_limit_failure(reason):
+            return (
+                f"Lane B ({composer_mode}) could not start on {label}: {reason}. "
+                f"{next_step}"
+            )
         return (
             f"Lane B ({composer_mode}) failed on {label}: {reason}. "
-            "Open Runtime or `/vault` if auth looks wrong, then retry."
+            f"{next_step}"
+        )
+    if is_usage_limit_failure(reason):
+        return (
+            f"Lane B ({composer_mode}) could not start — Cursor usage limits blocked the agent: "
+            f"{reason}. {next_step}"
         )
     return (
         f"Lane B ({composer_mode}) cannot start because no CLI runtime is ready: {reason}. "
-        "Open Runtime or `/vault`, then retry."
+        f"{next_step}"
     )
 
 

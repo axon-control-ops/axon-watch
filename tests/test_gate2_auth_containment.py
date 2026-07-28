@@ -306,6 +306,39 @@ class Gate2VaultAutoUnlockRemoteTests(unittest.TestCase):
             audit = Path(tmpdir.name, "audit.ndjson").read_text(encoding="utf-8")
             self.assertIn("vault_auto_unlock_enable", audit)
 
+    def test_control_plane_allows_enable_when_remote_override(self) -> None:
+        prepare_control_plane_imports()
+        tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tmpdir.cleanup)
+        with patch.dict(
+            os.environ,
+            {
+                "AXON_WATCH_CONTROL_PLANE_DB": str(Path(tmpdir.name) / "cp.sqlite3"),
+                "AXON_WATCH_WORKER_SCHEDULER": "0",
+                "AXON_WATCH_AUTH_MODE": "local_token",
+                "AXON_WATCH_OPERATOR_TOKEN": "gate2-vault-token",
+                "AXON_WATCH_AUTH_ALLOW_LOOPBACK": "0",
+                "AXON_WATCH_PUBLIC_BASE_URL": "https://axon.example.com",
+                "AXON_WATCH_REMOTELY_REACHABLE": "1",
+                "AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK": "1",
+                "AXON_WATCH_STATE_DIR": tmpdir.name,
+                "AXON_WATCH_AUTH_AUDIT_LOG": str(Path(tmpdir.name) / "audit.ndjson"),
+                "AXON_WATCH_WATCH_SERVICE_BASE_URL": "http://127.0.0.1:9",
+            },
+            clear=False,
+        ):
+            from app.auth.settings import vault_auto_unlock_allowed
+
+            self.assertTrue(vault_auto_unlock_allowed())
+            app = load_control_plane_app()
+            client = TestClient(app)
+            # Watch is unreachable in this unit test — expect proxy failure, not 403 refuse.
+            response = client.post(
+                "/api/vault/auto-unlock/enable",
+                headers={"Authorization": "Bearer gate2-vault-token"},
+            )
+            self.assertNotEqual(403, response.status_code)
+
 
 class Gate2ResidualContainmentTests(unittest.TestCase):
     def test_remote_forces_local_token_and_disables_loopback_bypass(self) -> None:

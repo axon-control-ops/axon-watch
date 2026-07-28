@@ -60,6 +60,27 @@ function resolveOperatorToken(): string {
 
 const operatorToken = resolveOperatorToken();
 
+function resolveAllowedHosts(): string[] {
+  // Vite preview blocks unknown Host headers. Soft-cutover :7734 rewrote Host to
+  // 127.0.0.1; direct Cloudflare ingress to :4173 keeps the public hostname.
+  const hosts = new Set<string>(['localhost', '127.0.0.1', '[::1]', '::1']);
+  const publicBase = (process.env.AXON_WATCH_PUBLIC_BASE_URL || '').trim();
+  if (publicBase) {
+    try {
+      const hostname = new URL(publicBase).hostname.trim().toLowerCase();
+      if (hostname) {
+        hosts.add(hostname);
+      }
+    } catch {
+      // Ignore malformed public base URLs; fall back to explicit defaults.
+    }
+  }
+  hosts.add('axon.edudashpro.org.za');
+  return [...hosts];
+}
+
+const allowedHosts = resolveAllowedHosts();
+
 function injectOperatorAuth(proxyReq: { setHeader: (name: string, value: string) => void }) {
   // Always-on Gate 2: console :4173 → vite /api proxy → CP appears as loopback.
   // With AUTH_ALLOW_LOOPBACK=0 the browser must not rely on loopback bypass;
@@ -103,8 +124,10 @@ export default defineConfig({
     strictPort: true,
     hmr: hmrEnabled,
     proxy: controlPlaneProxy,
+    allowedHosts,
   },
   preview: {
     proxy: controlPlaneProxy,
+    allowedHosts,
   },
 });

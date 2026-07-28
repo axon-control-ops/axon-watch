@@ -332,18 +332,12 @@ def vault_provider_key_status() -> dict[str, object]:
 
 
 def enable_auto_unlock() -> None:
-    from urllib.parse import urlparse
+    from app.internal_auth import vault_auto_unlock_allowed
 
-    forced = os.environ.get("AXON_WATCH_REMOTELY_REACHABLE", "").strip().lower()
-    public = os.environ.get("AXON_WATCH_PUBLIC_BASE_URL", "http://127.0.0.1:4173").strip()
-    host = (urlparse(public).hostname or "").lower()
-    loopback = host in {"127.0.0.1", "localhost", "::1"}
-    remotely = forced in {"1", "true", "yes", "on"} or (
-        forced not in {"0", "false", "no", "off"} and not loopback
-    )
-    if remotely:
+    if not vault_auto_unlock_allowed():
         raise RuntimeError(
-            "Vault auto-unlock is disabled when the deployment is remotely reachable"
+            "Vault auto-unlock is disabled when the deployment is remotely reachable "
+            "(set AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1 on a trusted always-on host to allow)"
         )
     key = VaultSession.get_key()
     if key is None:
@@ -356,18 +350,11 @@ def disable_auto_unlock() -> bool:
 
 
 def attempt_auto_unlock() -> tuple[bool, str]:
-    from urllib.parse import urlparse
+    from app.internal_auth import vault_auto_unlock_allowed
 
     if VaultSession.is_unlocked():
         return True, "Already unlocked"
-    forced = os.environ.get("AXON_WATCH_REMOTELY_REACHABLE", "").strip().lower()
-    public = os.environ.get("AXON_WATCH_PUBLIC_BASE_URL", "http://127.0.0.1:4173").strip()
-    host = (urlparse(public).hostname or "").lower()
-    loopback = host in {"127.0.0.1", "localhost", "::1"}
-    remotely = forced in {"1", "true", "yes", "on"} or (
-        forced not in {"0", "false", "no", "off"} and not loopback
-    )
-    if remotely:
+    if not vault_auto_unlock_allowed():
         return False, "Auto-unlock refused (remotely reachable deployment)"
     if not auto_unlock_enabled():
         return False, "No auto-unlock keyfile"

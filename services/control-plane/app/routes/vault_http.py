@@ -108,9 +108,10 @@ def vault_auto_unlock_status_route() -> dict[str, object]:
 
 @router.post("/api/vault/auto-unlock/enable")
 def vault_auto_unlock_enable_route() -> dict[str, object]:
-    from app.auth import append_auth_audit, get_request_identity, is_remotely_reachable
+    from app.auth import append_auth_audit, get_request_identity
+    from app.auth.settings import vault_auto_unlock_allowed
 
-    if is_remotely_reachable():
+    if not vault_auto_unlock_allowed():
         append_auth_audit(
             event_type="vault_auto_unlock_enable",
             summary=(
@@ -123,7 +124,9 @@ def vault_auto_unlock_enable_route() -> dict[str, object]:
             status_code=403,
             detail=(
                 "Vault auto-unlock is disabled when AXON_WATCH_PUBLIC_BASE_URL is "
-                "non-loopback or AXON_WATCH_REMOTELY_REACHABLE=1"
+                "non-loopback or AXON_WATCH_REMOTELY_REACHABLE=1. "
+                "On a trusted always-on host set AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1 "
+                "then axonrestart."
             ),
         )
     try:

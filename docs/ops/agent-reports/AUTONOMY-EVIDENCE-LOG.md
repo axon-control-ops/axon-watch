@@ -95,3 +95,22 @@ Template:
 - exit criteria met: partial — coded webhook → signal → lease → dispatch/report path for Axon-X Fast Gate; live broken-test→draft-PR drill still requires webhook secret + host wiring (fallback poller script shipped)
 - residual risks: Lane B/`gh` credentials for actual autonomous fix; live throwaway-branch repair drill still pending; no protected merge
 - next gate unlocked: complete live Gate 9 drill; then enable other workspace bindings
+
+### Board walkthrough — Lead fan-out for Gate verify (integrations) — 2026-07-28
+- owner: integrations (`task-30bb1aaab60e48e2`, run `run_0e2603c6b650`)
+- commit: evidence files only (no push this shift)
+- commands run: Lead plan GET + plan preview; task lease; `tests.test_lead_task_plan` + `tests.test_lead_fan_out` + `tests.test_lead_replan` (13 OK); `Gate2WatchInternalTokenTests` (5 OK); watch health + runtime summary; `gh run list` Fast Gate
+- pass/fail: pass
+- exit criteria met: yes for integrations board walkthrough receipts — plan linked, board task leased, Gate 5 proofs green, watch connected, latest branch Fast Gate success `30354423153`
+- residual risks: worker scheduler was `effective_enabled: true` during drill; Lead still needs synthesize on `lead-plan-279379f913bf4940`; sibling backend board task `task-755766f1d8cf4d9e` remains open
+- next gate unlocked: Lead synthesize / decide; backend owns sibling “Board walkthrough verify”
+
+### Board walkthrough verify (backend) — 2026-07-28
+- owner: backend (`task-755766f1d8cf4d9e`, run `run_a6264faa28bb`; prior fail `run_1a87787eda18`)
+- commit: evidence files only (no push this shift)
+- commands run: open-board Waiting proof; task lease; `tests.test_gate4_task_ledger` + `tests.test_parity_a1_run_stop_resume` + `tests.test_parity_a2_approval_boundaries` + `tests.test_parity_a3_review_ready_state` (15 OK); vitest `operator-task-board-view.test.ts` (4 OK); briefing + runtime summary + failed-run history smoke
+- pass/fail: pass
+- exit criteria met: yes for backend board walkthrough — acceptance **Board shows Waiting** proven while task was open; leased to retry run; runs/approvals/review-ready + Gate 4 proofs green
+- residual risks: worker scheduler was `effective_enabled: true` during drill; Lead still needs synthesize on `lead-plan-279379f913bf4940` (open Lead follow-up `task-4ca451779f2e4619`); this backend task is not linked in that plan’s `task_links`
+- next gate unlocked: Lead synthesize / decide on the Gate-verify Lead plan
+
