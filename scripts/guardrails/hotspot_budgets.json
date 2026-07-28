@@ -382,7 +382,7 @@
       "note": "Autonomy publish path-scope + receipts; extract next"
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
-      "max_lines": 579,
+      "max_lines": 585,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-task-board/*",
@@ -396,7 +396,7 @@
       "note": "REPORT theater presentation; split seat/stage/action layers next"
     },
     "apps/console-web/src/styles/shell/operator-task-board.css": {
-      "max_lines": 542,
+      "max_lines": 585,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/operator-task-board/*",

@@ -278,11 +278,7 @@ function speakEmployeeLine(employee: CompanyEmployeeRecord, kind: TeamMemberChat
 async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKind): Promise<void> {
   selectEmployee(employee);
   if (kind === 'retry') {
-    // Try again runs the shift immediately (draft + submit), same as Build plan.
-    await runEmployeeShiftRetry(shell, employee, {
-      keepActivityView: true,
-      focusThread: true,
-    });
+    await runEmployeeShiftRetry(shell, employee, { keepActivityView: true, focusThread: true });
     speakEmployeeLine(employee, kind);
     return;
   }
