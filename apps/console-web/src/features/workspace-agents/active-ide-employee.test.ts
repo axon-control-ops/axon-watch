@@ -214,7 +214,7 @@ describe('resolveIdeThreadEmployeeFailureDetailTooltip', () => {
       employees: [failed],
     });
     expect(tooltip).toBe(
-      'Cursor usage is exhausted account-wide. Raise the limit or wait for reset before retrying.',
+      'Cursor usage signal on this shift — Auto+Composer may still have headroom or on-demand spend. Check Usage, then retry.',
     );
   });
 });
