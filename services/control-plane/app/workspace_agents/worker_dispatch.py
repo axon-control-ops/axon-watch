@@ -176,6 +176,7 @@ def dispatch_continuous_worker_run(
             ),
             actor="workspace_scheduler",
         )
+        heartbeat.start()
         try:
             ide_stream = prepare_worker_ide_stream(
                 workspace_id=workspace_id,
@@ -198,7 +199,6 @@ def dispatch_continuous_worker_run(
                 employee.role,
             )
             ide_stream = None
-        heartbeat.start()
         isolation_root = create_worker_isolation(workspace_id=workspace_id, run_id=run_id)
         agent_root = worker_agent_workspace(isolation_root)
         append_run_execution_receipt(
