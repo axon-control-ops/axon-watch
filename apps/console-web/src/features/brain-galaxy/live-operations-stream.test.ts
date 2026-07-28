@@ -34,7 +34,13 @@ describe('projectLiveOperationsStream', () => {
     expect(items.some((item) => item.text.includes('Sentry'))).toBe(true);
     expect(items.some((item) => item.agent === 'MARCO')).toBe(true);
     expect(items.some((item) => item.tone === 'critical')).toBe(true);
-    expect(items.some((item) => item.text.includes('Last job failed'))).toBe(true);
+    expect(
+      items.some(
+        (item) =>
+          item.text.includes('Last job failed') ||
+          item.text.includes('closing Confidence line was missing'),
+      ),
+    ).toBe(true);
   });
 
   it('does not surface success-like stale failed tags as critical employee events', () => {

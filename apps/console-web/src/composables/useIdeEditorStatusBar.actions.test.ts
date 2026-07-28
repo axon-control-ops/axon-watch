@@ -124,8 +124,8 @@ describe('openEmployeeShiftRetry', () => {
     expect(shell.setAgentExecutionAccess).toHaveBeenCalledWith('full');
     expect(shell.openIdeComposerWithDraft).toHaveBeenCalledOnce();
     const draft = vi.mocked(shell.openIdeComposerWithDraft).mock.calls[0]?.[0] ?? '';
-    expect(draft).toContain('Jules');
-    expect(draft).toMatch(/I am Jules/i);
+    expect(draft).toContain('console UI/UX');
+    expect(draft).toMatch(/my last continuous shift/i);
     expect(draft).toContain('vitest assertion failed');
     expect(draft.toLowerCase()).toContain('first person');
   });

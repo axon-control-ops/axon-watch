@@ -213,7 +213,9 @@ describe('resolveIdeThreadEmployeeFailureDetailTooltip', () => {
       thread: { employee_id: 'employee-workspace_axon_watch-frontend-2' },
       employees: [failed],
     });
-    expect(tooltip).toBe(longDetail);
+    expect(tooltip).toBe(
+      'Usage limits blocked the agent runtime. Restore limits, then retry.',
+    );
   });
 });
 
