@@ -25,6 +25,20 @@ describe('sanitizeAgentThinkingForOperator', () => {
     ).toBe('I am planning activities and assignments for grades 1–4.');
   });
 
+  it('strips persona-assumption meta and rewrites gendered shift possessives', () => {
+    expect(
+      sanitizeAgentThinkingForOperator(
+        'Assuming the Lindi persona for the EDP Excellence workspace. Reviewing her last shift receipts and planning docs.',
+        { speakerName: 'Lindi' },
+      ),
+    ).toBe('Reviewing my last shift receipts and planning docs.');
+    expect(
+      sanitizeAgentThinkingForOperator('Assuming the Lindi persona for the workspace.', {
+        speakerName: 'Lindi',
+      }),
+    ).toBe('');
+  });
+
   it('strips third-person user-asking meta commentary', () => {
     expect(sanitizeAgentThinkingForOperator('The user is asking whether')).toBe('');
     expect(sanitizeAgentThinkingForOperator('*The user is asking whether*')).toBe('');

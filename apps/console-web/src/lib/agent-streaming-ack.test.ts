@@ -17,6 +17,9 @@ describe('buildStreamingAckLine', () => {
 
   it('falls back without inventing a fake On it reply', () => {
     expect(buildStreamingAckLine({ address: 'sir' })).toBe('Working that now, sir.');
+    expect(buildStreamingAckLine({ address: 'Sir King' })).toBe(
+      'Working that now, Sir King.',
+    );
     expect(buildStreamingAckLine({})).toBe('Working that now');
   });
 });

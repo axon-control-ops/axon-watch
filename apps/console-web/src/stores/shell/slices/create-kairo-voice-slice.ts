@@ -118,7 +118,11 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
   }
 
   function interruptKairoVoice(): void {
-    void interruptKairoSpeechQueue('barge_in');
+    void interruptKairoVoiceAndWait();
+  }
+
+  async function interruptKairoVoiceAndWait(): Promise<void> {
+    await interruptKairoSpeechQueue('barge_in');
     input.kairoVoicePaused.value = false;
     if (kairoConversationPhase.value === 'speaking') {
       setKairoConversationPhase('idle');
@@ -134,6 +138,8 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       speaker?: KairoVoiceSpeaker | null;
       priority?: 'interrupt' | 'alert' | 'conversation' | 'narration';
       allowDuringReportTheater?: boolean;
+      ttsTimeoutMs?: number;
+      onPlaybackStart?: () => void;
     },
   ): Promise<void> {
     const trimmed = line.trim();
@@ -144,12 +150,15 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       input.operatorPresenceSettings.value.privacy_mode ||
       configuredNarration === 'off'
     ) {
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'S4',location:'create-kairo-voice-slice.ts:speakKairoConversationLine:early-exit',message:'conversation line speech skipped',data:{empty:!trimmed,voiceAllowed:voiceDeliveryAllowed(),privacy:Boolean(input.operatorPresenceSettings.value.privacy_mode),narration:configuredNarration,allowDuringReportTheater:options?.allowDuringReportTheater===true,linePreview:trimmed.slice(0,100)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      options?.onPlaybackStart?.();
       if (kairoConversationPhase.value === 'thinking') {
         setKairoConversationPhase('idle');
       }
       return;
     }
-
     setKairoConversationPhase('speaking');
     input.kairoVoicePaused.value = false;
     let message = trimmed;
@@ -202,7 +211,12 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       azureVoiceId: options?.azureVoiceId?.trim() || undefined,
       speaker,
       allowDuringReportTheater: options?.allowDuringReportTheater === true,
+      ttsTimeoutMs: options?.ttsTimeoutMs,
+      onPlaybackStart: options?.onPlaybackStart,
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'S3',location:'create-kairo-voice-slice.ts:speakKairoConversationLine:playback',message:'conversation line playback finished',data:{engine:playback.engine,reason:playback.reason??null,allowDuringReportTheater:options?.allowDuringReportTheater===true,linePreview:message.slice(0,100)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
   }
 
   function handleKairoPresenceAction(): void {
@@ -500,6 +514,7 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     pauseKairoSpeech,
     resumeKairoSpeech,
     interruptKairoVoice,
+    interruptKairoVoiceAndWait,
     speakKairoConversationLine,
     handleKairoPresenceAction,
     deliverKairoSpokenAlert,

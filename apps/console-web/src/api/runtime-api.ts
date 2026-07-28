@@ -38,6 +38,24 @@ export interface RuntimeStatusSnapshot {
   vault_runtime?: RuntimeVaultPosture;
   local: RuntimeTargetRecord[];
   cloud: RuntimeTargetRecord[];
+  cursor_usage?: CursorUsageSnapshot | null;
+}
+
+export interface CursorUsageSnapshot {
+  ok: boolean;
+  source?: string;
+  updated_at?: string;
+  membership_type?: string | null;
+  subscription_status?: string | null;
+  on_demand_enabled?: boolean | null;
+  auto_percent_used?: number | null;
+  api_percent_used?: number | null;
+  total_percent_used?: number | null;
+  display_message?: string | null;
+  auto_display_message?: string | null;
+  api_display_message?: string | null;
+  message?: string | null;
+  allows_agent_retry?: boolean;
 }
 
 export interface CursorModelRecord {

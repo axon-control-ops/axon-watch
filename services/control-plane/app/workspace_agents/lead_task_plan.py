@@ -19,7 +19,16 @@ _SKIP_PLAN_ROLES = frozenset({"lead", "overview_agent"})
 _FAN_OUT_RE = re.compile(
     r"\b(?:check|ask|poll|sync|brief|consult)\b.{0,40}\b(?:all|every|each)\b.{0,40}"
     r"\b(?:sub[- ]?agents?|teammates?|specialists?|agents?|roles?)\b"
-    r"|\b(?:all|every|each)\b.{0,20}\b(?:sub[- ]?agents?|teammates?|specialists?)\b",
+    r"|\b(?:all|every|each)\b.{0,20}\b(?:sub[- ]?agents?|teammates?|specialists?)\b"
+    # Operator assign-all / get-to-work (not status-check phrasing).
+    r"|\b(?:assign|dispatch|hand\s*off|kick\s*off|start)\b.{0,48}"
+    r"\b(?:all|every|each|the)\b.{0,24}"
+    r"\b(?:sub[- ]?agents?|teammates?|specialists?|agents?|roles?|team)\b"
+    r"|\b(?:all|every|each)\b.{0,24}"
+    r"\b(?:sub[- ]?agents?|teammates?|specialists?|agents?)\b.{0,40}"
+    r"\b(?:start|work|working|go)\b"
+    r"|\bget\b.{0,24}\b(?:all|every|the)\b.{0,16}"
+    r"\b(?:agents?|teammates?|specialists?|team)\b.{0,24}\b(?:work|working|started?)\b",
     re.I | re.S,
 )
 _THEN_SPLIT_RE = re.compile(

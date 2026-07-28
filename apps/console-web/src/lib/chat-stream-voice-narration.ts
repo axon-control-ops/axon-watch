@@ -12,9 +12,12 @@ import { createKairoProgressNarrator } from './kairo-progress-narrator';
 import {
   isWaitProgressThinking,
   sanitizeAgentThinkingForOperator,
-  stripAgentStreamFenceMarkers,
   thinkingSpeechSimilarity,
 } from './agent-live-line-view';
+import {
+  addressFormForSpeaker,
+  buildStreamingAckLine,
+} from './agent-streaming-ack';
 import {
   shouldNarrateAgentEvent,
   shouldSpeakLiveThinkingBlock,
@@ -35,6 +38,8 @@ export type ChatStreamVoiceNarration = {
   progressNarrator: ProgressNarrator | null;
   agentMilestoneNarrator: Narrator | null;
   answerNarrator: Narrator | null;
+  /** Speak the same start line the thread shows (ack or first model live line). */
+  speakStartBookend: () => boolean;
   maybeSpeakThinkingBlock: (spokenBlock: string) => boolean;
   narrateAgentMilestone: (
     milestone: NarrationMilestone,
@@ -120,11 +125,55 @@ export function createChatStreamVoiceNarration(input: {
     dropWaitingKairoNarration('stale_run_advance');
   }
 
+  function threadStartAckLine(): string {
+    const active = speaker?.() ?? null;
+    const kind = active?.kind === 'employee' ? 'employee' : active?.kind ?? 'vaxon';
+    return buildStreamingAckLine({
+      operatorPrompt: input.operatorPrompt(),
+      address: addressFormForSpeaker(kind),
+    });
+  }
+
+  function speakVerbatimStart(line: string): boolean {
+    const message = line.trim();
+    if (
+      !toolNarrationEnabled ||
+      !message ||
+      thinkingThrottle.spokenCount() > 0 ||
+      input.narration() === 'off' ||
+      !input.voiceDeliveryAllowed()
+    ) {
+      return false;
+    }
+    cancelStaleNarration();
+    agentMilestoneNarrator?.narrate({
+      key: 'start',
+      message,
+      verbatim: true,
+    });
+    thinkingThrottle.recordSpoken();
+    thinkingCarriesUpdate = true;
+    lastSpokenThinking = message;
+    return true;
+  }
+
+  function speakStartBookend(): boolean {
+    // Match the thread placeholder (e.g. "Working that now, Sir King.") — not a forced receipts line.
+    return speakVerbatimStart(threadStartAckLine());
+  }
+
   function maybeSpeakThinkingBlock(spokenBlock: string): boolean {
-    const cleaned =
-      sanitizeAgentThinkingForOperator(spokenBlock) ||
-      stripAgentStreamFenceMarkers(spokenBlock);
-    if (!toolNarrationEnabled || !cleaned) {
+    if (!toolNarrationEnabled) {
+      return false;
+    }
+    const cleaned = sanitizeAgentThinkingForOperator(spokenBlock, {
+      speakerName: speaker?.()?.name ?? null,
+    });
+    // First breath: prefer the model live line shown in-thread; else the same ack the UI shows.
+    if (thinkingThrottle.spokenCount() === 0) {
+      return speakVerbatimStart(cleaned || threadStartAckLine());
+    }
+    if (!cleaned) {
       return false;
     }
     const waitProgress = isWaitProgressThinking(cleaned);
@@ -146,10 +195,8 @@ export function createChatStreamVoiceNarration(input: {
       return false;
     }
     cancelStaleNarration();
-    const milestoneKey =
-      thinkingThrottle.spokenCount() === 0 ? 'start' : `thinking:${thinkingThrottle.spokenCount()}`;
     agentMilestoneNarrator?.narrate({
-      key: milestoneKey,
+      key: `thinking:${thinkingThrottle.spokenCount()}`,
       message: cleaned,
       verbatim: true,
     });
@@ -267,6 +314,7 @@ export function createChatStreamVoiceNarration(input: {
     progressNarrator,
     agentMilestoneNarrator,
     answerNarrator,
+    speakStartBookend,
     maybeSpeakThinkingBlock,
     narrateAgentMilestone,
     narrateProgress,

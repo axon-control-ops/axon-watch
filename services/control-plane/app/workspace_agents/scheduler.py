@@ -25,7 +25,7 @@ from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_ag
 from app.workspace_agents.autonomy_debug import debug_autonomy_probe
 from app.workspace_agents.scheduler_auto_start_gates import (
     runtime_auth_blocks_auto_start,
-    workspace_usage_limit_blocks_auto_start,
+    usage_limit_blocks_auto_start,
 )
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
 
@@ -355,15 +355,10 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
                 continue
             if _active_role_run_exists(workspace_id, role):
                 continue
-            workspace_roles = [
-                str(item.role or "").strip().lower()
-                for item in company.employees
-                if str(item.role or "").strip()
-            ]
-            if workspace_usage_limit_blocks_auto_start(workspace_id, workspace_roles):
+            if usage_limit_blocks_auto_start(workspace_id, role):
                 logger.info(
                     "continuous worker tick skipped role=%s workspace=%s: "
-                    "Cursor usage limits blocked a recent shift (account-wide)",
+                    "Cursor usage limits blocked this role's last shift",
                     role,
                     workspace_id,
                 )

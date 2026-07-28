@@ -572,6 +572,7 @@ export const useShellStore = defineStore('shell', () => {
     workspaces,
     runtimeSummary,
     runtimeSummaryLoadState,
+    runtimeStatus,
     activeRun,
     primaryActiveRun,
     layoutMode,
@@ -1617,6 +1618,7 @@ export const useShellStore = defineStore('shell', () => {
     pauseKairoSpeech,
     resumeKairoSpeech,
     interruptKairoVoice,
+    interruptKairoVoiceAndWait,
     speakKairoConversationLine,
     handleKairoPresenceAction,
     deliverKairoSpokenAlert,
@@ -1735,6 +1737,7 @@ export const useShellStore = defineStore('shell', () => {
         return employee ? employeeVoiceSpeaker(employee) : null;
       },
     });
+    voiceNarration.speakStartBookend();
     chatStreamSessionsByWorkspace.set(
       threadId,
       startChatStreamSession({
@@ -3881,6 +3884,7 @@ export const useShellStore = defineStore('shell', () => {
     pauseKairoSpeech,
     resumeKairoSpeech,
     interruptKairoVoice,
+    interruptKairoVoiceAndWait,
     handleKairoPresenceAction,
     kairoSpeechActive,
     kairoSpeechSessionId,

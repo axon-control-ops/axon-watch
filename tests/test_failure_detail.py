@@ -58,6 +58,9 @@ class FailureDetailTests(unittest.TestCase):
         )
         self.assertTrue(is_usage_limit_failure(wrapped))
         self.assertFalse(is_usage_limit_failure("verify:contracts — assertion failed"))
+        self.assertFalse(is_usage_limit_failure("ActionRequiredError"))
+        self.assertFalse(is_usage_limit_failure("ActionRequiredError: Please accept the terms"))
+        self.assertTrue(is_usage_limit_failure("ActionRequiredError: You're out of usage."))
 
     def test_runtime_auth_detected_after_normalization(self) -> None:
         wrapped = (

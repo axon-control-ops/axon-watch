@@ -124,6 +124,7 @@ def _strip_advice_suffix(summary: str) -> str:
     for marker in (
         "Open Runtime or",
         "Raise the Cursor usage",
+        "Check Cursor Usage",
         "Run `cursor agent login`",
         "Check `cursor agent status`",
         "Check Runtime status",

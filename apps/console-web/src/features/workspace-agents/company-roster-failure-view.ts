@@ -66,7 +66,7 @@ export function employeeFailureLine(
       return 'Last job was interrupted before it could finish — tap Continue to pick up where they left off.';
     }
     if (isUsageLimitFailure(employee.last_outcome_detail)) {
-      return 'Last job could not start — Cursor usage is exhausted account-wide. Raise the limit or wait for reset — do not retry yet.';
+      return 'Last job hit a Cursor usage signal — Auto+Composer may still have headroom or on-demand spend. Check Usage in Settings → CLI runtime, then Try again.';
     }
     if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
       return 'Last job almost finished — the closing Confidence line was missing. Tap Try again to close it out.';
@@ -112,7 +112,7 @@ export function employeeFailureDetailTooltip(
     return 'Runtime login is not ready. Run `cursor agent login` or unlock /vault, then retry.';
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
-    return 'Cursor usage is exhausted account-wide. Raise the limit or wait for reset before retrying.';
+    return 'Cursor usage signal on this shift — Auto+Composer may still have headroom or on-demand spend. Check Usage, then retry.';
   }
   if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
     return 'Closing Confidence line was missing after real work. Retry to close the Critical Review.';

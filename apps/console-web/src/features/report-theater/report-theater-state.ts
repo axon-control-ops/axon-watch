@@ -8,7 +8,10 @@ import {
   normalizeReportTheaterSections,
   parseReportSectionsFromReply,
 } from './report-theater-model';
-import { toVaxonDirectiveLine } from './report-theater-directives';
+import {
+  toVaxonDirectiveLine,
+  type ReportTheaterDirective,
+} from './report-theater-directives';
 
 const open = ref(false);
 const sections = ref<ReportTheaterSections>(normalizeReportTheaterSections(null));
@@ -18,6 +21,7 @@ const stageIndex = ref(0);
 const showNextSteps = ref(false);
 const executing = ref(false);
 const speakerName = ref<string | null>(null);
+const directives = ref<ReportTheaterDirective[]>([]);
 /** Bumps when a new theater session starts so in-flight narration can cancel. */
 const sessionToken = ref(0);
 
@@ -29,6 +33,7 @@ export const reportTheaterStageIndex = computed(() => stageIndex.value);
 export const reportTheaterShowNextSteps = computed(() => showNextSteps.value);
 export const reportTheaterExecuting = computed(() => executing.value);
 export const reportTheaterSpeakerName = computed(() => speakerName.value);
+export const reportTheaterDirectives = computed(() => directives.value);
 export const reportTheaterStages = computed(() => buildReportTheaterStages(sections.value));
 export const reportTheaterSessionToken = computed(() => sessionToken.value);
 
@@ -87,6 +92,10 @@ export function setReportTheaterSpeakerName(name: string | null): void {
   speakerName.value = name?.trim() || null;
 }
 
+export function setReportTheaterDirectives(items: ReportTheaterDirective[]): void {
+  directives.value = [...items];
+}
+
 export function closeReportTheater(): void {
   open.value = false;
   showNextSteps.value = false;
@@ -95,6 +104,7 @@ export function closeReportTheater(): void {
   fingerprint.value = null;
   replyText.value = '';
   speakerName.value = null;
+  directives.value = [];
   sections.value = normalizeReportTheaterSections(null);
 }
 

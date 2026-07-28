@@ -9,6 +9,7 @@ from app.chat.lane_b_generated_image_actions import (
     lane_b_open_file_ui_action,
     maybe_generated_image_redisplay_reply,
 )
+from app.chat.lane_b_lead_fan_out_fast_path import maybe_post_lead_fan_out_message
 from app.chat.lane_b_persona_fast_path import build_lane_b_persona_reply, post_lane_b_persona_message
 from app.chat.lane_b_plan_run import finalize_lane_b_plan_run
 from app.chat.lane_b_run_dispatch import resolve_lane_b_agent_run
@@ -132,6 +133,27 @@ def post_lane_b_message(
         }
         for item in chat_store.list_thread_messages(thread_id)
     ]
+    thread_employee_role = str(early_thread.get("employee_role") or "").strip()
+    lead_fan_out_response = maybe_post_lead_fan_out_message(
+        workspace_id=workspace_id,
+        content=content,
+        thread_id=thread_id,
+        employee_role=thread_employee_role or None,
+        lead_name=employee_name_from_persona_block(employee_persona or "") or "Lead",
+        composer_mode=composer_mode,
+        created_at=created_at,
+        save_message=chat_store.save_message,
+        new_message_id=_new_message_id,
+        bind_attachments=lambda message_id: _bind_message_attachments(
+            attachment_ids=attachment_ids,
+            workspace_id=workspace_id,
+            message_id=message_id,
+            thread_id=thread_id,
+        )[0],
+    )
+    if lead_fan_out_response is not None:
+        return lead_fan_out_response
+
     # VAXON smalltalk fast-path stays on generic threads only — employee 1:1s dispatch.
     persona_reply = (
         build_lane_b_persona_reply(

@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
-import { openWatchConnectors } from '../../composables/useIdeEditorStatusBar';
+import {
+  openCursorUsageSettings,
+  openWatchConnectors,
+} from '../../composables/useIdeEditorStatusBar';
 import { isConnectorStatusBarChip } from '../../lib/connector-glance-view';
+import { isCursorUsageStatusBarChip } from '../../lib/cursor-usage-view';
 import { useShellStore } from '../../stores/shell';
 import SupportedCommandsFooter from './SupportedCommandsFooter.vue';
 import PersonaTitle from '../PersonaTitle.vue';
@@ -18,14 +22,17 @@ function updateClock(): void {
     second: '2-digit',
     hour12: false,
   });
-  // #region agent log
-  if (now.getSeconds() === 0) {
+}
 
-  }
-  // #endregion
+function isInteractiveCenterChip(id: string): boolean {
+  return isConnectorStatusBarChip(id) || isCursorUsageStatusBarChip(id);
 }
 
 function onCenterChipClick(id: string): void {
+  if (isCursorUsageStatusBarChip(id)) {
+    openCursorUsageSettings(shell);
+    return;
+  }
   if (!isConnectorStatusBarChip(id)) {
     return;
   }
@@ -34,6 +41,9 @@ function onCenterChipClick(id: string): void {
 }
 
 function connectorChipTitle(id: string): string | undefined {
+  if (isCursorUsageStatusBarChip(id)) {
+    return shell.statusBarZones.center.find((item) => item.id === id)?.title;
+  }
   if (!isConnectorStatusBarChip(id)) {
     return undefined;
   }
@@ -54,6 +64,12 @@ function connectorChipTitle(id: string): string | undefined {
 }
 
 function connectorChipAriaLabel(id: string, label: string): string | undefined {
+  if (isCursorUsageStatusBarChip(id)) {
+    return (
+      shell.statusBarZones.center.find((item) => item.id === id)?.ariaLabel ??
+      `${label}. Open Cursor usage settings.`
+    );
+  }
   if (!isConnectorStatusBarChip(id)) {
     return undefined;
   }
@@ -73,6 +89,9 @@ const operatorZone = computed(() => shell.statusBarZones.right[0]);
 onMounted(() => {
   updateClock();
   timer = window.setInterval(updateClock, 1000);
+  if (shell.runtimeStatusLoadState === 'idle') {
+    void shell.loadRuntimeStatus();
+  }
 });
 
 onUnmounted(() => {
@@ -128,23 +147,26 @@ onUnmounted(() => {
         <span class="status-bar-mockup__rail" aria-hidden="true" />
 
         <component
-          :is="isConnectorStatusBarChip(item.id) ? 'button' : 'div'"
+          :is="isInteractiveCenterChip(item.id) ? 'button' : 'div'"
           v-for="item in centerZones"
           :key="item.id"
           class="status-bar-mockup__chip"
           :class="{
             'status-bar-mockup__chip--brand': item.tone === 'brand',
+            'status-bar-mockup__chip--success':
+              item.tone === 'success' && item.id === 'cursor-usage',
             'status-bar-mockup__chip--warning':
               item.tone === 'warning' && item.id !== 'watch-offline',
             'status-bar-mockup__chip--connector-glance': item.id === 'connector-glance',
             'status-bar-mockup__chip--connector-required-alert':
               item.id === 'connector-required-alert',
             'status-bar-mockup__chip--watch-offline': item.id === 'watch-offline',
+            'status-bar-mockup__chip--cursor-usage': item.id === 'cursor-usage',
           }"
-          :type="isConnectorStatusBarChip(item.id) ? 'button' : undefined"
-          :title="connectorChipTitle(item.id)"
-          :aria-label="connectorChipAriaLabel(item.id, item.label)"
-          @click="isConnectorStatusBarChip(item.id) ? onCenterChipClick(item.id) : undefined"
+          :type="isInteractiveCenterChip(item.id) ? 'button' : undefined"
+          :title="connectorChipTitle(item.id) ?? item.title"
+          :aria-label="connectorChipAriaLabel(item.id, item.label) ?? item.ariaLabel"
+          @click="isInteractiveCenterChip(item.id) ? onCenterChipClick(item.id) : undefined"
         >
           <span
             v-if="item.id === 'phase'"

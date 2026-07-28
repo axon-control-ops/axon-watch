@@ -351,7 +351,6 @@ const onIdeQuickGuideAction = (actionId: IdeQuickGuideActionId): void =>
 const onOpenWatchConnectors = (): void => openWatchConnectors(shell);
 const onOpenSourceControl = (): void => openIdeSourceControl(shell);
 const onOpenSearch = (): void => openIdeSearch(shell);
-const onOpenTeam = (): void => openIdeTeam(shell);
 
 function startTerminalResize(event: MouseEvent): void {
   if (event.button !== 0) {
@@ -643,7 +642,7 @@ watch(
           @open-connectors="onOpenWatchConnectors"
           @open-source-control="onOpenSourceControl"
           @open-search="onOpenSearch"
-          @open-team="onOpenTeam"
+          @open-team="() => openIdeTeam(shell)"
           @show-agent="showAgentDock"
           @toggle-minimap="toggleEditorMinimap"
         />

@@ -1,0 +1,227 @@
+"""Lead IDE assign-all → materialize fan-out (no Lane B Lead essay)."""
+
+from __future__ import annotations
+
+import threading
+from pathlib import Path
+from typing import Any, Callable
+
+from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
+from app.workspace_agents.lead_task_plan import detect_fan_out_intent
+
+_DEBUG_LOG = Path("/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log")
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
+    # region agent log
+    try:
+        import json
+        import time
+
+        payload = {
+            "sessionId": "bef50e",
+            "runId": "lead-fan-out",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception:
+        pass
+    # endregion
+
+
+def _format_fan_out_reply(
+    *,
+    lead_name: str,
+    materialize: dict[str, Any],
+) -> str:
+    runs = list(materialize.get("runs") or [])
+    deferred = list(materialize.get("deferred") or [])
+    receipt = materialize.get("receipt") or {}
+    lines = [
+        f"Sir King — I assigned the specialists via Lead fan-out "
+        f"(plan `{materialize.get('plan_id')}`).",
+        "",
+    ]
+    if runs:
+        lines.append("Queued for continuous dispatch:")
+        for run in runs:
+            role = str(run.get("owner_role") or "?").strip()
+            run_id = str(run.get("run_id") or "").strip()
+            task_id = str(run.get("task_id") or "").strip()
+            lines.append(f"- {role}: run `{run_id}` · task `{task_id}`")
+        lines.append("")
+    if deferred:
+        lines.append(f"Deferred (dependencies): {len(deferred)}")
+        lines.append("")
+    summary = str(receipt.get("summary") or "").strip()
+    if summary:
+        lines.append(summary)
+    else:
+        lines.append(
+            f"Materialized {len(materialize.get('tasks') or [])} tasks; "
+            f"queued {len(runs)} ready runs."
+        )
+    lines.append(
+        "I did not write kickoff markdown — continuous worker owns the start. "
+        f"— {lead_name}"
+    )
+    return "\n".join(lines)
+
+
+def _kick_continuous_dispatch() -> None:
+    try:
+        from app.workspace_agents.scheduler import run_continuous_worker_tick
+
+        started = run_continuous_worker_tick()
+        _debug_log(
+            "H3",
+            "lane_b_lead_fan_out_fast_path.py:_kick",
+            "continuous tick after fan-out",
+            {"started_count": len(started or [])},
+        )
+    except Exception as exc:
+        _debug_log(
+            "H3",
+            "lane_b_lead_fan_out_fast_path.py:_kick",
+            "continuous tick failed",
+            {"error": type(exc).__name__},
+        )
+
+
+def maybe_post_lead_fan_out_message(
+    *,
+    workspace_id: str,
+    content: str,
+    thread_id: str,
+    employee_role: str | None,
+    lead_name: str,
+    composer_mode: str,
+    created_at: str,
+    save_message: Callable[[dict[str, Any]], dict[str, Any]],
+    new_message_id: Callable[[str], str],
+    bind_attachments: Callable[[str], list[dict[str, object]]],
+) -> dict[str, object] | None:
+    """When Lead hears assign-all intent, materialize fan-out instead of a Lane B essay."""
+    role = str(employee_role or "").strip().lower()
+    intent = detect_fan_out_intent(content)
+    _debug_log(
+        "H1,H2",
+        "lane_b_lead_fan_out_fast_path.py:maybe",
+        "lead fan-out gate",
+        {
+            "role": role,
+            "composer_mode": composer_mode,
+            "intent": intent,
+            "content_preview": str(content or "")[:120],
+        },
+    )
+    if composer_mode != "agent" or role != "lead" or not intent:
+        return None
+
+    try:
+        materialize = materialize_lead_fan_out(
+            workspace_id=workspace_id,
+            goal=content,
+            mode="fan_out",
+            create_runs=True,
+        )
+    except LeadFanOutError as exc:
+        _debug_log(
+            "H2",
+            "lane_b_lead_fan_out_fast_path.py:maybe",
+            "fan-out materialize failed",
+            {"error": str(exc)[:200]},
+        )
+        return None
+    except Exception as exc:
+        _debug_log(
+            "H2",
+            "lane_b_lead_fan_out_fast_path.py:maybe",
+            "fan-out unexpected failure",
+            {"error": type(exc).__name__},
+        )
+        return None
+
+    _debug_log(
+        "H2,H3",
+        "lane_b_lead_fan_out_fast_path.py:maybe",
+        "fan-out materialized from Lead IDE",
+        {
+            "plan_id": materialize.get("plan_id"),
+            "run_count": len(materialize.get("runs") or []),
+            "deferred_count": len(materialize.get("deferred") or []),
+            "mode": materialize.get("mode"),
+        },
+    )
+
+    threading.Thread(
+        target=_kick_continuous_dispatch,
+        daemon=True,
+        name="lead-fan-out-dispatch-kick",
+    ).start()
+
+    agent_content = _format_fan_out_reply(
+        lead_name=lead_name.strip() or "Lead",
+        materialize=materialize,
+    )
+    operator_message = save_message(
+        {
+            "message_id": new_message_id("message_operator"),
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": None,
+            "role": "operator",
+            "content": content,
+            "created_at": created_at,
+        }
+    )
+    operator_attachments = bind_attachments(str(operator_message["message_id"]))
+    if operator_attachments:
+        operator_message = {**operator_message, "attachments": operator_attachments}
+    system_message = save_message(
+        {
+            "message_id": new_message_id("message_system"),
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": None,
+            "role": "system",
+            "content": (
+                "Lead fan-out materialized; specialist runs queued for continuous dispatch "
+                "(no Lane B Lead turn)."
+            ),
+            "created_at": created_at,
+        }
+    )
+    agent_message = save_message(
+        {
+            "message_id": new_message_id("message_agent"),
+            "thread_id": thread_id,
+            "workspace_id": workspace_id,
+            "run_id": None,
+            "role": "agent",
+            "content": agent_content,
+            "created_at": created_at,
+        }
+    )
+    return {
+        "thread_id": thread_id,
+        "messages": [operator_message, system_message, agent_message],
+        "run_id": "",
+        "dispatched": True,
+        "run": None,
+        "streaming": False,
+        "ui_action": None,
+        "lead_fan_out": {
+            "plan_id": materialize.get("plan_id"),
+            "runs": materialize.get("runs") or [],
+            "deferred": materialize.get("deferred") or [],
+        },
+    }
+
+
+__all__ = ["maybe_post_lead_fan_out_message"]

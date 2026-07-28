@@ -94,6 +94,8 @@ describe('employee-failure-detail', () => {
       ),
     ).toBe(true);
     expect(isUsageLimitFailure('vitest: assertion failed')).toBe(false);
+    expect(isUsageLimitFailure('ActionRequiredError')).toBe(false);
+    expect(isUsageLimitFailure('ActionRequiredError: Please accept the terms')).toBe(false);
     expect(agentRuntimeFallbackSpeakDetail(wrapped)).toMatch(/usage limits blocked/i);
   });
 

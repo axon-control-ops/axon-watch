@@ -158,15 +158,18 @@ export function employeeResolvedFailureDetail(employee: CompanyEmployeeRecord): 
   return normalizeOperatorFailureDetail(employee.last_outcome_detail);
 }
 
-/** Matches Cursor usage-limit blocks before a shift could start or finish. */
+/** Matches Cursor usage-limit blocks before a shift could start or finish.
+ *
+ * Bare ActionRequiredError is not enough — require an explicit usage phrase.
+ */
 export function isUsageLimitFailure(detail: string | null | undefined): boolean {
   const hay = `${detail ?? ''} ${normalizeOperatorFailureDetail(detail)}`;
   return (
     /out of usage/i.test(hay) ||
     /increase limits/i.test(hay) ||
-    /ActionRequiredError/i.test(hay) ||
     /hit your usage/i.test(hay) ||
-    /usage limit/i.test(hay)
+    /usage limit/i.test(hay) ||
+    /used 100% of your included/i.test(hay)
   );
 }
 

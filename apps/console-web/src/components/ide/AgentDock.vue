@@ -11,14 +11,45 @@ import {
   agentDockReopenEmployeeInterrupted,
   agentDockReopenTitle,
 } from '../../lib/agent-dock-reopen-view';
+import { resolveAgentDockStickyPrompt } from '../../lib/agent-dock-sticky-prompt';
 import AgentDockComposer from './AgentDockComposer.vue';
+import AgentDockStickyPrompt from './agent-dock/AgentDockStickyPrompt.vue';
 import AgentDockThreadTabbar from './AgentDockThreadTabbar.vue';
 import AgentDockWorkspaceMenu from './AgentDockWorkspaceMenu.vue';
 import IdeAgentReviewStrip from './IdeAgentReviewStrip.vue';
 import { useShellStore } from '../../stores/shell';
+import './agent-dock/agent-dock-sticky-prompt.css';
 
 const shell = useShellStore();
 const dockRef = ref<HTMLElement | null>(null);
+
+const stickyOperatorPrompt = computed(() => {
+  const text = resolveAgentDockStickyPrompt({
+    threadMessages: shell.threadMessages,
+    activityPrompt: shell.ideComposerActivity?.operatorPrompt,
+  });
+  // #region agent log
+  if (text) {
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'bef50e',
+      },
+      body: JSON.stringify({
+        sessionId: 'bef50e',
+        runId: 'sticky-prompt',
+        hypothesisId: 'S1',
+        location: 'AgentDock.vue:stickyOperatorPrompt',
+        message: 'sticky prompt resolved',
+        data: { length: text.length, preview: text.slice(0, 80) },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }
+  // #endregion
+  return text;
+});
 
 const reopenState = computed(() => ({
   streaming: shell.agentStreamActive,
@@ -129,12 +160,10 @@ onMounted(() => {
     </header>
 
     <section class="agent-dock__thread">
-      <div
-        v-if="shell.threadStateLabel"
-        class="agent-dock__section-header agent-dock__section-header--compact"
-      >
-        <p class="agent-dock__section-meta">{{ shell.threadStateLabel }}</p>
-      </div>
+      <AgentDockStickyPrompt
+        v-if="stickyOperatorPrompt"
+        :text="stickyOperatorPrompt"
+      />
       <div class="agent-dock__transcript">
         <ConversationSeamPanel />
       </div>

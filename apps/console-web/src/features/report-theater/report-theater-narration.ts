@@ -2,7 +2,11 @@ import type { ReportTheaterStage } from './report-theater-model';
 import { isReportTheaterFillerLine, stageSpokenLine } from './report-theater-directives';
 
 export type ReportTheaterNarrationHooks = {
-  speak: (line: string, speakerName?: string | null) => Promise<void>;
+  speak: (
+    line: string,
+    speakerName?: string | null,
+    onPlaybackStart?: () => void,
+  ) => Promise<void>;
   setStageIndex: (index: number) => void;
   onComplete: () => void;
   /** Fired after next-move speech so VAXON can execute the commitment. */
@@ -106,23 +110,30 @@ export async function narrateReportTheater(
     if (!stage) {
       continue;
     }
-    hooks.setStageIndex(index);
     const attributedTurns = attributedStageTurns(stage);
+    let stageStarted = false;
+    const startStage = () => {
+      if (stageStarted) {
+        return;
+      }
+      stageStarted = true;
+      hooks.setStageIndex(index);
+    };
     if (attributedTurns) {
       for (const turn of attributedTurns) {
         // #region agent log
         fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'jarvis-polish',hypothesisId:'H52,H53',location:'report-theater-narration.ts:turn',message:'speaking polished theater turn',data:{stageId:stage.id,speaker:turn.speakerName,lineChars:turn.line.length,linePreview:turn.line.slice(0,160)},timestamp:Date.now()})}).catch(()=>{});
         // #endregion
-        await hooks.speak(turn.line, turn.speakerName);
+        await hooks.speak(turn.line, turn.speakerName, startStage);
       }
       continue;
     }
     const line = polishTheaterLine(stageSpokenLine(stage.title, stage.lines), 180);
     if (stageIsFiller(stage) && stage.id !== 'next_move') {
-      await hooks.speak(line);
+      await hooks.speak(line, null, startStage);
       continue;
     }
-    await hooks.speak(line);
+    await hooks.speak(line, null, startStage);
   }
 
   if (hooks.isCancelled()) {

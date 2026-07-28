@@ -136,11 +136,11 @@ describe('company-roster-failure-view', () => {
         "Lane B agent fallback reply generated (ActionRequiredError: Increase limits for faster responses You're out of usage.)",
     });
     const friendlyLine =
-      'Last job could not start — Cursor usage is exhausted account-wide. Raise the limit or wait for reset — do not retry yet.';
+      'Last job hit a Cursor usage signal — Auto+Composer may still have headroom or on-demand spend. Check Usage in Settings → CLI runtime, then Try again.';
     expect(employeeFailureLine(usageBlocked)).toBe(friendlyLine);
     expect(employeeFailureBannerCopy(usageBlocked)).toBe(`Jules — ${friendlyLine}`);
     expect(employeeFailureBannerAriaLabel(usageBlocked)).toContain('Full detail:');
-    expect(employeeFailureBannerAriaLabel(usageBlocked)).toMatch(/usage is exhausted|out of usage|usage limits/i);
+    expect(employeeFailureBannerAriaLabel(usageBlocked)).toMatch(/usage signal|Auto\+Composer|on-demand/i);
     expect(
       employeeFailureLine(
         employee({
@@ -380,7 +380,7 @@ describe('company-roster-failure-view', () => {
       last_outcome_detail: `${'ActionRequiredError: '.repeat(20)}out of usage`,
     });
     expect(employeeFailureDetailTooltip(row)).toBe(
-      'Cursor usage is exhausted account-wide. Raise the limit or wait for reset before retrying.',
+      'Cursor usage signal on this shift — Auto+Composer may still have headroom or on-demand spend. Check Usage, then retry.',
     );
   });
 

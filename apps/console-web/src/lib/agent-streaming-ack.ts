@@ -57,8 +57,8 @@ function intentHint(prompt: string): string | null {
 }
 
 /**
- * Short UI placeholder while the model stream has not produced speakable copy yet.
- * Prefer real thinking/reply text over this whenever available.
+ * Short UI/speech placeholder while the model stream has not produced speakable copy yet.
+ * Prefer real thinking/reply text over this whenever available — speech must match the thread.
  */
 export function buildStreamingAckLine(input: {
   operatorPrompt?: string | null;

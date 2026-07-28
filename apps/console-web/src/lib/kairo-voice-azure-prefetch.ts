@@ -30,6 +30,7 @@ export type AzureChunkHandlers = {
   ) => { engine: 'azure' | 'browser' | 'skipped' | 'idle'; reason: string | null };
   notifySpeaking: (active: boolean) => void;
   notifyIdle: () => void;
+  onPlaybackStart: () => void;
 };
 
 export async function speakAzureChunksWithPrefetch(
@@ -79,6 +80,9 @@ export async function speakAzureChunksWithPrefetch(
     const handle = handlers.createAudioHandle(response.audio_base64, response.content_type);
     handlers.registerAudio(handle.audio);
     try {
+      if (index === 0) {
+        handlers.onPlaybackStart();
+      }
       handlers.notifyChunk(chunk);
       await handlers.playToCompletion(handle.audio);
     } catch (error) {

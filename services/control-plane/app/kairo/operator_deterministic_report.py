@@ -372,8 +372,11 @@ def _lead_rollup_bits(snapshot: dict[str, Any]) -> list[str]:
         ) or _primary_lead_name(snapshot)
         raw_headline = str(handoff.get("headline") or "")
         raw_lead_next = str(handoff.get("lead_next") or "")
-        headline = _scrub_operator_line(raw_headline, max_len=120)
-        lead_next = _scrub_operator_line(raw_lead_next, max_len=90)
+        # Preserve the verified Lead response for the board. Spoken narration
+        # performs its own shorter projection; the visual transcript must not
+        # silently cut receipts or conclusions.
+        headline = _scrub_operator_line(raw_headline, max_len=420)
+        lead_next = _scrub_operator_line(raw_lead_next, max_len=320)
         # region agent log
         try:
             from app.workspace_agents.autonomy_debug import debug_autonomy_probe

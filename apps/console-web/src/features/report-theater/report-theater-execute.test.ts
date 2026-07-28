@@ -65,4 +65,39 @@ describe('executeReportTheaterAction', () => {
     expect(openVaultSurface).toHaveBeenCalledTimes(1);
     expect(shell.focusCommandSeam).not.toHaveBeenCalled();
   });
+
+  it('still switches workspace when the promised signal id is missing', async () => {
+    const calls: string[] = [];
+    const shell = {
+      setCurrentWorkspace: vi.fn((workspaceId: string) => calls.push(`workspace:${workspaceId}`)),
+      focusMissionControl: vi.fn(() => calls.push('mission-control')),
+      focusAttentionSidebar: vi.fn((signalId?: string | null) =>
+        calls.push(`signal:${signalId ?? 'none'}`),
+      ),
+      setLeftSidebarMode: vi.fn(() => calls.push('attention')),
+      handoffSignalToIde: vi.fn(async () => {
+        calls.push('start');
+      }),
+      focusCommandSeam: vi.fn(),
+    };
+
+    const result = await executeReportTheaterAction(shell, null, {
+      action_id: 'theater_switch_workspace_axon_watch',
+      kind: 'review_signal',
+      title: 'axon-watch',
+      detail: 'Switch to axon-watch and open Attention.',
+      workspace_id: 'workspace_axon_watch',
+      run_id: null,
+      signal_id: null,
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'review_signal' });
+    expect(calls).toEqual([
+      'workspace:workspace_axon_watch',
+      'mission-control',
+      'signal:none',
+      'attention',
+    ]);
+    expect(shell.handoffSignalToIde).not.toHaveBeenCalled();
+  });
 });

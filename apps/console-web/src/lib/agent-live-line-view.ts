@@ -10,6 +10,13 @@ const USER_META_ASKED_RE =
 const USER_META_PREFIX_RE =
   /^(?:\*+)?\s*(?:the\s+)?user\s+(?:is\s+asking(?:\s+(?:whether|if|about))?|asked|requested|said|says)\s*/i;
 const LEADING_WHETHER_RE = /^(?:whether|if)\s+/i;
+/** Model meta about "taking on" a named persona — UI already shows the speaker. */
+const PERSONA_ASSUMPTION_SENTENCE_RE =
+  /\b(?:i(?:['’]m|\s+am)\s+)?assum(?:e|ing)\s+(?:the\s+)?[A-Z][A-Za-z-]*(?:\s+[A-Z][A-Za-z-]*)?\s+persona\b[^.!?]*[.!?]?/gi;
+const PERSONA_ASSUMPTION_PREFIX_RE =
+  /^(?:\*+)?\s*(?:i(?:['’]m|\s+am)\s+)?assum(?:e|ing)\s+(?:the\s+)?[A-Z][A-Za-z-]*(?:\s+[A-Z][A-Za-z-]*)?\s+persona\b[^.!?]*(?:[.!?]|$)\s*/i;
+const ACTING_AS_PERSONA_SENTENCE_RE =
+  /\b(?:i(?:['’]m|\s+am)\s+)?(?:acting|speaking)\s+as\s+(?:the\s+)?[A-Z][A-Za-z-]+(?:\s+persona)?\b[^.!?]*[.!?]?/gi;
 
 const THINKING_ECHO_MIN = 40;
 /** Near-duplicate paragraphs (typos / glued words) still count as an echo. */
@@ -296,6 +303,11 @@ export function rewriteThirdPersonSpeaker(
   out = out.replace(new RegExp(`\\b${escaped}'s\\b`, 'gi'), 'my');
   out = out.replace(new RegExp(`\\b${escaped}\u2019s\\b`, 'gi'), 'my');
   out = out.replace(new RegExp(`\\bas\\s+${escaped}\\b[,]?\\s*`, 'gi'), '');
+  // Self-narration often uses gendered possessives ("her last shift") after naming.
+  out = out.replace(
+    /\b(?:his|her|their)\s+((?:last\s+)?(?:shift|receipts|run)s?)\b/gi,
+    'my $1',
+  );
   return flattenLiveLineText(out);
 }
 
@@ -312,12 +324,20 @@ export function sanitizeAgentThinkingForOperator(
   out = out.replace(USER_META_SENTENCE_RE, ' ');
   out = out.replace(USER_META_ASKED_RE, ' ');
   out = out.replace(USER_META_PREFIX_RE, '');
+  out = out.replace(PERSONA_ASSUMPTION_SENTENCE_RE, ' ');
+  out = out.replace(ACTING_AS_PERSONA_SENTENCE_RE, ' ');
+  out = out.replace(PERSONA_ASSUMPTION_PREFIX_RE, '');
   out = out.replace(LEADING_WHETHER_RE, '');
   out = flattenLiveLineText(out).replace(/^[,.\-–—:;]+/, '').trim();
   out = stripAgentStreamFenceMarkers(out);
   out = rewriteThirdPersonSpeaker(out, options?.speakerName);
   out = normalizeThinkingSpeechLead(out);
-  if (!out || /^(?:the\s+)?user\b/i.test(out) || /^(?:whether|if)\s*$/i.test(out)) {
+  if (
+    !out ||
+    /^(?:the\s+)?user\b/i.test(out) ||
+    /^(?:whether|if)\s*$/i.test(out) ||
+    /\bassum(?:e|ing)\s+(?:the\s+)?\w+\s+persona\b/i.test(out)
+  ) {
     return '';
   }
   return out;

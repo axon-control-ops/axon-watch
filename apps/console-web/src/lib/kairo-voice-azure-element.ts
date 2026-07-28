@@ -120,13 +120,19 @@ export async function playAzureAudioToCompletion(audio: HTMLAudioElement): Promi
   await waitForAudioReady(audio);
   // Do not seek to 0 after buffering — that can discard the primed start and clip.
   await delay(AUDIO_PREROLL_MS);
+  try {
+    audio.muted = false;
+    audio.volume = 1;
+  } catch {
+    // ignore
+  }
   // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'heading-audio-before-fix',hypothesisId:'H35,H36',location:'kairo-voice-azure-element.ts:before-play',message:'starting synthesized audio element',data:{currentTime:audio.currentTime,duration:Number.isFinite(audio.duration)?audio.duration:null,readyState:audio.readyState,paused:audio.paused,ended:audio.ended},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'S1',location:'kairo-voice-azure-element.ts:before-play',message:'starting synthesized audio element',data:{currentTime:audio.currentTime,duration:Number.isFinite(audio.duration)?audio.duration:null,readyState:audio.readyState,paused:audio.paused,ended:audio.ended,muted:audio.muted,volume:audio.volume},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   try {
     await playOnceToCompletion(audio);
     // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'heading-audio-before-fix',hypothesisId:'H35,H36',location:'kairo-voice-azure-element.ts:after-play',message:'synthesized audio element completed',data:{currentTime:audio.currentTime,duration:Number.isFinite(audio.duration)?audio.duration:null,readyState:audio.readyState,paused:audio.paused,ended:audio.ended,elapsedMs:Math.round(performance.now()-playbackStartedAt)},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'S1',location:'kairo-voice-azure-element.ts:after-play',message:'synthesized audio element completed',data:{currentTime:audio.currentTime,duration:Number.isFinite(audio.duration)?audio.duration:null,readyState:audio.readyState,paused:audio.paused,ended:audio.ended,muted:audio.muted,volume:audio.volume,elapsedMs:Math.round(performance.now()-playbackStartedAt)},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
   } catch (firstError) {
     // WebKitGTK often rejects the first play() until a media-element unlock

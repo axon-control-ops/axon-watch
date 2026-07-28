@@ -58,10 +58,11 @@ export async function executeReportTheaterAction(
     shell.focusAttentionSidebar(signalId);
     shell.setLeftSidebarMode?.('attention');
     // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'workspace-switch-fix',hypothesisId:'H38,H39',location:'report-theater-execute.ts:review-signal',message:'executed report workspace and Attention switch',data:{workspaceId,signalId,layoutMode:shell.layoutMode??null},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'D2',location:'report-theater-execute.ts:review-signal',message:'executed report workspace and Attention switch',data:{workspaceId,signalId,layoutMode:shell.layoutMode??null,hasSignal:Boolean(signal)},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
     if (!signalId) {
-      return { ok: false, reason: 'missing_signal_id' };
+      // Workspace switch still counts — Attention opens even without a concrete signal id.
+      return { ok: true, kind: action.kind };
     }
     await shell.handoffSignalToIde(
       {
@@ -74,7 +75,7 @@ export async function executeReportTheaterAction(
       { autoSubmit: true },
     );
     // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'report-auto-start-fix',hypothesisId:'H43,H44,H45',location:'report-theater-execute.ts:auto-start',message:'switched to promised workspace and submitted investigation',data:{workspaceId,signalId,autoSubmit:true,layoutMode:shell.layoutMode??null},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'D2',location:'report-theater-execute.ts:auto-start',message:'switched to promised workspace and submitted investigation',data:{workspaceId,signalId,autoSubmit:true,layoutMode:shell.layoutMode??null},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
     return { ok: true, kind: action.kind };
   }

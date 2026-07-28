@@ -42,7 +42,7 @@ const sectionMeta = computed(() => {
     case 'runtime':
       return {
         title: 'CLI runtime auth',
-        subtitle: 'Sign in or out of host CLI runtimes used by Agent dispatch.',
+        subtitle: 'Cursor & Codex host auth, plus live Cursor usage pools (Auto + Composer / API).',
       };
     case 'email':
       return {

@@ -217,6 +217,35 @@ function promisedWorkspace(
   );
 }
 
+function synthesizeWorkspaceSwitchAction(
+  workspace: ReportWorkspace,
+  topSignals: Array<
+    Pick<InboxItem, 'signal_id' | 'title' | 'summary' | 'workspace_id'> | null | undefined
+  >,
+): BriefingAction {
+  const signal =
+    topSignals.find(
+      (row) =>
+        row &&
+        String(row.workspace_id || '').trim() === workspace.workspace_id &&
+        String(row.signal_id || '').trim(),
+    ) ?? null;
+  const label =
+    String(workspace.display_name || '').trim() ||
+    workspace.workspace_id.replace(/^workspace[_-]/i, '').replace(/_/g, '-');
+  return {
+    action_id: `theater_switch_${workspace.workspace_id}`,
+    kind: 'review_signal',
+    title: String(signal?.title || label).trim() || label,
+    detail:
+      String(signal?.summary || '').trim() ||
+      `Switch to ${label} and open Attention.`,
+    workspace_id: workspace.workspace_id,
+    run_id: null,
+    signal_id: signal ? String(signal.signal_id || '').trim() || null : null,
+  };
+}
+
 export function buildVaxonReportDirectives(input: {
   nextMove: string;
   actions: BriefingAction[];
@@ -242,6 +271,12 @@ export function buildVaxonReportDirectives(input: {
       ? { ...matchedAction, workspace_id: promised.workspace_id }
       : matchedAction;
 
+  // Spoken next-move named a workspace but briefing actions were empty/stale —
+  // still bind a switch so auto-execute and click both work.
+  if (!primaryAction && promised && !recovery.recover) {
+    primaryAction = synthesizeWorkspaceSwitchAction(promised, input.topSignals ?? []);
+  }
+
   // Hard gate: do not auto-start investigations while production readiness is blocked.
   if (recovery.recover) {
     primaryAction = recovery.preferVault
@@ -261,7 +296,7 @@ export function buildVaxonReportDirectives(input: {
       : toVaxonDirectiveLine(input.nextMove);
   const primaryLabel = directive.replace(/\.$/, '');
   // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'readiness-recovery-fix',hypothesisId:'H51',location:'report-theater-directives.ts:build',message:'built theater directives with readiness gate',data:{score:input.readiness?.score??null,recover:recovery.recover,preferVault:recovery.preferVault,blocker:recovery.blocker,primaryLabel,actionKind:primaryAction?.kind??null},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'D1',location:'report-theater-directives.ts:build',message:'built theater directives with readiness gate',data:{score:input.readiness?.score??null,recover:recovery.recover,preferVault:recovery.preferVault,blocker:recovery.blocker,primaryLabel,actionKind:primaryAction?.kind??null,actionWorkspace:primaryAction?.workspace_id??null,actionSignal:primaryAction?.signal_id??null,promisedWorkspace:promised?.workspace_id??null,mergedActionCount:mergedActions.length,topSignalCount:(input.topSignals??[]).length,autoExecute:isAutoExecutableCommitment(primaryLabel, primaryAction)},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   const out: ReportTheaterDirective[] = [
     {

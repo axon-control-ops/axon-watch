@@ -15,9 +15,14 @@ describe('polishTheaterLine', () => {
 });
 
 describe('narrateReportTheater', () => {
-  it('shows each stage before speaking and invokes onCommitted after complete', async () => {
+  it('shows each stage when playback starts and commits after completion', async () => {
     const events: string[] = [];
-    const speak = vi.fn(async (line: string) => {
+    const speak = vi.fn(async (
+      line: string,
+      _speakerName?: string | null,
+      onPlaybackStart?: () => void,
+    ) => {
+      onPlaybackStart?.();
       events.push(`speak:${line}`);
     });
     const setStageIndex = vi.fn((index: number) => {
@@ -71,7 +76,8 @@ describe('narrateReportTheater', () => {
         },
       ],
       {
-        speak: async (line, speakerName) => {
+        speak: async (line, speakerName, onPlaybackStart) => {
+          onPlaybackStart?.();
           turns.push({ line, speaker: speakerName ?? null });
         },
         setStageIndex: () => undefined,

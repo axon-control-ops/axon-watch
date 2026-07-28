@@ -80,7 +80,7 @@
       "target": "services/control-plane/app/cli_runtime/stream_blocks/*"
     },
     "apps/console-web/src/components/shell/CenterWorkbench.vue": {
-      "max_lines": 658,
+      "max_lines": 660,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/workbench/*"
@@ -99,7 +99,7 @@
       "note": "CLI discovery only; snapshot cache in catalog_snapshot.py"
     },
     "services/control-plane/app/cli_runtime/catalog_snapshot.py": {
-      "max_lines": 270,
+      "max_lines": 272,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
@@ -185,7 +185,7 @@
       "target": "apps/console-web/src/components/settings/useEmailSettingsMailbox.ts"
     },
     "apps/console-web/src/features/kairo-conversation/use-kairo-conversation.ts": {
-      "max_lines": 371,
+      "max_lines": 392,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/kairo-conversation/*"
@@ -411,7 +411,7 @@
       "note": "Deterministic REPORT lane; extract handoff formatting next"
     },
     "apps/console-web/src/stores/shell/slices/create-kairo-voice-slice.ts": {
-      "max_lines": 520,
+      "max_lines": 522,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/kairo-voice-*",

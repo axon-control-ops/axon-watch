@@ -67,6 +67,8 @@ function preparePersonaNameForSpeech(text: string): string {
     )
     .replace(/\bV\s+A\s+X\s+O\s+N\b/gi, OPERATOR_PERSONA_SPOKEN_NAME)
     .replace(/\bVAXON\b/gi, OPERATOR_PERSONA_SPOKEN_NAME)
+    // Sesotho name — keep the written form, but guide TTS to TA-bo.
+    .replace(/\bThabo\b/gi, 'Ta-bo')
     // Zulu name — speak Sipho as SEE-po (not SIFO).
     .replace(/\bSipho\b/gi, 'See-po');
 }

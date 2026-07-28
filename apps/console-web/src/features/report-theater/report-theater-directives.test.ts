@@ -149,37 +149,19 @@ describe('report-theater-directives', () => {
     );
   });
 
-  it('overrides next-move to Vault recovery when production readiness is blocked', () => {
+  it('synthesizes a workspace switch when next-move names a workspace but actions are empty', () => {
     const directives = buildVaxonReportDirectives({
-      nextMove: "I'll open Attention for Axon-X GitHub API warning",
-      actions: [
-        {
-          action_id: 'inspect_runtime_degraded',
-          kind: 'inspect_runtime',
-          title: 'Inspect degraded runtime',
-          detail: 'CLI not ready',
-          workspace_id: null,
-          run_id: null,
-          signal_id: null,
-        },
-        {
-          action_id: 'review-axon',
-          kind: 'review_signal',
-          title: 'Axon-X GitHub API warning',
-          detail: 'Review',
-          workspace_id: 'workspace_axon_watch',
-          run_id: null,
-          signal_id: 'sig-axon',
-        },
+      nextMove: "I'll switch to axon-watch and start that investigation next",
+      actions: [],
+      topSignals: [],
+      workspaces: [
+        { workspace_id: 'workspace_axon_watch', display_name: 'axon-watch' },
+        { workspace_id: 'workspace_edudashpro_school', display_name: 'EDP Excellence' },
       ],
-      readiness: {
-        score: 60,
-        grade: 'partial',
-        blockers: ['CLI runtime not ready — no local CLI runtime is dispatch-ready'],
-      },
     });
-    expect(directives[0]?.label).toMatch(/open Vault and restore runtime/i);
-    expect(directives[0]?.briefingAction?.action_id).toBe('theater_open_vault');
+    expect(directives[0]?.briefingAction?.kind).toBe('review_signal');
+    expect(directives[0]?.briefingAction?.workspace_id).toBe('workspace_axon_watch');
     expect(directives[0]?.autoExecute).toBe(true);
+    expect(directives[0]?.detail).toMatch(/executes this next/i);
   });
 });

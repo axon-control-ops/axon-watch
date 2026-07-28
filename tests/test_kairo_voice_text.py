@@ -50,6 +50,11 @@ class KairoVoiceTextTests(unittest.TestCase):
         self.assertIn("Vekson", dotted)
         self.assertNotRegex(dotted, r"\bV\s*A\s*X\s*O\s*N\b")
 
+    def test_speaks_thabo_as_ta_bo(self) -> None:
+        spoken = normalize_spoken_line("Thabo is reporting.")
+        self.assertIn("Ta-bo", spoken)
+        self.assertNotIn("Thabo", spoken)
+
 
 if __name__ == "__main__":
     unittest.main()

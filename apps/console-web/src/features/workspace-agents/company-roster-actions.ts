@@ -63,7 +63,8 @@ export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
     return (
-      `Usage limits blocked my last shift on ${owns}. Once limits are restored, ` +
+      `A Cursor usage signal blocked my last shift on ${owns}. ` +
+      `Auto+Composer or on-demand may still have headroom — check Usage, then ` +
       `I will retry my bounded continuous shift. ${voiceLock} ` +
       `Summarize what I changed and include receipts.`
     );
@@ -117,8 +118,8 @@ export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
     return (
       `Walk me through what happened on my last job${runHint}. ` +
-      `The job never started because usage limits blocked the agent. ` +
-      `Summarize what was attempted and suggest next steps once limits are restored.`
+      `The job hit a Cursor usage signal — do not claim the whole account is exhausted. ` +
+      `Check live Usage pools (Auto+Composer vs API) and whether on-demand is enabled, then suggest the next move.`
     );
   }
   if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {

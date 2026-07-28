@@ -22,6 +22,7 @@ import {
   buildIdeEditorStatusTeamChip,
   buildIdeEditorStatusTerminalChip,
 } from '../lib/ide-editor-status-view';
+import { navigateToSettingsSection } from '../lib/settings-section-route';
 import { runEmployeeShiftRetry } from '../lib/run-employee-shift-retry';
 import { useShellStore } from '../stores/shell';
 
@@ -199,6 +200,14 @@ export function openIdeSearch(shell: ShellStore): void {
 /** Open Team in the left sidebar (status bar chip, quick guide). */
 export function openIdeTeam(shell: ShellStore): void {
   shell.focusIdeSidebarView('team');
+}
+
+/** Open Settings → CLI runtime for Cursor usage pools. */
+export function openCursorUsageSettings(shell: ShellStore): void {
+  if (shell.runtimeStatusLoadState === 'idle') {
+    void shell.loadRuntimeStatus();
+  }
+  navigateToSettingsSection('runtime');
 }
 
 /** Apply a resolved IDE layout keyboard shortcut through the same entry points as chips and quick guide. */

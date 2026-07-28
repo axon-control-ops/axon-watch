@@ -15,6 +15,7 @@ import {
   runtimeAuthSummary,
 } from '../../lib/runtime-auth-view';
 import { useShellStore } from '../../stores/shell';
+import CursorUsageCard from './CursorUsageCard.vue';
 
 type RuntimeFamily = 'cursor' | 'codex';
 
@@ -210,7 +211,13 @@ onMounted(() => {
       </article>
     </div>
 
-    <div v-else class="runtime-auth-settings__grid">
+    <CursorUsageCard
+      v-if="!isLoading"
+      class="runtime-auth-settings__usage"
+      :usage="shell.runtimeStatus?.cursor_usage"
+    />
+
+    <div v-if="!isLoading" class="runtime-auth-settings__grid">
       <article
         v-for="card in runtimeCards"
         :key="card.family"

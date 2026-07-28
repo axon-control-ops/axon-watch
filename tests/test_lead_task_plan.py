@@ -29,7 +29,11 @@ class LeadTaskPlanTests(unittest.TestCase):
     def test_detect_fan_out_intent(self) -> None:
         self.assertTrue(detect_fan_out_intent("Dana, check with all sub-agents about memory"))
         self.assertTrue(detect_fan_out_intent("Ask every teammate for a status"))
+        self.assertTrue(detect_fan_out_intent("Oi assign all the agents to start working"))
+        self.assertTrue(detect_fan_out_intent("assign all agents to start working"))
+        self.assertTrue(detect_fan_out_intent("get all the agents working"))
         self.assertFalse(detect_fan_out_intent("Fix the backend API heap calc"))
+        self.assertFalse(detect_fan_out_intent("Assign Marco the heap-calc fix only"))
 
     def test_fan_out_creates_parallel_specialist_tasks(self) -> None:
         plan = build_lead_task_plan(

@@ -27,6 +27,10 @@ export type EnqueueKairoSpeechOptions = {
   speaker?: KairoVoiceSpeaker;
   /** Command Theater narration — only this lane may speak while stand-up is open. */
   allowDuringReportTheater?: boolean;
+  /** Cap Azure wait before falling back to browser TTS (ms). */
+  ttsTimeoutMs?: number;
+  /** Fires once when audible playback begins. */
+  onPlaybackStart?: () => void;
 };
 
 type VoiceJob = {
@@ -38,6 +42,8 @@ type VoiceJob = {
   speechPitch?: number;
   azureVoiceId?: string;
   speaker?: KairoVoiceSpeaker;
+  ttsTimeoutMs?: number;
+  onPlaybackStart?: () => void;
   resolve: (result: KairoVoicePlaybackResult) => void;
   reject: (error: unknown) => void;
 };
@@ -106,6 +112,8 @@ async function pump(): Promise<void> {
           speechPitch: job.speechPitch,
           azureVoiceId: job.azureVoiceId,
           speaker: job.speaker,
+          ttsTimeoutMs: job.ttsTimeoutMs,
+          onPlaybackStart: job.onPlaybackStart,
         });
         await settleAfterUtterance();
         job.resolve(result);
@@ -180,6 +188,8 @@ export function enqueueKairoSpeech(
       speechPitch: options.speechPitch,
       azureVoiceId: options.azureVoiceId,
       speaker: options.speaker,
+      ttsTimeoutMs: options.ttsTimeoutMs,
+      onPlaybackStart: options.onPlaybackStart,
       resolve,
       reject,
     };

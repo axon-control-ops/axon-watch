@@ -32,6 +32,8 @@ export interface StatusBarZoneItem {
   id: string;
   label: string;
   tone?: 'default' | 'success' | 'warning' | 'brand';
+  title?: string;
+  ariaLabel?: string;
 }
 
 export interface StatusBarZones {

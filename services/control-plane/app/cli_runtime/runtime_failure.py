@@ -25,7 +25,10 @@ def _operator_next_step(reason: str) -> str:
     """Advice must match the real blocker — never default every failure to vault."""
     lowered = reason.lower()
     if is_usage_limit_failure(reason):
-        return "Raise the Cursor usage limit or switch model, then retry."
+        return (
+            "Check Cursor Usage in Settings → CLI runtime — Auto+Composer may still "
+            "have headroom or on-demand spend. Then retry."
+        )
     # Auth-probe timeouts are host CLI health, not vault unlock.
     if "auth probe" in lowered:
         return "Check `cursor agent status` on the host, then retry."

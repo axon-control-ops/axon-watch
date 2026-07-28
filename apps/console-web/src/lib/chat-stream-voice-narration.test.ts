@@ -94,4 +94,71 @@ describe('createChatStreamVoiceNarration', () => {
     voice.narrateCompletion('Here is a three-step plan.');
     expect(voice.answerNarrator?.narrate).not.toHaveBeenCalled();
   });
+
+  it('speaks the same thread ack on start, not a forced receipts line or persona meta', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_4',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_edudashpro_school',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'retry the bounded continuous shift',
+      fullAccess: () => true,
+      speaker: () => ({
+        kind: 'employee',
+        id: 'employee-lindi',
+        name: 'Lindi',
+        roleLabel: 'Lead',
+      }),
+    });
+
+    expect(voice.speakStartBookend()).toBe(true);
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'start',
+        verbatim: true,
+        message: 'Working that now, Sir King.',
+      }),
+    );
+
+    voice.maybeSpeakThinkingBlock(
+      'Assuming the Lindi persona for the EDP Excellence workspace. Reviewing her last shift receipts.',
+    );
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefers sanitized model live text over the ack when thinking arrives first', () => {
+    const voice = createChatStreamVoiceNarration({
+      composerMode: 'agent',
+      messageId: 'msg_5',
+      sessionId: () => 'session',
+      workspaceId: () => 'workspace_edudashpro_school',
+      narration: () => 'minimal',
+      narrateToolProgress: () => false,
+      voiceDeliveryAllowed: () => true,
+      operatorPrompt: () => 'retry the bounded continuous shift',
+      fullAccess: () => true,
+      speaker: () => ({
+        kind: 'employee',
+        id: 'employee-lindi',
+        name: 'Lindi',
+        roleLabel: 'Lead',
+      }),
+    });
+
+    expect(
+      voice.maybeSpeakThinkingBlock(
+        'Assuming the Lindi persona. Reviewing my last shift receipts and planning docs.',
+      ),
+    ).toBe(true);
+    expect(voice.agentMilestoneNarrator?.narrate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'start',
+        verbatim: true,
+        message: 'Reviewing my last shift receipts and planning docs.',
+      }),
+    );
+  });
 });

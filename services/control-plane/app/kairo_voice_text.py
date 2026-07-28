@@ -90,6 +90,8 @@ def _prepare_persona_name_for_speech(text: str) -> str:
         flags=re.IGNORECASE,
     )
     text = re.sub(r"\bVAXON\b", OPERATOR_PERSONA_SPOKEN_NAME, text, flags=re.IGNORECASE)
+    # Sesotho name — keep display text as Thabo, guide TTS to TA-bo.
+    text = re.sub(r"\bThabo\b", "Ta-bo", text, flags=re.IGNORECASE)
     # Zulu name — speak Sipho as SEE-po (not SIFO).
     return re.sub(r"\bSipho\b", "See-po", text, flags=re.IGNORECASE)
 

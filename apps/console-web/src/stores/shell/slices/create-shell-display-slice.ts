@@ -1,6 +1,7 @@
 import { computed, type ComputedRef, type Ref } from 'vue';
 
 import type { ConnectorProbeRecord } from '../../../api/control-plane';
+import type { RuntimeStatusSnapshot } from '../../../api/runtime-api';
 import type {
   InboxItem,
   OperatorBriefing,
@@ -9,6 +10,7 @@ import type {
   WorkspaceRecord,
 } from '../../../contracts/canonical';
 import { buildStatusBarConnectorChip } from '../../../lib/connector-glance-view';
+import { buildStatusBarUsageZone } from '../../../lib/cursor-usage-view';
 import { shouldShowIdeAgentStop } from '../../../lib/ide-agent-run-active';
 import { resolveIdeStopRun } from '../../../lib/ide-composer-queue';
 import {
@@ -46,7 +48,7 @@ interface CreateShellDisplaySliceInput {
   workspaces: Ref<WorkspaceRecord[]>;
   runtimeSummary: Ref<RuntimeSummary | null>;
   runtimeSummaryLoadState: Ref<RuntimeSummaryLoadState>;
-  activeRun: Ref<RunRecord | null>;
+  runtimeStatus: Ref<RuntimeStatusSnapshot | null>;
   primaryActiveRun: ComputedRef<RunRecord | null>;
   layoutMode: Ref<LayoutMode>;
   getIdePresenceProfile: () => IdePresenceProfile;
@@ -64,6 +66,8 @@ interface CreateShellDisplaySliceInput {
   connectorsItems: Ref<ConnectorProbeRecord[]>;
   connectorsSummary: Ref<{ required_unavailable: number } | null>;
   connectorsLoadState: Ref<'idle' | 'loading' | 'loaded' | 'error'>;
+  /** Kept for callers that still pass fleet activeRun; unused by status-bar zones. */
+  activeRun?: Ref<RunRecord | null>;
 }
 
 export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
@@ -166,6 +170,11 @@ export function createShellDisplaySlice(input: CreateShellDisplaySliceInput) {
     const connectorChip = buildStatusBarConnectorChip(connectorChipInput);
     if (connectorChip) {
       zones.center.push(connectorChip);
+    }
+
+    const usageZone = buildStatusBarUsageZone(input.runtimeStatus.value?.cursor_usage);
+    if (usageZone) {
+      zones.center.push(usageZone);
     }
 
     return zones;

@@ -56,6 +56,7 @@ import {
   reportTheaterStageIndex,
   reportTheaterStages,
   revealReportTheaterNextSteps,
+  setReportTheaterDirectives,
   setReportTheaterExecuting,
   setReportTheaterStageIndex,
 } from '../report-theater/report-theater-state';
@@ -243,7 +244,7 @@ export function useKairoConversation() {
       resetDraftState();
       await dispatchKairoConverseOutcome(shell, response, executeConverseAction);
       if (response.dispatch_lane === 'deterministic_report') {
-        shell.interruptKairoVoice();
+        await shell.interruptKairoVoiceAndWait();
         clearQueuedSpokenAlerts();
         openReportTheater({
           sections: {
@@ -257,11 +258,27 @@ export function useKairoConversation() {
           reply: response.reply,
           spokenReply: response.spoken_reply,
         });
+        const committedDirectives = buildVaxonReportDirectives({
+          nextMove: reportTheaterStages.value.at(-1)?.lines[0] ?? '',
+          actions: pickReportTheaterActions(shell.operatorBriefing?.next_safe_actions, 3),
+          topSignals: shell.operatorBriefing?.top_signals ?? [],
+          workspaces: shell.workspaces,
+          readiness: shell.operatorBriefing?.production_readiness ?? null,
+        });
+        setReportTheaterDirectives(committedDirectives);
         const narrationToken = reportTheaterSessionToken.value;
         await narrateReportTheater(reportTheaterStages.value, {
-          speak: async (line, speakerName) => {
-            kairoConversationReply.value = normalizeKairoCopy(line);
-            await speakReportTheaterTurn(shell, line, lastOperatorPrompt, speakerName);
+          speak: async (line, speakerName, onPlaybackStart) => {
+            await speakReportTheaterTurn(
+              shell,
+              line,
+              lastOperatorPrompt,
+              speakerName,
+              () => {
+                kairoConversationReply.value = normalizeKairoCopy(line);
+                onPlaybackStart?.();
+              },
+            );
           },
           setStageIndex: (index) => {
             setReportTheaterStageIndex(index);
@@ -270,28 +287,43 @@ export function useKairoConversation() {
             revealReportTheaterNextSteps();
           },
           onCommitted: async () => {
-            const directives = buildVaxonReportDirectives({
-              nextMove: reportTheaterStages.value.at(-1)?.lines[0] ?? '',
-              actions: pickReportTheaterActions(shell.operatorBriefing?.next_safe_actions, 3),
-              topSignals: shell.operatorBriefing?.top_signals ?? [],
-              workspaces: shell.workspaces,
-              readiness: shell.operatorBriefing?.production_readiness ?? null,
-            });
-            const primary = directives.find((item) => item.kind === 'primary' && item.autoExecute);
+            const primary = committedDirectives.find((item) => item.kind === 'primary');
+            // #region agent log
+            fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix-route-sync',hypothesisId:'R1',location:'use-kairo-conversation.ts:onCommitted:frozen',message:'executing frozen displayed directive',data:{primaryLabel:primary?.label??null,actionKind:primary?.briefingAction?.kind??null,workspaceId:primary?.briefingAction?.workspace_id??null,currentReadiness:shell.operatorBriefing?.production_readiness?.score??null},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             if (!primary?.briefingAction) {
+              // #region agent log
+              fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'D1',location:'use-kairo-conversation.ts:onCommitted',message:'stand-up commitment had no bound action',data:{primaryLabel:primary?.label??null,autoExecute:primary?.autoExecute??null},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
               return;
             }
-            setReportTheaterExecuting(true);
-            const result = await executeReportTheaterAction(
-              shell,
-              shell.operatorBriefing,
-              primary.briefingAction,
-            );
-            if (reportTheaterSessionToken.value === narrationToken) {
-              clearQueuedSpokenAlerts();
-              clearBriefingSurfaceOffer();
-              closeReportTheater();
+            // Auto-commit: execute immediately — do not add another spoken turn.
+            if (primary.autoExecute) {
+              // #region agent log
+              fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'D2',location:'use-kairo-conversation.ts:autoExecute',message:'auto-executing stand-up primary directive',data:{primaryLabel:primary.label,actionKind:primary.briefingAction.kind,workspaceId:primary.briefingAction.workspace_id??null,signalId:primary.briefingAction.signal_id??null},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
+              setReportTheaterExecuting(true);
+              await executeReportTheaterAction(
+                shell,
+                shell.operatorBriefing,
+                primary.briefingAction,
+              );
+              if (reportTheaterSessionToken.value === narrationToken) {
+                clearQueuedSpokenAlerts();
+                clearBriefingSurfaceOffer();
+                closeReportTheater();
+              }
+              return;
             }
+            const secondary = committedDirectives.find((item) => item.kind !== 'primary');
+            const choiceLine = secondary
+              ? `Your call. ${primary.label}. Or ${secondary.label}.`
+              : `Your call. ${primary.label}.`;
+            // #region agent log
+            fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'S2',location:'use-kairo-conversation.ts:directive-voice',message:'speaking stand-up directive choice',data:{primaryLabel:primary.label,secondaryLabel:secondary?.label??null,autoExecute:false,linePreview:choiceLine.slice(0,160)},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+            kairoConversationReply.value = normalizeKairoCopy(choiceLine);
+            await speakReportTheaterTurn(shell, choiceLine, lastOperatorPrompt);
           },
           isCancelled: () => reportTheaterSessionToken.value !== narrationToken,
         });

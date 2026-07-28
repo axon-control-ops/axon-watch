@@ -1,0 +1,37 @@
+.agent-dock-sticky-prompt {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  margin: 0.1rem 0.55rem 0.3rem;
+  padding: 0.35rem 0.65rem 0.4rem;
+  border: 1px solid rgba(138, 154, 173, 0.22);
+  border-radius: 0.45rem;
+  background: rgba(10, 16, 24, 0.92);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  z-index: 4;
+}
+
+.agent-dock-sticky-prompt__label {
+  margin: 0;
+  color: rgba(150, 231, 255, 0.78);
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-dock-sticky-prompt__text {
+  margin: 0;
+  color: rgba(233, 239, 245, 0.96);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}

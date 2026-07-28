@@ -260,13 +260,14 @@ describe('company-roster-actions', () => {
         "Lane B agent fallback reply generated (ActionRequiredError: You're out of usage.)",
       last_run_id: 'run_7ae605411d4d',
     });
-    expect(employeeRetryDraft(failed)).toContain('Usage limits blocked my last shift');
-    expect(employeeRetryDraft(failed)).toContain('Once limits are restored');
+    expect(employeeRetryDraft(failed)).toContain('Cursor usage signal blocked my last shift');
+    expect(employeeRetryDraft(failed)).toContain('Auto+Composer or on-demand');
     expect(employeeRetryDraft(failed)).not.toContain('ActionRequiredError');
 
     expect(employeeReceiptsDraft(failed)).toContain('run_7ae605411d4d');
-    expect(employeeReceiptsDraft(failed)).toContain('usage limits blocked the agent');
+    expect(employeeReceiptsDraft(failed)).toContain('Cursor usage signal');
     expect(employeeReceiptsDraft(failed)).not.toContain('ActionRequiredError');
+    expect(employeeReceiptsDraft(failed)).toContain('do not claim the whole account is exhausted');
   });
 
   it('uses runtime-auth guidance in retry and receipts drafts', () => {

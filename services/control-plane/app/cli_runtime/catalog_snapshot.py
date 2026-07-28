@@ -14,6 +14,7 @@ from app.cli_runtime.auth_probes import (
     cursor_auth_status as _cursor_auth_status,
     vault_auth_overlay as _vault_auth_overlay,
 )
+from app.cli_runtime.cursor_usage_probe import probe_cursor_usage
 from app.cli_runtime.vault_keys import fetch_runtime_context
 
 StatusRecord = dict[str, Any]
@@ -264,6 +265,7 @@ def runtime_status_snapshot(
             "vault_runtime": vault_posture,
             "local": local,
             "cloud": cloud,
+            "cursor_usage": probe_cursor_usage(force_refresh=force_refresh),
         }
         _SNAPSHOT_CACHE["fetched_at"] = time.monotonic()
         _SNAPSHOT_CACHE["payload"] = copy.deepcopy(payload)

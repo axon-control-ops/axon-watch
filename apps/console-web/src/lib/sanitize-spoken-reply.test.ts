@@ -159,6 +159,11 @@ describe('sanitizeSpokenReply', () => {
     expect(sanitizeSpokenReply('Ask Sipho for status.')).not.toMatch(/\bSipho\b/);
   });
 
+  it('speaks Thabo as Ta-bo while display text remains canonical', () => {
+    expect(formatConversationDisplayReply('Thabo is reporting.')).toBe('Thabo is reporting.');
+    expect(sanitizeSpokenReply('Thabo is reporting.')).toMatch(/^Ta-bo is reporting/i);
+  });
+
   it('keeps Lead-team hyphen and spells CI for TTS', () => {
     const spoken = sanitizeSpokenReply(
       'Four Lead-team plans waiting. DashPro CI failed on main.',

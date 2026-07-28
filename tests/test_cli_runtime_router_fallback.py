@@ -114,7 +114,7 @@ class FallbackReplyTests(unittest.TestCase):
         self.assertIn("could not start", reply.lower())
         self.assertIn("usage", reply.lower())
         self.assertNotIn("/vault", reply.lower())
-        self.assertIn("Raise the Cursor usage limit", reply)
+        self.assertIn("Check Cursor Usage", reply)
 
 
 class DispatchRecursionRecoveryTests(unittest.TestCase):

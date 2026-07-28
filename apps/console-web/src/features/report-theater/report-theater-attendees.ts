@@ -36,7 +36,7 @@ function employeeStatus(employee: CompanyEmployeeRecord): string {
     return 'just wrapped';
   }
   if (String(employee.last_outcome || '').toLowerCase() === 'failed') {
-    return 'needs follow-up';
+    return 'follow-up';
   }
   if (employeeIsLead(employee)) {
     return 'Lead present';

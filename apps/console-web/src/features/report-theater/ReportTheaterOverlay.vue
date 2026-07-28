@@ -4,12 +4,11 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { OPERATOR_PERSONA_NAME } from '../../lib/operator-persona-name';
 import { useShellStore } from '../../stores/shell';
 import { buildReportTheaterAttendees } from './report-theater-attendees';
-import { buildVaxonReportDirectives } from './report-theater-directives';
 import { executeReportTheaterAction } from './report-theater-execute';
-import { pickReportTheaterActions } from './report-theater-model';
 import { polishTheaterLine } from './report-theater-narration';
 import {
   closeReportTheater,
+  reportTheaterDirectives,
   reportTheaterExecuting,
   reportTheaterFingerprint,
   reportTheaterOpen,
@@ -35,15 +34,9 @@ const readinessBlocker = computed(() => {
   return polishTheaterLine(blocker, 72);
 });
 const activeStage = computed(() => stages.value[activeIndex.value] ?? null);
-const directives = computed(() =>
-  buildVaxonReportDirectives({
-    nextMove: stages.value[stages.value.length - 1]?.lines[0] ?? '',
-    actions: pickReportTheaterActions(shell.operatorBriefing?.next_safe_actions, 3),
-    topSignals: shell.operatorBriefing?.top_signals ?? [],
-    workspaces: shell.workspaces,
-    readiness: readiness.value,
-  }),
-);
+// Frozen when the theater opens so the displayed promise and executed action
+// cannot diverge if live readiness changes while narration is in progress.
+const directives = reportTheaterDirectives;
 const primaryDirective = computed(() => directives.value.find((item) => item.kind === 'primary') ?? null);
 const secondaryDirectives = computed(() =>
   directives.value.filter((item) => item.kind !== 'primary').slice(0, 2),
@@ -120,10 +113,10 @@ const boardCards = computed((): BoardCard[] => {
   return lines.map((line) => {
     if (stage.id === 'lead_rollups' && line.includes(':')) {
       const tag = line.split(':')[0]?.trim() || null;
-      const body = polishTheaterLine(line.slice(line.indexOf(':') + 1).trim(), 160);
+      const body = polishTheaterLine(line.slice(line.indexOf(':') + 1).trim(), 800);
       return { tag, body };
     }
-    return { tag: null, body: polishTheaterLine(line, 160) };
+    return { tag: null, body: polishTheaterLine(line, 800) };
   });
 });
 

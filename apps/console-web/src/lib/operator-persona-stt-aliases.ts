@@ -8,6 +8,8 @@ const PERSONA_CANONICAL_NAME = 'VAXON';
 export const PERSONA_STT_MISHEAR_REPLACEMENTS: ReadonlyArray<[RegExp, string]> = [
   // Spelled or dotted: "V A X O N", "V-A-X-O-N"
   [/\bv[\s.\-_]*a[\s.\-_]*x[\s.\-_]*o[\s.\-_]*n\b/gi, PERSONA_CANONICAL_NAME],
+  // TTS phonetic spelling must never leak into on-screen transcripts.
+  [/\bvekson\b/gi, PERSONA_CANONICAL_NAME],
 
   // Legacy operator persona names
   [/\bkairos\b/gi, PERSONA_CANONICAL_NAME],
