@@ -84,4 +84,25 @@ describe('runEmployeeShiftRetry', () => {
     expect(openOrFocusEmployeeIdeThread).not.toHaveBeenCalled();
     expect(submitIdeComposer).toHaveBeenCalledWith('agent');
   });
+
+  it('still submits when the last failure was a Cursor usage limit', async () => {
+    const submitIdeComposer = vi.fn().mockResolvedValue(undefined);
+    const openIdeComposerWithDraft = vi.fn();
+
+    const result = await runEmployeeShiftRetry(
+      {
+        openOrFocusEmployeeIdeThread: vi.fn().mockResolvedValue('thread_1'),
+        openIdeComposerWithDraft,
+        setAgentExecutionAccess: vi.fn(),
+        submitIdeComposer,
+      },
+      employee({
+        last_outcome_detail: "ActionRequiredError: You're out of usage.",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(openIdeComposerWithDraft).toHaveBeenCalledOnce();
+    expect(submitIdeComposer).toHaveBeenCalledWith('agent');
+  });
 });

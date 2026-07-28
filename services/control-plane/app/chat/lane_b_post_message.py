@@ -24,6 +24,10 @@ from app.persistence import chat_store
 from app.plans.service import maybe_attach_plan_artifact
 from app.terminal.session_registry import ensure_agent_session, serialize_session
 from app.workspace_agents.employee_persona_prompt import build_employee_persona_appendix
+from app.workspace_agents.employee_first_person import (
+    employee_name_from_persona_block,
+    rewrite_employee_third_person_to_first,
+)
 
 
 def post_lane_b_message(
@@ -321,6 +325,8 @@ def post_lane_b_message(
         )
 
     agent_content = str(lane_b_result.get("content") or "")
+    speaker_name = employee_name_from_persona_block(memory_appendix)
+    agent_content = rewrite_employee_third_person_to_first(agent_content, speaker_name)
     # Thread id may still be unresolved here; capture after resolve below for plan mode.
 
     if is_tool_capable_composer_mode(composer_mode) and run_record is not None:

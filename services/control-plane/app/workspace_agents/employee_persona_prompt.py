@@ -135,7 +135,10 @@ def build_employee_persona_appendix(
         ),
         (
             f"Never speak about yourself in the third person. Do not say \"{name}'s shift\", "
-            f"\"Pulling {name}'s…\", \"checking {name}'s logs\", or \"as {name}\". "
+            f"\"Pulling {name}'s…\", \"checking {name}'s logs\", \"as {name}\", or "
+            f"\"{name} is planning…\". "
+            f"Bad: \"{name} is planning activities and assignments.\" "
+            "Good: \"I am planning activities and assignments.\" "
             "Say \"my shift\", \"my receipts\", \"my last run\" — you are the speaker."
         ),
         (

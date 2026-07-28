@@ -139,9 +139,9 @@ describe('sanitizeSpokenReply', () => {
     expect(cleaned).not.toContain('Listen for numbered steps');
   });
 
-  it('keeps digit+role phrases speakable (4 Lead → four Lead)', () => {
+  it('keeps digit+role phrases speakable (4 Lead → four, Lead-team)', () => {
     const spoken = sanitizeSpokenReply('4 Lead plans awaiting engagement in VAXON.');
-    expect(spoken.toLowerCase()).toContain('four lead');
+    expect(spoken.toLowerCase()).toContain('four, lead-team');
     expect(spoken).not.toMatch(/\b4\s+Lead\b/);
     expect(spoken).toMatch(/Vekson/i);
     expect(spoken).not.toMatch(/\bVAXON\b/);
@@ -154,12 +154,16 @@ describe('sanitizeSpokenReply', () => {
     expect(sanitizeSpokenReply('VAXON online.')).not.toMatch(/\bV\s+A\s+X\s+O\s+N\b/);
   });
 
-  it('splits Lead-team and spells CI for TTS', () => {
+  it('speaks Sipho as See-po', () => {
+    expect(sanitizeSpokenReply('Sipho is speaking.')).toMatch(/See-po is speaking/i);
+    expect(sanitizeSpokenReply('Ask Sipho for status.')).not.toMatch(/\bSipho\b/);
+  });
+
+  it('keeps Lead-team hyphen and spells CI for TTS', () => {
     const spoken = sanitizeSpokenReply(
       'Four Lead-team plans waiting. DashPro CI failed on main.',
     );
-    expect(spoken).toMatch(/Lead team/i);
-    expect(spoken).not.toMatch(/Lead-team/i);
+    expect(spoken).toMatch(/four, Lead-team/i);
     expect(spoken).toMatch(/C I/);
     expect(spoken).not.toMatch(/\bCI\b/);
   });

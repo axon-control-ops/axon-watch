@@ -14,6 +14,7 @@ import {
   employeeSurfaceAction,
   employeeTalkDraft,
 } from './company-roster-actions';
+import { employeeFailureBlocksAutoRetry } from './company-roster-view';
 
 function employee(overrides: Partial<CompanyEmployeeRecord> = {}): CompanyEmployeeRecord {
   return {
@@ -151,6 +152,33 @@ describe('company-roster-actions', () => {
     expect(employeeReceiptsDraft(failed)).not.toContain("Priya's");
     expect(employeeReceiptsDraft(failed)).not.toContain('Error: Run completed');
     expect(employeeChatComposerMode('receipts')).toBe('ask');
+  });
+
+  it('still offers Try again when Cursor usage is exhausted (copy warns; dock must not hide retry)', () => {
+    const usageBlocked = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'ActionRequiredError: out of usage',
+      last_run_id: 'run_usage_blocked',
+    });
+    const actions = employeeQuickActions(usageBlocked);
+    expect(actions.map((action) => action.id)).toEqual([
+      'retry',
+      'receipts',
+      'talk',
+      'status',
+      'assign',
+      'toggle_enabled',
+    ]);
+    expect(actions.find((action) => action.id === 'retry')?.label).toBe('Try again');
+    expect(employeeDockDisplayActions(actions, usageBlocked).map((action) => action.id)).toEqual([
+      'retry',
+      'talk',
+      'status',
+      'assign',
+      'toggle_enabled',
+    ]);
+    expect(employeeFailureBlocksAutoRetry(usageBlocked)).toBe(true);
   });
 
   it('explains completed jobs without calling them failures', () => {

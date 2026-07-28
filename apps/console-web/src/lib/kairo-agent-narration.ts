@@ -70,7 +70,9 @@ export function resolveStreamingActivity(
       : personaThreadPrefix(body);
   const thinking = liveThinkingText(content);
   if (thinking) {
-    const sanitized = sanitizeAgentThinkingForOperator(thinking);
+    const sanitized = sanitizeAgentThinkingForOperator(thinking, {
+      speakerName: personaName,
+    });
     if (sanitized) {
       const displayBody = truncateAgentLiveLineForDisplay(sanitized, AGENT_LIVE_LINE_DISPLAY_MAX);
       return {
@@ -167,10 +169,32 @@ export function spokenCompletionSummary(content: string): string {
     return '';
   }
   const flat = cleaned.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Prefer the closing confidence line so we do not speak a mid-shift opener
+  // ("Retrying my bounded shift now…") after the composer run already stopped.
+  const confidence = flat.match(/\bConfidence:\s*(\d{1,2})\s*\/\s*10\b/i);
+  if (confidence) {
+    const score = confidence[1] ?? '?';
+    const review = flat.match(/Critical\s+Review[^.!?]{0,160}[.!?]?/i)?.[0]?.trim();
+    if (review && review.length >= 24) {
+      const clipped =
+        review.length > COMPLETION_SUMMARY_MAX
+          ? `${review.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`
+          : review;
+      return clipped.endsWith('.') || clipped.endsWith('…') ? clipped : `${clipped}.`;
+    }
+    return `Shift complete. Confidence ${score} out of 10.`;
+  }
   const sentences = flat.match(/[^.!?]+[.!?]+/g) ?? [];
-  if (sentences.length > 0) {
-    let summary = (sentences[0] ?? '').trim();
-    const second = sentences[1];
+  const usable = sentences.filter(
+    (sentence) =>
+      !/^\s*(Retrying|Continuing|I(?:'ll| will) (?:read|start|begin|retry))\b/i.test(
+        sentence.trim(),
+      ),
+  );
+  const pool = usable.length ? usable : sentences;
+  if (pool.length > 0) {
+    let summary = (pool[0] ?? '').trim();
+    const second = pool[1];
     if (summary.length < 120 && second) {
       summary = `${summary} ${second.trim()}`;
     }

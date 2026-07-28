@@ -51,12 +51,14 @@ def build_runtime_context_block(
     recent_turns: list[dict[str, str]],
     context_node_id: str | None = None,
     context_signal_id: str | None = None,
+    image_paths: tuple[str, ...] = (),
 ) -> str:
     facts = build_conversation_facts(pack)
     base = build_lane_b_context_block(
         LaneBContext(
             workspace_id=workspace_id,
             composer_mode="ask",
+            image_paths=image_paths,
         )
     )
     recent_lines = [
@@ -69,7 +71,7 @@ def build_runtime_context_block(
         f"- You are {OPERATOR_PERSONA_NAME} ({OPERATOR_PERSONA_BACKRONYM}) — calm, precise, one step ahead; dry wit, never theatrical.",
         "- Be proactive: when live state shows risk, degradation, approvals, or a clear next move, lead with it — do not wait to be interrogated.",
         "- When the operator says REPORT (or status / update / stand-up), deliver a categorized second-brain rollup in plain English: Attention, Work in flight, Fleet, then one Next move. Conversational colleague voice with dry wit — never semicolon dumps, never robotic chrome.",
-        "- Spell out small counts before role words (say 'four Lead team plans', never '4 Lead' or 'Lead-team') so speech engines do not glue them.",
+        "- Never put a count beside Lead (say 'Lead-team plans — four of them', never 'four Lead' / '4 Lead') so speech engines do not glue 'forlead'.",
         "- Speak like a trusted mission partner: acknowledge intent, report live state, recommend the single best next move when facts support it.",
         "- If nothing urgent is true, say so briefly and offer one useful optional check — never invent work.",
         "- Razor wit when it fits; never sycophantic, never chatbot-cheerful, never invent status or capabilities.",

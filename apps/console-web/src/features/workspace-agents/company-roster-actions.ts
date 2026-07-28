@@ -227,6 +227,9 @@ export function employeeQuickActions(employee: CompanyEmployeeRecord): TeamMembe
     chatKind: 'talk',
     composerMode: 'agent',
   };
+  // Always keep a real retry control on failed jobs. Usage-limit cases still warn in
+  // the failure line copy — do not swap retry for receipts (that id is stripped when
+  // the dock already links the failed run).
   const retryAction: TeamMemberQuickAction = {
     id: 'retry',
     label: employeeFailureRetryActionLabel(employee),

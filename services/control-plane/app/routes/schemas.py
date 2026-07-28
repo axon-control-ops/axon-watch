@@ -175,6 +175,7 @@ class KairoConverseRequest(BaseModel):
     context_workspace_id: str = ""
     context_signal_id: str = ""
     context_node_id: str = ""
+    attachment_ids: list[str] | None = None
 
 
 class KairoTtsRequest(BaseModel):

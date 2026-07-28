@@ -89,7 +89,9 @@ def _prepare_persona_name_for_speech(text: str) -> str:
         text,
         flags=re.IGNORECASE,
     )
-    return re.sub(r"\bVAXON\b", OPERATOR_PERSONA_SPOKEN_NAME, text, flags=re.IGNORECASE)
+    text = re.sub(r"\bVAXON\b", OPERATOR_PERSONA_SPOKEN_NAME, text, flags=re.IGNORECASE)
+    # Zulu name — speak Sipho as SEE-po (not SIFO).
+    return re.sub(r"\bSipho\b", "See-po", text, flags=re.IGNORECASE)
 
 
 def _soften_symbols_for_speech(text: str) -> str:
@@ -197,7 +199,7 @@ def _strip_forbidden_listener_address(text: str) -> str:
 
 
 def _prepare_counts_for_speech(text: str) -> str:
-    """Stop TTS from gluing '4 Lead' into 'forlead'."""
+    """Stop TTS from gluing '4 Lead' / 'four Lead' into 'forlead'."""
     number_words = {
         "0": "zero",
         "1": "one",
@@ -213,12 +215,25 @@ def _prepare_counts_for_speech(text: str) -> str:
         "11": "eleven",
         "12": "twelve",
     }
+    count_words = "|".join(number_words.values())
+
+    def _lead_replace(match: re.Match[str]) -> str:
+        raw = match.group(1)
+        spoken = number_words.get(raw.lower(), number_words.get(raw, raw))
+        # Comma + hyphenated Lead-team forces Azure to pause (avoids "forlead").
+        return f"{spoken}, Lead-team"
+
+    text = re.sub(
+        rf"\b({count_words}|\d{{1,2}})\s+Lead(?:[- ]team)?\b",
+        _lead_replace,
+        text,
+        flags=re.IGNORECASE,
+    )
 
     def _replace(match: re.Match[str]) -> str:
         digits = match.group(1)
         word = match.group(2)
         spoken = number_words.get(digits, digits)
-        # Keep a clear pause before capitalized role words (Lead, Sentry, …).
         return f"{spoken} {word}"
 
     return re.sub(r"\b(\d{1,2})\s+([A-Z][A-Za-z-]+)\b", _replace, text)

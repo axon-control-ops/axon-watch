@@ -143,6 +143,8 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("Never speak about yourself in the third person", appendix)
         self.assertIn("I am doing this as Priya", appendix)
         self.assertIn("I am wiring Copy Link", appendix)
+        self.assertIn("Priya is planning", appendix)
+        self.assertIn("I am planning activities and assignments", appendix)
 
     def test_appendix_fallback_when_roster_misses(self) -> None:
         with patch(

@@ -90,6 +90,13 @@
   animation: company-roster-busy-pulse 1.5s ease-in-out infinite;
 }
 
+.company-roster__busy-badge--idle {
+  border-color: rgba(120, 150, 170, 0.28);
+  color: rgba(170, 195, 210, 0.72);
+  background: rgba(30, 42, 52, 0.55);
+  animation: none;
+}
+
 @keyframes company-roster-busy-pulse {
   0%,
   100% {

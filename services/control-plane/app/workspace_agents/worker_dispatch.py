@@ -243,6 +243,14 @@ def dispatch_continuous_worker_run(
             workspace_root=agent_root,
         )
         reply_text = str(lane_b_result.get("content") or "")
+        from app.workspace_agents.employee_first_person import (
+            rewrite_employee_third_person_to_first,
+        )
+
+        reply_text = rewrite_employee_third_person_to_first(
+            reply_text,
+            str(employee.name or "").strip() or None,
+        )
         scope_guard_detail = parse_out_of_scope_guard(reply_text)
         if scope_guard_detail:
             dispatched = False

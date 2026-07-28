@@ -4,6 +4,7 @@ import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import {
   companyBusyEmployeesCount,
   employeeIsActivelyBusy,
+  resolveLiveBusyEmployeeIds,
 } from './company-roster-busy';
 import { employeeIsWorking } from './company-roster-status';
 
@@ -45,5 +46,43 @@ describe('company-roster-busy', () => {
     });
     expect(employeeIsActivelyBusy(specialist)).toBe(true);
     expect(companyBusyEmployeesCount([specialist])).toBe(1);
+  });
+
+  it('treats watching specialists with an active run as busy', () => {
+    const watcher = employee({
+      status: 'watching',
+      active_run_id: 'run_continuous',
+    });
+    expect(employeeIsActivelyBusy(watcher)).toBe(true);
+    expect(companyBusyEmployeesCount([watcher])).toBe(1);
+  });
+
+  it('counts every streaming thread owner as live-busy, not only the focused tab', () => {
+    const sipho = employee({
+      employee_id: 'sipho',
+      name: 'Sipho',
+      role: 'backend',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'usage limits',
+    });
+    const amara = employee({
+      employee_id: 'amara',
+      name: 'Amara',
+      role: 'integrations',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: 'usage limits',
+    });
+    const ids = resolveLiveBusyEmployeeIds({
+      employees: [sipho, amara],
+      streamingThreadIds: ['thread_sipho', 'thread_amara'],
+      threads: [
+        { thread_id: 'thread_sipho', employee_id: 'sipho' },
+        { thread_id: 'thread_amara', employee_id: 'amara' },
+      ],
+      focusedStreamEmployeeId: 'sipho',
+    });
+    expect(ids.sort()).toEqual(['amara', 'sipho']);
   });
 });

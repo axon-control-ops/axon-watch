@@ -11,7 +11,6 @@ import {
 import { resolveRosterSelectionForIdeThread } from '../../features/workspace-agents/active-ide-employee';
 import {
   buildCompanyRosterAlertBadge,
-  companyBusyEmployeesCount,
   companyHeadline,
   companyFailedEmployeesHint,
   companyFailedEmployeesHintTooltip,
@@ -22,6 +21,7 @@ import {
   employeeSpeakLine,
   firstFailedRosterEmployee,
   pickDefaultRosterEmployee,
+  resolveLiveBusyEmployeeIds,
 } from '../../features/workspace-agents/company-roster-view';
 import {
   markIntroSpokenToday,
@@ -177,27 +177,21 @@ const headline = computed(() =>
 );
 
 const liveBusyEmployeeIds = computed(() => {
-  const ids = new Set<string>();
-  for (const row of employees.value) {
-    if (employeeIsActivelyBusy(row)) {
-      ids.add(row.employee_id);
-    }
-  }
-  // Prefer the open IDE thread's owner — Lead can be "delegating" in chrome while
-  // a specialist thread is the one actually streaming.
-  if (shell.agentStreamActive) {
-    const threadEmployeeId = shell.activeIdeThread?.employee_id?.trim();
-    const recordEmployeeId = shell.activeIdeEmployeeRecord?.employee_id?.trim();
-    const primaryId =
-      employees.value.find((row) => row.primary)?.employee_id?.trim() ||
-      employees.value.find((row) => row.role === 'lead')?.employee_id?.trim() ||
-      null;
-    const streamOwnerId = threadEmployeeId || recordEmployeeId || primaryId;
-    if (streamOwnerId) {
-      ids.add(streamOwnerId);
-    }
-  }
-  return [...ids];
+  const focusedStreamEmployeeId = shell.agentStreamActive
+    ? shell.activeIdeThread?.employee_id?.trim() ||
+      shell.activeIdeEmployeeRecord?.employee_id?.trim() ||
+      null
+    : null;
+  const ids = resolveLiveBusyEmployeeIds({
+    employees: employees.value,
+    streamingThreadIds: shell.streamingIdeThreadIds,
+    threads: shell.ideThreadsForCurrentWorkspace,
+    focusedStreamEmployeeId,
+  });
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'busy-presence',hypothesisId:'H1,H2,H5',location:'CompanyRosterPanel.vue:liveBusyEmployeeIds',message:'resolved live busy employee ids',data:{busyCount:ids.length,busyIds:ids,streamingThreadIds:shell.streamingIdeThreadIds,focusedStreamEmployeeId,agentStreamActive:shell.agentStreamActive,rosterStatuses:employees.value.map((row)=>({id:row.employee_id,name:row.name,status:row.status,activeRun:Boolean(row.active_run_id),lastOutcome:row.last_outcome??null,rosterBusy:employeeIsActivelyBusy(row)}))},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  return ids;
 });
 
 const hasFailedEmployees = computed(() =>
@@ -208,20 +202,13 @@ const rosterAlertBadge = computed(() =>
   buildCompanyRosterAlertBadge(employees.value, liveBusyEmployeeIds.value),
 );
 
-const busyCount = computed(() => {
-  const rosterBusy = companyBusyEmployeesCount(employees.value);
-  const liveExtra = liveBusyEmployeeIds.value.filter(
-    (id) => !employees.value.some((row) => row.employee_id === id && employeeIsActivelyBusy(row)),
-  ).length;
-  return rosterBusy + liveExtra;
-});
+const busyCount = computed(() => liveBusyEmployeeIds.value.length);
 
 const busyBadgeLabel = computed(() => {
-  const count = busyCount.value;
-  if (count <= 0) {
+  if (!employees.value.length) {
     return null;
   }
-  return `${count} BUSY`;
+  return `${busyCount.value} BUSY`;
 });
 
 const failedEmployeesHint = computed(() =>
@@ -278,7 +265,15 @@ function speakEmployeeLine(employee: CompanyEmployeeRecord, kind: TeamMemberChat
 async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKind): Promise<void> {
   selectEmployee(employee);
   if (kind === 'retry') {
-    await runEmployeeShiftRetry(shell, employee, { keepActivityView: true, focusThread: true });
+    controlError.value = null;
+    const result = await runEmployeeShiftRetry(shell, employee, {
+      keepActivityView: true,
+      focusThread: true,
+    });
+    if (!result.ok) {
+      controlError.value = result.reason;
+      return;
+    }
     speakEmployeeLine(employee, kind);
     return;
   }
@@ -418,6 +413,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
             <span
               v-if="busyBadgeLabel"
               class="company-roster__busy-badge"
+              :class="{ 'company-roster__busy-badge--idle': busyCount === 0 }"
               :title="`${busyCount} teammate${busyCount === 1 ? '' : 's'} currently busy`"
               :aria-label="`${busyCount} teammate${busyCount === 1 ? '' : 's'} currently busy`"
             >

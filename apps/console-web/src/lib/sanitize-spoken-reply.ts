@@ -66,7 +66,9 @@ function preparePersonaNameForSpeech(text: string): string {
       OPERATOR_PERSONA_SPOKEN_NAME,
     )
     .replace(/\bV\s+A\s+X\s+O\s+N\b/gi, OPERATOR_PERSONA_SPOKEN_NAME)
-    .replace(/\bVAXON\b/gi, OPERATOR_PERSONA_SPOKEN_NAME);
+    .replace(/\bVAXON\b/gi, OPERATOR_PERSONA_SPOKEN_NAME)
+    // Zulu name — speak Sipho as SEE-po (not SIFO).
+    .replace(/\bSipho\b/gi, 'See-po');
 }
 
 /** Keep TTS from reading punctuation / symbol names aloud. */
@@ -78,7 +80,7 @@ function softenSymbolsForSpeech(text: string): string {
     // Expand acronyms before slash/hyphen softening so TTS does not say "see" / "fourlead".
     .replace(/\bCI\/CD\b/g, 'C I C D')
     .replace(/\bCI\b/g, 'C I')
-    .replace(/\bLead-team\b/gi, 'Lead team')
+    // Keep Lead-team hyphenated — it forces a TTS break (Lead team → "forlead" after counts).
     // Emoji / pictographs (incl. many "smiley" ranges).
     .replace(/[\u{1F300}-\u{1FAFF}\u{2700}-\u{27BF}\u{2600}-\u{26FF}]/gu, ' ')
     .replace(/\\/g, ' ')
@@ -100,7 +102,7 @@ function softenSymbolsForSpeech(text: string): string {
   return out.replace(/\s+/g, ' ').trim();
 }
 
-/** Stop TTS from gluing "4 Lead" into "forlead". */
+/** Stop TTS from gluing "4 Lead" / "four Lead" into "forlead". */
 function prepareCountsForSpeech(text: string): string {
   const numberWords: Record<string, string> = {
     '0': 'zero',
@@ -117,10 +119,20 @@ function prepareCountsForSpeech(text: string): string {
     '11': 'eleven',
     '12': 'twelve',
   };
-  return text.replace(/\b(\d{1,2})\s+([A-Z][A-Za-z-]+)\b/g, (_full, digits: string, word: string) => {
+  const countWord = Object.values(numberWords).join('|');
+  // Count immediately before Lead → insert a comma + keep Lead-team hyphen for a clear break.
+  let out = text.replace(
+    new RegExp(`\\b(${countWord}|\\d{1,2})\\s+Lead(?:[- ]team)?\\b`, 'gi'),
+    (_full, raw: string) => {
+      const spoken = numberWords[String(raw).toLowerCase()] ?? numberWords[raw] ?? String(raw);
+      return `${spoken}, Lead-team`;
+    },
+  );
+  out = out.replace(/\b(\d{1,2})\s+([A-Z][A-Za-z-]+)\b/g, (_full, digits: string, word: string) => {
     const spoken = numberWords[digits] ?? digits;
     return `${spoken} ${word}`;
   });
+  return out;
 }
 
 function stripPersonaPrefix(text: string): string {

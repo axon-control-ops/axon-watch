@@ -66,7 +66,7 @@ export function employeeFailureLine(
       return 'Last job was interrupted before it could finish — tap Continue to pick up where they left off.';
     }
     if (isUsageLimitFailure(employee.last_outcome_detail)) {
-      return 'Last job could not start — usage limits blocked the agent. Restore limits, then tap Try again.';
+      return 'Last job could not start — Cursor usage is exhausted account-wide. Raise the limit or wait for reset — do not retry yet.';
     }
     if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
       return 'Last job almost finished — the closing Confidence line was missing. Tap Try again to close it out.';
@@ -112,7 +112,7 @@ export function employeeFailureDetailTooltip(
     return 'Runtime login is not ready. Run `cursor agent login` or unlock /vault, then retry.';
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
-    return 'Usage limits blocked the agent runtime. Restore limits, then retry.';
+    return 'Cursor usage is exhausted account-wide. Raise the limit or wait for reset before retrying.';
   }
   if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
     return 'Closing Confidence line was missing after real work. Retry to close the Critical Review.';
@@ -197,6 +197,16 @@ export function employeeFailureRetryActionLabel(employee: CompanyEmployeeRecord)
     return OPERATOR_FAILURE_RETRY_LABEL;
   }
   return operatorFailureRetryLabel(employeeShiftNeedsContinuation(employee));
+}
+
+/**
+ * True when automated/continuous retry would only burn more Cursor quota.
+ * Manual Team "Try again" still stays available — copy warns the operator.
+ */
+export function employeeFailureBlocksAutoRetry(employee: CompanyEmployeeRecord): boolean {
+  return (
+    Boolean(employeeFailureLine(employee)) && isUsageLimitFailure(employee.last_outcome_detail)
+  );
 }
 
 /** Status chip value: surfaces failed when the last job failed and the teammate is idle. */

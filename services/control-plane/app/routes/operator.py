@@ -360,19 +360,21 @@ def kairo_converse(
     refresh: bool = Query(default=False),
 ) -> dict[str, object]:
     trimmed = body.content.strip()
-    if not trimmed:
+    attachment_ids = list(body.attachment_ids or [])
+    if not trimmed and not attachment_ids:
         raise HTTPException(status_code=400, detail="content must not be empty")
     try:
         return converse_turn(
-            content=trimmed,
+            content=trimmed or "Please review the attached files.",
             session_id=body.session_id,
             workspace_id=body.workspace_id or None,
-            use_runtime=body.use_runtime,
-            answer_tier=body.answer_tier,
+            use_runtime=body.use_runtime or bool(attachment_ids),
+            answer_tier="deep" if attachment_ids else body.answer_tier,
             context_workspace_id=body.context_workspace_id or None,
             context_signal_id=body.context_signal_id or None,
             context_node_id=body.context_node_id or None,
             force_refresh=refresh,
+            attachment_ids=attachment_ids,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

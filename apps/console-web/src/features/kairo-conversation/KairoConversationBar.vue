@@ -23,10 +23,22 @@ import {
 } from '../../lib/apply-employee-specialty-route';
 import { teammateRouteNotice } from '../../lib/teammate-route-notice';
 import { useShellStore } from '../../stores/shell';
+import VaxonConversationAttachControls from './VaxonConversationAttachControls.vue';
 
 const shell = useShellStore();
-const { draft, pending, thinkingLine, canSubmit, submitTurn, handleFocus, handleBlur, handleHistoryKeydown, speechCapture } =
-  useKairoConversation();
+const {
+  draft,
+  pending,
+  thinkingLine,
+  canSubmit,
+  submitTurn,
+  handleFocus,
+  handleBlur,
+  handleHistoryKeydown,
+  speechCapture,
+  attachments,
+} = useKairoConversation();
+const pendingAttachments = attachments.pendingAttachments;
 
 const workspaceId = computed(() => shell.currentWorkspace?.workspace_id ?? null);
 const pendingApprovals = computed(
@@ -313,7 +325,13 @@ onUnmounted(() => {
       @dismiss="dismissTeammateRoute"
     />
     <div class="kairo-conversation-bar__command-row">
-      <form class="kairo-conversation-bar__form" @submit.prevent="handleSubmit">
+      <form
+        class="kairo-conversation-bar__form"
+        @submit.prevent="handleSubmit"
+        @paste="attachments.handlePaste"
+        @dragover.prevent
+        @drop.prevent="attachments.handleDrop"
+      >
         <span class="kairo-conversation-bar__glyph-slot" aria-hidden="true">
           <OperatorPersonaMark size="xs" />
         </span>
@@ -329,6 +347,12 @@ onUnmounted(() => {
           @focus="handleInputFocus"
           @blur="handleBlur"
           @keydown="handleInputKeydown"
+        />
+        <VaxonConversationAttachControls
+          :attachments="pendingAttachments"
+          :disabled="inputDisabled"
+          @attach="attachments.pickFiles"
+          @remove="attachments.removeAttachment"
         />
         <button
           v-if="showInterrupt"

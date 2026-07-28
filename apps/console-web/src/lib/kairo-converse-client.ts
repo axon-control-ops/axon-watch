@@ -80,6 +80,7 @@ export interface KairoConverseRequest {
   context_workspace_id?: string;
   context_signal_id?: string;
   context_node_id?: string;
+  attachment_ids?: string[];
 }
 
 export interface KairoConverseReportSections {

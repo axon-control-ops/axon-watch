@@ -87,7 +87,9 @@ export function createAgentStreamIncrementalState(options?: {
     if (inBlock === 'thinking' && inThinkingBlock) {
       const trimmedEnd = line.trimEnd();
       if (BLOCK_CLOSE_RE.test(trimmedEnd)) {
-        const complete = sanitizeAgentThinkingForOperator(currentThinkingBody);
+        const complete = sanitizeAgentThinkingForOperator(currentThinkingBody, {
+          speakerName: personaName,
+        });
         if (complete) {
           completedThinkingSpeechQueue.push(complete);
         }
@@ -106,7 +108,9 @@ export function createAgentStreamIncrementalState(options?: {
           }
           currentThinkingBody += withoutClose;
         }
-        const complete = sanitizeAgentThinkingForOperator(currentThinkingBody);
+        const complete = sanitizeAgentThinkingForOperator(currentThinkingBody, {
+          speakerName: personaName,
+        });
         if (complete) {
           completedThinkingSpeechQueue.push(complete);
         }
@@ -236,12 +240,9 @@ export function createAgentStreamIncrementalState(options?: {
   function toStreamingActivityView(fullAccess = false): StreamingActivityView {
     const thinking = liveThinkingTextFromState();
     if (thinking) {
-      const sanitized = sanitizeAgentThinkingForOperator(thinking);
-      // #region agent log
-      if (/:::/.test(thinking) || /:::/.test(sanitized)) {
-
-      }
-      // #endregion
+      const sanitized = sanitizeAgentThinkingForOperator(thinking, {
+        speakerName: personaName,
+      });
       if (sanitized) {
         const displayBody = truncateAgentLiveLineForDisplay(sanitized, AGENT_LIVE_LINE_DISPLAY_MAX);
         return {

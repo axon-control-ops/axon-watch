@@ -288,8 +288,12 @@ def _attention_bits(snapshot: dict[str, Any]) -> list[str]:
 
     awaiting = int(snapshot.get("awaiting_engagement_count") or 0)
     if awaiting > 0:
-        noun = "Lead team plan" if awaiting == 1 else "Lead team plans"
-        bits.append(f"{_spell_count(awaiting)} {noun} waiting for you")
+        if awaiting == 1:
+            bits.append("a Lead-team plan waiting for you")
+        else:
+            bits.append(
+                f"Lead-team plans waiting for you — {_spell_count(awaiting)} of them"
+            )
 
     notice = str((snapshot.get("briefing") or {}).get("notice") or "").strip().rstrip(".")
     if notice:

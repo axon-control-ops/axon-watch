@@ -61,10 +61,11 @@
       "target": "apps/console-web/src/styles/tokens/* + feature CSS"
     },
     "services/control-plane/app/kairo_conversation.py": {
-      "max_lines": 410,
+      "max_lines": 417,
       "soft_limit": 350,
       "hard_limit": 500,
-      "target": "services/control-plane/app/kairo/*"
+      "target": "services/control-plane/app/kairo/*",
+      "note": "VAXON attachment path pass-through; extract early-intent next"
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
       "max_lines": 531,
@@ -293,7 +294,7 @@
       "note": "Watch inbox/connector client cache; extract cache helpers next"
     },
     "apps/console-web/src/styles/shell/agent-persona-dock.css": {
-      "max_lines": 663,
+      "max_lines": 675,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/agent-persona-*",

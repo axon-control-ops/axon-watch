@@ -278,7 +278,31 @@ export function normalizeThinkingSpeechLead(text: string): string {
   return capitalizeWord(rest);
 }
 
-export function sanitizeAgentThinkingForOperator(text: string): string {
+export function rewriteThirdPersonSpeaker(
+  text: string,
+  speakerName?: string | null,
+): string {
+  const name = String(speakerName || '').trim();
+  const cleaned = String(text || '');
+  if (!name || !cleaned) {
+    return cleaned;
+  }
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let out = cleaned;
+  out = out.replace(new RegExp(`\\b${escaped}\\s+is\\b`, 'gi'), 'I am');
+  out = out.replace(new RegExp(`\\b${escaped}\\s+was\\b`, 'gi'), 'I was');
+  out = out.replace(new RegExp(`\\b${escaped}\\s+will\\b`, 'gi'), 'I will');
+  out = out.replace(new RegExp(`\\b${escaped}\\s+has\\b`, 'gi'), 'I have');
+  out = out.replace(new RegExp(`\\b${escaped}'s\\b`, 'gi'), 'my');
+  out = out.replace(new RegExp(`\\b${escaped}\u2019s\\b`, 'gi'), 'my');
+  out = out.replace(new RegExp(`\\bas\\s+${escaped}\\b[,]?\\s*`, 'gi'), '');
+  return flattenLiveLineText(out);
+}
+
+export function sanitizeAgentThinkingForOperator(
+  text: string,
+  options?: { speakerName?: string | null },
+): string {
   let out = collapseBackToBackThinkingEcho(text);
   if (!out) {
     return '';
@@ -291,6 +315,7 @@ export function sanitizeAgentThinkingForOperator(text: string): string {
   out = out.replace(LEADING_WHETHER_RE, '');
   out = flattenLiveLineText(out).replace(/^[,.\-–—:;]+/, '').trim();
   out = stripAgentStreamFenceMarkers(out);
+  out = rewriteThirdPersonSpeaker(out, options?.speakerName);
   out = normalizeThinkingSpeechLead(out);
   if (!out || /^(?:the\s+)?user\b/i.test(out) || /^(?:whether|if)\s*$/i.test(out)) {
     return '';

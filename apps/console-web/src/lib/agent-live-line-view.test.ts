@@ -16,6 +16,15 @@ const DASHBOARD_THOUGHT =
   'I found the one concrete breakage left behind: the new teacher dashboard tests aren’t mocking useWindowDimensions, so they fail immediately, while the parent realtime tests already pass. I’m patching the test environment now so the new dashboard work can actually run.';
 
 describe('sanitizeAgentThinkingForOperator', () => {
+  it('rewrites teammate third-person self-narration into first person', () => {
+    expect(
+      sanitizeAgentThinkingForOperator(
+        'Lindi is planning activities and assignments for grades 1–4.',
+        { speakerName: 'Lindi' },
+      ),
+    ).toBe('I am planning activities and assignments for grades 1–4.');
+  });
+
   it('strips third-person user-asking meta commentary', () => {
     expect(sanitizeAgentThinkingForOperator('The user is asking whether')).toBe('');
     expect(sanitizeAgentThinkingForOperator('*The user is asking whether*')).toBe('');

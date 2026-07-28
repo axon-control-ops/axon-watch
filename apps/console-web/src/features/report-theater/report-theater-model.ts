@@ -64,7 +64,7 @@ export function normalizeReportTheaterSections(
   const scrub = (item: string): string =>
     String(item || '')
       .replace(/[#*`_]+/g, ' ')
-      .replace(/\bLead-team\b/gi, 'Lead team')
+      // Keep Lead-team hyphen — TTS needs the break (four Lead → forlead).
       .replace(/\s+/g, ' ')
       .replace(/(?:^|\.\s*)Lead next:\s*$/i, '')
       .trim()

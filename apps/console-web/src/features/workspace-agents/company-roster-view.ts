@@ -26,6 +26,7 @@ export {
   companyBusyEmployeesCount,
   employeeIsActivelyBusy,
   employeeIsLeadLikeRole,
+  resolveLiveBusyEmployeeIds,
 } from './company-roster-busy';
 
 export {
@@ -47,6 +48,7 @@ export {
   employeeFailureLine,
   employeeFailurePeekKey,
   employeeFailureRetryActionLabel,
+  employeeFailureBlocksAutoRetry,
   employeeShiftNeedsContinuation,
   employeeDockReceiptDetail,
   type CompanyRosterAlertBadge,

@@ -101,6 +101,7 @@ def _build_runtime_context_block(
     recent_turns: list[dict[str, str]],
     context_node_id: str | None = None,
     context_signal_id: str | None = None,
+    image_paths: tuple[str, ...] = (),
 ) -> str:
     return build_runtime_context_block(
         content=content,
@@ -110,6 +111,7 @@ def _build_runtime_context_block(
         recent_turns=recent_turns,
         context_node_id=context_node_id,
         context_signal_id=context_signal_id,
+        image_paths=image_paths,
     )
 
 
@@ -151,6 +153,7 @@ def converse_turn(
     context_signal_id: str | None = None,
     context_node_id: str | None = None,
     force_refresh: bool = False,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, object]:
     started_at = time.perf_counter()
     raw_content = content.strip()
@@ -158,15 +161,29 @@ def converse_turn(
     if not trimmed:
         raise ValueError("content must not be empty")
 
-    guest_name = update_participant_from_utterance(session_id, trimmed)
+    from app.kairo.converse_attachments import ConverseAttachmentError, prepare_converse_attachment_paths
 
+    if attachment_ids:
+        use_runtime = True
+        answer_tier = "deep"
+    guest_name = update_participant_from_utterance(session_id, trimmed)
     tier: ConversationAnswerTier = "deep" if str(answer_tier).strip().lower() == "deep" else "fast"
     inferred_workspace_id = infer_workspace_id_from_content(trimmed)
     entity = _entity_context(session_id)
-    entity_workspace_id = entity.get("target_workspace_id") or None
     resolved_workspace_id = (
-        context_workspace_id or workspace_id or inferred_workspace_id or entity_workspace_id
+        context_workspace_id
+        or workspace_id
+        or inferred_workspace_id
+        or entity.get("target_workspace_id")
+        or None
     )
+    try:
+        image_paths = prepare_converse_attachment_paths(
+            attachment_ids=attachment_ids,
+            workspace_id=str(resolved_workspace_id or workspace_id or ""),
+        )
+    except ConverseAttachmentError as exc:
+        raise ValueError(str(exc)) from exc
     from app.kairo.operator_deterministic_report import is_operator_report_request
 
     # REPORT always needs a fresh briefing/roster snapshot — ignore cache TTL.
@@ -320,6 +337,10 @@ def converse_turn(
     turn_kind = classify_conversation_turn(trimmed)
     # Keep caller use_runtime; voice_routing_mode gates lanes inside the router.
     recent = _recent_turns(session_id)
+
+    def _runtime_context_with_attachments(**kwargs: Any) -> str:
+        return _build_runtime_context_block(**kwargs, image_paths=image_paths)
+
     decision = route_voice_turn(
         content=trimmed,
         session_id=session_id,
@@ -327,13 +348,13 @@ def converse_turn(
         pack=pack,
         turn_kind=turn_kind,
         voice_routing_mode=voice_routing_mode,
-        use_runtime=use_runtime,
+        use_runtime=use_runtime or bool(image_paths),
         answer_tier=tier,
         recent_turns=recent,
         command_ack_line=command_ack_line,
         workspace_short_label=workspace_short_label,
         build_runtime_artifact=build_runtime_artifact,
-        build_runtime_context_block=_build_runtime_context_block,
+        build_runtime_context_block=_runtime_context_with_attachments,
         remember_entities=_remember_entities,
         remember_top_signal=_remember_top_signal,
         dispatch_runtime=dispatch_ide_composer,

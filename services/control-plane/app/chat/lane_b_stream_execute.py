@@ -37,6 +37,10 @@ from app.workspace_agents.critical_review_clause import (
     critical_review_receipt_summary,
     resolve_critical_review_confidence,
 )
+from app.workspace_agents.employee_first_person import (
+    employee_name_from_persona_block,
+    rewrite_employee_third_person_to_first,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -325,6 +329,8 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             on_chunk=on_chunk,
         )
         agent_content = str(lane_b_result.get("content") or "")
+        speaker_name = employee_name_from_persona_block(job.memory_appendix)
+        agent_content = rewrite_employee_third_person_to_first(agent_content, speaker_name)
         execution_tier = str(lane_b_result.get("execution_tier") or "consultative")
         try:
             workspace_root = resolve_workspace_root(job.workspace_id)

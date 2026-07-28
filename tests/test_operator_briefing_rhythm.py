@@ -51,7 +51,7 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
             lead_awaiting_engagement_count=1,
         )
 
-        self.assertEqual("One Lead team plan is waiting for you to engage in VAXON.", notice)
+        self.assertEqual("A Lead-team plan is waiting for you to engage in VAXON.", notice)
 
     def test_notice_surfaces_multiple_lead_plans_tts_safe(self) -> None:
         notice = build_briefing_notice(
@@ -64,10 +64,11 @@ class OperatorBriefingRhythmTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            "Four Lead team plans are waiting for you to engage in VAXON.",
+            "Lead-team plans are waiting for you to engage in VAXON — Four of them.",
             notice,
         )
         self.assertNotRegex(notice, r"\b\d+\s+Lead\b")
+        self.assertNotRegex(notice, r"(?i)\bfour\s+Lead\b")
 
     def test_idle_rhythm_stays_quiet_instead_of_inventing_status_copy(self) -> None:
         rhythm = build_operator_briefing_rhythm(

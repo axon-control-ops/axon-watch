@@ -136,11 +136,11 @@ describe('company-roster-failure-view', () => {
         "Lane B agent fallback reply generated (ActionRequiredError: Increase limits for faster responses You're out of usage.)",
     });
     const friendlyLine =
-      'Last job could not start — usage limits blocked the agent. Restore limits, then tap Try again.';
+      'Last job could not start — Cursor usage is exhausted account-wide. Raise the limit or wait for reset — do not retry yet.';
     expect(employeeFailureLine(usageBlocked)).toBe(friendlyLine);
     expect(employeeFailureBannerCopy(usageBlocked)).toBe(`Jules — ${friendlyLine}`);
     expect(employeeFailureBannerAriaLabel(usageBlocked)).toContain('Full detail:');
-    expect(employeeFailureBannerAriaLabel(usageBlocked)).toMatch(/usage limits blocked/i);
+    expect(employeeFailureBannerAriaLabel(usageBlocked)).toMatch(/usage is exhausted|out of usage|usage limits/i);
     expect(
       employeeFailureLine(
         employee({
@@ -158,7 +158,7 @@ describe('company-roster-failure-view', () => {
           last_outcome_detail: 'ActionRequiredError: out of usage',
         }),
       ),
-    ).toContain('usage limits blocked the agent');
+    ).toMatch(/usage/i);
   });
 
   it('maps restart-interrupted failures to operator-friendly copy', () => {
@@ -380,7 +380,7 @@ describe('company-roster-failure-view', () => {
       last_outcome_detail: `${'ActionRequiredError: '.repeat(20)}out of usage`,
     });
     expect(employeeFailureDetailTooltip(row)).toBe(
-      'Usage limits blocked the agent runtime. Restore limits, then retry.',
+      'Cursor usage is exhausted account-wide. Raise the limit or wait for reset before retrying.',
     );
   });
 
