@@ -80,6 +80,17 @@ describe('narrationForCompletion', () => {
     );
   });
 
+  it('prefers Confidence closing over a mid-shift Retrying opener', () => {
+    const content = [
+      'Retrying my bounded shift now, Sir King — I will read the charter next.',
+      'Critical Review: receipts restored after usage limits.',
+      'Confidence: 9/10',
+    ].join('\n\n');
+    const spoken = spokenCompletionSummary(content);
+    expect(spoken).not.toMatch(/^Retrying/i);
+    expect(spoken.toLowerCase()).toMatch(/confidence|critical review|shift complete/);
+  });
+
   it('marks Lane B runtime failures instead of done', () => {
     const failure =
       "Lane B (agent) cannot start because no CLI runtime is ready: ActionRequiredError: You're out of usage.";

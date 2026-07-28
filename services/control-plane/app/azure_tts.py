@@ -39,6 +39,8 @@ def _clean_for_speech(text: str) -> str:
     )
     cleaned = re.sub(r"\bV\s+A\s+X\s+O\s+N\b", "Vekson", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bVAXON\b", "Vekson", cleaned, flags=re.IGNORECASE)
+    # Zulu names Azure often misreads — speak Sipho as SEE-po.
+    cleaned = re.sub(r"\bSipho\b", "See-po", cleaned, flags=re.IGNORECASE)
     return cleaned[:3000]
 
 
