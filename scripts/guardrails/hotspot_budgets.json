@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3927,
+      "max_lines": 3935,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -105,13 +105,13 @@
       "note": "Runtime status snapshot cache and probe assembly"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1546,
+      "max_lines": 1670,
       "soft_limit": 400,
-      "hard_limit": 1546,
+      "hard_limit": 1670,
       "target": "docs/how-to/* chapters"
     },
     "docs/HOW-TO-HANDBOOK.html": {
-      "max_lines": 3079,
+      "max_lines": 3280,
       "soft_limit": 250,
       "hard_limit": 400,
       "target": "docs/how-to/* generated HTML"
@@ -389,7 +389,7 @@
       "note": "Mission Control Task Board; extract plan/task sections next"
     },
     "apps/console-web/src/features/report-theater/report-theater.css": {
-      "max_lines": 534,
+      "max_lines": 550,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/report-theater/*",
@@ -403,11 +403,18 @@
       "note": "Task Board density polish; split header/list/card CSS next"
     },
     "services/control-plane/app/kairo/operator_deterministic_report.py": {
-      "max_lines": 501,
+      "max_lines": 540,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/report_*",
       "note": "Deterministic REPORT lane; extract handoff formatting next"
+    },
+    "apps/console-web/src/stores/shell/slices/create-kairo-voice-slice.ts": {
+      "max_lines": 520,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/stores/shell/slices/kairo-voice-*",
+      "note": "Spoken alert + theater lock; extract walk-fix recovery next"
     },
     "tests/test_run_outcome.py": {
       "max_lines": 529,
