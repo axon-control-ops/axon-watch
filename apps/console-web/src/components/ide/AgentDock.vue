@@ -160,6 +160,12 @@ onMounted(() => {
     </header>
 
     <section class="agent-dock__thread">
+      <div
+        v-if="shell.threadStateLabel"
+        class="agent-dock__section-header agent-dock__section-header--compact"
+      >
+        <p class="agent-dock__section-meta">{{ shell.threadStateLabel }}</p>
+      </div>
       <AgentDockStickyPrompt
         v-if="stickyOperatorPrompt"
         :text="stickyOperatorPrompt"
