@@ -5,6 +5,7 @@ import WorkbenchTerminalDock from '../WorkbenchTerminalDock.vue';
 import AgentEditReviewViewer from '../AgentEditReviewViewer.vue';
 import EditorHost from '../EditorHost.vue';
 import GalaxySpeechCaptions from '../../features/brain-galaxy/GalaxySpeechCaptions.vue';
+import { shouldShowGalaxySpeechCaptions } from '../../features/brain-galaxy/should-show-galaxy-speech-captions';
 import EditorMarkdownToolbar from './EditorMarkdownToolbar.vue';
 import EditorCsvToolbar from './EditorCsvToolbar.vue';
 import CenterWorkbenchIdeQuickGuide from './CenterWorkbenchIdeQuickGuide.vue';
@@ -64,11 +65,11 @@ import { useWorkbenchTerminalAutoClose } from '../../composables/useWorkbenchTer
 import { buildWorkbenchProblemItems } from '../../lib/workbench-problem-items';
 import { useEditorPlanBuild } from '../../composables/use-editor-plan-build';
 import { useEditorStatusBarMeta } from '../../composables/useEditorStatusBarMeta';
-
 const shell = useShellStore();
 const { activePlanId, buildingPlan, buildPlanError, buildActivePlan } = useEditorPlanBuild(shell);
 const hideOperatorEditor = computed(() => shell.layoutMode === 'operator');
 const isIdeMode = computed(() => shell.layoutMode === 'ide');
+const showGalaxySpeechCaptions = computed(() => shouldShowGalaxySpeechCaptions({ layoutMode: shell.layoutMode, operatorBrainGalaxyActive: shell.operatorBrainGalaxyActive }));
 const workbenchLayoutMode = computed((): 'operator' | 'ide' =>
   hideOperatorEditor.value ? 'operator' : 'ide',
 );
@@ -650,8 +651,7 @@ watch(
     </section>
 
     <OperatorStatusRadarPanel v-if="hideOperatorEditor" :terminal-visible="terminalPanelVisible" @toggle-terminal="toggleTerminalPanel" />
-    <!-- Speaker HUD stays Operator-only — IDE keeps the editor clear (presence lives in left rail / status bar). -->
-    <GalaxySpeechCaptions v-if="!isIdeMode" />
+    <GalaxySpeechCaptions v-if="showGalaxySpeechCaptions" />
     <WorkbenchTerminalDock v-if="showTerminalDock" :hide-operator-editor="hideOperatorEditor" :log-lines="logLines" :output-lines="outputLines" :problem-items="problemItems" :terminal-height="terminalHeight" @hide="hideTerminalPanel" @start-resize="startTerminalResize" />
   </main>
 </template>

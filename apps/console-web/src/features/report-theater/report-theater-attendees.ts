@@ -52,11 +52,14 @@ export function buildReportTheaterAttendees(input: {
   activeLines: string[];
   /** When Lead rollups is on stage, keep Leads highlighted as speakers. */
   stageId?: string | null;
+  /** Exact narration speaker; when set, only this attendee glows. */
+  activeSpeakerName?: string | null;
   max?: number;
 }): ReportTheaterAttendee[] {
   const max = Math.max(4, input.max ?? 7);
   const lines = input.activeLines;
   const leadStage = input.stageId === 'lead_rollups';
+  const activeSpeaker = String(input.activeSpeakerName || '').trim().toLowerCase();
   const ranked = [...input.employees].sort((left, right) => {
     const leftLead = employeeIsLead(left) ? 0 : 1;
     const rightLead = employeeIsLead(right) ? 0 : 1;
@@ -79,8 +82,9 @@ export function buildReportTheaterAttendees(input: {
   const people = ranked.slice(0, max - 1).map((employee) => {
     const avatar = buildEmployeeAvatar(employee);
     const lead = employeeIsLead(employee);
-    const speaking =
-      mentionedInLines(employee.name, lines) || (leadStage && lead);
+    const speaking = activeSpeaker
+      ? employee.name.trim().toLowerCase() === activeSpeaker
+      : mentionedInLines(employee.name, lines) || (leadStage && lead);
     return {
       id: employee.employee_id,
       name: employee.name,
@@ -111,7 +115,7 @@ export function buildReportTheaterAttendees(input: {
         foreground: '#d7f6ff',
         faceUrl: resolveVaxonAvatarUrl(),
       },
-      speaking: !leadStage,
+      speaking: activeSpeaker ? activeSpeaker === 'vaxon' : !leadStage,
       statusLine: leadStage ? 'listening' : 'briefing',
     },
     ...people,

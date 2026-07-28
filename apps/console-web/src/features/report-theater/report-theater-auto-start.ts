@@ -23,6 +23,15 @@ export function resetReportTheaterAutoStartForTests(): void {
   lastAutoStartKey = '';
 }
 
+/** Initial hydration establishes a baseline; only a changed briefing may auto-open theater. */
+export function isReportTheaterAutoStartTransition(
+  previousBriefKey: string | undefined,
+  currentBriefKey: string,
+  eligible: boolean,
+): boolean {
+  return previousBriefKey !== undefined && previousBriefKey !== currentBriefKey && eligible;
+}
+
 /**
  * Semi/Full autonomy: VAXON opens Command Theater without the operator typing REPORT.
  */

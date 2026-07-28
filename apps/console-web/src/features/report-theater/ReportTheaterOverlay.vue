@@ -7,12 +7,14 @@ import { buildReportTheaterAttendees } from './report-theater-attendees';
 import { buildVaxonReportDirectives } from './report-theater-directives';
 import { executeReportTheaterAction } from './report-theater-execute';
 import { pickReportTheaterActions } from './report-theater-model';
+import { polishTheaterLine } from './report-theater-narration';
 import {
   closeReportTheater,
   reportTheaterExecuting,
   reportTheaterFingerprint,
   reportTheaterOpen,
   reportTheaterShowNextSteps,
+  reportTheaterSpeakerName,
   reportTheaterStageIndex,
   reportTheaterStages,
 } from './report-theater-state';
@@ -25,17 +27,26 @@ const showNextSteps = reportTheaterShowNextSteps;
 const executing = reportTheaterExecuting;
 
 const readiness = computed(() => shell.operatorBriefing?.production_readiness ?? null);
+const readinessBlocker = computed(() => {
+  const blocker = readiness.value?.blockers?.[0] ?? null;
+  if (!blocker) {
+    return null;
+  }
+  return polishTheaterLine(blocker, 72);
+});
 const activeStage = computed(() => stages.value[activeIndex.value] ?? null);
 const directives = computed(() =>
   buildVaxonReportDirectives({
     nextMove: stages.value[stages.value.length - 1]?.lines[0] ?? '',
     actions: pickReportTheaterActions(shell.operatorBriefing?.next_safe_actions, 3),
     topSignals: shell.operatorBriefing?.top_signals ?? [],
+    workspaces: shell.workspaces,
+    readiness: readiness.value,
   }),
 );
 const primaryDirective = computed(() => directives.value.find((item) => item.kind === 'primary') ?? null);
 const secondaryDirectives = computed(() =>
-  directives.value.filter((item) => item.kind !== 'primary'),
+  directives.value.filter((item) => item.kind !== 'primary').slice(0, 2),
 );
 
 const attendees = computed(() =>
@@ -46,7 +57,8 @@ const attendees = computed(() =>
       primaryDirective.value?.label ?? '',
     ],
     stageId: activeStage.value?.id ?? null,
-    max: 7,
+    activeSpeakerName: reportTheaterSpeakerName.value,
+    max: 6,
   }),
 );
 
@@ -81,9 +93,38 @@ const boardTitle = computed(() => {
     return 'Taking initiative';
   }
   if (heroMode.value === 'directive') {
-    return 'VAXON directive';
+    return 'Next directive';
   }
   return activeStage.value?.title ?? 'Stand-up';
+});
+
+type BoardCard = { tag: string | null; body: string };
+
+const boardCards = computed((): BoardCard[] => {
+  const stage = activeStage.value;
+  if (!stage || heroMode.value !== 'stage') {
+    return [];
+  }
+  const speaker = String(reportTheaterSpeakerName.value || '').trim().toLowerCase();
+  let lines = stage.lines.filter((line) => line.trim());
+  if (stage.id === 'lead_rollups') {
+    if (speaker && speaker !== 'vaxon') {
+      const match = lines.find((line) => line.toLowerCase().startsWith(speaker));
+      lines = match ? [match] : lines.slice(0, 1);
+    } else {
+      lines = lines.slice(0, 1);
+    }
+  } else {
+    lines = lines.slice(0, 2);
+  }
+  return lines.map((line) => {
+    if (stage.id === 'lead_rollups' && line.includes(':')) {
+      const tag = line.split(':')[0]?.trim() || null;
+      const body = polishTheaterLine(line.slice(line.indexOf(':') + 1).trim(), 160);
+      return { tag, body };
+    }
+    return { tag: null, body: polishTheaterLine(line, 160) };
+  });
 });
 
 function onKeydown(event: KeyboardEvent): void {
@@ -103,20 +144,13 @@ async function runDirective(directiveId: string): Promise<void> {
     return;
   }
   // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H23',location:'ReportTheaterOverlay.vue:runDirective',message:'directive clicked',data:{directiveId,label:directive.label,kind:directive.kind,actionKind:directive.briefingAction?.kind??null,actionTitle:directive.briefingAction?.title??null,signalId:directive.briefingAction?.signal_id??null,autoExecute:directive.autoExecute,layoutMode:shell.layoutMode,centerView:shell.operatorCenterView??null},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'jarvis-polish',hypothesisId:'H54',location:'ReportTheaterOverlay.vue:runDirective',message:'directive clicked',data:{directiveId,label:directive.label,actionKind:directive.briefingAction?.kind??null},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   if (!directive.briefingAction) {
     closeReportTheater();
     return;
   }
-  const result = await executeReportTheaterAction(
-    shell,
-    shell.operatorBriefing,
-    directive.briefingAction,
-  );
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H23',location:'ReportTheaterOverlay.vue:runDirective:result',message:'directive action executed',data:{directiveId,ok:result.ok,resultKind:'kind' in result ? result.kind : null,reason:'reason' in result ? result.reason : null,layoutModeAfter:shell.layoutMode,centerViewAfter:shell.operatorCenterView??null,leftSidebar:shell.leftSidebarMode??null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
+  await executeReportTheaterAction(shell, shell.operatorBriefing, directive.briefingAction);
   closeReportTheater();
 }
 
@@ -151,16 +185,20 @@ onUnmounted(() => {
 
         <header class="report-theater__header">
           <div>
-            <p class="report-theater__eyebrow">{{ OPERATOR_PERSONA_NAME }} · team stand-up</p>
+            <p class="report-theater__eyebrow">{{ OPERATOR_PERSONA_NAME }} command theater</p>
             <h2 class="report-theater__title">Stand-up</h2>
           </div>
           <div class="report-theater__meta">
             <span class="report-theater__pulse">{{ pulseLabel }}</span>
-            <span v-if="readiness" class="report-theater__readiness">
-              Production is {{ readiness.score }}%
+            <span
+              v-if="readiness"
+              class="report-theater__readiness"
+              :title="readinessBlocker || undefined"
+            >
+              {{ readiness.score }}%
             </span>
             <button type="button" class="report-theater__dismiss" @click="dismiss">
-              Dismiss
+              Esc
             </button>
           </div>
         </header>
@@ -190,9 +228,6 @@ onUnmounted(() => {
             </div>
             <div class="report-theater__seat-copy">
               <span class="report-theater__seat-name">{{ person.name }}</span>
-              <span class="report-theater__seat-role">
-                {{ person.kind === 'vaxon' ? 'Chair' : person.roleLabel }}
-              </span>
               <span class="report-theater__seat-status">{{ person.statusLine }}</span>
             </div>
           </div>
@@ -214,29 +249,27 @@ onUnmounted(() => {
         <div class="report-theater__board" :data-mode="heroMode">
           <p class="report-theater__hero-kicker">{{ boardTitle }}</p>
 
-          <template v-if="heroMode === 'stage' && activeStage">
+          <template v-if="heroMode === 'stage' && boardCards.length">
             <ul class="report-theater__hero-lines">
               <li
-                v-for="(line, lineIndex) in activeStage.lines.slice(0, 3)"
-                :key="`${activeStage.id}:${line}`"
+                v-for="(card, lineIndex) in boardCards"
+                :key="`${activeStage?.id}:${card.tag}:${card.body}`"
                 class="report-theater__hero-line"
-                :class="{
-                  'report-theater__hero-line--lead': activeStage.id === 'lead_rollups',
-                }"
+                :class="{ 'report-theater__hero-line--lead': Boolean(card.tag) }"
                 :style="{ animationDelay: `${lineIndex * 70}ms` }"
               >
-                <template v-if="activeStage.id === 'lead_rollups' && line.includes(':')">
-                  <span class="report-theater__lead-tag">{{ line.split(':')[0] }}</span>
-                  <span>{{ line.slice(line.indexOf(':') + 1).trim() }}</span>
+                <template v-if="card.tag">
+                  <span class="report-theater__lead-tag">{{ card.tag }}</span>
+                  <span>{{ card.body }}</span>
                 </template>
-                <template v-else>{{ line }}</template>
+                <template v-else>{{ card.body }}</template>
               </li>
             </ul>
           </template>
 
           <template v-else-if="heroMode === 'intro'">
             <p class="report-theater__hero-directive report-theater__hero-directive--intro">
-              Leads are present — {{ OPERATOR_PERSONA_NAME }} is compiling the board…
+              Leads are present — compiling the board…
             </p>
           </template>
 
@@ -272,7 +305,6 @@ onUnmounted(() => {
                 @click="runDirective(directive.id)"
               >
                 <span class="report-theater__action-label">{{ directive.label }}</span>
-                <span class="report-theater__action-detail">{{ directive.detail }}</span>
               </button>
             </div>
             <p v-if="reportTheaterFingerprint" class="report-theater__fingerprint">
@@ -283,10 +315,25 @@ onUnmounted(() => {
 
         <p class="report-theater__hint">
           <template v-if="heroMode === 'executing'">{{ OPERATOR_PERSONA_NAME }} is moving</template>
-          <template v-else-if="showNextSteps">Esc aborts · otherwise VAXON continues</template>
-          <template v-else>Team briefing synced to {{ OPERATOR_PERSONA_NAME }} · Esc to dismiss</template>
+          <template v-else-if="showNextSteps">Esc aborts · otherwise continues</template>
+          <template v-else>Voice-synced briefing · Esc to dismiss</template>
         </p>
       </div>
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.report-theater__seat--speaking {
+  animation: report-theater-speaker-glow 1.1s ease-in-out infinite alternate;
+}
+
+.report-theater__seat--speaking .report-theater__face {
+  box-shadow: 0 0 10px currentColor, 0 0 28px rgba(0, 242, 255, 0.9);
+}
+
+@keyframes report-theater-speaker-glow {
+  from { filter: brightness(1.05); }
+  to { filter: brightness(1.5) saturate(1.35); }
+}
+</style>

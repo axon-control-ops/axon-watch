@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from app.connectors.catalog import WatchConnectorDefinition
@@ -12,6 +12,13 @@ from app.probe_failure_detail import format_probe_failure
 from app.signals.iso_time import utc_now_iso
 
 ConnectorStatus = str  # ok | degraded | unavailable
+
+# Cloudflare often blocks the default Python-urllib User-Agent with 403.
+# Keep aligned with services/axon-watch/app/tunnel/tunnel_probe.py.
+_PROBE_HEADERS = {
+    "Accept": "application/json, */*",
+    "User-Agent": "Axon-X-ConnectorProbe/1.0 (+https://axon.edudashpro.org.za)",
+}
 
 
 def probe_connector(
@@ -31,7 +38,7 @@ def probe_connector(
     }
 
     try:
-        request = Request(definition.health_url, headers={"Accept": "*/*"})
+        request = Request(definition.health_url, headers=dict(_PROBE_HEADERS))
         with urlopen(request, timeout=timeout_seconds) as response:
             body = response.read(4096).decode("utf-8", errors="replace")
             latency_ms = int((time.monotonic() - started) * 1000)
@@ -59,6 +66,13 @@ def probe_connector(
             record["status"] = "ok"
             record["detail"] = detail
             return record
+    except HTTPError as exc:
+        latency_ms = int((time.monotonic() - started) * 1000)
+        record["latency_ms"] = latency_ms
+        # Non-200 HTTP responses raise HTTPError before status can be read.
+        record["status"] = "degraded"
+        record["detail"] = f"HTTP {exc.code}"
+        return record
     except (URLError, TimeoutError, OSError, ValueError) as exc:
         latency_ms = int((time.monotonic() - started) * 1000)
         record["latency_ms"] = latency_ms

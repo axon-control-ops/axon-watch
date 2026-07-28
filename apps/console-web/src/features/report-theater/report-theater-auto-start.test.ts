@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isReportTheaterAutoStartTransition,
   markReportTheaterAutoStarted,
   resetReportTheaterAutoStartForTests,
   shouldAutoStartReportTheater,
@@ -8,6 +9,13 @@ import {
 import { resetReportTheaterStateForTests } from './report-theater-state';
 
 describe('report-theater-auto-start', () => {
+  it('uses hydration as a quiet baseline and starts only after the briefing changes', () => {
+    expect(isReportTheaterAutoStartTransition(undefined, 'signal-a', true)).toBe(false);
+    expect(isReportTheaterAutoStartTransition('signal-a', 'signal-a', true)).toBe(false);
+    expect(isReportTheaterAutoStartTransition('signal-a', 'signal-b', true)).toBe(true);
+    expect(isReportTheaterAutoStartTransition('signal-a', 'signal-b', false)).toBe(false);
+  });
+
   it('starts in semi/full when actionable and cools down repeats', () => {
     resetReportTheaterAutoStartForTests();
     resetReportTheaterStateForTests();

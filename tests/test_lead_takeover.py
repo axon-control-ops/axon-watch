@@ -130,6 +130,32 @@ class LeadTakeoverTests(unittest.TestCase):
         again_vaxon = (again.get("takeover") or {}).get("vaxon_flash") or {}
         self.assertEqual("already_posted", again_vaxon.get("status"))
 
+    def test_failed_specialist_shift_keeps_lead_follow_up_open(self) -> None:
+        from app.persistence import task_store
+        from app.workspace_agents.lead_takeover import post_lead_takeover_report
+
+        with patch("app.live_events.broadcast_material_change"):
+            takeover = post_lead_takeover_report(
+                workspace_id="workspace_dashpro",
+                run_id="run_priya_failed_1",
+                employee_role="frontend",
+                employee_name="Priya",
+                phase="failed",
+                outcome="targeted test failed",
+                reply_text=(
+                    "Targeted test failed on the legacy fixture.\n"
+                    "Blockers / Lead next: Lead: assign the smallest fixture repair.\n"
+                    "Confidence: 8/10"
+                ),
+                create_follow_up_task=True,
+            )
+
+        follow = task_store.get_task(str(takeover.get("follow_up_task_id")))
+        self.assertIsNotNone(follow)
+        assert follow is not None
+        self.assertEqual("open", follow.get("status"))
+        self.assertEqual("lead", follow.get("owner_role"))
+
     def test_lead_shift_completion_posts_vaxon_flash(self) -> None:
         from app.persistence import chat_store
         from app.workspace_agents import lead_adhoc_receipt_store

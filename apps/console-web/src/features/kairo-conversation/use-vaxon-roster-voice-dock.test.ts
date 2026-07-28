@@ -8,6 +8,7 @@ describe('shouldShowVaxonRosterVoiceDock', () => {
       shouldShowVaxonRosterVoiceDock({
         layoutMode: 'operator',
         operatorBrainGalaxyActive: false,
+        operatorCenterView: 'grid',
         voiceDockVisible: true,
       }),
     ).toBe(false);
@@ -28,6 +29,7 @@ describe('shouldShowVaxonRosterVoiceDock', () => {
       shouldShowVaxonRosterVoiceDock({
         layoutMode: 'operator',
         operatorBrainGalaxyActive: true,
+        operatorCenterView: 'graph',
         voiceDockVisible: true,
       }),
     ).toBe(true);

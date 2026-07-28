@@ -13,6 +13,7 @@ type QueuedUtterance = {
   text: string;
   rate: number;
   pitch: number;
+  voiceHint?: string;
   onStart?: (text: string) => void;
 };
 
@@ -24,8 +25,58 @@ let pendingSpeakTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 let queueEpoch = 0;
 const speakingListeners = new Set<(active: boolean) => void>();
 const idleListeners = new Set<() => void>();
-const SPEECH_START_DELAY_MS = 150;
-const POST_UTTERANCE_DRAIN_MS = 280;
+const SPEECH_START_DELAY_MS = 50;
+const POST_UTTERANCE_DRAIN_MS = 120;
+/** Azure neural short-names → preferred browser gender when the exact voice is missing. */
+const FEMALE_NEURAL_NAMES = new Set([
+  'sonia',
+  'libby',
+  'hollie',
+  'jenny',
+  'aria',
+  'emma',
+  'sara',
+  'natasha',
+  'michelle',
+  'amber',
+  'ashley',
+  'jane',
+  'nancy',
+]);
+const MALE_NEURAL_NAMES = new Set([
+  'ryan',
+  'thomas',
+  'elliot',
+  'davis',
+  'guy',
+  'george',
+  'daniel',
+  'brian',
+  'andrew',
+  'christopher',
+  'eric',
+  'steffan',
+]);
+
+function voiceLooksFemale(voice: SpeechSynthesisVoice): boolean {
+  return /female|woman|zira|susan|hazel|jenny|libby|sonia|emma|aria|hollie|karen|moira/i.test(
+    `${voice.name} ${voice.voiceURI}`,
+  );
+}
+
+function voiceLooksMale(voice: SpeechSynthesisVoice): boolean {
+  return /male|\bman\b|david|mark|ryan|thomas|elliot|daniel|george|davis|fred|alex/i.test(
+    `${voice.name} ${voice.voiceURI}`,
+  );
+}
+
+/** Chrome often clips the first phoneme of short utterances — lead with a soft pause. */
+function padBrowserSpeechText(text: string): string {
+  if (text.length >= 48) {
+    return text;
+  }
+  return `\u200B${text}`;
+}
 
 function notifySpeaking(active: boolean): void {
   speaking = active;
@@ -88,6 +139,38 @@ function pickJarvisVoice(speech: SpeechPort): SpeechSynthesisVoice | null {
   return cachedVoice;
 }
 
+function pickEmployeeVoice(
+  speech: SpeechPort,
+  voiceHint: string,
+): SpeechSynthesisVoice | null {
+  const voices = speech.getVoices().filter((voice) => voice.lang.toLowerCase().startsWith('en'));
+  if (!voices.length) {
+    return pickJarvisVoice(speech);
+  }
+  const neuralName = voiceHint.match(/-([a-z]+)neural$/i)?.[1]?.toLowerCase();
+  const named = neuralName
+    ? voices.find((voice) => `${voice.name} ${voice.voiceURI}`.toLowerCase().includes(neuralName))
+    : null;
+  if (named) {
+    return named;
+  }
+
+  const preferFemale = neuralName ? FEMALE_NEURAL_NAMES.has(neuralName) : false;
+  const preferMale = neuralName ? MALE_NEURAL_NAMES.has(neuralName) : false;
+  const gendered = preferFemale
+    ? voices.filter(voiceLooksFemale)
+    : preferMale
+      ? voices.filter(voiceLooksMale)
+      : [];
+  const pool = gendered.length ? gendered : voices;
+  const hash = [...voiceHint].reduce((value, char) => ((value * 31) + char.charCodeAt(0)) >>> 0, 7);
+  const picked = pool[hash % pool.length] ?? pool[0] ?? null;
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'voice-gender-fix',hypothesisId:'H48',location:'speech-queue.ts:pickEmployeeVoice',message:'browser employee voice resolved',data:{voiceHint,neuralName,preferFemale,preferMale,poolSize:pool.length,picked:picked?.name??null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  return picked;
+}
+
 function warmSpeechIfNeeded(speech: SpeechPort): void {
   if (voicesReady) {
     return;
@@ -116,20 +199,26 @@ function drainQueue(speech: SpeechPort): void {
 
   notifySpeaking(true);
   const next = queue.shift() ?? { text: '', rate: 1.0, pitch: 1.04 };
-  const utterance = new SpeechSynthesisUtterance(next.text);
+  const utterance = new SpeechSynthesisUtterance(padBrowserSpeechText(next.text));
   const epoch = queueEpoch;
+  const queuedAt = performance.now();
   utterance.rate = next.rate;
   utterance.pitch = next.pitch;
   utterance.volume = 1;
-  const voice = pickJarvisVoice(speech);
+  const voice = next.voiceHint
+    ? pickEmployeeVoice(speech, next.voiceHint)
+    : pickJarvisVoice(speech);
   if (voice) {
     utterance.voice = voice;
   }
 
-  const finish = (): void => {
+  const finish = (eventType: 'end' | 'error'): void => {
     if (epoch !== queueEpoch) {
       return;
     }
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'narration-sync-fix',hypothesisId:'H47',location:'speech-queue.ts:finish',message:'browser speech turn finished',data:{eventType,textLength:next.text.length,elapsedMs:Math.round(performance.now()-queuedAt),voice:utterance.voice?.name??null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     notifySpeaking(false);
     globalThis.setTimeout(() => {
       if (epoch !== queueEpoch) {
@@ -140,12 +229,15 @@ function drainQueue(speech: SpeechPort): void {
     }, POST_UTTERANCE_DRAIN_MS);
   };
 
-  utterance.onend = finish;
-  utterance.onerror = finish;
+  utterance.onend = () => finish('end');
+  utterance.onerror = () => finish('error');
   utterance.onstart = () => {
     if (epoch !== queueEpoch) {
       return;
     }
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'narration-sync-fix',hypothesisId:'H47',location:'speech-queue.ts:onstart',message:'browser speech turn started',data:{textPreview:next.text.slice(0,100),textLength:next.text.length,queuedMs:Math.round(performance.now()-queuedAt),voice:utterance.voice?.name??null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     next.onStart?.(next.text);
   };
 
@@ -162,7 +254,12 @@ function drainQueue(speech: SpeechPort): void {
 export function enqueueSpeech(
   message: string,
   speech: SpeechPort | null,
-  options: { rate?: number; pitch?: number; onStart?: (text: string) => void } = {},
+  options: {
+    rate?: number;
+    pitch?: number;
+    voiceHint?: string;
+    onStart?: (text: string) => void;
+  } = {},
 ): void {
   const trimmed = message.trim();
   if (!trimmed || !speech) {
@@ -173,6 +270,7 @@ export function enqueueSpeech(
     text: trimmed,
     rate: options.rate ?? 1.0,
     pitch: options.pitch ?? 1.04,
+    voiceHint: options.voiceHint,
     onStart: options.onStart,
   });
   drainQueue(speech);

@@ -15,9 +15,10 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-25 — Gates 0–5 closed; Gate 6 verifier + draft-PR
+**Last verified:** 2026-07-28 — Gates 0–5 closed; Gate 6 verifier + draft-PR
 delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and
-file-size patrol plumbing landed. **Not yet a closed unattended auto-loop** —
+file-size patrol plumbing landed. Connector/tunnel recovery documented
+(`axonfixconnectors`). **Not yet a closed unattended auto-loop** —
 scheduler stays **off** by default; Mission Control still needs Retry / dig-in.
 Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first
 for status + Cursor credit budgets. After every push run
@@ -91,10 +92,12 @@ This section is the living operator onboarding guide.
 | `axonhealth` | Probe console + control-plane + watch (+ key APIs) |
 | `axonrestart` | Soft restart of systemd user units, then health check |
 | `axonrevive` | **Use when the shell is empty** (Runtime unavailable / No workspace). Force-kills a wedged control-plane, restarts all three units, health-checks |
+| `axonfixconnectors` | **Use when** Mission Control shows **REQUIRED CONNECTOR DOWN** / **tunnel token missing** / vault unlock **HTTP 503** about `AXON_WATCH_INTERNAL_SERVICE_TOKEN` |
 
 ```bash
 axonhealth          # is everything up?
 axonrevive          # empty shell / hung API — fix it
+axonfixconnectors  # required connector / tunnel / vault 503 — diagnose (+ optional fix)
 # then hard-refresh http://127.0.0.1:4173
 ```
 
@@ -1173,13 +1176,121 @@ Use this order when something breaks:
 1. **Stack health** — `axonhealth` (or `./scripts/dev/check-health.sh`).
 2. **Empty shell / Runtime unavailable** — `axonrevive`, then hard-refresh `:4173`. Do **not** rely on `./scripts/dev/down.sh` when systemd owns the ports.
 3. **Soft refresh** — `axonrestart` after backend route changes (if the API still answers).
-4. **Stale UI on `:4173`** — rebuild console-web (`npm run build -w @axon-watch/console-web`), `systemctl --user restart console-web.service`, then hard-refresh. Source-only / `:5173` Vite edits do **not** update the systemd bundle.
-5. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
-6. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
-7. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
-8. **Logs** — `journalctl --user -u control-plane.service -n 80` (always-on) or `.local/logs/` (dev bootstrap).
+4. **Required connector / tunnel / vault 503** — `axonfixconnectors` (see below). Local `axonhealth` can still be green while the **public** console probe is red.
+5. **Stale UI on `:4173`** — rebuild console-web (`npm run build -w @axon-watch/console-web`), `systemctl --user restart console-web.service`, then hard-refresh. Source-only / `:5173` Vite edits do **not** update the systemd bundle.
+6. **Browser cache** — hard refresh `:4173` (`Ctrl+Shift+R`) after console-web bundle changes.
+7. **Connectors truth** — Mission Control → **Connectors** rail or `GET /api/connectors`.
+8. **Gate scripts** — `npm run verify:production-operator`, then the slice gate (`verify:testN` / `verify:shell-commands`).
+9. **Logs** — `journalctl --user -u control-plane.service -n 80` (always-on) or `.local/logs/` (dev bootstrap).
 
 Symptom-specific fixes continue in the sections below.
+
+## Problem: REQUIRED CONNECTOR DOWN / tunnel token missing / Vault unlock HTTP 503
+
+### What you see
+
+- Mission Control chip: **1 REQUIRED CONNECTOR DOWN**, **degraded**, **tunnel token missing**
+- Connectors rail: **Console web** `REQUIRED` → unavailable / probe failed
+- Cloudflare tunnel row: `tunnel token missing (auth=missing)`
+- Vault page (`/vault`): unlock fails with red banner  
+  `Watch vault API HTTP 503: AXON_WATCH_INTERNAL_SERVICE_TOKEN is required when the operator surface is remotely reachable`
+- Status line may still say **WATCH CONNECTED** and `axonhealth` can still pass — because **local** `:4173` / `:8787` are fine. The **required** `console_web` probe hits the **public** URL (`AXON_WATCH_PUBLIC_BASE_URL`, e.g. `https://axon.edudashpro.org.za/api/health`), which needs the tunnel.
+
+### Why it happens (failure chain)
+
+1. `AXON_WATCH_PUBLIC_BASE_URL` is a non-loopback hostname → deployment is **remotely reachable**.
+2. Remotely reachable hosts **require** a shared `AXON_WATCH_INTERNAL_SERVICE_TOKEN` on both control-plane and axon-watch (same value in `~/.config/axon-watch/deployment.env`).
+3. If that token is missing, control-plane → watch **mutating** calls (vault unlock, tunnel start) return **HTTP 503**.
+4. Vault stays **locked** → tunnel token cannot resolve from encrypted vault secrets → managed `cloudflared` will not start → public health returns Cloudflare **1033** → required `console_web` stays down.
+5. Auto-unlock keyfile may show as “enabled” on `/vault`, but **auto-unlock is refused** when remotely reachable (by design). You must unlock manually after the internal token is fixed.
+
+Also see [`docs/how-to/autonomy-gates-and-service-identity.md`](how-to/autonomy-gates-and-service-identity.md) and [`docs/NATIVE_TUNNEL_CONTROL.md`](NATIVE_TUNNEL_CONTROL.md).
+
+### Fix (copy-paste)
+
+**One-word path (preferred):**
+
+```bash
+# 1) Only if vault unlock shows INTERNAL_SERVICE_TOKEN HTTP 503:
+axonfixconnectors --ensure-internal-token --restart
+
+# 2) Browser: /vault → master password + 2FA → Remember me → UNLOCK
+#    Confirm secret name: cloudflare_tunnel_token
+#    (aliases: AXON_CLOUDFLARE_TUNNEL_TOKEN / CLOUDFLARE_TUNNEL_TOKEN / TUNNEL_TOKEN)
+
+# 3) Start tunnel + reprobe (reads AXON_WATCH_OPERATOR_TOKEN from deployment.env)
+axonfixconnectors
+```
+
+**Do not** restart `axon-watch` after a successful vault unlock unless you are ready to unlock again. Vault unlock is **in-process** on the watch service; a watch restart drops the session, and on this remotely reachable host auto-unlock will not restore it. Managed `cloudflared` can also stop with the watch unit.
+
+Other facts for this host:
+
+- Mutating CP routes (`POST /api/tunnel/start`, `reprobe_connector`) need
+  `Authorization: Bearer <AXON_WATCH_OPERATOR_TOKEN>` under `local_token`
+  (forced when the public URL is non-loopback). `axonfixconnectors` loads that
+  token from `~/.config/axon-watch/deployment.env`. Mission Control can mutate
+  via a desktop session cookie instead.
+- Auto-unlock may show enabled in the UI, but **auto-unlock is refused** while
+  remotely reachable.
+- `cloudflare_tunnel` is **optional** (`required: false`). **REQUIRED CONNECTOR DOWN**
+  is driven by required probes — here `console_web` → public `/api/health`.
+- Soft cutover is normal: remote ingress may still target `http://localhost:7734`
+  while `axon-public-origin-proxy` forwards to `:4173`. Healthy tunnel detail:
+  **active soft cutover**.
+- Connector probes must use a non-default User-Agent. Cloudflare returns **403**
+  to stock `Python-urllib`, which used to surface as generic `probe failed`
+  even when `curl` and the tunnel probe succeeded (fixed in connector probe headers).
+
+Install / refresh the PATH wrapper if needed:
+
+```bash
+./scripts/ops/install-bin-wrappers.sh
+# or without PATH:
+./scripts/ops/axonfixconnectors.sh --ensure-internal-token --restart
+```
+
+**Manual path (same outcome):**
+
+```bash
+# Add shared internal token only if missing (do not commit this file)
+echo "AXON_WATCH_INTERNAL_SERVICE_TOKEN=$(openssl rand -hex 24)" >> ~/.config/axon-watch/deployment.env
+axonrestart
+
+# Unlock Vault in the UI (Remember me), then:
+source ~/.config/axon-watch/deployment.env   # or export OPERATOR token another way
+curl -sS -X POST http://127.0.0.1:8787/api/tunnel/start \
+  -H "Authorization: Bearer ${AXON_WATCH_OPERATOR_TOKEN}" | python3 -m json.tool
+curl -sS -X POST http://127.0.0.1:8787/api/watch/commands \
+  -H "Authorization: Bearer ${AXON_WATCH_OPERATOR_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{"command_type":"reprobe_connector","target_type":"connector","target_id":"console_web","requested_by":"operator"}'
+```
+
+**Durable tunnel auth (survives watch restart):** put the named-tunnel token in env
+(or keep unlocking after every watch restart):
+
+```bash
+# ~/.config/axon-watch/deployment.env
+AXON_CLOUDFLARE_TUNNEL_TOKEN=<named-tunnel-token-from-cloudflare>
+axonrestart
+axonfixconnectors
+```
+
+Accepted vault/env names: `AXON_CLOUDFLARE_TUNNEL_TOKEN`, `CLOUDFLARE_TUNNEL_TOKEN`,
+`cloudflare_tunnel_token`, `TUNNEL_TOKEN`. When the vault secret
+`cloudflare_tunnel_token` is loaded, status may show `auth_source=settings`
+(resolver labels a non-empty stored value that way) — that still means a token
+is available.
+
+### Verify
+
+```bash
+axonfixconnectors          # required_unavailable should be 0
+curl -sS http://127.0.0.1:8787/api/tunnel/status | python3 -m json.tool
+curl -sS --max-time 15 https://axon.edudashpro.org.za/api/health
+# hard-refresh Mission Control — degraded / REQUIRED CONNECTOR DOWN chips should clear
+```
 
 ## Problem: Runtime unavailable / No workspace selected / Briefing unavailable
 
@@ -1375,11 +1486,14 @@ Installed on PATH via `~/.local/bin` → repo `bin/`:
 | **`axonhealth`** | `./scripts/dev/check-health.sh` | Quick “is the stack OK?” |
 | **`axonrestart`** | `systemctl --user restart` axon-watch + control-plane + console-web, then health | Soft restart when APIs still respond |
 | **`axonrevive`** | Force-kill control-plane → restart all three → health | Empty shell, hung health, wedged worker |
+| **`axonfixconnectors`** | Diagnose tunnel/connectors; optional `--ensure-internal-token --restart` | REQUIRED CONNECTOR DOWN, tunnel token missing, vault unlock HTTP 503 |
 
 ```bash
 axonhealth
 axonrestart
 axonrevive
+axonfixconnectors --ensure-internal-token --restart   # vault 503 / missing internal token
+axonfixconnectors                                     # after vault unlock: start tunnel + reprobe
 ```
 
 Repo scripts (same behavior without PATH):
@@ -1388,9 +1502,12 @@ Repo scripts (same behavior without PATH):
 ./scripts/ops/axonhealth.sh
 ./scripts/ops/axonrestart.sh
 ./scripts/ops/axonrevive.sh
+./scripts/ops/axonfixconnectors.sh
 ```
 
 Open console after revive: **http://127.0.0.1:4173** (hard-refresh).
+
+Full connector/tunnel recovery write-up: [Problem: REQUIRED CONNECTOR DOWN](#problem-required-connector-down--tunnel-token-missing--vault-unlock-http-503).
 
 ### Console-web rebuild (always-on `:4173`)
 

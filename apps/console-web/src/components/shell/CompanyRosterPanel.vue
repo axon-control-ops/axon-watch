@@ -53,6 +53,7 @@ const showVaxonVoiceDock = computed(() =>
   shouldShowVaxonRosterVoiceDock({
     layoutMode: shell.layoutMode,
     operatorBrainGalaxyActive: shell.operatorBrainGalaxyActive,
+    operatorCenterView: shell.operatorCenterView,
     voiceDockVisible: vaxonVoiceDock.visible.value,
   }),
 );

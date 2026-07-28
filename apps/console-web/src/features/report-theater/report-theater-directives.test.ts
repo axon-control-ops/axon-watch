@@ -50,6 +50,33 @@ describe('report-theater-directives', () => {
     ).toBe('a-sentry');
   });
 
+  it('matches a promised workspace switch before the first review action', () => {
+    const actions = [
+      {
+        action_id: 'dash',
+        kind: 'review_signal' as const,
+        title: 'DashPro warning',
+        detail: 'DashPro',
+        workspace_id: 'workspace_dashpro',
+        run_id: null,
+        signal_id: 'sig-dash',
+      },
+      {
+        action_id: 'axon',
+        kind: 'review_signal' as const,
+        title: 'Axon-X warning',
+        detail: 'Axon Watch',
+        workspace_id: 'workspace_axon_watch',
+        run_id: null,
+        signal_id: 'sig-axon',
+      },
+    ];
+    expect(
+      matchActionForNextMove("I'll switch to axon-watch and review that signal next", actions)
+        ?.action_id,
+    ).toBe('axon');
+  });
+
   it('synthesizes signal actions when next_safe_actions are empty', () => {
     const directives = buildVaxonReportDirectives({
       nextMove: "I'll switch us there and review that signal next",
@@ -68,6 +95,32 @@ describe('report-theater-directives', () => {
     expect(isAutoExecutableCommitment(directives[0]!.label, directives[0]!.briefingAction)).toBe(
       true,
     );
+  });
+
+  it('binds the action to the workspace VAXON names even when signal metadata is stale', () => {
+    const directives = buildVaxonReportDirectives({
+      nextMove: "I'll switch to DashPro and review that signal next",
+      actions: [
+        {
+          action_id: 'cloudflare',
+          kind: 'review_signal',
+          title: 'Cloudflare tunnel unavailable',
+          detail: 'Inspect tunnel',
+          workspace_id: 'workspace_axon_watch',
+          run_id: null,
+          signal_id: 'sig-cloudflare',
+        },
+      ],
+      workspaces: [
+        { workspace_id: 'workspace_axon_watch', display_name: 'axon-watch' },
+        { workspace_id: 'workspace_dashpro', display_name: 'DashPro' },
+      ],
+    });
+
+    expect(directives[0]?.label).toBe(
+      "I'll switch to DashPro and start that investigation next",
+    );
+    expect(directives[0]?.briefingAction?.workspace_id).toBe('workspace_dashpro');
   });
 
   it('compresses completed-work lists for fluent speech', () => {
@@ -94,5 +147,39 @@ describe('report-theater-directives', () => {
     ).toBe(
       'Mira here. Rowan failed. Issue is the last shift outcome. Plan: diagnose the failure, then requeue the smallest fix',
     );
+  });
+
+  it('overrides next-move to Vault recovery when production readiness is blocked', () => {
+    const directives = buildVaxonReportDirectives({
+      nextMove: "I'll open Attention for Axon-X GitHub API warning",
+      actions: [
+        {
+          action_id: 'inspect_runtime_degraded',
+          kind: 'inspect_runtime',
+          title: 'Inspect degraded runtime',
+          detail: 'CLI not ready',
+          workspace_id: null,
+          run_id: null,
+          signal_id: null,
+        },
+        {
+          action_id: 'review-axon',
+          kind: 'review_signal',
+          title: 'Axon-X GitHub API warning',
+          detail: 'Review',
+          workspace_id: 'workspace_axon_watch',
+          run_id: null,
+          signal_id: 'sig-axon',
+        },
+      ],
+      readiness: {
+        score: 60,
+        grade: 'partial',
+        blockers: ['CLI runtime not ready — no local CLI runtime is dispatch-ready'],
+      },
+    });
+    expect(directives[0]?.label).toMatch(/open Vault and restore runtime/i);
+    expect(directives[0]?.briefingAction?.action_id).toBe('theater_open_vault');
+    expect(directives[0]?.autoExecute).toBe(true);
   });
 });

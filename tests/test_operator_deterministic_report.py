@@ -176,6 +176,106 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertIn("idle", empty["text"].lower())
         self.assertIn("standing by", empty["text"].lower())
 
+    def test_lead_rollup_scrubs_cli_dump_into_operator_line(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        headline = (
+            "Mira (lead) failed — Lane B (agent) cannot start because no CLI runtime is ready: "
+            "Codex CLI (local) unavailable; Cursor auth probe timed out. Run cursor agent status "
+            "manually.; Cursor Cloud Agent unavailable; Codex Cloud Task unavailable. "
+            "Open Runtime or /vault , then retry."
+        )
+        composed = compose_operator_report(
+            {
+                "workspace_id": "workspace_axon_watch",
+                "briefing": _MOCK_BRIEFING,
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [
+                    {
+                        "lead_name": "Mira",
+                        "headline": headline,
+                        "lead_next": "",
+                    }
+                ],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "cli-dump-rollup",
+            }
+        )
+
+        line = composed["sections"]["lead_rollups"][0]
+        self.assertIn("Mira:", line)
+        self.assertIn("no CLI runtime is ready", line)
+        self.assertNotIn("invocation", line.lower())
+        self.assertLessEqual(len(line), 180)
+
+    def test_lead_rollup_keeps_readable_headline_and_plan(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        headline = (
+            "Priya completed the classroom workflow and verified the teacher handoff."
+        )
+        lead_next = "Run the focused browser check, then ship the verified change."
+        composed = compose_operator_report(
+            {
+                "workspace_id": "workspace_dashpro",
+                "briefing": _MOCK_BRIEFING,
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [
+                    {
+                        "lead_name": "Dana",
+                        "headline": headline,
+                        "lead_next": lead_next,
+                    }
+                ],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "complete-rollup",
+            }
+        )
+
+        line = composed["sections"]["lead_rollups"][0]
+        self.assertIn("Priya completed the classroom workflow", line)
+        self.assertIn("focused browser check", line)
+        self.assertLessEqual(len(line), 220)
+
+    def test_next_move_preserves_promised_workspace_switch(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        composed = compose_operator_report(
+            {
+                "briefing": {
+                    **_MOCK_BRIEFING,
+                    "advise": (
+                        "Critical signal in axon-watch needs review; "
+                        "switch there before continuing."
+                    ),
+                },
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "switch-workspace",
+            }
+        )
+
+        self.assertEqual(
+            "I'll switch to axon-watch and start that investigation next",
+            composed["sections"]["next_move"],
+        )
+
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
     @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)

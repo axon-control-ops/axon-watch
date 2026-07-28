@@ -14,6 +14,11 @@ export interface ReportTheaterDirective {
   autoExecute: boolean;
 }
 
+type ReportWorkspace = {
+  workspace_id: string;
+  display_name?: string | null;
+};
+
 const FILLER_LINE_RE =
   /^(?:nothing screaming\.?|idle\.?|none verified yet\.?|fleet telemetry quiet\.?|listening for the briefing…?|lead standing by on the board\.?)$/i;
 
@@ -31,10 +36,13 @@ export function toVaxonDirectiveLine(nextMove: string): string {
     return "I'll keep watching the fleet and brief you when something moves.";
   }
   if (/^I(?:'d|'ll| will)\b/i.test(cleaned)) {
-    return `${cleaned}.`;
+    return `${cleaned.replace(
+      /and review that signal next$/i,
+      'and start that investigation next',
+    )}.`;
   }
   if (/needs review|need review/i.test(cleaned) && /switch/i.test(cleaned)) {
-    return `I'll switch us there and review that signal next.`;
+    return `I'll switch us there and start that investigation next.`;
   }
   if (/open (?:the )?lead/i.test(cleaned) || /lead rollup/i.test(cleaned)) {
     return `I'll open the Lead rollup and walk the next handoff with you.`;
@@ -63,7 +71,9 @@ export function toVaxonActionLabel(action: BriefingAction): string {
     return `I'll open Mission Control for that run`;
   }
   if (action.kind === 'inspect_runtime') {
-    return `I'll open the command seam and inspect runtime`;
+    return action.action_id === 'theater_open_vault' || /^open vault$/i.test(action.title)
+      ? "I'll open Vault and restore runtime next"
+      : `I'll open the command seam and inspect runtime`;
   }
   const fallback = briefingActionCtaLabel(action);
   if (/^I(?:'ll| will)\b/i.test(fallback)) {
@@ -106,6 +116,17 @@ export function matchActionForNextMove(
     return null;
   }
   const hay = nextMove.toLowerCase();
+  const workspaceMatched = actions.find((action) => {
+    const workspace = String(action.workspace_id || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^workspace[_-]/, '')
+      .replace(/_/g, '-');
+    return action.kind === 'review_signal' && workspace.length > 2 && hay.includes(workspace);
+  });
+  if (workspaceMatched) {
+    return workspaceMatched;
+  }
   const titled = actions.find((action) => {
     if (action.kind !== 'review_signal') {
       return false;
@@ -138,8 +159,61 @@ export function isAutoExecutableCommitment(label: string, action: BriefingAction
   if (!action) {
     return false;
   }
-  return /I'll (?:switch|open Attention|open the Lead|clear Approvals|open Mission Control|open the command seam)/i.test(
+  return /I'll (?:switch|open Attention|open the Lead|clear Approvals|open Mission Control|open the command seam|open Vault|restore runtime)/i.test(
     label,
+  );
+}
+
+function readinessNeedsRecovery(readiness?: {
+  score?: number;
+  blockers?: string[];
+  grade?: string;
+} | null): { recover: boolean; preferVault: boolean; blocker: string | null } {
+  const score = typeof readiness?.score === 'number' ? readiness.score : 100;
+  const blockers = (readiness?.blockers ?? []).map((item) => String(item || '').trim()).filter(Boolean);
+  if (score >= 80 && !blockers.length) {
+    return { recover: false, preferVault: false, blocker: null };
+  }
+  const blocker = blockers[0] ?? readiness?.grade ?? null;
+  const hay = blockers.join(' ').toLowerCase();
+  const preferVault = /vault|cli|auth|key|login|dispatch-ready|runtime not ready/i.test(hay);
+  return {
+    recover: score < 80 || preferVault,
+    preferVault,
+    blocker,
+  };
+}
+
+function synthesizeRuntimeRecoveryAction(preferVault: boolean): BriefingAction {
+  return {
+    action_id: preferVault ? 'theater_open_vault' : 'theater_inspect_runtime',
+    kind: 'inspect_runtime',
+    title: preferVault ? 'Open Vault' : 'Inspect runtime',
+    detail: preferVault
+      ? 'Unlock Vault so CLI and neural voice can recover.'
+      : 'Open the command seam and inspect degraded runtime.',
+    workspace_id: null,
+    run_id: null,
+    signal_id: null,
+  };
+}
+
+function promisedWorkspace(
+  nextMove: string,
+  workspaces: ReportWorkspace[],
+): ReportWorkspace | null {
+  const hay = nextMove.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return (
+    workspaces.find((workspace) => {
+      const labels = [
+        workspace.display_name,
+        workspace.workspace_id.replace(/^workspace[_-]/i, '').replace(/_/g, '-'),
+      ];
+      return labels.some((label) => {
+        const normalized = String(label || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+        return normalized.length > 2 && hay.includes(normalized);
+      });
+    }) ?? null
   );
 }
 
@@ -147,27 +221,59 @@ export function buildVaxonReportDirectives(input: {
   nextMove: string;
   actions: BriefingAction[];
   topSignals?: Array<Pick<InboxItem, 'signal_id' | 'title' | 'summary' | 'workspace_id'> | null | undefined>;
+  workspaces?: ReportWorkspace[];
+  readiness?: {
+    score?: number;
+    blockers?: string[];
+    grade?: string;
+  } | null;
 }): ReportTheaterDirective[] {
+  const recovery = readinessNeedsRecovery(input.readiness);
   const mergedActions = [
     ...input.actions,
     ...synthesizeActionsFromSignals(input.topSignals ?? []).filter(
       (synth) => !input.actions.some((action) => action.signal_id && action.signal_id === synth.signal_id),
     ),
   ];
-  const primaryAction = matchActionForNextMove(input.nextMove, mergedActions);
-  const directive = primaryAction
-    ? /switch|review that signal/i.test(input.nextMove)
-      ? toVaxonDirectiveLine(input.nextMove)
-      : toVaxonActionLabel(primaryAction)
-    : toVaxonDirectiveLine(input.nextMove);
+  const matchedAction = matchActionForNextMove(input.nextMove, mergedActions);
+  const promised = promisedWorkspace(input.nextMove, input.workspaces ?? []);
+  let primaryAction =
+    matchedAction && promised && matchedAction.kind === 'review_signal'
+      ? { ...matchedAction, workspace_id: promised.workspace_id }
+      : matchedAction;
+
+  // Hard gate: do not auto-start investigations while production readiness is blocked.
+  if (recovery.recover) {
+    primaryAction = recovery.preferVault
+      ? synthesizeRuntimeRecoveryAction(true)
+      : mergedActions.find((action) => action.kind === 'inspect_runtime') ??
+        synthesizeRuntimeRecoveryAction(false);
+  }
+
+  const directive = recovery.recover
+    ? recovery.preferVault
+      ? "I'll open Vault and restore runtime next"
+      : "I'll open the command seam and inspect runtime"
+    : primaryAction
+      ? /switch|review that signal/i.test(input.nextMove)
+        ? toVaxonDirectiveLine(input.nextMove)
+        : toVaxonActionLabel(primaryAction)
+      : toVaxonDirectiveLine(input.nextMove);
   const primaryLabel = directive.replace(/\.$/, '');
+  // #region agent log
+  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'readiness-recovery-fix',hypothesisId:'H51',location:'report-theater-directives.ts:build',message:'built theater directives with readiness gate',data:{score:input.readiness?.score??null,recover:recovery.recover,preferVault:recovery.preferVault,blocker:recovery.blocker,primaryLabel,actionKind:primaryAction?.kind??null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const out: ReportTheaterDirective[] = [
     {
       id: 'vaxon-primary-next',
       label: primaryLabel,
-      detail: primaryAction
-        ? 'VAXON executes this next'
-        : 'Primary directive from this stand-up',
+      detail: recovery.recover
+        ? recovery.blocker
+          ? `Blocked at ${input.readiness?.score ?? '?'}%: ${recovery.blocker}`
+          : 'Restore runtime before new investigations'
+        : primaryAction
+          ? 'VAXON executes this next'
+          : 'Primary directive from this stand-up',
       kind: 'primary',
       briefingAction: primaryAction,
       autoExecute: isAutoExecutableCommitment(primaryLabel, primaryAction),
@@ -259,6 +365,10 @@ export function stageSpokenLine(title: string, lines: string[]): string {
       .filter(Boolean)
       .slice(0, 3);
     return `${title}. ${names.join(', ')} just wrapped.`;
+  }
+  if (concrete.length === 1 && concrete[0]!.toLowerCase().startsWith(title.toLowerCase())) {
+    const line = concrete[0]!;
+    return `${line.charAt(0).toUpperCase()}${line.slice(1)}.`;
   }
   const body = concrete.slice(0, 2).join('. ');
   return `${title}. ${body}.`;

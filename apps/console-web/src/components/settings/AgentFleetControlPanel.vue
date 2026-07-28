@@ -53,7 +53,7 @@ const modeCopy: Record<AutonomyMode, string> = {
   semi:
     'VAXON stays on the loop with proactive advisory briefs. Lead check-ins continue; continuous workers stay paused.',
   full:
-    'VAXON advisory plus continuous workers that execute queued specialist shifts automatically.',
+    'VAXON advisory plus Full Access agents that keep executing queued work, retries, and Lead follow-ups without per-run approval.',
 };
 
 async function reload(): Promise<void> {
@@ -200,7 +200,7 @@ onUnmounted(() => {
     >
       {{
         actionMessage ||
-        'Choose Manual, Semi, or Full autonomy. VAXON stays advisory in Semi/Full; only Full starts continuous workers.'
+        'Choose Manual, Semi, or Full autonomy. Full keeps agents in Full Access and continuously owns queued work through completion.'
       }}
     </p>
 

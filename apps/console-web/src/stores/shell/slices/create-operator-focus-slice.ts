@@ -86,6 +86,9 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
 
   function focusMissionControl(): void {
     // Mission Control = fleet mosaic (Brain Graph is a separate center view).
+    if (input.layoutMode.value === 'ide') {
+      input.setLayoutMode('operator');
+    }
     setOperatorCenterView('grid');
     input.missionControlEmphasized.value = true;
     if (typeof window !== 'undefined') {

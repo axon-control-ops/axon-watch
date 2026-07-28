@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -362,7 +364,9 @@ def post_lead_takeover_report(
     )
     follow_up = None
     lead_next = extract_lead_next(reply_text)
-    if create_follow_up_task and phase == "completed":
+    # Full-autonomy loops must keep ownership after both successful and failed
+    # specialist shifts. The Lead decides whether to verify, retry, or reassign.
+    if create_follow_up_task and phase in {"completed", "failed"}:
         follow_up = enqueue_lead_follow_up_task(
             workspace_id=workspace_id,
             employee_name=employee_name,
@@ -370,6 +374,10 @@ def post_lead_takeover_report(
             lead_next=lead_next,
             run_id=cleaned_run,
         )
+        # region agent log
+        with open("/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log", "a", encoding="utf-8") as debug_file:
+            debug_file.write(json.dumps({"sessionId": "bef50e", "runId": "closeout-access", "hypothesisId": "H29", "location": "workspace_agents/lead_takeover.py:post_lead_takeover_report", "message": "preserved continuous ownership after specialist shift", "data": {"workspaceId": workspace_id, "runId": cleaned_run, "phase": phase, "followUpTaskId": (follow_up or {}).get("task_id")}, "timestamp": int(time.time() * 1000)}) + "\n")
+        # endregion
     vaxon_flash: dict[str, Any] | None = None
     try:
         from app.workspace_agents.lead_vaxon_handoff import post_ad_hoc_lead_takeover_to_vaxon

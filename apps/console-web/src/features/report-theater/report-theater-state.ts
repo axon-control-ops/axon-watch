@@ -17,6 +17,7 @@ const replyText = ref('');
 const stageIndex = ref(0);
 const showNextSteps = ref(false);
 const executing = ref(false);
+const speakerName = ref<string | null>(null);
 /** Bumps when a new theater session starts so in-flight narration can cancel. */
 const sessionToken = ref(0);
 
@@ -27,6 +28,7 @@ export const reportTheaterReply = computed(() => replyText.value);
 export const reportTheaterStageIndex = computed(() => stageIndex.value);
 export const reportTheaterShowNextSteps = computed(() => showNextSteps.value);
 export const reportTheaterExecuting = computed(() => executing.value);
+export const reportTheaterSpeakerName = computed(() => speakerName.value);
 export const reportTheaterStages = computed(() => buildReportTheaterStages(sections.value));
 export const reportTheaterSessionToken = computed(() => sessionToken.value);
 
@@ -51,6 +53,7 @@ export function openReportTheater(payload: ReportTheaterPayload): void {
   stageIndex.value = -1;
   showNextSteps.value = false;
   executing.value = false;
+  speakerName.value = 'VAXON';
   sessionToken.value += 1;
   open.value = true;
   clearBriefingSurfaceOffer();
@@ -80,6 +83,10 @@ export function setReportTheaterExecuting(active: boolean): void {
   executing.value = Boolean(active);
 }
 
+export function setReportTheaterSpeakerName(name: string | null): void {
+  speakerName.value = name?.trim() || null;
+}
+
 export function closeReportTheater(): void {
   open.value = false;
   showNextSteps.value = false;
@@ -87,6 +94,7 @@ export function closeReportTheater(): void {
   stageIndex.value = 0;
   fingerprint.value = null;
   replyText.value = '';
+  speakerName.value = null;
   sections.value = normalizeReportTheaterSections(null);
 }
 

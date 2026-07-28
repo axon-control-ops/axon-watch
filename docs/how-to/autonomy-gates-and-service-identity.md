@@ -143,6 +143,16 @@ AXON_WATCH_REMOTELY_REACHABLE=1   # or a non-loopback AXON_WATCH_PUBLIC_BASE_URL
 When remotely reachable, watch **refuses** mutating internal routes if the token
 is missing (HTTP 503) or wrong (HTTP 401).
 
+Operator recovery (Mission Control **REQUIRED CONNECTOR DOWN** / vault unlock 503):
+
+```bash
+axonfixconnectors --ensure-internal-token --restart
+# unlock Vault in the UI (Remember me), then:
+axonfixconnectors
+```
+
+Full playbook: [`docs/HOW-TO-HANDBOOK.md`](../HOW-TO-HANDBOOK.md#problem-required-connector-down--tunnel-token-missing--vault-unlock-http-503).
+
 ### Proxy mTLS capability (deployment proof required)
 
 Axon-X supports proxy-verified client certificates **plus** the shared token.

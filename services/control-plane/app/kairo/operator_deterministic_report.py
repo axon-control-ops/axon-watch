@@ -90,12 +90,40 @@ def _truncate(text: str, *, max_len: int) -> str:
 
 
 def _scrub_operator_line(text: str, *, max_len: int = 160) -> str:
-    """Strip markdown noise so theater panels and TTS stay readable."""
+    """Strip markdown / telemetry noise so theater panels and TTS stay readable."""
     cleaned = str(text or "")
     cleaned = re.sub(r"[#*`_]+", " ", cleaned)
+    cleaned = re.sub(r"(?i)\binvocation\s*id[:,]?\s*[a-f0-9-]+", " ", cleaned)
+    cleaned = re.sub(r"(?i)\bunit:\s*[\w.-]+", " ", cleaned)
+    cleaned = re.sub(r"(?i)\bscope[,:]?\s*[\w.-]+", " ", cleaned)
+    cleaned = re.sub(r"(?i)\bauth\s*=\s*missing\b", "authentication missing", cleaned)
+    cleaned = re.sub(r"(?i)\bopen\s+runtime\s+or\s+/vault\b", "open Runtime or Vault", cleaned)
+    # Collapse long CLI laundry lists into one operator phrase.
+    if re.search(r"(?i)no\s+cli\s+runtime\s+is\s+ready|cli\s*\(local\)\s*unavailable", cleaned):
+        cleaned = re.sub(
+            r"(?i).{0,40}cannot\s+start because no CLI runtime is ready.*",
+            "cannot start — no CLI runtime is ready. Open Runtime or Vault, then retry",
+            cleaned,
+            count=1,
+        )
+        cleaned = re.sub(
+            r"(?i):\s*Codex CLI.*$",
+            ". Open Runtime or Vault, then retry",
+            cleaned,
+            count=1,
+        )
+    if re.search(r"(?i)failed on Cursor CLI", cleaned):
+        cleaned = re.sub(
+            r"(?i)failed on Cursor CLI.*",
+            "failed on Cursor CLI — runtime login is not ready",
+            cleaned,
+            count=1,
+        )
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" :-")
     cleaned = re.sub(r"(?i)\blead next:\s*$", "", cleaned).strip(" :-")
     cleaned = re.sub(r"(?i)\blead-team\b", "Lead team", cleaned)
+    cleaned = re.sub(r"\s*;\s*", ". ", cleaned)
+    cleaned = re.sub(r"\.\s*\.", ".", cleaned)
     return _truncate(cleaned, max_len=max_len)
 
 
@@ -338,8 +366,13 @@ def _lead_rollup_bits(snapshot: dict[str, Any]) -> list[str]:
             str(handoff.get("lead_name") or handoff.get("from_name") or ""),
             max_len=40,
         ) or _primary_lead_name(snapshot)
-        headline = _scrub_operator_line(str(handoff.get("headline") or ""), max_len=120)
-        lead_next = _scrub_operator_line(str(handoff.get("lead_next") or ""), max_len=100)
+        raw_headline = str(handoff.get("headline") or "")
+        raw_lead_next = str(handoff.get("lead_next") or "")
+        headline = _scrub_operator_line(raw_headline, max_len=120)
+        lead_next = _scrub_operator_line(raw_lead_next, max_len=90)
+        # region agent log
+        debug_file = open("/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log", "a", encoding="utf-8"); debug_file.write(json.dumps({"sessionId": "bef50e", "runId": "jarvis-polish", "hypothesisId": "H52", "location": "kairo/operator_deterministic_report.py:_lead_rollup_bits", "message": "projected Lead handoff into REPORT line", "data": {"leadName": lead_name, "rawHeadlineLength": len(raw_headline), "projectedHeadlineLength": len(headline), "headlineTruncated": headline.endswith("…"), "rawLeadNextLength": len(raw_lead_next), "projectedLeadNextLength": len(lead_next), "leadNextTruncated": lead_next.endswith("…")}, "timestamp": int(__import__("time").time() * 1000)}) + "\n"); debug_file.close()
+        # endregion
         if not headline:
             continue
         if lead_next and lead_next.lower() not in headline.lower():
@@ -351,7 +384,7 @@ def _lead_rollup_bits(snapshot: dict[str, Any]) -> list[str]:
         seen.add(line)
         bits.append(line)
     if bits:
-        return bits[:5]
+        return bits[:3]
 
     # No verified handoff yet — Lead still briefs issue + fix intent from live board.
     lead_name = _primary_lead_name(snapshot)
@@ -419,7 +452,8 @@ def _next_move(snapshot: dict[str, Any]) -> str:
         if lower.startswith(("i'd", "i'll", "i will")):
             return advise_clean
         if "needs review" in lower and "switch" in lower:
-            return "I'll switch us there and review that signal next"
+            target = re.search(r"\bsignal in ([a-z0-9_-]+)\b", advise_clean, re.IGNORECASE)
+            return f"I'll switch to {target.group(1)} and start that investigation next" if target else "I'll switch us there and start that investigation next"
         if "lead" in lower and ("rollup" in lower or "open" in lower):
             return "I'll open the Lead rollup and walk the next handoff"
         if "approval" in lower:
@@ -492,10 +526,4 @@ def compose_operator_report(snapshot: dict[str, Any]) -> dict[str, Any]:
         "fingerprint": snapshot.get("fingerprint"),
         "lane": "deterministic_report",
     }
-
-
-__all__ = [
-    "build_operator_report_snapshot",
-    "compose_operator_report",
-    "is_operator_report_request",
-]
+__all__ = ["build_operator_report_snapshot", "compose_operator_report", "is_operator_report_request"]

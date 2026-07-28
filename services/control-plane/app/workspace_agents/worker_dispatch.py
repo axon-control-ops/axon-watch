@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -214,6 +215,10 @@ def dispatch_continuous_worker_run(
             employee=employee,
             task=task,
         )
+        # region agent log
+        with open("/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log", "a", encoding="utf-8") as debug_file:
+            debug_file.write(json.dumps({"sessionId": "bef50e", "runId": "closeout-access", "hypothesisId": "H28,H29", "location": "workspace_agents/worker_dispatch.py:dispatch_continuous_worker_run", "message": "dispatching Mission Control worker with execution access", "data": {"workspaceId": workspace_id, "runId": run_id, "taskId": task_id, "role": employee.role, "executionAccess": "full"}, "timestamp": int(time.time() * 1000)}) + "\n")
+        # endregion
         ensure_agent_session(workspace_id=workspace_id, run_id=run_id)
         context = LaneBContext(workspace_id=workspace_id, composer_mode="agent")
         lane_b_result = generate_lane_b_result(

@@ -15,9 +15,14 @@ import { kairoVoiceFollowupExpiresAt } from '../../lib/kairo-voice-followup-wind
 export function shouldShowVaxonRosterVoiceDock(input: {
   layoutMode: string;
   operatorBrainGalaxyActive: boolean;
+  operatorCenterView?: string | null;
   voiceDockVisible: boolean;
 }): boolean {
-  if (!input.voiceDockVisible || input.layoutMode === 'ide') {
+  if (
+    !input.voiceDockVisible ||
+    input.layoutMode === 'ide' ||
+    input.operatorCenterView === 'grid'
+  ) {
     return false;
   }
   // Mission Control already owns VAXON presence in the right LIVE OPERATIONS orb.

@@ -1643,6 +1643,7 @@ export const useShellStore = defineStore('shell', () => {
     currentThreadSurface,
     focusAttentionSidebar,
     focusKairoBriefing,
+    focusCommandSeam,
   });
 
   function attachChatStream(
@@ -3072,7 +3073,6 @@ export const useShellStore = defineStore('shell', () => {
     setLastViewportCompactRequested,
   });
   briefingLoader.load = loadOperatorBriefing;
-
   const {
     loadOperatorPresenceSettings,
     saveOperatorPresenceSettingsPatch,
@@ -3086,8 +3086,9 @@ export const useShellStore = defineStore('shell', () => {
     operatorPresenceSettingsError,
     operatorPresenceSettingsSavedAt,
     loadOperatorBriefing: () => loadOperatorBriefing(),
+    agentExecutionAccess,
+    setAgentExecutionAccess,
   });
-
   const {
     loadInbox,
     dismissInboxSignalIds,

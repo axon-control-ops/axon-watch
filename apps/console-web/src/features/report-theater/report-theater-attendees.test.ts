@@ -32,10 +32,11 @@ describe('report-theater-attendees', () => {
         } as never,
       ],
       activeLines: ['Reed (Backend) just wrapped'],
+      activeSpeakerName: 'Mira',
       max: 5,
     });
     expect(attendees[0]?.kind).toBe('vaxon');
-    expect(attendees.some((row) => row.name === 'Reed' && row.speaking)).toBe(true);
-    expect(attendees.some((row) => row.name === 'Mira' && row.lead)).toBe(true);
+    expect(attendees.some((row) => row.name === 'Reed' && row.speaking)).toBe(false);
+    expect(attendees.some((row) => row.name === 'Mira' && row.lead && row.speaking)).toBe(true);
   });
 });

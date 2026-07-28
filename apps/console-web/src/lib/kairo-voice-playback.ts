@@ -4,7 +4,7 @@ import {
   markKairoVoicePlaybackActive,
   recordKairoVoicePlayback,
 } from './kairo-voice-diagnostics';
-import { postKairoTts, type KairoTtsResponse } from './kairo-tts-client';
+import { postKairoTts, isAzureTtsBlocked, azureTtsBlockedReasonValue, type KairoTtsResponse } from './kairo-tts-client';
 import { speakAzureChunksWithPrefetch } from './kairo-voice-azure-prefetch';
 import {
   playAzureAudioToCompletion,
@@ -109,7 +109,8 @@ function resolveSpeechTuning(options: {
   };
 }
 
-const AUDIO_PREROLL_MS = 280;
+const AUDIO_PREROLL_MS = 120;
+let browserPrerollArmed = true;
 function speechPort(): SpeechPort | null {
   return typeof speechSynthesis === 'undefined' ? null : speechSynthesis;
 }
@@ -232,6 +233,7 @@ export function subscribeKairoVoiceChunk(
 }
 
 export function stopKairoPlayback(): void {
+  browserPrerollArmed = true;
   stopSharedPlayback();
   stopSpeech(speechPort());
   notifyKairoVoiceUtterance(null);
@@ -305,11 +307,15 @@ async function speakWithBrowser(
   notifyKairoVoiceUtterance(trimmed, speaker);
   notifySpeaking(true);
   markKairoVoicePlaybackActive('browser', reason);
-  await delay(AUDIO_PREROLL_MS);
+  if (browserPrerollArmed) {
+    await delay(AUDIO_PREROLL_MS);
+    browserPrerollArmed = false;
+  }
   for (const chunk of browserChunks) {
     enqueueSpeech(chunk, port, {
       rate: tuning.rate,
       pitch: tuning.pitch,
+      voiceHint: speaker?.azureVoiceId?.trim() || speaker?.id,
       onStart: () => {
         notifyChunk(chunk);
       },
@@ -348,8 +354,16 @@ export async function playKairoUtteranceNow(
     return finishPlayback({ engine: 'skipped', reason: 'empty_text' }, text);
   }
 
-  if (options.preferBrowser) {
-    return speakWithBrowser(trimmed, 'preferred_browser', tuning, speaker);
+  if (options.preferBrowser || isAzureTtsBlocked()) {
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'voice-gender-fix',hypothesisId:'H49',location:'kairo-voice-playback.ts:skip-azure',message:'skipping Azure TTS for browser path',data:{preferBrowser:Boolean(options.preferBrowser),azureBlocked:azureTtsBlockedReasonValue(),textLength:trimmed.length,speaker:speaker?.displayName??null,azureVoiceId:speaker?.azureVoiceId??options.azureVoiceId??null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return speakWithBrowser(
+      trimmed,
+      options.preferBrowser ? 'preferred_browser' : azureTtsBlockedReasonValue() || 'azure_blocked',
+      tuning,
+      speaker,
+    );
   }
 
   notifyKairoVoiceUtterance(trimmed, speaker);

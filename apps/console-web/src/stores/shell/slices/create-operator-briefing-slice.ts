@@ -8,6 +8,7 @@ import type {
 } from '../../../contracts/canonical';
 import { submitKairoConversationTranscript } from '../../../features/kairo-conversation/kairo-conversation-bus';
 import {
+  isReportTheaterAutoStartTransition,
   markReportTheaterAutoStarted,
   shouldAutoStartReportTheater,
 } from '../../../features/report-theater/report-theater-auto-start';
@@ -30,6 +31,7 @@ interface CreateOperatorBriefingSliceInput {
 export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceInput) {
   let operatorBriefingFetchInFlight: Promise<void> | null = null;
   let operatorBriefingFetchWorkspaceKey: string | null = null;
+  const observedFullBriefKeyByWorkspace = new Map<string, string>();
 
   async function loadOperatorBriefing(options?: {
     viewportCompact?: boolean;
@@ -120,7 +122,11 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
             briefing.top_signals?.[0]?.signal_id ?? '',
             String(briefing.pending_approvals?.count ?? 0),
           ].join('|');
-          const shouldStart = shouldAutoStartReportTheater({
+          const previousBriefKey = observedFullBriefKeyByWorkspace.get(requestedWorkspaceKey);
+          const initialHydration = previousBriefKey === undefined;
+          const briefChanged = previousBriefKey !== briefKey;
+          observedFullBriefKeyByWorkspace.set(requestedWorkspaceKey, briefKey);
+          const autoStartEligible = shouldAutoStartReportTheater({
             autonomyMode: settings.autonomy_mode,
             privacyMode: Boolean(settings.privacy_mode),
             spokenAlertsEnabled: settings.spoken_alerts_enabled !== false,
@@ -130,6 +136,14 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
             degradedActive: Boolean(briefing.degraded?.active),
             briefKey,
           });
+          const shouldStart = isReportTheaterAutoStartTransition(
+            previousBriefKey,
+            briefKey,
+            autoStartEligible,
+          );
+          // #region agent log
+          fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-refresh-fix',hypothesisId:'H30',location:'create-operator-briefing-slice.ts:auto-start-hydration-gate',message:'gated automatic REPORT on a new briefing transition',data:{workspaceKey:requestedWorkspaceKey,initialHydration,briefChanged,autoStartEligible,shouldStart},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           // #region agent log
           fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H25',location:'create-operator-briefing-slice.ts:auto-start',message:'evaluated automatic REPORT stand-up',data:{shouldStart,autonomyMode:settings.autonomy_mode,topSignalCount:briefing.top_signals?.length??0,awaiting:briefing.awaiting_engagement_count??0,pending:briefing.pending_approvals?.count??0,degraded:Boolean(briefing.degraded?.active),briefKeyPreview:briefKey.slice(0,120)},timestamp:Date.now()})}).catch(()=>{});
           // #endregion

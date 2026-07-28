@@ -25,8 +25,8 @@
     </div>
     <div class="cover-footer">
       <div class="cover-meta">
-        <strong>Last verified</strong> · 2026-07-25 — Gates 0–5 closed; Gate 6 verifier + draft-PR delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and file-size patrol plumbing landed. **Not yet a closed unattended auto-loop** — scheduler stays **off** by default; Mission Control still needs Retry / dig-in. Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first for status + Cursor credit budgets. After every push run `./scripts/ops/watch-fast-gate.sh`.<br/>
-        Generated 25 Jul 2026
+        <strong>Last verified</strong> · 2026-07-28 — Gates 0–5 closed; Gate 6 verifier + draft-PR delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and file-size patrol plumbing landed. Connector/tunnel recovery documented (`axonfixconnectors`). **Not yet a closed unattended auto-loop** — scheduler stays **off** by default; Mission Control still needs Retry / dig-in. Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first for status + Cursor credit budgets. After every push run `./scripts/ops/watch-fast-gate.sh`.<br/>
+        Generated 28 Jul 2026
       </div>
       <div class="cover-chips">
         <span class="cover-chip">console-web</span>
@@ -43,7 +43,7 @@
     <div class="toc-kicker">Field guide</div>
     <h2>16 chapters</h2>
   </div>
-  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-auto-loop-status-credits-budget-operator-brief">Auto-loop status & credits budget (operator brief)</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">46</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">47</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
+  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-auto-loop-status-credits-budget-operator-brief">Auto-loop status & credits budget (operator brief)</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-unlock-vault-in-the-ui-remember-me-then">unlock Vault in the UI (Remember me), then:</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">46</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">47</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">48</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
 </nav>
 
     
@@ -160,10 +160,15 @@
 <td><code>axonrevive</code></td>
 <td><strong>Use when the shell is empty</strong> (Runtime unavailable / No workspace). Force-kills a wedged control-plane, restarts all three units, health-checks</td>
 </tr>
+<tr>
+<td><code>axonfixconnectors</code></td>
+<td><strong>Use when</strong> Mission Control shows <strong>REQUIRED CONNECTOR DOWN</strong> / <strong>tunnel token missing</strong> / vault unlock <strong>HTTP 503</strong> about <code>AXON_WATCH_INTERNAL_SERVICE_TOKEN</code></td>
+</tr>
 </tbody>
 </table>
 <pre><code class="language-bash">axonhealth          # is everything up?
 axonrevive          # empty shell / hung API — fix it
+axonfixconnectors  # required connector / tunnel / vault 503 — diagnose (+ optional fix)
 # then hard-refresh http://127.0.0.1:4173
 </code></pre>
 <p>These are on your PATH (<code>~/.local/bin</code> → <code>bin/</code> in this repo). See <a href="#snippet-cookbook">Snippet cookbook</a>.</p>
@@ -1467,6 +1472,7 @@ evidence yet.</p>
 <li><strong>Stack health</strong> — <code>axonhealth</code> (or <code>./scripts/dev/check-health.sh</code>).</li>
 <li><strong>Empty shell / Runtime unavailable</strong> — <code>axonrevive</code>, then hard-refresh <code>:4173</code>. Do <strong>not</strong> rely on <code>./scripts/dev/down.sh</code> when systemd owns the ports.</li>
 <li><strong>Soft refresh</strong> — <code>axonrestart</code> after backend route changes (if the API still answers).</li>
+<li><strong>Required connector / tunnel / vault 503</strong> — <code>axonfixconnectors</code> (see below). Local <code>axonhealth</code> can still be green while the <strong>public</strong> console probe is red.</li>
 <li><strong>Stale UI on <code>:4173</code></strong> — rebuild console-web (<code>npm run build -w @axon-watch/console-web</code>), <code>systemctl --user restart console-web.service</code>, then hard-refresh. Source-only / <code>:5173</code> Vite edits do <strong>not</strong> update the systemd bundle.</li>
 <li><strong>Browser cache</strong> — hard refresh <code>:4173</code> (<code>Ctrl+Shift+R</code>) after console-web bundle changes.</li>
 <li><strong>Connectors truth</strong> — Mission Control → <strong>Connectors</strong> rail or <code>GET /api/connectors</code>.</li>
@@ -1474,6 +1480,66 @@ evidence yet.</p>
 <li><strong>Logs</strong> — <code>journalctl --user -u control-plane.service -n 80</code> (always-on) or <code>.local/logs/</code> (dev bootstrap).</li>
 </ol>
 <p>Symptom-specific fixes continue in the sections below.</p>
+<h2>Problem: REQUIRED CONNECTOR DOWN / tunnel token missing / Vault unlock HTTP 503</h2>
+<h3>What you see</h3>
+<ul>
+<li>Mission Control chip: <strong>1 REQUIRED CONNECTOR DOWN</strong>, <strong>degraded</strong>, <strong>tunnel token missing</strong></li>
+<li>Connectors rail: <strong>Console web</strong> <code>REQUIRED</code> → unavailable / probe failed</li>
+<li>Cloudflare tunnel row: <code>tunnel token missing (auth=missing)</code></li>
+<li>Vault page (<code>/vault</code>): unlock fails with red banner<br>
+<code>Watch vault API HTTP 503: AXON_WATCH_INTERNAL_SERVICE_TOKEN is required when the operator surface is remotely reachable</code></li>
+<li>Status line may still say <strong>WATCH CONNECTED</strong> and <code>axonhealth</code> can still pass — because <strong>local</strong> <code>:4173</code> / <code>:8787</code> are fine. The <strong>required</strong> <code>console_web</code> probe hits the <strong>public</strong> URL (<code>AXON_WATCH_PUBLIC_BASE_URL</code>, e.g. <code>https://axon.edudashpro.org.za/api/health</code>), which needs the tunnel.</li>
+</ul>
+<h3>Why it happens (failure chain)</h3>
+<ol>
+<li><code>AXON_WATCH_PUBLIC_BASE_URL</code> is a non-loopback hostname → deployment is <strong>remotely reachable</strong>.</li>
+<li>Remotely reachable hosts <strong>require</strong> a shared <code>AXON_WATCH_INTERNAL_SERVICE_TOKEN</code> on both control-plane and axon-watch (same value in <code>~/.config/axon-watch/deployment.env</code>).</li>
+<li>If that token is missing, control-plane → watch <strong>mutating</strong> calls (vault unlock, tunnel start) return <strong>HTTP 503</strong>.</li>
+<li>Vault stays <strong>locked</strong> → tunnel token cannot resolve from encrypted vault secrets → managed <code>cloudflared</code> will not start → public health returns Cloudflare <strong>1033</strong> → required <code>console_web</code> stays down.</li>
+<li>Auto-unlock keyfile may show as “enabled” on <code>/vault</code>, but <strong>auto-unlock is refused</strong> when remotely reachable (by design). You must unlock manually after the internal token is fixed.</li>
+</ol>
+<p>Also see <a href="how-to/autonomy-gates-and-service-identity.md"><code>docs/how-to/autonomy-gates-and-service-identity.md</code></a> and <a href="NATIVE_TUNNEL_CONTROL.md"><code>docs/NATIVE_TUNNEL_CONTROL.md</code></a>.</p>
+<h3>Fix (copy-paste)</h3>
+<p><strong>One-word path (preferred):</strong></p>
+<pre><code class="language-bash"># 1) Mint missing internal token + restart stack so CP and watch both load it
+axonfixconnectors --ensure-internal-token --restart
+
+# 2) In the browser: open /vault → master password + 2FA → check Remember me → UNLOCK
+#    Confirm a tunnel secret exists (cloudflare_tunnel_token or AXON_CLOUDFLARE_TUNNEL_TOKEN)
+
+# 3) Start tunnel + reprobe public console connector
+axonfixconnectors
+</code></pre>
+<p>Install / refresh the PATH wrapper if needed:</p>
+<pre><code class="language-bash">./scripts/ops/install-bin-wrappers.sh
+# or without PATH:
+./scripts/ops/axonfixconnectors.sh --ensure-internal-token --restart
+</code></pre>
+<p><strong>Manual path (same outcome):</strong></p>
+<pre><code class="language-bash"># Add shared token (do not commit this file)
+echo &quot;AXON_WATCH_INTERNAL_SERVICE_TOKEN=$(openssl rand -hex 24)&quot; &gt;&gt; ~/.config/axon-watch/deployment.env
+axonrestart
+
+# Unlock Vault in the UI (Remember me), then:
+curl -sS -X POST http://127.0.0.1:8787/api/tunnel/start | python3 -m json.tool
+# Mission Control → Connectors → REPROBE on Console web (or):
+curl -sS -X POST http://127.0.0.1:8787/api/watch/commands \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;command_type&quot;:&quot;reprobe_connector&quot;,&quot;target_type&quot;:&quot;connector&quot;,&quot;target_id&quot;:&quot;console_web&quot;,&quot;requested_by&quot;:&quot;operator&quot;}'
+</code></pre>
+<p><strong>If vault unlock works but tunnel auth is still <code>missing</code>:</strong> add a durable env token (or store the secret in vault under one of the accepted names), then restart:</p>
+<pre><code class="language-bash"># ~/.config/axon-watch/deployment.env
+AXON_CLOUDFLARE_TUNNEL_TOKEN=&lt;named-tunnel-token-from-cloudflare&gt;
+axonrestart
+axonfixconnectors
+</code></pre>
+<p>Accepted vault/env names: <code>AXON_CLOUDFLARE_TUNNEL_TOKEN</code>, <code>CLOUDFLARE_TUNNEL_TOKEN</code>, <code>cloudflare_tunnel_token</code>, <code>TUNNEL_TOKEN</code>.</p>
+<h3>Verify</h3>
+<pre><code class="language-bash">axonfixconnectors          # required_unavailable should be 0
+curl -sS http://127.0.0.1:8787/api/tunnel/status | python3 -m json.tool
+curl -sS --max-time 15 https://axon.edudashpro.org.za/api/health
+# hard-refresh Mission Control — degraded / REQUIRED CONNECTOR DOWN chips should clear
+</code></pre>
 <h2>Problem: Runtime unavailable / No workspace selected / Briefing unavailable</h2>
 <p>This is the <strong>wedged control-plane</strong> pattern. The Vue shell is up, but <code>/api/*</code> times out (even <code>/api/health</code>). Bootstrap never selects a workspace, so explorer + chat look empty.</p>
 <pre><code class="language-bash">axonrevive
@@ -1655,18 +1721,27 @@ another live process. Free the port or stop the other process before retrying.</
 <td>Force-kill control-plane → restart all three → health</td>
 <td>Empty shell, hung health, wedged worker</td>
 </tr>
+<tr>
+<td><strong><code>axonfixconnectors</code></strong></td>
+<td>Diagnose tunnel/connectors; optional <code>--ensure-internal-token --restart</code></td>
+<td>REQUIRED CONNECTOR DOWN, tunnel token missing, vault unlock HTTP 503</td>
+</tr>
 </tbody>
 </table>
 <pre><code class="language-bash">axonhealth
 axonrestart
 axonrevive
+axonfixconnectors --ensure-internal-token --restart   # vault 503 / missing internal token
+axonfixconnectors                                     # after vault unlock: start tunnel + reprobe
 </code></pre>
 <p>Repo scripts (same behavior without PATH):</p>
 <pre><code class="language-bash">./scripts/ops/axonhealth.sh
 ./scripts/ops/axonrestart.sh
 ./scripts/ops/axonrevive.sh
+./scripts/ops/axonfixconnectors.sh
 </code></pre>
 <p>Open console after revive: <strong>http://127.0.0.1:4173</strong> (hard-refresh).</p>
+<p>Full connector/tunnel recovery write-up: <a href="#problem-required-connector-down--tunnel-token-missing--vault-unlock-http-503">Problem: REQUIRED CONNECTOR DOWN</a>.</p>
 <h3>Console-web rebuild (always-on <code>:4173</code>)</h3>
 <p><code>:4173</code> serves the <strong>built</strong> <code>apps/console-web/dist</code> via systemd <code>console-web.service</code>. Source edits (including Vite <code>:5173</code>) are <strong>not</strong> live on <code>:4173</code> until:</p>
 <pre><code class="language-bash">npm run build -w @axon-watch/console-web
@@ -2472,12 +2547,55 @@ watching the Actions tab.</p>
 <li>Confirm delivery with a red Fast Gate push; inbox should show
    <code>Axon-X Fast Gate failed on &lt;branch&gt;</code>.</li>
 </ol>
+<h3>Local poll fallback (when public tunnel/DNS is down)</h3>
+<p>GitHub webhook deliveries fail with <code>connection_error</code> if
+<code>axon.edudashpro.org.za</code> does not resolve or the tunnel is degraded.
+Config alone cannot auto-fix CI in that state — Rowan never sees the event.</p>
+<p>Use the local poller (HMAC to control-plane on localhost):</p>
+<pre><code class="language-bash">CONTROL_PLANE_URL=http://127.0.0.1:8787 \
+  ./scripts/ops/poll-fast-gate-remediation.sh
+</code></pre>
+<p>Always-on timer (user systemd):</p>
+<pre><code class="language-bash">mkdir -p ~/.config/systemd/user
+cp scripts/ops/systemd/axon-fast-gate-remediation-poll.{service,timer} \
+  ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now axon-fast-gate-remediation-poll.timer
+</code></pre>
+<p>Public webhook remains preferred; the timer only covers tunnel/DNS outages.</p>
 <h3>Operator surfaces</h3>
 <ul>
 <li><strong>Attention / inbox</strong> — CI failure and repair/blocked updates</li>
 <li><strong>Task board</strong> — leased <code>CI repair:</code> task for Rowan (escalate role Quinn)</li>
 <li><strong>Voice</strong> — report-outcome returns a <code>spoken</code> line; ask-shaped dig-in on budget exhaustion</li>
+<li><strong>Stale clear</strong> — when Fast Gate goes green again (webhook/poller) or on the
+  worker scheduler tick, Axon-X confirms and resolves drill / superseded failure
+  alerts so VAXON stops re-speaking them. Say <strong>“clear stale alerts”</strong> to VAXON
+  to run the same confirmation sweep on demand.</li>
 </ul>
+<h4>What counts as confirmed-stale</h4>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Cleared when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>drill/...</code> Fast Gate failure</td>
+<td>Always (drill / useless after the exercise)</td>
+</tr>
+<tr>
+<td>Real branch failure</td>
+<td>Latest Fast Gate on that branch is <strong>success</strong> (via <code>gh</code> or green webhook)</td>
+</tr>
+<tr>
+<td>Operator ack</td>
+<td>Attention clear / acknowledge resolves Gate 9 CI store rows (not watch-only)</td>
+</tr>
+</tbody>
+</table>
 <h3>Enabled workspaces</h3>
 <ul>
 <li>Axon-X: <code>Axon-X Fast Gate</code></li>
@@ -2659,6 +2777,12 @@ AXON_WATCH_REMOTELY_REACHABLE=1   # or a non-loopback AXON_WATCH_PUBLIC_BASE_URL
 <strong>Don’t:</strong> expose watch port <code>:8788</code> on the public internet</p>
 <p>When remotely reachable, watch <strong>refuses</strong> mutating internal routes if the token
 is missing (HTTP 503) or wrong (HTTP 401).</p>
+<p>Operator recovery (Mission Control <strong>REQUIRED CONNECTOR DOWN</strong> / vault unlock 503):</p>
+<pre><code class="language-bash">axonfixconnectors --ensure-internal-token --restart
+## unlock Vault in the UI (Remember me), then:
+axonfixconnectors
+</code></pre>
+<p>Full playbook: <a href="../HOW-TO-HANDBOOK.md#problem-required-connector-down--tunnel-token-missing--vault-unlock-http-503"><code>docs/HOW-TO-HANDBOOK.md</code></a>.</p>
 <h4>Proxy mTLS capability (deployment proof required)</h4>
 <p>Axon-X supports proxy-verified client certificates <strong>plus</strong> the shared token.
 This is not end-to-end proof by itself: the proxy must strip incoming
@@ -2725,11 +2849,14 @@ npm run verify:console-web
 <li>Re-read <a href="auto-loop-and-credits.md"><code>auto-loop-and-credits.md</code></a> before buying Ultra / enabling 3+ projects</li>
 </ol>
 <hr>
-</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">44</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
-<p><strong>Updated:</strong> 2026-07-22<br>
+</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">45</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-27<br>
 <strong>Audience:</strong> operators and agents who need plain-language “what changed and how to use it.”</p>
 <p>Companion to <a href="../HOW-TO-HANDBOOK.md"><code>docs/HOW-TO-HANDBOOK.md</code></a> and
 <a href="autonomy-gates-and-service-identity.md"><code>autonomy-gates-and-service-identity.md</code></a>.</p>
+<p><strong>Mission Control second brain (2026-07-27):</strong> Transmission card, open vs focus workspace,
+fleet busy presence, and <strong><code>REPORT</code></strong> hotword — see
+<a href="mission-control-transmission-and-report.md"><code>mission-control-transmission-and-report.md</code></a>.</p>
 <hr>
 <h3>1. Mission Control task board (Gate 4)</h3>
 <h4>Where it is (easy to miss)</h4>
@@ -2904,7 +3031,37 @@ promotes queued fan-out runs into Lane B; keep it off until Gate 6 is solid.</p>
 <pre><code class="language-bash">./scripts/dev/python.sh -m unittest tests.test_lead_task_plan tests.test_lead_fan_out -q
 </code></pre>
 <hr>
-<h3>5. After every push — watch Fast Gate</h3>
+<h3>4b. Continuous Lead takeover (specialist → Dana)</h3>
+<p>When a specialist shift ends (continuous worker <strong>or</strong> IDE Lane B), Dana now
+posts a <strong>Lead takeover</strong> rollup in the Lead IDE tab even if the shift was not
+linked to a formal Lead fan-out plan. Missing <code>task_id</code> no longer drops the
+handoff.</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Takeover report</td>
+<td><code>lead_takeover.post_lead_takeover_report</code></td>
+</tr>
+<tr>
+<td>Notify hook</td>
+<td><code>notify_lead_after_worker_task</code> (+ Lane B finalize)</td>
+</tr>
+<tr>
+<td>Follow-up</td>
+<td>Open <code>Lead follow-up after …</code> task for Decide / next assign</td>
+</tr>
+</tbody>
+</table>
+<p>Full multi-specialist synthesis still waits until every plan task is terminal;
+single specialist completions get an immediate Dana report so the loop stays
+continuous.</p>
+<hr>
 <h4>Why</h4>
 <p><code>feat/*</code> and PRs to <code>dev</code> must keep <strong>Axon-X Fast Gate</strong> green. A red push blocks
 merge and often means file-size ratchets or unit tests.</p>
@@ -2947,6 +3104,37 @@ runtime health after any push to <code>origin</code>.</p>
 (HMAC webhook), raise an inbox signal, lease a repair task to <strong>Rowan</strong>, and
 report the outcome. See <a href="ci-remediation-gate9.md"><code>ci-remediation-gate9.md</code></a>.
 Fallback poller: <code>./scripts/ops/poll-fast-gate-remediation.sh</code>.</p>
+<hr>
+<h3>5b. Lead team check-in scheduler (clocked)</h3>
+<p>Company Leads run a <strong>cooldown-gated check-in</strong> on the continuous worker clock
+(same tick family as file-size patrol — axon-local-style interval work).</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Work source</td>
+<td><code>lead_team_checkin</code> in <code>config/autonomy-work-sources.json</code></td>
+</tr>
+<tr>
+<td>Logic</td>
+<td><code>services/control-plane/app/workspace_agents/lead_team_checkin.py</code></td>
+</tr>
+<tr>
+<td>Hierarchy + close-out</td>
+<td><a href="company-hierarchy-and-lead-checkin.md"><code>company-hierarchy-and-lead-checkin.md</code></a></td>
+</tr>
+</tbody>
+</table>
+<p>Failed shifts and degraded monitors/connectors become <code>Lead assigned:</code> tasks for
+the matching specialist. Usage/auth/restart failures escalate to the Lead IDE
+only (no bogus repair task).</p>
+<p>External HTTP health probes: <code>http_health</code> checks in
+<code>config/axon-x-monitor-slice.json</code> and <code>config/dashpro-monitor-slice.json</code>.</p>
 <hr>
 <h3>6. Workspace company parity (vs DashPro)</h3>
 <p>DashPro is not a special UI — every bound workspace uses the same Team panel,
@@ -3028,7 +3216,7 @@ sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/d
 </code></pre>
 <p>Requires Debian-family x86_64 + WebKitGTK 4.1; current sidecars need <strong>glibc ≥ 2.42</strong>. Full first-run / tray / update notes: <a href="../VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a> and <a href="../DUAL_RUNTIME_STARTUP_CONTRACT.md"><code>docs/DUAL_RUNTIME_STARTUP_CONTRACT.md</code></a>.</p>
 <hr>
-</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">46</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">47</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
 <p>Preferred → fallback order (matches the control-plane research path):</p>
 <ol>
 <li><strong>SearXNG</strong> when <code>AXON_WATCH_SEARXNG_URL</code> is set (recommended local path)</li>

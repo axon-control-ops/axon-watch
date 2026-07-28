@@ -45,7 +45,7 @@ describe('speech queue', () => {
 
     enqueueSpeech('first line', speech);
     expect(isSpeechQueueSpeaking()).toBe(true);
-    vi.advanceTimersByTime(150);
+    vi.advanceTimersByTime(50);
     expect(speech.utterances).toHaveLength(1);
 
     stopSpeech(speech);
@@ -63,7 +63,7 @@ describe('speech queue', () => {
     const idle = waitForSpeechQueueIdle();
     expect(isSpeechQueueBusy()).toBe(true);
 
-    vi.advanceTimersByTime(150);
+    vi.advanceTimersByTime(50);
     const utterance = speech.utterances[0];
     utterance.onend?.();
     await vi.advanceTimersByTimeAsync(300);
@@ -95,7 +95,7 @@ describe('speech queue', () => {
     stopSpeech(speech);
 
     enqueueSpeech('natural voice', speech);
-    vi.advanceTimersByTime(150);
+    vi.advanceTimersByTime(50);
 
     const utterance = speech.utterances[0] as MockUtterance;
     expect(utterance.rate).toBe(1.0);
@@ -110,11 +110,47 @@ describe('speech queue', () => {
     stopSpeech(speech);
 
     enqueueSpeech('slower voice', speech, { rate: 0.85, pitch: 1.12 });
-    vi.advanceTimersByTime(150);
+    vi.advanceTimersByTime(50);
 
     const utterance = speech.utterances[0] as MockUtterance;
     expect(utterance.rate).toBe(0.85);
     expect(utterance.pitch).toBe(1.12);
+    vi.useRealTimers();
+  });
+
+  it('selects a distinct browser voice from the employee voice hint', () => {
+    vi.useFakeTimers();
+    const speech = createSpeechPort();
+    speech.getVoices = () =>
+      [
+        { name: 'Microsoft Davis', voiceURI: 'davis', lang: 'en-US' },
+        { name: 'Microsoft Jenny', voiceURI: 'jenny', lang: 'en-US' },
+      ] as SpeechSynthesisVoice[];
+    stopSpeech(speech);
+
+    enqueueSpeech('Cass reporting', speech, { voiceHint: 'en-US-DavisNeural' });
+    vi.advanceTimersByTime(50);
+
+    const utterance = speech.utterances[0] as MockUtterance;
+    expect(utterance.voice?.name).toBe('Microsoft Davis');
+    vi.useRealTimers();
+  });
+
+  it('maps SoniaNeural to a female browser voice when Sonia is missing', () => {
+    vi.useFakeTimers();
+    const speech = createSpeechPort();
+    speech.getVoices = () =>
+      [
+        { name: 'Google UK English Male', voiceURI: 'uk-male', lang: 'en-GB' },
+        { name: 'Google UK English Female', voiceURI: 'uk-female', lang: 'en-GB' },
+      ] as SpeechSynthesisVoice[];
+    stopSpeech(speech);
+
+    enqueueSpeech('Mira reporting', speech, { voiceHint: 'en-GB-SoniaNeural' });
+    vi.advanceTimersByTime(50);
+
+    const utterance = speech.utterances[0] as MockUtterance;
+    expect(utterance.voice?.name).toBe('Google UK English Female');
     vi.useRealTimers();
   });
 
@@ -140,10 +176,10 @@ describe('speech queue', () => {
     enqueueSpeech('old line', speech);
     stopSpeech(speech);
     enqueueSpeech('fresh line', speech);
-    vi.advanceTimersByTime(150);
+    vi.advanceTimersByTime(50);
 
     expect(speech.utterances).toHaveLength(1);
-    expect(speech.utterances[0]?.text).toBe('fresh line');
+    expect(speech.utterances[0]?.text).toBe('\u200Bfresh line');
     vi.useRealTimers();
   });
 });
