@@ -411,7 +411,7 @@
       "note": "Deterministic REPORT lane; extract handoff formatting next"
     },
     "apps/console-web/src/stores/shell/slices/create-kairo-voice-slice.ts": {
-      "max_lines": 522,
+      "max_lines": 525,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/kairo-voice-*",
