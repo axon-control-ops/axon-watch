@@ -356,7 +356,7 @@ export async function playKairoUtteranceNow(
 
   if (options.preferBrowser || isAzureTtsBlocked()) {
     // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'voice-gender-fix',hypothesisId:'H49',location:'kairo-voice-playback.ts:skip-azure',message:'skipping Azure TTS for browser path',data:{preferBrowser:Boolean(options.preferBrowser),azureBlocked:azureTtsBlockedReasonValue(),textLength:trimmed.length,speaker:speaker?.displayName??null,azureVoiceId:speaker?.azureVoiceId??options.azureVoiceId??null},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'voice-gender-fix',hypothesisId:'H49',location:'kairo-voice-playback.ts:skip-azure',message:'skipping Azure TTS for browser path',data:{preferBrowser:Boolean(options.preferBrowser),azureBlocked:azureTtsBlockedReasonValue(),textLength:trimmed.length,speaker:speaker?.name??null,azureVoiceId:speaker?.azureVoiceId??options.azureVoiceId??null},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
     return speakWithBrowser(
       trimmed,
