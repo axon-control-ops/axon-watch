@@ -11,13 +11,16 @@ def debug_autonomy_probe(
     hypothesis_id: str,
     message: str,
     data: dict[str, Any],
+    *,
+    location: str = "workspace_agents/scheduler.py",
+    run_id: str = "post-fix",
 ) -> None:
     # region agent log
     payload = {
         "sessionId": "bef50e",
-        "runId": "post-fix",
+        "runId": run_id,
         "hypothesisId": hypothesis_id,
-        "location": "workspace_agents/scheduler.py",
+        "location": location,
         "message": message,
         "data": data,
         "timestamp": int(time.time() * 1000),

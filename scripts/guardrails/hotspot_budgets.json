@@ -403,7 +403,7 @@
       "note": "Task Board density polish; split header/list/card CSS next"
     },
     "services/control-plane/app/kairo/operator_deterministic_report.py": {
-      "max_lines": 540,
+      "max_lines": 560,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/report_*",

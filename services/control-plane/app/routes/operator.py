@@ -163,8 +163,18 @@ def operator_presence_settings_put(body: OperatorPresenceSettingsRequest) -> dic
             )
             scheduler_settings = worker_scheduler_settings_store.load_settings()
             # region agent log
-            with open("/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log", "a", encoding="utf-8") as debug_file:
-                debug_file.write(json.dumps({"sessionId": "bef50e", "runId": "closeout-access", "hypothesisId": "H26,H27", "location": "routes/operator.py:operator_presence_settings_put", "message": "persisted autonomy and synchronized worker scheduler", "data": {"autonomyMode": mode, "schedulerEnabled": bool(scheduler_settings.get("scheduler_enabled"))}, "timestamp": int(time.time() * 1000)}) + "\n")
+            from app.workspace_agents.autonomy_debug import debug_autonomy_probe
+
+            debug_autonomy_probe(
+                "H26,H27",
+                "persisted autonomy and synchronized worker scheduler",
+                {
+                    "autonomyMode": mode,
+                    "schedulerEnabled": bool(scheduler_settings.get("scheduler_enabled")),
+                },
+                location="routes/operator.py:operator_presence_settings_put",
+                run_id="closeout-access",
+            )
             # endregion
     current.update(patch)
     return operator_presence_settings_store.save_settings(current)

@@ -371,7 +371,26 @@ def _lead_rollup_bits(snapshot: dict[str, Any]) -> list[str]:
         headline = _scrub_operator_line(raw_headline, max_len=120)
         lead_next = _scrub_operator_line(raw_lead_next, max_len=90)
         # region agent log
-        debug_file = open("/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log", "a", encoding="utf-8"); debug_file.write(json.dumps({"sessionId": "bef50e", "runId": "jarvis-polish", "hypothesisId": "H52", "location": "kairo/operator_deterministic_report.py:_lead_rollup_bits", "message": "projected Lead handoff into REPORT line", "data": {"leadName": lead_name, "rawHeadlineLength": len(raw_headline), "projectedHeadlineLength": len(headline), "headlineTruncated": headline.endswith("…"), "rawLeadNextLength": len(raw_lead_next), "projectedLeadNextLength": len(lead_next), "leadNextTruncated": lead_next.endswith("…")}, "timestamp": int(__import__("time").time() * 1000)}) + "\n"); debug_file.close()
+        try:
+            from app.workspace_agents.autonomy_debug import debug_autonomy_probe
+
+            debug_autonomy_probe(
+                "H52",
+                "projected Lead handoff into REPORT line",
+                {
+                    "leadName": lead_name,
+                    "rawHeadlineLength": len(raw_headline),
+                    "projectedHeadlineLength": len(headline),
+                    "headlineTruncated": headline.endswith("…"),
+                    "rawLeadNextLength": len(raw_lead_next),
+                    "projectedLeadNextLength": len(lead_next),
+                    "leadNextTruncated": lead_next.endswith("…"),
+                },
+                location="kairo/operator_deterministic_report.py:_lead_rollup_bits",
+                run_id="jarvis-polish",
+            )
+        except Exception:
+            pass
         # endregion
         if not headline:
             continue

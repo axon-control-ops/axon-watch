@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import time
@@ -375,8 +374,20 @@ def post_lead_takeover_report(
             run_id=cleaned_run,
         )
         # region agent log
-        with open("/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log", "a", encoding="utf-8") as debug_file:
-            debug_file.write(json.dumps({"sessionId": "bef50e", "runId": "closeout-access", "hypothesisId": "H29", "location": "workspace_agents/lead_takeover.py:post_lead_takeover_report", "message": "preserved continuous ownership after specialist shift", "data": {"workspaceId": workspace_id, "runId": cleaned_run, "phase": phase, "followUpTaskId": (follow_up or {}).get("task_id")}, "timestamp": int(time.time() * 1000)}) + "\n")
+        from app.workspace_agents.autonomy_debug import debug_autonomy_probe
+
+        debug_autonomy_probe(
+            "H29",
+            "preserved continuous ownership after specialist shift",
+            {
+                "workspaceId": workspace_id,
+                "runId": cleaned_run,
+                "phase": phase,
+                "followUpTaskId": (follow_up or {}).get("task_id"),
+            },
+            location="workspace_agents/lead_takeover.py:post_lead_takeover_report",
+            run_id="closeout-access",
+        )
         # endregion
     vaxon_flash: dict[str, Any] | None = None
     try:
