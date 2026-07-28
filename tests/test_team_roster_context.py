@@ -52,7 +52,7 @@ class TeamRosterContextTests(unittest.TestCase):
         self.assertIn("Dana (Lead / lead) [LEAD]", block)
         self.assertIn("owns: product priorities and handoffs", block)
         self.assertIn("Priya (Frontend / frontend)", block)
-        self.assertIn("last shift failed: usage limits blocked the agent runtime", block)
+        self.assertIn("last job failed: usage limits blocked the agent runtime", block)
         self.assertIn("Do NOT Glob, Grep, or Read", block)
 
     def test_format_specialist_block_is_compact(self) -> None:
