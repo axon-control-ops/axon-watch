@@ -136,6 +136,9 @@ function sortNewest(left: WorkspaceTaskRecord, right: WorkspaceTaskRecord): numb
   return right.updated_at.localeCompare(left.updated_at);
 }
 
+/** Shared plan-chip width so row labels match plan-group chips. */
+const PLAN_CHIP_LABEL_MAX = 48;
+
 /** Compact operator-facing label for plan chips and dependency tags. */
 export function summarizeTaskBoardLabel(text: string, max = 52): string {
   const cleaned = String(text || '')
@@ -202,7 +205,7 @@ function toRow(
     planId,
     planKey: task.plan_key?.trim() || null,
     planGoal,
-    planLabel: planGoal ? summarizeTaskBoardLabel(planGoal, 40) : null,
+    planLabel: planGoal ? summarizeTaskBoardLabel(planGoal, PLAN_CHIP_LABEL_MAX) : null,
     updatedAt: task.updated_at,
     createdAt: task.created_at,
   };
@@ -296,7 +299,7 @@ export function buildOperatorTaskBoardView(
     planGroups.push({
       planId: plan.plan_id,
       planGoal: plan.goal || 'Lead plan',
-      planLabel: summarizeTaskBoardLabel(plan.goal || 'Lead plan', 48),
+      planLabel: summarizeTaskBoardLabel(plan.goal || 'Lead plan', PLAN_CHIP_LABEL_MAX),
       planStatus: String(plan.status || ''),
       awaitingEngagement: Boolean(plan.awaiting_engagement),
       rows: planRows,
