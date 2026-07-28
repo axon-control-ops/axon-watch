@@ -251,10 +251,8 @@ def _maybe_notify_lead_after_lane_b(
         return
     try:
         from app.workspace_agents import build_company_roster
-        from app.workspace_agents.lead_replan import (
-            notify_lead_after_worker_task,
-            notify_vaxon_after_lead_shift,
-        )
+        from app.workspace_agents.lead_replan import notify_lead_after_worker_task
+        from app.workspace_agents.lead_vaxon_handoff import notify_vaxon_after_lead_shift
 
         name = role
         company = build_company_roster(workspace_id)

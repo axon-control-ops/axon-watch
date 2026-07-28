@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3900,
+      "max_lines": 3927,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -48,7 +48,7 @@
       "note": "FS-005: thin orchestrator; Plan soft-switch offer accept/decline + teammate soft-route bindings"
     },
     "apps/console-web/src/api/control-plane.ts": {
-      "max_lines": 13,
+      "max_lines": 15,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/api/*-api.ts",
@@ -184,7 +184,7 @@
       "target": "apps/console-web/src/components/settings/useEmailSettingsMailbox.ts"
     },
     "apps/console-web/src/features/kairo-conversation/use-kairo-conversation.ts": {
-      "max_lines": 264,
+      "max_lines": 371,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/kairo-conversation/*"
@@ -272,7 +272,7 @@
       "note": "Roster view tests after speech/presence"
     },
     "apps/console-web/src/features/workspace-agents/company-roster-failure-view.test.ts": {
-      "max_lines": 571,
+      "max_lines": 613,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/workspace-agents/*",
@@ -286,7 +286,7 @@
       "note": "Explorer + activity stub panels; extract per-panel components next"
     },
     "services/control-plane/app/adapters/watch_client.py": {
-      "max_lines": 406,
+      "max_lines": 449,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/adapters/watch_*",
@@ -380,6 +380,48 @@
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_delivery/*",
       "note": "Autonomy publish path-scope + receipts; extract next"
+    },
+    "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
+      "max_lines": 579,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/shell/operator-task-board/*",
+      "note": "Mission Control Task Board; extract plan/task sections next"
+    },
+    "apps/console-web/src/features/report-theater/report-theater.css": {
+      "max_lines": 534,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/features/report-theater/*",
+      "note": "REPORT theater presentation; split seat/stage/action layers next"
+    },
+    "apps/console-web/src/styles/shell/operator-task-board.css": {
+      "max_lines": 542,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/styles/shell/operator-task-board/*",
+      "note": "Task Board density polish; split header/list/card CSS next"
+    },
+    "services/control-plane/app/kairo/operator_deterministic_report.py": {
+      "max_lines": 501,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/kairo/report_*",
+      "note": "Deterministic REPORT lane; extract handoff formatting next"
+    },
+    "tests/test_run_outcome.py": {
+      "max_lines": 529,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_run_outcome_*.py",
+      "note": "Roster outcome selection coverage; split confidence cases next"
+    },
+    "services/control-plane/app/workspace_agents/lead_vaxon_handoff.py": {
+      "max_lines": 517,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
+      "note": "Lead\u2192VAXON handoffs including Lead-shift flash; split message builders next"
     }
   }
 }

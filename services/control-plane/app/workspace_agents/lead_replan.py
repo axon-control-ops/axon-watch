@@ -265,55 +265,6 @@ def maybe_synthesize_lead_plan_for_task(task_id: str) -> dict[str, Any] | None:
     return synthesize_lead_plan(plan_id)
 
 
-def notify_vaxon_after_lead_shift(
-    *,
-    workspace_id: str,
-    run_id: str,
-    employee_name: str,
-    phase: str,
-    reply_text: str | None = None,
-) -> dict[str, Any]:
-    """When Dana/Lead finishes their own shift, publish one VAXON operator flash.
-
-    Specialists already reach VAXON via Lead takeover. Lead self-completions were
-    previously silent — REPORT and the operator thread never saw the rollup.
-    """
-    cleaned_run = str(run_id or "").strip()
-    workspace = str(workspace_id or "").strip()
-    if not cleaned_run or not workspace:
-        return {"status": "skipped_missing_ids"}
-
-    from app.workspace_agents.lead_takeover import (
-        _lead_summary_from_reply,
-        extract_blockers,
-        extract_lead_next,
-    )
-    from app.workspace_agents.lead_vaxon_handoff import post_ad_hoc_lead_takeover_to_vaxon
-
-    name = (employee_name or "Lead").strip() or "Lead"
-    terminal = phase if phase in {"completed", "failed"} else (phase or "ended")
-    try:
-        vaxon_flash = post_ad_hoc_lead_takeover_to_vaxon(
-            workspace_id=workspace,
-            run_id=cleaned_run,
-            employee_role="lead",
-            employee_name=name,
-            phase=terminal,
-            lead_next=extract_lead_next(reply_text),
-            lead_summary=_lead_summary_from_reply(reply_text),
-            blockers=extract_blockers(reply_text),
-            reply_text=None,
-        )
-    except Exception as exc:  # noqa: BLE001
-        return {"status": "error", "detail": str(exc), "run_id": cleaned_run}
-
-    return {
-        "status": "ok_lead_shift",
-        "run_id": cleaned_run,
-        "vaxon_flash": vaxon_flash,
-    }
-
-
 def notify_lead_after_worker_task(
     *,
     workspace_id: str,
@@ -332,6 +283,8 @@ def notify_lead_after_worker_task(
     """
     role = str(employee_role or "").strip().lower()
     if role == "lead":
+        from app.workspace_agents.lead_vaxon_handoff import notify_vaxon_after_lead_shift
+
         return notify_vaxon_after_lead_shift(
             workspace_id=workspace_id,
             run_id=run_id,
@@ -519,7 +472,6 @@ __all__ = [
     "LeadReplanError",
     "maybe_synthesize_lead_plan_for_task",
     "notify_lead_after_worker_task",
-    "notify_vaxon_after_lead_shift",
     "replan_lead_goal",
     "synthesize_lead_plan",
 ]

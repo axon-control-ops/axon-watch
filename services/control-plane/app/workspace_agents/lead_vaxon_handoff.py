@@ -454,6 +454,54 @@ def post_ad_hoc_lead_takeover_to_vaxon(
     return published
 
 
+def notify_vaxon_after_lead_shift(
+    *,
+    workspace_id: str,
+    run_id: str,
+    employee_name: str,
+    phase: str,
+    reply_text: str | None = None,
+) -> dict[str, Any]:
+    """When Dana/Lead finishes their own shift, publish one VAXON operator flash.
+
+    Specialists already reach VAXON via Lead takeover. Lead self-completions were
+    previously silent — REPORT and the operator thread never saw the rollup.
+    """
+    cleaned_run = str(run_id or "").strip()
+    workspace = str(workspace_id or "").strip()
+    if not cleaned_run or not workspace:
+        return {"status": "skipped_missing_ids"}
+
+    from app.workspace_agents.lead_takeover import (
+        _lead_summary_from_reply,
+        extract_blockers,
+        extract_lead_next,
+    )
+
+    name = (employee_name or "Lead").strip() or "Lead"
+    terminal = phase if phase in {"completed", "failed"} else (phase or "ended")
+    try:
+        vaxon_flash = post_ad_hoc_lead_takeover_to_vaxon(
+            workspace_id=workspace,
+            run_id=cleaned_run,
+            employee_role="lead",
+            employee_name=name,
+            phase=terminal,
+            lead_next=extract_lead_next(reply_text),
+            lead_summary=_lead_summary_from_reply(reply_text),
+            blockers=extract_blockers(reply_text),
+            reply_text=None,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "detail": str(exc), "run_id": cleaned_run}
+
+    return {
+        "status": "ok_lead_shift",
+        "run_id": cleaned_run,
+        "vaxon_flash": vaxon_flash,
+    }
+
+
 __all__ = [
     "AD_HOC_TAKEOVER_VAXON_KIND",
     "HANDOFF_RECEIPT_KIND",
@@ -461,6 +509,7 @@ __all__ = [
     "build_lead_synthesis_vaxon_message",
     "count_awaiting_engagement_plans",
     "list_awaiting_engagement_plans",
+    "notify_vaxon_after_lead_shift",
     "post_ad_hoc_lead_takeover_to_vaxon",
     "post_lead_synthesis_to_vaxon",
     "publish_ad_hoc_synthesis_to_vaxon",
