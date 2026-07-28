@@ -62,6 +62,14 @@ describe('sanitizeSpokenReply', () => {
     expect(spoken).toContain('42');
   });
 
+  it('speaks readiness scores as percent instead of one hundred one hundred', () => {
+    const spoken = sanitizeSpokenReply(
+      'Production readiness 100/100 (ready) — clear to operate with confidence',
+    );
+    expect(spoken.toLowerCase()).toContain('100 percent');
+    expect(spoken).not.toMatch(/100\s+100/);
+  });
+
   it('keeps clock times with a colon', () => {
     const spoken = sanitizeSpokenReply('Briefing ready at 12:30.');
     expect(spoken).toContain('12:30');
@@ -135,5 +143,24 @@ describe('sanitizeSpokenReply', () => {
     const spoken = sanitizeSpokenReply('4 Lead plans awaiting engagement in VAXON.');
     expect(spoken.toLowerCase()).toContain('four lead');
     expect(spoken).not.toMatch(/\b4\s+Lead\b/);
+    expect(spoken).toMatch(/Vekson/i);
+    expect(spoken).not.toMatch(/\bVAXON\b/);
+  });
+
+  it('speaks VAXON as Vekson, never letter-by-letter', () => {
+    expect(sanitizeSpokenReply('VAXON is watching.')).toMatch(/^Vekson is watching/i);
+    expect(sanitizeSpokenReply('Engage in V.A.X.O.N now.')).toMatch(/Vekson/i);
+    expect(sanitizeSpokenReply('Say V A X O N clearly.')).toMatch(/Vekson/i);
+    expect(sanitizeSpokenReply('VAXON online.')).not.toMatch(/\bV\s+A\s+X\s+O\s+N\b/);
+  });
+
+  it('splits Lead-team and spells CI for TTS', () => {
+    const spoken = sanitizeSpokenReply(
+      'Four Lead-team plans waiting. DashPro CI failed on main.',
+    );
+    expect(spoken).toMatch(/Lead team/i);
+    expect(spoken).not.toMatch(/Lead-team/i);
+    expect(spoken).toMatch(/C I/);
+    expect(spoken).not.toMatch(/\bCI\b/);
   });
 });

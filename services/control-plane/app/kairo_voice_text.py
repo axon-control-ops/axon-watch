@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from app.operator_persona_name import OPERATOR_PERSONA_NAME
+from app.operator_persona_name import OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_SPOKEN_NAME
 from app.kairo_spoken_symbol_words import strip_literal_symbol_words
 
 _STREAM_BLOCK_START_RE = re.compile(
@@ -73,6 +73,23 @@ def _strip_markdown_for_speech(text: str) -> str:
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     text = text.replace('"', " ").replace("'", "'")
     return text
+
+
+def _prepare_persona_name_for_speech(text: str) -> str:
+    """Speak as Vekson (vek-son) — never letter-spell V-A-X-O-N."""
+    text = re.sub(
+        r"\bV\s*[.\-]\s*A\s*[.\-]\s*X\s*[.\-]\s*O\s*[.\-]\s*N\b",
+        OPERATOR_PERSONA_SPOKEN_NAME,
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"\bV\s+A\s+X\s+O\s+N\b",
+        OPERATOR_PERSONA_SPOKEN_NAME,
+        text,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(r"\bVAXON\b", OPERATOR_PERSONA_SPOKEN_NAME, text, flags=re.IGNORECASE)
 
 
 def _soften_symbols_for_speech(text: str) -> str:
@@ -227,6 +244,7 @@ def normalize_spoken_line(raw: str, *, max_chars: int = _MAX_SPOKEN_CHARS) -> st
         flags=re.IGNORECASE,
     )
     text = _strip_forbidden_listener_address(text)
+    text = _prepare_persona_name_for_speech(text)
     text = _prepare_counts_for_speech(text)
     text = _soften_symbols_for_speech(text)
     text = strip_literal_symbol_words(text)

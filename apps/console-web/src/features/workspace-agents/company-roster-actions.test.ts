@@ -139,14 +139,16 @@ describe('company-roster-actions', () => {
     expect(employeeQuickActions(failed).find((action) => action.id === 'receipts')?.label).toBe(
       'Explain what happened',
     );
-    expect(employeeRetryDraft(failed)).toMatch(/I am .+\. My last continuous shift failed/);
+    expect(employeeRetryDraft(failed)).toMatch(/My last continuous shift on .+ failed/);
+    expect(employeeRetryDraft(failed)).not.toMatch(/^I am /);
     expect(employeeRetryDraft(failed)).toContain('vitest: assertion failed');
     expect(employeeRetryDraft(failed).toLowerCase()).toContain('first person');
     expect(employeeChatDraft(failed, 'retry')).toBe(employeeRetryDraft(failed));
 
     expect(employeeReceiptsDraft(failed)).toContain('run_failed_abc123');
     expect(employeeReceiptsDraft(failed)).toContain('vitest: assertion failed');
-    expect(employeeReceiptsDraft(failed)).toContain('what happened');
+    expect(employeeReceiptsDraft(failed)).toContain('my last job');
+    expect(employeeReceiptsDraft(failed)).not.toContain("Priya's");
     expect(employeeReceiptsDraft(failed)).not.toContain('Error: Run completed');
     expect(employeeChatComposerMode('receipts')).toBe('ask');
   });
@@ -253,6 +255,21 @@ describe('company-roster-actions', () => {
 
     expect(employeeReceiptsDraft(failed)).toContain('run_43ca086d22d4');
     expect(employeeReceiptsDraft(failed)).toContain('login is not ready');
+  });
+
+  it('uses auth-probe guidance (not login) when the Cursor probe timed out', () => {
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Lane B agent fallback reply generated (Cursor auth probe timed out. Run `cursor agent status` manually.; Cursor Cloud Agent unavailable)',
+      last_run_id: 'run_probe_timeout',
+    });
+    expect(employeeRetryDraft(failed)).toContain('auth probe timed out');
+    expect(employeeRetryDraft(failed)).toContain('cursor agent status');
+    expect(employeeRetryDraft(failed)).not.toContain('cursor agent login');
+    expect(employeeReceiptsDraft(failed)).toContain('auth probe timed out');
+    expect(employeeReceiptsDraft(failed)).not.toContain('login is not ready');
   });
 
   it('hides duplicate view receipts in the dock when the run link is shown', () => {

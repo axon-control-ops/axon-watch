@@ -165,9 +165,14 @@ function buildRosterFailureQuickGuide(input: {
   failedEmployeesHint?: string | null;
   rosterAlertTone?: CompanyRosterAlertBadgeTone | null;
   terminalVisible: boolean;
+  teamExpanded?: boolean;
 }): IdeQuickGuide | null {
   const count = input.failedEmployeeCount ?? 0;
   if (count <= 0) {
+    return null;
+  }
+  // Team already owns the failure surface — don't also sticky-banner "Open Team".
+  if (input.teamExpanded) {
     return null;
   }
 
@@ -185,10 +190,9 @@ function buildRosterFailureQuickGuide(input: {
     steps: [
       hint || rosterFailureQuickGuideFallbackStep(count, tone),
       rosterFailureRecoveryStep(tone),
-      'Activity bar Team badge · editor status bar chip · roster alert hint · select a teammate to open their dock.',
       ...(input.terminalVisible
         ? []
-        : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
+        : ['Ctrl/Cmd+J opens the terminal when you need shell output.']),
     ],
   };
 }
@@ -214,6 +218,8 @@ export function buildIdeQuickGuide(input: {
   sourceControlExpanded?: boolean;
   workspaceFilesLoadState?: 'idle' | 'loading' | 'loaded' | 'error';
   searchExpanded?: boolean;
+  /** Team activity view already open — skip redundant "Open Team" failure sticky. */
+  teamExpanded?: boolean;
 }): IdeQuickGuide | null {
   if (input.layoutMode !== 'ide') {
     return null;
@@ -276,6 +282,11 @@ export function buildIdeQuickGuide(input: {
     !input.streaming &&
     input.pendingApprovals <= 0
   ) {
+    // Dock banner already owns the failure CTA — don't sticky a second failure strip
+    // over the editor when Team is also open.
+    if (input.teamExpanded) {
+      return null;
+    }
     const interrupted = Boolean(input.employeeShiftInterrupted);
     const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
     const actions: IdeQuickGuideAction[] = [];
@@ -292,13 +303,13 @@ export function buildIdeQuickGuide(input: {
         : 'Last job failed — retry from the agent dock banner',
       tone: interrupted ? 'interrupted' : 'failure',
       actions,
-      steps: withEmployeeFailureDetail(input.employeeFailureLine, [
+      steps: [
         employeeFailureComposerBannerStep(interrupted),
         'Open Team in the left sidebar to review receipts or talk it through.',
         ...(input.terminalVisible
           ? []
-          : ['Ctrl/Cmd+J opens the terminal when you need shell output in the workbench.']),
-      ]),
+          : ['Ctrl/Cmd+J opens the terminal when you need shell output.']),
+      ],
     };
   }
 

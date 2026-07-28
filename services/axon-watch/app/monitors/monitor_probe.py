@@ -69,7 +69,12 @@ def probe_monitor_slice(config: dict[str, object]) -> list[dict[str, object]]:
 
         issues: list[dict[str, object]] = []
         if check_type == "sentry_recent_issues":
-            status, detail, issues = check_sentry_recent_issues(env=env)
+            environment = str(entry.get("environment") or "").strip() or None
+            status, detail, issues = check_sentry_recent_issues(
+                env=env,
+                environment=environment,
+                workspace_id=workspace_id,
+            )
         elif check_type == "posthog_recent_events":
             status, detail = check_posthog_recent_events(env=env)
         elif check_type == "supabase_storage_quota":

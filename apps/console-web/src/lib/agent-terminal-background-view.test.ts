@@ -26,6 +26,15 @@ describe('agent terminal background visibility', () => {
     ).toBe(true);
   });
 
+  it('hides once the shell tool has finished (Cursor: no re-run on history cards)', () => {
+    expect(
+      shouldShowAgentTerminalBackgroundControl({
+        canStopIdeAgentRun: true,
+        terminalBlockRunning: false,
+      }),
+    ).toBe(false);
+  });
+
   it('hides for a busy agent with no open shell block', () => {
     expect(
       shouldShowAgentTerminalBackgroundControl({

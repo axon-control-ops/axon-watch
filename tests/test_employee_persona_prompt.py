@@ -137,6 +137,10 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("Never announce your name or role mid-reply", appendix)
         self.assertIn("Sir King", appendix)
         self.assertIn("On it", appendix)
+        self.assertIn("my last shift receipts", appendix)
+        self.assertIn('e.g. "Pulling my last shift receipts now, Sir King."', appendix)
+        self.assertNotIn('e.g. "Pulling Priya\'s shift receipts now, Sir King."', appendix)
+        self.assertIn("Never speak about yourself in the third person", appendix)
         self.assertIn("I am doing this as Priya", appendix)
         self.assertIn("I am wiring Copy Link", appendix)
 

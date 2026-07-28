@@ -205,6 +205,18 @@ def fallback_for_event(
         return str(context.get("literal_line") or "Approval required before I can continue.")
 
     if event_type == "alert":
+        # Prefer control-plane crafted copy (e.g. autonomy_advisory) over idle persona filler.
+        crafted = str(
+            context.get("literal_line")
+            or context.get("fallback")
+            or ""
+        ).strip()
+        if crafted:
+            return apply_participant_address(
+                crafted,
+                guest_name,
+                speaker_kind=speaker_kind,
+            )
         line = build_persona_voice_line(
             pending_approvals=int(context.get("pending_approvals") or 0),
             top_signal_title=str(context.get("top_signal_title") or ""),

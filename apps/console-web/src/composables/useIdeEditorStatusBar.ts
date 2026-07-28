@@ -141,6 +141,7 @@ export function useIdeEditorStatusBar(input: {
       sourceControlExpanded: sourceControlExpanded.value,
       workspaceFilesLoadState: shell.workspaceFilesLoadState,
       searchExpanded: searchExpanded.value,
+      teamExpanded: teamExpanded.value,
     });
   });
 

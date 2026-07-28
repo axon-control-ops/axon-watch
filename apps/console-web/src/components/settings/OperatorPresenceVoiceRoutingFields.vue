@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { OperatorPresenceSettings } from '../../contracts/canonical';
+import { VAXON_MODEL_OPTIONS } from '../../lib/operator-presence-settings';
 
 const props = defineProps<{
   draft: OperatorPresenceSettings;
@@ -25,6 +26,12 @@ function onVoiceRoutingChange(event: Event): void {
   emit('patch', {
     voice_routing_mode: (event.target as HTMLSelectElement)
       .value as OperatorPresenceSettings['voice_routing_mode'],
+  });
+}
+
+function onVaxonModelChange(event: Event): void {
+  emit('patch', {
+    vaxon_model_id: (event.target as HTMLSelectElement).value,
   });
 }
 </script>
@@ -80,6 +87,29 @@ function onVoiceRoutingChange(event: Event): void {
       <option value="runtime_on_deep">Runtime on deep (recommended)</option>
       <option value="runtime_aggressive">Runtime aggressive</option>
       <option value="template_first">Template first (low credit)</option>
+    </select>
+  </label>
+  <label class="operator-settings-form__row operator-settings-form__row--select">
+    <span class="operator-settings-form__copy">
+      <strong>VAXON model</strong>
+      <small>
+        Operator-global LLM for VAXON conversation and narration — never tied to a
+        workspace Agent Dock model.
+      </small>
+    </span>
+    <select
+      class="operator-settings-form__select"
+      :value="draft.vaxon_model_id"
+      :disabled="saving"
+      @change="onVaxonModelChange"
+    >
+      <option
+        v-for="option in VAXON_MODEL_OPTIONS"
+        :key="option.id"
+        :value="option.id"
+      >
+        {{ option.label }}{{ option.id === 'gpt-5.4-high' ? ' (recommended)' : '' }}
+      </option>
     </select>
   </label>
 </template>

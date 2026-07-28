@@ -26,6 +26,8 @@ describe('voice cockpit presence', () => {
           voice_routing_mode: 'template_first',
           narrate_tool_progress: false,
           proactive_duplex_enabled: false,
+          autonomy_mode: 'manual',
+          vaxon_model_id: 'gpt-5.4-high',
         },
         spoken_alert: {
           eligible: true,

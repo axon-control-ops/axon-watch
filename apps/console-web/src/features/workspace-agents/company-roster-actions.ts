@@ -6,6 +6,7 @@ import {
   employeeFailureLine,
   employeeFailureRetryActionLabel,
   isRuntimeAuthFailure,
+  isRuntimeAuthProbeFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
   looksLikeSuccessfulOutcomeDetail,
@@ -49,42 +50,47 @@ export function employeeAssignDraft(employee: CompanyEmployeeRecord): string {
 }
 
 export function employeeRetryDraft(employee: CompanyEmployeeRecord): string {
-  const name = employee.name.trim() || 'Teammate';
   const owns = ownsSnippet(employee);
   const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
   const voiceLock =
-    `Speak in first person as ${name} only — never say you are "acting as" a role, ` +
-    `Lane B, or VAXON.`;
+    'Speak in first person only — never say you are "acting as" a role, ' +
+    'Lane B, or VAXON, and never refer to yourself by name in the third person.';
   if (isShiftContinuationFailure(detail)) {
     return (
-      `I am ${name} (${owns}). ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
+      `Continue my interrupted shift on ${owns}. ${SERVER_RESTART_CONTINUATION_PROMPT} ` +
       `${voiceLock} Summarize what I changed and include receipts.`
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
     return (
-      `I am ${name} (${owns}). Usage limits blocked my last shift. Once limits are restored, ` +
+      `Usage limits blocked my last shift on ${owns}. Once limits are restored, ` +
       `I will retry my bounded continuous shift. ${voiceLock} ` +
+      `Summarize what I changed and include receipts.`
+    );
+  }
+  if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
+    return (
+      `Cursor CLI auth probe timed out on my last shift on ${owns}. After checking ` +
+      `\`cursor agent status\` on the host, I will retry my bounded continuous shift. ${voiceLock} ` +
       `Summarize what I changed and include receipts.`
     );
   }
   if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
     return (
-      `I am ${name} (${owns}). Runtime auth blocked my last shift. After \`cursor agent login\` ` +
+      `Runtime auth blocked my last shift on ${owns}. After \`cursor agent login\` ` +
       `on the host or /vault unlock, I will retry my bounded continuous shift. ${voiceLock} ` +
       `Summarize what I changed and include receipts.`
     );
   }
   const errorHint = detail ? ` Last error: ${detail}` : '';
   return (
-    `I am ${name} (${owns}). My last continuous shift failed.${errorHint} ` +
+    `My last continuous shift on ${owns} failed.${errorHint} ` +
     `Retry that bounded shift now as me. ${voiceLock} ` +
     `Summarize what I changed and include receipts.`
   );
 }
 
 export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
-  const name = employee.name.trim() || 'this teammate';
   const runId = employeeDockReceiptRunId(employee);
   const detail = normalizeOperatorFailureDetail(employee.last_outcome_detail);
   const outcome = (employee.last_outcome ?? '').trim().toLowerCase();
@@ -97,27 +103,34 @@ export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
 
   if (completed) {
     return (
-      `Walk me through what ${name} shipped on their last job${runHint}. ` +
+      `Walk me through what I shipped on my last job${runHint}. ` +
       `This run completed successfully — do not treat it as a failure. ` +
       `Summarize what changed, what was verified, any blockers or Lead next items, and suggest the next move.`
     );
   }
   if (isShiftContinuationFailure(detail)) {
     return (
-      `Walk me through what was in progress when the server restarted for ${name}'s job${runHint}. ` +
+      `Walk me through what was in progress when the server restarted on my job${runHint}. ` +
       `${SERVER_RESTART_CONTINUATION_PROMPT} Summarize what was incomplete, cite commands, and suggest next steps.`
     );
   }
   if (isUsageLimitFailure(employee.last_outcome_detail)) {
     return (
-      `Walk me through what happened on ${name}'s last job${runHint}. ` +
+      `Walk me through what happened on my last job${runHint}. ` +
       `The job never started because usage limits blocked the agent. ` +
       `Summarize what was attempted and suggest next steps once limits are restored.`
     );
   }
+  if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
+    return (
+      `Walk me through what happened on my last job${runHint}. ` +
+      `The job could not run because the Cursor CLI auth probe timed out. ` +
+      `Summarize what was attempted and suggest next steps after \`cursor agent status\` is healthy.`
+    );
+  }
   if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
     return (
-      `Walk me through what happened on ${name}'s last job${runHint}. ` +
+      `Walk me through what happened on my last job${runHint}. ` +
       `The job could not run because login is not ready. ` +
       `Summarize what was attempted and suggest next steps once auth is fixed.`
     );
@@ -125,12 +138,13 @@ export function employeeReceiptsDraft(employee: CompanyEmployeeRecord): string {
   const detailHint = detail ? ` Reported issue: ${detail}.` : '';
   if (runId) {
     return (
-      `Walk me through what happened on ${name}'s last job (${runId}).${detailHint} ` +
+      `Walk me through the receipts for my last job (${runId}).${detailHint} ` +
+      `Use that run id / control-plane history — do not dig stale autoloop terminal logs. ` +
       `Summarize what went wrong, cite commands or checks, and suggest next steps.`
     );
   }
   return (
-    `Walk me through what happened on ${name}'s last failed job.${detailHint} ` +
+    `Walk me through the receipts for my last failed job.${detailHint} ` +
     `Summarize what went wrong and suggest next steps.`
   );
 }

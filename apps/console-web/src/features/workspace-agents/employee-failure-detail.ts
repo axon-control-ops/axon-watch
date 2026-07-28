@@ -138,15 +138,45 @@ const RUNTIME_AUTH_MARKERS = [
   /authentication failed/i,
   /authentication required/i,
   /api_key_invalid/i,
+  /auth probe timed out/i,
+  /auth probe failed/i,
+  /cursor auth probe/i,
+  /codex auth probe/i,
 ];
 
-/** True when the agent runtime could not authenticate (CLI login or vault keys). */
+/** True when the agent runtime could not authenticate (CLI login, vault keys, or auth probe). */
 export function isRuntimeAuthFailure(detail: string | null | undefined): boolean {
   const normalized = normalizeOperatorFailureDetail(detail);
   if (!normalized) {
     return false;
   }
   return RUNTIME_AUTH_MARKERS.some((marker) => marker.test(normalized));
+}
+
+/** Auth-probe timeout vs missing login — both are runtime auth, different operator next step. */
+export function isRuntimeAuthProbeFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes('auth probe timed out') ||
+    normalized.includes('auth probe failed') ||
+    normalized.includes('cursor auth probe') ||
+    normalized.includes('codex auth probe')
+  );
+}
+
+/** Formatting miss on the mandatory Critical Review Confidence line. */
+export function isMissingConfidenceFailure(detail: string | null | undefined): boolean {
+  const normalized = normalizeOperatorFailureDetail(detail).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes('critical review clause missing') ||
+    normalized.includes('must end with confidence')
+  );
 }
 
 /** Matches Lane B runtime fallback receipts where no CLI/cloud agent could run the shift. */
@@ -178,6 +208,12 @@ export function agentRuntimeFallbackSpeakDetail(detail: string): string {
     return 'usage limits blocked the agent runtime';
   }
   if (isRuntimeAuthFailure(firstClause)) {
+    if (
+      /auth probe timed out/i.test(firstClause) ||
+      /auth probe failed/i.test(firstClause)
+    ) {
+      return 'Cursor CLI auth timed out';
+    }
     return 'runtime auth is not ready';
   }
   return truncateFailureDetail(firstClause, SPEAK_DETAIL_MAX);

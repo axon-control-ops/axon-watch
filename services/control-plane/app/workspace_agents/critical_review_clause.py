@@ -33,6 +33,12 @@ MISSING_CONFIDENCE_DETAIL = (
     "(integer 1-10) after the rewritten summary."
 )
 
+# When the agent did real work but forgot the closing score, auto-recover so the
+# operator does not get stuck on a red Try-again strip for a formatting miss.
+AUTO_RECOVERED_CONFIDENCE = 6
+_MIN_SUBSTANTIVE_REPLY_CHARS = 280
+_THINKING_BLOCK_RE = re.compile(r":::thinking\b[\s\S]*?(?:::|\Z)", re.IGNORECASE)
+
 
 def append_critical_review_clause(prompt: str) -> str:
     """Append the mandatory clause instruction unless already present."""
@@ -50,3 +56,33 @@ def parse_confidence(text: str) -> int | None:
     if not matches:
         return None
     return int(matches[-1].group(1))
+
+
+def _substantive_reply_body(text: str) -> str:
+    cleaned = _THINKING_BLOCK_RE.sub(" ", text or "")
+    return " ".join(cleaned.split()).strip()
+
+
+def resolve_critical_review_confidence(reply_text: str) -> tuple[int | None, bool]:
+    """Return ``(confidence, auto_recovered)``.
+
+    Explicit Confidence wins. Substantive replies that omit the closing line are
+    auto-scored so roster/error strips do not demand a manual Try again for a
+    formatting miss. Empty / trivial replies still fail closed.
+    """
+    parsed = parse_confidence(reply_text)
+    if parsed is not None:
+        return parsed, False
+    body = _substantive_reply_body(reply_text)
+    if len(body) >= _MIN_SUBSTANTIVE_REPLY_CHARS:
+        return AUTO_RECOVERED_CONFIDENCE, True
+    return None, False
+
+
+def critical_review_receipt_summary(confidence: int, *, auto_recovered: bool) -> str:
+    if auto_recovered:
+        return (
+            f"Critical Review Confidence: {confidence}/10 "
+            "(auto-recovered — closing Confidence line was missing)"
+        )
+    return f"Critical Review Confidence: {confidence}/10"

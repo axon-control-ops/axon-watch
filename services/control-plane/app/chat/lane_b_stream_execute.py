@@ -34,7 +34,8 @@ from app.runs.service import (
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 from app.workspace_agents.critical_review_clause import (
     MISSING_CONFIDENCE_DETAIL,
-    parse_confidence,
+    critical_review_receipt_summary,
+    resolve_critical_review_confidence,
 )
 
 logger = logging.getLogger(__name__)
@@ -148,7 +149,7 @@ def finalize_lane_b_agent_run(
     )
     try:
         if dispatched:
-            confidence = parse_confidence(reply_text)
+            confidence, auto_recovered = resolve_critical_review_confidence(reply_text)
             if confidence is None:
                 run_record = append_run_execution_receipt(
                     dispatch_run_id,
@@ -162,11 +163,19 @@ def finalize_lane_b_agent_run(
                     dispatch_run_id,
                     receipt_summary=MISSING_CONFIDENCE_DETAIL,
                 )
+                # Still notify Lead/VAXON on terminal failure so the chain is not silent.
+                _maybe_notify_lead_after_lane_b(
+                    dispatch_run_id=dispatch_run_id,
+                    run_record=run_record,
+                    reply_text=reply_text,
+                )
                 return False, run_record
             run_record = append_run_execution_receipt(
                 dispatch_run_id,
                 receipt_type="critical_review",
-                receipt_summary=f"Critical Review Confidence: {confidence}/10",
+                receipt_summary=critical_review_receipt_summary(
+                    confidence, auto_recovered=auto_recovered
+                ),
                 actor="critical_review",
                 success=True,
                 intent="lane_b_agent",
@@ -225,14 +234,14 @@ def _maybe_notify_lead_after_lane_b(
     run_record: dict[str, object] | None,
     reply_text: str,
 ) -> None:
-    """Continuous Lead takeover for IDE specialist shifts (no worker task required)."""
+    """Lead takeover for specialists; Lead-shift → VAXON flash when Dana finishes."""
     if not isinstance(run_record, dict):
         return
     phase = str(run_record.get("phase") or "").strip().lower()
     if phase not in {"completed", "failed"}:
         return
     role = str(run_record.get("employee_role") or "").strip().lower()
-    if not role or role in {"lead", "overview_agent"}:
+    if not role or role == "overview_agent":
         return
     # Continuous workers already notify after task ledger finalize.
     if str(run_record.get("task_id") or "").strip():
@@ -242,7 +251,10 @@ def _maybe_notify_lead_after_lane_b(
         return
     try:
         from app.workspace_agents import build_company_roster
-        from app.workspace_agents.lead_replan import notify_lead_after_worker_task
+        from app.workspace_agents.lead_replan import (
+            notify_lead_after_worker_task,
+            notify_vaxon_after_lead_shift,
+        )
 
         name = role
         company = build_company_roster(workspace_id)
@@ -252,10 +264,20 @@ def _maybe_notify_lead_after_lane_b(
             if str(row.get("role") or "").strip().lower() == role:
                 name = str(row.get("name") or role).strip() or role
                 break
+        run_id = str(run_record.get("run_id") or dispatch_run_id)
+        if role == "lead":
+            notify_vaxon_after_lead_shift(
+                workspace_id=workspace_id,
+                run_id=run_id,
+                employee_name=name,
+                phase=phase,
+                reply_text=reply_text,
+            )
+            return
         notify_lead_after_worker_task(
             workspace_id=workspace_id,
             task_id="",
-            run_id=str(run_record.get("run_id") or dispatch_run_id),
+            run_id=run_id,
             employee_role=role,
             employee_name=name,
             phase=phase,
@@ -263,7 +285,7 @@ def _maybe_notify_lead_after_lane_b(
         )
     except Exception:  # noqa: BLE001 — never block Lane B finalize on Lead notify
         logger.exception(
-            "lead notify after Lane B specialist shift failed for %s",
+            "lead/VAXON notify after Lane B shift failed for %s",
             dispatch_run_id,
         )
 

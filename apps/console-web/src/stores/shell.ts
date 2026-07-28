@@ -310,6 +310,7 @@ import { createThreadSurfaceSlice } from './shell/slices/create-thread-surface-s
 import { createCompanyRosterSlice } from './shell/slices/create-company-roster-slice';
 import { createBusyEmployeeIdeStreamSlice } from './shell/slices/create-busy-employee-ide-stream-slice';
 import { createWorkspaceTasksSlice } from './shell/slices/create-workspace-tasks-slice';
+import { createLeadPlansSlice } from './shell/slices/create-lead-plans-slice';
 import { createViewportCompactSlice } from './shell/slices/create-viewport-compact-slice';
 import { createKairoVoiceSlice } from './shell/slices/create-kairo-voice-slice';
 import { createChatStreamSessionSlice } from './shell/slices/create-chat-stream-session-slice';
@@ -999,6 +1000,33 @@ export const useShellStore = defineStore('shell', () => {
     currentWorkspace,
   });
 
+  const {
+    leadPlansByWorkspaceId,
+    leadPlansForCurrentWorkspace,
+    leadPlanIdByTaskId,
+    leadPlansError,
+    leadPlansMutating,
+    loadLeadPlans,
+    fanOutCurrentWorkspaceLeadPlan,
+    synthesizeCurrentLeadPlan,
+  } = createLeadPlansSlice({
+    currentWorkspace,
+  });
+
+  const workspaceTasksWithPlanLinks = computed(() =>
+    workspaceTasksForCurrentWorkspace.value.map((task) => {
+      const link = leadPlanIdByTaskId.value.get(task.task_id);
+      if (!link) {
+        return task;
+      }
+      return {
+        ...task,
+        plan_id: link.planId,
+        plan_key: link.planKey,
+      };
+    }),
+  );
+
   /** Fleet-wide roster for cross-workspace speaker avatar resolution. */
   const companyEmployeesFleet = computed(() => {
     const byId = new Map<string, (typeof companyEmployeesForCurrentWorkspace.value)[number]>();
@@ -1555,6 +1583,7 @@ export const useShellStore = defineStore('shell', () => {
     openIdeBriefingPanel,
     toggleSignalDetails,
     focusMissionControl,
+    focusOperatorTaskBoard,
     focusWatchConnectors,
     setOperatorCenterView,
     afterRunLifecycleMutation,
@@ -3621,12 +3650,20 @@ export const useShellStore = defineStore('shell', () => {
     companyEmployeesFleet,
     loadCompanyEmployees,
     workspaceTasksById,
-    workspaceTasksForCurrentWorkspace,
+    workspaceTasksForCurrentWorkspace: workspaceTasksWithPlanLinks,
     workspaceTasksError,
     workspaceTasksMutating,
     loadWorkspaceTasks,
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
+    leadPlansByWorkspaceId,
+    leadPlansForCurrentWorkspace,
+    leadPlanIdByTaskId,
+    leadPlansError,
+    leadPlansMutating,
+    loadLeadPlans,
+    fanOutCurrentWorkspaceLeadPlan,
+    synthesizeCurrentLeadPlan,
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,
     activeTerminalSession,
@@ -3833,6 +3870,7 @@ export const useShellStore = defineStore('shell', () => {
     openIdeComposerWithDraft,
     focusAttentionSidebar,
     focusMissionControl,
+    focusOperatorTaskBoard,
     focusWatchConnectors,
     focusKairoBriefing,
     deliverKairoSpokenAlert,

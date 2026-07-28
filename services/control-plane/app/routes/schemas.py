@@ -103,6 +103,13 @@ class SentryResolveRequest(BaseModel):
     requested_by: str = "operator"
 
 
+class SentryAttendRequest(BaseModel):
+    confirm_release: str = ""
+    requested_by: str = "operator"
+    mark_resolved_in_next_release: bool = True
+    workspace_id: str = "workspace_dashpro"
+
+
 class VaultImportRequest(BaseModel):
     secrets: dict[str, str] = {}
     export_text: str = ""
@@ -140,11 +147,13 @@ class OperatorPresenceSettingsRequest(BaseModel):
     ide_voice_strip_enabled: bool | None = None
     hands_free_enabled: bool | None = None
     proactive_duplex_enabled: bool | None = None
+    autonomy_mode: str | None = None
     speech_rate: float | None = None
     speech_pitch: float | None = None
     azure_voice_id: str | None = None
     stt_mode: str | None = None
     voice_routing_mode: str | None = None
+    vaxon_model_id: str | None = None
     narrate_tool_progress: bool | None = None
 
 

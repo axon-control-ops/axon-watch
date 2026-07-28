@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -48,6 +49,8 @@ class DashProSentryMonitorTests(unittest.TestCase):
         def fake_urlopen(req, timeout=0):
             self.assertEqual("GET", req.get_method())
             self.assertIn("/issues/", req.full_url)
+            self.assertIn("environment%3Aproduction", req.full_url)
+            self.assertIn("is%3Aunresolved", req.full_url)
             return _FakeResponse(200, issues)
 
         with patch.object(dashpro_sentry, "urlopen", side_effect=fake_urlopen):
@@ -62,7 +65,7 @@ class DashProSentryMonitorTests(unittest.TestCase):
             )
 
         self.assertEqual("ok", status)
-        self.assertIn("1 unresolved issue(s)", detail)
+        self.assertIn("1 unresolved production issue(s)", detail)
         self.assertEqual(1, len(sample))
 
     def test_transport_failure_downgrades_to_warning(self) -> None:
@@ -104,6 +107,64 @@ class DashProSentryMonitorTests(unittest.TestCase):
         )
         assert item is not None
         self.assertEqual("warning", item["severity"])
+
+    def test_attended_production_issue_is_suppressed(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from app.signals import sentry_issue_attendance_store
+
+        class _FakeResponse:
+            def __init__(self, status: int, payload):
+                self.status = status
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = str(Path(tmp) / "watch.db")
+            with patch.dict(os.environ, {"AXON_WATCH_WATCH_SERVICE_DB": db_path}):
+                sentry_issue_attendance_store.reset_store()
+                sentry_issue_attendance_store.attend_issue(
+                    issue_id="1",
+                    workspace_id="workspace_dashpro",
+                    confirm_release="1.2.3",
+                    attended_by="operator",
+                )
+                issues = [
+                    {
+                        "id": "1",
+                        "shortId": "RN-1",
+                        "title": "TypeError: boom",
+                        "level": "error",
+                        "count": "40",
+                        "permalink": "https://sentry.io/issues/1/",
+                        "culprit": "app",
+                        "lastRelease": {"version": "1.2.3"},
+                    }
+                ]
+
+                with patch.object(
+                    dashpro_sentry,
+                    "urlopen",
+                    return_value=_FakeResponse(200, issues),
+                ):
+                    status, detail, sample = dashpro_sentry.check_sentry_recent_issues(
+                        env={"SENTRY_AUTH_TOKEN": "token"},
+                        warning_threshold=1,
+                        critical_threshold=2,
+                    )
+
+        self.assertEqual("ok", status)
+        self.assertIn("suppressed", detail.lower())
+        self.assertEqual([], sample)
 
 
 if __name__ == "__main__":

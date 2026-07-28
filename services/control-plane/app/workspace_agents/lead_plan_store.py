@@ -224,6 +224,46 @@ def list_plans_by_status(
     return [_decode_plan(row) for row in rows]
 
 
+def list_workspace_plans(
+    workspace_id: str,
+    *,
+    limit: int = 50,
+    include_task_links: bool = True,
+) -> list[dict[str, Any]]:
+    """Return workspace Lead plans newest-first, optionally with task mappings."""
+    scoped = str(workspace_id or "").strip()
+    if not scoped:
+        return []
+    capped = max(1, min(int(limit or 50), 200))
+    with _connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM lead_plans
+            WHERE workspace_id = ?
+            ORDER BY updated_at DESC, rowid DESC
+            LIMIT ?
+            """,
+            (scoped, capped),
+        ).fetchall()
+    plans = [_decode_plan(row) for row in rows]
+    if not include_task_links:
+        return plans
+    enriched: list[dict[str, Any]] = []
+    for plan in plans:
+        plan_id = str(plan.get("plan_id") or "").strip()
+        task_links = plan_task_links(plan_id) if plan_id else []
+        enriched.append(
+            {
+                **plan,
+                "task_links": task_links,
+                "task_ids": [link["task_id"] for link in task_links],
+                "awaiting_engagement": str(plan.get("status") or "") == "awaiting_engagement",
+            }
+        )
+    return enriched
+
+
 def set_plan_status(plan_id: str, status: str) -> dict[str, Any]:
     cleaned = status.strip().lower()
     if cleaned not in {
@@ -365,6 +405,7 @@ __all__ = [
     "list_plans_by_status",
     "list_receipts",
     "list_receipts_by_kind",
+    "list_workspace_plans",
     "persist_plan",
     "plan_id_for_task",
     "plan_task_links",

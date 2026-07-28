@@ -15,6 +15,8 @@ export type WorkspaceTaskRecord = {
   risk: string;
   owner_role: string;
   dependencies: string[];
+  exclusive_paths?: string[];
+  allowed_paths?: string[];
   status: WorkspaceTaskStatus;
   lease_holder: string | null;
   lease_expires_at: string | null;
@@ -24,6 +26,9 @@ export type WorkspaceTaskRecord = {
   run_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Populated client-side from Lead plan mappings when available. */
+  plan_id?: string | null;
+  plan_key?: string | null;
 };
 
 export type WorkspaceTasksSnapshot = {
@@ -37,6 +42,8 @@ export type CreateWorkspaceTaskInput = {
   risk?: string;
   owner_role?: string;
   dependencies?: string[];
+  exclusive_paths?: string[];
+  allowed_paths?: string[];
   attempt_budget?: number;
 };
 

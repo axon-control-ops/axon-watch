@@ -45,6 +45,19 @@ function employee(overrides: Partial<CompanyEmployeeRecord> = {}): CompanyEmploy
 }
 
 describe('company-roster-failure-view', () => {
+  it('hides stale failures while the teammate is live-busy in IDE', () => {
+    const failed = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Critical Review Clause missing: final reply must end with Confidence: N/10',
+    });
+    expect(employeeFailureLine(failed)).toContain('closing Confidence line was missing');
+    expect(employeeFailureLine(failed, { liveBusy: true })).toBeNull();
+    expect(companyFailedEmployees([failed], [failed.employee_id])).toEqual([]);
+    expect(companyHasFailedEmployees([failed], [failed.employee_id])).toBe(false);
+  });
+
   it('surfaces last shift failure detail instead of bare FAILED', () => {
     expect(
       employeeFailureLine(
@@ -127,7 +140,7 @@ describe('company-roster-failure-view', () => {
     expect(employeeFailureLine(usageBlocked)).toBe(friendlyLine);
     expect(employeeFailureBannerCopy(usageBlocked)).toBe(`Jules — ${friendlyLine}`);
     expect(employeeFailureBannerAriaLabel(usageBlocked)).toContain('Full detail:');
-    expect(employeeFailureBannerAriaLabel(usageBlocked)).toContain('out of usage');
+    expect(employeeFailureBannerAriaLabel(usageBlocked)).toMatch(/usage limits blocked/i);
     expect(
       employeeFailureLine(
         employee({
@@ -197,6 +210,23 @@ describe('company-roster-failure-view', () => {
     expect(
       employeeSpeakLine(authBlocked, 'talk', { talkMode: 'callback', entropy: '1' }),
     ).toMatch(/runtime auth is not ready/i);
+  });
+
+  it('maps Cursor auth probe timeouts to runtime-auth friendly copy', () => {
+    const probeTimedOut = employee({
+      name: 'Priya',
+      role: 'frontend',
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail:
+        'Lane B agent fallback reply generated (Cursor auth probe timed out. Run `cursor agent status` manually.; Cursor Cloud Agent unavailable)',
+      last_run_id: 'run_auth_probe',
+    });
+    const friendlyLine =
+      'Last job could not run — Cursor CLI auth timed out. Check runtime on the host, then tap Try again.';
+    expect(employeeFailureLine(probeTimedOut)).toBe(friendlyLine);
+    expect(employeeFailureDetailTooltip(probeTimedOut)).toContain('auth timed out');
+    expect(employeeFailureDetailTooltip(probeTimedOut)).not.toContain('Lane B');
   });
 
   it('maps operator-stopped failures to operator-friendly copy', () => {
@@ -324,23 +354,34 @@ describe('company-roster-failure-view', () => {
   });
 
   it('exposes full failure detail for tooltips when the banner line is truncated', () => {
-    const longDetail = `${'ActionRequiredError: '.repeat(20)}out of usage`;
+    const longDetail = `${'verify:contracts assertion failed — '.repeat(8)}end`;
     const row = employee({
       status: 'idle',
       last_outcome: 'failed',
       last_outcome_detail: longDetail,
     });
-    expect(employeeFailureDetailTooltip(row)).toBe(longDetail);
+    expect(employeeFailureDetailTooltip(row)).toBe(longDetail.replace(/\s+/g, ' ').trim());
     expect(
       employeeFailureDetailTooltip(employee({ status: 'executing', last_outcome: 'failed' })),
     ).toBeUndefined();
     expect(employeeFailureBannerAriaLabel(row)).toContain('Full detail:');
-    expect(employeeFailureBannerAriaLabel(row)).toContain(longDetail);
+    expect(employeeFailureBannerAriaLabel(row)).toContain('verify:contracts');
     expect(employeeFailureBeatAriaLabel(row)).toContain('Full detail:');
-    expect(employeeFailureBeatAriaLabel(row)).toContain(longDetail);
-    expect(employeePresenceStripHoverTitle(row)).toBe(longDetail);
+    expect(employeeFailureBeatAriaLabel(row)).toContain('verify:contracts');
+    expect(employeePresenceStripHoverTitle(row)).toContain('verify:contracts');
     expect(employeePresenceSelectAriaLabel(row)).toContain('Full detail:');
-    expect(employeePresenceSelectAriaLabel(row)).toContain(longDetail);
+    expect(employeePresenceSelectAriaLabel(row)).toContain('verify:contracts');
+  });
+
+  it('uses operator-friendly tooltips for usage-limit failures', () => {
+    const row = employee({
+      status: 'idle',
+      last_outcome: 'failed',
+      last_outcome_detail: `${'ActionRequiredError: '.repeat(20)}out of usage`,
+    });
+    expect(employeeFailureDetailTooltip(row)).toBe(
+      'Usage limits blocked the agent runtime. Restore limits, then retry.',
+    );
   });
 
   it('keeps short failure labels compact for hover and screen readers', () => {
@@ -451,14 +492,15 @@ describe('company-roster-failure-view', () => {
   });
 
   it('exposes full failure detail on roster alert hint hover when truncated', () => {
-    const longDetail = `${'ActionRequiredError: '.repeat(20)}out of usage`;
+    const longDetail = `${'verify:contracts assertion failed — '.repeat(8)}end`;
     const row = employee({
       name: 'Jules',
       status: 'idle',
       last_outcome: 'failed',
       last_outcome_detail: longDetail,
     });
-    expect(companyFailedEmployeesHintTooltip([row])).toBe(`Jules — ${longDetail}`);
+    const normalized = longDetail.replace(/\s+/g, ' ').trim();
+    expect(companyFailedEmployeesHintTooltip([row])).toBe(`Jules — ${normalized}`);
     expect(companyFailedEmployeesHintTooltip([row, employee({ employee_id: 'e2', last_outcome: 'failed' })])).toBeNull();
     expect(
       companyFailedEmployeesHintTooltip([

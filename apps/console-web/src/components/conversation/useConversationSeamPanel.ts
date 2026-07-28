@@ -170,11 +170,8 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     void shell.backgroundIdeAgentRun();
   }
 
-  async function continueTerminalInBackground(command: string): Promise<void> {
-    await shell.runCommandInAgentBackgroundTerminal(command);
-  }
-
   function showTerminalBackgroundControl(messageId: string, segmentOpen: boolean): boolean {
+    // Cursor: background/move only while the shell tool is still running.
     return shouldShowAgentTerminalBackgroundControl({
       canStopIdeAgentRun: shell.canStopIdeAgentRun,
       terminalBlockRunning: segmentOpen && isStreamingMessage(messageId),
@@ -340,7 +337,6 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
     segmentKey,
     revealTerminalPanel,
     backgroundAgentTerminalRun,
-    continueTerminalInBackground,
     showTerminalBackgroundControl,
     terminalMirrorBadge,
     thinkingBodyText,

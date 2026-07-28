@@ -7,25 +7,40 @@ import {
 import {
   employeeResolvedFailureDetail,
   isAgentSessionInterruptedFailure,
+  isMissingConfidenceFailure,
   isOperatorStoppedFailure,
   isRestartInterruptedFailure,
   isRuntimeAuthFailure,
+  isRuntimeAuthProbeFailure,
   isShiftContinuationFailure,
   isUsageLimitFailure,
   looksLikeSuccessfulOutcomeDetail,
   truncateFailureDetail,
 } from './employee-failure-detail';
-import { employeeIsWorking } from './company-roster-status';
+import { employeeIsWorking, employeeStatusIsActivelyBusy } from './company-roster-status';
 
 const DOCK_RECEIPT_DETAIL_MAX = 180;
 
-export function employeeFailureLine(employee: CompanyEmployeeRecord): string | null {
+export function employeeFailureLine(
+  employee: CompanyEmployeeRecord,
+  options?: { liveBusy?: boolean },
+): string | null {
   const outcome = (employee.last_outcome ?? '').trim().toLowerCase();
   if (outcome !== 'failed') {
     return null;
   }
-  // Active jobs supersede the last failure banner.
+  // Active jobs / live IDE streams supersede the last failure banner.
+  if (options?.liveBusy) {
+    return null;
+  }
   if (employeeIsWorking(employee.status)) {
+    return null;
+  }
+  // Mid-shift role run — hide stale last-job failures while work is in flight.
+  if (
+    employee.active_run_id?.trim() &&
+    employeeStatusIsActivelyBusy(employee.status)
+  ) {
     return null;
   }
   const detail = employeeResolvedFailureDetail(employee);
@@ -52,6 +67,12 @@ export function employeeFailureLine(employee: CompanyEmployeeRecord): string | n
     }
     if (isUsageLimitFailure(employee.last_outcome_detail)) {
       return 'Last job could not start — usage limits blocked the agent. Restore limits, then tap Try again.';
+    }
+    if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
+      return 'Last job almost finished — the closing Confidence line was missing. Tap Try again to close it out.';
+    }
+    if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
+      return 'Last job could not run — Cursor CLI auth timed out. Check runtime on the host, then tap Try again.';
     }
     if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
       return 'Last job could not run — login is not ready. Run `cursor agent login` on the host or unlock /vault, then tap Try again.';
@@ -83,6 +104,18 @@ export function employeeFailureDetailTooltip(
 ): string | undefined {
   if (!employeeFailureLine(employee)) {
     return undefined;
+  }
+  if (isRuntimeAuthProbeFailure(employee.last_outcome_detail)) {
+    return 'Cursor CLI auth timed out on the host. Check `cursor agent status`, then retry.';
+  }
+  if (isRuntimeAuthFailure(employee.last_outcome_detail)) {
+    return 'Runtime login is not ready. Run `cursor agent login` or unlock /vault, then retry.';
+  }
+  if (isUsageLimitFailure(employee.last_outcome_detail)) {
+    return 'Usage limits blocked the agent runtime. Restore limits, then retry.';
+  }
+  if (isMissingConfidenceFailure(employee.last_outcome_detail)) {
+    return 'Closing Confidence line was missing after real work. Retry to close the Critical Review.';
   }
   const detail = employeeResolvedFailureDetail(employee);
   return detail || undefined;
@@ -177,27 +210,41 @@ export function employeeDisplayStatus(employee: CompanyEmployeeRecord): string {
 
 export function companyFailedEmployees(
   employees: readonly CompanyEmployeeRecord[] | null | undefined,
+  liveBusyEmployeeIds?: readonly string[] | null,
 ): CompanyEmployeeRecord[] {
-  return (employees ?? []).filter((row) => Boolean(employeeFailureLine(row)));
+  const liveBusy = new Set(
+    (liveBusyEmployeeIds ?? []).map((id) => id.trim()).filter(Boolean),
+  );
+  return (employees ?? []).filter((row) =>
+    Boolean(
+      employeeFailureLine(row, {
+        liveBusy: liveBusy.has(row.employee_id),
+      }),
+    ),
+  );
 }
 
 export function companyHasFailedEmployees(
   employees: readonly CompanyEmployeeRecord[] | null | undefined,
+  liveBusyEmployeeIds?: readonly string[] | null,
 ): boolean {
-  return companyFailedEmployees(employees).length > 0;
+  return companyFailedEmployees(employees, liveBusyEmployeeIds).length > 0;
 }
 
 export function companyFailedEmployeesHint(
   employees: readonly CompanyEmployeeRecord[] | null | undefined,
+  liveBusyEmployeeIds?: readonly string[] | null,
 ): string | null {
-  const failed = companyFailedEmployees(employees);
+  const failed = companyFailedEmployees(employees, liveBusyEmployeeIds);
   if (!failed.length) {
     return null;
   }
   if (failed.length === 1) {
     const row = failed[0];
     const name = row.name.trim() || 'A teammate';
-    const line = employeeFailureLine(row);
+    const line = employeeFailureLine(row, {
+      liveBusy: liveBusyEmployeeIds?.includes(row.employee_id),
+    });
     if (line) {
       return `${name} — ${line}`;
     }
@@ -209,14 +256,17 @@ export function companyFailedEmployeesHint(
 /** Hover title for the roster alert hint when a single teammate failed with truncated detail. */
 export function companyFailedEmployeesHintTooltip(
   employees: readonly CompanyEmployeeRecord[] | null | undefined,
+  liveBusyEmployeeIds?: readonly string[] | null,
 ): string | null {
-  const failed = companyFailedEmployees(employees);
+  const failed = companyFailedEmployees(employees, liveBusyEmployeeIds);
   if (failed.length !== 1) {
     return null;
   }
   const row = failed[0];
   const detail = employeeFailureDetailTooltip(row);
-  const line = employeeFailureLine(row);
+  const line = employeeFailureLine(row, {
+    liveBusy: liveBusyEmployeeIds?.includes(row.employee_id),
+  });
   if (!detail || !line || (!line.endsWith('…') && line.includes(detail))) {
     return null;
   }
@@ -236,8 +286,9 @@ export type CompanyRosterAlertBadge = {
 /** Compact roster headline badge when teammates need attention after a failed or interrupted job. */
 export function buildCompanyRosterAlertBadge(
   employees: readonly CompanyEmployeeRecord[] | null | undefined,
+  liveBusyEmployeeIds?: readonly string[] | null,
 ): CompanyRosterAlertBadge | null {
-  const needsAttention = companyFailedEmployees(employees);
+  const needsAttention = companyFailedEmployees(employees, liveBusyEmployeeIds);
   const count = needsAttention.length;
   if (count === 0) {
     return null;

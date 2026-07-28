@@ -101,6 +101,26 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     }
   }
 
+  function focusOperatorTaskBoard(): void {
+    setOperatorCenterView('grid');
+    input.missionControlEmphasized.value = true;
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        const board = document.getElementById('operator-task-board');
+        board?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+        if (window.location.hash !== '#operator-task-board') {
+          window.history.replaceState(null, '', '#operator-task-board');
+        }
+        window.setTimeout(() => {
+          input.missionControlEmphasized.value = false;
+        }, 1200);
+      });
+    }
+  }
+
   function focusWatchConnectors(): void {
     if (input.layoutMode.value === 'ide') {
       input.setLayoutMode('operator');
@@ -216,6 +236,7 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     openIdeBriefingPanel,
     toggleSignalDetails,
     focusMissionControl,
+    focusOperatorTaskBoard,
     focusWatchConnectors,
     setOperatorCenterView,
     afterRunLifecycleMutation,

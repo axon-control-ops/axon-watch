@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from app.monitors.sentry_issue_sample import extract_sentry_issue_sample
+from app.signals.sentry_issue_attendance_store import (
+    attendance_map,
+    should_suppress_issue,
+)
 
 
 def _sentry_org_slug(env: dict[str, str]) -> str:
@@ -26,6 +32,18 @@ def _sentry_project_slug(env: dict[str, str]) -> str:
     return "react-native"
 
 
+def _sentry_issue_query(*, environment: str | None = None) -> str:
+    env_name = str(
+        environment
+        if environment is not None
+        else os.environ.get("AXON_WATCH_SENTRY_ENVIRONMENT")
+        or "production"
+    ).strip()
+    if not env_name or env_name.lower() in {"*", "all", "any"}:
+        return "is:unresolved"
+    return f"is:unresolved environment:{env_name}"
+
+
 def check_sentry_recent_issues(
     *,
     env: dict[str, str],
@@ -33,6 +51,8 @@ def check_sentry_recent_issues(
     warning_threshold: int = 10,
     critical_threshold: int = 20,
     timeout_seconds: float = 10,
+    environment: str | None = None,
+    workspace_id: str = "workspace_dashpro",
 ) -> tuple[str, str, list[dict[str, object]]]:
     token = str(env.get("SENTRY_AUTH_TOKEN") or env.get("SENTRY_API_TOKEN") or "").strip()
     org = _sentry_org_slug(env)
@@ -40,9 +60,10 @@ def check_sentry_recent_issues(
     empty: list[dict[str, object]] = []
     if not token:
         return "skipped", "Sentry check skipped until SENTRY_AUTH_TOKEN is available", empty
+    query = _sentry_issue_query(environment=environment)
     url = (
         f"https://sentry.io/api/0/projects/{org}/{project}/issues/"
-        f"?query=is:unresolved&limit={max(1, limit)}"
+        f"?query={quote(query)}&limit={max(1, limit)}"
     )
     request = Request(
         url,
@@ -78,17 +99,39 @@ def check_sentry_recent_issues(
     if not isinstance(issues, list):
         return "critical", "Sentry API response was not an issue list", empty
     if not issues:
-        return "ok", f"Sentry project {project} has zero unresolved issues", empty
+        return "ok", f"Sentry project {project} has zero unresolved production issues", empty
 
-    sample = extract_sentry_issue_sample(issues, limit=max(1, limit))
-    titles = [str(item.get("title") or "unknown")[:80] for item in sample[:3]]
-    total_events = sum(int(item.get("count") or 0) for item in sample)
+    sample = extract_sentry_issue_sample(issues, limit=max(1, limit * 2))
+    attendances = attendance_map(workspace_id=workspace_id)
+    active_sample: list[dict[str, object]] = []
+    suppressed = 0
+    for item in sample:
+        attendance = attendances.get(str(item.get("id") or ""))
+        if should_suppress_issue(item, attendance):
+            suppressed += 1
+            continue
+        active_sample.append(item)
+        if len(active_sample) >= max(1, limit):
+            break
+
+    if not active_sample:
+        detail = (
+            f"Sentry production issues attended after OTA/build "
+            f"({suppressed} suppressed); no active unresolved noise"
+        )
+        return "ok", detail, empty
+
+    titles = [str(item.get("title") or "unknown")[:80] for item in active_sample[:3]]
+    total_events = sum(int(item.get("count") or 0) for item in active_sample)
     detail = (
-        f"Sentry returned {len(issues)} unresolved issue(s), {total_events} event(s); "
-        f"latest={titles[0] if titles else 'unknown'}"
+        f"Sentry returned {len(active_sample)} unresolved production issue(s), "
+        f"{total_events} event(s)"
     )
-    if len(issues) >= critical_threshold or total_events >= critical_threshold * 5:
-        return "critical", detail, sample
-    if len(issues) >= warning_threshold:
-        return "warning", detail, sample
-    return "ok", detail, sample
+    if suppressed:
+        detail += f", {suppressed} attended/suppressed"
+    detail += f"; latest={titles[0] if titles else 'unknown'}"
+    if len(active_sample) >= critical_threshold or total_events >= critical_threshold * 5:
+        return "critical", detail, active_sample
+    if len(active_sample) >= warning_threshold:
+        return "warning", detail, active_sample
+    return "ok", detail, active_sample

@@ -26,6 +26,7 @@ const props = defineProps<{
   employee: CompanyEmployeeRecord;
   actions: TeamMemberQuickAction[];
   controlBusy: boolean;
+  liveBusy?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -34,8 +35,12 @@ const emit = defineEmits<{
 }>();
 
 const avatar = computed(() => buildEmployeeAvatar(props.employee));
-const failure = computed(() => employeeFailureLine(props.employee));
-const interruptedShift = computed(() => employeeShiftNeedsContinuation(props.employee));
+const failure = computed(() =>
+  employeeFailureLine(props.employee, { liveBusy: props.liveBusy }),
+);
+const interruptedShift = computed(() =>
+  Boolean(failure.value) && employeeShiftNeedsContinuation(props.employee),
+);
 const failureDetailTooltip = computed(() => employeeFailureDetailTooltip(props.employee));
 const failureBeatAriaLabel = computed(() => employeeFailureBeatAriaLabel(props.employee));
 const liveBeat = computed(() => {

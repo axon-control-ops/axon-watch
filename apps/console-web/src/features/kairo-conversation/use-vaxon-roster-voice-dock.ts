@@ -12,6 +12,18 @@ import {
 } from '../../lib/kairo-voice-utterance';
 import { kairoVoiceFollowupExpiresAt } from '../../lib/kairo-voice-followup-window';
 
+export function shouldShowVaxonRosterVoiceDock(input: {
+  layoutMode: string;
+  operatorBrainGalaxyActive: boolean;
+  voiceDockVisible: boolean;
+}): boolean {
+  if (!input.voiceDockVisible || input.layoutMode === 'ide') {
+    return false;
+  }
+  // Mission Control already owns VAXON presence in the right LIVE OPERATIONS orb.
+  return input.operatorBrainGalaxyActive;
+}
+
 export function useVaxonRosterVoiceDock(
   speechActive: ComputedRef<boolean>,
   workspaceId: ComputedRef<string | null | undefined>,

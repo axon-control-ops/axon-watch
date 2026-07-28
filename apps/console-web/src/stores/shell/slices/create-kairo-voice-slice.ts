@@ -31,6 +31,7 @@ import {
   subscribeKairoVoiceSpeaking,
   isKairoVoiceSpeaking,
 } from '../../../lib/kairo-voice-playback';
+import { reportTheaterOpen } from '../../../features/report-theater/report-theater-state';
 import {
   flushKairoSpeechQueue,
   interruptKairoSpeechQueue,
@@ -128,6 +129,8 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       skipSpeakApi?: boolean;
       azureVoiceId?: string | null;
       speaker?: KairoVoiceSpeaker | null;
+      priority?: 'interrupt' | 'alert' | 'conversation' | 'narration';
+      allowDuringReportTheater?: boolean;
     },
   ): Promise<void> {
     const trimmed = line.trim();
@@ -190,11 +193,12 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
           }
         : vaxonVoiceSpeaker());
     const playback = await speakKairoLine(message, {
-      priority: 'conversation',
+      priority: options?.priority ?? 'conversation',
       speechRate: input.operatorPresenceSettings.value.speech_rate,
       speechPitch: input.operatorPresenceSettings.value.speech_pitch,
       azureVoiceId: options?.azureVoiceId?.trim() || undefined,
       speaker,
+      allowDuringReportTheater: options?.allowDuringReportTheater === true,
     });
   }
 
@@ -232,7 +236,14 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
 
 
   async function deliverKairoSpokenAlert(alert: SpokenAlertEligibility): Promise<void> {
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H8',location:'create-kairo-voice-slice.ts:deliverKairoSpokenAlert',message:'spoken alert delivery evaluated',data:{voiceDeliveryAllowed:voiceDeliveryAllowed(),alertEligible:alert.eligible,alertReason:alert.reason,alertMessagePreview:(alert.message||'').slice(0,160),reportTheaterOpen:reportTheaterOpen.value,autonomyMode:input.operatorPresenceSettings.value.autonomy_mode,spokenAlertsEnabled:input.operatorPresenceSettings.value.spoken_alerts_enabled,proactiveDuplexEnabled:input.operatorPresenceSettings.value.proactive_duplex_enabled,handsFreeEnabled:input.operatorPresenceSettings.value.hands_free_enabled,privacyMode:input.operatorPresenceSettings.value.privacy_mode,narration:input.effectiveKairoNarrationLevel.value},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (!voiceDeliveryAllowed()) {
+      return;
+    }
+    // Command theater owns the voice queue — do not barge in with alerts/advisories.
+    if (reportTheaterOpen.value) {
       return;
     }
     if (!alert.eligible || !input.operatorPresenceSettings.value.spoken_alerts_enabled) {
@@ -247,6 +258,9 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
 
     let eventType = 'alert';
     const topSignal = input.operatorBriefing.value?.top_signals[0];
+    const strippedAlertMessage = alert.message
+      .replace(/^(?:VAXON|NAXON|X|KAIRO):\s*/i, '')
+      .trim();
     const context: Record<string, unknown> = {
       fallback: alert.message,
       pending_approvals: input.pendingApprovalsCount.value,
@@ -258,12 +272,17 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       degraded_active: Boolean(input.runtimeSummary.value?.degraded.active),
     };
 
-    if (alert.reason === 'operator_approval_required') {
+    // Speak control-plane crafted copy literally — do not rebuild idle persona filler.
+    if (
+      alert.reason === 'operator_approval_required' ||
+      alert.reason === 'autonomy_advisory'
+    ) {
       eventType = 'approval_literal';
-      context.literal_line = alert.message.replace(/^(?:VAXON|NAXON|X|KAIRO):\s*/i, '').trim();
+      context.literal_line = strippedAlertMessage;
     }
 
     let message = '';
+    let speakSource = '';
     try {
       const response = await postKairoSpeak({
         event_type: eventType,
@@ -271,14 +290,28 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
         session_id: kairoSpeechSessionId(),
         workspace_id: input.currentWorkspace.value?.workspace_id ?? '',
         narration: input.effectiveKairoNarrationLevel.value,
+        use_runtime: eventType !== 'approval_literal',
       });
       if (response.source === 'skipped' || !response.line?.trim()) {
         return;
       }
       message = response.line.trim();
+      speakSource = response.source;
     } catch {
       return;
     }
+
+    // Drop in-flight alerts that started before Command Theater opened.
+    if (reportTheaterOpen.value) {
+      // #region agent log
+      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H9',location:'create-kairo-voice-slice.ts:deliverKairoSpokenAlert:dropped',message:'dropped in-flight spoken alert because report theater is open',data:{alertReason:alert.reason,eventType,speakSource,spokenLinePreview:message.slice(0,120)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      return;
+    }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H8',location:'create-kairo-voice-slice.ts:deliverKairoSpokenAlert:spoken',message:'spoken alert line resolved',data:{alertReason:alert.reason,eventType,speakSource,spokenLinePreview:message.slice(0,180),usedLiteral:eventType==='approval_literal',reportTheaterOpen:false},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     void deliverSpokenOperatorAlert(
       {
@@ -349,7 +382,9 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
           workspaceId: input.currentWorkspace.value?.workspace_id ?? null,
         });
       }
-      scheduleBriefingSurfaceOffer();
+      if (!reportTheaterOpen.value) {
+        scheduleBriefingSurfaceOffer();
+      }
     } catch {
       // Voice line unavailable — operator can read briefing in dock.
     }

@@ -54,7 +54,6 @@ const {
   segmentKey,
   revealTerminalPanel,
   backgroundAgentTerminalRun,
-  continueTerminalInBackground,
   showTerminalBackgroundControl,
   terminalMirrorBadge,
   thinkingBodyText,
@@ -359,7 +358,6 @@ const { answeredOptionForQuestion } = createConversationSeamAnswerBridge(convers
               :show-terminal-background-control="showTerminalBackgroundControl"
               @reveal="revealTerminalPanel"
               @background="backgroundAgentTerminalRun"
-              @continue-in-background="continueTerminalInBackground"
               @copy-output="copyTerminalOutput"
             />
 

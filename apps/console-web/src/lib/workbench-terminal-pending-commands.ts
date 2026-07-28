@@ -10,6 +10,7 @@ import {
 
 export type TerminalPendingHost = {
   writeInput?: (data: string) => void;
+  runCommand?: (command: string) => void;
   exitMirrorMode?: () => void;
 };
 
@@ -32,6 +33,7 @@ function flushRoleCommand(input: {
   deps: FlushDeps;
   sessionId?: string;
   beforeWrite?: (host: TerminalPendingHost) => void;
+  write?: (host: TerminalPendingHost, command: string) => void;
 }): void {
   if (!input.pending) {
     return;
@@ -47,7 +49,7 @@ function flushRoleCommand(input: {
     return;
   }
   const host = input.deps.hosts[session.id];
-  if (!host?.writeInput) {
+  if (!host || (!input.write && !host.writeInput)) {
     return;
   }
   const command = input.take();
@@ -57,6 +59,10 @@ function flushRoleCommand(input: {
   input.beforeWrite?.(host);
   input.deps.setVisibleSessionIds([session.id]);
   requestAnimationFrame(() => {
+    if (input.write) {
+      input.write(host, command);
+      return;
+    }
     host.writeInput?.(`${command}\r`);
   });
 }
@@ -75,7 +81,7 @@ export function flushPendingOperatorTerminalCommand(
   });
 }
 
-/** Inject a Continue-in-background command into the focused vaxon agent PTY. */
+/** Run a completed transcript command again in the focused vaxon agent PTY. */
 export function flushPendingAgentBackgroundTerminalCommand(
   deps: FlushDeps,
   sessionId?: string,
@@ -89,6 +95,9 @@ export function flushPendingAgentBackgroundTerminalCommand(
     beforeWrite: (host) => {
       clearAgentShellMirror();
       host.exitMirrorMode?.();
+    },
+    write: (host, command) => {
+      host.runCommand?.(command);
     },
   });
 }

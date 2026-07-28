@@ -109,6 +109,76 @@ class OperatorPresencePolicyTests(unittest.TestCase):
         self.assertTrue(payload["mobile"]["compact_layout"])
         self.assertEqual("observing", payload["presence_state"])
 
+    def test_semi_autonomy_emits_advisory_without_interruptive_signal(self) -> None:
+        payload = build_operator_presence(
+            {
+                "top_signals": [],
+                "pending_approvals": {"count": 0},
+                "degraded": {"active": False},
+                "connectivity": {"watch_connected": True},
+                "notice": "Fleet quiet.",
+                "advise": "Watch DashPro CI and keep Leads on cooldown.",
+                "production_readiness": {
+                    "score": 75,
+                    "grade": "partial",
+                    "summary": "Production readiness 75/100 (partial)",
+                },
+            },
+            settings={
+                "spoken_alerts_enabled": True,
+                "privacy_mode": False,
+                "autonomy_mode": "semi",
+                "operator_persona_enabled": True,
+            },
+        )
+        spoken = payload["spoken_alert"]
+        self.assertTrue(spoken["eligible"])
+        self.assertEqual("autonomy_advisory", spoken["reason"])
+        self.assertIn("DashPro", spoken["message"])
+        self.assertIn("Fleet quiet", spoken["message"])
+
+    def test_semi_autonomy_skips_readiness_only_advisory(self) -> None:
+        payload = build_operator_presence(
+            {
+                "top_signals": [],
+                "pending_approvals": {"count": 0},
+                "degraded": {"active": False},
+                "connectivity": {"watch_connected": True},
+                "production_readiness": {
+                    "score": 100,
+                    "grade": "ready",
+                    "summary": "Production is 100%",
+                },
+            },
+            settings={
+                "spoken_alerts_enabled": True,
+                "privacy_mode": False,
+                "autonomy_mode": "semi",
+                "operator_persona_enabled": True,
+            },
+        )
+        spoken = payload["spoken_alert"]
+        self.assertFalse(spoken["eligible"])
+
+    def test_manual_autonomy_stays_silent_without_interruptive_signal(self) -> None:
+        payload = build_operator_presence(
+            {
+                "top_signals": [],
+                "pending_approvals": {"count": 0},
+                "degraded": {"active": False},
+                "connectivity": {"watch_connected": True},
+                "advise": "Should not speak in manual mode.",
+            },
+            settings={
+                "spoken_alerts_enabled": True,
+                "privacy_mode": False,
+                "autonomy_mode": "manual",
+            },
+        )
+        spoken = payload["spoken_alert"]
+        self.assertFalse(spoken["eligible"])
+        self.assertEqual("no_interruptive_signal", spoken["reason"])
+
     def test_presence_state_privacy_blocked(self) -> None:
         state = resolve_presence_state(
             settings={"privacy_mode": True},
@@ -187,6 +257,20 @@ class OperatorPresenceSettingsApiTests(unittest.TestCase):
 
         loaded = self.client.get("/api/operator-presence/settings").json()
         self.assertTrue(loaded["settings"]["ide_voice_strip_enabled"])
+
+    def test_vaxon_model_id_defaults_and_round_trip(self) -> None:
+        loaded = self.client.get("/api/operator-presence/settings").json()
+        self.assertEqual("gpt-5.4-high", loaded["settings"]["vaxon_model_id"])
+
+        save = self.client.put(
+            "/api/operator-presence/settings",
+            json={"vaxon_model_id": "composer-2"},
+        )
+        self.assertEqual(200, save.status_code)
+        self.assertEqual("composer-2", save.json()["settings"]["vaxon_model_id"])
+
+        reloaded = self.client.get("/api/operator-presence/settings").json()
+        self.assertEqual("composer-2", reloaded["settings"]["vaxon_model_id"])
 
 
 if __name__ == "__main__":

@@ -85,6 +85,16 @@ def _normalize_settings(raw: dict[str, Any] | None) -> dict[str, bool | str | fl
             if value in {"template_first", "runtime_on_deep", "runtime_aggressive"}:
                 normalized[key] = value
             continue
+        if key == "vaxon_model_id":
+            value = str(raw[key] or defaults[key]).strip()
+            if value:
+                normalized[key] = value[:120]
+            continue
+        if key == "autonomy_mode":
+            value = str(raw[key] or defaults[key]).strip().lower()
+            if value in {"manual", "semi", "full"}:
+                normalized[key] = value
+            continue
         normalized[key] = bool(raw[key])
     return normalized
 

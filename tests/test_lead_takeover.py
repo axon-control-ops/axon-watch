@@ -130,6 +130,53 @@ class LeadTakeoverTests(unittest.TestCase):
         again_vaxon = (again.get("takeover") or {}).get("vaxon_flash") or {}
         self.assertEqual("already_posted", again_vaxon.get("status"))
 
+    def test_lead_shift_completion_posts_vaxon_flash(self) -> None:
+        from app.persistence import chat_store
+        from app.workspace_agents import lead_adhoc_receipt_store
+        from app.workspace_agents.lead_replan import notify_lead_after_worker_task
 
-if __name__ == "__main__":
-    unittest.main()
+        reply = (
+            "Retried my failed continuous Lead shift. Public site is up; remote CI "
+            "is still red until the local contract fix lands.\n"
+            "Next: On your go-ahead commit/push the contract fix.\n"
+            "Confidence: 8/10"
+        )
+        with patch("app.live_events.broadcast_material_change"):
+            result = notify_lead_after_worker_task(
+                workspace_id="workspace_dashpro",
+                task_id="",
+                run_id="run_dana_lead_1",
+                employee_role="lead",
+                employee_name="Dana",
+                phase="completed",
+                reply_text=reply,
+            )
+        self.assertEqual("ok_lead_shift", result.get("status"))
+        vaxon = result.get("vaxon_flash") or {}
+        self.assertIn(vaxon.get("status"), {"posted", "already_posted"})
+
+        synthesis = lead_adhoc_receipt_store.find_receipt_for_run(
+            run_id="run_dana_lead_1",
+            kind=lead_adhoc_receipt_store.KIND_LEAD_SYNTHESIS,
+        )
+        self.assertIsNotNone(synthesis)
+        assert synthesis is not None
+        self.assertEqual("Dana", (synthesis.get("payload") or {}).get("employee_name"))
+        self.assertEqual("lead", (synthesis.get("payload") or {}).get("employee_role"))
+
+        operator = chat_store.get_latest_thread_for_workspace(
+            "workspace_dashpro",
+            thread_kind="operator",
+        )
+        self.assertIsNotNone(operator)
+        op_msgs = chat_store.list_thread_messages(str(operator["thread_id"]))
+        self.assertTrue(
+            any(
+                str(m.get("content") or "").startswith("VAXON:")
+                and "Dana" in str(m.get("content") or "")
+                and "lead" in str(m.get("content") or "").lower()
+                and "run_dana_lead_1" in str(m.get("content") or "")
+                for m in op_msgs
+                if m.get("role") == "agent"
+            )
+        )

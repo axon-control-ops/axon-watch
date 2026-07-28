@@ -7,6 +7,7 @@ import {
   type CursorCatalogRow,
 } from '../../lib/cursor-catalog-view';
 import { CURSOR_PICKER_DEFAULT_MODEL } from '../../lib/cursor-picker-prefs';
+import { DEFAULT_VAXON_MODEL_ID } from '../../lib/operator-presence-settings';
 
 export type ConversationModelSwitchIntent = {
   kind: 'switch_composer_model';
@@ -167,8 +168,8 @@ export function resolveConversationModelSwitchIntent(
 
   const label = cursorModelLabel(modelId, rows);
   const reply = isCursorAutoModel(modelId)
-    ? 'Brain set to Auto. Cursor will pick the default model per request.'
-    : `Brain switched to ${label}. The orb and Agent dock now use that model.`;
+    ? `VAXON brain set to ${cursorModelLabel(DEFAULT_VAXON_MODEL_ID, rows)}. That is the operator-global default — Agent Dock keeps its own workspace model.`
+    : `VAXON brain switched to ${label}. That is operator-global — Agent Dock keeps its own workspace model.`;
 
   return {
     kind: 'switch_composer_model',

@@ -17,6 +17,7 @@ from app.workspace_agents.critical_review_clause import (  # noqa: E402
     CRITICAL_REVIEW_CLAUSE,
     append_critical_review_clause,
     parse_confidence,
+    resolve_critical_review_confidence,
 )
 from app.workspace_agents.config_loader import EmployeeConfig  # noqa: E402
 from app.workspace_agents.worker_prompt import build_continuous_worker_prompt  # noqa: E402
@@ -38,6 +39,20 @@ class CriticalReviewClauseHelperTests(unittest.TestCase):
         self.assertIsNone(parse_confidence("no score here"))
         self.assertIsNone(parse_confidence("Confidence: 0/10"))
         self.assertIsNone(parse_confidence("Confidence: 11/10"))
+
+    def test_resolve_auto_recovers_substantive_reply_without_score(self) -> None:
+        long_reply = (
+            "Verified control plane health and production site HTTP 200. "
+            "Traced red CI on main to a missing contract coverage gap and added "
+            "local contract checks that pass. Remote CI stays red until the fix "
+            "is committed and pushed on operator go-ahead. Next Soren confirms "
+            "green main reaches Vercel after the push lands."
+        )
+        confidence, recovered = resolve_critical_review_confidence(long_reply)
+        self.assertEqual(6, confidence)
+        self.assertTrue(recovered)
+        short = resolve_critical_review_confidence("Finished the edit without a score.")
+        self.assertEqual((None, False), short)
 
 
 class CriticalReviewPromptContractTests(unittest.TestCase):
@@ -80,6 +95,29 @@ class CriticalReviewFinalizeGateTests(unittest.TestCase):
             "Confidence: N/10",
             str(record.get("current_step") or record.get("detail") or ""),
         )
+
+    def test_agent_finalize_auto_recovers_substantive_reply_without_score(self) -> None:
+        created = create_run(
+            workspace_id="workspace_alpha",
+            summary="agent shift",
+            mode="agent",
+        )
+        run_id = str(created["run_id"])
+        long_reply = (
+            "Verified control plane health and production site HTTP 200. "
+            "Traced red CI on main to a missing contract coverage gap and added "
+            "local contract checks that pass. Remote CI stays red until the fix "
+            "is committed and pushed on operator go-ahead. Next Soren confirms "
+            "green main reaches Vercel after the push lands."
+        )
+        dispatched, record = finalize_lane_b_agent_run(
+            dispatch_run_id=run_id,
+            lane_b_result={"dispatched": True, "runtime_label": "Cursor CLI"},
+            reply_text=long_reply,
+        )
+        self.assertTrue(dispatched)
+        assert record is not None
+        self.assertEqual("completed", record["phase"])
 
     def test_agent_finalize_completes_with_confidence_receipt(self) -> None:
         created = create_run(

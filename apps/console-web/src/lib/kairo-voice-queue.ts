@@ -10,6 +10,7 @@ import {
   type KairoVoicePlaybackResult,
 } from './kairo-voice-playback';
 import type { KairoVoiceSpeaker } from './kairo-voice-utterance';
+import { reportTheaterOpen } from '../features/report-theater/report-theater-state';
 
 export type KairoVoicePriority =
   | 'interrupt'
@@ -24,6 +25,8 @@ export type EnqueueKairoSpeechOptions = {
   speechPitch?: number;
   azureVoiceId?: string;
   speaker?: KairoVoiceSpeaker;
+  /** Command Theater narration — only this lane may speak while stand-up is open. */
+  allowDuringReportTheater?: boolean;
 };
 
 type VoiceJob = {
@@ -156,6 +159,15 @@ export function enqueueKairoSpeech(
   const priority = options.priority ?? 'conversation';
   if (!trimmed) {
     return Promise.resolve({ engine: 'skipped', reason: 'empty' });
+  }
+
+  // Hard mute: nothing barges into Command Theater except the stand-up lane.
+  if (
+    reportTheaterOpen.value &&
+    !options.allowDuringReportTheater &&
+    priority !== 'interrupt'
+  ) {
+    return Promise.resolve({ engine: 'skipped', reason: 'report_theater_lock' });
   }
 
   return new Promise<KairoVoicePlaybackResult>((resolve, reject) => {

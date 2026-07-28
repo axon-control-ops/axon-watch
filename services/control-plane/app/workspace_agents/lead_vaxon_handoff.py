@@ -216,8 +216,11 @@ def build_ad_hoc_lead_vaxon_message(
         f"VAXON: {name} ({role}) just {status}.",
         f"Workspace: {workspace_id}",
         f"Run: {run_id}",
-        "Lead has the takeover rollup in their Lead tab.",
     ]
+    if role.lower() == "lead":
+        lines.append("Lead shift rollup is ready in the Lead tab.")
+    else:
+        lines.append("Lead has the takeover rollup in their Lead tab.")
     summary = _truncate(lead_summary, max_len=280)
     if summary:
         lines.append(f"Lead summary: {summary}")

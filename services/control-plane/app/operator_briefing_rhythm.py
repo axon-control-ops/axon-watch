@@ -62,11 +62,11 @@ def build_briefing_notice(
         return f"{len(review_ready)} runs are ready for your review."
 
     if lead_awaiting_engagement_count > 0:
-        # Spell the count and hyphenate Lead-team so TTS does not say "forlead".
+        # Spell the count; keep a space before "team" so TTS does not glue "fourlead".
         count_word = _count_words(lead_awaiting_engagement_count)
         if lead_awaiting_engagement_count == 1:
-            return f"{count_word} Lead-team plan is waiting for you to engage in VAXON."
-        return f"{count_word} Lead-team plans are waiting for you to engage in VAXON."
+            return f"{count_word} Lead team plan is waiting for you to engage in VAXON."
+        return f"{count_word} Lead team plans are waiting for you to engage in VAXON."
 
     cli = cli_runtime if isinstance(cli_runtime, dict) else {}
     if not bool(cli.get("dispatch_ready", True)):

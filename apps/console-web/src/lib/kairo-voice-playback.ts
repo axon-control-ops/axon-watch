@@ -11,6 +11,7 @@ import {
   playbackErrorReason,
 } from './kairo-voice-azure-element';
 import { sanitizeSpokenReply, splitSpokenReplyChunks } from './sanitize-spoken-reply';
+import { reportTheaterOpen } from '../features/report-theater/report-theater-state';
 import {
   isKairoPlaybackActive,
   pauseKairoPlayback,
@@ -52,6 +53,8 @@ export type SpeakKairoLineOptions = {
   azureVoiceId?: string;
   /** Who is speaking — drives Galaxy speaker avatar popup. */
   speaker?: KairoVoiceSpeaker | null;
+  /** Command Theater narration may speak while stand-up holds the floor. */
+  allowDuringReportTheater?: boolean;
 };
 
 const speakingListeners = new Set<(active: boolean) => void>();
@@ -407,6 +410,12 @@ export async function speakKairoLine(
   options: SpeakKairoLineOptions = {},
 ): Promise<KairoVoicePlaybackResult> {
   if (options.immediate) {
+    if (
+      reportTheaterOpen.value &&
+      !options.allowDuringReportTheater
+    ) {
+      return { engine: 'skipped', reason: 'report_theater_lock' };
+    }
     return playKairoUtteranceNow(text, {
       preferBrowser: options.preferBrowser,
       speechRate: options.speechRate,
@@ -423,6 +432,7 @@ export async function speakKairoLine(
     speechPitch: options.speechPitch,
     azureVoiceId: options.azureVoiceId,
     speaker: options.speaker ?? undefined,
+    allowDuringReportTheater: options.allowDuringReportTheater,
   });
 }
 

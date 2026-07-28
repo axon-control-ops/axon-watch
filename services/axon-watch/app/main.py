@@ -56,6 +56,7 @@ from app.vault.operations import attempt_auto_unlock
 from app.watch_summary import build_connectors_response, build_watch_summary
 from app.monitors.monitor_snapshot import build_monitors_response
 from app.monitors.sentry_resolve_service import (
+    attend_watch_sentry_issue,
     probe_watch_sentry_write_scope,
     resolve_watch_sentry_issue,
 )
@@ -89,6 +90,13 @@ class WatchCommandBody(BaseModel):
 class SentryResolveBody(BaseModel):
     status: str = "resolved"
     requested_by: str = "operator"
+
+
+class SentryAttendBody(BaseModel):
+    confirm_release: str = ""
+    requested_by: str = "operator"
+    mark_resolved_in_next_release: bool = True
+    workspace_id: str = "workspace_dashpro"
 
 
 app = FastAPI(
@@ -205,6 +213,21 @@ def sentry_resolve_issue(issue_id: str, body: SentryResolveBody | None = None) -
         issue_id,
         status=payload.status,
         requested_by=payload.requested_by,
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result)
+    return result
+
+
+@app.post("/internal/watch/sentry/issues/{issue_id}/attend")
+def sentry_attend_issue(issue_id: str, body: SentryAttendBody | None = None) -> dict[str, object]:
+    payload = body or SentryAttendBody()
+    result = attend_watch_sentry_issue(
+        issue_id,
+        confirm_release=payload.confirm_release,
+        requested_by=payload.requested_by,
+        mark_resolved_in_next_release=payload.mark_resolved_in_next_release,
+        workspace_id=payload.workspace_id,
     )
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result)

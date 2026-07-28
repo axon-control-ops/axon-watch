@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { WorkspaceTaskRecord } from '../api/tasks-api';
 import {
   buildOperatorTaskBoardView,
+  columnForTask,
   filterTaskBoardRows,
 } from './operator-task-board-view';
 
@@ -29,81 +30,113 @@ function task(
 }
 
 describe('buildOperatorTaskBoardView', () => {
-  it('counts buckets and prefers leased rows first', () => {
+  it('places tasks into plan-aware columns without drag semantics', () => {
+    const view = buildOperatorTaskBoardView(
+      [
+        task({
+          task_id: 'task-open',
+          goal: 'Open work',
+          status: 'open',
+          updated_at: '2026-07-22T12:02:00Z',
+        }),
+        task({
+          task_id: 'task-leased',
+          goal: 'Live work',
+          status: 'leased',
+          lease_holder: 'backend-1',
+          updated_at: '2026-07-22T12:03:00Z',
+        }),
+        task({
+          task_id: 'task-done',
+          goal: 'Finished',
+          status: 'completed',
+          updated_at: '2026-07-22T12:01:00Z',
+        }),
+        task({
+          task_id: 'task-failed',
+          goal: 'Broken',
+          status: 'failed',
+          updated_at: '2026-07-22T12:04:00Z',
+        }),
+        task({
+          task_id: 'task-cancelled',
+          goal: 'Stopped',
+          status: 'cancelled',
+          updated_at: '2026-07-22T11:00:00Z',
+        }),
+      ],
+      [
+        {
+          plan_id: 'lead-plan-1',
+          workspace_id: 'workspace_dashpro',
+          goal: 'Ship Gate 5',
+          mode: 'fan_out',
+          status: 'active',
+          plan: {},
+          supersedes_plan_id: null,
+          created_at: '2026-07-22T11:00:00Z',
+          updated_at: '2026-07-22T12:00:00Z',
+          task_links: [
+            { plan_key: 'backend', task_id: 'task-open' },
+            { plan_key: 'frontend', task_id: 'task-leased' },
+          ],
+          task_ids: ['task-open', 'task-leased'],
+          awaiting_engagement: false,
+        },
+      ],
+    );
+
+    expect(view.counts.waiting).toBe(1);
+    expect(view.counts.inProgress).toBe(1);
+    expect(view.counts.done).toBe(1);
+    expect(view.counts.needsAttention).toBe(1);
+    expect(view.counts.cancelled).toBe(1);
+    expect(view.columns.map((column) => column.id)).toEqual([
+      'waiting',
+      'in_progress',
+      'done',
+      'needs_attention',
+    ]);
+    expect(view.historyRows).toHaveLength(1);
+    expect(view.planGroups.some((group) => group.planId === 'lead-plan-1')).toBe(true);
+  });
+
+  it('marks open dependencies as blocking chips', () => {
     const view = buildOperatorTaskBoardView([
       task({
-        task_id: 'task-open',
-        goal: 'Open work',
+        task_id: 'task-dep',
+        goal: 'Dependency',
         status: 'open',
-        updated_at: '2026-07-22T12:02:00Z',
       }),
       task({
-        task_id: 'task-leased',
-        goal: 'Leased work',
-        status: 'leased',
-        lease_holder: 'employee-workspace_dashpro-backend',
-        attempts_used: 1,
-        updated_at: '2026-07-22T12:01:00Z',
-      }),
-      task({
-        task_id: 'task-done',
-        goal: 'Finished',
-        status: 'completed',
-        terminal_outcome: 'acceptance met',
-        updated_at: '2026-07-22T11:00:00Z',
-      }),
-      task({
-        task_id: 'task-cancelled',
-        goal: 'Noise',
-        status: 'cancelled',
-        updated_at: '2026-07-22T13:00:00Z',
+        task_id: 'task-blocked',
+        goal: 'Blocked work',
+        status: 'open',
+        dependencies: ['task-dep'],
       }),
     ]);
+    const blocked = view.rows.find((row) => row.taskId === 'task-blocked');
+    expect(blocked?.blockedByOpenDeps).toBe(true);
+    expect(blocked?.dependencyChips[0]?.blocking).toBe(true);
+  });
+});
 
-    expect(view.counts).toEqual({
-      open: 1,
-      leased: 1,
-      completed: 1,
-      failed: 0,
-      cancelled: 1,
-      total: 4,
-    });
-    expect(view.headline).toBe('1 leased · 1 waiting');
-    expect(view.defaultFilter).toBe('active');
-    expect(view.rows[0]?.taskId).toBe('task-leased');
-    expect(view.rows[0]?.canCancel).toBe(true);
-    expect(view.rows[1]?.taskId).toBe('task-open');
-    expect(view.rows.find((row) => row.taskId === 'task-cancelled')?.bucket).toBe(
-      'cancelled',
+describe('columnForTask', () => {
+  it('keeps cancelled off the live columns', () => {
+    expect(columnForTask(task({ task_id: 'c', goal: 'c', status: 'cancelled' }))).toBeNull();
+    expect(columnForTask(task({ task_id: 'f', goal: 'f', status: 'failed' }))).toBe(
+      'needs_attention',
     );
   });
+});
 
-  it('defaults to done when only completed work remains', () => {
+describe('filterTaskBoardRows', () => {
+  it('hides cancelled from the default board filter', () => {
     const view = buildOperatorTaskBoardView([
-      task({
-        task_id: 'task-done',
-        goal: 'Finished',
-        status: 'completed',
-      }),
-      task({
-        task_id: 'task-cancelled',
-        goal: 'Noise',
-        status: 'cancelled',
-        updated_at: '2026-07-22T13:00:00Z',
-      }),
+      task({ task_id: 'task-done', goal: 'Done', status: 'completed' }),
+      task({ task_id: 'task-cancelled', goal: 'Cancelled', status: 'cancelled' }),
     ]);
-    expect(view.defaultFilter).toBe('done');
-    expect(view.headline).toBe('1 done');
-    expect(filterTaskBoardRows(view.rows, 'done').map((row) => row.taskId)).toEqual([
-      'task-done',
-    ]);
-    expect(filterTaskBoardRows(view.rows, 'active')).toEqual([]);
-  });
-
-  it('shows empty copy when ledger is empty', () => {
-    const view = buildOperatorTaskBoardView([]);
-    expect(view.rows).toEqual([]);
-    expect(view.headline).toBe('Nothing queued');
-    expect(view.purpose.toLowerCase()).toContain('specialist');
+    expect(filterTaskBoardRows(view.rows, 'board')).toHaveLength(1);
+    expect(filterTaskBoardRows(view.rows, 'history')).toHaveLength(2);
   });
 });

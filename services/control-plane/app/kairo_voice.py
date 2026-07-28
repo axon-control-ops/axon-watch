@@ -82,6 +82,7 @@ def _try_runtime_line(
     context: dict[str, Any],
     recent: list[str],
     workspace_id: str,
+    model: str = "",
 ) -> str | None:
     binary = find_cursor_cli()
     if not binary:
@@ -117,6 +118,7 @@ def _try_runtime_line(
             workspace_root=workspace_root,
             composer_mode="ask",
             execution_tier="consultative",
+            model=model,
             timeout_seconds=_RUNTIME_TIMEOUT_SECONDS,
         )
     except Exception:
@@ -178,13 +180,20 @@ def generate_spoken_line(
 
     line: str | None = None
     source = "fallback"
+    selected_model = ""
 
     if use_runtime and should_use_runtime_for_event(event_type, narration):
+        from app.kairo.voice_dispatch import resolve_vaxon_model
+        from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
+
+        presence = load_presence_settings()
+        selected_model = resolve_vaxon_model(presence.get("vaxon_model_id"))
         line = _try_runtime_line(
             event_type=event_type,
             context=payload,
             recent=recent,
             workspace_id=str(workspace_id or payload.get("workspace_id") or "axon-watch"),
+            model=selected_model,
         )
         if line:
             source = "model"
@@ -209,7 +218,7 @@ def generate_spoken_line(
                 fallback_workspace_id=str(workspace_id or payload.get("workspace_id") or ""),
             )
             note_dig_in_offer(session_id, line)
-    return {"line": line, "source": source}
+    return {"line": line, "source": source, "selected_model": selected_model or ""}
 
 
 def narration_allows_event(event_type: str, narration: NarrationLevel) -> bool:

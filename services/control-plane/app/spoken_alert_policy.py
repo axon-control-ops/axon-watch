@@ -21,6 +21,8 @@ def default_operator_presence_settings() -> dict[str, bool | str | float]:
         # Hands-free stays opt-in (mic permission). Duplex = speak then listen like JARVIS.
         "hands_free_enabled": False,
         "proactive_duplex_enabled": True,
+        # manual = alerts only; semi = VAXON advisory; full = advisory + continuous workers.
+        "autonomy_mode": "manual",
         # axon-local parity defaults (desktop voice deck).
         "speech_rate": 1.0,
         "speech_pitch": 1.04,
@@ -28,6 +30,8 @@ def default_operator_presence_settings() -> dict[str, bool | str | float]:
         "stt_mode": "cloud",
         # Prefer runtime for deep status/open asks; keep templates for quick facts.
         "voice_routing_mode": "runtime_on_deep",
+        # Operator-global VAXON model — independent from workspace Composer prefs.
+        "vaxon_model_id": "gpt-5.4-high",
         "narrate_tool_progress": False,
     }
 

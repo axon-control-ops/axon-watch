@@ -50,11 +50,15 @@ _RUNTIME_AUTH_MARKERS = (
     "authentication failed",
     "authentication required",
     "api_key_invalid",
+    "auth probe timed out",
+    "auth probe failed",
+    "cursor auth probe",
+    "codex auth probe",
 )
 
 
 def is_runtime_auth_failure(detail: str | None) -> bool:
-    """True when the agent runtime could not authenticate (CLI login or vault keys)."""
+    """True when the agent runtime could not authenticate (CLI login, vault, or auth probe)."""
     normalized = normalize_operator_failure_detail(detail)
     if not normalized:
         return False

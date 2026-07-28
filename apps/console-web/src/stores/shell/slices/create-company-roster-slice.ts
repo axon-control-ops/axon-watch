@@ -93,12 +93,15 @@ export function createCompanyRosterSlice(input: CreateCompanyRosterSliceInput) {
     }),
   );
 
-  const activeIdeEmployeeFailureLine = computed(() =>
-    resolveIdeThreadEmployeeFailure({
+  const activeIdeEmployeeFailureLine = computed(() => {
+    if (input.agentStreamActive?.value && activeIdeThread.value?.employee_id?.trim()) {
+      return null;
+    }
+    return resolveIdeThreadEmployeeFailure({
       thread: activeIdeThread.value,
       employees: companyEmployeesForCurrentWorkspace.value,
-    }),
-  );
+    });
+  });
 
   const activeIdeEmployeeShiftInterrupted = computed(() => {
     const row = activeIdeEmployeeRecord.value;

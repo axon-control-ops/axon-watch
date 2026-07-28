@@ -17,7 +17,12 @@ from app.chat.command_intent import (
 )
 from app.cli_runtime.router import dispatch_ide_composer
 from app.kairo.context_pack_cache import get_cached_context_pack
-from app.kairo.voice_dispatch import VoiceModelReceipt, normalize_voice_routing_mode, route_voice_turn
+from app.kairo.voice_dispatch import (
+    VoiceModelReceipt,
+    normalize_voice_routing_mode,
+    resolve_vaxon_model,
+    route_voice_turn,
+)
 from app.kairo.voice_autonomy import resolve_voice_action_tier
 from app.kairo_early_intents import maybe_handle_early_converse_intent
 from app.persistence.operator_presence_settings_store import load_settings as load_presence_settings
@@ -173,6 +178,7 @@ def converse_turn(
     voice_routing_mode = normalize_voice_routing_mode(
         presence_settings.get("voice_routing_mode")
     )
+    preferred_vaxon_model = resolve_vaxon_model(presence_settings.get("vaxon_model_id"))
     if context_signal_id and resolved_workspace_id:
         _remember_entities(
             session_id,
@@ -333,6 +339,7 @@ def converse_turn(
         dispatch_runtime=dispatch_ide_composer,
         context_signal_id=context_signal_id,
         context_node_id=context_node_id,
+        preferred_model=preferred_vaxon_model,
     )
 
     reply = decision.reply
@@ -369,11 +376,13 @@ def converse_turn(
             "action_tier": decision.action_tier,
             "dispatch_lane": decision.lane,
             "voice_routing_mode": voice_routing_mode,
+            "vaxon_model_id": preferred_vaxon_model,
             "model_receipt": model_receipt,
             "routing_receipt": decision.model_receipt.as_line() if decision.model_receipt else None,
             "action": decision.action,
             "artifacts": artifacts,
             "active_participant": listener,
+            "report": decision.report,
         },
         duration_ms=round((time.perf_counter() - started_at) * 1000),
         runtime_dispatched=runtime_dispatched,

@@ -146,7 +146,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertIn("Priya (Frontend) just completed", text)
         self.assertIn("Lead rollups:", text)
         self.assertIn("graduation survey", text.lower())
-        self.assertIn("Lead next:", text)
+        self.assertIn("Plan:", text)
         self.assertNotIn("Confidence:", text)
         self.assertIn("Fleet:", text)
         self.assertIn("Next move:", text)
@@ -174,6 +174,7 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         )
         self.assertIn("nothing screaming", empty["text"].lower())
         self.assertIn("idle", empty["text"].lower())
+        self.assertIn("standing by", empty["text"].lower())
 
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
@@ -221,6 +222,14 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         # Spoken normalization turns "Attention:" into "Attention,".
         self.assertRegex(reply, r"Attention[,:]")
         self.assertRegex(reply, r"Work in flight[,:]")
+        report = payload.get("report")
+        self.assertIsInstance(report, dict)
+        sections = report.get("sections") if isinstance(report, dict) else None
+        self.assertIsInstance(sections, dict)
+        assert isinstance(sections, dict)
+        self.assertTrue(
+            any("Dana" in str(item) for item in (sections.get("work_in_flight") or [])),
+        )
         mock_dispatch.assert_not_called()
 
 

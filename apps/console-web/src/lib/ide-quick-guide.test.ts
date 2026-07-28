@@ -69,6 +69,28 @@ describe('buildIdeQuickGuide', () => {
     ]);
   });
 
+  it('hides roster failure sticky when Team is already open', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      agentDockCollapsed: false,
+      failedEmployeeCount: 1,
+      failedEmployeesHint: 'Priya needs attention after a failed job.',
+      teamExpanded: true,
+    });
+    expect(guide).toBeNull();
+  });
+
+  it('hides open-dock failure sticky when Team is already open and dock is expanded', () => {
+    const guide = buildIdeQuickGuide({
+      ...base,
+      agentDockCollapsed: false,
+      employeeFailureLine: 'Last job could not run — Cursor CLI auth timed out.',
+      employeeRetryActionLabel: 'Try again',
+      teamExpanded: true,
+    });
+    expect(guide).toBeNull();
+  });
+
   it('uses Continue in interrupted quick-guide steps', () => {
     const guide = buildIdeQuickGuide({
       ...base,
@@ -111,8 +133,8 @@ describe('buildIdeQuickGuide', () => {
 
     expect(guide?.title).toContain('Last job failed');
     expect(guide?.tone).toBe('failure');
-    expect(guide?.steps[0]).toBe(failureLine);
-    expect(guide?.steps.join(' ')).toContain('Try again');
+    // Dock banner already shows the failure line — sticky points at Try again there.
+    expect(guide?.steps[0]).toContain('Try again in the failure banner');
     expect(guide?.steps.join(' ')).toContain('agent dock composer');
     expect(guide?.actions).toEqual([{ id: 'retry-employee-shift', label: 'Try again' }]);
   });

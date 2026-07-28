@@ -82,6 +82,20 @@ export interface KairoConverseRequest {
   context_node_id?: string;
 }
 
+export interface KairoConverseReportSections {
+  attention: string[];
+  work_in_flight: string[];
+  lead_rollups: string[];
+  fleet: string[];
+  next_move: string;
+}
+
+export interface KairoConverseReport {
+  sections: KairoConverseReportSections;
+  fingerprint?: string | null;
+  lane?: string | null;
+}
+
 export interface KairoConverseResponse {
   turn_kind: KairoConverseTurnKind;
   reply: string;
@@ -97,6 +111,8 @@ export interface KairoConverseResponse {
   model_receipt?: Record<string, unknown> | null;
   action: KairoConverseAction | null;
   artifacts: KairoConverseArtifact[];
+  /** Structured stand-up payload for command-theater overlay. */
+  report?: KairoConverseReport | null;
 }
 
 export async function postKairoConverse(body: KairoConverseRequest): Promise<KairoConverseResponse> {

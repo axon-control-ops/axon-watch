@@ -6,6 +6,9 @@ export type SentrySignalIssue = {
   count: number;
   permalink: string;
   culprit: string;
+  environment: string;
+  firstRelease: string;
+  lastRelease: string;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -43,6 +46,9 @@ export function sentryIssuesFromSignalMeta(meta: unknown): SentrySignalIssue[] {
       count: Number(item.count || 0) || 0,
       permalink: String(item.permalink || '').trim(),
       culprit: String(item.culprit || '').trim(),
+      environment: String(item.environment || '').trim(),
+      firstRelease: String(item.first_release || item.firstRelease || '').trim(),
+      lastRelease: String(item.last_release || item.lastRelease || '').trim(),
     });
   }
   return issues;

@@ -6,6 +6,7 @@ import unittest
 
 from app.kairo.voice_dispatch import (
     normalize_voice_routing_mode,
+    resolve_vaxon_model,
     should_use_vaxon_runtime,
     vaxon_model_pool,
 )
@@ -58,6 +59,12 @@ class VoiceDispatchTests(unittest.TestCase):
 
     def test_model_pool_non_empty(self) -> None:
         self.assertGreaterEqual(len(vaxon_model_pool()), 1)
+
+    def test_resolve_vaxon_model_defaults_to_gpt_54_high(self) -> None:
+        self.assertEqual(resolve_vaxon_model(None), "gpt-5.4-high")
+        self.assertEqual(resolve_vaxon_model("auto"), "gpt-5.4-high")
+        self.assertEqual(resolve_vaxon_model("composer-2"), "composer-2")
+        self.assertEqual(resolve_vaxon_model("GPT-5.4-HIGH"), "gpt-5.4-high")
 
 
 if __name__ == "__main__":

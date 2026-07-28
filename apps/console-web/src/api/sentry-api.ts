@@ -43,6 +43,19 @@ function errorMessageFromPayload(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+export type SentryAttendResult = {
+  ok: boolean;
+  issue_id?: string;
+  detail?: string;
+  reason?: string;
+  attendance?: {
+    issue_id: string;
+    confirm_release: string;
+    attended_at: string;
+  };
+  sentry?: SentryResolveResult | null;
+};
+
 export async function resolveSentryIssue(
   issueId: string,
   body: { status?: string; requested_by?: string } = {},
@@ -80,6 +93,52 @@ export async function resolveSentryIssue(
   }
 
   return (payload ?? { ok: true, issue_id: normalized }) as SentryResolveResult;
+}
+
+export async function attendSentryIssue(
+  issueId: string,
+  body: {
+    confirm_release?: string;
+    requested_by?: string;
+    mark_resolved_in_next_release?: boolean;
+    workspace_id?: string;
+  } = {},
+): Promise<SentryAttendResult> {
+  const normalized = String(issueId || '').trim();
+  if (!normalized) {
+    return { ok: false, reason: 'missing_issue_id' };
+  }
+
+  const response = await fetch(apiUrl(`/api/sentry/issues/${encodeURIComponent(normalized)}/attend`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      confirm_release: body.confirm_release ?? '',
+      requested_by: body.requested_by ?? 'operator',
+      mark_resolved_in_next_release: body.mark_resolved_in_next_release ?? true,
+      workspace_id: body.workspace_id ?? 'workspace_dashpro',
+    }),
+  });
+
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const detailPayload =
+      payload && typeof payload === 'object' && 'detail' in (payload as object)
+        ? (payload as { detail: unknown }).detail
+        : payload;
+    if (detailPayload && typeof detailPayload === 'object') {
+      return detailPayload as SentryAttendResult;
+    }
+    throw new Error(errorMessageFromPayload(payload, `sentry attend failed (${response.status})`));
+  }
+
+  return (payload ?? { ok: true, issue_id: normalized }) as SentryAttendResult;
 }
 
 export async function probeSentryWriteScope(): Promise<SentryWriteProbeResult> {

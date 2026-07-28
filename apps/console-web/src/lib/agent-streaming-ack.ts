@@ -36,7 +36,7 @@ function intentHint(prompt: string): string | null {
     return null;
   }
   if (/\breceipts?\b/i.test(flat) || /\blast shift\b/i.test(flat)) {
-    return 'Pulling the shift receipts now';
+    return 'Pulling my shift receipts now';
   }
   if (/\bsentry\b/i.test(flat)) {
     return 'Looking at that Sentry alert now';

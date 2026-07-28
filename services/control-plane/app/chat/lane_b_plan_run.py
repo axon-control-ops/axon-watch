@@ -10,7 +10,8 @@ from app.runs.service import (
 )
 from app.workspace_agents.critical_review_clause import (
     MISSING_CONFIDENCE_DETAIL,
-    parse_confidence,
+    critical_review_receipt_summary,
+    resolve_critical_review_confidence,
 )
 
 
@@ -40,7 +41,7 @@ def finalize_lane_b_plan_run(
     )
     try:
         if dispatched:
-            confidence = parse_confidence(reply_text)
+            confidence, auto_recovered = resolve_critical_review_confidence(reply_text)
             if confidence is None:
                 run_record = append_run_execution_receipt(
                     run_id,
@@ -55,7 +56,9 @@ def finalize_lane_b_plan_run(
             run_record = append_run_execution_receipt(
                 run_id,
                 receipt_type="critical_review",
-                receipt_summary=f"Critical Review Confidence: {confidence}/10",
+                receipt_summary=critical_review_receipt_summary(
+                    confidence, auto_recovered=auto_recovered
+                ),
                 actor="critical_review",
                 success=True,
                 intent="lane_b_plan",

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.persistence import task_store
 from app.workspace_agents import build_company_roster
+from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
 from app.workspace_agents.lead_replan import (
     LeadReplanError,
@@ -59,6 +60,30 @@ def _roster_members(workspace_id: str) -> list[LeadPlanRosterMember]:
             )
         )
     return members
+
+
+@router.get("/api/workspaces/{workspace_id}/lead/plans")
+def workspace_lead_plans(workspace_id: str, limit: int = 50) -> dict[str, Any]:
+    cleaned = str(workspace_id or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="workspace_id is required")
+    items = lead_plan_store.list_workspace_plans(cleaned, limit=limit)
+    return {"workspace_id": cleaned, "items": items, "count": len(items)}
+
+
+@router.get("/api/lead/plans/{plan_id}")
+def lead_plan_get(plan_id: str) -> dict[str, Any]:
+    cleaned = str(plan_id or "").strip()
+    plan = lead_plan_store.get_plan(cleaned)
+    if plan is None:
+        raise HTTPException(status_code=404, detail=f"lead plan not found: {cleaned}")
+    task_links = lead_plan_store.plan_task_links(cleaned)
+    return {
+        **plan,
+        "task_links": task_links,
+        "task_ids": [link["task_id"] for link in task_links],
+        "awaiting_engagement": str(plan.get("status") or "") == "awaiting_engagement",
+    }
 
 
 @router.post("/api/workspaces/{workspace_id}/lead/plan")

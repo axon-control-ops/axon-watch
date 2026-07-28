@@ -25,7 +25,8 @@ describe('resolveConversationModelSwitchIntent', () => {
       kind: 'switch_composer_model',
       modelId: 'gpt-5.4-high',
       label: 'GPT-5.4 High',
-      reply: 'Brain switched to GPT-5.4 High. The orb and Agent dock now use that model.',
+      reply:
+        'VAXON brain switched to GPT-5.4 High. That is operator-global — Agent Dock keeps its own workspace model.',
     });
   });
 
@@ -34,7 +35,8 @@ describe('resolveConversationModelSwitchIntent', () => {
       kind: 'switch_composer_model',
       modelId: 'composer-2.5-fast',
       label: 'Composer 2.5 Fast',
-      reply: 'Brain switched to Composer 2.5 Fast. The orb and Agent dock now use that model.',
+      reply:
+        'VAXON brain switched to Composer 2.5 Fast. That is operator-global — Agent Dock keeps its own workspace model.',
     });
   });
 
@@ -45,7 +47,9 @@ describe('resolveConversationModelSwitchIntent', () => {
   });
 
   it('sets auto without matching brain galaxy navigation', () => {
-    expect(resolveConversationModelSwitchIntent('set brain to auto', ROWS)?.modelId).toBe('auto');
+    const autoIntent = resolveConversationModelSwitchIntent('set brain to auto', ROWS);
+    expect(autoIntent?.modelId).toBe('auto');
+    expect(autoIntent?.reply).toContain('operator-global default');
     expect(resolveConversationModelSwitchIntent('switch to brain galaxy', ROWS)).toBeNull();
   });
 

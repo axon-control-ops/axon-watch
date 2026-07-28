@@ -22,6 +22,8 @@ import { useVoiceCockpitPresence } from './features/voice-deck/use-voice-cockpit
 import { useKairoAppVoice } from './features/kairo-conversation/use-kairo-app-voice';
 import MobileVoiceCockpitStrip from './components/shell/MobileVoiceCockpitStrip.vue';
 import VoiceOrbHost from './features/brain-galaxy/VoiceOrbHost.vue';
+import ReportTheaterOverlay from './features/report-theater/ReportTheaterOverlay.vue';
+import './features/report-theater/report-theater.css';
 import HudHoloAtmosphere from './features/hud-holo/HudHoloAtmosphere.vue';
 import { useShellStore } from './stores/shell';
 
@@ -170,5 +172,6 @@ onUnmounted(() => {
       <StatusBar />
     </div>
     <VoiceOrbHost v-if="bootComplete && !isFoundationSurface" />
+    <ReportTheaterOverlay v-if="bootComplete && !isFoundationSurface" />
   </template>
 </template>

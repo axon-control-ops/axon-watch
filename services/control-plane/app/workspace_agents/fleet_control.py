@@ -46,6 +46,17 @@ def build_scheduler_status() -> dict[str, Any]:
 
 def patch_scheduler_settings(patch: dict[str, Any]) -> dict[str, Any]:
     worker_scheduler_settings_store.patch_settings(patch)
+    if "scheduler_enabled" in patch and patch["scheduler_enabled"] is not None:
+        # Keep presence autonomy_mode aligned with the fleet master switch.
+        from app.persistence import operator_presence_settings_store
+
+        current = operator_presence_settings_store.load_settings()
+        mode = str(current.get("autonomy_mode") or "manual").strip().lower()
+        enabled = bool(patch["scheduler_enabled"])
+        if enabled and mode != "full":
+            operator_presence_settings_store.save_settings({**current, "autonomy_mode": "full"})
+        elif not enabled and mode == "full":
+            operator_presence_settings_store.save_settings({**current, "autonomy_mode": "semi"})
     return build_scheduler_status()
 
 

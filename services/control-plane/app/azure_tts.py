@@ -30,6 +30,15 @@ _AZURE_REGION_NAMES = ("AZURE_SPEECH_REGION", "azure_speech_region")
 
 def _clean_for_speech(text: str) -> str:
     cleaned = re.sub(r"\s+", " ", str(text or "").strip())
+    # Last-resort TTS safety: never letter-spell the persona name.
+    cleaned = re.sub(
+        r"\bV\s*[.\-]\s*A\s*[.\-]\s*X\s*[.\-]\s*O\s*[.\-]\s*N\b",
+        "Vekson",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\bV\s+A\s+X\s+O\s+N\b", "Vekson", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bVAXON\b", "Vekson", cleaned, flags=re.IGNORECASE)
     return cleaned[:3000]
 
 

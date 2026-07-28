@@ -383,6 +383,49 @@ def post_watch_sentry_issue_resolve(
     return payload
 
 
+def post_watch_sentry_issue_attend(
+    issue_id: str,
+    *,
+    confirm_release: str = "",
+    requested_by: str = "operator",
+    mark_resolved_in_next_release: bool = True,
+    workspace_id: str = "workspace_dashpro",
+    timeout_seconds: float = 20.0,
+) -> dict[str, object] | None:
+    normalized = str(issue_id or "").strip()
+    if not normalized:
+        return {"ok": False, "reason": "missing_issue_id"}
+    url = f"{watch_base_url()}/internal/watch/sentry/issues/{normalized}/attend"
+    encoded = json.dumps(
+        {
+            "confirm_release": str(confirm_release or "").strip(),
+            "requested_by": str(requested_by or "operator").strip() or "operator",
+            "mark_resolved_in_next_release": bool(mark_resolved_in_next_release),
+            "workspace_id": str(workspace_id or "workspace_dashpro").strip()
+            or "workspace_dashpro",
+        }
+    ).encode("utf-8")
+
+    try:
+        request = Request(
+            url,
+            data=encoded,
+            headers=watch_request_headers(content_type="application/json"),
+            method="POST",
+        )
+        with watch_urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError) as exc:
+        error_payload = _parse_watch_error_payload(exc)
+        if error_payload is not None:
+            return error_payload
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
 def post_watch_sentry_probe_write(timeout_seconds: float = 15.0) -> dict[str, object] | None:
     url = f"{watch_base_url()}/internal/watch/sentry/probe-write"
 

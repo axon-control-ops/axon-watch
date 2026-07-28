@@ -4,7 +4,10 @@ import { computed, nextTick, ref, watch } from 'vue';
 import AgentPersonaDock from './AgentPersonaDock.vue';
 import CompanyPresenceStrip from './CompanyPresenceStrip.vue';
 import VaxonRosterVoiceDock from './VaxonRosterVoiceDock.vue';
-import { useVaxonRosterVoiceDock } from '../../features/kairo-conversation/use-vaxon-roster-voice-dock';
+import {
+  shouldShowVaxonRosterVoiceDock,
+  useVaxonRosterVoiceDock,
+} from '../../features/kairo-conversation/use-vaxon-roster-voice-dock';
 import { resolveRosterSelectionForIdeThread } from '../../features/workspace-agents/active-ide-employee';
 import {
   buildCompanyRosterAlertBadge,
@@ -45,6 +48,13 @@ const currentWorkspaceId = computed(() => shell.currentWorkspace?.workspace_id ?
 const vaxonVoiceDock = useVaxonRosterVoiceDock(
   computed(() => shell.kairoSpeechActive),
   currentWorkspaceId,
+);
+const showVaxonVoiceDock = computed(() =>
+  shouldShowVaxonRosterVoiceDock({
+    layoutMode: shell.layoutMode,
+    operatorBrainGalaxyActive: shell.operatorBrainGalaxyActive,
+    voiceDockVisible: vaxonVoiceDock.visible.value,
+  }),
 );
 /** Single roster source of truth — shell owns the poll; do not dual-poll here (causes IDE flicker). */
 const employees = computed(() => shell.companyEmployeesForCurrentWorkspace);
@@ -164,10 +174,6 @@ const headline = computed(() =>
   ),
 );
 
-const hasFailedEmployees = computed(() => companyHasFailedEmployees(employees.value));
-
-const rosterAlertBadge = computed(() => buildCompanyRosterAlertBadge(employees.value));
-
 const liveBusyEmployeeIds = computed(() => {
   const ids = new Set<string>();
   for (const row of employees.value) {
@@ -192,6 +198,14 @@ const liveBusyEmployeeIds = computed(() => {
   return [...ids];
 });
 
+const hasFailedEmployees = computed(() =>
+  companyHasFailedEmployees(employees.value, liveBusyEmployeeIds.value),
+);
+
+const rosterAlertBadge = computed(() =>
+  buildCompanyRosterAlertBadge(employees.value, liveBusyEmployeeIds.value),
+);
+
 const busyCount = computed(() => {
   const rosterBusy = companyBusyEmployeesCount(employees.value);
   const liveExtra = liveBusyEmployeeIds.value.filter(
@@ -208,10 +222,12 @@ const busyBadgeLabel = computed(() => {
   return `${count} BUSY`;
 });
 
-const failedEmployeesHint = computed(() => companyFailedEmployeesHint(employees.value));
+const failedEmployeesHint = computed(() =>
+  companyFailedEmployeesHint(employees.value, liveBusyEmployeeIds.value),
+);
 
 const failedEmployeesHintTooltip = computed(() =>
-  companyFailedEmployeesHintTooltip(employees.value),
+  companyFailedEmployeesHintTooltip(employees.value, liveBusyEmployeeIds.value),
 );
 
 const selectedEmployee = computed(
@@ -454,9 +470,9 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
       />
 
       <div :id="COMPANY_ROSTER_DOCK_ID" ref="dockRootRef" class="company-roster__dock-host">
-        <!-- IDE: KairoSidebarPanel owns VAXON speech — avoid a second speaking dock. -->
+        <!-- Mission Control uses the right LIVE OPERATIONS orb; IDE uses KairoSidebarPanel. -->
         <VaxonRosterVoiceDock
-          v-if="shell.layoutMode !== 'ide' && vaxonVoiceDock.visible.value"
+          v-if="showVaxonVoiceDock"
           :speaking="vaxonVoiceDock.speaking.value"
           :line="vaxonVoiceDock.line.value"
           :remaining-seconds="vaxonVoiceDock.remainingSeconds.value"
@@ -469,6 +485,7 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
           :employee="selectedEmployee"
           :actions="selectedActions"
           :control-busy="controlBusyId === selectedEmployee.employee_id"
+          :live-busy="liveBusyEmployeeIds.includes(selectedEmployee.employee_id)"
           @talk="void startChat(selectedEmployee, 'talk')"
           @action="onQuickAction(selectedEmployee, $event)"
         />

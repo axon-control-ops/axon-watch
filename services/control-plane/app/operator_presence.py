@@ -2,12 +2,38 @@
 
 from __future__ import annotations
 
+import json
+import time
+
 from app.kairo_persona import build_persona_voice_line
 from app.operator_briefing_signals import first_actionable_signal, is_bootstrap_signal
 from app.spoken_alert_policy import (
     default_operator_presence_settings,
     resolve_spoken_alert,
 )
+
+
+# region agent log
+def _debug_presence_probe(message: str, data: dict[str, object]) -> None:
+    payload = {
+        "sessionId": "bef50e",
+        "runId": "post-fix",
+        "hypothesisId": "H2,H3,H4",
+        "location": "operator_presence.py",
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open(
+            "/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log",
+            "a",
+            encoding="utf-8",
+        ) as handle:
+            handle.write(json.dumps(payload, sort_keys=True) + "\n")
+    except OSError:
+        pass
+# endregion
 
 
 def resolve_presence_state(
@@ -26,6 +52,57 @@ def resolve_presence_state(
     if briefing_loaded and watch_connected:
         return "observing"
     return "idle"
+
+
+def _autonomy_mode(settings: dict[str, object]) -> str:
+    mode = str(settings.get("autonomy_mode") or "manual").strip().lower()
+    return mode if mode in {"manual", "semi", "full"} else "manual"
+
+
+def _maybe_autonomy_advisory(
+    *,
+    spoken_alert: dict[str, object],
+    settings: dict[str, object],
+    notice: str,
+    advise: str,
+) -> dict[str, object]:
+    """Semi/Full: speak advisory when no interruptive alert (15-minute cadence bucket)."""
+    if spoken_alert.get("eligible"):
+        return spoken_alert
+    if _autonomy_mode(settings) not in {"semi", "full"}:
+        return spoken_alert
+    if settings.get("privacy_mode"):
+        return spoken_alert
+    if not settings.get("spoken_alerts_enabled", True):
+        return spoken_alert
+
+    parts: list[str] = []
+    if notice:
+        parts.append(notice)
+    if advise and advise not in parts:
+        parts.append(advise)
+    # Never speak readiness alone — "Production is 100%" is a badge, not an advisory.
+    line = " ".join(parts).strip()
+    if not line:
+        return spoken_alert
+
+    persona_enabled = bool(settings.get("operator_persona_enabled", True))
+    if persona_enabled and not line.upper().startswith("VAXON"):
+        line = f"VAXON: {line}"
+
+    bucket = int(time.time() // 900)
+    return {
+        "eligible": True,
+        "reason": "autonomy_advisory",
+        "signal_id": f"advisory:{bucket}",
+        "message": line,
+        "explanation": {
+            "what": "Periodic autonomy advisory",
+            "you_do": "Acknowledge, ask a follow-up, or switch autonomy mode in Settings → Agents.",
+            "agent_do": "VAXON keeps watching and will interrupt for approvals or critical signals.",
+            "spoken": line,
+        },
+    }
 
 
 def build_operator_presence(
@@ -84,6 +161,41 @@ def build_operator_presence(
         degraded_active=degraded_active,
         degraded_reason=degraded_reason,
     )
+    readiness = briefing.get("production_readiness")
+    spoken_alert = _maybe_autonomy_advisory(
+        spoken_alert=spoken_alert,
+        settings=resolved_settings,
+        notice=str(briefing.get("notice") or "").strip(),
+        advise=str(briefing.get("advise") or "").strip(),
+    )
+    # region agent log
+    _debug_presence_probe(
+        "operator presence projected",
+        {
+            "spoken_alerts_enabled": bool(
+                resolved_settings.get("spoken_alerts_enabled", True)
+            ),
+            "proactive_duplex_enabled": bool(
+                resolved_settings.get("proactive_duplex_enabled", True)
+            ),
+            "hands_free_enabled": bool(
+                resolved_settings.get("hands_free_enabled", False)
+            ),
+            "privacy_mode": bool(resolved_settings.get("privacy_mode", False)),
+            "autonomy_mode": _autonomy_mode(resolved_settings),
+            "pending_approvals": pending_approvals,
+            "critical_count": critical_count,
+            "high_count": high_count,
+            "degraded_active": degraded_active,
+            "alert_eligible": bool(spoken_alert.get("eligible")),
+            "alert_reason": str(spoken_alert.get("reason") or ""),
+            "has_readiness_projection": isinstance(readiness, dict),
+            "readiness_score": (
+                int(readiness.get("score") or 0) if isinstance(readiness, dict) else None
+            ),
+        },
+    )
+    # endregion
     top_meta = top_signal.get("meta") if top_signal else None
     voice_line = build_persona_voice_line(
         pending_approvals=pending_approvals,

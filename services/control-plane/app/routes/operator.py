@@ -147,6 +147,18 @@ def operator_presence_settings_get() -> dict[str, object]:
 def operator_presence_settings_put(body: OperatorPresenceSettingsRequest) -> dict[str, object]:
     current = operator_presence_settings_store.load_settings()
     patch = body.model_dump(exclude_none=True)
+    if "autonomy_mode" in patch:
+        mode = str(patch.get("autonomy_mode") or "manual").strip().lower()
+        if mode not in {"manual", "semi", "full"}:
+            patch.pop("autonomy_mode", None)
+        else:
+            patch["autonomy_mode"] = mode
+            # Full autonomy drives continuous worker starts; manual/semi keep them paused.
+            from app.persistence import worker_scheduler_settings_store
+
+            worker_scheduler_settings_store.patch_settings(
+                {"scheduler_enabled": mode == "full"}
+            )
     current.update(patch)
     return operator_presence_settings_store.save_settings(current)
 

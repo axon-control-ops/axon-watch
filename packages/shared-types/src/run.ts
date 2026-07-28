@@ -82,6 +82,8 @@ export interface RunRecord {
   history_ref: string;
   /** Roster role that owns this run when started by the continuous worker scheduler. */
   employee_role?: string | null;
+  /** Durable task ledger id when this run was leased from a workspace task. */
+  task_id?: string | null;
   /** Latest worker delivery stage when this run published code. */
   delivery_stage?: WorkerDeliveryStage | null;
   delivery_refs?: WorkerDeliveryRefs | null;

@@ -1,4 +1,4 @@
-import { OPERATOR_PERSONA_NAME } from './operator-persona-name';
+import { OPERATOR_PERSONA_NAME, OPERATOR_PERSONA_SPOKEN_NAME } from './operator-persona-name';
 import { stripLiteralSymbolWords } from './spoken-symbol-words';
 
 const STREAM_BLOCK_START_RE =
@@ -58,9 +58,27 @@ function stripMarkdownForSpeech(text: string): string {
     .replace(/'/g, "'");
 }
 
+/** Stop TTS from letter-spelling V-A-X-O-N; speak as Vekson (vek-son). */
+function preparePersonaNameForSpeech(text: string): string {
+  return text
+    .replace(
+      /\bV\s*[.\-]\s*A\s*[.\-]\s*X\s*[.\-]\s*O\s*[.\-]\s*N\b/gi,
+      OPERATOR_PERSONA_SPOKEN_NAME,
+    )
+    .replace(/\bV\s+A\s+X\s+O\s+N\b/gi, OPERATOR_PERSONA_SPOKEN_NAME)
+    .replace(/\bVAXON\b/gi, OPERATOR_PERSONA_SPOKEN_NAME);
+}
+
 /** Keep TTS from reading punctuation / symbol names aloud. */
 function softenSymbolsForSpeech(text: string): string {
   let out = text
+    // Speak readiness scores before slash stripping ("100/100" → "100 percent").
+    .replace(/\b(\d{1,3})\s*\/\s*100\b/g, '$1 percent')
+    .replace(/\b(\d{1,3})\s*\/\s*(\d{1,3})\b/g, '$1 out of $2')
+    // Expand acronyms before slash/hyphen softening so TTS does not say "see" / "fourlead".
+    .replace(/\bCI\/CD\b/g, 'C I C D')
+    .replace(/\bCI\b/g, 'C I')
+    .replace(/\bLead-team\b/gi, 'Lead team')
     // Emoji / pictographs (incl. many "smiley" ranges).
     .replace(/[\u{1F300}-\u{1FAFF}\u{2700}-\u{27BF}\u{2600}-\u{26FF}]/gu, ' ')
     .replace(/\\/g, ' ')
@@ -188,7 +206,9 @@ export function formatConversationDisplayReply(raw: string, maxChars = MAX_DISPL
 /** Convert agent/model text into operator-facing speech (may still be long). */
 export function sanitizeSpokenReply(raw: string, maxChars = MAX_SPOKEN_CHARS): string {
   const display = formatConversationDisplayReply(raw, maxChars);
-  let spoken = softenSymbolsForSpeech(display.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim());
+  let spoken = display.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+  spoken = preparePersonaNameForSpeech(spoken);
+  spoken = softenSymbolsForSpeech(spoken);
   spoken = prepareCountsForSpeech(spoken);
   spoken = stripLiteralSymbolWords(spoken);
   if (spoken && !/[.!?]$/.test(spoken)) {

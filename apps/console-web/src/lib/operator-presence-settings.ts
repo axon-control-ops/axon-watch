@@ -1,4 +1,5 @@
 import type {
+  AutonomyMode,
   OperatorPresenceSettings,
   SttMode,
   VoiceRoutingMode,
@@ -12,6 +13,14 @@ export const DEFAULT_SPEECH_PITCH = 1.04;
 export const DEFAULT_AZURE_VOICE_ID = 'en-GB-RyanNeural';
 export const DEFAULT_STT_MODE: SttMode = 'cloud';
 export const DEFAULT_VOICE_ROUTING_MODE: VoiceRoutingMode = 'runtime_on_deep';
+export const DEFAULT_VAXON_MODEL_ID = 'gpt-5.4-high';
+export const DEFAULT_AUTONOMY_MODE: AutonomyMode = 'manual';
+
+export const VAXON_MODEL_OPTIONS = [
+  { id: 'gpt-5.4-high', label: 'GPT-5.4 High' },
+  { id: 'composer-2', label: 'Composer 2' },
+  { id: 'claude-sonnet-5-thinking-high', label: 'Claude Sonnet 5 Thinking High' },
+] as const;
 
 export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
   return {
@@ -24,11 +33,13 @@ export function defaultOperatorPresenceSettings(): OperatorPresenceSettings {
     hands_free_enabled: false,
     // JARVIS duplex: after VAXON speaks, listen for a natural reply.
     proactive_duplex_enabled: true,
+    autonomy_mode: DEFAULT_AUTONOMY_MODE,
     speech_rate: DEFAULT_SPEECH_RATE,
     speech_pitch: DEFAULT_SPEECH_PITCH,
     azure_voice_id: DEFAULT_AZURE_VOICE_ID,
     stt_mode: DEFAULT_STT_MODE,
     voice_routing_mode: DEFAULT_VOICE_ROUTING_MODE,
+    vaxon_model_id: DEFAULT_VAXON_MODEL_ID,
     narrate_tool_progress: false,
   };
 }
@@ -74,6 +85,30 @@ function normalizeVoiceRoutingMode(raw: unknown): VoiceRoutingMode {
   return DEFAULT_VOICE_ROUTING_MODE;
 }
 
+function normalizeVaxonModelId(raw: unknown): string {
+  const value = String(raw ?? '').trim();
+  if (!value) {
+    return DEFAULT_VAXON_MODEL_ID;
+  }
+  const allowed = new Set<string>(VAXON_MODEL_OPTIONS.map((row) => row.id));
+  if (allowed.has(value)) {
+    return value;
+  }
+  // Accept catalog ids that match the VAXON allowlist by prefix (env-extended pools).
+  if (/^[a-z0-9][a-z0-9._-]{1,118}$/i.test(value)) {
+    return value.slice(0, 120);
+  }
+  return DEFAULT_VAXON_MODEL_ID;
+}
+
+function normalizeAutonomyMode(raw: unknown): AutonomyMode {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (value === 'manual' || value === 'semi' || value === 'full') {
+    return value;
+  }
+  return DEFAULT_AUTONOMY_MODE;
+}
+
 export function normalizeOperatorPresenceSettings(
   raw: Partial<OperatorPresenceSettings> | null | undefined,
 ): OperatorPresenceSettings {
@@ -96,6 +131,7 @@ export function normalizeOperatorPresenceSettings(
     hands_free_enabled: raw.hands_free_enabled ?? defaults.hands_free_enabled,
     proactive_duplex_enabled:
       raw.proactive_duplex_enabled ?? defaults.proactive_duplex_enabled,
+    autonomy_mode: normalizeAutonomyMode(raw.autonomy_mode ?? defaults.autonomy_mode),
     speech_rate: normalizeSpeechRate(raw.speech_rate ?? defaults.speech_rate),
     speech_pitch: normalizeSpeechPitch(raw.speech_pitch ?? defaults.speech_pitch),
     azure_voice_id: normalizeAzureVoiceId(raw.azure_voice_id ?? defaults.azure_voice_id),
@@ -103,6 +139,7 @@ export function normalizeOperatorPresenceSettings(
     voice_routing_mode: normalizeVoiceRoutingMode(
       raw.voice_routing_mode ?? defaults.voice_routing_mode,
     ),
+    vaxon_model_id: normalizeVaxonModelId(raw.vaxon_model_id ?? defaults.vaxon_model_id),
     narrate_tool_progress: raw.narrate_tool_progress ?? defaults.narrate_tool_progress,
   };
 }

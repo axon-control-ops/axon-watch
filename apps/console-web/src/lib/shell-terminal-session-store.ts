@@ -171,10 +171,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     await createTerminalSession({ role: 'operator', title: 'bash' });
   }
 
-  /**
-   * Continue a finished in-thread shell command in the vaxon agent PTY so the
-   * operator can watch long jobs (OTA, builds) while the agent continues other work.
-   */
+  /** Inject a command into the read-only vaxon PTY (not offered on finished transcript cards). */
   async function runCommandInAgentBackgroundTerminal(command: string): Promise<void> {
     const trimmed = command.trim();
     if (!trimmed) {

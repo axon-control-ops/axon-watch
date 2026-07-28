@@ -57,6 +57,57 @@ def resolve_watch_sentry_issue(
     return result
 
 
+def attend_watch_sentry_issue(
+    issue_id: str,
+    *,
+    confirm_release: str = "",
+    requested_by: str = "operator",
+    mark_resolved_in_next_release: bool = True,
+    workspace_id: str = "workspace_dashpro",
+) -> dict[str, object]:
+    """Mark a production Sentry issue attended after OTA/new build and mute until newer release."""
+    from app.signals.sentry_issue_attendance_store import attend_issue
+
+    cleaned_issue = str(issue_id or "").strip()
+    if not cleaned_issue:
+        return {"ok": False, "reason": "missing_issue_id"}
+
+    release = str(confirm_release or "").strip() or "attended"
+    attendance = attend_issue(
+        issue_id=cleaned_issue,
+        workspace_id=workspace_id,
+        confirm_release=release,
+        attended_by=requested_by,
+    )
+
+    sentry_result: dict[str, object] | None = None
+    if mark_resolved_in_next_release:
+        sentry_result = resolve_watch_sentry_issue(
+            cleaned_issue,
+            status="resolvedInNextRelease",
+            requested_by=requested_by,
+        )
+    else:
+        from app.monitors.dashpro_monitor import reset_monitor_probe_cache
+
+        reset_monitor_probe_cache()
+
+    ok = True
+    if sentry_result is not None and not sentry_result.get("ok"):
+        # Local attend still stands even if Sentry write fails (token scope).
+        ok = True
+    return {
+        "ok": ok,
+        "issue_id": cleaned_issue,
+        "attendance": attendance,
+        "sentry": sentry_result,
+        "detail": (
+            "Attended after OTA/build — suppressed in Axon until a newer production release "
+            "reports this issue again."
+        ),
+    }
+
+
 def probe_watch_sentry_write_scope() -> dict[str, object]:
     project_root = _dashpro_project_root()
     if project_root is None:

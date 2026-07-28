@@ -32,7 +32,7 @@ const topbarSubtitle = computed(() => {
   return shell.layoutMode === 'ide' ? 'IDE WORKSPACE' : 'OPERATOR CONSOLE';
 });
 const showTopbarKairoPresence = computed(
-  () => activeSurface.value === 'console',
+  () => activeSurface.value === 'console' && shell.layoutMode !== 'operator',
 );
 const showIdeInterruptTopbar = computed(
   () =>

@@ -16,6 +16,7 @@ from app.host_context.reminders import due_reminders
 from app.persistence.operator_memory_store import search_memories
 from app.operator_briefing_rhythm import build_operator_briefing_rhythm
 from app.operator_presence import build_operator_presence
+from app.production_readiness import build_production_readiness
 from app.runtime_summary_assembler import WatchProbe, assemble_runtime_summary
 from app.workspace_project_bindings import load_workspace_project_bindings
 
@@ -71,12 +72,13 @@ def _build_next_safe_actions(
     if top_signals:
         signal = top_signals[0]
         signal_id = str(signal.get("signal_id", ""))
+        signal_title = str(signal.get("title") or "top signal").strip() or "top signal"
         actions.append(
             {
                 "action_id": f"review_{signal_id}",
                 "kind": "review_signal",
-                "title": "Review top signal",
-                "detail": f"Inspect {signal.get('title', 'top signal')}.",
+                "title": signal_title,
+                "detail": f"Inspect {signal_title}.",
                 "workspace_id": str(signal.get("workspace_id", "")) or None,
                 "run_id": None,
                 "signal_id": signal_id or None,
@@ -285,6 +287,52 @@ def build_operator_briefing(
         except Exception:  # noqa: BLE001 — briefing must stay available
             host_artifacts = []
 
+    presence_settings = operator_presence_settings_store.load_settings()
+    autonomy_mode = str(presence_settings.get("autonomy_mode") or "manual").strip().lower()
+    if autonomy_mode not in {"manual", "semi", "full"}:
+        autonomy_mode = "manual"
+    scheduler_effective = False
+    try:
+        from app.workspace_agents.scheduler import scheduler_enabled
+
+        scheduler_effective = bool(scheduler_enabled())
+    except Exception:  # noqa: BLE001 — briefing must stay available
+        scheduler_effective = False
+
+    critical_signal_count = sum(
+        1
+        for item in top_signals
+        if isinstance(item, dict) and str(item.get("severity", "")).lower() == "critical"
+    )
+    degraded_payload = runtime_summary["degraded"]
+    degraded_reasons = (
+        list(degraded_payload.get("reasons") or [])
+        if isinstance(degraded_payload, dict)
+        else []
+    )
+    production_readiness = build_production_readiness(
+        watch_connected=bool(runtime_summary["watch"]["connected"]),
+        control_plane_ready=bool(runtime_summary["control_plane"]["ready"]),
+        degraded_active=bool(degraded_payload.get("active"))
+        if isinstance(degraded_payload, dict)
+        else False,
+        degraded_reasons=[str(item) for item in degraded_reasons],
+        cli_runtime=(
+            runtime_summary.get("cli_runtime")
+            if isinstance(runtime_summary.get("cli_runtime"), dict)
+            else None
+        ),
+        critical_signal_count=critical_signal_count,
+        pending_approvals=pending_approvals_count,
+        autonomy_mode=autonomy_mode,
+        scheduler_effective=scheduler_effective,
+    )
+
+    connectivity = {
+        "control_plane_ready": bool(runtime_summary["control_plane"]["ready"]),
+        "watch_connected": bool(runtime_summary["watch"]["connected"]),
+    }
+
     return {
         "generated_at": runtime_summary["generated_at"],
         "scope": scope,
@@ -302,10 +350,8 @@ def build_operator_briefing(
         + sum(1 for run in active_runs if run.get("phase") == "review_ready"),
         "degraded": runtime_summary["degraded"],
         "cli_runtime": runtime_summary.get("cli_runtime", {}),
-        "connectivity": {
-            "control_plane_ready": bool(runtime_summary["control_plane"]["ready"]),
-            "watch_connected": bool(runtime_summary["watch"]["connected"]),
-        },
+        "connectivity": connectivity,
+        "production_readiness": production_readiness,
         "memory_highlights": (
             []
             if light
@@ -324,11 +370,12 @@ def build_operator_briefing(
                     "count": runtime_summary["approvals"]["pending_count"],
                 },
                 "degraded": runtime_summary["degraded"],
-                "connectivity": {
-                    "watch_connected": bool(runtime_summary["watch"]["connected"]),
-                },
+                "connectivity": connectivity,
+                "notice": rhythm["notice"],
+                "advise": rhythm["advise"],
+                "production_readiness": production_readiness,
             },
             viewport_compact=viewport_compact,
-            settings=operator_presence_settings_store.load_settings(),
+            settings=presence_settings,
         ),
     }

@@ -17,9 +17,20 @@ from app.terminal.session_registry import (
 from app.terminal.session_runtime import ensure_runtime
 from app.terminal.workspace_roots import WorkspaceRootError, resolve_workspace_root
 
+_MAX_AGENT_COMMAND_CHARS = 32_768
+
 
 def _decode_output(data: bytes) -> str:
     return data.decode("utf-8", errors="surrogateescape")
+
+
+def _agent_command_bytes(value: object) -> bytes | None:
+    if not isinstance(value, str):
+        return None
+    command = value.strip()
+    if not command or len(command) > _MAX_AGENT_COMMAND_CHARS or "\x00" in command:
+        return None
+    return f"{command}\n".encode("utf-8")
 
 
 async def _send_json(websocket: WebSocket, payload: dict[str, Any]) -> None:
@@ -99,6 +110,18 @@ async def handle_terminal_session(
                 data = message.get("data", "")
                 if session.role != "agent" and isinstance(data, str):
                     pty.write(data.encode("utf-8"))
+            elif msg_type == "run_command":
+                command = _agent_command_bytes(message.get("command"))
+                if session.role == "agent" and command is not None:
+                    pty.write(command)
+                else:
+                    await _send_json(
+                        websocket,
+                        {
+                            "type": "error",
+                            "message": "agent terminal command rejected",
+                        },
+                    )
             elif msg_type == "resize":
                 pty.resize(int(message.get("cols", 80)), int(message.get("rows", 24)))
             elif msg_type == "close":

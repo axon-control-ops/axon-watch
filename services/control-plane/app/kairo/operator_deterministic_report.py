@@ -89,6 +89,16 @@ def _truncate(text: str, *, max_len: int) -> str:
     return f"{cleaned[: max_len - 1].rstrip()}…"
 
 
+def _scrub_operator_line(text: str, *, max_len: int = 160) -> str:
+    """Strip markdown noise so theater panels and TTS stay readable."""
+    cleaned = str(text or "")
+    cleaned = re.sub(r"[#*`_]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" :-")
+    cleaned = re.sub(r"(?i)\blead next:\s*$", "", cleaned).strip(" :-")
+    cleaned = re.sub(r"(?i)\blead-team\b", "Lead team", cleaned)
+    return _truncate(cleaned, max_len=max_len)
+
+
 def _employee_rows(company: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(company, dict):
         return []
@@ -250,15 +260,15 @@ def _attention_bits(snapshot: dict[str, Any]) -> list[str]:
 
     awaiting = int(snapshot.get("awaiting_engagement_count") or 0)
     if awaiting > 0:
-        noun = "Lead-team plan" if awaiting == 1 else "Lead-team plans"
+        noun = "Lead team plan" if awaiting == 1 else "Lead team plans"
         bits.append(f"{_spell_count(awaiting)} {noun} waiting for you")
 
     notice = str((snapshot.get("briefing") or {}).get("notice") or "").strip().rstrip(".")
     if notice:
         notice_l = notice.lower()
         # Avoid repeating the same awaiting-engagement beat from briefing notice.
-        if "lead-team plan" not in notice_l and "waiting for you to engage" not in notice_l:
-            bits.append(notice)
+        if "lead team plan" not in notice_l and "lead-team plan" not in notice_l and "waiting for you to engage" not in notice_l:
+            bits.append(_scrub_operator_line(notice, max_len=180))
 
     for row in (snapshot.get("roster") or {}).get("failed") or []:
         bits.append(f"{_name_role(row)} last job failed")
@@ -307,21 +317,78 @@ def _work_bits(snapshot: dict[str, Any]) -> list[str]:
     return bits[:6]
 
 
+def _primary_lead_name(snapshot: dict[str, Any]) -> str:
+    roster = snapshot.get("roster") or {}
+    for row in roster.get("employees") or []:
+        if not isinstance(row, dict):
+            continue
+        role = str(row.get("role") or row.get("role_label") or "").strip().lower()
+        if bool(row.get("primary")) or role == "lead":
+            name = str(row.get("name") or "").strip()
+            if name:
+                return name
+    return "Lead"
+
+
 def _lead_rollup_bits(snapshot: dict[str, Any]) -> list[str]:
     bits: list[str] = []
     seen: set[str] = set()
     for handoff in snapshot.get("handoffs") or []:
-        headline = _truncate(str(handoff.get("headline") or ""), max_len=220)
-        lead_next = _truncate(str(handoff.get("lead_next") or ""), max_len=160)
+        lead_name = _scrub_operator_line(
+            str(handoff.get("lead_name") or handoff.get("from_name") or ""),
+            max_len=40,
+        ) or _primary_lead_name(snapshot)
+        headline = _scrub_operator_line(str(handoff.get("headline") or ""), max_len=120)
+        lead_next = _scrub_operator_line(str(handoff.get("lead_next") or ""), max_len=100)
         if not headline:
             continue
-        line = headline
         if lead_next and lead_next.lower() not in headline.lower():
-            line = f"{headline}; Lead next: {lead_next}"
+            line = f"{lead_name}: {headline}. Plan: {lead_next}"
+        else:
+            line = f"{lead_name}: {headline}"
         if line in seen:
             continue
         seen.add(line)
         bits.append(line)
+    if bits:
+        return bits[:5]
+
+    # No verified handoff yet — Lead still briefs issue + fix intent from live board.
+    lead_name = _primary_lead_name(snapshot)
+    for row in (snapshot.get("roster") or {}).get("failed") or []:
+        label = _name_role(row)
+        line = (
+            f"{lead_name}: {label} failed. "
+            "Issue is the last shift outcome. "
+            "Plan: diagnose the failure, then requeue the smallest fix."
+        )
+        if line not in seen:
+            seen.add(line)
+            bits.append(line)
+    for signal in (snapshot.get("top_signals") or [])[:2]:
+        if not isinstance(signal, dict):
+            continue
+        title = _scrub_operator_line(str(signal.get("title") or ""), max_len=80)
+        summary = _scrub_operator_line(str(signal.get("summary") or ""), max_len=100)
+        if not title:
+            continue
+        issue = summary or "needs containment"
+        line = (
+            f"{lead_name}: {title}. "
+            f"Issue: {issue}. "
+            "Plan: open Attention, contain blast radius, then land the smallest fix."
+        )
+        if line not in seen:
+            seen.add(line)
+            bits.append(line)
+    if not bits and int(snapshot.get("awaiting_engagement_count") or 0) > 0:
+        bits.append(
+            f"{lead_name}: Lead-team plans are waiting. "
+            "Issue: engagement gate is open. "
+            "Plan: walk the rollup and decide the next handoff."
+        )
+    if not bits:
+        bits.append(f"{lead_name}: No verified rollup yet — standing by on the board.")
     return bits[:5]
 
 
@@ -347,23 +414,38 @@ def _fleet_bits(snapshot: dict[str, Any]) -> list[str]:
 def _next_move(snapshot: dict[str, Any]) -> str:
     advise = str((snapshot.get("briefing") or {}).get("advise") or "").strip().rstrip(".")
     if advise:
-        return advise
+        advise_clean = _scrub_operator_line(advise, max_len=160)
+        lower = advise_clean.lower()
+        if lower.startswith(("i'd", "i'll", "i will")):
+            return advise_clean
+        if "needs review" in lower and "switch" in lower:
+            return "I'll switch us there and review that signal next"
+        if "lead" in lower and ("rollup" in lower or "open" in lower):
+            return "I'll open the Lead rollup and walk the next handoff"
+        if "approval" in lower:
+            return "I'll clear Approvals before starting anything new"
+        if lower.startswith("inspect "):
+            target = advise_clean[8:].strip() or "that signal"
+            return f"I'll open Attention for {target}"
+        if "sentry" in lower:
+            return f"I'll open Attention for {advise_clean}"
+        return f"I'll open Attention for {advise_clean}"
     for handoff in snapshot.get("handoffs") or []:
-        lead_next = _truncate(str(handoff.get("lead_next") or ""), max_len=200)
+        lead_next = _scrub_operator_line(str(handoff.get("lead_next") or ""), max_len=140)
         if lead_next:
-            return f"I'd take the Lead next: {lead_next}"
+            return f"I'll take the next Lead decision: {lead_next}"
     pending = int(snapshot.get("pending_approvals") or 0)
     if pending > 0:
-        return "I'd clear Approvals before starting anything new"
+        return "I'll clear Approvals before starting anything new"
     awaiting = int(snapshot.get("awaiting_engagement_count") or 0)
     if awaiting > 0:
-        return "I'd open the Lead-team plan waiting for engagement"
+        return "I'll open the Lead team plan waiting for engagement"
     actions = snapshot.get("next_safe_actions") or []
     if actions:
         label = str(actions[0].get("label") or actions[0].get("title") or "").strip()
         if label:
-            return label
-    return "Nothing urgent — I can roll the fleet, check DashPro, or take your next order"
+            return f"I'll {label[0].lower() + label[1:]}" if label[0].isupper() else f"I'll {label}"
+    return "I'll keep watching — say the word if you want DashPro, Approvals, or a fleet roll"
 
 
 def compose_operator_report(snapshot: dict[str, Any]) -> dict[str, Any]:

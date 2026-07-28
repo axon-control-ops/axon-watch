@@ -12,7 +12,7 @@ describe('buildStreamingAckLine', () => {
         operatorPrompt: "Walk me through receipts for Priya's last shift",
         address: 'Sir King',
       }),
-    ).toBe('Pulling the shift receipts now, Sir King.');
+    ).toBe('Pulling my shift receipts now, Sir King.');
   });
 
   it('falls back without inventing a fake On it reply', () => {

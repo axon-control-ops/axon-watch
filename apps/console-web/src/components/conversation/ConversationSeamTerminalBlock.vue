@@ -14,7 +14,6 @@ defineProps<{
 const emit = defineEmits<{
   reveal: [segment: TerminalSegment];
   background: [segment: TerminalSegment];
-  continueInBackground: [command: string];
   copyOutput: [output: string];
 }>();
 </script>
@@ -43,25 +42,19 @@ const emit = defineEmits<{
           class="agent-block__terminal-mirrored"
         >{{ terminalMirrorBadge(segment.open) }}</span>
       </button>
+      <!--
+        Cursor parity: Move / Watch in background only while the shell tool is
+        still in flight. Finished cards are history — no re-run CTA.
+      -->
       <button
         v-if="showTerminalBackgroundControl(messageId, segment.open)"
         type="button"
         class="agent-block__terminal-background"
-        title="Mirror live shell output into vaxon (Cursor CLI still owns the process — true detach is unavailable)"
-        aria-label="Background shell into vaxon terminal"
+        title="Watch this live Cursor-owned shell in the vaxon terminal"
+        aria-label="Watch shell in vaxon terminal"
         @click="emit('background', segment)"
       >
-        Background
-      </button>
-      <button
-        v-if="!segment.open && segment.command.trim()"
-        type="button"
-        class="agent-block__terminal-background"
-        title="Continue this command in the vaxon agent terminal so you can watch it while the agent keeps working"
-        aria-label="Continue command in background agent terminal"
-        @click="emit('continueInBackground', segment.command)"
-      >
-        Continue in background
+        Watch in terminal
       </button>
       <button
         v-if="segment.output"

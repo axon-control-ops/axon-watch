@@ -374,6 +374,7 @@ function handleOperatorQuickGuideAction(actionId: OperatorQuickGuideActionId): v
         :terminal-panel-aria-label="terminalPanelAriaLabel"
         :kairo-title="kairoParts.title"
         :kairo-subtitle="kairoParts.subtitle"
+        :show-kairo-presence="centerView !== 'grid'"
         @set-center-view="setCenterView"
         @toggle-terminal="toggleTerminal"
       />
