@@ -214,7 +214,7 @@ describe('resolveIdeThreadEmployeeFailureDetailTooltip', () => {
       employees: [failed],
     });
     expect(tooltip).toBe(
-      'Usage limits blocked the agent runtime. Restore limits, then retry.',
+      'Cursor usage is exhausted account-wide. Raise the limit or wait for reset before retrying.',
     );
   });
 });
