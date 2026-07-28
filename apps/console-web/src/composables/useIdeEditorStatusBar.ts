@@ -1,19 +1,16 @@
 import { computed, type ComputedRef, type Ref } from 'vue';
 
-import { employeeComposerOpenPayload } from '../features/workspace-agents/company-roster-actions';
 import { buildCompanyRosterAlertBadge } from '../features/workspace-agents/company-roster-failure-view';
 import {
   companyFailedEmployees,
   companyFailedEmployeesHint,
   employeeFailureRetryActionLabel,
 } from '../features/workspace-agents/company-roster-view';
-import { focusAgentDockComposerInput } from '../lib/agent-dock-composer-focus';
 import type { AgentDockReopenState } from '../lib/agent-dock-reopen-view';
 import {
   effectiveRequiredConnectorsUnavailable,
   isLegacyConnectorGlanceVisible,
 } from '../lib/connector-glance-view';
-import { requestIdeComposerMode } from '../lib/ide-composer-restore-request';
 import { countIdeDirtyFileTabs } from '../lib/ide-activity-panel-view';
 import type { IdeLayoutShortcutAction } from '../lib/ide-layout-shortcuts';
 import { buildIdeQuickGuide, type IdeQuickGuideActionId } from '../lib/ide-quick-guide';
@@ -25,6 +22,7 @@ import {
   buildIdeEditorStatusTeamChip,
   buildIdeEditorStatusTerminalChip,
 } from '../lib/ide-editor-status-view';
+import { runEmployeeShiftRetry } from '../lib/run-employee-shift-retry';
 import { useShellStore } from '../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
@@ -231,28 +229,20 @@ export function handleIdeLayoutShortcutAction(
   shell.toggleIdeTerminalPanel();
 }
 
-export function openEmployeeShiftRetry(input: {
+export async function openEmployeeShiftRetry(input: {
   shell: ShellStore;
   showAgentDock: () => void;
-}): void {
+}): Promise<void> {
   const employee = input.shell.activeIdeEmployeeRecord;
   if (!employee) {
     return;
   }
 
   input.showAgentDock();
-  const { mode, draft } = employeeComposerOpenPayload(employee, 'retry');
-  if (mode) {
-    requestIdeComposerMode(mode);
-  }
-  // Try again always needs tools — force Full Access even if composer was consultative.
-  input.shell.setAgentExecutionAccess('full');
-  if (draft) {
-    input.shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
-  } else {
-    input.shell.openIdeComposer({ keepActivityView: true });
-  }
-  focusAgentDockComposerInput();
+  await runEmployeeShiftRetry(input.shell, employee, {
+    keepActivityView: true,
+    focusThread: true,
+  });
 }
 
 export function handleIdeQuickGuideAction(
@@ -289,7 +279,7 @@ export function handleIdeQuickGuideAction(
   }
 
   if (actionId === 'retry-employee-shift') {
-    openEmployeeShiftRetry(input);
+    void openEmployeeShiftRetry(input);
     return;
   }
 

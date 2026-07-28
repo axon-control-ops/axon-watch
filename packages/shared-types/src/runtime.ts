@@ -71,6 +71,8 @@ export interface CliRuntimeReadiness {
   default_runtime: string;
   default_ready: boolean;
   blockers: string[];
+  /** True while CLI probe cache is empty (stale-while-revalidate bootstrap). */
+  probe_pending?: boolean;
 }
 
 export interface RuntimeSummaryConnectors {

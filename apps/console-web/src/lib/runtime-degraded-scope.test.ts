@@ -21,7 +21,9 @@ describe('runtime-degraded-scope', () => {
       ),
     ).toBe(true);
     expect(isRemoteIngressDegradedReason('watch summary stale')).toBe(false);
-    expect(isRemoteIngressDegradedReason('HTTP 503')).toBe(false);
+    expect(isRemoteIngressDegradedReason('HTTP 503')).toBe(true);
+    expect(isRemoteIngressDegradedReason('HTTP 530')).toBe(true);
+    expect(isRemoteIngressDegradedReason('CLI runtime not ready')).toBe(false);
   });
 
   it('partitions mixed reasons', () => {

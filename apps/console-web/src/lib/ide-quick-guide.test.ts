@@ -63,6 +63,8 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.tone).toBe('failure');
     expect(guide?.steps[0]).toBe(failureLine);
     expect(guide?.steps.join(' ')).toContain('Try again');
+    expect(guide?.steps.join(' ')).toContain('Open Team');
+    expect(guide?.steps.join(' ')).not.toContain('in the failure banner');
     expect(guide?.actions).toEqual([
       { id: 'expand-agent-dock', label: 'Expand agent dock' },
       { id: 'retry-employee-shift', label: 'Try again' },
@@ -101,6 +103,7 @@ describe('buildIdeQuickGuide', () => {
     });
 
     expect(guide?.steps.join(' ')).toContain('Continue');
+    expect(guide?.steps.join(' ')).toContain('Open Team');
     expect(guide?.steps.join(' ')).not.toContain('Try again in the failure banner');
     expect(guide?.actions).toContainEqual({
       id: 'retry-employee-shift',
@@ -121,7 +124,7 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.steps.join(' ')).toContain('Continue');
   });
 
-  it('guides retry from the dock banner when a teammate failed with the dock already open', () => {
+  it('guides retry from Team when a teammate failed with the dock already open', () => {
     const failureLine = 'Last job failed: vitest assertion failed';
     const guide = buildIdeQuickGuide({
       ...base,
@@ -133,10 +136,9 @@ describe('buildIdeQuickGuide', () => {
 
     expect(guide?.title).toContain('Last job failed');
     expect(guide?.tone).toBe('failure');
-    // Dock banner already shows the failure line — sticky points at Try again there.
-    expect(guide?.steps[0]).toContain('Try again in the failure banner');
-    expect(guide?.steps.join(' ')).toContain('agent dock composer');
-    expect(guide?.actions).toEqual([{ id: 'retry-employee-shift', label: 'Try again' }]);
+    expect(guide?.steps[0]).toContain('Open Team');
+    expect(guide?.steps.join(' ')).not.toContain('Try again in the failure banner');
+    expect(guide?.actions).toEqual([{ id: 'open-team', label: 'Open Team' }]);
   });
 
   it('offers terminal reopen when the dock is open and a shift was interrupted', () => {
@@ -153,7 +155,7 @@ describe('buildIdeQuickGuide', () => {
     expect(guide?.title).toContain('Job interrupted');
     expect(guide?.tone).toBe('interrupted');
     expect(guide?.actions).toEqual([
-      { id: 'retry-employee-shift', label: 'Continue' },
+      { id: 'open-team', label: 'Open Team' },
       { id: 'show-terminal', label: 'Show terminal' },
     ]);
   });

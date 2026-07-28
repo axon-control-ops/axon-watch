@@ -8,7 +8,6 @@ import {
   employeeFailureBannerAriaLabel,
   employeeFailureBannerCopy,
   employeeFailureDetailTooltip,
-  employeeFailureRetryActionLabel,
   employeeShiftNeedsContinuation,
 } from '../../../features/workspace-agents/company-roster-view';
 import { focusAgentDockComposerInput } from '../../../lib/agent-dock-composer-focus';
@@ -43,22 +42,15 @@ const showReceiptsAction = computed(() =>
 const interruptedShift = computed(() =>
   employee.value ? employeeShiftNeedsContinuation(employee.value) : false,
 );
-const retryActionLabel = computed(() =>
-  employee.value ? employeeFailureRetryActionLabel(employee.value) : 'Try again',
-);
 const actionsDisabled = computed(() => shell.composerAgentBusy);
 
 function openComposerDraft(
   row: CompanyEmployeeRecord,
-  kind: 'retry' | 'receipts',
-  options?: { forceFullAccess?: boolean },
+  kind: 'receipts',
 ): void {
   const { mode, draft } = employeeComposerOpenPayload(row, kind);
   if (mode) {
     requestIdeComposerMode(mode);
-  }
-  if (options?.forceFullAccess) {
-    shell.setAgentExecutionAccess('full');
   }
   if (draft) {
     shell.openIdeComposerWithDraft(draft, { keepActivityView: true });
@@ -66,14 +58,6 @@ function openComposerDraft(
     shell.openIdeComposer({ keepActivityView: true });
   }
   focusAgentDockComposerInput();
-}
-
-function handleRetry(): void {
-  const row = employee.value;
-  if (!row) {
-    return;
-  }
-  openComposerDraft(row, 'retry', { forceFullAccess: true });
 }
 
 function handleReceipts(): void {
@@ -105,14 +89,6 @@ function handleOpenTeam(): void {
       {{ failureCopy }}
     </p>
     <div class="agent-dock-composer__employee-failure-actions">
-      <button
-        type="button"
-        class="agent-dock-composer__employee-failure-btn agent-dock-composer__employee-failure-btn--retry"
-        :disabled="actionsDisabled"
-        @click="handleRetry"
-      >
-        {{ retryActionLabel }}
-      </button>
       <button
         v-if="showReceiptsAction"
         type="button"

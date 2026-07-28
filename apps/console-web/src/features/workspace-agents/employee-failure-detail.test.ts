@@ -74,6 +74,15 @@ describe('employee-failure-detail', () => {
     expect(isShiftContinuationFailure('vitest: assertion failed')).toBe(false);
   });
 
+  it('prefers usage-limit causes over unavailable peers', () => {
+    const wrapped =
+      "Lane B agent fallback reply generated (Codex CLI (local) unavailable; Running as unit: axon-agent.scope; Invocation ID: abc; ActionRequiredError: You're out of usage.)";
+    expect(normalizeOperatorFailureDetail(wrapped)).toMatch(/ActionRequiredError|out of usage/i);
+    expect(normalizeOperatorFailureDetail(wrapped)).not.toMatch(/Codex CLI \(local\) unavailable/i);
+    expect(isUsageLimitFailure(wrapped)).toBe(true);
+    expect(agentRuntimeFallbackSpeakDetail(wrapped)).toMatch(/usage limits blocked/i);
+  });
+
   it('detects usage-limit failures after lane b wrapper normalization', () => {
     const wrapped =
       "Lane B agent fallback reply generated (ActionRequiredError: You're out of usage.)";

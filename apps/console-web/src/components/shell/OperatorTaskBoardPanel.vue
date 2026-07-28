@@ -320,10 +320,13 @@ function columnTone(columnId: TaskBoardColumnId): string {
           type="button"
           class="operator-task-board__plan-chip"
           :class="{ 'operator-task-board__plan-chip--active': planFilterId === group.planId }"
+          :title="group.planGoal"
           @click="planFilterId = group.planId ?? 'all'"
         >
-          {{ group.planGoal }}
-          <span v-if="group.awaitingEngagement"> · engage</span>
+          {{ group.planLabel }}
+          <span v-if="group.awaitingEngagement" class="operator-task-board__plan-chip-tag">
+            engage
+          </span>
         </button>
       </div>
 
@@ -451,10 +454,11 @@ function columnTone(columnId: TaskBoardColumnId): string {
                   {{ row.ownerRole }} · attempts {{ row.attemptsLabel }}
                 </span>
                 <span
-                  v-if="row.planGoal"
+                  v-if="row.planLabel"
                   class="operator-task-board__chip operator-task-board__chip--plan"
+                  :title="row.planGoal || undefined"
                 >
-                  {{ row.planGoal }}
+                  {{ row.planLabel }}
                 </span>
                 <span
                   v-for="chip in row.dependencyChips"

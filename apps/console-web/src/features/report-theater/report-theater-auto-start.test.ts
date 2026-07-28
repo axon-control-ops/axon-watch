@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   isReportTheaterAutoStartTransition,
   markReportTheaterAutoStarted,
+  isReportTheaterAutoStartPending,
   resetReportTheaterAutoStartForTests,
   shouldAutoStartReportTheater,
+  shouldStartReportTheaterForBriefing,
 } from './report-theater-auto-start';
 import { resetReportTheaterStateForTests } from './report-theater-state';
 
@@ -14,6 +16,49 @@ describe('report-theater-auto-start', () => {
     expect(isReportTheaterAutoStartTransition('signal-a', 'signal-a', true)).toBe(false);
     expect(isReportTheaterAutoStartTransition('signal-a', 'signal-b', true)).toBe(true);
     expect(isReportTheaterAutoStartTransition('signal-a', 'signal-b', false)).toBe(false);
+  });
+
+  it('lets Full Autonomous start on the first actionable briefing', () => {
+    expect(
+      shouldStartReportTheaterForBriefing({
+        autonomyMode: 'full',
+        previousBriefKey: undefined,
+        currentBriefKey: 'signal-a',
+        eligible: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldStartReportTheaterForBriefing({
+        autonomyMode: 'semi',
+        previousBriefKey: undefined,
+        currentBriefKey: 'signal-a',
+        eligible: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldStartReportTheaterForBriefing({
+        autonomyMode: 'semi',
+        previousBriefKey: 'signal-a',
+        currentBriefKey: 'signal-b',
+        eligible: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldStartReportTheaterForBriefing({
+        autonomyMode: 'full',
+        previousBriefKey: undefined,
+        currentBriefKey: 'signal-a',
+        eligible: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('marks auto-start pending so passive advisories can yield to REPORT', () => {
+    resetReportTheaterAutoStartForTests();
+    expect(isReportTheaterAutoStartPending(1_000_000)).toBe(false);
+    markReportTheaterAutoStarted('signal-a', 1_000_000);
+    expect(isReportTheaterAutoStartPending(1_005_000)).toBe(true);
+    expect(isReportTheaterAutoStartPending(1_030_000)).toBe(false);
   });
 
   it('starts in semi/full when actionable and cools down repeats', () => {

@@ -5,6 +5,7 @@ import {
   buildOperatorTaskBoardView,
   columnForTask,
   filterTaskBoardRows,
+  summarizeTaskBoardLabel,
 } from './operator-task-board-view';
 
 function task(
@@ -99,6 +100,53 @@ describe('buildOperatorTaskBoardView', () => {
     ]);
     expect(view.historyRows).toHaveLength(1);
     expect(view.planGroups.some((group) => group.planId === 'lead-plan-1')).toBe(true);
+  });
+
+  it('shortens Lead fan-out essays into plan chip labels', () => {
+    const longGoal =
+      'Check with all sub-agents and fan out this corrected graduation readiness cut — real work, thin slices. • Marco (backend): Confirm roster. • Priya (frontend): UI caller.';
+    const view = buildOperatorTaskBoardView(
+      [
+        task({
+          task_id: 'task-open',
+          goal: 'Open work',
+          status: 'open',
+          plan_id: 'lead-plan-long',
+        }),
+      ],
+      [
+        {
+          plan_id: 'lead-plan-long',
+          workspace_id: 'workspace_dashpro',
+          goal: longGoal,
+          mode: 'fan_out',
+          status: 'active',
+          plan: {},
+          supersedes_plan_id: null,
+          created_at: '2026-07-22T11:00:00Z',
+          updated_at: '2026-07-22T12:00:00Z',
+          task_links: [{ plan_key: 'backend', task_id: 'task-open' }],
+          task_ids: ['task-open'],
+          awaiting_engagement: true,
+        },
+      ],
+    );
+    const group = view.planGroups.find((item) => item.planId === 'lead-plan-long');
+    expect(group?.planGoal).toBe(longGoal);
+    expect(group?.planLabel.length).toBeLessThan(60);
+    expect(group?.planLabel).toMatch(/^Check with all sub-agents/i);
+    expect(group?.planLabel).not.toContain('Marco (backend)');
+    expect(view.rows[0]?.planLabel).toBe(group?.planLabel);
+  });
+
+  it('summarizes plan labels without dumping the whole fan-out', () => {
+    expect(
+      summarizeTaskBoardLabel(
+        'Ship Gate 5. Then verify CI. Then hand off to integrations.',
+        40,
+      ),
+    ).toBe('Ship Gate 5.');
+    expect(summarizeTaskBoardLabel('Short', 40)).toBe('Short');
   });
 
   it('marks open dependencies as blocking chips', () => {

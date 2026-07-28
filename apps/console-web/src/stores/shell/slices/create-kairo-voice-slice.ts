@@ -32,6 +32,7 @@ import {
   isKairoVoiceSpeaking,
 } from '../../../lib/kairo-voice-playback';
 import { reportTheaterOpen } from '../../../features/report-theater/report-theater-state';
+import { isReportTheaterAutoStartPending } from '../../../features/report-theater/report-theater-auto-start';
 import { navigateToAppSurface } from '../../../lib/app-surface-route';
 import {
   flushKairoSpeechQueue,
@@ -246,6 +247,10 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     }
     // Command theater owns the voice queue — do not barge in with alerts/advisories.
     if (reportTheaterOpen.value) {
+      return;
+    }
+    // Full autonomy just kicked off REPORT — let theater speak and act instead of a passive brief.
+    if (alert.reason === 'autonomy_advisory' && isReportTheaterAutoStartPending()) {
       return;
     }
     if (!alert.eligible || !input.operatorPresenceSettings.value.spoken_alerts_enabled) {

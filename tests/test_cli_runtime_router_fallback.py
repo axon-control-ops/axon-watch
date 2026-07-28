@@ -85,6 +85,8 @@ class FallbackReplyTests(unittest.TestCase):
         )
         self.assertIn("no CLI runtime is ready", reply)
         self.assertNotIn("failed on", reply)
+        self.assertIn("cursor agent status", reply.lower())
+        self.assertNotIn("Open Runtime or `/vault`", reply)
 
     def test_run_error_copy_distinguishes_ready_crash(self) -> None:
         reply = _fallback_reply(
@@ -98,6 +100,21 @@ class FallbackReplyTests(unittest.TestCase):
         self.assertIn("failed on Cursor CLI (local)", reply)
         self.assertIn("maximum recursion depth exceeded", reply)
         self.assertNotIn("no CLI runtime is ready", reply)
+        self.assertNotIn("Open Runtime or `/vault`", reply)
+
+    def test_usage_limit_run_error_does_not_blame_vault(self) -> None:
+        reply = _fallback_reply(
+            composer_mode="agent",
+            user_prompt="continue",
+            context_block="ctx",
+            reason="ActionRequiredError: You've hit your usage limit",
+            failure_phase="run_error",
+            runtime_label="Cursor CLI (local)",
+        )
+        self.assertIn("could not start", reply.lower())
+        self.assertIn("usage", reply.lower())
+        self.assertNotIn("/vault", reply.lower())
+        self.assertIn("Raise the Cursor usage limit", reply)
 
 
 class DispatchRecursionRecoveryTests(unittest.TestCase):
@@ -184,7 +201,7 @@ class DispatchRecursionRecoveryTests(unittest.TestCase):
         self.assertNotIn("no CLI runtime is ready", content)
         reason = str(result.get("reason") or "")
         self.assertIn("maximum recursion depth exceeded", reason)
-        self.assertIn("Codex CLI (local) unavailable", reason)
+        self.assertNotIn("Codex CLI (local) unavailable", reason)
 
 
 if __name__ == "__main__":

@@ -77,6 +77,8 @@ describe('buildIdeAgentSidebarStub', () => {
     expect(panel.tone).toBe('failure');
     expect(panel.lines[0]).toBe(failureLine);
     expect(panel.lines.join(' ')).toContain('Try again');
+    expect(panel.lines.join(' ')).toMatch(/open Team/i);
+    expect(panel.lines.join(' ')).not.toContain('in the failure banner');
     expect(panel.actionLabel).toBe('Expand agent dock');
     expect(panel.secondaryActionLabel).toBe('Try again');
   });

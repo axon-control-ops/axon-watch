@@ -88,15 +88,15 @@ function withEmployeeFailureDetail(
 }
 
 function employeeFailureBannerStep(interrupted: boolean): string {
-  const action = operatorFailureRetryLabel(interrupted);
   return interrupted
-    ? `Tap ${action} in the failure banner to continue, or open Team to talk it through.`
-    : `Tap ${action} in the failure banner, or open Team to talk it through.`;
+    ? 'Open Team and tap Continue on their roster card to pick up where they left off.'
+    : 'Open Team and tap Try again on their roster card, or talk it through.';
 }
 
 function employeeFailureComposerBannerStep(interrupted: boolean): string {
-  const action = operatorFailureRetryLabel(interrupted);
-  return `Tap ${action} in the failure banner at the top of the agent dock composer.`;
+  return interrupted
+    ? 'Open Team and tap Continue on their roster card to pick up where they left off.'
+    : 'Open Team and tap Try again on their roster card, or talk it through.';
 }
 
 function rosterFailureQuickGuideTone(
@@ -282,30 +282,25 @@ export function buildIdeQuickGuide(input: {
     !input.streaming &&
     input.pendingApprovals <= 0
   ) {
-    // Dock banner already owns the failure CTA — don't sticky a second failure strip
-    // over the editor when Team is also open.
+    // Dock banner owns the failure line; retry lives on Team roster (not composer).
     if (input.teamExpanded) {
       return null;
     }
     const interrupted = Boolean(input.employeeShiftInterrupted);
-    const retryLabel = (input.employeeRetryActionLabel ?? '').trim();
-    const actions: IdeQuickGuideAction[] = [];
-    if (retryLabel) {
-      actions.push({ id: 'retry-employee-shift', label: retryLabel });
-    }
+    const actions: IdeQuickGuideAction[] = [{ id: 'open-team', label: 'Open Team' }];
     if (!input.terminalVisible) {
       actions.push({ id: 'show-terminal', label: 'Show terminal' });
     }
 
     return {
       title: interrupted
-        ? 'Job interrupted — retry from the agent dock banner'
-        : 'Last job failed — retry from the agent dock banner',
+        ? 'Job interrupted — continue from Team'
+        : 'Last job failed — retry from Team',
       tone: interrupted ? 'interrupted' : 'failure',
       actions,
       steps: [
         employeeFailureComposerBannerStep(interrupted),
-        'Open Team in the left sidebar to review receipts or talk it through.',
+        'The composer banner explains the failure; retry stays on the Team roster.',
         ...(input.terminalVisible
           ? []
           : ['Ctrl/Cmd+J opens the terminal when you need shell output.']),

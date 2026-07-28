@@ -40,6 +40,7 @@ import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
 import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
 import { employeeVoiceSpeaker } from '../../lib/kairo-voice-utterance';
+import { runEmployeeShiftRetry } from '../../lib/run-employee-shift-retry';
 import { navigateToSettingsSection } from '../../lib/settings-section-route';
 import { useShellStore } from '../../stores/shell';
 
@@ -276,16 +277,21 @@ function speakEmployeeLine(employee: CompanyEmployeeRecord, kind: TeamMemberChat
 
 async function startChat(employee: CompanyEmployeeRecord, kind: TeamMemberChatKind): Promise<void> {
   selectEmployee(employee);
-  // Talk / Status / Assign / Retry all land on that teammate's owned IDE thread.
+  if (kind === 'retry') {
+    // Try again runs the shift immediately (draft + submit), same as Build plan.
+    await runEmployeeShiftRetry(shell, employee, {
+      keepActivityView: true,
+      focusThread: true,
+    });
+    speakEmployeeLine(employee, kind);
+    return;
+  }
+  // Talk / Status / Assign land on that teammate's owned IDE thread.
   await shell.openOrFocusEmployeeIdeThread(employee);
   const { mode, draft } = employeeComposerOpenPayload(employee, kind);
   // Status is voice + focus only — never flip Ask/consultative (or any mode).
   if (mode) {
     requestIdeComposerMode(mode);
-  }
-  if (kind === 'retry') {
-    // Try again always needs tools — ignore consultative composer setting.
-    shell.setAgentExecutionAccess('full');
   }
   if (draft) {
     shell.openIdeComposerWithDraft(draft, { keepActivityView: true });

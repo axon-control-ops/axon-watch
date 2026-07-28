@@ -517,6 +517,9 @@ def dispatch_ide_composer(
 
     reason = "; ".join(item for item in errors if item) or "no CLI runtime is installed"
     failure_phase = "run_error" if ready_run_errors else "not_ready"
+    # When a ready runtime actually failed, don't bury that under skipped "unavailable" peers.
+    if failure_phase == "run_error" and ready_run_errors:
+        reason = "; ".join(item for item in ready_run_errors if item) or reason
     return _finish({
         "content": _fallback_reply(
             composer_mode=composer_mode,

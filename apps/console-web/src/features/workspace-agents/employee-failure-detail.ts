@@ -31,8 +31,53 @@ export function isRestartInterruptedFailure(detail: string | null | undefined): 
 const AGENT_RUNTIME_FALLBACK_RE =
   /^Lane B (?:agent fallback reply generated|plan fallback failed)\s*\(/i;
 const LANE_B_FALLBACK_NORMALIZE_RE =
-  /^Lane B (?:agent fallback reply generated|plan fallback failed)\s*\((.*)\)\s*$/i;
+  /^Lane B (?:agent fallback reply generated|plan fallback failed)\s*\(([\s\S]*?)\s*\)?\s*$/i;
 const DISPATCH_FAILURE_PREFIX = 'continuous worker dispatch failed:';
+
+const RUNTIME_AUTH_MARKERS = [
+  /not signed in/i,
+  /cursor agent login/i,
+  /codex login/i,
+  /unlock \/vault/i,
+  /vault locked/i,
+  /cursor rejected CURSOR_API_KEY/i,
+  /authentication failed/i,
+  /authentication required/i,
+  /api_key_invalid/i,
+  /auth probe timed out/i,
+  /auth probe failed/i,
+  /cursor auth probe/i,
+  /codex auth probe/i,
+];
+
+const FAILURE_NOISE_RE = /^(?:running as unit|invocation id|scope)[:\s]/i;
+
+function pickPrimaryFailureCause(inner: string): string {
+  const parts = inner
+    .split(';')
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .filter((part) => !FAILURE_NOISE_RE.test(part));
+  if (!parts.length) {
+    return inner.trim();
+  }
+  const rank = (part: string): number => {
+    if (/ActionRequiredError|out of usage|increase limits/i.test(part)) {
+      return 0;
+    }
+    if (RUNTIME_AUTH_MARKERS.some((marker) => marker.test(part))) {
+      return 1;
+    }
+    if (/failed on\b/i.test(part)) {
+      return 2;
+    }
+    if (/unavailable/i.test(part)) {
+      return 4;
+    }
+    return 3;
+  };
+  return [...parts].sort((left, right) => rank(left) - rank(right))[0] ?? parts[0] ?? inner;
+}
 
 /** True when outcome detail is a success receipt, not a failure root cause. */
 export function looksLikeSuccessfulOutcomeDetail(detail: string | null | undefined): boolean {
@@ -61,17 +106,15 @@ export function normalizeOperatorFailureDetail(detail: string | null | undefined
   if (!cleaned) {
     return cleaned;
   }
-  const match = cleaned.match(LANE_B_FALLBACK_NORMALIZE_RE);
-  if (match) {
-    const inner = (match[1] ?? '').replace(/\s+/g, ' ').trim();
-    const primary = (inner.split(';')[0] ?? inner).trim();
-    return primary || inner;
-  }
   if (cleaned.toLowerCase().startsWith(DISPATCH_FAILURE_PREFIX)) {
     const tail = cleaned.slice(DISPATCH_FAILURE_PREFIX.length).trim();
-    return tail || cleaned;
+    return pickPrimaryFailureCause(tail || cleaned);
   }
-  return cleaned;
+  const match = cleaned.match(LANE_B_FALLBACK_NORMALIZE_RE);
+  if (match) {
+    return pickPrimaryFailureCause((match[1] ?? '').replace(/\s+/g, ' ').trim());
+  }
+  return pickPrimaryFailureCause(cleaned);
 }
 
 /** True when the operator stopped the CLI before the shift could finish. */
@@ -117,40 +160,20 @@ export function employeeResolvedFailureDetail(employee: CompanyEmployeeRecord): 
 
 /** Matches Cursor usage-limit blocks before a shift could start or finish. */
 export function isUsageLimitFailure(detail: string | null | undefined): boolean {
-  const normalized = normalizeOperatorFailureDetail(detail);
-  if (!normalized) {
-    return false;
-  }
+  const hay = `${detail ?? ''} ${normalizeOperatorFailureDetail(detail)}`;
   return (
-    /out of usage/i.test(normalized) ||
-    /increase limits/i.test(normalized) ||
-    /ActionRequiredError/i.test(normalized)
+    /out of usage/i.test(hay) ||
+    /increase limits/i.test(hay) ||
+    /ActionRequiredError/i.test(hay) ||
+    /hit your usage/i.test(hay) ||
+    /usage limit/i.test(hay)
   );
 }
 
-const RUNTIME_AUTH_MARKERS = [
-  /not signed in/i,
-  /cursor agent login/i,
-  /codex login/i,
-  /unlock \/vault/i,
-  /vault locked/i,
-  /cursor rejected CURSOR_API_KEY/i,
-  /authentication failed/i,
-  /authentication required/i,
-  /api_key_invalid/i,
-  /auth probe timed out/i,
-  /auth probe failed/i,
-  /cursor auth probe/i,
-  /codex auth probe/i,
-];
-
 /** True when the agent runtime could not authenticate (CLI login, vault keys, or auth probe). */
 export function isRuntimeAuthFailure(detail: string | null | undefined): boolean {
-  const normalized = normalizeOperatorFailureDetail(detail);
-  if (!normalized) {
-    return false;
-  }
-  return RUNTIME_AUTH_MARKERS.some((marker) => marker.test(normalized));
+  const hay = `${detail ?? ''} ${normalizeOperatorFailureDetail(detail)}`;
+  return RUNTIME_AUTH_MARKERS.some((marker) => marker.test(hay));
 }
 
 /** Auth-probe timeout vs missing login — both are runtime auth, different operator next step. */
@@ -201,11 +224,11 @@ export function agentRuntimeFallbackSpeakDetail(detail: string): string {
   if (/exited with status 143/i.test(firstClause)) {
     return 'the agent session was interrupted before it could finish';
   }
+  if (isUsageLimitFailure(firstClause)) {
+    return 'usage limits blocked the agent runtime';
+  }
   if (/unavailable/i.test(firstClause)) {
     return 'no agent runtime was ready';
-  }
-  if (/out of usage/i.test(firstClause)) {
-    return 'usage limits blocked the agent runtime';
   }
   if (isRuntimeAuthFailure(firstClause)) {
     if (

@@ -41,13 +41,18 @@ export type TaskBoardRow = {
   planId: string | null;
   planKey: string | null;
   planGoal: string | null;
+  /** Short plan chip label — never the full Lead fan-out essay. */
+  planLabel: string | null;
   updatedAt: string;
   createdAt: string;
 };
 
 export type TaskBoardPlanGroup = {
   planId: string | null;
+  /** Full Lead plan goal (tooltip / detail). */
   planGoal: string;
+  /** Short chip label derived from the plan goal. */
+  planLabel: string;
   planStatus: string | null;
   awaitingEngagement: boolean;
   rows: TaskBoardRow[];
@@ -131,6 +136,23 @@ function sortNewest(left: WorkspaceTaskRecord, right: WorkspaceTaskRecord): numb
   return right.updated_at.localeCompare(left.updated_at);
 }
 
+/** Compact operator-facing label for plan chips and dependency tags. */
+export function summarizeTaskBoardLabel(text: string, max = 52): string {
+  const cleaned = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) {
+    return 'Untitled';
+  }
+  const firstChunk =
+    cleaned.split(/(?<=[.!?])\s+|;\s+| — |\s+[•·]\s+|\s+-\s+/)[0]?.trim() || cleaned;
+  const base = firstChunk.length >= 12 ? firstChunk : cleaned;
+  if (base.length <= max) {
+    return base;
+  }
+  return `${base.slice(0, Math.max(8, max - 1)).trimEnd()}…`;
+}
+
 function toRow(
   task: WorkspaceTaskRecord,
   byId: Map<string, WorkspaceTaskRecord>,
@@ -142,7 +164,7 @@ function toRow(
     const status = dep?.status ?? 'open';
     return {
       taskId: depId,
-      goal: dep?.goal?.trim() || depId.slice(0, 12),
+      goal: summarizeTaskBoardLabel(dep?.goal?.trim() || depId.slice(0, 12), 36),
       status,
       blocking: status === 'open' || status === 'leased' || status === 'failed',
     };
@@ -151,6 +173,7 @@ function toRow(
   const planId = task.plan_id?.trim() || null;
   const plan = planId ? planById.get(planId) : undefined;
   const column = columnForTask(task);
+  const planGoal = plan?.goal?.trim() || null;
 
   return {
     taskId: task.task_id,
@@ -178,7 +201,8 @@ function toRow(
     blockedByOpenDeps,
     planId,
     planKey: task.plan_key?.trim() || null,
-    planGoal: plan?.goal?.trim() || null,
+    planGoal,
+    planLabel: planGoal ? summarizeTaskBoardLabel(planGoal, 40) : null,
     updatedAt: task.updated_at,
     createdAt: task.created_at,
   };
@@ -272,6 +296,7 @@ export function buildOperatorTaskBoardView(
     planGroups.push({
       planId: plan.plan_id,
       planGoal: plan.goal || 'Lead plan',
+      planLabel: summarizeTaskBoardLabel(plan.goal || 'Lead plan', 48),
       planStatus: String(plan.status || ''),
       awaitingEngagement: Boolean(plan.awaiting_engagement),
       rows: planRows,
@@ -284,6 +309,7 @@ export function buildOperatorTaskBoardView(
     planGroups.push({
       planId: null,
       planGoal: 'Ungrouped tasks',
+      planLabel: 'Ungrouped tasks',
       planStatus: null,
       awaitingEngagement: false,
       rows: unplanned,

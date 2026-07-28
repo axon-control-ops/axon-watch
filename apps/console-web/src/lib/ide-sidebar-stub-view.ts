@@ -1,7 +1,6 @@
 import {
   OPERATOR_FAILURE_CONTINUE_LABEL,
   OPERATOR_FAILURE_RETRY_LABEL,
-  operatorFailureRetryLabel,
 } from './operator-failure-copy';
 
 export type IdeSidebarStubTone =
@@ -69,10 +68,9 @@ function approvalPhrase(count: number): string {
 }
 
 function employeeFailureSidebarStep(interrupted: boolean): string {
-  const action = operatorFailureRetryLabel(interrupted);
   return interrupted
-    ? `Expand the dock and tap ${action} in the failure banner to pick up where they left off.`
-    : `Expand the dock and tap ${action} in the failure banner, or open Team to talk it through.`;
+    ? 'Expand the dock, then open Team and tap Continue on their roster card.'
+    : 'Expand the dock, then open Team and tap Try again on their roster card.';
 }
 
 /** Copy and CTA for the IDE left-rail agent stub when the dock lives on the right. */

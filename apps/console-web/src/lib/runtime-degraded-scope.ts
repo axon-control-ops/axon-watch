@@ -10,6 +10,14 @@ const REMOTE_INGRESS_MARKERS = [
   'cloudflare',
   'trycloudflare',
   'soft cutover',
+  'http 530',
+  'http 502',
+  'http 503',
+  'http 504',
+  'error 530',
+  'error 502',
+  'error 503',
+  'error 504',
 ] as const;
 
 export function isRemoteIngressDegradedReason(reason: string): boolean {
