@@ -62,6 +62,7 @@ class ControlPlaneOperatorBriefingTests(unittest.TestCase):
                 "scope",
                 "notice",
                 "advise",
+                "advise_ui_action",
                 "executive_rhythm",
                 "top_signals",
                 "pending_approvals",

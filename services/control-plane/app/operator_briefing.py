@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.chat.command_intent import humanize_run_summary, is_auto_complete_run_summary
 from app.operator_briefing_signals import filter_actionable_inbox_items, is_monitor_signal
 from app.inbox_projection import WatchInboxFetcher, build_inbox_response
-from app.operator_fleet_advice import build_fleet_advice_pack
+from app.operator_fleet_advice import build_advise_ui_action, build_fleet_advice_pack
 from app.runs.service import (
     list_operator_facing_active_runs,
     list_pending_approval_records,
@@ -278,6 +278,11 @@ def build_operator_briefing(
         display_names=display_names,
         lead_awaiting_engagement_count=lead_awaiting_engagement_count,
     )
+    winner = fleet_advice_pack.get("winner") if isinstance(fleet_advice_pack, dict) else None
+    advise_ui_action = build_advise_ui_action(
+        winner if isinstance(winner, dict) else None,
+        focused_workspace_id=scoped_workspace_id,
+    )
 
     scope: dict[str, object] = (
         {"mode": "workspace", "workspace_id": scoped_workspace_id}
@@ -346,7 +351,7 @@ def build_operator_briefing(
         "scope": scope,
         "notice": rhythm["notice"],
         "advise": rhythm["advise"],
-        "advise_ui_action": rhythm.get("advise_ui_action"),
+        "advise_ui_action": advise_ui_action,
         "executive_rhythm": rhythm,
         "top_signals": top_signals,
         "pending_approvals": {

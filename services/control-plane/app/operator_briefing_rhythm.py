@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from app.operator_fleet_advice import build_advise_ui_action, resolve_fleet_briefing_advise
+from app.operator_fleet_advice import resolve_fleet_briefing_advise
 
 EXECUTIVE_RHYTHM_KEYS = ("notice", "advise", "decide", "execute", "verify", "report")
 
@@ -262,7 +262,7 @@ def build_operator_briefing_rhythm(
     fleet_advice_pack: dict[str, object] | None = None,
     display_names: Mapping[str, str] | None = None,
     lead_awaiting_engagement_count: int = 0,
-) -> dict[str, object]:
+) -> dict[str, str]:
     notice = build_briefing_notice(
         active_runs=active_runs,
         top_signals=top_signals,
@@ -279,17 +279,9 @@ def build_operator_briefing_rhythm(
         display_names=display_names,
         lead_awaiting_engagement_count=lead_awaiting_engagement_count,
     )
-    winner = None
-    focused = None
-    if isinstance(fleet_advice_pack, dict):
-        raw_winner = fleet_advice_pack.get("winner")
-        winner = raw_winner if isinstance(raw_winner, dict) else None
-        focused = str(fleet_advice_pack.get("focused_workspace_id") or "").strip() or None
-    advise_ui_action = build_advise_ui_action(winner, focused_workspace_id=focused)
     return {
         "notice": notice,
         "advise": advise,
-        "advise_ui_action": advise_ui_action,
         "decide": build_briefing_decide(
             pending_approvals_count=pending_approvals_count,
             active_runs=active_runs,
