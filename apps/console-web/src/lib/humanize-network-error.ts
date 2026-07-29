@@ -24,6 +24,24 @@ export function humanizeNetworkError(
     );
   }
 
+  if (
+    lower.includes('control-plane unavailable') ||
+    lower.includes('cp_down') ||
+    /\b503\b/.test(lower)
+  ) {
+    return (
+      `${action} hit a brief control-plane gap (:8787). ` +
+      'Retry send in a moment — if it keeps failing, run ./scripts/dev/check-health.sh.'
+    );
+  }
+
+  if (lower.includes('step-up') || lower.includes('step up confirmation')) {
+    return (
+      `${action} needs Full Access step-up (X-Axon-Step-Up). ` +
+      'Keep Agent on FULL ACCESS and retry — if this persists, refresh the console session.'
+    );
+  }
+
   if (lower.includes('timed out after')) {
     return raw.startsWith(action) ? raw : `${action}: ${raw}`;
   }

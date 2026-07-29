@@ -1,0 +1,88 @@
+/* Dense Task Board cards / plan chips — keep operator-task-board.css under ratchet. */
+
+.operator-task-board__item-cancel {
+  align-self: start;
+  width: 1.55rem;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  margin: 0.35rem 0.3rem 0 0;
+  padding: 0;
+  border: 1px solid rgba(255, 120, 120, 0.4);
+  border-radius: 0.3rem;
+  background: rgba(60, 14, 18, 0.9);
+  color: rgba(255, 200, 200, 0.95);
+  font-size: 1.05rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.operator-task-board__list {
+  gap: 0.28rem;
+  max-height: 18rem;
+}
+
+.operator-task-board__item {
+  gap: 0.2rem 0.25rem;
+  padding: 0;
+  border-radius: 0.3rem;
+}
+
+.operator-task-board__item-main {
+  gap: 0.14rem;
+  padding: 0.4rem 0.45rem;
+}
+
+.operator-task-board__item-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.operator-task-board__item-role {
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: rgba(150, 190, 205, 0.88);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operator-task-board__item-status {
+  font-size: 0.58rem;
+}
+
+.operator-task-board__item-goal {
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.operator-task-board__item-meta {
+  font-size: 0.64rem;
+}
+
+.operator-task-board__plan-filter {
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.operator-task-board__plan-more {
+  color: rgba(150, 190, 205, 0.82);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+}
+
+.operator-task-board__plan-chip {
+  gap: 0.3rem;
+  max-width: min(100%, 12rem);
+  border-radius: 0.3rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  padding: 0.28rem 0.45rem;
+}

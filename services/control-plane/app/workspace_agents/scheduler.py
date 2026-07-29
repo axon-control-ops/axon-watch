@@ -203,6 +203,32 @@ def _dispatch_queued_lead_fan_out_runs(
     )
 
 
+def kick_lead_fan_out_dispatch(*, starts_bound: int = 3) -> list[dict[str, Any]]:
+    """Start queued Lead fan-out runs even when continuous workers are paused.
+
+    Operator Send / Lead decompose is an explicit handoff. Do not require
+    autonomy Full (scheduler_enabled) — only capacity + worker_dispatch_enabled.
+    """
+    if not worker_dispatch_enabled():
+        return []
+    _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
+    active_bound = max_active_executing()
+    executing = _executing_run_count()
+    free_slots = max(0, active_bound - executing)
+    if free_slots <= 0:
+        return []
+    try:
+        bound = max(1, int(starts_bound))
+    except (TypeError, ValueError):
+        bound = 1
+    bound = min(bound, free_slots)
+    return _dispatch_queued_lead_fan_out_runs(
+        companies=companies,
+        starts_bound=bound,
+        active_bound=active_bound,
+    )
+
+
 def run_continuous_worker_tick(
     *,
     starts_bound_override: int | None = None,

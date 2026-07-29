@@ -261,7 +261,7 @@ async function cancelAllWaiting(): Promise<void> {
 
 async function retryTask(row: TaskBoardRow): Promise<void> {
   const created = await shell.createCurrentWorkspaceTask({
-    goal: row.goal,
+    goal: row.goalFull || row.goal,
     owner_role: row.ownerRole === 'unassigned' ? '' : row.ownerRole,
     acceptance_criteria: row.acceptance,
     risk: row.risk,

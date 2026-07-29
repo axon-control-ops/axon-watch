@@ -100,8 +100,11 @@ const controlPlaneProxy = {
     target: process.env.VITE_CONTROL_PLANE_BASE_URL ?? 'http://127.0.0.1:8787',
     changeOrigin: true,
     ws: true,
-    timeout: 20_000,
-    proxyTimeout: 20_000,
+    // Lead decompose / agent Full Access can exceed 20s (model plan + materialize).
+    // Keep aligned with CHAT_MESSAGE_FETCH_TIMEOUT_MS (60s) so Vite does not
+    // kill the socket and the browser reports a bare "Failed to fetch".
+    timeout: 90_000,
+    proxyTimeout: 90_000,
     configure: (proxy: {
       on: (event: string, listener: (...args: unknown[]) => void) => void;
     }) => {

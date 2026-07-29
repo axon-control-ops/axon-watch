@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+
 import type { TaskBoardPlanGroup } from '../../../lib/operator-task-board-view';
 
-defineProps<{
+const props = defineProps<{
   planGroups: TaskBoardPlanGroup[];
   planFilterId: string | 'all';
   leadPlansMutating: boolean;
@@ -11,14 +13,24 @@ const emit = defineEmits<{
   'update:planFilterId': [value: string | 'all'];
   closeLeadPlan: [planId: string | null | undefined];
 }>();
+
+const MAX_VISIBLE_PLANS = 6;
+
+const plannedGroups = computed(() => props.planGroups.filter((item) => item.planId));
+const visiblePlans = computed(() => plannedGroups.value.slice(0, MAX_VISIBLE_PLANS));
+const hiddenPlanCount = computed(() =>
+  Math.max(0, plannedGroups.value.length - MAX_VISIBLE_PLANS),
+);
+const engageGroups = computed(() =>
+  plannedGroups.value.filter((item) => item.awaitingEngagement),
+);
+const showFilter = computed(
+  () => plannedGroups.value.length > 1 || engageGroups.value.length > 0,
+);
 </script>
 
 <template>
-  <div
-    v-if="planGroups.length > 1 || planGroups.some((group) => group.awaitingEngagement)"
-    class="operator-task-board__plan-filter"
-    data-orb-field
-  >
+  <div v-if="showFilter" class="operator-task-board__plan-filter" data-orb-field>
     <button
       type="button"
       class="operator-task-board__plan-chip"
@@ -28,7 +40,7 @@ const emit = defineEmits<{
       All plans
     </button>
     <button
-      v-for="group in planGroups.filter((item) => item.planId)"
+      v-for="group in visiblePlans"
       :key="group.planId ?? 'none'"
       type="button"
       class="operator-task-board__plan-chip"
@@ -41,8 +53,15 @@ const emit = defineEmits<{
         engage
       </span>
     </button>
+    <span
+      v-if="hiddenPlanCount > 0"
+      class="operator-task-board__plan-more"
+      :title="`${hiddenPlanCount} older plan(s) hidden — filter via All or open a task`"
+    >
+      +{{ hiddenPlanCount }} more
+    </span>
     <button
-      v-for="group in planGroups.filter((item) => item.planId && item.awaitingEngagement)"
+      v-for="group in engageGroups"
       :key="`close-${group.planId}`"
       type="button"
       class="operator-task-board__plan-chip operator-task-board__plan-chip--close"

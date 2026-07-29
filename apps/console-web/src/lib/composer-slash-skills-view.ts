@@ -13,12 +13,17 @@ export type SlashPaletteRow = {
   mode?: SlashModeKey;
 };
 
+export type SlashPaletteContext = {
+  /** Active IDE thread is a Lead employee — clarify Ask vs Agent fan-out. */
+  leadThread?: boolean;
+};
+
 const MODE_COMMAND_ROWS: SlashPaletteRow[] = [
   {
     id: 'mode:ask',
     command: '/ask',
     label: 'Ask',
-    detail: 'Switch composer to Ask mode',
+    detail: 'Answer-only mode — no edits, no specialist fan-out',
     kind: 'mode',
     mode: 'ask',
   },
@@ -26,7 +31,7 @@ const MODE_COMMAND_ROWS: SlashPaletteRow[] = [
     id: 'mode:plan',
     command: '/plan',
     label: 'Plan',
-    detail: 'Switch composer to Plan mode',
+    detail: 'Outline an approach before implementing',
     kind: 'mode',
     mode: 'plan',
   },
@@ -34,7 +39,7 @@ const MODE_COMMAND_ROWS: SlashPaletteRow[] = [
     id: 'mode:agent',
     command: '/agent',
     label: 'Agent',
-    detail: 'Switch composer to Agent mode',
+    detail: 'Full Access implement mode',
     kind: 'mode',
     mode: 'agent',
   },
@@ -42,7 +47,7 @@ const MODE_COMMAND_ROWS: SlashPaletteRow[] = [
     id: 'mode:debug',
     command: '/debug',
     label: 'Debug',
-    detail: 'Switch composer to Debug mode',
+    detail: 'Runtime evidence / debug loop',
     kind: 'mode',
     mode: 'debug',
   },
@@ -50,13 +55,20 @@ const MODE_COMMAND_ROWS: SlashPaletteRow[] = [
     id: 'mode:kairo',
     command: '/kairo',
     label: 'Kairo',
-    detail: 'Switch composer to Kairo voice mode',
+    detail: 'Voice-first Kairo mode',
     kind: 'mode',
     mode: 'kairo',
   },
 ];
 
 const UTILITY_COMMAND_ROWS: SlashPaletteRow[] = [
+  {
+    id: 'cmd:status',
+    command: '/status',
+    label: 'Status',
+    detail: 'Ask for a fleet status brief (Ask mode — no fan-out)',
+    kind: 'command',
+  },
   {
     id: 'cmd:help',
     command: '/help',
@@ -65,6 +77,27 @@ const UTILITY_COMMAND_ROWS: SlashPaletteRow[] = [
     kind: 'command',
   },
 ];
+
+function modeRowsForContext(context?: SlashPaletteContext | null): SlashPaletteRow[] {
+  if (!context?.leadThread) {
+    return MODE_COMMAND_ROWS;
+  }
+  return MODE_COMMAND_ROWS.map((row) => {
+    if (row.mode === 'ask') {
+      return {
+        ...row,
+        detail: 'Ask Lead — answer only, no specialist tasks',
+      };
+    }
+    if (row.mode === 'agent') {
+      return {
+        ...row,
+        detail: 'Lead Agent — implement asks fan out to specialists',
+      };
+    }
+    return row;
+  });
+}
 
 export function skillToSlashRow(skill: OperatorSkillRecord): SlashPaletteRow {
   return {
@@ -81,28 +114,123 @@ export function skillToSlashRow(skill: OperatorSkillRecord): SlashPaletteRow {
 export function buildSlashPaletteCatalog(
   skills: OperatorSkillRecord[],
   workspaceId?: string | null,
+  context?: SlashPaletteContext | null,
 ): SlashPaletteRow[] {
   const scoped = workspaceId
     ? skills.filter((skill) => skill.workspace_id === workspaceId)
     : skills;
   const skillRows = (scoped.length ? scoped : skills).map(skillToSlashRow);
-  return [...skillRows, ...MODE_COMMAND_ROWS, ...UTILITY_COMMAND_ROWS];
+  // Modes/utilities first so `/` opens with Ask/Agent/Status before skill spam.
+  return [...modeRowsForContext(context), ...UTILITY_COMMAND_ROWS, ...skillRows];
 }
 
+function slashMatchScore(row: SlashPaletteRow, normalized: string): number {
+  const commandBody = row.command.slice(1).toLowerCase();
+  const label = row.label.toLowerCase();
+  const slug = (row.skillSlug ?? '').toLowerCase();
+  if (commandBody === normalized || label === normalized || slug === normalized) {
+    return 400;
+  }
+  if (commandBody.startsWith(normalized)) {
+    return 300 - Math.min(commandBody.length, 99);
+  }
+  if (label.startsWith(normalized) || slug.startsWith(normalized)) {
+    return 200;
+  }
+  const haystack = `${row.command} ${row.label} ${row.detail} ${slug}`.toLowerCase();
+  if (haystack.includes(normalized)) {
+    return 100;
+  }
+  return 0;
+}
+
+function kindRank(kind: SlashPaletteRow['kind']): number {
+  if (kind === 'mode') {
+    return 3;
+  }
+  if (kind === 'command') {
+    return 2;
+  }
+  return 1;
+}
+
+/** Ranked filter: exact/prefix modes first, then commands, then skills. */
 export function filterSlashPaletteRows(
   rows: SlashPaletteRow[],
   query: string,
-  limit = 10,
+  limit = 12,
 ): SlashPaletteRow[] {
   const normalized = query.trim().toLowerCase().replace(/^\//, '');
   if (!normalized) {
     return rows.slice(0, limit);
   }
-  const filtered = rows.filter((row) => {
-    const haystack = `${row.command} ${row.label} ${row.detail} ${row.skillSlug ?? ''}`.toLowerCase();
-    return row.command.slice(1).startsWith(normalized) || haystack.includes(normalized);
-  });
-  return filtered.slice(0, limit);
+  return rows
+    .map((row) => ({ row, score: slashMatchScore(row, normalized) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      const kindDelta = kindRank(b.row.kind) - kindRank(a.row.kind);
+      if (kindDelta !== 0) {
+        return kindDelta;
+      }
+      return a.row.command.localeCompare(b.row.command);
+    })
+    .slice(0, limit)
+    .map((entry) => entry.row);
+}
+
+/** Shared command-body prefix across filtered rows (without leading `/`). */
+export function longestCommonSlashPrefix(commands: readonly string[]): string {
+  const bodies = commands
+    .map((command) => command.trim().replace(/^\//, '').toLowerCase())
+    .filter(Boolean);
+  if (!bodies.length) {
+    return '';
+  }
+  let prefix = bodies[0] ?? '';
+  for (const body of bodies.slice(1)) {
+    let i = 0;
+    while (i < prefix.length && i < body.length && prefix[i] === body[i]) {
+      i += 1;
+    }
+    prefix = prefix.slice(0, i);
+    if (!prefix) {
+      return '';
+    }
+  }
+  return prefix;
+}
+
+export type SlashTabAction = 'complete-common' | 'complete-selected' | 'apply';
+
+/**
+ * Decide Tab behavior for an open slash palette.
+ * Tab completes text first; only applies when the selected command is already typed.
+ */
+export function resolveSlashTabAction(input: {
+  query: string;
+  selectedCommand: string;
+  filteredCommands: readonly string[];
+}): SlashTabAction {
+  const query = input.query.trim().replace(/^\//, '').toLowerCase();
+  const selected = input.selectedCommand.trim().replace(/^\//, '').toLowerCase();
+  if (!selected) {
+    return 'apply';
+  }
+  const common = longestCommonSlashPrefix(input.filteredCommands);
+  if (
+    input.filteredCommands.length > 1 &&
+    common.length > query.length &&
+    common !== selected
+  ) {
+    return 'complete-common';
+  }
+  if (query === selected) {
+    return 'apply';
+  }
+  return 'complete-selected';
 }
 
 /** True when a path points at a Cursor-style `SKILL.md` under a skills folder. */
@@ -211,3 +339,5 @@ export function slashHelpText(rows: SlashPaletteRow[]): string {
     ...rows.map((row) => `- \`${row.command}\` ${row.detail}`),
   ].join('\n');
 }
+
+export const SLASH_STATUS_PROMPT = 'Give me a status of everything.';

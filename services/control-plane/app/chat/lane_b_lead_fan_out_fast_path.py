@@ -6,6 +6,7 @@ import threading
 from typing import Any, Callable
 
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
+from app.workspace_agents.lead_handoff_receipt import record_lead_handoff_run
 from app.workspace_agents.lead_task_plan import (
     detect_fan_out_intent,
     is_employee_shift_retry_request,
@@ -48,14 +49,16 @@ def _format_fan_out_reply(
         "I did not write kickoff markdown — continuous worker owns the start. "
         f"— {lead_name}"
     )
+    lines.append("")
+    lines.append("Confidence: 8/10")
     return "\n".join(lines)
 
 
 def _kick_continuous_dispatch() -> None:
     try:
-        from app.workspace_agents.scheduler import run_continuous_worker_tick
+        from app.workspace_agents.scheduler import kick_lead_fan_out_dispatch
 
-        run_continuous_worker_tick()
+        kick_lead_fan_out_dispatch(starts_bound=3)
     except Exception:
         pass
 
@@ -100,6 +103,18 @@ def maybe_post_lead_fan_out_message(
         name="lead-fan-out-dispatch-kick",
     ).start()
 
+    plan_id = str(materialize.get("plan_id") or "").strip()
+    handoff_run = record_lead_handoff_run(
+        workspace_id=workspace_id,
+        summary=content,
+        detail=(
+            f"Lead fan-out handoff completed"
+            + (f" (plan {plan_id})" if plan_id else "")
+            + "; specialists queued for dispatch"
+        ),
+    )
+    handoff_run_id = str((handoff_run or {}).get("run_id") or "").strip() or None
+
     agent_content = _format_fan_out_reply(
         lead_name=lead_name.strip() or "Lead",
         materialize=materialize,
@@ -109,7 +124,7 @@ def maybe_post_lead_fan_out_message(
             "message_id": new_message_id("message_operator"),
             "thread_id": thread_id,
             "workspace_id": workspace_id,
-            "run_id": None,
+            "run_id": handoff_run_id,
             "role": "operator",
             "content": content,
             "created_at": created_at,
@@ -123,7 +138,7 @@ def maybe_post_lead_fan_out_message(
             "message_id": new_message_id("message_agent"),
             "thread_id": thread_id,
             "workspace_id": workspace_id,
-            "run_id": None,
+            "run_id": handoff_run_id,
             "role": "agent",
             "content": agent_content,
             "created_at": created_at,
@@ -132,9 +147,9 @@ def maybe_post_lead_fan_out_message(
     return {
         "thread_id": thread_id,
         "messages": [operator_message, agent_message],
-        "run_id": "",
+        "run_id": handoff_run_id or "",
         "dispatched": True,
-        "run": None,
+        "run": handoff_run,
         "streaming": False,
         "ui_action": None,
         "lead_fan_out": {

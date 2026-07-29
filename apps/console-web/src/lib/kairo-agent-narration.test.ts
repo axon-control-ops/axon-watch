@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  agentTurnHasConfidenceRating,
   liveThinkingText,
   narrationForCompletion,
   narrationMilestonesForDelta,
@@ -89,6 +90,16 @@ describe('narrationForCompletion', () => {
     const spoken = spokenCompletionSummary(content);
     expect(spoken).not.toMatch(/^Retrying/i);
     expect(spoken.toLowerCase()).toMatch(/confidence|critical review|shift complete/);
+  });
+
+  it('detects a successful Critical Review confidence rating', () => {
+    expect(agentTurnHasConfidenceRating('Done.\n\nConfidence: 9/10')).toBe(true);
+    expect(agentTurnHasConfidenceRating('Still working — no close-out yet.')).toBe(false);
+    expect(
+      agentTurnHasConfidenceRating(
+        "Lane B (agent) cannot start because no CLI runtime is ready: ActionRequiredError: You're out of usage.\nConfidence: 9/10",
+      ),
+    ).toBe(false);
   });
 
   it('marks Lane B runtime failures instead of done', () => {

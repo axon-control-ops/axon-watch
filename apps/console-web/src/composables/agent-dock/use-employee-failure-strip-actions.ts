@@ -10,6 +10,7 @@ import {
   employeeShiftNeedsContinuation,
 } from '../../features/workspace-agents/company-roster-view';
 import { focusAgentDockComposerInput } from '../../lib/agent-dock-composer-focus';
+import { latestIdeAgentTurnHasConfidence } from '../../lib/ide-agent-center-view';
 import { requestIdeComposerMode } from '../../lib/ide-composer-restore-request';
 import { shouldSurfaceIdeEmployeeFailure } from '../../lib/ide-presence-profile';
 import { runEmployeeShiftRetry } from '../../lib/run-employee-shift-retry';
@@ -33,18 +34,23 @@ export function useEmployeeFailureStripActions(shell: ShellStore): {
 
   const employee = computed(() => shell.activeIdeEmployeeRecord);
   const failureLine = computed(() => shell.activeIdeEmployeeFailureLine);
+  const closedWithConfidence = computed(() =>
+    latestIdeAgentTurnHasConfidence(shell.threadMessages),
+  );
 
   const showFailureActions = computed(
     () =>
+      !closedWithConfidence.value &&
       shouldSurfaceIdeEmployeeFailure({
         profileState: shell.ideDisplayKairoPresenceState,
         employeeFailureLine: failureLine.value,
         agentStreamActive: shell.agentStreamActive,
         kairoSpeechActive: shell.kairoSpeechActive,
-      }) && Boolean(employee.value),
+      }) &&
+      Boolean(employee.value),
   );
 
-  /** Try again / Continue only when the last job failed or was interrupted — never after success. */
+  /** Try again / Continue only for real failures — never after Confidence: N/10. */
   const showRetryAction = computed(() => showFailureActions.value);
 
   const showExplainAction = computed(() =>

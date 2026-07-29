@@ -59,6 +59,11 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
             "deferred": [],
         }
 
+        handoff = {
+            "run_id": "run_lead_handoff",
+            "phase": "completed",
+            "employee_role": "lead",
+        }
         with (
             patch(
                 "app.chat.lane_b_lead_decompose_fast_path._roster_members",
@@ -71,6 +76,10 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
             patch(
                 "app.chat.lane_b_lead_decompose_fast_path.materialize_lead_fan_out",
                 return_value=materialize,
+            ),
+            patch(
+                "app.chat.lane_b_lead_decompose_fast_path.record_lead_handoff_run",
+                return_value=handoff,
             ),
             patch(
                 "app.chat.lane_b_lead_decompose_fast_path._kick_continuous_dispatch",
@@ -91,13 +100,16 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
 
         self.assertIsNotNone(response)
         assert response is not None
-        self.assertEqual("", response["run_id"])
+        self.assertEqual("run_lead_handoff", response["run_id"])
+        self.assertEqual("completed", response["run"]["phase"])
         self.assertFalse(response["streaming"])
         self.assertEqual("plan_test", response["lead_decompose"]["plan_id"])
         agent = next(row for row in saved if row["role"] == "agent")
         self.assertIn("decomposed the work", agent["content"])
         self.assertIn("frontend:", agent["content"].lower())
         self.assertIn("Fleet:", agent["content"])
+        self.assertIn("Confidence: 8/10", agent["content"])
+        self.assertEqual("run_lead_handoff", agent["run_id"])
 
     def test_skips_assign_all_intent(self) -> None:
         response = maybe_post_lead_decompose_message(

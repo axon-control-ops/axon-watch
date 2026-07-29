@@ -27,4 +27,20 @@ describe('humanizeNetworkError', () => {
       }),
     ).toBe('chat message submit failed: mutating API rate limit exceeded');
   });
+
+  it('explains control-plane 503 soft failures', () => {
+    expect(
+      humanizeNetworkError(new Error('chat message submit failed: control-plane unavailable'), {
+        action: 'Chat send',
+      }),
+    ).toContain('brief control-plane gap');
+  });
+
+  it('explains step-up confirmation failures', () => {
+    expect(
+      humanizeNetworkError(new Error('agent chat failed: step-up confirmation required'), {
+        action: 'Chat send',
+      }),
+    ).toContain('Full Access step-up');
+  });
 });

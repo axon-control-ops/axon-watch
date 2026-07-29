@@ -6,7 +6,10 @@ import {
   buildIdeAgentReviewBar,
   buildIdeAgentReviewComposerLabel,
   collectIdeAgentEditSummariesFromThread,
+  extractIdeAgentEditSummaries,
   latestIdeAgentTurnFailed,
+  latestIdeAgentTurnHasConfidence,
+  resolveActiveIdeAgentMessage,
   resolveIdeAgentEditDiffFromThread,
   shouldShowIdeAgentReviewStrip,
 } from '../../lib/ide-agent-center-view';
@@ -35,7 +38,19 @@ const editSummaries = computed(() => {
   if (shell.agentStreamActive) {
     return [];
   }
-  return collectIdeAgentEditSummariesFromThread(shell.threadMessages, { includeDiff: false });
+  const messages = shell.threadMessages;
+  // Successful close-out (incl. Lead handoff Confidence) must not resurrect
+  // Review-N-files chrome from older agent turns on the same thread.
+  if (latestIdeAgentTurnHasConfidence(messages)) {
+    const latest = resolveActiveIdeAgentMessage(messages, false, null);
+    if (!latest) {
+      return [];
+    }
+    return extractIdeAgentEditSummaries(latest.content, latest.message_id, {
+      includeDiff: false,
+    });
+  }
+  return collectIdeAgentEditSummariesFromThread(messages, { includeDiff: false });
 });
 
 const streamedEditCount = computed(

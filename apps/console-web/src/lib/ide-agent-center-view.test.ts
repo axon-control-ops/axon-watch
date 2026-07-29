@@ -6,6 +6,7 @@ import {
   buildIdeAgentThreadStatusLabel,
   collectIdeAgentEditSummariesFromThread,
   extractIdeAgentEditSummaries,
+  latestIdeAgentTurnHasConfidence,
   resolveActiveIdeAgentMessage,
   shouldShowIdeAgentReviewStrip,
   shouldShowIdeAgentThreadStatusStrip,
@@ -41,6 +42,35 @@ describe('ide agent center view', () => {
     );
     expect(edits).toHaveLength(1);
     expect(edits[0]?.path).toBe('README.md');
+  });
+
+  it('detects Confidence close-out on the latest agent turn', () => {
+    expect(
+      latestIdeAgentTurnHasConfidence([
+        { message_id: 'm1', role: 'operator', content: 'Ship it' },
+        {
+          message_id: 'm2',
+          role: 'agent',
+          content: 'Payments button is hidden.\n\nConfidence: 9/10',
+        },
+      ]),
+    ).toBe(true);
+
+    expect(
+      latestIdeAgentTurnHasConfidence([
+        {
+          message_id: 'm1',
+          role: 'agent',
+          content: 'Confidence: 9/10',
+        },
+        {
+          message_id: 'm2',
+          role: 'agent',
+          content:
+            "Lane B (agent) cannot start because no CLI runtime is ready: ActionRequiredError: You're out of usage.",
+        },
+      ]),
+    ).toBe(false);
   });
 
   it('shows the review strip while the agent is busy or review is ready', () => {

@@ -147,6 +147,8 @@ export function narrationMilestonesForDelta(
   return milestones;
 }
 
+const AGENT_CONFIDENCE_LINE_RE = /\bConfidence:\s*(\d{1,2})\s*\/\s*10\b/i;
+
 /** True when the agent turn ended as a runtime/auth failure, not a successful reply. */
 export function isAgentTurnFailureContent(content: string): boolean {
   const text = content.trim();
@@ -162,6 +164,20 @@ export function isAgentTurnFailureContent(content: string): boolean {
   );
 }
 
+/** Critical Review close-out line — successful shifts end with Confidence: N/10. */
+export function agentTurnHasConfidenceRating(content: string): boolean {
+  const text = content.trim();
+  if (!text || isAgentTurnFailureContent(text)) {
+    return false;
+  }
+  const match = text.match(AGENT_CONFIDENCE_LINE_RE);
+  if (!match) {
+    return false;
+  }
+  const score = Number(match[1]);
+  return Number.isFinite(score) && score >= 1 && score <= 10;
+}
+
 /** First one or two sentences from the final agent reply for end-of-run narration. */
 export function spokenCompletionSummary(content: string): string {
   const cleaned = cleanAgentReplyText(content);
@@ -171,7 +187,7 @@ export function spokenCompletionSummary(content: string): string {
   const flat = cleaned.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
   // Prefer the closing confidence line so we do not speak a mid-shift opener
   // ("Retrying my bounded shift now…") after the composer run already stopped.
-  const confidence = flat.match(/\bConfidence:\s*(\d{1,2})\s*\/\s*10\b/i);
+  const confidence = flat.match(AGENT_CONFIDENCE_LINE_RE);
   if (confidence) {
     const score = confidence[1] ?? '?';
     const review = flat.match(/Critical\s+Review[^.!?]{0,160}[.!?]?/i)?.[0]?.trim();

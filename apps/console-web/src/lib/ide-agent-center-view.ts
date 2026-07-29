@@ -2,7 +2,10 @@ import {
   normalizeEditedFilePath,
   parseAgentTranscriptBlocks,
 } from './agent-transcript-blocks';
-import { isAgentTurnFailureContent } from './kairo-agent-narration';
+import {
+  agentTurnHasConfidenceRating,
+  isAgentTurnFailureContent,
+} from './kairo-agent-narration';
 import { OPERATOR_PERSONA_NAME, personaThreadPrefix } from './operator-persona-name';
 
 export type IdeAgentThreadMessage = {
@@ -198,6 +201,22 @@ export function latestIdeAgentTurnFailed(
     const message = messages[index];
     if (message.role === 'agent' && message.content.trim()) {
       return isAgentTurnFailureContent(message.content);
+    }
+  }
+  return false;
+}
+
+/**
+ * Latest agent turn closed Critical Review with Confidence: N/10.
+ * Soft Attention "Try again" must not stay up after a successful close-out.
+ */
+export function latestIdeAgentTurnHasConfidence(
+  messages: readonly IdeAgentThreadMessage[],
+): boolean {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === 'agent' && message.content.trim()) {
+      return agentTurnHasConfidenceRating(message.content);
     }
   }
   return false;

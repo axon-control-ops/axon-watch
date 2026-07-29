@@ -16,7 +16,10 @@ export type TaskBoardDependencyChip = {
 
 export type TaskBoardRow = {
   taskId: string;
+  /** Short card label — never the full Lead essay. */
   goal: string;
+  /** Full goal for tooltips / detail drawer. */
+  goalFull: string;
   ownerRole: string;
   status: WorkspaceTaskStatus;
   bucket: TaskBoardBucket;
@@ -137,7 +140,8 @@ function sortNewest(left: WorkspaceTaskRecord, right: WorkspaceTaskRecord): numb
 }
 
 /** Shared plan-chip width so row labels match plan-group chips. */
-const PLAN_CHIP_LABEL_MAX = 48;
+const PLAN_CHIP_LABEL_MAX = 28;
+const TASK_CARD_GOAL_MAX = 64;
 
 /** Compact operator-facing label for plan chips and dependency tags. */
 export function summarizeTaskBoardLabel(text: string, max = 52): string {
@@ -178,9 +182,11 @@ function toRow(
   const column = columnForTask(task);
   const planGoal = plan?.goal?.trim() || null;
 
+  const goalFull = task.goal.trim() || 'Untitled';
   return {
     taskId: task.task_id,
-    goal: task.goal,
+    goal: summarizeTaskBoardLabel(goalFull, TASK_CARD_GOAL_MAX),
+    goalFull,
     ownerRole: task.owner_role.trim() || 'unassigned',
     status: task.status,
     bucket: bucketForStatus(task.status),

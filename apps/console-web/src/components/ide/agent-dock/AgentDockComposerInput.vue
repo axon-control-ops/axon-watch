@@ -63,6 +63,7 @@ const props = defineProps<{
   privacyMode: boolean;
   typeaheadOpen?: boolean;
   typeaheadCaption?: string;
+  typeaheadEmptyHint?: string;
   typeaheadLoading?: boolean;
   typeaheadRows?: ComposerTypeaheadRow[];
   typeaheadSelectedIndex?: number;
@@ -224,6 +225,7 @@ const contextChips = computed(() =>
     <AgentDockComposerTypeahead
       :open="Boolean(typeaheadOpen)"
       :caption="typeaheadCaption || ''"
+      :empty-hint="typeaheadEmptyHint || 'No matches'"
       :loading="Boolean(typeaheadLoading)"
       :rows="typeaheadRows || []"
       :selected-index="typeaheadSelectedIndex || 0"

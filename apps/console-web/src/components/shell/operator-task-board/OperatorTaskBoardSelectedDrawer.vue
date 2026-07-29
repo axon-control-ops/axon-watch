@@ -20,7 +20,7 @@ const emit = defineEmits<{
 <template>
   <aside class="operator-task-board__drawer" data-orb-field aria-label="Selected task">
     <header class="operator-task-board__drawer-head">
-      <h4>{{ row.goal }}</h4>
+      <h4>{{ row.goalFull || row.goal }}</h4>
       <button type="button" class="operator-task-board__cancel" @click="emit('close')">
         Close
       </button>

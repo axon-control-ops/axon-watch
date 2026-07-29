@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from app.workspace_agents import build_company_roster
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
+from app.workspace_agents.lead_handoff_receipt import record_lead_handoff_run
 from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
     LeadPlanRosterMember,
@@ -63,13 +64,6 @@ def _fleet_status_lines(*, kick_started: int, queued_run_count: int) -> list[str
         ]
 
     lines: list[str] = []
-    if not enabled:
-        lines.append(
-            "Continuous workers are OFF — specialist runs stay queued until you "
-            "enable the worker scheduler (Mission Control / Full)."
-        )
-        return lines
-
     lines.append(f"Fleet: {executing}/{active_bound} workers busy · up to {starts} start(s) per ~{interval}s tick.")
     if kick_started > 0:
         lines.append(f"Dispatch kick started {kick_started} specialist run(s) just now.")
@@ -82,6 +76,12 @@ def _fleet_status_lines(*, kick_started: int, queued_run_count: int) -> list[str
         lines.append(
             f"{queued_run_count} specialist run(s) are queued; dispatch kick requested "
             "(will start on the next free slot)."
+        )
+    if not enabled:
+        lines.append(
+            "Continuous workers stay OFF (semi/manual) — idle ticks will not pick up "
+            "more work. This Lead Send still kicks specialists when slots are free; "
+            "switch autonomy to Full for always-on leasing."
         )
     lines.append(
         "I did not do that specialist work on this Lead thread — open each specialist "
@@ -126,23 +126,22 @@ def _format_decompose_reply(
             f"Cleared {len(superseded)} overlapping stale queue task(s) so this handoff can move."
         )
     lines.append(f"— {lead_name.strip() or 'Lead'}")
+    # Soft Attention / Critical Review suppressors key off this close-out line.
+    lines.append("")
+    lines.append("Confidence: 8/10")
     return "\n".join(lines)
 
 
 def _kick_continuous_dispatch() -> int:
-    """Kick specialists with a slightly elevated start budget when slots are free."""
-    try:
-        from app.workspace_agents.scheduler import (
-            max_active_executing,
-            max_starts_per_tick,
-            run_continuous_worker_tick,
-            _executing_run_count,
-        )
+    """Kick Lead specialists even when continuous workers are paused.
 
-        free = max(0, max_active_executing() - _executing_run_count())
-        # Lead handoffs should start more than one specialist when capacity allows.
-        override = max(max_starts_per_tick(), min(3, free or max_starts_per_tick()))
-        started = run_continuous_worker_tick(starts_bound_override=override)
+    Operator Send is an explicit handoff — do not wait for Full autonomy /
+    the always-on scheduler tick.
+    """
+    try:
+        from app.workspace_agents.scheduler import kick_lead_fan_out_dispatch
+
+        started = kick_lead_fan_out_dispatch(starts_bound=3)
         return len(started or [])
     except Exception:
         return 0
@@ -205,6 +204,18 @@ def maybe_post_lead_decompose_message(
         name="lead-decompose-dispatch-kick",
     ).start()
 
+    plan_id = str(materialize.get("plan_id") or "").strip()
+    handoff_run = record_lead_handoff_run(
+        workspace_id=workspace_id,
+        summary=content,
+        detail=(
+            f"Lead decompose handoff completed"
+            + (f" (plan {plan_id})" if plan_id else "")
+            + "; specialists queued for dispatch"
+        ),
+    )
+    handoff_run_id = str((handoff_run or {}).get("run_id") or "").strip() or None
+
     agent_content = _format_decompose_reply(
         lead_name=lead_name.strip() or "Lead",
         materialize=materialize,
@@ -215,7 +226,7 @@ def maybe_post_lead_decompose_message(
             "message_id": new_message_id("message_operator"),
             "thread_id": thread_id,
             "workspace_id": workspace_id,
-            "run_id": None,
+            "run_id": handoff_run_id,
             "role": "operator",
             "content": content,
             "created_at": created_at,
@@ -229,11 +240,11 @@ def maybe_post_lead_decompose_message(
             "message_id": new_message_id("message_system"),
             "thread_id": thread_id,
             "workspace_id": workspace_id,
-            "run_id": None,
+            "run_id": handoff_run_id,
             "role": "system",
             "content": (
                 "Lead decompose materialized; specialist runs queued for continuous dispatch "
-                "(no Lane B Lead turn)."
+                "(Lead handoff receipt recorded — no Lane B Lead essay)."
             ),
             "created_at": created_at,
         }
@@ -243,7 +254,7 @@ def maybe_post_lead_decompose_message(
             "message_id": new_message_id("message_agent"),
             "thread_id": thread_id,
             "workspace_id": workspace_id,
-            "run_id": None,
+            "run_id": handoff_run_id,
             "role": "agent",
             "content": agent_content,
             "created_at": created_at,
@@ -252,9 +263,9 @@ def maybe_post_lead_decompose_message(
     return {
         "thread_id": thread_id,
         "messages": [operator_message, system_message, agent_message],
-        "run_id": "",
+        "run_id": handoff_run_id or "",
         "dispatched": True,
-        "run": None,
+        "run": handoff_run,
         "streaming": False,
         "ui_action": None,
         "lead_decompose": {

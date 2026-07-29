@@ -51,12 +51,17 @@ function toneFor(columnId: TaskBoardColumnId): string {
           <button
             type="button"
             class="operator-task-board__item-main"
+            :title="row.goalFull"
             @click="emit('selectTask', row.taskId)"
           >
-            <span class="operator-task-board__item-status">{{ row.status }}</span>
+            <span class="operator-task-board__item-top">
+              <span class="operator-task-board__item-status">{{ row.status }}</span>
+              <span class="operator-task-board__item-role">{{ row.ownerRole }}</span>
+            </span>
             <span class="operator-task-board__item-goal">{{ row.goal }}</span>
             <span class="operator-task-board__item-meta">
-              {{ row.ownerRole }} · attempts {{ row.attemptsLabel }}
+              attempts {{ row.attemptsLabel }}
+              <template v-if="row.blockedByOpenDeps"> · blocked</template>
             </span>
             <span
               v-if="row.planLabel"
@@ -66,7 +71,7 @@ function toneFor(columnId: TaskBoardColumnId): string {
               {{ row.planLabel }}
             </span>
             <span
-              v-for="chip in row.dependencyChips"
+              v-for="chip in row.dependencyChips.slice(0, 2)"
               :key="`${row.taskId}-${chip.taskId}`"
               class="operator-task-board__chip"
               :class="{ 'operator-task-board__chip--blocking': chip.blocking }"
@@ -79,10 +84,11 @@ function toneFor(columnId: TaskBoardColumnId): string {
             type="button"
             class="operator-task-board__item-cancel"
             title="Cancel queued task"
+            aria-label="Cancel queued task"
             :disabled="workspaceTasksMutating"
             @click.stop="emit('cancelTask', row.taskId)"
           >
-            Cancel
+            ×
           </button>
         </li>
       </ul>
@@ -105,7 +111,12 @@ function toneFor(columnId: TaskBoardColumnId): string {
       :key="row.taskId"
       class="operator-task-board__item operator-task-board__item--cancelled"
     >
-      <button type="button" class="operator-task-board__item-main" @click="emit('selectTask', row.taskId)">
+      <button
+        type="button"
+        class="operator-task-board__item-main"
+        :title="row.goalFull"
+        @click="emit('selectTask', row.taskId)"
+      >
         <span class="operator-task-board__item-status">cancelled</span>
         <span class="operator-task-board__item-goal">{{ row.goal }}</span>
       </button>

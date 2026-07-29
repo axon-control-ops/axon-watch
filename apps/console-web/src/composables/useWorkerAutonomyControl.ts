@@ -14,9 +14,9 @@ export type AutonomyActionTone = 'idle' | 'ok' | 'error' | 'pending' | 'warn';
 
 export const AUTONOMY_MODE_COPY: Record<AutonomyMode, string> = {
   manual:
-    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused.',
+    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused. Lead Send still kicks specialists for that handoff.',
   semi:
-    'VAXON stays proactive with advisory briefs. Continuous workers stay paused — no Cursor burn from idle ticks.',
+    'VAXON stays proactive with advisory briefs. Continuous workers stay paused (no idle Cursor burn). Lead Send still kicks specialists for that handoff — Full is required for always-on leasing.',
   full:
     'VAXON advisory plus continuous workers that lease tasks and run Cursor shifts without per-run approval.',
 };

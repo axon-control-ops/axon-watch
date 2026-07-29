@@ -133,10 +133,26 @@ describe('buildOperatorTaskBoardView', () => {
     );
     const group = view.planGroups.find((item) => item.planId === 'lead-plan-long');
     expect(group?.planGoal).toBe(longGoal);
-    expect(group?.planLabel.length).toBeLessThan(60);
+    expect(group?.planLabel.length).toBeLessThan(40);
     expect(group?.planLabel).toMatch(/^Check with all sub-agents/i);
     expect(group?.planLabel).not.toContain('Marco (backend)');
     expect(view.rows[0]?.planLabel).toBe(group?.planLabel);
+  });
+
+  it('shortens long task goals on cards while keeping full text for detail', () => {
+    const essay =
+      'Please confirm if we did this job "The Payments button is still hidden" — check backend billing route and frontend nav gate, then report.';
+    const view = buildOperatorTaskBoardView([
+      task({
+        task_id: 'task-payments',
+        goal: essay,
+        status: 'open',
+      }),
+    ]);
+    const row = view.rows[0];
+    expect(row?.goalFull).toBe(essay);
+    expect(row?.goal.length).toBeLessThan(essay.length);
+    expect(row?.goal.length).toBeLessThanOrEqual(65);
   });
 
   it('summarizes plan labels without dumping the whole fan-out', () => {

@@ -173,28 +173,6 @@
   max-width: 100%;
 }
 
-.agent-dock-composer__typeahead {
-  position: absolute;
-  bottom: calc(100% + 0.35rem);
-  left: 0.65rem;
-  right: 0.65rem;
-  z-index: var(--agent-dock-composer-overlay-z, 120);
-  max-height: min(18rem, 45vh);
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 0.45rem;
-  border: 1px solid rgba(138, 154, 173, 0.16);
-  border-radius: 10px;
-  background: rgba(10, 14, 20, 0.98);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-}
-
-.agent-dock-composer__typeahead .agent-dock-composer__menu-item strong {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
 .agent-dock-composer__input {
   flex: 1 1 10rem;
   width: auto;

@@ -11,6 +11,9 @@ import {
   buildSlashPaletteCatalog,
   filterSlashPaletteRows,
   isComposerSkillFilePath,
+  longestCommonSlashPrefix,
+  resolveSlashTabAction,
+  SLASH_STATUS_PROMPT,
   slashHelpText,
   type SlashPaletteRow,
 } from '../../lib/composer-slash-skills-view';
@@ -57,14 +60,24 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
   const skillsCache = ref<OperatorSkillRecord[]>([]);
   const skillsLoaded = ref(false);
 
+  const leadThread = computed(() => {
+    const role = String(shell.activeIdeEmployeeRecord?.role || '')
+      .trim()
+      .toLowerCase();
+    return role === 'lead';
+  });
+
+  const slashCatalog = computed(() =>
+    buildSlashPaletteCatalog(skillsCache.value, shell.currentWorkspace?.workspace_id, {
+      leadThread: leadThread.value,
+    }),
+  );
+
   const slashRows = computed(() => {
     if (kind.value !== 'slash') {
       return [] as SlashPaletteRow[];
     }
-    return filterSlashPaletteRows(
-      buildSlashPaletteCatalog(skillsCache.value, shell.currentWorkspace?.workspace_id),
-      query.value,
-    );
+    return filterSlashPaletteRows(slashCatalog.value, query.value);
   });
 
   const mentionRows = computed(() => {
@@ -83,9 +96,22 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
       return 'Mention a file';
     }
     if (kind.value === 'slash') {
-      return 'Skills & commands';
+      return leadThread.value
+        ? 'Lead commands — /ask answers · /agent fans out'
+        : 'Commands & skills';
     }
     return '';
+  });
+
+  const emptyHint = computed(() => {
+    if (kind.value !== 'slash' || loading.value) {
+      return 'No matches';
+    }
+    const q = query.value.trim();
+    if (!q) {
+      return 'No commands available';
+    }
+    return `No matches for /${q.replace(/^\//, '')} — try /ask, /status, or /help`;
   });
 
   function closeTypeahead(): void {
@@ -137,6 +163,22 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
     });
   }
 
+  function clampSelectedIndex(previousId?: string): void {
+    const list = rows.value;
+    if (!list.length) {
+      selectedIndex.value = 0;
+      return;
+    }
+    if (previousId) {
+      const kept = list.findIndex((row) => 'id' in row && row.id === previousId);
+      if (kept >= 0) {
+        selectedIndex.value = kept;
+        return;
+      }
+    }
+    selectedIndex.value = Math.max(0, Math.min(selectedIndex.value, list.length - 1));
+  }
+
   let syncSeq = 0;
 
   async function syncTypeaheadFromComposer(): Promise<void> {
@@ -150,12 +192,20 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
       return;
     }
 
+    const previousId =
+      rows.value[selectedIndex.value] && 'id' in rows.value[selectedIndex.value]
+        ? (rows.value[selectedIndex.value] as { id: string }).id
+        : undefined;
+    const queryChanged = token.query !== query.value || token.kind !== kind.value;
+
     closeToolbarMenus();
     activeToken.value = token;
     kind.value = token.kind;
     query.value = token.query;
     open.value = true;
-    selectedIndex.value = 0;
+    if (queryChanged) {
+      selectedIndex.value = 0;
+    }
 
     if (token.kind === 'slash') {
       await ensureSkillsLoaded();
@@ -166,9 +216,23 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
       return;
     }
 
-    if (selectedIndex.value >= rows.value.length) {
-      selectedIndex.value = Math.max(0, rows.value.length - 1);
+    clampSelectedIndex(queryChanged ? undefined : previousId);
+  }
+
+  function completeSlashTokenText(command: string): boolean {
+    const token = activeToken.value;
+    if (!token || token.kind !== 'slash') {
+      return false;
     }
+    const insertion = command.startsWith('/') ? command : `/${command}`;
+    if (token.token === insertion) {
+      return false;
+    }
+    const result = replaceComposerToken(getDraft(), token, insertion);
+    setDraft(result.next);
+    restoreCaret(result.caret);
+    void syncTypeaheadFromComposer();
+    return true;
   }
 
   function applyRow(row: ComposerTypeaheadRow): void {
@@ -207,11 +271,16 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
       return;
     }
 
+    if (row.kind === 'command' && row.command === '/status') {
+      composerMode.value = 'ask';
+      setDraft(SLASH_STATUS_PROMPT);
+      closeTypeahead();
+      restoreCaret(SLASH_STATUS_PROMPT.length);
+      return;
+    }
+
     if (row.kind === 'command' && row.command === '/help') {
-      const catalog = buildSlashPaletteCatalog(
-        skillsCache.value,
-        shell.currentWorkspace?.workspace_id,
-      );
+      const catalog = slashCatalog.value;
       setDraft(slashHelpText(catalog));
       closeTypeahead();
       restoreCaret(getDraft().length);
@@ -239,6 +308,32 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
     return true;
   }
 
+  function completeSelectedSlashWithTab(): boolean {
+    const row = rows.value[selectedIndex.value];
+    const token = activeToken.value;
+    if (!open.value || !row || !token || token.kind !== 'slash' || !('command' in row)) {
+      return applySelectedRow();
+    }
+
+    const filteredCommands = slashRows.value.map((item) => item.command);
+    const action = resolveSlashTabAction({
+      query: token.query,
+      selectedCommand: row.command,
+      filteredCommands,
+    });
+
+    if (action === 'complete-common') {
+      const common = longestCommonSlashPrefix(filteredCommands);
+      if (common) {
+        return completeSlashTokenText(`/${common}`);
+      }
+    }
+    if (action === 'complete-selected') {
+      return completeSlashTokenText(row.command);
+    }
+    return applySelectedRow();
+  }
+
   function handleTypeaheadKeydown(event: KeyboardEvent): boolean {
     if (!open.value) {
       return false;
@@ -256,6 +351,10 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
         event.preventDefault();
         return true;
       }
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        return true;
+      }
       return false;
     }
 
@@ -270,7 +369,14 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
         (selectedIndex.value - 1 + rows.value.length) % rows.value.length;
       return true;
     }
-    if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey)) {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      if (kind.value === 'slash') {
+        return completeSelectedSlashWithTab();
+      }
+      return applySelectedRow();
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       return applySelectedRow();
     }
@@ -282,6 +388,7 @@ export function useComposerTypeahead(options: UseComposerTypeaheadOptions) {
     typeaheadKind: kind,
     typeaheadRows: rows,
     typeaheadCaption: caption,
+    typeaheadEmptyHint: emptyHint,
     typeaheadSelectedIndex: selectedIndex,
     typeaheadLoading: loading,
     closeTypeahead,

@@ -90,6 +90,7 @@ const toolbarProps = useAgentDockComposerToolbarProps(composer);
           :privacy-mode="composer.shell.operatorPresenceSettings.privacy_mode"
           :typeahead-open="composer.typeaheadOpen.value"
           :typeahead-caption="composer.typeaheadCaption.value"
+          :typeahead-empty-hint="composer.typeaheadEmptyHint.value"
           :typeahead-loading="composer.typeaheadLoading.value"
           :typeahead-rows="composer.typeaheadRows.value"
           :typeahead-selected-index="composer.typeaheadSelectedIndex.value"
