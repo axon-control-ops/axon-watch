@@ -39,9 +39,17 @@ const importSubmitLabel = computed(() => {
   }
   return 'Import monitor keys';
 });
-const stateLabel = computed(() => vaultStateLabel(snapshot.value));
+const stateLabel = computed(() =>
+  vaultStateLabel(snapshot.value, {
+    unavailable: Boolean(vault.error.value) && !snapshot.value,
+  }),
+);
 const ttlLabel = computed(() => vaultTtlLabel(snapshot.value?.ttl_remaining));
-const showSetupFlow = computed(() => Boolean(vault.setupTotpSecret.value) || Boolean(snapshot.value && !snapshot.value.is_setup));
+const showSetupFlow = computed(
+  () =>
+    Boolean(vault.setupTotpSecret.value) ||
+    Boolean(snapshot.value && snapshot.value.is_setup === false),
+);
 const showUnlockFlow = computed(
   () => Boolean(snapshot.value?.is_setup) && !snapshot.value?.is_unlocked && !vault.setupTotpSecret.value,
 );

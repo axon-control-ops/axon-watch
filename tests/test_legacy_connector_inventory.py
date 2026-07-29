@@ -50,11 +50,11 @@ class LegacyConnectorInventoryTests(unittest.TestCase):
     def test_rejects_missing_watch_connector_mapping(self) -> None:
         spec = copy.deepcopy(load_json(DEFAULT_SPEC_PATH))
         spec["inventory"] = [
-            item for item in spec["inventory"] if item["id"] != "axon_local"
+            item for item in spec["inventory"] if item["id"] != "control_plane"
         ]
         result = validate_legacy_connector_inventory(spec=spec)
         self.assertEqual("fail", result.status)
-        self.assertIn("axon_local", result.message)
+        self.assertIn("control_plane", result.message)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ Type=simple
 EnvironmentFile=%h/.config/axon-watch/deployment.env
 WorkingDirectory=%h
 ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/run-service.sh axon-watch
-Restart=on-failure
+Restart=always
 RestartSec=3
 TimeoutStopSec=12
 KillMode=mixed
@@ -16,7 +16,7 @@ KillSignal=SIGTERM
 MemoryAccounting=yes
 MemoryHigh=400M
 MemoryMax=800M
-OOMPolicy=stop
+OOMPolicy=continue
 
 [Install]
 WantedBy=default.target

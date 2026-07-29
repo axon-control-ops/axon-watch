@@ -57,9 +57,12 @@ class WatchConnectorCatalogTests(unittest.TestCase):
             definitions["control_plane"].health_url,
         )
         self.assertEqual(
-            "http://127.0.0.1:4173/api/health",
+            "http://127.0.0.1:4173/",
             definitions["console_web"].health_url,
         )
+        self.assertTrue(definitions["console_web"].required)
+        self.assertIn("public_ingress", definitions)
+        self.assertFalse(definitions["public_ingress"].required)
 
     def test_expands_env_vars_in_health_url(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

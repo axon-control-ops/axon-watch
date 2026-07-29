@@ -15,7 +15,8 @@ Axon-X production operator is `:4173`; axon-local remains explicit fallback only
 | ID | Status | Owner | Probe | Phase G | Fallback removal criteria |
 |---|---|---|---|---|---|
 | `control_plane` | **migrated** | `services/control-plane` | HTTP `${AXON_WATCH_CONTROL_PLANE_BASE_URL}/api/health` · `verify:test3` | — | Native on Axon-X; axon-local not required. |
-| `console_web` | **migrated** | `apps/console-web` | HTTP `${AXON_WATCH_PUBLIC_BASE_URL}/` · `verify:test3` | — | Primary operator is `:4173`. |
+| `console_web` | **migrated** | `apps/console-web` | HTTP `${AXON_WATCH_CONSOLE_WEB_BASE_URL}/` · `verify:test3` | — | Primary operator is `:4173`. |
+| `public_ingress` | **migrated** | `services/axon-watch/app/tunnel` | HTTP `${AXON_WATCH_PUBLIC_BASE_URL}/api/health` · optional | — | Cloudflare/public only; not required for local ONLINE. |
 | `axon_local` | **optional fallback** | axon-local `:7734` | HTTP `http://127.0.0.1:7734/api/health` (optional) · `verify:test3` | G6 | Remove rail + probe after G4.2–G4.5 replaced/discarded, G5 matrix green, G6 one-week `:4173`-only sign-off. |
 | `agent_orchestration` | **replaced** | `cli_runtime` + run store | `verify:agent-orchestration-parity` | G3 | Blocker cleared when orchestration gate stays green; no `:7734` needed for agent file edits. |
 | `whatsapp_web_monitor` | **unmigrated** | axon-local `whatsapp_web_monitor.py` | Manual (scheduler job on `:7734`) | G4.2 | Bounded watch slice + vault auth + inbox signals, or explicit operator discard (G5.4). |
@@ -35,7 +36,8 @@ Configured in `config/watch-connectors.json` and surfaced on Mission Control →
 |---|---|---|
 | `control_plane` | yes | Connectors rail |
 | `console_web` | yes | Connectors rail |
-| `axon_local` | no | Connectors rail + **Open :7734 fallback** |
+| `public_ingress` | no | Connectors rail (Cloudflare/public) |
+| `axon_local` | — | Runtime retired; source kept for parity only |
 
 See `docs/WATCH_CONNECTORS.md`.
 

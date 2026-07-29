@@ -4,17 +4,13 @@
       "display_name": "audio-transcribe",
       "project_root": "/home/edp/Projectx/product/audio-transcribe"
     },
-    "workspace_axon_local": {
-      "display_name": "axon-local",
-      "project_root": "/home/edp/axon-nvme/repos/axon-local"
+    "workspace_axon_watch": {
+      "display_name": "axon-watch",
+      "project_root": "/home/edp/axon-nvme/repos/axon-watch"
     },
     "workspace_axon_online": {
       "display_name": "axon-online",
       "project_root": "/home/edp/Projectx/internal/axon-online"
-    },
-    "workspace_axon_watch": {
-      "display_name": "axon-watch",
-      "project_root": "/home/edp/axon-nvme/repos/axon-watch"
     },
     "workspace_bkk_invoice_system": {
       "display_name": "bkk-invoice-system",

@@ -34,7 +34,7 @@
       "phase_g_slice": null,
       "probe": {
         "kind": "http",
-        "url": "${AXON_WATCH_PUBLIC_BASE_URL}/",
+        "url": "${AXON_WATCH_CONSOLE_WEB_BASE_URL}/",
         "watch_connector_id": "console_web",
         "required": true,
         "gate": "verify:test3"
@@ -43,24 +43,69 @@
       "removal_criteria": "Primary operator surface is :4173. axon-local UI is explicit fallback only."
     },
     {
-      "id": "axon_local",
-      "display_name": "axon-local (legacy)",
-      "category": "legacy_surface",
-      "axon_x_status": "optional_fallback",
-      "owner": "axon-local (:7734)",
-      "phase_g_slice": "G6",
+      "id": "public_ingress",
+      "display_name": "Public ingress",
+      "category": "health_probe",
+      "axon_x_status": "migrated",
+      "owner": "services/axon-watch/app/tunnel",
+      "phase_g_slice": null,
       "probe": {
         "kind": "http",
-        "url": "http://127.0.0.1:7734/api/health",
-        "watch_connector_id": "axon_local",
+        "url": "${AXON_WATCH_PUBLIC_BASE_URL}/api/health",
+        "watch_connector_id": "public_ingress",
         "required": false,
         "gate": "verify:test3"
       },
-      "fallback": {
-        "url": "http://127.0.0.1:7734",
-        "ui_entry": "Mission Control → Connectors → Open :7734 fallback"
+      "fallback": null,
+      "removal_criteria": "Optional Cloudflare/public reachability. Local Mission Control must stay green when public ingress flaps."
+    },
+    {
+      "id": "github_api",
+      "display_name": "GitHub API",
+      "category": "health_probe",
+      "axon_x_status": "migrated",
+      "owner": "services/axon-watch/app/connectors",
+      "phase_g_slice": null,
+      "probe": {
+        "kind": "http",
+        "url": "https://api.github.com/zen",
+        "watch_connector_id": "github_api",
+        "required": false,
+        "gate": "verify:test3"
       },
-      "removal_criteria": "Remove fallback rail + probe only after G4.2–G4.5 unmigrated slices are replaced or operator-discarded, G5 capability matrix is green, and G6 one-week :4173-only sign-off."
+      "fallback": null,
+      "removal_criteria": "Optional GitHub reachability probe. Not required for local ONLINE status."
+    },
+    {
+      "id": "edudashpro_site",
+      "display_name": "EduDash Pro site",
+      "category": "health_probe",
+      "axon_x_status": "migrated",
+      "owner": "services/axon-watch/app/connectors",
+      "phase_g_slice": null,
+      "probe": {
+        "kind": "http",
+        "url": "https://edudashpro.org.za",
+        "watch_connector_id": "edudashpro_site",
+        "required": false,
+        "gate": "verify:test3"
+      },
+      "fallback": null,
+      "removal_criteria": "Optional DashPro site probe. Not required for local ONLINE status."
+    },
+    {
+      "id": "axon_local",
+      "display_name": "axon-local (legacy)",
+      "category": "legacy_surface",
+      "axon_x_status": "replaced",
+      "owner": "axon-local source tree (runtime retired)",
+      "phase_g_slice": null,
+      "probe": {
+        "kind": "manual",
+        "note": "Runtime retired. Source kept at repos/axon-local for parity reference only. No watch connector probe."
+      },
+      "fallback": null,
+      "removal_criteria": "Source retained for parity until explicit project discard; do not restart :7734 or axon-server for operator work."
     },
     {
       "id": "agent_orchestration",

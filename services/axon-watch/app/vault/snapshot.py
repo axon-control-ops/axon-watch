@@ -167,8 +167,22 @@ def _consumer_record(env: dict[str, str], spec: dict[str, object]) -> dict[str, 
 
 
 def vault_operator_snapshot(*, project_root: Path | None = None) -> dict[str, object]:
+    """Operator vault snapshot. CLI subscription probes are cached/short-timeout."""
+    from concurrent.futures import ThreadPoolExecutor
+
     env = merge_monitor_env(project_root=project_root)
     base = vault_status(project_root=project_root)
+
+    # Warm cursor/codex probes in parallel so /vault/status stays under the UI budget.
+    probe_names = [
+        str(spec.get("subscription_probe") or "").strip()
+        for spec in _VAULT_CONSUMERS
+        if str(spec.get("subscription_probe") or "").strip()
+    ]
+    if probe_names:
+        with ThreadPoolExecutor(max_workers=min(4, len(probe_names))) as pool:
+            list(pool.map(_subscription_probe, probe_names))
+
     consumers = [_consumer_record(env, spec) for spec in _VAULT_CONSUMERS]
     return {
         **base,

@@ -11,12 +11,12 @@ EnvironmentFile=%h/.config/axon-watch/deployment.env
 WorkingDirectory=%h
 ExecStartPre=/bin/bash -lc 'cd "%h/axon-nvme/repos/axon-watch" && test -d apps/console-web/dist || npm run build -w @axon-watch/console-web'
 ExecStart=%h/axon-nvme/repos/axon-watch/scripts/ops/run-service.sh console-web
-Restart=on-failure
+Restart=always
 RestartSec=3
 MemoryAccounting=yes
 MemoryHigh=512M
 MemoryMax=1G
-OOMPolicy=stop
+OOMPolicy=continue
 
 [Install]
 WantedBy=default.target

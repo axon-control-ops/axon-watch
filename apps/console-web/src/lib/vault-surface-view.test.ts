@@ -19,6 +19,7 @@ import {
   vaultImportFileLabel,
   vaultMissingKeysLabel,
   vaultReadyConsumerCount,
+  vaultStateLabel,
 } from './vault-surface-view';
 
 describe('app surface route', () => {
@@ -160,5 +161,20 @@ POSTHOG_PERSONAL_API_KEY,xyz789`),
   it('formats vault timestamps for display and handles invalid values', () => {
     expect(formatVaultTimestamp('2026-07-06T09:43:00Z', 'en-US')).toContain('2026');
     expect(formatVaultTimestamp('not-a-date', 'en-US')).toBe('Unknown');
+  });
+
+  it('does not treat a timed-out vault fetch as setup required', () => {
+    expect(vaultStateLabel(null, { unavailable: true })).toBe('Status unavailable');
+    expect(vaultStateLabel(null)).toBe('Setup required');
+    expect(
+      vaultStateLabel({
+        is_setup: true,
+        is_unlocked: true,
+        import_file_present: false,
+        import_file: '',
+        available_keys: [],
+        sources: [],
+      }),
+    ).toBe('Unlocked');
   });
 });

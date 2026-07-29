@@ -49,6 +49,12 @@ def _bootstrap_connector_env() -> None:
     control_plane_port = os.environ["AXON_WATCH_CONTROL_PLANE_PORT"]
     watch_port = os.environ["AXON_WATCH_WATCH_SERVICE_PORT"]
 
+    # Required console probe stays on loopback so Cloudflare flaps cannot
+    # mark Mission Control degraded while the PC-local stack is healthy.
+    os.environ.setdefault(
+        "AXON_WATCH_CONSOLE_WEB_BASE_URL",
+        f"http://127.0.0.1:{console_port}",
+    )
     os.environ.setdefault(
         "AXON_WATCH_PUBLIC_BASE_URL",
         f"http://127.0.0.1:{console_port}",
