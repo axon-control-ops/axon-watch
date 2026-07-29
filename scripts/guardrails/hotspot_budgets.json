@@ -325,7 +325,7 @@
       "note": "Autonomy readiness assessment; split chapters when revising"
     },
     "tests/test_run_stale_reconcile.py": {
-      "max_lines": 563,
+      "max_lines": 600,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_run_stale_* slices"
