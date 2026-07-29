@@ -22,6 +22,7 @@ import {
   vaxonBriefingPendingByWorkspace,
 } from '../../lib/vaxon-briefing-interaction';
 import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
+import { sidebarSpeechShouldOfferReply } from '../../lib/sidebar-speech-reply-route';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
 import { useShellStore } from '../../stores/shell';
 import OperatorPersonaMark from '../OperatorPersonaMark.vue';
@@ -34,6 +35,8 @@ const shell = useShellStore();
 const { spokenText, speaker } = useSpokenUtteranceText();
 const stickySpokenText = ref('');
 const stickySpeakerName = ref('');
+const stickySpeakerKind = ref<'vaxon' | 'employee' | null>(null);
+const stickySpeakerId = ref<string | null>(null);
 const stickyNeedsDecision = ref(false);
 const followupTick = ref(0);
 let followupTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -48,6 +51,8 @@ watch(
     stickySpokenText.value = next;
     const speakerName = name?.trim() || '';
     const activeEmployee = shell.activeIdeEmployee?.name?.trim() || '';
+    stickySpeakerKind.value = kind === 'employee' || kind === 'vaxon' ? kind : null;
+    stickySpeakerId.value = typeof speakerId === 'string' && speakerId.trim() ? speakerId : null;
     stickySpeakerName.value =
       (speakerName && speakerName.toLowerCase() !== 'teammate'
         ? speakerName
@@ -56,7 +61,14 @@ watch(
       OPERATOR_PERSONA_NAME;
     const needsDecision = kind === 'vaxon' && vaxonLineAsksForReply(next);
     stickyNeedsDecision.value = needsDecision;
-    // Only questions awaiting an operator answer persist; plain narration expires.
+    // Employee asks replace a prior VAXON decision so the reply box matches the speaker.
+    if (kind === 'employee') {
+      const ws = shell.currentWorkspace?.workspace_id?.trim();
+      if (ws) {
+        clearVaxonBriefingInteraction(ws);
+      }
+    }
+    // Only VAXON questions awaiting an operator answer persist; plain narration expires.
     if (needsDecision) {
       const ws = shell.currentWorkspace?.workspace_id?.trim();
       if (ws) {
@@ -243,6 +255,8 @@ function dismissSpeechChip(): void {
   }
   stickySpokenText.value = '';
   stickySpeakerName.value = '';
+  stickySpeakerKind.value = null;
+  stickySpeakerId.value = null;
   stickyNeedsDecision.value = false;
   followupTick.value += 1;
 }
@@ -288,22 +302,17 @@ const speechChipText = computed(
 );
 const showSpeechReplyBlock = computed(() => {
   const line = speechChipText.value?.trim() ?? '';
-  if (!line) {
-    return false;
-  }
-  const isVaxonSurface =
-    speaker.value?.kind === 'vaxon' ||
-    stickySpeakerName.value === OPERATOR_PERSONA_NAME ||
-    Boolean(pendingVaxonDecision.value);
-  if (!isVaxonSurface) {
-    return false;
-  }
-  // VAXON questions / invites always get a reply surface in IDE.
-  if (vaxonLineAsksForReply(line)) {
-    return true;
-  }
-  // Duplex follow-up window after VAXON finishes speaking.
-  return stickyDecisionActive.value;
+  const speakerKind =
+    speaker.value?.kind ??
+    stickySpeakerKind.value ??
+    (stickySpeakerName.value === OPERATOR_PERSONA_NAME ? 'vaxon' : null);
+  return sidebarSpeechShouldOfferReply({
+    line,
+    speakerKind,
+    stickyNeedsDecision: stickyNeedsDecision.value,
+    pendingVaxonDecision: Boolean(pendingVaxonDecision.value),
+    followupActive: stickyDecisionActive.value,
+  });
 });
 const agentLinkLabel = computed(() => {
   if (shell.kairoSpeechActive) {
@@ -479,6 +488,9 @@ function handleStopSpeech(event?: Event): void {
       :fallback-persona-name="speechPersonaName"
       :sticky-text="stickySpokenText"
       :sticky-speaker-name="stickySpeakerName"
+      :sticky-speaker-kind="stickySpeakerKind"
+      :sticky-speaker-id="stickySpeakerId"
+      :employees="shell.companyEmployeesForCurrentWorkspace"
       :show-dismiss="showSpeechDismiss"
       :awaiting-reply="showSpeechReplyBlock"
       @stop-speech="handleStopSpeech()"

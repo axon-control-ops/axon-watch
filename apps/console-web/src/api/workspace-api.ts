@@ -348,3 +348,34 @@ export async function deleteWorkspaceTerminalSession(
     'workspace terminal session delete failed',
   );
 }
+
+export type AgentTerminalJobRecord = {
+  job_id: string;
+  workspace_id: string;
+  session_id: string;
+  run_id: string | null;
+  command: string;
+  status: string;
+  created_at: string;
+  receipt: string;
+  agent_terminal_session: TerminalSessionRecord;
+};
+
+export async function enqueueWorkspaceAgentTerminalJob(
+  workspaceId: string,
+  options: { command: string; run_id?: string | null },
+): Promise<AgentTerminalJobRecord> {
+  const encodedWorkspaceId = encodeURIComponent(workspaceId);
+  return fetchJson<AgentTerminalJobRecord>(
+    `/api/workspaces/${encodedWorkspaceId}/terminal/agent-jobs`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        command: options.command,
+        run_id: options.run_id ?? null,
+      }),
+    },
+    'workspace agent terminal job enqueue failed',
+  );
+}

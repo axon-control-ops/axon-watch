@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -43,6 +45,9 @@ from app.workspace_agents.employee_first_person import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Keep role-tagged IDE turns ahead of the stale reaper during long Cursor sessions.
+_LANE_B_PROGRESS_RECEIPT_MIN_SECONDS = 60.0
 
 
 @dataclass(frozen=True)
@@ -306,9 +311,11 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
     run_record = None
     lane_b_result: dict[str, object] = {}
     milestone_content = ""
+    progress_lock = threading.Lock()
+    last_progress_at = 0.0
 
     def on_chunk(accumulated: str, delta: str) -> None:
-        nonlocal milestone_content
+        nonlocal milestone_content, last_progress_at
         milestone_content = persist_stream_delta(
             thread_id=job.thread_id,
             message_id=job.agent_message_id,
@@ -317,6 +324,25 @@ def execute_lane_b_stream(job: LaneBStreamJob) -> None:
             delta=delta,
             updated_at=_utc_now(),
         )
+        # Role-tagged IDE turns need non-heartbeat receipts or the 12-minute stale
+        # reaper treats a long Cursor agent session as hung (especially Lead).
+        run_id = str(job.dispatch_run_id or "").strip()
+        if not run_id:
+            return
+        now = time.monotonic()
+        with progress_lock:
+            if now - last_progress_at < _LANE_B_PROGRESS_RECEIPT_MIN_SECONDS:
+                return
+            last_progress_at = now
+        try:
+            append_run_execution_receipt(
+                run_id,
+                receipt_type="worker_progress",
+                receipt_summary="IDE agent turn still executing",
+                actor="cli_runtime",
+            )
+        except (RunLifecycleError, RunNotFoundError):
+            return
 
     try:
         lane_b_result = generate_lane_b_result(

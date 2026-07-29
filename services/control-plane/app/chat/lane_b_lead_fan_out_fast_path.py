@@ -113,20 +113,6 @@ def maybe_post_lead_fan_out_message(
     operator_attachments = bind_attachments(str(operator_message["message_id"]))
     if operator_attachments:
         operator_message = {**operator_message, "attachments": operator_attachments}
-    system_message = save_message(
-        {
-            "message_id": new_message_id("message_system"),
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "run_id": None,
-            "role": "system",
-            "content": (
-                "Lead fan-out materialized; specialist runs queued for continuous dispatch "
-                "(no Lane B Lead turn)."
-            ),
-            "created_at": created_at,
-        }
-    )
     agent_message = save_message(
         {
             "message_id": new_message_id("message_agent"),
@@ -140,7 +126,7 @@ def maybe_post_lead_fan_out_message(
     )
     return {
         "thread_id": thread_id,
-        "messages": [operator_message, system_message, agent_message],
+        "messages": [operator_message, agent_message],
         "run_id": "",
         "dispatched": True,
         "run": None,

@@ -3,6 +3,7 @@ import { computed, type Ref } from 'vue';
 import {
   createWorkspaceTerminalSession,
   deleteWorkspaceTerminalSession,
+  enqueueWorkspaceAgentTerminalJob,
   fetchWorkspaceTerminalSessions,
   renameWorkspaceTerminalSession,
   type TerminalSessionRecord,
@@ -160,11 +161,45 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     input.revealIdeTerminalPanel();
   }
 
-  async function backgroundIdeAgentRun(): Promise<void> {
+  /** Inject a command into the Axon agent PTY and focus the vaxon tab. */
+  async function runCommandInAgentBackgroundTerminal(command: string): Promise<void> {
+    const trimmed = command.trim();
+    if (!trimmed) {
+      return;
+    }
+    const workspaceId = input.currentWorkspace.value?.workspace_id;
+    if (workspaceId) {
+      try {
+        const job = await enqueueWorkspaceAgentTerminalJob(workspaceId, {
+          command: trimmed,
+          run_id: input.ideAgentRunId.value,
+        });
+        applyTerminalSession(job.agent_terminal_session);
+        input.revealIdeTerminalPanel();
+        input.activeTerminalSessionId.value = job.session_id;
+        return;
+      } catch {
+        // Fall through to local pending queue if control-plane is unreachable.
+      }
+    }
+    queueAgentBackgroundCommand(trimmed);
+    input.revealIdeTerminalPanel();
+    const agentSession = input.terminalSessions.value.find((session) => session.role === 'agent');
+    if (agentSession) {
+      input.activeTerminalSessionId.value = agentSession.id;
+      return;
+    }
+    await createVaxonTerminalSession(input.ideAgentRunId.value);
+  }
+
+  async function backgroundIdeAgentRun(command?: string | null): Promise<void> {
     // Drop any pinned snapshot so the live open `:::terminal` card can stream in.
     clearAgentShellMirrorForcedText();
     armAgentShellMirror();
     input.revealIdeTerminalPanel();
+    // Do not re-run an in-flight Cursor shell command in the Axon PTY — that
+    // duplicates side effects. Axon-owned jobs use runCommandInAgentBackgroundTerminal.
+    void command;
     const agentSession = input.terminalSessions.value.find((session) => session.role === 'agent');
     if (agentSession) {
       input.activeTerminalSessionId.value = agentSession.id;
@@ -188,22 +223,6 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
       return;
     }
     await createTerminalSession({ role: 'operator', title: 'zsh' });
-  }
-
-  /** Inject a command into the read-only vaxon PTY (not offered on finished transcript cards). */
-  async function runCommandInAgentBackgroundTerminal(command: string): Promise<void> {
-    const trimmed = command.trim();
-    if (!trimmed) {
-      return;
-    }
-    queueAgentBackgroundCommand(trimmed);
-    input.revealIdeTerminalPanel();
-    const agentSession = input.terminalSessions.value.find((session) => session.role === 'agent');
-    if (agentSession) {
-      input.activeTerminalSessionId.value = agentSession.id;
-      return;
-    }
-    await createVaxonTerminalSession(input.ideAgentRunId.value);
   }
 
   async function splitTerminalSession(sessionId: string): Promise<string | null> {

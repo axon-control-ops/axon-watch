@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { vaxonAffirmReplyCta, vaxonLineAsksForReply } from './vaxon-reply-prompt';
+import {
+  isAffirmativeOperatorReply,
+  spokenLineAsksForRetry,
+  vaxonAffirmReplyCta,
+  vaxonLineAsksForReply,
+} from './vaxon-reply-prompt';
 
 describe('vaxonLineAsksForReply', () => {
   it('treats trailing questions as reply prompts', () => {
@@ -15,10 +20,24 @@ describe('vaxonLineAsksForReply', () => {
   it('matches invite phrasing without requiring a trailing question mark', () => {
     expect(vaxonLineAsksForReply('Shall I open Attention for the top signal')).toBe(true);
     expect(vaxonLineAsksForReply('Would you like me to triage DashPro next')).toBe(true);
+    expect(
+      vaxonLineAsksForReply(
+        'I can try again, or explain what happened — your call.',
+      ),
+    ).toBe(true);
   });
 
   it('ignores plain narration', () => {
     expect(vaxonLineAsksForReply('Watch connected. Runtime looks nominal.')).toBe(false);
+  });
+});
+
+describe('spokenLineAsksForRetry', () => {
+  it('matches teammate try-again invites', () => {
+    expect(spokenLineAsksForRetry('I can try again, or explain what happened — your call.')).toBe(
+      true,
+    );
+    expect(spokenLineAsksForRetry('Hit Try again when you want another go')).toBe(true);
   });
 });
 
@@ -27,5 +46,19 @@ describe('vaxonAffirmReplyCta', () => {
     expect(vaxonAffirmReplyCta('Open Attention for DashPro Sentry critical?')).toBe(
       'Yes — open Attention',
     );
+  });
+
+  it('offers Try again when the spoken line asks for a retry', () => {
+    expect(vaxonAffirmReplyCta('I can try again, or explain what happened — your call.')).toBe(
+      'Try again',
+    );
+  });
+});
+
+describe('isAffirmativeOperatorReply', () => {
+  it('accepts short affirmations and Try again', () => {
+    expect(isAffirmativeOperatorReply('Try again')).toBe(true);
+    expect(isAffirmativeOperatorReply('yes')).toBe(true);
+    expect(isAffirmativeOperatorReply('no')).toBe(false);
   });
 });

@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 # Cursor agent turns time out around 240s; keep headroom for finalize + retries.
 DEFAULT_STALE_SECONDS = 720.0
+# Lead shifts coordinate specialists and often run longer than a single CLI turn.
+DEFAULT_LEAD_STALE_SECONDS = 1800.0
 _STALE_SUMMARY = "Continuous worker run exceeded stale timeout"
 _PAUSED_ABANDON_SUMMARY = "Paused continuous worker run abandoned after stale timeout"
 
@@ -35,6 +37,21 @@ def employee_run_stale_seconds() -> float:
     except ValueError:
         return DEFAULT_STALE_SECONDS
     return max(60.0, value)
+
+
+def employee_run_stale_seconds_for_role(role: str | None) -> float:
+    """Per-role idle TTL — leads get a longer default for fan-out / board work."""
+    base = employee_run_stale_seconds()
+    cleaned = str(role or "").strip().lower()
+    if cleaned != "lead":
+        return base
+    raw = os.environ.get("AXON_WATCH_LEAD_RUN_STALE_SECONDS", "").strip()
+    if raw:
+        try:
+            return max(60.0, float(raw))
+        except ValueError:
+            pass
+    return max(base, DEFAULT_LEAD_STALE_SECONDS)
 
 
 def _parse_iso(value: object) -> datetime | None:
@@ -86,13 +103,10 @@ def _run_idle_age_seconds(record: dict[str, Any], *, now: datetime) -> float | N
     return max(0.0, (now - stamp).total_seconds())
 
 
-def _normalize_cutoff(stale_seconds: float | None) -> float:
-    cutoff = (
-        employee_run_stale_seconds()
-        if stale_seconds is None
-        else float(stale_seconds)
-    )
-    return max(60.0, cutoff)
+def _normalize_cutoff(stale_seconds: float | None, *, role: str | None = None) -> float:
+    if stale_seconds is not None:
+        return max(60.0, float(stale_seconds))
+    return employee_run_stale_seconds_for_role(role)
 
 
 def _cancel_stale_employee_run_via_pause(
@@ -196,7 +210,6 @@ def reap_stale_employee_runs(
     """
     from app.runs.service import RunLifecycleError, RunNotFoundError, fail_run
 
-    cutoff = _normalize_cutoff(stale_seconds)
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
@@ -209,6 +222,7 @@ def reap_stale_employee_runs(
         phase = str(record.get("phase") or "").strip()
         if is_terminal_phase(phase):
             continue
+        cutoff = _normalize_cutoff(stale_seconds, role=role)
         age = _run_idle_age_seconds(record, now=moment)
         if age is None or age < cutoff:
             continue
@@ -269,7 +283,9 @@ def reap_stale_employee_runs(
 
 __all__ = [
     "BUSY_EMPLOYEE_PHASES",
+    "DEFAULT_LEAD_STALE_SECONDS",
     "DEFAULT_STALE_SECONDS",
     "employee_run_stale_seconds",
+    "employee_run_stale_seconds_for_role",
     "reap_stale_employee_runs",
 ]

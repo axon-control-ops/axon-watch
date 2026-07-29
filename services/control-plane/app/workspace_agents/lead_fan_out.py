@@ -112,23 +112,11 @@ def _post_assignment_to_employee_thread(
             employee_role=owner_role,
         )
     thread_id = str(thread["thread_id"])
-    goal_line = " ".join(str(goal or "").split())
-    if len(goal_line) > 220:
-        goal_line = f"{goal_line[:219].rstrip()}…"
-    chat_store.save_message(
-        {
-            "message_id": f"message_system_{uuid4().hex}",
-            "thread_id": thread_id,
-            "workspace_id": workspace_id,
-            "run_id": run_id,
-            "role": "system",
-            "content": (
-                f"Lead fan-out assigned task {task_id} → run {run_id} "
-                f"(queued — waiting for worker dispatch)."
-            ),
-            "created_at": created_at,
-        }
-    )
+    goal_line = " ".join(str(goal or "").strip().split())
+    if len(goal_line) > 160:
+        goal_line = f"{goal_line[:159].rstrip()}…"
+    # Compact chip only — SYSTEM queue essays clutter the specialist dock.
+    # Lead keeps a full summary on their own thread; run receipts stay on the ledger.
     chat_store.save_message(
         {
             "message_id": f"message_agent_{uuid4().hex}",
@@ -136,12 +124,7 @@ def _post_assignment_to_employee_thread(
             "workspace_id": workspace_id,
             "run_id": run_id,
             "role": "agent",
-            "content": (
-                f"Assigned by Lead fan-out.\n"
-                f"Goal: {goal_line or '(no goal text)'}\n"
-                f"Status: queued until continuous worker dispatch starts Lane B. "
-                f"Open this thread after dispatch to follow the shift transcript."
-            ),
+            "content": f"Queued for dispatch · {goal_line or f'task `{task_id}`'}",
             "created_at": created_at,
         }
     )

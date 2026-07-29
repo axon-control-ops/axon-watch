@@ -66,6 +66,11 @@ class CreateTerminalSessionRequest(BaseModel):
     session_id: str | None = None
 
 
+class EnqueueAgentTerminalJobRequest(BaseModel):
+    command: str
+    run_id: str | None = None
+
+
 class RenameTerminalSessionRequest(BaseModel):
     title: str
 

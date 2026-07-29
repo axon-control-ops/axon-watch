@@ -69,6 +69,21 @@ gh run view --log-failed
 **Axon-X company ownership:** Rowan (watcher) + Mira (Lead) own Fast Gate for
 `workspace_axon_watch`. Quinn (integrations) supports Actions wiring.
 
+### How to know older red runs are “fixed”
+
+GitHub **never** flips a finished red run green. Older failures on the same
+branch stay red forever. The only merge signal that matters is the **tip of the
+branch**:
+
+1. `git rev-parse HEAD` matches the green Fast Gate run’s `headSha`.
+2. `gh run list --branch <branch> --workflow "Axon-X Fast Gate" --limit 1`
+   shows `conclusion=success`.
+3. Or Actions UI: newest Fast Gate on that branch is green for the same commit.
+
+Typical early fails: hard **file-size ratchets**, planning **manifest hash**
+drift, or missing **workspace bindings**. Fix tip → push → watch Fast Gate.
+Uncommitted local WIP is not CI-proven until it is committed, pushed, and green.
+
 ### What Fast Gate runs (~2–3 minutes)
 
 1. **`npm run verify:contracts`** — shared types, control-plane/watch contract
@@ -188,6 +203,7 @@ Guards (so one restart cannot flood the fleet):
 | `AXON_WATCH_WORKER_SCHEDULER_DISPATCH` | `1` | Lane B dispatch after `create_run` |
 | `AXON_WATCH_WORKER_SCHEDULER_INTERVAL_SECONDS` | `45` | Tick interval |
 | `AXON_WATCH_WORKER_RUN_STALE_SECONDS` | `720` | Fail/cancel idle role-tagged shifts older than this |
+| `AXON_WATCH_LEAD_RUN_STALE_SECONDS` | `1800` | Lead-role idle TTL (defaults to at least 30m so fan-out / board work survives) |
 | `AXON_WATCH_EMPLOYEE_RUN_RETENTION_PER_ROLE` | `8` | Keep this many finished role-tagged runs per workspace/role |
 | `AXON_WATCH_REVIEW_READY_STALE_SECONDS` | `14400` | Auto-complete idle untagged `review_ready` checkpoints older than this |
 

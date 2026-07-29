@@ -266,6 +266,31 @@ class RunStaleReconcileTests(unittest.TestCase):
         self.assertEqual(reaped, [])
         self.assertEqual("executing", get_run(run_id)["phase"])
 
+    def test_lead_default_ttl_survives_specialist_stale_cutoff(self) -> None:
+        from app.runs.stale_reconcile import (
+            DEFAULT_LEAD_STALE_SECONDS,
+            employee_run_stale_seconds_for_role,
+        )
+
+        self.assertGreaterEqual(
+            employee_run_stale_seconds_for_role("lead"),
+            DEFAULT_LEAD_STALE_SECONDS,
+        )
+        record = create_run(
+            workspace_id="workspace_axon_watch",
+            mode="agent",
+            summary="Dana: continuous worker shift",
+            employee_role="lead",
+        )
+        run_id = str(record["run_id"])
+        # Specialist TTL (720s) would reap this; Lead default is 1800s.
+        _age_run(run_id, seconds=900)
+
+        reaped = reap_stale_employee_runs()
+
+        self.assertEqual(reaped, [])
+        self.assertEqual("executing", get_run(run_id)["phase"])
+
     def test_reap_leaves_untagged_interactive_runs_alone(self) -> None:
         record = create_run(
             workspace_id="workspace_axon_watch",
