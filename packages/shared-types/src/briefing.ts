@@ -58,7 +58,6 @@ export interface ExecutiveOperatorRhythm {
   execute: string;
   verify: string;
   report: string;
-  advise_ui_action?: Record<string, unknown> | null;
 }
 
 export interface OperatorBriefingScope {
