@@ -98,7 +98,7 @@ export function createBusyEmployeeIdeStreamSlice(input: CreateBusyEmployeeIdeStr
           resolvedMessageId: messageId,
           alreadyActive: Boolean(streamUi.active),
           alreadyMessageId: streamUi.messageId,
-          hasLiveSession: Boolean(input.hasLiveChatStreamSession?.(threadId)),
+          hasLiveSession: Boolean(threadId && input.hasLiveChatStreamSession?.(threadId)),
         });
         if (decision !== 'attach' || !threadId || !messageId) {
           continue;

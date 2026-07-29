@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const focusAgentDockComposerInput = vi.fn();
 const requestIdeComposerMode = vi.fn();
-const restoreComposerDraft = vi.fn();
-const submitIdeComposer = vi.fn(async () => undefined);
+const restoreComposerDraft = vi.fn((_text: string) => undefined);
+const submitIdeComposer = vi.fn(async (_mode?: 'agent' | 'ask' | 'plan') => undefined);
 
 let draftValue = '';
 let commandMutationState = 'idle';
@@ -31,8 +31,8 @@ vi.mock('../stores/shell', () => ({
     set ideComposerDraft(value: string) {
       draftValue = value;
     },
-    restoreComposerDraft: (...args: unknown[]) => restoreComposerDraft(...args),
-    submitIdeComposer: (...args: unknown[]) => submitIdeComposer(...args),
+    restoreComposerDraft: (text: string) => restoreComposerDraft(text),
+    submitIdeComposer: (mode: 'agent' | 'ask' | 'plan') => submitIdeComposer(mode),
   }),
 }));
 

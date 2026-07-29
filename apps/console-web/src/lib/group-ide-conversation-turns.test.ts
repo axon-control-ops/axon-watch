@@ -6,10 +6,13 @@ import type { OperatorThreadEntry } from './operator-thread';
 function msg(
   role: OperatorThreadEntry['role'],
   id: string,
-  content = role,
+  content: string = role,
 ): OperatorThreadEntry {
   return {
     message_id: id,
+    thread_id: 'thread_test',
+    run_id: null,
+    workspace_id: 'ws_test',
     role,
     content,
     created_at: '2026-07-29T00:00:00Z',
@@ -61,7 +64,6 @@ describe('groupIdeConversationTurns', () => {
           attachment_id: att,
           filename: 'a.png',
           mime_type: 'image/png',
-          size_bytes: 1,
           url: '/x',
         },
       ],
