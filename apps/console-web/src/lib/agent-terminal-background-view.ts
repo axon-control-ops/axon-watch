@@ -43,8 +43,11 @@ export function agentTerminalMirrorBadgeLabel(input: {
   segmentOpen: boolean;
   mirrorActive: boolean;
 }): string | null {
-  if (!input.segmentOpen || !input.mirrorActive) {
+  if (!input.mirrorActive) {
     return null;
   }
-  return CURSOR_SHELL_PROCESS_DETACH_AVAILABLE ? 'backgrounded' : 'mirrored in vaxon';
+  if (CURSOR_SHELL_PROCESS_DETACH_AVAILABLE && input.segmentOpen) {
+    return 'backgrounded';
+  }
+  return input.segmentOpen ? 'watching in terminal' : 'shown in terminal';
 }

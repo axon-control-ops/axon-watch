@@ -23,9 +23,11 @@ Background / auto-surface on an **open** in-thread `:::terminal` block:
 
 1. Reveals/focuses the **vaxon** agent terminal tab (also auto-arms on first shell tool).
 2. **Mirrors** the live transcript shell card into that xterm viewport (read-only).
-3. Shows an in-thread badge: `mirrored in vaxon`.
-4. Does **not** take ownership of the Cursor CLI shell process.
-5. Does **not** free the agent — Cursor CLI still awaits its own shell tool completion.
+3. Shows an in-thread badge: `watching in terminal`.
+4. Collapses the in-thread scrollback to a receipt while the dock owns the logs
+   (Expand in chat remains available).
+5. Does **not** take ownership of the Cursor CLI shell process.
+6. Does **not** free the agent — Cursor CLI still awaits its own shell tool completion.
 
 Closed / finished terminal cards have **no** "Run again" CTA (Cursor parity).
 Clicking the command still **reveals** a pinned snapshot of that output in vaxon;

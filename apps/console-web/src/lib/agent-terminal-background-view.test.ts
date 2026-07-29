@@ -52,14 +52,20 @@ describe('agent terminal background visibility', () => {
     expect(agentTranscriptHasOpenTerminalBlock(':::thinking\nstill going')).toBe(false);
   });
 
-  it('labels mirrored in-flight shells honestly while process detach is unavailable', () => {
+  it('labels watching shells honestly while process detach is unavailable', () => {
     expect(CURSOR_SHELL_PROCESS_DETACH_AVAILABLE).toBe(false);
     expect(
       agentTerminalMirrorBadgeLabel({
         segmentOpen: true,
         mirrorActive: true,
       }),
-    ).toBe('mirrored in vaxon');
+    ).toBe('watching in terminal');
+    expect(
+      agentTerminalMirrorBadgeLabel({
+        segmentOpen: false,
+        mirrorActive: true,
+      }),
+    ).toBe('shown in terminal');
     expect(
       agentTerminalMirrorBadgeLabel({
         segmentOpen: true,
