@@ -77,6 +77,62 @@ describe('report-theater-directives', () => {
     ).toBe('axon');
   });
 
+  it('binds vault recovery when next-move names the GitHub probe token', () => {
+    const actions = [
+      {
+        action_id: 'theater_open_vault',
+        kind: 'inspect_runtime' as const,
+        title: 'Open Vault',
+        detail: 'Restore runtime secrets',
+        workspace_id: null,
+        run_id: null,
+        signal_id: null,
+      },
+      {
+        action_id: 'sig',
+        kind: 'review_signal' as const,
+        title: 'DashPro GitHub API warning',
+        detail: '401',
+        workspace_id: 'workspace_dashpro',
+        run_id: null,
+        signal_id: 'sig-gh',
+      },
+    ];
+    expect(
+      matchActionForNextMove(
+        "I'll open Vault and restore the GitHub probe token next",
+        actions,
+      )?.action_id,
+    ).toBe('theater_open_vault');
+  });
+
+  it('does not bind or auto-execute an unrelated action for a Lead push receipt', () => {
+    const actions = [
+      {
+        action_id: 'sig-unrelated',
+        kind: 'review_signal' as const,
+        title: 'Unrelated Sentry signal',
+        detail: 'Open Attention',
+        workspace_id: 'workspace_dashpro',
+        run_id: null,
+        signal_id: 'sig-unrelated',
+      },
+    ];
+    const nextMove =
+      "I'll open the Lead receipt and inspect the exact push error before retrying";
+
+    expect(matchActionForNextMove(nextMove, actions)).toBeNull();
+    const directives = buildVaxonReportDirectives({
+      nextMove,
+      actions,
+      topSignals: [],
+      workspaces: [],
+    });
+    expect(directives[0]?.label).toBe(nextMove);
+    expect(directives[0]?.briefingAction).toBeNull();
+    expect(directives[0]?.autoExecute).toBe(false);
+  });
+
   it('synthesizes signal actions when next_safe_actions are empty', () => {
     const directives = buildVaxonReportDirectives({
       nextMove: "I'll switch us there and review that signal next",
@@ -163,5 +219,17 @@ describe('report-theater-directives', () => {
     expect(directives[0]?.briefingAction?.workspace_id).toBe('workspace_axon_watch');
     expect(directives[0]?.autoExecute).toBe(true);
     expect(directives[0]?.detail).toMatch(/executes this next/i);
+  });
+
+  it('binds public tunnel restart when next-move names the tunnel', () => {
+    const directives = buildVaxonReportDirectives({
+      nextMove: "I'll restart the public tunnel next",
+      actions: [],
+      topSignals: [],
+      workspaces: [],
+    });
+    expect(directives[0]?.label).toMatch(/restart the public tunnel/i);
+    expect(directives[0]?.briefingAction?.action_id).toBe('theater_start_tunnel');
+    expect(directives[0]?.autoExecute).toBe(true);
   });
 });

@@ -3,6 +3,9 @@ import { reportTheaterOpen } from './report-theater-state';
 const AUTO_START_COOLDOWN_MS = 12 * 60 * 1000;
 const AUTO_START_PENDING_MS = 20_000;
 
+/** Operator policy: Command Theater opens only via REPORT / STAND-UP — never from briefing polls. */
+export const REPORT_THEATER_AUTO_START_ENABLED = false;
+
 let lastAutoStartAt = 0;
 let lastAutoStartKey = '';
 let autoStartPendingUntil = 0;
@@ -41,9 +44,8 @@ export function isReportTheaterAutoStartTransition(
 }
 
 /**
- * Semi keeps the hydration quiet-baseline (advise until the brief changes).
- * Full Autonomous starts on the first actionable briefing — otherwise VAXON
- * only speaks autonomy_advisory and never opens theater / executes.
+ * Stand-up is operator-initiated. Autonomy still speaks advisories and can
+ * execute after an explicit REPORT — it must not open Command Theater alone.
  */
 export function shouldStartReportTheaterForBriefing(input: {
   autonomyMode: string | null | undefined;
@@ -51,6 +53,9 @@ export function shouldStartReportTheaterForBriefing(input: {
   currentBriefKey: string;
   eligible: boolean;
 }): boolean {
+  if (!REPORT_THEATER_AUTO_START_ENABLED) {
+    return false;
+  }
   if (!input.eligible) {
     return false;
   }
@@ -66,9 +71,13 @@ export function shouldStartReportTheaterForBriefing(input: {
 }
 
 /**
- * Semi/Full autonomy: VAXON opens Command Theater without the operator typing REPORT.
+ * Semi/Full autonomy used to open Command Theater without REPORT.
+ * Disabled by policy — keep the helper for tests / future opt-in flag.
  */
 export function shouldAutoStartReportTheater(input: AutoStartStandupInput): boolean {
+  if (!REPORT_THEATER_AUTO_START_ENABLED) {
+    return false;
+  }
   if (reportTheaterOpen.value) {
     return false;
   }

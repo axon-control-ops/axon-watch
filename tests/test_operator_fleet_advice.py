@@ -171,6 +171,40 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         line = build_fleet_coach_line(pack["winner"], scope_mode="fleet")
         self.assertEqual("Review the ready run in Finance.", line)
 
+    def test_github_api_warning_advise_points_at_vault(self) -> None:
+        line = build_fleet_coach_line(
+            {
+                "kind": "critical_signal",
+                "workspace_id": "workspace_dashpro",
+                "title": "DashPro GitHub API warning",
+                "summary": "HTTP 401 — invalid or placeholder probe token",
+            },
+            focused_workspace_id="workspace_alpha",
+            scope_mode="workspace",
+            display_names={"workspace_dashpro": "DashPro"},
+        )
+        self.assertIn("Vault", line)
+        self.assertIn("GH_TOKEN", line)
+        self.assertNotIn("needs review; switch there", line)
+
+    def test_generic_github_warning_does_not_invent_token_failure(self) -> None:
+        line = build_fleet_coach_line(
+            {
+                "kind": "critical_signal",
+                "workspace_id": "workspace_dashpro",
+                "title": "DashPro GitHub API warning",
+                "summary": "API rate limit is low",
+            },
+            focused_workspace_id="workspace_alpha",
+            scope_mode="workspace",
+            display_names={"workspace_dashpro": "DashPro"},
+        )
+        self.assertNotIn("GH_TOKEN", line)
+        self.assertEqual(
+            "Critical signal in DashPro needs review; switch there before continuing.",
+            line,
+        )
+
     def test_same_rank_prefers_focused_workspace(self) -> None:
         winner = select_fleet_advice_winner(
             [

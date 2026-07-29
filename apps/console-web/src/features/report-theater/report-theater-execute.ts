@@ -13,6 +13,10 @@ export type ReportTheaterActionShell = BriefingActionShell & {
   setCurrentWorkspace?: (workspaceId: string) => void;
   layoutMode?: string;
   openVaultSurface?: () => void;
+  startCloudflareTunnel?: () => Promise<void>;
+  loadRuntimeSummary?: (opts?: { background?: boolean }) => Promise<void>;
+  loadOperatorBriefing?: () => Promise<void>;
+  loadInbox?: () => Promise<void>;
 };
 
 function openVault(shell: ReportTheaterActionShell): void {
@@ -21,6 +25,17 @@ function openVault(shell: ReportTheaterActionShell): void {
     return;
   }
   navigateToAppSurface('vault');
+}
+
+async function restartPublicTunnel(shell: ReportTheaterActionShell): Promise<void> {
+  if (typeof shell.startCloudflareTunnel === 'function') {
+    await shell.startCloudflareTunnel();
+  }
+  await Promise.all([
+    shell.loadRuntimeSummary?.({ background: true }),
+    shell.loadOperatorBriefing?.(),
+    shell.loadInbox?.(),
+  ]);
 }
 
 /**
@@ -33,13 +48,17 @@ export async function executeReportTheaterAction(
   action: BriefingAction,
 ): Promise<BriefingActionResult> {
   if (action.kind === 'inspect_runtime') {
+    if (
+      action.action_id === 'theater_start_tunnel' ||
+      /tunnel/i.test(action.title || '')
+    ) {
+      await restartPublicTunnel(shell);
+      return { ok: true, kind: action.kind };
+    }
     const preferVault =
       action.action_id === 'theater_open_vault' ||
       /^open vault$/i.test(action.title) ||
       /vault/i.test(action.detail || '');
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'readiness-recovery-fix',hypothesisId:'H51',location:'report-theater-execute.ts:inspect-runtime',message:'executing runtime recovery directive',data:{preferVault,actionId:action.action_id,title:action.title},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (preferVault) {
       openVault(shell);
       return { ok: true, kind: action.kind };
@@ -57,9 +76,6 @@ export async function executeReportTheaterAction(
     shell.focusMissionControl();
     shell.focusAttentionSidebar(signalId);
     shell.setLeftSidebarMode?.('attention');
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'D2',location:'report-theater-execute.ts:review-signal',message:'executed report workspace and Attention switch',data:{workspaceId,signalId,layoutMode:shell.layoutMode??null,hasSignal:Boolean(signal)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!signalId) {
       // Workspace switch still counts — Attention opens even without a concrete signal id.
       return { ok: true, kind: action.kind };
@@ -74,9 +90,6 @@ export async function executeReportTheaterAction(
       },
       { autoSubmit: true },
     );
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'D2',location:'report-theater-execute.ts:auto-start',message:'switched to promised workspace and submitted investigation',data:{workspaceId,signalId,autoSubmit:true,layoutMode:shell.layoutMode??null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return { ok: true, kind: action.kind };
   }
   return executeBriefingAction(shell, briefing, action);

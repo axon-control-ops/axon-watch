@@ -161,21 +161,6 @@ def operator_presence_settings_put(body: OperatorPresenceSettingsRequest) -> dic
             worker_scheduler_settings_store.patch_settings(
                 {"scheduler_enabled": mode == "full"}
             )
-            scheduler_settings = worker_scheduler_settings_store.load_settings()
-            # region agent log
-            from app.workspace_agents.autonomy_debug import debug_autonomy_probe
-
-            debug_autonomy_probe(
-                "H26,H27",
-                "persisted autonomy and synchronized worker scheduler",
-                {
-                    "autonomyMode": mode,
-                    "schedulerEnabled": bool(scheduler_settings.get("scheduler_enabled")),
-                },
-                location="routes/operator.py:operator_presence_settings_put",
-                run_id="closeout-access",
-            )
-            # endregion
     current.update(patch)
     return operator_presence_settings_store.save_settings(current)
 
@@ -226,6 +211,7 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
 
     from app.azure_tts import (
         DEFAULT_AZURE_VOICE,
+        LEADING_AUDIO_GUARD_MS,
         azure_speech_configured,
         synthesize_azure_speech,
     )
@@ -262,6 +248,7 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         "voice": voice,
         "content_type": content_type,
         "audio_base64": base64.b64encode(audio).decode("ascii"),
+        "leading_audio_guard_ms": LEADING_AUDIO_GUARD_MS,
     }
 
 

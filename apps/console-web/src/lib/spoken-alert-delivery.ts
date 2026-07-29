@@ -42,6 +42,17 @@ export type DeliverSpokenAlertOptions = {
   queueUntilUnlock?: boolean;
   /** Open the post-speech follow-up listen window (default true for alerts). */
   openFollowupWindow?: boolean;
+  /**
+   * Skip the Voice Deck handler and speak via the shared Azure queue — required
+   * for Report Theater multi-agent turns (Voice Deck always speaks as VAXON).
+   */
+  directPlayback?: boolean;
+  /** Allow speech while Command Theater is open (stand-up narration). */
+  allowDuringReportTheater?: boolean;
+  /** Optional Azure fetch timeout override; omit to keep Mission Control's default. */
+  ttsTimeoutMs?: number;
+  /** Fired when audible playback actually starts (caption / stage sync). */
+  onPlaybackStart?: () => void;
 };
 
 function resolveSpokenAlertSpeaker(
@@ -181,7 +192,11 @@ export async function deliverSpokenOperatorAlert(
     return enqueueUntilUnlock(alert, storage, options);
   }
 
-  if (voiceDeckSpokenAlertHandler && (options.priority ?? 'alert') === 'alert') {
+  if (
+    !options.directPlayback &&
+    voiceDeckSpokenAlertHandler &&
+    (options.priority ?? 'alert') === 'alert'
+  ) {
     const handled = await voiceDeckSpokenAlertHandler(alert);
     if (handled) {
       markFollowupIfNeeded(options);
@@ -194,6 +209,9 @@ export async function deliverSpokenOperatorAlert(
     priority: options.priority ?? 'alert',
     azureVoiceId: options.azureVoiceId?.trim() || undefined,
     speaker,
+    allowDuringReportTheater: options.allowDuringReportTheater === true,
+    ttsTimeoutMs: options.ttsTimeoutMs,
+    onPlaybackStart: options.onPlaybackStart,
   });
   if (result.engine === 'azure') {
     markFollowupIfNeeded(options);

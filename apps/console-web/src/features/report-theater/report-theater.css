@@ -132,10 +132,10 @@
   border: 1px solid rgba(0, 242, 255, 0.35);
   border-radius: 0.15rem;
   font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(180, 236, 255, 0.95);
-  max-width: 12rem;
+  max-width: min(22rem, 70vw);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -254,11 +254,11 @@
 .report-theater__seat-role,
 .report-theater__seat-status {
   font-size: 0.55rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.62;
   white-space: nowrap;
-  max-width: 6.75rem;
+  max-width: 8rem;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;

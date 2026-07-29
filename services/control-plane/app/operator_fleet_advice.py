@@ -229,6 +229,38 @@ def build_fleet_coach_line(
 
     if kind == "critical_signal":
         title = str(fact.get("title") or "Critical signal").strip() or "Critical signal"
+        title_l = title.lower()
+        signal_detail = " ".join(
+            [
+                title,
+                str(fact.get("summary") or ""),
+                str(fact.get("detail") or ""),
+                str(fact.get("reason") or ""),
+            ]
+        ).lower()
+        if "github" in title_l and (
+            "token" in signal_detail
+            or "http 401" in signal_detail
+            or "http 403" in signal_detail
+            or "invalid credential" in signal_detail
+            or "placeholder" in signal_detail
+        ):
+            if cross:
+                return (
+                    f"GitHub probe token for {name} is failing — "
+                    "open Vault there and restore GH_TOKEN before continuing."
+                )
+            return (
+                f"GitHub probe token is failing — open Vault and restore GH_TOKEN "
+                f"({title})."
+            )
+        if "sentry" in title_l:
+            if cross:
+                return (
+                    f"Sentry attention in {name} needs review; "
+                    "switch there before continuing."
+                )
+            return f"Sentry attention needs review: {title}."
         if cross:
             return (
                 f"Critical signal in {name} needs review; switch there before continuing."

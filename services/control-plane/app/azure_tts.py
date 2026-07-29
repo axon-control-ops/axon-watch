@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import http.client
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from xml.sax.saxutils import escape
@@ -22,7 +24,11 @@ DEFAULT_AZURE_OUTPUT_FORMAT = "audio-48khz-192kbitrate-mono-mp3"
 # Runtime evidence: Chromium reported fully buffered audio at currentTime=0,
 # yet the sink dropped roughly the first 400–500 ms ("Continuing" → "uing").
 # Encoded silence survives decoder/device wake-up; a JS delay before play does not.
-LEADING_AUDIO_GUARD_MS = 650
+# Bumped past 650ms — stand-up lines still clipped openings on some sinks.
+LEADING_AUDIO_GUARD_MS = 950
+TTS_READ_ATTEMPTS = 2
+TTS_REQUEST_TIMEOUT_SECONDS = 6
+TTS_RETRY_BACKOFF_SECONDS = 0.15
 _PLACEHOLDER_KEYS = frozenset({"changeme", "change-me", "placeholder", "your-key-here", "test"})
 _AZURE_KEY_NAMES = ("AZURE_SPEECH_KEY", "azure_speech_key")
 _AZURE_REGION_NAMES = ("AZURE_SPEECH_REGION", "azure_speech_region")
@@ -181,24 +187,33 @@ def synthesize_azure_speech(
 
     speech_region = resolve_azure_speech_region(region or resolved_region)
     url = f"https://{speech_region}.tts.speech.microsoft.com/cognitiveservices/v1"
-    request = urllib.request.Request(
-        url,
-        data=build_azure_ssml(trimmed, voice=voice, rate=rate, pitch=pitch).encode("utf-8"),
-        headers={
-            "Ocp-Apim-Subscription-Key": speech_key,
-            "Content-Type": "application/ssml+xml",
-            "X-Microsoft-OutputFormat": DEFAULT_AZURE_OUTPUT_FORMAT,
-            "User-Agent": "axon-watch-control-plane",
-        },
-        method="POST",
-    )
+    body = build_azure_ssml(trimmed, voice=voice, rate=rate, pitch=pitch).encode("utf-8")
+    headers = {
+        "Ocp-Apim-Subscription-Key": speech_key,
+        "Content-Type": "application/ssml+xml",
+        "X-Microsoft-OutputFormat": DEFAULT_AZURE_OUTPUT_FORMAT,
+        "User-Agent": "axon-watch-control-plane",
+    }
 
-    try:
-        with urllib.request.urlopen(request, timeout=12) as response:
-            payload = response.read()
-            content_type = response.headers.get("Content-Type", "audio/mpeg")
-            if not payload:
-                return None
-            return payload, content_type
-    except (urllib.error.URLError, TimeoutError, ValueError):
-        return None
+    # IncompleteRead used to escape as a 500 and tear stand-up audio mid-line.
+    # Retry quietly; fall back to browser TTS via available=false.
+    last_error: Exception | None = None
+    for attempt in range(TTS_READ_ATTEMPTS):
+        request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=TTS_REQUEST_TIMEOUT_SECONDS) as response:
+                payload = response.read()
+                content_type = response.headers.get("Content-Type", "audio/mpeg")
+                if not payload:
+                    return None
+                return payload, content_type
+        except http.client.IncompleteRead as exc:
+            last_error = exc
+            if attempt + 1 < TTS_READ_ATTEMPTS:
+                time.sleep(TTS_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                continue
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+            last_error = exc
+            break
+    _ = last_error
+    return None

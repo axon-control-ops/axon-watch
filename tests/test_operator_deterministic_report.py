@@ -185,10 +185,15 @@ class OperatorDeterministicReportTests(unittest.TestCase):
             "manually.; Cursor Cloud Agent unavailable; Codex Cloud Task unavailable. "
             "Open Runtime or /vault , then retry."
         )
+        briefing = {
+            **_MOCK_BRIEFING,
+            # Keep the dump so scrubbing is exercised — healed CLI would drop it.
+            "cli_runtime": {"dispatch_ready": False, "blockers": ["Cursor auth probe timed out"]},
+        }
         composed = compose_operator_report(
             {
                 "workspace_id": "workspace_axon_watch",
-                "briefing": _MOCK_BRIEFING,
+                "briefing": briefing,
                 "fleet": _MOCK_FLEET,
                 "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
                 "handoffs": [
@@ -212,6 +217,43 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         self.assertIn("no CLI runtime is ready", line)
         self.assertNotIn("invocation", line.lower())
         self.assertLessEqual(len(line), 180)
+
+    def test_lead_rollup_strips_terminal_shell_laundry(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        headline = (
+            "Mira (lead) completed. terminal ls -la "
+            "/home/edp/axon-nvme/repos/axon-watch/control-plane.sqlite3 "
+            "find /home/edp -name '*.sqlite' 2>/dev/null | head -20"
+        )
+        composed = compose_operator_report(
+            {
+                "workspace_id": "workspace_axon_watch",
+                "briefing": _MOCK_BRIEFING,
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [
+                    {
+                        "lead_name": "Mira",
+                        "headline": headline,
+                        "lead_next": "",
+                    }
+                ],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "shell-laundry-rollup",
+            }
+        )
+
+        line = composed["sections"]["lead_rollups"][0]
+        self.assertIn("Mira:", line)
+        self.assertIn("completed", line.lower())
+        self.assertNotIn("terminal", line.lower())
+        self.assertNotIn("sqlite", line.lower())
+        self.assertNotIn("/home/", line)
 
     def test_lead_rollup_keeps_readable_headline_and_plan(self) -> None:
         from app.kairo.operator_deterministic_report import compose_operator_report
@@ -276,6 +318,180 @@ class OperatorDeterministicReportTests(unittest.TestCase):
             composed["sections"]["next_move"],
         )
 
+    def test_lead_rollup_scrubs_ask_option_and_push_laundry(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        composed = compose_operator_report(
+            {
+                "workspace_id": "workspace_dashpro",
+                "briefing": _MOCK_BRIEFING,
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [
+                    {
+                        "lead_name": "Dana",
+                        "headline": (
+                            "Dana (lead) completed. Committed successfully with message: "
+                            "Selected option 1: Yes. Push failed: git push failed"
+                        ),
+                        "lead_next": "",
+                    }
+                ],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "push-laundry",
+            }
+        )
+
+        line = composed["sections"]["lead_rollups"][0]
+        self.assertIn("Dana:", line)
+        self.assertIn("Committed after your choice", line)
+        self.assertIn("push did not", line.lower())
+        self.assertNotIn("Selected option", line)
+        self.assertNotIn("Push failed: git push failed", line)
+
+    def test_next_move_prefers_push_failure_over_stale_switch_advise(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        composed = compose_operator_report(
+            {
+                "briefing": {
+                    **_MOCK_BRIEFING,
+                    "advise": (
+                        "Critical signal in axon-watch needs review; "
+                        "switch there before continuing."
+                    ),
+                },
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [
+                    {
+                        "lead_name": "Dana",
+                        "headline": (
+                            "Dana (lead) completed. Committed successfully with message: "
+                            "Selected option 1: Yes. Push failed: git push failed"
+                        ),
+                        "lead_next": "",
+                    }
+                ],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "push-over-switch",
+            }
+        )
+
+        self.assertIn("inspect the exact push error", composed["sections"]["next_move"].lower())
+        self.assertNotIn("switch to axon-watch", composed["sections"]["next_move"].lower())
+
+    def test_next_move_uses_non_fast_forward_stderr(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        composed = compose_operator_report(
+            {
+                "briefing": _MOCK_BRIEFING,
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [
+                    {
+                        "lead_name": "Dana",
+                        "headline": (
+                            "Committed successfully. Push failed: git push failed: "
+                            "updates were rejected (non-fast-forward); fetch first"
+                        ),
+                        "lead_next": "",
+                    }
+                ],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "push-non-fast-forward",
+            }
+        )
+
+        self.assertEqual(
+            "I'll open the Lead receipt, sync the branch safely, then retry the push",
+            composed["sections"]["next_move"],
+        )
+        self.assertIn(
+            "remote branch is ahead",
+            composed["sections"]["lead_rollups"][0].lower(),
+        )
+
+    def test_next_move_uses_authentication_stderr(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        composed = compose_operator_report(
+            {
+                "briefing": _MOCK_BRIEFING,
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [
+                    {
+                        "lead_name": "Dana",
+                        "headline": (
+                            "Committed successfully. Push failed: git push failed: "
+                            "remote: HTTP 403 permission denied"
+                        ),
+                        "lead_next": "",
+                    }
+                ],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "push-auth",
+            }
+        )
+
+        self.assertEqual(
+            "I'll open the Lead receipt, restore Git credentials, then retry the push",
+            composed["sections"]["next_move"],
+        )
+
+    def test_next_move_prefers_vault_for_github_probe_signal(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        composed = compose_operator_report(
+            {
+                "briefing": {
+                    **_MOCK_BRIEFING,
+                    "advise": (
+                        "Critical signal in axon-watch needs review; "
+                        "switch there before continuing."
+                    ),
+                },
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [],
+                "top_signals": [
+                    {
+                        "title": "DashPro GitHub API warning",
+                        "summary": "HTTP 401 — invalid or placeholder probe token",
+                        "severity": "high",
+                    }
+                ],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "github-vault",
+            }
+        )
+
+        self.assertEqual(
+            "I'll open Vault and restore the GitHub probe token next",
+            composed["sections"]["next_move"],
+        )
+
     @patch(_GRAPH_PATCH, return_value=_MOCK_GRAPH)
     @patch(_FLEET_PATCH, return_value=_MOCK_FLEET)
     @patch(_BRIEFING_PATCH, return_value=_MOCK_BRIEFING)
@@ -331,6 +547,42 @@ class OperatorDeterministicReportTests(unittest.TestCase):
             any("Dana" in str(item) for item in (sections.get("work_in_flight") or [])),
         )
         mock_dispatch.assert_not_called()
+
+    def test_compose_prioritizes_public_tunnel_restart_when_ingress_soft(self) -> None:
+        from app.kairo.operator_deterministic_report import compose_operator_report
+
+        briefing = {
+            **_MOCK_BRIEFING,
+            "advise": "Inspect Axon-X GitHub API warning",
+            "degraded": {
+                "active": True,
+                "reasons": [
+                    "remote ingress · Network unreachable on https://axon.edudashpro.org.za/api/health"
+                ],
+            },
+        }
+        composed = compose_operator_report(
+            {
+                "workspace_id": "workspace_axon_watch",
+                "briefing": briefing,
+                "fleet": _MOCK_FLEET,
+                "roster": {"busy": [], "completed": [], "failed": [], "employees": []},
+                "handoffs": [],
+                "top_signals": [],
+                "active_runs": [],
+                "pending_approvals": 0,
+                "awaiting_engagement_count": 0,
+                "next_safe_actions": [],
+                "fingerprint": "tunnel-soft",
+            }
+        )
+        attention = " ".join(composed["sections"]["attention"]).lower()
+        self.assertIn("public tunnel", attention)
+        self.assertIn("restart", attention)
+        self.assertEqual(
+            "I'll restart the public tunnel next",
+            composed["sections"]["next_move"],
+        )
 
 
 if __name__ == "__main__":

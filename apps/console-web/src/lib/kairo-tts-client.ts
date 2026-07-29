@@ -5,12 +5,15 @@ export interface KairoTtsResponse {
   audio_base64?: string;
   content_type?: string;
   voice?: string;
+  /** Encoded SSML silence before the first spoken phoneme. */
+  leading_audio_guard_ms?: number;
   first_byte_ms?: number;
   prefetch?: boolean;
 }
 
 /** Sticky until Azure succeeds again — vault_locked / missing_key skip round-trips. */
 let azureTtsBlockedReason: string | null = null;
+let activeTtsAbort: AbortController | null = null;
 
 export function isAzureTtsBlocked(): boolean {
   return azureTtsBlockedReason === 'vault_locked' || azureTtsBlockedReason === 'missing_key';
@@ -18,6 +21,15 @@ export function isAzureTtsBlocked(): boolean {
 
 export function azureTtsBlockedReasonValue(): string | null {
   return azureTtsBlockedReason;
+}
+
+/** Cancel an in-flight Azure TTS fetch so barge-in / stand-up can take the lane. */
+export function abortActiveKairoTts(): void {
+  if (!activeTtsAbort) {
+    return;
+  }
+  activeTtsAbort.abort();
+  activeTtsAbort = null;
 }
 
 function noteAzureTtsResponse(payload: KairoTtsResponse): void {
@@ -46,13 +58,11 @@ export async function postKairoTts(
   const baseUrl = import.meta.env.VITE_CONTROL_PLANE_BASE_URL ?? '';
   const url = baseUrl ? `${baseUrl}/api/kairo/tts` : '/api/kairo/tts';
   const controller = new AbortController();
+  activeTtsAbort = controller;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = performance.now();
 
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'heading-audio-before-fix',hypothesisId:'H33,H34',location:'kairo-tts-client.ts:postKairoTts',message:'submitting exact text for speech synthesis',data:{textPreview:text.slice(0,140),textLength:text.length,startsWithWorkInFlight:/^Work in flight\b/i.test(text),rate:options.rate??null,voice:options.voice??null,azureBlocked:azureTtsBlockedReason},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,14 +81,14 @@ export async function postKairoTts(
 
     const payload = (await response.json()) as KairoTtsResponse;
     noteAzureTtsResponse(payload);
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'narration-sync-fix',hypothesisId:'H46',location:'kairo-tts-client.ts:response',message:'speech synthesis response received',data:{available:payload.available,provider:payload.provider,reason:payload.reason??null,elapsedMs:Math.round(performance.now()-startedAt),textLength:text.length,azureBlocked:azureTtsBlockedReason},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return {
       ...payload,
       first_byte_ms: Math.round(performance.now() - startedAt),
     };
   } finally {
+    if (activeTtsAbort === controller) {
+      activeTtsAbort = null;
+    }
     clearTimeout(timeout);
   }
 }

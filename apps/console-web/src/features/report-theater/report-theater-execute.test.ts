@@ -100,4 +100,36 @@ describe('executeReportTheaterAction', () => {
     ]);
     expect(shell.handoffSignalToIde).not.toHaveBeenCalled();
   });
+
+  it('restarts the public tunnel for theater tunnel directives', async () => {
+    const startCloudflareTunnel = vi.fn(async () => undefined);
+    const loadRuntimeSummary = vi.fn(async () => undefined);
+    const loadOperatorBriefing = vi.fn(async () => undefined);
+    const loadInbox = vi.fn(async () => undefined);
+    const shell = {
+      focusMissionControl: vi.fn(),
+      focusAttentionSidebar: vi.fn(),
+      handoffSignalToIde: vi.fn(),
+      focusCommandSeam: vi.fn(),
+      startCloudflareTunnel,
+      loadRuntimeSummary,
+      loadOperatorBriefing,
+      loadInbox,
+    };
+
+    const result = await executeReportTheaterAction(shell, null, {
+      action_id: 'theater_start_tunnel',
+      kind: 'inspect_runtime',
+      title: 'Restart public tunnel',
+      detail: 'Start Cloudflare tunnel and refresh public ingress health.',
+      workspace_id: null,
+      run_id: null,
+      signal_id: null,
+    });
+
+    expect(result).toEqual({ ok: true, kind: 'inspect_runtime' });
+    expect(startCloudflareTunnel).toHaveBeenCalledTimes(1);
+    expect(loadRuntimeSummary).toHaveBeenCalledTimes(1);
+    expect(shell.focusCommandSeam).not.toHaveBeenCalled();
+  });
 });

@@ -44,11 +44,25 @@ export function toVaxonDirectiveLine(nextMove: string): string {
   if (/needs review|need review/i.test(cleaned) && /switch/i.test(cleaned)) {
     return `I'll switch us there and start that investigation next.`;
   }
+  if (/github/i.test(cleaned) && (/vault/i.test(cleaned) || /token/i.test(cleaned))) {
+    return "I'll open Vault and restore the GitHub probe token next.";
+  }
+  if (/push did not|retry the push|lead receipt|branch protection/i.test(cleaned)) {
+    return (
+      "I'll open the Lead receipt, fix remote auth or branch protection, then retry the push."
+    );
+  }
   if (/open (?:the )?lead/i.test(cleaned) || /lead rollup/i.test(cleaned)) {
     return `I'll open the Lead rollup and walk the next handoff with you.`;
   }
   if (/approval/i.test(cleaned)) {
     return `I'll take us to Approvals and clear the gate before new work starts.`;
+  }
+  if (/^I'll\b/i.test(cleaned) && /tunnel/i.test(cleaned)) {
+    return cleaned.endsWith('.') ? cleaned : `${cleaned}.`;
+  }
+  if (/tunnel|remote ingress|public health/i.test(cleaned)) {
+    return "I'll restart the public tunnel next.";
   }
   if (/^inspect\s+/i.test(cleaned)) {
     return `I'll open Attention for ${cleaned.replace(/^inspect\s+/i, '').trim()}.`;
@@ -71,6 +85,9 @@ export function toVaxonActionLabel(action: BriefingAction): string {
     return `I'll open Mission Control for that run`;
   }
   if (action.kind === 'inspect_runtime') {
+    if (action.action_id === 'theater_start_tunnel' || /tunnel/i.test(action.title)) {
+      return "I'll restart the public tunnel next";
+    }
     return action.action_id === 'theater_open_vault' || /^open vault$/i.test(action.title)
       ? "I'll open Vault and restore runtime next"
       : `I'll open the command seam and inspect runtime`;
@@ -116,6 +133,12 @@ export function matchActionForNextMove(
     return null;
   }
   const hay = nextMove.toLowerCase();
+  // A Lead receipt is a promise to inspect evidence, not permission to run an
+  // unrelated signal / approval action. Keep it visible but operator-triggered
+  // until a dedicated receipt action exists.
+  if (/lead receipt|push did not|retry(?:ing)? the push|exact push error/i.test(hay)) {
+    return null;
+  }
   const workspaceMatched = actions.find((action) => {
     const workspace = String(action.workspace_id || '')
       .trim()
@@ -143,6 +166,20 @@ export function matchActionForNextMove(
   if (/switch|sentry|signal|attention|inspect|review/i.test(hay)) {
     return actions.find((action) => action.kind === 'review_signal') ?? null;
   }
+  if (/tunnel|remote ingress|public health/i.test(hay)) {
+    return (
+      actions.find((action) => action.action_id === 'theater_start_tunnel') ??
+      actions.find((action) => action.kind === 'inspect_runtime') ??
+      null
+    );
+  }
+  if (/vault|github.*token|probe token|restore runtime/i.test(hay)) {
+    return (
+      actions.find((action) => action.action_id === 'theater_open_vault') ??
+      actions.find((action) => action.kind === 'inspect_runtime') ??
+      null
+    );
+  }
   if (/runtime|command seam|cli/i.test(hay)) {
     return actions.find((action) => action.kind === 'inspect_runtime') ?? null;
   }
@@ -159,7 +196,7 @@ export function isAutoExecutableCommitment(label: string, action: BriefingAction
   if (!action) {
     return false;
   }
-  return /I'll (?:switch|open Attention|open the Lead|clear Approvals|open Mission Control|open the command seam|open Vault|restore runtime)/i.test(
+  return /I'll (?:switch|open Attention|open the Lead|clear Approvals|open Mission Control|open the command seam|open Vault|restore runtime|restart the public tunnel)/i.test(
     label,
   );
 }
@@ -168,18 +205,20 @@ function readinessNeedsRecovery(readiness?: {
   score?: number;
   blockers?: string[];
   grade?: string;
-} | null): { recover: boolean; preferVault: boolean; blocker: string | null } {
+} | null): { recover: boolean; preferVault: boolean; preferTunnel: boolean; blocker: string | null } {
   const score = typeof readiness?.score === 'number' ? readiness.score : 100;
   const blockers = (readiness?.blockers ?? []).map((item) => String(item || '').trim()).filter(Boolean);
   if (score >= 80 && !blockers.length) {
-    return { recover: false, preferVault: false, blocker: null };
+    return { recover: false, preferVault: false, preferTunnel: false, blocker: null };
   }
   const blocker = blockers[0] ?? readiness?.grade ?? null;
   const hay = blockers.join(' ').toLowerCase();
   const preferVault = /vault|cli|auth|key|login|dispatch-ready|runtime not ready/i.test(hay);
+  const preferTunnel = /tunnel|remote ingress|public health|edudashpro|network unreachable/i.test(hay);
   return {
-    recover: score < 80 || preferVault,
+    recover: score < 80 || preferVault || preferTunnel,
     preferVault,
+    preferTunnel: preferTunnel && !preferVault,
     blocker,
   };
 }
@@ -192,6 +231,18 @@ function synthesizeRuntimeRecoveryAction(preferVault: boolean): BriefingAction {
     detail: preferVault
       ? 'Unlock Vault so CLI and neural voice can recover.'
       : 'Open the command seam and inspect degraded runtime.',
+    workspace_id: null,
+    run_id: null,
+    signal_id: null,
+  };
+}
+
+function synthesizeTunnelRepairAction(): BriefingAction {
+  return {
+    action_id: 'theater_start_tunnel',
+    kind: 'inspect_runtime',
+    title: 'Restart public tunnel',
+    detail: 'Start Cloudflare tunnel and refresh public ingress health.',
     workspace_id: null,
     run_id: null,
     signal_id: null,
@@ -266,6 +317,7 @@ export function buildVaxonReportDirectives(input: {
   ];
   const matchedAction = matchActionForNextMove(input.nextMove, mergedActions);
   const promised = promisedWorkspace(input.nextMove, input.workspaces ?? []);
+  const wantsTunnel = /tunnel|remote ingress|public health/i.test(input.nextMove);
   let primaryAction =
     matchedAction && promised && matchedAction.kind === 'review_signal'
       ? { ...matchedAction, workspace_id: promised.workspace_id }
@@ -273,31 +325,39 @@ export function buildVaxonReportDirectives(input: {
 
   // Spoken next-move named a workspace but briefing actions were empty/stale —
   // still bind a switch so auto-execute and click both work.
-  if (!primaryAction && promised && !recovery.recover) {
+  if (!primaryAction && promised && !recovery.recover && !wantsTunnel) {
     primaryAction = synthesizeWorkspaceSwitchAction(promised, input.topSignals ?? []);
+  }
+
+  if (wantsTunnel && !recovery.preferVault) {
+    primaryAction = synthesizeTunnelRepairAction();
   }
 
   // Hard gate: do not auto-start investigations while production readiness is blocked.
   if (recovery.recover) {
-    primaryAction = recovery.preferVault
-      ? synthesizeRuntimeRecoveryAction(true)
-      : mergedActions.find((action) => action.kind === 'inspect_runtime') ??
+    if (recovery.preferVault) {
+      primaryAction = synthesizeRuntimeRecoveryAction(true);
+    } else if (recovery.preferTunnel || wantsTunnel) {
+      primaryAction = synthesizeTunnelRepairAction();
+    } else {
+      primaryAction =
+        mergedActions.find((action) => action.kind === 'inspect_runtime') ??
         synthesizeRuntimeRecoveryAction(false);
+    }
   }
 
   const directive = recovery.recover
     ? recovery.preferVault
       ? "I'll open Vault and restore runtime next"
-      : "I'll open the command seam and inspect runtime"
+      : recovery.preferTunnel || wantsTunnel
+        ? "I'll restart the public tunnel next"
+        : "I'll open the command seam and inspect runtime"
     : primaryAction
       ? /switch|review that signal/i.test(input.nextMove)
         ? toVaxonDirectiveLine(input.nextMove)
         : toVaxonActionLabel(primaryAction)
       : toVaxonDirectiveLine(input.nextMove);
   const primaryLabel = directive.replace(/\.$/, '');
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'D1',location:'report-theater-directives.ts:build',message:'built theater directives with readiness gate',data:{score:input.readiness?.score??null,recover:recovery.recover,preferVault:recovery.preferVault,blocker:recovery.blocker,primaryLabel,actionKind:primaryAction?.kind??null,actionWorkspace:primaryAction?.workspace_id??null,actionSignal:primaryAction?.signal_id??null,promisedWorkspace:promised?.workspace_id??null,mergedActionCount:mergedActions.length,topSignalCount:(input.topSignals??[]).length,autoExecute:isAutoExecutableCommitment(primaryLabel, primaryAction)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   const out: ReportTheaterDirective[] = [
     {
       id: 'vaxon-primary-next',
@@ -305,7 +365,9 @@ export function buildVaxonReportDirectives(input: {
       detail: recovery.recover
         ? recovery.blocker
           ? `Blocked at ${input.readiness?.score ?? '?'}%: ${recovery.blocker}`
-          : 'Restore runtime before new investigations'
+          : recovery.preferTunnel || wantsTunnel
+            ? 'Restart public ingress before new investigations'
+            : 'Restore runtime before new investigations'
         : primaryAction
           ? 'VAXON executes this next'
           : 'Primary directive from this stand-up',
@@ -336,9 +398,11 @@ export function buildVaxonReportDirectives(input: {
       detail:
         action.kind === 'review_signal'
           ? 'Opens Attention on that signal'
-          : action.kind === 'inspect_runtime'
-            ? 'Opens the command seam'
-            : action.detail?.trim() || action.title,
+          : action.action_id === 'theater_start_tunnel'
+            ? 'Restarts Cloudflare public tunnel'
+            : action.kind === 'inspect_runtime'
+              ? 'Opens the command seam'
+              : action.detail?.trim() || action.title,
       kind: 'secondary',
       briefingAction: action,
       autoExecute: false,

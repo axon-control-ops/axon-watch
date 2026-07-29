@@ -100,11 +100,50 @@ const controlPlaneProxy = {
     target: process.env.VITE_CONTROL_PLANE_BASE_URL ?? 'http://127.0.0.1:8787',
     changeOrigin: true,
     ws: true,
+    timeout: 20_000,
+    proxyTimeout: 20_000,
     configure: (proxy: {
       on: (event: string, listener: (...args: unknown[]) => void) => void;
     }) => {
       proxy.on('proxyReq', (proxyReq: unknown) => {
         injectOperatorAuth(proxyReq as { setHeader: (name: string, value: string) => void });
+      });
+      // During axonrestart :8787 is briefly down. Answer 503 instead of
+      // uncaught ECONNREFUSED spam that looks like a permanent outage.
+      proxy.on('error', (err: unknown, _req: unknown, res: unknown) => {
+        const code =
+          err && typeof err === 'object' && 'code' in err
+            ? String((err as { code?: string }).code || '')
+            : '';
+        const message =
+          err instanceof Error ? err.message : typeof err === 'string' ? err : 'proxy error';
+        const socket = res as {
+          writeHead?: (code: number, headers: Record<string, string>) => void;
+          end?: (body?: string) => void;
+          headersSent?: boolean;
+          writableEnded?: boolean;
+        } | undefined;
+        if (
+          socket &&
+          typeof socket.writeHead === 'function' &&
+          typeof socket.end === 'function' &&
+          !socket.headersSent &&
+          !socket.writableEnded
+        ) {
+          socket.writeHead(503, { 'Content-Type': 'application/json' });
+          socket.end(
+            JSON.stringify({
+              detail: 'control-plane unavailable',
+              code: code || 'cp_down',
+              hint: 'Waiting for :8787 — axonrestart/axonrevive if it stays down',
+            }),
+          );
+          return;
+        }
+        if (code === 'ECONNREFUSED' || /ECONNREFUSED/i.test(message)) {
+          // eslint-disable-next-line no-console
+          console.warn('[vite] control-plane :8787 refused — soft 503 (will recover on restart)');
+        }
       });
     },
   },

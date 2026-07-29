@@ -16,6 +16,7 @@ import {
   reportTheaterSpeakerName,
   reportTheaterStageIndex,
   reportTheaterStages,
+  reportTheaterAttendeesRoster,
 } from './report-theater-state';
 
 const shell = useShellStore();
@@ -44,7 +45,10 @@ const secondaryDirectives = computed(() =>
 
 const attendees = computed(() =>
   buildReportTheaterAttendees({
-    employees: shell.companyEmployeesForCurrentWorkspace ?? [],
+    employees:
+      reportTheaterAttendeesRoster.value.length > 0
+        ? reportTheaterAttendeesRoster.value
+        : (shell.companyEmployeesForCurrentWorkspace ?? []),
     activeLines: [
       ...(activeStage.value?.lines ?? []),
       primaryDirective.value?.label ?? '',
@@ -136,9 +140,6 @@ async function runDirective(directiveId: string): Promise<void> {
   if (!directive) {
     return;
   }
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'jarvis-polish',hypothesisId:'H54',location:'ReportTheaterOverlay.vue:runDirective',message:'directive clicked',data:{directiveId,label:directive.label,actionKind:directive.briefingAction?.kind??null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (!directive.briefingAction) {
     closeReportTheater();
     return;

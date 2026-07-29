@@ -20,16 +20,58 @@ function stageIsFiller(stage: ReportTheaterStage): boolean {
 
 type TheaterSpeechTurn = { line: string; speakerName: string | null };
 
-const MAX_SPOKEN_BODY = 140;
+/** Keep Lead turns brisk; the full receipt remains visible on the board. */
+const MAX_SPOKEN_BODY = 220;
+
+const SHELL_DUMP_SPLIT =
+  /\s+(?:terminal\b|ls\s+-la\b|find\s+\/|cat\s+\/|grep\s+|head\s+-|2>\/dev\/null)/i;
+
+function pushFailureSummary(text: string): string | null {
+  const hay = text.toLowerCase();
+  if (!/push failed|git push failed|push did not|retry the push/i.test(hay)) {
+    return null;
+  }
+  if (/protected branch|branch protection|pull request/i.test(hay)) {
+    return 'Commit landed; direct push was blocked by branch protection';
+  }
+  if (/non-fast-forward|fetch first|updates were rejected|branch is behind/i.test(hay)) {
+    return 'Commit landed; push was rejected because the remote branch is ahead';
+  }
+  if (/authentication failed|permission denied|invalid credentials|repository not found|http 40[13]/i.test(hay)) {
+    return 'Commit landed; push was rejected by Git authentication or permissions';
+  }
+  if (/could not resolve host|timed out|connection reset|network is unreachable|failed to connect/i.test(hay)) {
+    return 'Commit landed; push could not reach the remote';
+  }
+  if (/pre-receive hook|pre-push hook|hook declined/i.test(hay)) {
+    return 'Commit landed; a push hook rejected it';
+  }
+  return 'Commit landed; push did not. Inspect the Lead receipt for the exact error';
+}
 
 /** Operator-facing scrub for board cards and TTS — strip CLI laundry lists. */
 export function polishTheaterLine(body: string, maxChars = MAX_SPOKEN_BODY): string {
+  const pushSummary = pushFailureSummary(body);
   let cleaned = String(body || '')
     .replace(/\binvocation\s*id[:,]?\s*[a-f0-9-]+/gi, '')
     .replace(/\bunit:\s*[\w.-]+/gi, '')
     .replace(/\bscope[,:]?\s*[\w.-]+/gi, '')
     .replace(/\bauth\s*=\s*missing\b/gi, 'authentication is missing')
     .replace(/\bopen\s+runtime\s+or\s+\/vault\b/gi, 'open Runtime or Vault')
+    .replace(
+      /committed successfully with message:\s*selected option\s+\S+\s*:\s*/gi,
+      'Committed after your choice — ',
+    )
+    .replace(/committed successfully with message:\s*/gi, 'Committed — ')
+    .replace(/selected option\s+\S+\s*:\s*/gi, '')
+    .trim();
+  if (pushSummary) {
+    cleaned = cleaned.replace(
+      /(?:push failed:\s*)?git push failed(?:\s*:\s*)?.*$/i,
+      pushSummary,
+    );
+  }
+  cleaned = cleaned
     .replace(/\s*—\s*/g, '. ')
     .replace(/\s*;\s*/g, '. ')
     .replace(/\s+/g, ' ')
@@ -47,6 +89,18 @@ export function polishTheaterLine(body: string, maxChars = MAX_SPOKEN_BODY): str
       /failed on Cursor CLI.*/i,
       'failed on Cursor CLI — runtime login is not ready',
     );
+  }
+  // Strip shell/path laundry that Leads sometimes paste into handoff headlines.
+  if (SHELL_DUMP_SPLIT.test(cleaned) || /\/home\/\w+\//.test(cleaned) || /\.sqlite3?\b/i.test(cleaned)) {
+    cleaned = cleaned.split(SHELL_DUMP_SPLIT)[0]?.trim().replace(/[.]+$/, '').trim() || '';
+    if (/\/home\/\w+\//.test(cleaned)) {
+      cleaned = cleaned.split(/\s+\/home\//i)[0]?.trim().replace(/[.]+$/, '').trim() || '';
+    }
+    if (!cleaned) {
+      cleaned = 'Shift completed — details are in the Lead receipts';
+    } else if (!/[.!?]$/.test(cleaned)) {
+      cleaned = `${cleaned}.`;
+    }
   }
   if (/^just completed$/i.test(cleaned)) {
     return 'I just completed my shift';
@@ -97,7 +151,7 @@ export async function narrateReportTheater(
   if (hooks.isCancelled()) {
     return;
   }
-  await hooks.speak('Stand-up online.');
+  await hooks.speak("Here's the stand-up.");
   if (hooks.isCancelled()) {
     return;
   }
@@ -121,9 +175,6 @@ export async function narrateReportTheater(
     };
     if (attributedTurns) {
       for (const turn of attributedTurns) {
-        // #region agent log
-        fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'jarvis-polish',hypothesisId:'H52,H53',location:'report-theater-narration.ts:turn',message:'speaking polished theater turn',data:{stageId:stage.id,speaker:turn.speakerName,lineChars:turn.line.length,linePreview:turn.line.slice(0,160)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         await hooks.speak(turn.line, turn.speakerName, startStage);
       }
       continue;

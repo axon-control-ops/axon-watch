@@ -1,3 +1,4 @@
+import http.client
 import os
 import sys
 import unittest
@@ -9,6 +10,9 @@ sys.path.insert(0, str(CONTROL_ROOT))
 
 from app.azure_tts import (  # noqa: E402
     LEADING_AUDIO_GUARD_MS,
+    TTS_READ_ATTEMPTS,
+    TTS_REQUEST_TIMEOUT_SECONDS,
+    TTS_RETRY_BACKOFF_SECONDS,
     azure_speech_configured,
     build_azure_ssml,
     extract_azure_speech_key,
@@ -51,6 +55,33 @@ class AzureTtsTests(unittest.TestCase):
             with patch("app.cli_runtime.vault_keys.runtime_vault_env", return_value={}):
                 self.assertFalse(azure_speech_configured())
                 self.assertIsNone(synthesize_azure_speech("Hello"))
+
+    def test_retry_budget_stays_below_browser_timeout(self) -> None:
+        total_budget = (
+            TTS_READ_ATTEMPTS * TTS_REQUEST_TIMEOUT_SECONDS
+            + TTS_RETRY_BACKOFF_SECONDS * (TTS_READ_ATTEMPTS - 1)
+        )
+        self.assertLess(total_budget, 15)
+
+    def test_incomplete_read_retries_only_within_budget(self) -> None:
+        with (
+            patch(
+                "app.azure_tts.resolve_azure_speech_credentials",
+                return_value=("", "southafricanorth"),
+            ),
+            patch(
+                "app.azure_tts.urllib.request.urlopen",
+                side_effect=http.client.IncompleteRead(b"partial"),
+            ) as mock_open,
+            patch("app.azure_tts.time.sleep") as mock_sleep,
+        ):
+            result = synthesize_azure_speech(
+                "Hello operator",
+                key="abc1234567890123456789012345678",
+            )
+        self.assertIsNone(result)
+        self.assertEqual(mock_open.call_count, TTS_READ_ATTEMPTS)
+        mock_sleep.assert_called_once_with(TTS_RETRY_BACKOFF_SECONDS)
 
     @patch("app.cli_runtime.vault_keys.runtime_vault_env")
     def test_resolve_azure_speech_credentials_from_unlocked_vault(self, mock_runtime_env) -> None:

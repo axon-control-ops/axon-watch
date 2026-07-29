@@ -27,7 +27,7 @@ function mentionedInLines(name: string, lines: string[]): boolean {
   });
 }
 
-function employeeStatus(employee: CompanyEmployeeRecord): string {
+function employeeRosterStatus(employee: CompanyEmployeeRecord): string {
   const status = String(employee.status || '').replace(/_/g, ' ').trim();
   if (employee.active_run_id) {
     return status || 'working';
@@ -42,6 +42,64 @@ function employeeStatus(employee: CompanyEmployeeRecord): string {
     return 'Lead present';
   }
   return status || 'present';
+}
+
+/**
+ * Stage + speaker aware chip copy so the gallery stays locked to narration.
+ * Roster outcome is a fallback only when the stage has nothing to say about them.
+ */
+export function theaterAttendeeStatus(input: {
+  employee: CompanyEmployeeRecord;
+  speaking: boolean;
+  mentioned: boolean;
+  stageId?: string | null;
+}): string {
+  const stage = String(input.stageId || '').trim();
+  if (input.speaking) {
+    if (stage === 'work_in_flight' && input.employee.active_run_id) {
+      return 'assigned';
+    }
+    return 'reporting';
+  }
+  if (stage === 'lead_rollups') {
+    if (input.mentioned) {
+      return 'just wrapped';
+    }
+    return employeeIsLead(input.employee) ? 'standing by' : 'listening';
+  }
+  if (stage === 'work_in_flight') {
+    if (input.employee.active_run_id) {
+      return 'assigned';
+    }
+    if (input.mentioned) {
+      return 'on deck';
+    }
+    return 'standing by';
+  }
+  if (stage === 'attention' || stage === 'fleet') {
+    return input.mentioned ? 'flagged' : 'listening';
+  }
+  if (stage === 'next_move') {
+    return 'standing by';
+  }
+  return employeeRosterStatus(input.employee);
+}
+
+function vaxonStatus(stageId?: string | null, speaking?: boolean): string {
+  const stage = String(stageId || '').trim();
+  if (stage === 'next_move') {
+    return speaking ? 'moving' : 'standing by';
+  }
+  if (speaking) {
+    return 'briefing';
+  }
+  if (stage === 'lead_rollups' || stage === 'work_in_flight') {
+    return 'listening';
+  }
+  if (stage === 'attention' || stage === 'fleet') {
+    return 'briefing';
+  }
+  return 'briefing';
 }
 
 /**
@@ -82,9 +140,10 @@ export function buildReportTheaterAttendees(input: {
   const people = ranked.slice(0, max - 1).map((employee) => {
     const avatar = buildEmployeeAvatar(employee);
     const lead = employeeIsLead(employee);
+    const mentioned = mentionedInLines(employee.name, lines);
     const speaking = activeSpeaker
       ? employee.name.trim().toLowerCase() === activeSpeaker
-      : mentionedInLines(employee.name, lines) || (leadStage && lead);
+      : mentioned || (leadStage && lead);
     return {
       id: employee.employee_id,
       name: employee.name,
@@ -98,9 +157,18 @@ export function buildReportTheaterAttendees(input: {
         faceUrl: avatar.faceUrl,
       },
       speaking,
-      statusLine: speaking && leadStage && lead ? 'reporting' : employeeStatus(employee),
+      statusLine: theaterAttendeeStatus({
+        employee,
+        speaking,
+        mentioned,
+        stageId: input.stageId,
+      }),
     };
   });
+
+  const vaxonSpeaking = activeSpeaker
+    ? activeSpeaker === 'vaxon' || activeSpeaker === OPERATOR_PERSONA_NAME.toLowerCase()
+    : !leadStage && !activeSpeaker;
 
   return [
     {
@@ -115,8 +183,8 @@ export function buildReportTheaterAttendees(input: {
         foreground: '#d7f6ff',
         faceUrl: resolveVaxonAvatarUrl(),
       },
-      speaking: activeSpeaker ? activeSpeaker === 'vaxon' : !leadStage,
-      statusLine: leadStage ? 'listening' : 'briefing',
+      speaking: vaxonSpeaking,
+      statusLine: vaxonStatus(input.stageId, vaxonSpeaking),
     },
     ...people,
   ];

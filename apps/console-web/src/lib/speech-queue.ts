@@ -25,8 +25,8 @@ let pendingSpeakTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 let queueEpoch = 0;
 const speakingListeners = new Set<(active: boolean) => void>();
 const idleListeners = new Set<() => void>();
-const SPEECH_START_DELAY_MS = 50;
-const POST_UTTERANCE_DRAIN_MS = 120;
+const SPEECH_START_DELAY_MS = 140;
+const POST_UTTERANCE_DRAIN_MS = 160;
 /** Azure neural short-names → preferred browser gender when the exact voice is missing. */
 const FEMALE_NEURAL_NAMES = new Set([
   'sonia',
@@ -70,12 +70,14 @@ function voiceLooksMale(voice: SpeechSynthesisVoice): boolean {
   );
 }
 
-/** Chrome often clips the first phoneme of short utterances — lead with a soft pause. */
+/** Chrome often clips the first phoneme — give the engine a disposable onset. */
 function padBrowserSpeechText(text: string): string {
-  if (text.length >= 48) {
-    return text;
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return trimmed;
   }
-  return `\u200B${text}`;
+  // ZWSP + thin space — not spoken, but shifts the onset past sink warm-up.
+  return `\u200B\u200B\u2009${trimmed}`;
 }
 
 function notifySpeaking(active: boolean): void {
@@ -165,9 +167,6 @@ function pickEmployeeVoice(
   const pool = gendered.length ? gendered : voices;
   const hash = [...voiceHint].reduce((value, char) => ((value * 31) + char.charCodeAt(0)) >>> 0, 7);
   const picked = pool[hash % pool.length] ?? pool[0] ?? null;
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'voice-gender-fix',hypothesisId:'H48',location:'speech-queue.ts:pickEmployeeVoice',message:'browser employee voice resolved',data:{voiceHint,neuralName,preferFemale,preferMale,poolSize:pool.length,picked:picked?.name??null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   return picked;
 }
 
@@ -216,9 +215,6 @@ function drainQueue(speech: SpeechPort): void {
     if (epoch !== queueEpoch) {
       return;
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'narration-sync-fix',hypothesisId:'H47',location:'speech-queue.ts:finish',message:'browser speech turn finished',data:{eventType,textLength:next.text.length,elapsedMs:Math.round(performance.now()-queuedAt),voice:utterance.voice?.name??null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     notifySpeaking(false);
     globalThis.setTimeout(() => {
       if (epoch !== queueEpoch) {
@@ -235,9 +231,6 @@ function drainQueue(speech: SpeechPort): void {
     if (epoch !== queueEpoch) {
       return;
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'narration-sync-fix',hypothesisId:'H47',location:'speech-queue.ts:onstart',message:'browser speech turn started',data:{textPreview:next.text.slice(0,100),textLength:next.text.length,queuedMs:Math.round(performance.now()-queuedAt),voice:utterance.voice?.name??null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     next.onStart?.(next.text);
   };
 

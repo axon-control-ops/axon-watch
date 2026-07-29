@@ -4,7 +4,13 @@ import {
   markKairoVoicePlaybackActive,
   recordKairoVoicePlayback,
 } from './kairo-voice-diagnostics';
-import { postKairoTts, isAzureTtsBlocked, azureTtsBlockedReasonValue, type KairoTtsResponse } from './kairo-tts-client';
+import {
+  abortActiveKairoTts,
+  postKairoTts,
+  isAzureTtsBlocked,
+  azureTtsBlockedReasonValue,
+  type KairoTtsResponse,
+} from './kairo-tts-client';
 import { speakAzureChunksWithPrefetch } from './kairo-voice-azure-prefetch';
 import {
   playAzureAudioToCompletion,
@@ -37,6 +43,18 @@ export type KairoVoicePlaybackResult = {
   engine: KairoVoiceEngine;
   reason: string | null;
 };
+
+/** Bumped on barge-in so in-flight Azure fetches never fall through to browser. */
+let playbackGeneration = 0;
+
+export function getKairoPlaybackGeneration(): number {
+  return playbackGeneration;
+}
+
+export function bumpKairoPlaybackGeneration(): number {
+  playbackGeneration += 1;
+  return playbackGeneration;
+}
 
 export type SpeakKairoLineOptions = {
   /** When set, routes through the global voice queue. Default: conversation. */
@@ -237,6 +255,8 @@ export function subscribeKairoVoiceChunk(
 }
 
 export function stopKairoPlayback(): void {
+  bumpKairoPlaybackGeneration();
+  abortActiveKairoTts();
   browserPrerollArmed = true;
   stopSharedPlayback();
   stopSpeech(speechPort());
@@ -252,10 +272,6 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     globalThis.setTimeout(resolve, ms);
   });
-}
-
-async function playAzureAudio(audio: HTMLAudioElement): Promise<void> {
-  await playAzureAudioToCompletion(audio);
 }
 
 async function speakAzureChunks(
@@ -364,9 +380,11 @@ export async function playKairoUtteranceNow(
   const trimmed = sanitizeSpokenReply(text);
   const tuning = resolveSpeechTuning(options);
   const speaker = options.speaker ?? null;
+  const generation = getKairoPlaybackGeneration();
+  const wasInterrupted = () => generation !== getKairoPlaybackGeneration();
   let playbackStarted = false;
   const notifyPlaybackStart = () => {
-    if (playbackStarted) {
+    if (playbackStarted || wasInterrupted()) {
       return;
     }
     playbackStarted = true;
@@ -377,9 +395,9 @@ export async function playKairoUtteranceNow(
   }
 
   if (options.preferBrowser || isAzureTtsBlocked()) {
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'voice-gender-fix',hypothesisId:'H49',location:'kairo-voice-playback.ts:skip-azure',message:'skipping Azure TTS for browser path',data:{preferBrowser:Boolean(options.preferBrowser),azureBlocked:azureTtsBlockedReasonValue(),textLength:trimmed.length,speaker:speaker?.name??null,azureVoiceId:speaker?.azureVoiceId??options.azureVoiceId??null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+    if (wasInterrupted()) {
+      return finishPlayback({ engine: 'skipped', reason: 'interrupted' }, trimmed);
+    }
     return speakWithBrowser(
       trimmed,
       options.preferBrowser ? 'preferred_browser' : azureTtsBlockedReasonValue() || 'azure_blocked',
@@ -401,6 +419,9 @@ export async function playKairoUtteranceNow(
         voice: tuning.voice,
         timeoutMs: options.ttsTimeoutMs,
       });
+      if (wasInterrupted()) {
+        return finishPlayback({ engine: 'skipped', reason: 'interrupted' }, trimmed);
+      }
       if (response.available && response.audio_base64) {
         const azureReason =
           typeof response.first_byte_ms === 'number'
@@ -410,15 +431,26 @@ export async function playKairoUtteranceNow(
         const handle = createAzureAudioHandle(response.audio_base64, response.content_type);
         registerKairoAudioElement(handle.audio);
         try {
-          notifyKairoVoiceUtterance(trimmed, speaker);
-          notifyPlaybackStart();
-          notifyChunk(chunks[0]);
-          await playAzureAudio(handle.audio);
+          await playAzureAudioToCompletion(
+            handle.audio,
+            () => {
+              notifyKairoVoiceUtterance(trimmed, speaker);
+              notifyPlaybackStart();
+              notifyChunk(chunks[0]);
+            },
+            response.leading_audio_guard_ms,
+          );
+          if (wasInterrupted()) {
+            return finishPlayback({ engine: 'skipped', reason: 'interrupted' }, trimmed);
+          }
           notifySpeaking(false);
           notifyIdle();
           return finishPlayback({ engine: 'azure', reason: azureReason }, trimmed);
         } catch (error) {
           registerKairoAudioElement(null);
+          if (wasInterrupted()) {
+            return finishPlayback({ engine: 'skipped', reason: 'interrupted' }, trimmed);
+          }
           const reason =
             error instanceof Error && error.message.startsWith('audio_playback_failed')
               ? error.message
@@ -428,6 +460,9 @@ export async function playKairoUtteranceNow(
           registerKairoAudioElement(null);
           handle.revoke();
         }
+      }
+      if (wasInterrupted()) {
+        return finishPlayback({ engine: 'skipped', reason: 'interrupted' }, trimmed);
       }
       return speakWithBrowser(
         trimmed,
@@ -445,6 +480,9 @@ export async function playKairoUtteranceNow(
     logKairoVoice('tts_error', {
       message: error instanceof Error ? error.message : String(error),
     });
+    if (wasInterrupted()) {
+      return finishPlayback({ engine: 'skipped', reason: 'interrupted' }, trimmed);
+    }
     return speakWithBrowser(trimmed, 'fetch_error', tuning, speaker, notifyPlaybackStart);
   }
 }

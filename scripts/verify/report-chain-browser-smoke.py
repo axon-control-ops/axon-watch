@@ -174,6 +174,7 @@ def main() -> int:
     # Browser: open DashPro IDE and capture Mission Control / Transmission if available.
     browser_ok = False
     browser_error = None
+    auto_opened_before_click: bool | None = None
     try:
         from playwright.sync_api import sync_playwright
 
@@ -187,6 +188,7 @@ def main() -> int:
             )
             page.goto(console, wait_until="domcontentloaded", timeout=60000)
             page.wait_for_timeout(2500)
+            auto_opened_before_click = page.locator(".report-theater").count() > 0
             page.screenshot(path=str(OUTPUT_DIR / "01-mission-control.png"), full_page=True)
 
             # Prefer opening DashPro workspace into IDE when the control is present.
@@ -202,33 +204,40 @@ def main() -> int:
 
             page.screenshot(path=str(OUTPUT_DIR / "02-after-dashpro-focus.png"), full_page=True)
 
-            # Type REPORT into a visible talk/composer box if present.
-            filled = False
-            for selector in (
-                "textarea",
-                "input[type='text']",
-                "[contenteditable='true']",
-            ):
-                boxes = page.locator(selector)
-                for index in range(min(boxes.count(), 6)):
-                    box = boxes.nth(index)
-                    try:
-                        if not box.is_visible():
-                            continue
-                        box.click(timeout=2000)
-                        box.fill("REPORT")
-                        box.press("Enter")
-                        filled = True
-                        break
-                    except Exception:
-                        continue
-                if filled:
-                    break
-
-            page.wait_for_timeout(4000)
-            page.screenshot(path=str(OUTPUT_DIR / "03-after-report.png"), full_page=True)
-            body_text = page.inner_text("body")
-            browser_ok = "Priya" in body_text or "Lead" in body_text or "stand-up" in body_text.lower()
+            # Use the explicit command-theater control. Generic textarea probing
+            # produced false positives by typing REPORT into unrelated composers.
+            standup = page.get_by_role(
+                "button",
+                name="Open VAXON stand-up report",
+            ).first
+            standup.click(timeout=10000)
+            theater = page.locator(".report-theater")
+            theater.wait_for(state="visible", timeout=30000)
+            page.wait_for_timeout(500)
+            page.screenshot(path=str(OUTPUT_DIR / "03-theater-opening.png"), full_page=True)
+            page.wait_for_function(
+                """() => {
+                  const kicker = document.querySelector('.report-theater__hero-kicker');
+                  return Boolean(
+                    kicker && kicker.textContent?.trim().toLowerCase() !== 'team stand-up'
+                  );
+                }""",
+                timeout=30000,
+            )
+            first_card = page.locator(".report-theater__hero-line").first
+            first_card.wait_for(state="visible", timeout=5000)
+            page.wait_for_timeout(500)
+            page.screenshot(path=str(OUTPUT_DIR / "04-theater-active-stage.png"), full_page=True)
+            theater_text = theater.inner_text()
+            browser_ok = (
+                not auto_opened_before_click
+                and "STAND-UP" in theater_text.upper()
+                and page.locator(".report-theater__hero-line").count() > 0
+                and any(
+                    marker in theater_text.lower()
+                    for marker in ("attention", "work in flight", "lead reports", "fleet")
+                )
+            )
             browser.close()
     except Exception as exc:  # noqa: BLE001
         browser_error = str(exc)
@@ -239,10 +248,12 @@ def main() -> int:
             "id": "browser_dashpro_report",
             "ok": browser_ok,
             "error": browser_error,
+            "auto_opened_before_click": auto_opened_before_click,
             "screenshots": [
                 "01-mission-control.png",
                 "02-after-dashpro-focus.png",
-                "03-after-report.png",
+                "03-theater-opening.png",
+                "04-theater-active-stage.png",
             ],
         }
     )

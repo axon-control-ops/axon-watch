@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
 
+import type { CompanyEmployeeRecord } from '../../contracts/canonical';
 import { clearBriefingSurfaceOffer } from '../kairo-conversation/conversation-briefing-surface';
 import { clearQueuedSpokenAlerts } from '../../lib/spoken-alert-delivery';
 import type { ReportTheaterPayload, ReportTheaterSections } from './report-theater-model';
@@ -22,6 +23,8 @@ const showNextSteps = ref(false);
 const executing = ref(false);
 const speakerName = ref<string | null>(null);
 const directives = ref<ReportTheaterDirective[]>([]);
+/** Frozen at open so attendee chips stay aligned with spoken sections. */
+const attendeesRoster = ref<CompanyEmployeeRecord[]>([]);
 /** Bumps when a new theater session starts so in-flight narration can cancel. */
 const sessionToken = ref(0);
 
@@ -34,6 +37,7 @@ export const reportTheaterShowNextSteps = computed(() => showNextSteps.value);
 export const reportTheaterExecuting = computed(() => executing.value);
 export const reportTheaterSpeakerName = computed(() => speakerName.value);
 export const reportTheaterDirectives = computed(() => directives.value);
+export const reportTheaterAttendeesRoster = computed(() => attendeesRoster.value);
 export const reportTheaterStages = computed(() => buildReportTheaterStages(sections.value));
 export const reportTheaterSessionToken = computed(() => sessionToken.value);
 
@@ -54,6 +58,9 @@ export function openReportTheater(payload: ReportTheaterPayload): void {
   };
   fingerprint.value = payload.fingerprint?.trim() || null;
   replyText.value = String(payload.reply || payload.spokenReply || '').trim();
+  attendeesRoster.value = Array.isArray(payload.employees)
+    ? payload.employees.map((row) => ({ ...row }))
+    : [];
   // -1 = intro/preamble — do not show Attention while "Here's the stand-up" plays.
   stageIndex.value = -1;
   showNextSteps.value = false;
@@ -105,6 +112,7 @@ export function closeReportTheater(): void {
   replyText.value = '';
   speakerName.value = null;
   directives.value = [];
+  attendeesRoster.value = [];
   sections.value = normalizeReportTheaterSections(null);
 }
 

@@ -1,4 +1,4 @@
-import type { BriefingAction } from '../../contracts/canonical';
+import type { BriefingAction, CompanyEmployeeRecord } from '../../contracts/canonical';
 
 export type ReportTheaterSectionId =
   | 'attention'
@@ -20,6 +20,8 @@ export interface ReportTheaterPayload {
   fingerprint?: string | null;
   reply?: string;
   spokenReply?: string | null;
+  /** Frozen roster for attendee chips — keeps theater aligned with spoken sections. */
+  employees?: CompanyEmployeeRecord[] | null;
 }
 
 export interface ReportTheaterStage {
