@@ -2,6 +2,7 @@ import { computed, onScopeDispose, ref, watch, type Ref } from 'vue';
 
 import {
   cancelWorkspaceTask,
+  cancelWorkspaceTasksBatch,
   createWorkspaceTask,
   fetchWorkspaceTasks,
   type CreateWorkspaceTaskInput,
@@ -106,6 +107,36 @@ export function createWorkspaceTasksSlice(input: CreateWorkspaceTasksSliceInput)
     }
   }
 
+  async function cancelWaitingWorkspaceTasks(): Promise<number> {
+    const workspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
+    if (!workspaceId) {
+      return 0;
+    }
+    workspaceTasksMutating.value = true;
+    try {
+      const result = await cancelWorkspaceTasksBatch(workspaceId, {
+        scope: 'waiting',
+        terminalOutcome: 'cancelled by operator (clear waiting)',
+      });
+      const byId = new Map(result.cancelled.map((row) => [row.task_id, row]));
+      const previous = workspaceTasksById.value[workspaceId] ?? [];
+      workspaceTasksById.value = {
+        ...workspaceTasksById.value,
+        [workspaceId]: previous.map((row) => byId.get(row.task_id) ?? row),
+      };
+      workspaceTasksError.value = null;
+      // Refresh so cancelled runs/leases disappear from board promptly.
+      await loadWorkspaceTasks(workspaceId);
+      return result.cancelled_count;
+    } catch (error) {
+      workspaceTasksError.value =
+        error instanceof Error ? error.message : 'Failed to cancel waiting tasks';
+      return 0;
+    } finally {
+      workspaceTasksMutating.value = false;
+    }
+  }
+
   const workspaceTasksForCurrentWorkspace = computed(() => {
     const workspaceId = input.currentWorkspace.value?.workspace_id;
     if (!workspaceId) {
@@ -138,5 +169,6 @@ export function createWorkspaceTasksSlice(input: CreateWorkspaceTasksSliceInput)
     loadWorkspaceTasks,
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
+    cancelWaitingWorkspaceTasks,
   };
 }

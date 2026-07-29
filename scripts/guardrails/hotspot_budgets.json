@@ -415,11 +415,11 @@
       "note": "Autonomy publish path-scope + receipts; gh resolve extracted to gh_cli.py"
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
-      "max_lines": 430,
+      "max_lines": 458,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-task-board/*",
-      "note": "Mission Control Task Board; thin orchestrator \u2014 create form, plan filter, columns, drawer extracted"
+      "note": "Mission Control Task Board; cancel-all-waiting + columns cancel wiring"
     },
     "apps/console-web/src/features/report-theater/report-theater.css": {
       "max_lines": 550,
@@ -429,11 +429,11 @@
       "note": "REPORT theater presentation; split seat/stage/action layers next"
     },
     "apps/console-web/src/styles/shell/operator-task-board.css": {
-      "max_lines": 651,
+      "max_lines": 684,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/operator-task-board/*",
-      "note": "Task Board density polish; split header/list/card CSS next"
+      "note": "Task Board density polish + cancel-waiting / item-cancel controls"
     },
     "services/control-plane/app/kairo/operator_deterministic_report.py": {
       "max_lines": 587,

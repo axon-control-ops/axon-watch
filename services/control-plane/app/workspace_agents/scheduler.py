@@ -10,7 +10,6 @@ from typing import Any
 
 from app.domain.run_state import is_terminal_phase
 from app.persistence import task_store, worker_scheduler_settings_store
-from app.runs.begin_execution import begin_execution
 from app.runs.service import (
     RunLifecycleError,
     create_run,
@@ -26,6 +25,7 @@ from app.workspace_agents.scheduler_auto_start_gates import (
     runtime_auth_blocks_auto_start,
     usage_limit_blocks_auto_start,
 )
+from app.workspace_agents.scheduler_queued_fan_out import dispatch_queued_lead_fan_out_runs
 from app.workspace_agents.worker_dispatch import dispatch_continuous_worker_run, worker_dispatch_enabled
 
 logger = logging.getLogger(__name__)
@@ -193,55 +193,14 @@ def _dispatch_queued_lead_fan_out_runs(
     active_bound: int,
 ) -> list[dict[str, Any]]:
     """Promote Lead fan-out queued runs into Lane B without creating duplicate runs."""
-    if not worker_dispatch_enabled() or starts_bound <= 0:
-        return []
-    started: list[dict[str, Any]] = []
-    queued = [
-        run
-        for run in list_runs()
-        if str(run.get("phase") or "").strip() == "queued"
-        and str(run.get("employee_role") or "").strip()
-        and str(run.get("task_id") or "").strip()
-        and not is_terminal_phase(str(run.get("phase") or "").strip())
-    ]
-    queued.sort(key=lambda run: str(run.get("started_at") or run.get("updated_at") or ""))
-    for run in queued:
-        if len(started) >= starts_bound:
-            break
-        if _executing_run_count() + len(started) >= active_bound:
-            break
-        workspace_id = str(run.get("workspace_id") or "").strip()
-        role = str(run.get("employee_role") or "").strip().lower()
-        employee = _employee_for_role(companies, workspace_id, role)
-        if employee is None:
-            continue
-        if not worker_scheduler_settings_store.is_employee_enabled(
-            workspace_id,
-            role,
-            file_enabled=bool(employee.enabled),
-        ):
-            continue
-        try:
-            advanced = begin_execution(
-                str(run["run_id"]),
-                actor="workspace_scheduler",
-                receipt_summary="Queued fan-out run entered execution for dispatch",
-            )
-        except RunLifecycleError:
-            logger.exception("could not advance queued fan-out run %s", run.get("run_id"))
-            continue
-        started.append(advanced)
-        threading.Thread(
-            target=_dispatch_worker_run,
-            kwargs={
-                "workspace_id": workspace_id,
-                "employee": employee,
-                "run_record": advanced,
-            },
-            daemon=True,
-            name=f"worker-dispatch-queued-{advanced.get('run_id')}",
-        ).start()
-    return started
+    return dispatch_queued_lead_fan_out_runs(
+        companies=companies,
+        starts_bound=starts_bound,
+        active_bound=active_bound,
+        executing_run_count=_executing_run_count,
+        employee_for_role=_employee_for_role,
+        dispatch_worker_run=_dispatch_worker_run,
+    )
 
 
 def run_continuous_worker_tick(

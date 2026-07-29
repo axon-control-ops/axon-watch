@@ -102,3 +102,30 @@ export async function cancelWorkspaceTask(
     'cancel workspace task failed',
   );
 }
+
+export type CancelWorkspaceTasksBatchResult = {
+  workspace_id: string;
+  cancelled_count: number;
+  cancelled: WorkspaceTaskRecord[];
+  errors: Array<{ task_id: string; detail: string }>;
+};
+
+export async function cancelWorkspaceTasksBatch(
+  workspaceId: string,
+  input: { taskIds?: string[]; scope?: 'waiting' | ''; terminalOutcome?: string } = {},
+): Promise<CancelWorkspaceTasksBatchResult> {
+  const encoded = encodeURIComponent(workspaceId);
+  return fetchJson<CancelWorkspaceTasksBatchResult>(
+    `/api/workspaces/${encoded}/tasks/cancel-batch`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task_ids: input.taskIds ?? [],
+        scope: input.scope ?? '',
+        terminal_outcome: input.terminalOutcome ?? 'cancelled by operator',
+      }),
+    },
+    'cancel workspace tasks batch failed',
+  );
+}

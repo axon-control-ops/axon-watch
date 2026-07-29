@@ -243,6 +243,22 @@ async function cancelTask(taskId: string): Promise<void> {
   await shell.cancelCurrentWorkspaceTask(taskId);
 }
 
+async function cancelAllWaiting(): Promise<void> {
+  const waiting = boardView.value.counts.waiting;
+  if (!waiting || shell.workspaceTasksMutating) {
+    return;
+  }
+  const confirmed = window.confirm(
+    `Cancel all ${waiting} waiting task(s) on this workspace? Bound queued runs will stop too.`,
+  );
+  if (!confirmed) {
+    return;
+  }
+  await shell.cancelWaitingWorkspaceTasks();
+  selectedTaskId.value = null;
+  await refreshScheduler();
+}
+
 async function retryTask(row: TaskBoardRow): Promise<void> {
   const created = await shell.createCurrentWorkspaceTask({
     goal: row.goal,
@@ -323,6 +339,16 @@ function openFleetControls(): void {
         </div>
         <div class="operator-task-board__header-actions">
           <span class="operator-task-board__headline">{{ boardView.headline }}</span>
+          <button
+            v-if="boardView.counts.waiting > 0"
+            type="button"
+            class="operator-task-board__cancel-waiting"
+            :disabled="shell.workspaceTasksMutating"
+            title="Cancel every open/waiting task so Leads are not buried"
+            @click="void cancelAllWaiting()"
+          >
+            Cancel all waiting ({{ boardView.counts.waiting }})
+          </button>
           <button
             type="button"
             class="operator-task-board__add"
@@ -409,7 +435,9 @@ function openFleetControls(): void {
         :board-view="boardView"
         :selected-task-id="selectedTaskId"
         :show-history="showHistory"
+        :workspace-tasks-mutating="shell.workspaceTasksMutating"
         @select-task="selectTask"
+        @cancel-task="void cancelTask($event)"
         @update:show-history="showHistory = $event"
       />
 

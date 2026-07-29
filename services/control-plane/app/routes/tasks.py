@@ -155,6 +155,52 @@ def fail_task(task_id: str, body: TaskFailRequest) -> dict[str, Any]:
 def cancel_task(task_id: str, body: TaskCancelRequest | None = None) -> dict[str, Any]:
     payload = body or TaskCancelRequest()
     try:
-        return task_store.cancel_task(task_id, terminal_outcome=payload.terminal_outcome)
+        cancelled = task_store.cancel_task(task_id, terminal_outcome=payload.terminal_outcome)
     except task_store.TaskLedgerError as exc:
         raise _http_error(exc) from exc
+    run_id = str(cancelled.get("run_id") or "").strip()
+    if run_id:
+        try:
+            from app.runs.restart_reconcile import interrupt_run_on_restart
+
+            interrupt_run_on_restart(run_id)
+        except Exception:  # noqa: BLE001 — task cancel must succeed even if run is already terminal
+            pass
+    return cancelled
+
+
+class TaskCancelBatchRequest(BaseModel):
+    task_ids: list[str] = Field(default_factory=list)
+    scope: str = ""  # "waiting" = all open tasks in workspace
+    terminal_outcome: str = "cancelled by operator"
+
+
+@router.post("/api/workspaces/{workspace_id}/tasks/cancel-batch")
+def cancel_tasks_batch(workspace_id: str, body: TaskCancelBatchRequest) -> dict[str, Any]:
+    workspace = workspace_id.strip()
+    if not workspace:
+        raise HTTPException(status_code=400, detail="workspace_id is required")
+    outcome = (body.terminal_outcome or "cancelled by operator").strip() or "cancelled by operator"
+    target_ids: list[str] = []
+    scope = (body.scope or "").strip().lower()
+    if scope == "waiting":
+        for row in task_store.list_tasks(workspace_id=workspace, limit=500):
+            if str(row.get("status") or "").strip().lower() == "open":
+                task_id = str(row.get("task_id") or "").strip()
+                if task_id:
+                    target_ids.append(task_id)
+    else:
+        target_ids = [str(item).strip() for item in body.task_ids if str(item).strip()]
+    cancelled: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    for task_id in target_ids:
+        try:
+            cancelled.append(cancel_task(task_id, TaskCancelRequest(terminal_outcome=outcome)))
+        except HTTPException as exc:
+            errors.append({"task_id": task_id, "detail": str(exc.detail)})
+    return {
+        "workspace_id": workspace,
+        "cancelled_count": len(cancelled),
+        "cancelled": cancelled,
+        "errors": errors,
+    }

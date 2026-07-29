@@ -120,6 +120,11 @@ def _format_decompose_reply(
         lines.append(f"Deferred (dependencies): {len(deferred)}")
         lines.append("")
     lines.extend(_fleet_status_lines(kick_started=kick_started, queued_run_count=len(runs)))
+    superseded = list(materialize.get("superseded_tasks") or [])
+    if superseded:
+        lines.append(
+            f"Cleared {len(superseded)} overlapping stale queue task(s) so this handoff can move."
+        )
     lines.append(f"— {lead_name.strip() or 'Lead'}")
     return "\n".join(lines)
 

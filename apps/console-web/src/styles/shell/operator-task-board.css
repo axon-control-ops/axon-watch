@@ -80,10 +80,43 @@
   cursor: pointer;
 }
 
+.operator-task-board__add,
+.operator-task-board__cancel-waiting,
+.operator-task-board__item-cancel {
+  appearance: none;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  font: inherit;
+}
+
 .operator-task-board__add {
   border-color: rgba(120, 190, 255, 0.35);
   background: rgba(80, 160, 220, 0.1);
   color: rgba(180, 220, 255, 0.96);
+}
+
+.operator-task-board__cancel-waiting {
+  border: 1px solid rgba(255, 120, 120, 0.45);
+  background: rgba(80, 18, 22, 0.75);
+  color: rgba(255, 210, 210, 0.95);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.operator-task-board__cancel-waiting:disabled,
+.operator-task-board__item-cancel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.operator-task-board__item-cancel {
+  align-self: start;
+  border: 1px solid rgba(255, 120, 120, 0.4);
+  background: rgba(60, 14, 18, 0.9);
+  color: rgba(255, 200, 200, 0.95);
+  padding: 0.28rem 0.45rem;
+  font-size: 0.72rem;
+  white-space: nowrap;
 }
 
 .operator-task-board__filters {

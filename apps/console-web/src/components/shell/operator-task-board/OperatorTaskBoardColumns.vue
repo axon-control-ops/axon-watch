@@ -2,7 +2,6 @@
 import type {
   OperatorTaskBoardView,
   TaskBoardColumnId,
-  TaskBoardRow,
 } from '../../../lib/operator-task-board-view';
 
 import { columnTone } from './operator-task-board-helpers';
@@ -12,10 +11,12 @@ defineProps<{
   boardView: OperatorTaskBoardView;
   selectedTaskId: string | null;
   showHistory: boolean;
+  workspaceTasksMutating: boolean;
 }>();
 
 const emit = defineEmits<{
   selectTask: [taskId: string];
+  cancelTask: [taskId: string];
   'update:showHistory': [value: boolean];
 }>();
 
@@ -72,6 +73,16 @@ function toneFor(columnId: TaskBoardColumnId): string {
             >
               {{ chip.blocking ? 'blocked by' : 'after' }} {{ chip.goal }}
             </span>
+          </button>
+          <button
+            v-if="row.canCancel"
+            type="button"
+            class="operator-task-board__item-cancel"
+            title="Cancel queued task"
+            :disabled="workspaceTasksMutating"
+            @click.stop="emit('cancelTask', row.taskId)"
+          >
+            Cancel
           </button>
         </li>
       </ul>
