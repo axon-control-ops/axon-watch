@@ -40,3 +40,18 @@ export function shouldApplyAdviseAttendOnAffirm(input: {
 }): boolean {
   return Boolean(input.adviseUiAction) && isAffirmativeOperatorReply(input.message);
 }
+
+/** Apply an affirmative Attend reply and mark the turn as fully consumed. */
+export function consumeAdviseAttendReply(
+  shell: WorkspaceSwitchShell,
+  input: {
+    message: string;
+    adviseUiAction: ChatUiAction | null;
+  },
+): boolean {
+  if (!shouldApplyAdviseAttendOnAffirm(input)) {
+    return false;
+  }
+  applyAdviseAttendAction(shell, input.adviseUiAction);
+  return true;
+}

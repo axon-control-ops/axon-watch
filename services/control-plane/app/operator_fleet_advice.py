@@ -303,20 +303,19 @@ def build_fleet_coach_line(
 
     if kind == "open_handoff":
         task = str(fact.get("title") or "the listed task").strip() or "the listed task"
-        task_short = task if len(task) <= 72 else f"{task[:71].rstrip()}…"
         title_l = task.lower()
         auth_hint = ""
         if "401" in title_l or "unauthorized" in title_l or "github api" in title_l:
             auth_hint = " Fix GitHub credentials there;"
         if cross and focus_label:
             return (
-                f"Handoff to {name} is open — switch there and finish “{task_short}”."
+                f"Handoff to {name} is open — switch there and finish “{task}”."
                 f"{auth_hint} Pause more {focus_label} work until that closes."
             )
         if cross:
-            base = f"Handoff to {name} is open — switch there and finish “{task_short}”."
+            base = f"Handoff to {name} is open — switch there and finish “{task}”."
             return f"{base}{auth_hint}".rstrip(";") if auth_hint else base
-        return f"Finish the open handoff ticket in {name}: “{task_short}”."
+        return f"Finish the open handoff ticket in {name}: “{task}”."
 
     if kind == "degraded_runtime":
         if fact.get("watch_connected") is False:

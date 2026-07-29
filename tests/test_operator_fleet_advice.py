@@ -274,6 +274,43 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         self.assertEqual("workspace_dashpro", action["workspace_id"])
         self.assertTrue(action["focus_attention"])
 
+    def test_open_handoff_advice_keeps_the_complete_task(self) -> None:
+        task = (
+            "DashPro PostHog warning, PostHog API query failed, "
+            "The read operation timed out while loading project insights"
+        )
+        pack = build_fleet_advice_pack(
+            active_run_records=[],
+            pending_approval_records=[],
+            fleet_signals=[],
+            degraded={"active": False, "reasons": []},
+            watch_connected=True,
+            display_names={"workspace_dashpro": "DashPro"},
+            focused_workspace_id="workspace_axon_watch",
+            scope_mode="workspace",
+            open_handoffs=[
+                {
+                    "handoff_id": "handoff-long-task",
+                    "source_workspace_id": "workspace_axon_watch",
+                    "target_workspace_id": "workspace_dashpro",
+                    "task": task,
+                    "status": "routed",
+                    "target_task_id": "task-long",
+                }
+            ],
+        )
+
+        advise = resolve_fleet_briefing_advise(
+            pack=pack,
+            display_names={
+                "workspace_dashpro": "DashPro",
+                "workspace_axon_watch": "Axon Watch",
+            },
+        )
+
+        self.assertIn(f"finish “{task}”", advise)
+        self.assertNotIn("…", advise)
+
 
 if __name__ == "__main__":
     unittest.main()

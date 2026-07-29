@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   adviseAttendCtaLabel,
   applyAdviseAttendAction,
+  consumeAdviseAttendReply,
   parseAdviseUiAction,
   shouldApplyAdviseAttendOnAffirm,
 } from './kairo-sidebar-attend';
@@ -52,6 +53,26 @@ describe('kairo-sidebar-attend', () => {
     );
     expect(setCurrentWorkspace).toHaveBeenCalledWith('workspace_axon_watch');
     expect(setLayoutMode).toHaveBeenCalledWith('operator');
+    expect(focusAttentionSidebar).toHaveBeenCalledWith(null);
+  });
+
+  it('consumes an affirmative Attend reply after executing its action', () => {
+    const setCurrentWorkspace = vi.fn();
+    const openWorkspaceFile = vi.fn().mockResolvedValue(undefined);
+    const focusAttentionSidebar = vi.fn();
+    const action = parseAdviseUiAction({
+      type: 'switch_workspace',
+      workspace_id: 'workspace_dashpro',
+      focus_attention: true,
+    });
+
+    expect(
+      consumeAdviseAttendReply(
+        { setCurrentWorkspace, openWorkspaceFile, focusAttentionSidebar },
+        { message: 'do it', adviseUiAction: action },
+      ),
+    ).toBe(true);
+    expect(setCurrentWorkspace).toHaveBeenCalledWith('workspace_dashpro');
     expect(focusAttentionSidebar).toHaveBeenCalledWith(null);
   });
 });

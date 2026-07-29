@@ -14,9 +14,8 @@ import {
   sidebarSpeechCanExpand,
 } from '../../lib/sidebar-speech-chip-view';
 import {
-  applyAdviseAttendAction,
+  consumeAdviseAttendReply,
   parseAdviseUiAction,
-  shouldApplyAdviseAttendOnAffirm,
 } from '../../lib/kairo-sidebar-attend';
 import { vaxonAffirmReplyCta, vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import { useShellStore } from '../../stores/shell';
@@ -167,20 +166,19 @@ async function send(content?: string): Promise<void> {
     const adviseAction = parseAdviseUiAction(shell.operatorBriefing?.advise_ui_action ?? null);
     if (
       target.kind === 'vaxon' &&
-      shouldApplyAdviseAttendOnAffirm({ message, adviseUiAction: adviseAction })
-    ) {
-      applyAdviseAttendAction(
+      consumeAdviseAttendReply(
         {
           setCurrentWorkspace: shell.setCurrentWorkspace,
           openWorkspaceFile: shell.openWorkspaceFile,
           setLayoutMode: shell.setLayoutMode,
           focusAttentionSidebar: shell.focusAttentionSidebar,
         },
-        adviseAction,
-      );
+        { message, adviseUiAction: adviseAction },
+      )
+    ) {
       emit('replied');
-      // Still acknowledge to VAXON so memory/rhythm stay aligned.
-      await submitTurn(message);
+      // The action is the reply. Re-submitting an affirmative to converse can
+      // produce a fresh copy of the briefing after the requested UI move.
       return;
     }
     emit('replied');
