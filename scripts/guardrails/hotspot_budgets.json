@@ -225,10 +225,11 @@
       "note": "Lowered after explorer/activity panel CSS extraction"
     },
     "apps/console-web/src/styles/ide/ide-layout-08.css": {
-      "max_lines": 557,
+      "max_lines": 565,
       "soft_limit": 350,
       "hard_limit": 500,
-      "target": "apps/console-web/src/styles/ide/*"
+      "target": "apps/console-web/src/styles/ide/*",
+      "note": "Raised for Cursor-soft agent-dock notice styles"
     },
     "apps/console-web/src/styles/shell/mockup-shell-07.css": {
       "max_lines": 182,
