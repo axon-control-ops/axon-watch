@@ -14,9 +14,9 @@ from app.workspace_agents.lead_task_persist import persist_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
     LeadPlanRosterMember,
     PlanMode,
-    build_lead_task_plan,
     detect_fan_out_intent,
 )
+from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
 
 
 class LeadFanOutError(ValueError):
@@ -155,6 +155,7 @@ def materialize_lead_fan_out(
     mode: PlanMode = "auto",
     create_runs: bool = True,
     supersedes_plan_id: str | None = None,
+    use_model: bool = True,
 ) -> dict[str, Any]:
     """Build plan, persist tasks, and open leased runs for dependency-ready items.
 
@@ -174,7 +175,13 @@ def materialize_lead_fan_out(
         raise LeadFanOutError(f"no company roster for workspace {workspace}")
 
     try:
-        plan = build_lead_task_plan(goal=cleaned_goal, roster=roster, mode=mode)
+        plan = resolve_lead_task_plan(
+            goal=cleaned_goal,
+            roster=roster,
+            mode=mode,
+            workspace_id=workspace,
+            use_model=use_model,
+        )
     except ValueError as exc:
         raise LeadFanOutError(str(exc)) from exc
 

@@ -31,6 +31,25 @@ describe('agent-message-markdown', () => {
     expect(html).toContain('<th>Slot</th>');
   });
 
+  it('promotes empty-header key/value tables so credentials render as HTML tables', () => {
+    const content = [
+      'Login details for Lesego',
+      '',
+      '| |',
+      '|---|---|',
+      '| Username | lesego.mkhwebane |',
+      '| Initial password | Lesego2026! |',
+      '| Staff ID | s007 |',
+    ].join('\n');
+    const html = renderAgentMessageMarkdown(content);
+    expect(html).toContain('<table>');
+    expect(html).toContain('<th>Field</th>');
+    expect(html).toContain('<th>Value</th>');
+    expect(html).toContain('<td>Username</td>');
+    expect(html).toContain('<td>lesego.mkhwebane</td>');
+    expect(html).not.toContain('|---|---|');
+  });
+
   it('extracts read_file fenced markdown from agent execution wrapper', () => {
     const content = [
       'Executed `read_file` (ok) for run run_abc.',

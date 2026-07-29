@@ -100,6 +100,46 @@
       "should_route": false,
       "employee_id": null,
       "reason": "build_plan_implement"
+    },
+    {
+      "id": "named_assign_frontend_from_lead",
+      "prompt": "Ok assign Priya the task and have her report back",
+      "current_employee_id": "employee-workspace_dashpro-lead-0",
+      "should_route": true,
+      "employee_id": "employee-workspace_dashpro-frontend-2",
+      "reason": "named_assign_frontend"
+    },
+    {
+      "id": "named_assign_backend_from_lead",
+      "prompt": "Have Marco fix the quality-gate failure",
+      "current_employee_id": "employee-workspace_dashpro-lead-0",
+      "should_route": true,
+      "employee_id": "employee-workspace_dashpro-backend-3",
+      "reason": "named_assign_backend"
+    },
+    {
+      "id": "named_assign_integrations_from_lead",
+      "prompt": "Give Soren the GitHub Actions secrets wiring",
+      "current_employee_id": "employee-workspace_dashpro-lead-0",
+      "should_route": true,
+      "employee_id": "employee-workspace_dashpro-integrations-4",
+      "reason": "named_assign_integrations"
+    },
+    {
+      "id": "named_assign_watcher_from_lead",
+      "prompt": "@Cass please watch the red-build alerts",
+      "current_employee_id": "employee-workspace_dashpro-lead-0",
+      "should_route": true,
+      "employee_id": "employee-workspace_dashpro-watcher-1",
+      "reason": "named_assign_watcher"
+    },
+    {
+      "id": "named_assign_already_on_target",
+      "prompt": "Assign Priya the enrollment card polish",
+      "current_employee_id": "employee-workspace_dashpro-frontend-2",
+      "should_route": false,
+      "employee_id": "employee-workspace_dashpro-frontend-2",
+      "reason": "already_owning"
     }
   ]
 }

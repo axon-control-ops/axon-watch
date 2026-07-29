@@ -11,32 +11,37 @@ from app.persistence import task_store
 from app.workspace_agents import build_company_roster
 from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
+from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
 from app.workspace_agents.lead_replan import (
     LeadReplanError,
     replan_lead_goal,
     synthesize_lead_plan,
 )
 from app.workspace_agents.lead_task_persist import persist_lead_task_plan
-from app.workspace_agents.lead_task_plan import LeadPlanRosterMember, build_lead_task_plan
+from app.workspace_agents.lead_task_plan import LeadPlanRosterMember
 
 router = APIRouter(tags=["lead-planner"])
+
+_PLAN_MODE = Literal["auto", "fan_out", "sequential", "decompose"]
 
 
 class LeadPlanRequest(BaseModel):
     goal: str = Field(min_length=1)
-    mode: Literal["auto", "fan_out", "sequential"] = "auto"
+    mode: _PLAN_MODE = "auto"
     persist: bool = False
+    use_model: bool = True
 
 
 class LeadFanOutRequest(BaseModel):
     goal: str = Field(min_length=1)
-    mode: Literal["auto", "fan_out", "sequential"] = "auto"
+    mode: _PLAN_MODE = "auto"
     create_runs: bool = True
+    use_model: bool = True
 
 
 class LeadReplanRequest(BaseModel):
     goal: str = Field(min_length=1)
-    mode: Literal["auto", "fan_out", "sequential"] = "auto"
+    mode: _PLAN_MODE = "auto"
     create_runs: bool = True
 
 
@@ -92,10 +97,12 @@ def workspace_lead_plan(workspace_id: str, body: LeadPlanRequest) -> dict[str, A
     if not goal:
         raise HTTPException(status_code=400, detail="goal must not be empty")
     try:
-        plan = build_lead_task_plan(
+        plan = resolve_lead_task_plan(
             goal=goal,
             roster=_roster_members(workspace_id),
-            mode=body.mode,  # type: ignore[arg-type]
+            mode=body.mode,
+            workspace_id=workspace_id,
+            use_model=body.use_model,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -116,6 +123,7 @@ def workspace_lead_fan_out(workspace_id: str, body: LeadFanOutRequest) -> dict[s
             goal=body.goal,
             mode=body.mode,  # type: ignore[arg-type]
             create_runs=body.create_runs,
+            use_model=body.use_model,
         )
     except LeadFanOutError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

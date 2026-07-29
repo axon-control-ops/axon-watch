@@ -168,6 +168,34 @@ def should_soft_route_to_teammate(
     if is_build_plan_implement_prompt(text):
         return TeammateRouteDecision(should_route=False, reason="build_plan_implement")
 
+    from app.workspace_agents.named_assign_route import match_named_assign_employee
+
+    named = match_named_assign_employee(text, employees)
+    if named is not None:
+        current_id = current_employee.employee_id.strip() if current_employee else ""
+        if current_id and named.employee_id.strip() == current_id:
+            return TeammateRouteDecision(
+                should_route=False,
+                reason="already_owning",
+                employee=named,
+                routing_receipt="named_assign;already_owning",
+            )
+        from_name = (
+            (current_employee.name.strip() if current_employee else "")
+            or ("teammate" if current_id else "workspace")
+        )
+        return TeammateRouteDecision(
+            should_route=True,
+            reason=f"named_assign_{normalize_teammate_role(named.role)}",
+            employee=named,
+            from_employee_id=current_id or None,
+            from_name=from_name,
+            routing_receipt=(
+                f"named_assign;role={normalize_teammate_role(named.role)};"
+                f"to={named.employee_id}"
+            ),
+        )
+
     scored = score_roster(text, employees)
     if not scored:
         return TeammateRouteDecision(should_route=False, reason="no_match")
@@ -416,6 +444,34 @@ def route_teammate_decision(
         current = next((row for row in roster if row.employee_id == cleaned_current), None)
 
     from app.workspace_agents.lead_task_plan import detect_fan_out_intent
+    from app.workspace_agents.named_assign_route import match_named_assign_employee
+
+    # Explicit "assign Cole / have Priya…" wins over fan-out and soft specialty scoring.
+    named = match_named_assign_employee(prompt, roster)
+    if named is not None:
+        cleaned_current = current.employee_id.strip() if current else ""
+        if cleaned_current and named.employee_id.strip() == cleaned_current:
+            return TeammateRouteDecision(
+                should_route=False,
+                reason="already_owning",
+                employee=named,
+                from_employee_id=cleaned_current,
+                from_name=current.name if current else None,
+                source="deterministic",
+                routing_receipt="named_assign;already_owning",
+            )
+        return TeammateRouteDecision(
+            should_route=True,
+            reason=f"named_assign_{normalize_teammate_role(named.role)}",
+            employee=named,
+            from_employee_id=cleaned_current or None,
+            from_name=(current.name if current else None) or ("teammate" if cleaned_current else "workspace"),
+            source="deterministic",
+            routing_receipt=(
+                f"named_assign;role={normalize_teammate_role(named.role)};"
+                f"to={named.employee_id}"
+            ),
+        )
 
     # Fan-out is Lead planner territory — never collapse to a single specialty winner.
     if detect_fan_out_intent(prompt):

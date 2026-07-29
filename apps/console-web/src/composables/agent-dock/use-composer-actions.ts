@@ -20,6 +20,10 @@ import {
   undoEmployeeSpecialtyRoute,
 } from '../../lib/apply-employee-specialty-route';
 import { shouldSoftSwitchAgentToPlan } from '../../lib/composer-plan-auto-switch';
+import {
+  matchNamedAssignEmployee,
+  rewriteNamedAssignPrompt,
+} from '../../lib/named-assign-route';
 import { resolveEmployeeSpecialtyRoute } from '../../lib/resolve-employee-specialty-route';
 import { DEBUG_REPRODUCE_PROCEED_MESSAGE } from '../../lib/debug-reproduce-view';
 import {
@@ -179,22 +183,35 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     // Deterministic specialty route only on the send path. Model tie-break runs a
     // full ask-mode composer call (up to 45s) and was blocking Enter/send before
     // the real agent run started.
+    const roster = shell.companyEmployeesForCurrentWorkspace;
+    const namedAssign = matchNamedAssignEmployee(submitDraft, roster);
     const routeDecision = await resolveEmployeeSpecialtyRoute({
       prompt: submitDraft,
       workspaceId,
       currentEmployee: shell.activeIdeEmployeeRecord,
-      roster: shell.companyEmployeesForCurrentWorkspace,
+      roster,
       useModelTiebreak: false,
     });
     const routeMs = Date.now() - submitStartedAt;
+    let routed = false;
     if (routeDecision.shouldRoute) {
-      await applyEmployeeSpecialtyRoute(shell, routeDecision);
+      const applied = await applyEmployeeSpecialtyRoute(shell, routeDecision);
+      routed = applied.routed;
     }
     const applyMs = Date.now() - submitStartedAt;
+    const shouldRewriteNamedAssign =
+      Boolean(namedAssign) &&
+      (routed ||
+        (routeDecision.reason === 'already_owning' &&
+          routeDecision.employee?.employee_id === namedAssign?.employee.employee_id));
+    const routedPrompt =
+      shouldRewriteNamedAssign && namedAssign
+        ? rewriteNamedAssignPrompt(submitDraft, namedAssign.employee.name)
+        : submitDraft;
 
     const attachmentFiles = composerImages.value.map((image) => image.file);
     // openOrFocusEmployeeIdeThread may clear/restore drafts — keep the routed prompt.
-    shell.ideComposerDraft = submitDraft;
+    shell.ideComposerDraft = routedPrompt;
     await shell.submitIdeComposer(modeForSubmit, { attachmentFiles });
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(draft);
@@ -249,18 +266,31 @@ export function useComposerActions(options: UseComposerActionsOptions) {
     shell.ideComposerDraft = pending;
     dismissEmployeeSpecialtyRoute();
     const workspaceId = shell.currentWorkspace?.workspace_id ?? '';
+    const roster = shell.companyEmployeesForCurrentWorkspace;
+    const namedAssign = matchNamedAssignEmployee(pending, roster);
     const routeDecision = await resolveEmployeeSpecialtyRoute({
       prompt: pending,
       workspaceId,
       currentEmployee: shell.activeIdeEmployeeRecord,
-      roster: shell.companyEmployeesForCurrentWorkspace,
+      roster,
       useModelTiebreak: false,
     });
+    let routed = false;
     if (routeDecision.shouldRoute) {
-      await applyEmployeeSpecialtyRoute(shell, routeDecision);
+      const applied = await applyEmployeeSpecialtyRoute(shell, routeDecision);
+      routed = applied.routed;
     }
+    const shouldRewriteNamedAssign =
+      Boolean(namedAssign) &&
+      (routed ||
+        (routeDecision.reason === 'already_owning' &&
+          routeDecision.employee?.employee_id === namedAssign?.employee.employee_id));
+    const routedPrompt =
+      shouldRewriteNamedAssign && namedAssign
+        ? rewriteNamedAssignPrompt(pending, namedAssign.employee.name)
+        : pending;
     const attachmentFiles = composerImages.value.map((image) => image.file);
-    shell.ideComposerDraft = pending;
+    shell.ideComposerDraft = routedPrompt;
     await shell.submitIdeComposer('agent', { attachmentFiles });
     clearSkillAttachments?.();
     recordComposerHistoryIfSent(pending);
