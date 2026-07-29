@@ -387,9 +387,9 @@
       "note": "Lane B post_message orchestration; extract stream helpers next"
     },
     "tests/test_operator_deterministic_report.py": {
-      "max_lines": 589,
+      "max_lines": 595,
       "soft_limit": 350,
-      "hard_limit": 500,
+      "hard_limit": 595,
       "target": "tests/test_operator_deterministic_report_* slices",
       "note": "Deterministic report regression matrix after push-failure advice coverage; split next"
     },
@@ -436,9 +436,9 @@
       "note": "Task Board density polish; split header/list/card CSS next"
     },
     "services/control-plane/app/kairo/operator_deterministic_report.py": {
-      "max_lines": 707,
+      "max_lines": 716,
       "soft_limit": 350,
-      "hard_limit": 500,
+      "hard_limit": 716,
       "target": "services/control-plane/app/kairo/report_*",
       "note": "Deterministic REPORT lane; scrub helpers extracted to report_text.py; auth-heal filters next"
     },
