@@ -1,5 +1,9 @@
 {
   "bindings": {
+    "workspace_axon_local": {
+      "project_root": "../axon-local",
+      "display_name": "axon-local"
+    },
     "workspace_axon_watch": {
       "project_root": ".",
       "display_name": "axon-watch"

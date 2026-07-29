@@ -78,7 +78,3 @@ class ControlPlaneSkeletonE2ETests(unittest.TestCase):
         active_ids = {row["run_id"] for row in summary["active_runs"]}
         self.assertIn(created["run_id"], active_ids)
         self.assertEqual("executing", created["phase"])
-
-
-if __name__ == "__main__":
-    unittest.main()

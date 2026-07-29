@@ -396,13 +396,31 @@ def migrate_legacy_import_file() -> list[str]:
     return migrated
 
 
-def vault_runtime_env() -> dict[str, str]:
-    from app.vault import runtime_env as _runtime_env
+def _vault_runtime_env_module():
+    """Load sibling runtime_env by file path.
 
-    return _runtime_env.vault_runtime_env()
+    Control-plane also ships ``app.vault``. Cross-service in-process tests can
+    leave that package in ``sys.modules``, so ``from app.vault import runtime_env``
+    (and even relative imports) resolve to the wrong package.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent / "runtime_env.py"
+    spec = importlib.util.spec_from_file_location(
+        "axon_watch_vault_runtime_env",
+        path,
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"unable to load vault runtime_env from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def vault_runtime_env() -> dict[str, str]:
+    return _vault_runtime_env_module().vault_runtime_env()
 
 
 def vault_runtime_posture() -> dict[str, object]:
-    from app.vault import runtime_env as _runtime_env
-
-    return _runtime_env.vault_runtime_posture()
+    return _vault_runtime_env_module().vault_runtime_posture()
