@@ -45,7 +45,7 @@ describe('speech queue', () => {
 
     enqueueSpeech('first line', speech);
     expect(isSpeechQueueSpeaking()).toBe(true);
-    vi.advanceTimersByTime(140);
+    vi.advanceTimersByTime(220);
     expect(speech.utterances).toHaveLength(1);
 
     stopSpeech(speech);
@@ -63,7 +63,7 @@ describe('speech queue', () => {
     const idle = waitForSpeechQueueIdle();
     expect(isSpeechQueueBusy()).toBe(true);
 
-    vi.advanceTimersByTime(140);
+    vi.advanceTimersByTime(220);
     const utterance = speech.utterances[0];
     utterance.onend?.();
     await vi.advanceTimersByTimeAsync(300);
@@ -95,7 +95,7 @@ describe('speech queue', () => {
     stopSpeech(speech);
 
     enqueueSpeech('natural voice', speech);
-    vi.advanceTimersByTime(140);
+    vi.advanceTimersByTime(220);
 
     const utterance = speech.utterances[0] as MockUtterance;
     expect(utterance.rate).toBe(1.0);
@@ -110,7 +110,7 @@ describe('speech queue', () => {
     stopSpeech(speech);
 
     enqueueSpeech('slower voice', speech, { rate: 0.85, pitch: 1.12 });
-    vi.advanceTimersByTime(140);
+    vi.advanceTimersByTime(220);
 
     const utterance = speech.utterances[0] as MockUtterance;
     expect(utterance.rate).toBe(0.85);
@@ -129,7 +129,7 @@ describe('speech queue', () => {
     stopSpeech(speech);
 
     enqueueSpeech('Cass reporting', speech, { voiceHint: 'en-US-DavisNeural' });
-    vi.advanceTimersByTime(140);
+    vi.advanceTimersByTime(220);
 
     const utterance = speech.utterances[0] as MockUtterance;
     expect(utterance.voice?.name).toBe('Microsoft Davis');
@@ -147,7 +147,7 @@ describe('speech queue', () => {
     stopSpeech(speech);
 
     enqueueSpeech('Mira reporting', speech, { voiceHint: 'en-GB-SoniaNeural' });
-    vi.advanceTimersByTime(140);
+    vi.advanceTimersByTime(220);
 
     const utterance = speech.utterances[0] as MockUtterance;
     expect(utterance.voice?.name).toBe('Google UK English Female');
@@ -176,10 +176,10 @@ describe('speech queue', () => {
     enqueueSpeech('old line', speech);
     stopSpeech(speech);
     enqueueSpeech('fresh line', speech);
-    vi.advanceTimersByTime(140);
+    vi.advanceTimersByTime(220);
 
     expect(speech.utterances).toHaveLength(1);
-    expect(speech.utterances[0]?.text).toBe('\u200B\u200B\u2009fresh line');
+    expect(speech.utterances[0]?.text).toBe('\u200B\u200B\u200B\u2009\u2009fresh line');
     vi.useRealTimers();
   });
 });

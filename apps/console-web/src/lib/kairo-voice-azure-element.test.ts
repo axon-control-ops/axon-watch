@@ -32,12 +32,12 @@ describe('playAzureAudioToCompletion', () => {
     const onAudibleStart = vi.fn();
 
     const completion = playAzureAudioToCompletion(audio, onAudibleStart, 300);
-    await vi.advanceTimersByTimeAsync(120);
+    await vi.advanceTimersByTimeAsync(160);
     await completion;
 
     expect(audio.play).toHaveBeenCalledOnce();
     expect(onAudibleStart).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(519);
+    await vi.advanceTimersByTimeAsync(579);
     expect(onAudibleStart).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(onAudibleStart).toHaveBeenCalledOnce();
