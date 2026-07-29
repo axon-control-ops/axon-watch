@@ -423,6 +423,6 @@ export function buildStatusBarZones(input: {
   return {
     left,
     center,
-    right: [{ id: 'workspace', label: `WORKSPACE: ${workspaceLabel}`, tone: 'default' }],
+    right: [],
   };
 }

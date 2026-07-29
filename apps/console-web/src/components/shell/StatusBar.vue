@@ -203,9 +203,12 @@ onUnmounted(() => {
 
         <span class="status-bar-mockup__rail" aria-hidden="true" />
 
-        <div class="status-bar-mockup__chip status-bar-mockup__chip--operator">
+        <div
+          v-if="operatorZone"
+          class="status-bar-mockup__chip status-bar-mockup__chip--operator"
+        >
           <span class="status-bar-mockup__icon status-bar-mockup__icon--operator" aria-hidden="true" />
-          <span class="status-bar-mockup__chip-label">{{ operatorZone?.label }}</span>
+          <span class="status-bar-mockup__chip-label">{{ operatorZone.label }}</span>
         </div>
 
         <button

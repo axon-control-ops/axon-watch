@@ -15,11 +15,10 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-29 — Gate 9 polls Fast Gate every three minutes: red
-runs dispatch Rowan; green runs clear stale alerts. GitHub and Cursor dispatch
-were confirmed ready. Restart recovery, manual stand-up, speech onset, and
-AgentDock hover actions are documented below. Protected merges, force-pushes,
-and secrets remain human-gated. After every push: `./scripts/ops/watch-fast-gate.sh`.
+**Last verified:** 2026-07-29 — Workspace picker lives in the TopBar (above AgentDock).
+Draft-PR delivery resolves `gh` via PATH, `~/.local/bin`, or `AXON_WATCH_GH_CLI_PATH`.
+Gate 9 still polls Fast Gate every three minutes. After every push:
+`./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
@@ -327,6 +326,26 @@ Axon-X probes subscription auth live:
 - **Dispatch**: if subscription is active, control-plane **strips** `CURSOR_API_KEY` from the subprocess env to avoid auth conflicts (browser login and API key are alternate paths per Cursor docs).
 
 **Pro without vault key:** if `cursor agent status` prints `Logged in as …@…` and vault search shows no `CURSOR_API_KEY`, you are on the **subscription path** — correct for daily Pro use.
+
+### GitHub CLI (`gh`) for draft-PR delivery
+
+Worker shifts that finish with `push_policy=draft_pr` need the **GitHub CLI** on the
+**control-plane host** (not inside the chat UI). If Team shows
+`Delivery blocked: gh CLI is required to open a draft PR`, fix the host:
+
+1. Install: https://cli.github.com/ (or `sudo apt install gh` / package manager).
+2. Auth once as the operator user: `gh auth login` (HTTPS or SSH matching the repo remotes).
+3. Confirm control-plane can see it:
+   - `command -v gh` and `gh auth status`
+   - If systemd PATH omits `~/.local/bin`, either restart after
+     `scripts/ops/run-service.sh` (it prepends `~/.local/bin`) **or** set
+     `AXON_WATCH_GH_CLI_PATH=/absolute/path/to/gh` in
+     `~/.config/axon-watch/deployment.env`, then
+     `systemctl --user restart control-plane`.
+4. Retry the teammate (**Try again** / **Continue** on the soft Attention notice).
+
+Source: `services/control-plane/app/workspace_delivery/gh_cli.py`,
+`publish.py` (`_open_or_update_draft_pr`).
 
 ### Codex / OpenAI auth
 
@@ -1191,15 +1210,20 @@ Symptom-specific fixes continue in the sections below.
 - Cloudflare tunnel row: `tunnel token missing (auth=missing)`
 - Vault page (`/vault`): unlock fails with red banner  
   `Watch vault API HTTP 503: AXON_WATCH_INTERNAL_SERVICE_TOKEN is required when the operator surface is remotely reachable`
-- Status line may still say **WATCH CONNECTED** and `axonhealth` can still pass — because **local** `:4173` / `:8787` are fine. The **required** `console_web` probe hits the **public** URL (`AXON_WATCH_PUBLIC_BASE_URL`, e.g. `https://axon.edudashpro.org.za/api/health`), which needs the tunnel.
+- Status line may still say **WATCH CONNECTED** and `axonhealth` can still pass — because **local** `:4173` / `:8787` are fine.
+
+**Current rule:** required `console_web` probes **loopback** (`AXON_WATCH_CONSOLE_WEB_BASE_URL`, usually `:4173`). Cloudflare/public reachability is optional `public_ingress`. A tunnel flap alone must not mark Mission Control degraded.
+
+**Older builds** probed required `console_web` against `AXON_WATCH_PUBLIC_BASE_URL` (e.g. `https://axon.edudashpro.org.za/api/health`), which incorrectly tied local ONLINE to Cloudflare.
 
 ### Why it happens (failure chain)
 
 1. `AXON_WATCH_PUBLIC_BASE_URL` is a non-loopback hostname → deployment is **remotely reachable**.
 2. Remotely reachable hosts **require** a shared `AXON_WATCH_INTERNAL_SERVICE_TOKEN` on both control-plane and axon-watch (same value in `~/.config/axon-watch/deployment.env`).
 3. If that token is missing, control-plane → watch **mutating** calls (vault unlock, tunnel start) return **HTTP 503**.
-4. Vault stays **locked** → tunnel token cannot resolve from encrypted vault secrets → managed `cloudflared` will not start → public health returns Cloudflare **1033** → required `console_web` stays down.
+4. Vault stays **locked** → tunnel token cannot resolve from encrypted vault secrets → managed `cloudflared` will not start → public health returns Cloudflare **1033** → optional `public_ingress` goes soft (local required connectors should still be green).
 5. Auto-unlock keyfile may show as enabled on `/vault`, but **auto-unlock is refused by default** when remotely reachable. On this trusted always-on host set `AXON_WATCH_ALLOW_VAULT_AUTO_UNLOCK=1` in `~/.config/axon-watch/deployment.env`, then `axonrestart` (or Enable auto-unlock in `/vault`).
+6. Separately: a slow `/api/vault/status` (Cursor/Codex CLI probes) used to exceed the console’s **12s** fetch budget and show a false **SETUP REQUIRED** — probes are now short-timeout + cached.
 
 Also see [`docs/how-to/autonomy-gates-and-service-identity.md`](how-to/autonomy-gates-and-service-identity.md) and [`docs/NATIVE_TUNNEL_CONTROL.md`](NATIVE_TUNNEL_CONTROL.md).
 
@@ -1256,8 +1280,8 @@ problems. Copy now distinguishes:
 Guard-rails: continuous scheduler skips the whole workspace after any role hits usage
 limits (Cursor quota is account-wide). Pause Fleet Controls when burning quota on a
 known limit.
-- `cloudflare_tunnel` is **optional** (`required: false`). **REQUIRED CONNECTOR DOWN**
-  is driven by required probes — here `console_web` → public `/api/health`.
+- `cloudflare_tunnel` / `public_ingress` are **optional** (`required: false`). **REQUIRED CONNECTOR DOWN**
+  is driven by required **loopback** probes — `control_plane` + local `console_web`.
 - Soft cutover is normal: remote ingress may still target `http://localhost:7734`
   while `axon-public-origin-proxy` forwards to `:4173`. Healthy tunnel detail:
   **active soft cutover**.

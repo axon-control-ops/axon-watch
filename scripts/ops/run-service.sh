@@ -26,6 +26,10 @@ fi
 : "${AXON_WATCH_WATCH_SERVICE_PORT:=8788}"
 : "${AXON_WATCH_STATE_DIR:=${AXON_WATCH_REPO_ROOT}/.local/state}"
 
+# Ensure user-local CLIs (gh, cursor, …) remain visible when systemd starts
+# control-plane with a minimal PATH.
+export PATH="${HOME}/.local/bin:/usr/local/bin:${PATH}"
+
 # Gate 2 safety net for always-on: if local_token is required but the token is
 # missing, mint one into deployment.env so console proxy + CP stay aligned.
 auth_mode="${AXON_WATCH_AUTH_MODE:-placeholder}"

@@ -280,7 +280,8 @@ body:has(.console-shell--mockup) {
   padding: 0;
   min-height: var(--topbar-height);
   max-height: var(--topbar-height);
-  overflow: hidden;
+  /* visible so TopBar menus (workspace picker) are not clipped */
+  overflow: visible;
   background: linear-gradient(180deg, rgba(0, 18, 28, 0.98), rgba(0, 10, 18, 0.98));
   border-bottom: 0;
 }
@@ -298,7 +299,7 @@ body:has(.console-shell--mockup) {
   min-height: var(--topbar-height);
   max-height: var(--topbar-height);
   padding: 0 0.85rem;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .topbar-mockup__identity-zone {

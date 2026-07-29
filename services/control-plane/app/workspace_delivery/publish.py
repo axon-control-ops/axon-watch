@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +20,7 @@ from app.workspace_delivery.config import (
     get_workspace_delivery_policy,
     is_protected_branch,
 )
+from app.workspace_delivery.gh_cli import gh_missing_hint, resolve_gh_cli
 from app.workspace_delivery import store as delivery_store
 from app.workspace_delivery.receipts import delivery_refs_from_record, emit_delivery_receipt
 
@@ -215,11 +215,12 @@ def _open_or_update_draft_pr(
     title: str,
     body: str,
 ) -> tuple[bool, str]:
-    if not shutil.which("gh"):
-        return False, "gh CLI is required to open a draft PR"
+    gh_bin = resolve_gh_cli()
+    if not gh_bin:
+        return False, gh_missing_hint()
     existing = _run(
         [
-            "gh",
+            gh_bin,
             "pr",
             "list",
             "--head",
@@ -247,7 +248,7 @@ def _open_or_update_draft_pr(
                 return True, url
     created = _run(
         [
-            "gh",
+            gh_bin,
             "pr",
             "create",
             "--draft",

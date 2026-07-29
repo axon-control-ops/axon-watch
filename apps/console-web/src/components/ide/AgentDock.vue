@@ -13,7 +13,6 @@ import {
 } from '../../lib/agent-dock-reopen-view';
 import AgentDockComposer from './AgentDockComposer.vue';
 import AgentDockThreadTabbar from './AgentDockThreadTabbar.vue';
-import AgentDockWorkspaceMenu from './AgentDockWorkspaceMenu.vue';
 import IdeAgentReviewStrip from './IdeAgentReviewStrip.vue';
 import { useShellStore } from '../../stores/shell';
 
@@ -103,16 +102,16 @@ onMounted(() => {
       <span class="agent-dock__resize-grip" aria-hidden="true" />
     </div>
 
-    <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide">
-      <div class="agent-dock__head-row">
-        <div class="agent-dock__head-main">
-          <AgentDockWorkspaceMenu />
-          <div v-if="shell.pendingApprovalsCount" class="agent-dock__head-pills" aria-label="Agent attention">
-            <span v-if="shell.pendingApprovalsCount" class="agent-dock__pill agent-dock__pill--approvals">
-              {{ shell.pendingApprovalsCount }} approval{{ shell.pendingApprovalsCount === 1 ? '' : 's' }}
-            </span>
-          </div>
-        </div>
+    <header class="agent-dock__header agent-dock__header--compact agent-dock__header--ide agent-dock__header--chat">
+      <div class="agent-dock__chat-chrome">
+        <AgentDockThreadTabbar />
+        <span
+          v-if="shell.pendingApprovalsCount"
+          class="agent-dock__pill agent-dock__pill--approvals"
+          :title="`${shell.pendingApprovalsCount} pending approval${shell.pendingApprovalsCount === 1 ? '' : 's'}`"
+        >
+          {{ shell.pendingApprovalsCount }}
+        </span>
         <button
           type="button"
           class="agent-dock__collapse"
@@ -122,9 +121,6 @@ onMounted(() => {
         >
           ×
         </button>
-      </div>
-      <div class="agent-dock__head-tabs">
-        <AgentDockThreadTabbar />
       </div>
     </header>
 

@@ -107,7 +107,7 @@ describe('mockup shell view helpers', () => {
     expect(zones.left[1]?.label).toBe('WATCH OK');
     expect(zones.left[2]?.label).toBe('v0.1.0');
     expect(zones.center[0]?.label).toBe('RUN PHASE: EXECUTE');
-    expect(zones.right[0]?.label).toBe('WORKSPACE: workspace_smoke');
+    expect(zones.right).toEqual([]);
   });
 
   it('builds IDE quiet status bar without watch or ops telemetry', () => {

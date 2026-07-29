@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import IdeInterruptPanel from '../ide/IdeInterruptPanel.vue';
 import KairoPresenceBar from './KairoPresenceBar.vue';
 import VoiceUnlockBanner from './VoiceUnlockBanner.vue';
+import WorkspacePickerMenu from './WorkspacePickerMenu.vue';
 import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
@@ -99,6 +100,11 @@ async function openStandup(): Promise<void> {
       </div>
 
       <div class="topbar-mockup__controls">
+        <WorkspacePickerMenu
+          v-if="activeSurface === 'console'"
+          compact
+          class="topbar-mockup__workspace"
+        />
         <div
           class="layout-toggle layout-toggle--mockup topbar-mockup__surface-nav"
           role="group"
@@ -193,6 +199,13 @@ async function openStandup(): Promise<void> {
 .topbar-mockup__kairo-slot {
   min-width: 0;
   overflow: hidden;
+}
+
+.topbar-mockup__workspace {
+  margin-right: 0.45rem;
+  max-width: 12.5rem;
+  position: relative;
+  z-index: 70;
 }
 
 .topbar-mockup__settings-wrap {
