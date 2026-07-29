@@ -12,6 +12,8 @@ import {
   type ConversationDisplayItem,
 } from '../../lib/operator-conversation-view';
 import { conversationMessageWindow } from '../../lib/conversation-message-window';
+import { collapseConsecutiveDuplicateOperatorMessages } from '../../lib/collapse-duplicate-operator-messages';
+import { groupIdeConversationTurns } from '../../lib/group-ide-conversation-turns';
 import { operatorArtifactRecords } from '../../lib/operator-artifact-view';
 import type { OperatorThreadEntry, ThreadMessageAttachment } from '../../lib/operator-thread';
 import { agentContentHasTranscriptBlocks } from '../../lib/agent-transcript-blocks';
@@ -34,9 +36,13 @@ import { useShellStore } from '../../stores/shell';
 
 export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listRef: Ref<HTMLElement | null>, handleContentChange: () => void) {
   const shell = useShellStore();
-  const conversationMessages = computed(() =>
-    shell.layoutMode === 'ide' ? shell.threadMessages : shell.operatorThreadMessages,
-  );
+  const conversationMessages = computed(() => {
+    const raw =
+      shell.layoutMode === 'ide' ? shell.threadMessages : shell.operatorThreadMessages;
+    return shell.layoutMode === 'ide'
+      ? collapseConsecutiveDuplicateOperatorMessages(raw)
+      : raw;
+  });
   const ideHistoryPage = ref(0);
   const ideMessageWindow = computed(() =>
     conversationMessageWindow(conversationMessages.value, ideHistoryPage.value),
@@ -52,6 +58,11 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
       artifacts: operatorArtifactRecords.value,
     }).items;
   });
+  const ideConversationTurns = computed(() =>
+    shell.layoutMode === 'ide'
+      ? groupIdeConversationTurns(ideMessageWindow.value.items)
+      : [],
+  );
 
   const conversationDockHint = computed(() =>
     shell.layoutMode === 'operator'
@@ -320,6 +331,7 @@ export function useConversationSeamPanel(rootRef: Ref<HTMLElement | null>, listR
   return {
     shell,
     conversationDisplayItems,
+    ideConversationTurns,
     ideMessageWindow,
     conversationDockHint,
     showAgentWorking,

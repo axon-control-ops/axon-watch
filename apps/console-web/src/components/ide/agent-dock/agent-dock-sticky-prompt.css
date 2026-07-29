@@ -1,37 +1,361 @@
+/* Cursor-parity operator prompt: in-place edit, icon actions, mini-composer chrome */
+
 .agent-dock-sticky-prompt {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.22rem;
-  margin: 0.1rem 0.55rem 0.3rem;
-  padding: 0.35rem 0.65rem 0.4rem;
-  border: 1px solid rgba(138, 154, 173, 0.22);
-  border-radius: 0.45rem;
-  background: rgba(10, 16, 24, 0.92);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  gap: 0;
+  margin: 0.1rem 0 0.3rem;
+  padding: 0.45rem 0.65rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(36, 36, 38, 0.98), rgba(24, 24, 26, 0.98));
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
   z-index: 4;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+.agent-dock-sticky-prompt:hover,
+.agent-dock-sticky-prompt--active {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.agent-dock-sticky-prompt--editing {
+  cursor: text;
+  border-color: rgba(255, 255, 255, 0.16);
+  padding-bottom: 0.35rem;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.agent-dock-sticky-prompt:focus-visible {
+  border-color: rgba(0, 245, 212, 0.42);
+}
+
+.agent-dock-sticky-prompt__chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-height: 1.1rem;
+  margin: 0 0 0.15rem;
+  padding: 0;
 }
 
 .agent-dock-sticky-prompt__label {
   margin: 0;
-  color: rgba(150, 231, 255, 0.78);
+  padding: 0;
+  color: rgba(168, 178, 192, 0.88);
   font-family: var(--font-ui);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
+  line-height: 1;
   text-transform: uppercase;
 }
 
 .agent-dock-sticky-prompt__text {
   margin: 0;
-  color: rgba(233, 239, 245, 0.96);
+  padding: 0.05rem 0 0;
+  color: rgba(236, 240, 245, 0.96);
   font-family: var(--font-ui);
-  font-size: 0.78rem;
-  line-height: 1.35;
+  font-size: 0.84rem;
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 6;
   overflow: hidden;
+  cursor: pointer;
+}
+
+.agent-dock-sticky-prompt__editor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0.1rem 0 0;
+  padding: 0.2rem 0.1rem 0.35rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(236, 240, 245, 0.98);
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+}
+
+.agent-dock-sticky-prompt__editor:focus {
+  outline: none;
+}
+
+.agent-dock-sticky-prompt__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin: 0.15rem -0.2rem 0;
+  padding: 0.35rem 0.2rem 0.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.agent-dock-sticky-prompt__footer-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.agent-dock-sticky-prompt__mode-chip,
+.agent-dock-sticky-prompt__model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-height: 1.55rem;
+  padding: 0 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(12, 12, 14, 0.55);
+  color: rgba(210, 216, 224, 0.92);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.agent-dock-sticky-prompt__mode-icon {
+  font-size: 0.78rem;
+  line-height: 1;
+  color: rgba(0, 245, 212, 0.88);
+}
+
+.agent-dock-sticky-prompt__model-chip {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 0;
+  background: transparent;
+  color: rgba(168, 178, 192, 0.9);
+  padding-left: 0.15rem;
+  padding-right: 0.15rem;
+}
+
+.agent-dock-sticky-prompt__footer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.agent-dock-sticky-prompt__icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(12, 12, 14, 0.45);
+  color: rgba(180, 188, 200, 0.9);
+  cursor: pointer;
+}
+
+.agent-dock-sticky-prompt__icon-btn:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(236, 240, 245, 0.96);
+}
+
+.agent-dock-sticky-prompt__icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agent-dock-sticky-prompt__send {
+  display: inline-grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  min-width: 1.85rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(230, 232, 236, 0.98), rgba(196, 200, 208, 0.94));
+  color: rgba(18, 18, 20, 0.96);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  cursor: pointer;
+}
+
+.agent-dock-sticky-prompt__send:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(242, 244, 248, 1), rgba(210, 214, 222, 0.98));
+}
+
+.agent-dock-sticky-prompt__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.agent-dock-sticky-prompt__send-icon {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.agent-dock-sticky-prompt__send-spinner {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid rgba(18, 18, 20, 0.22);
+  border-top-color: rgba(18, 18, 20, 0.9);
+  border-radius: 50%;
+  animation: agent-dock-sticky-prompt-spin 0.8s linear infinite;
+}
+
+@keyframes agent-dock-sticky-prompt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agent-dock-sticky-prompt .conversation-seam__attachments--thread {
+  margin: 0.2rem 0 0.15rem;
+}
+
+.conversation-seam__operator-turn {
+  position: relative;
+  min-width: 0;
+}
+
+.agent-dock-sticky-prompt .conversation-seam__message-actions,
+.agent-dock-sticky-prompt__actions.conversation-seam__message-actions {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  z-index: 5;
+  margin: 0;
+  gap: 0.2rem;
+}
+
+.conversation-seam__message-actions--icons {
+  align-items: center;
+}
+
+.agent-dock-sticky-prompt .conversation-seam__meta-button--icon {
+  width: 1.55rem;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  min-height: 1.55rem;
+  padding: 0;
+  justify-content: center;
+  border-radius: 999px;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(12, 12, 14, 0.72);
+  color: rgba(196, 204, 214, 0.92);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.agent-dock-sticky-prompt .conversation-seam__meta-button--icon:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(246, 248, 250, 0.98);
+  background: rgba(28, 28, 32, 0.9);
+}
+
+.agent-dock-sticky-prompt .conversation-seam__action-icon {
+  display: block;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt:not(.agent-dock-sticky-prompt--editing)
+    .conversation-seam__message-actions {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-0.08rem);
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease;
+  }
+
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt:hover
+    .conversation-seam__message-actions,
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt:focus-within
+    .conversation-seam__message-actions,
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt--active
+    .conversation-seam__message-actions,
+  .agent-dock__transcript
+    .conversation-seam__operator-turn:hover
+    .conversation-seam__message-actions,
+  .agent-dock__transcript
+    .conversation-seam__operator-turn:focus-within
+    .conversation-seam__message-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt--editing
+    .conversation-seam__message-actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt:not(.agent-dock-sticky-prompt--editing)
+    .conversation-seam__message-actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt--active
+    .conversation-seam__message-actions,
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt:focus-within
+    .conversation-seam__message-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt--editing
+    .conversation-seam__message-actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-dock-sticky-prompt,
+  .agent-dock__transcript
+    .agent-dock-sticky-prompt
+    .conversation-seam__message-actions {
+    transition: none;
+  }
+
+  .agent-dock-sticky-prompt__send-spinner {
+    animation: none;
+  }
 }

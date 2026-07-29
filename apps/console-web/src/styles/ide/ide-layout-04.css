@@ -82,12 +82,13 @@
   min-height: min-content;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  /* visible so in-transcript sticky OP banners can pin to the transcript scrollport */
+  overflow: visible;
 }
 
 .agent-dock__transcript .conversation-seam__list {
   gap: 0.55rem;
-  overflow-x: hidden;
+  overflow: visible;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
@@ -101,7 +102,31 @@
   background: transparent;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.agent-dock__transcript .conversation-seam__item--operator {
+  padding: 0.15rem 0 0.35rem;
+}
+
+.agent-dock__transcript .conversation-seam__turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.15rem 0 0.45rem;
+}
+
+.agent-dock__transcript .conversation-seam__turn-prompt {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: rgba(6, 12, 18, 0.88);
+  backdrop-filter: blur(10px);
+  padding-bottom: 0.15rem;
+}
+
+.agent-dock__transcript .conversation-seam__turn-reply {
+  min-width: 0;
 }
 
 .agent-dock__transcript .conversation-seam__item--agent {
@@ -164,8 +189,8 @@
   color: rgba(150, 231, 255, 0.94);
 }
 
-.agent-dock__transcript .conversation-seam__message-actions {
-  margin-top: 0.28rem;
+.agent-dock__transcript .conversation-seam__operator-turn > .conversation-seam__message-actions {
+  margin-top: 0;
 }
 
 .agent-dock__transcript .conversation-seam__time {
@@ -175,22 +200,23 @@
 }
 
 .agent-dock__transcript .conversation-seam__attachments--thread {
-  margin-top: 0.28rem;
+  margin: 0.12rem 0 0.28rem;
   max-width: 100%;
 }
 
 .agent-dock__transcript .conversation-seam__attachment-card--thread {
-  width: min(100%, 14rem);
-  max-height: 11rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  max-height: none;
 }
 
 .agent-dock__transcript .conversation-seam__attachment-card--thread .conversation-seam__attachment-preview {
-  max-height: 11rem;
+  max-height: none;
 }
 
 .agent-dock__transcript .conversation-seam__attachment-card--thread.conversation-seam__attachment-card--file {
-  max-width: 8.5rem;
-  height: 4rem;
+  max-width: 6.5rem;
+  height: 2.75rem;
 }
 
 .conversation-seam__inline-image {

@@ -4,19 +4,39 @@ import { focusAgentDockComposerInput } from './agent-dock-composer-focus';
 import { requestIdeComposerMode } from './ide-composer-restore-request';
 import { useShellStore } from '../stores/shell';
 
+/** Command-turn / legacy path — loads text into the bottom composer. */
 export function restoreOperatorTextToComposer(text: string): void {
   requestIdeComposerMode('agent');
   useShellStore().restoreComposerDraft(text);
   focusAgentDockComposerInput();
 }
 
-export async function resendOperatorMessage(content: string): Promise<void> {
+/**
+ * Submit an edited YOU prompt without leaving it parked in the composer.
+ * Temporarily uses the draft for dispatch, then restores the prior draft if
+ * submit did not clear it (failure / no-op).
+ */
+export async function submitOperatorPromptInline(content: string): Promise<boolean> {
   const trimmed = content.trim();
   const shell = useShellStore();
-  if (!trimmed || shell.commandMutationState === 'submitting') {
-    return;
+  if (
+    !trimmed ||
+    shell.commandMutationState === 'submitting' ||
+    shell.agentStreamActive
+  ) {
+    return false;
   }
   requestIdeComposerMode('agent');
-  shell.restoreComposerDraft(trimmed);
+  const previousDraft = shell.ideComposerDraft;
+  shell.ideComposerDraft = trimmed;
   await shell.submitIdeComposer('agent');
+  if (shell.ideComposerDraft.trim() === trimmed) {
+    shell.ideComposerDraft = previousDraft;
+    return false;
+  }
+  return true;
+}
+
+export async function resendOperatorMessage(content: string): Promise<void> {
+  await submitOperatorPromptInline(content);
 }
