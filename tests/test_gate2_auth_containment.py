@@ -358,6 +358,18 @@ class Gate2ResidualContainmentTests(unittest.TestCase):
             detail = reject_mutating_rate_limit(request, identity="operator")
             self.assertIsNotNone(detail)
             self.assertIn("rate limit", detail or "")
+
+            chat_request = Request(
+                {
+                    **request.scope,
+                    "path": "/api/chat/messages",
+                    "raw_path": b"/api/chat/messages",
+                }
+            )
+            self.assertIsNone(
+                reject_mutating_rate_limit(chat_request, identity="operator"),
+                "run traffic must not starve interactive Team chat",
+            )
         reset_rate_limit_state_for_tests()
 
 

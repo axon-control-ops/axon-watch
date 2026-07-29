@@ -171,6 +171,33 @@ describe('startChatStreamSession', () => {
     expect(onError).toHaveBeenCalledWith('chat stream closed');
   });
 
+  it('marks mid-run hub close as interrupted after deltas', () => {
+    const harness = createEventSourceHarness();
+    const onError = vi.fn();
+    const onDone = vi.fn();
+    const onDelta = vi.fn();
+
+    startChatStreamSession({
+      threadId: 'thread-1',
+      messageId: 'message-1',
+      onDelta,
+      onDone,
+      onError,
+      EventSourceImpl: harness.EventSourceImpl,
+    });
+
+    harness.emit({
+      type: 'chat_stream_delta',
+      message_id: 'message-1',
+      content: 'Working…',
+    });
+    harness.emit({ type: 'chat_stream_close' });
+
+    expect(onDone).not.toHaveBeenCalled();
+    expect(onDelta).toHaveBeenCalledWith('Working…');
+    expect(onError).toHaveBeenCalledWith('chat stream interrupted');
+  });
+
   it('does not double-settle when done is followed by close', () => {
     const harness = createEventSourceHarness();
     const onError = vi.fn();

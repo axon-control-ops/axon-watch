@@ -265,7 +265,7 @@
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
-
+.agent-dock-notice--copy-only .agent-dock-notice__body { padding-block: 0.28rem; }
 .agent-dock-notice--error .agent-dock-notice__copy {
   padding-right: 0.35rem;
   color: rgba(254, 202, 202, 0.92);

@@ -244,7 +244,10 @@ def _dispatch_queued_lead_fan_out_runs(
     return started
 
 
-def run_continuous_worker_tick() -> list[dict[str, Any]]:
+def run_continuous_worker_tick(
+    *,
+    starts_bound_override: int | None = None,
+) -> list[dict[str, Any]]:
     """Reconcile hung shifts, then start bounded role-tagged runs when enabled."""
     reaped = reap_stale_employee_runs()
     if reaped:
@@ -296,14 +299,24 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
 
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()
     active_bound = max_active_executing()
-    if _executing_run_count() >= active_bound:
+    executing = _executing_run_count()
+    if executing >= active_bound:
         logger.info(
             "continuous worker tick skipped: executing debt bound reached (%s)",
             active_bound,
         )
         return []
 
-    starts_bound = max_starts_per_tick()
+    free_slots = max(0, active_bound - executing)
+    default_starts = max_starts_per_tick()
+    if starts_bound_override is not None:
+        try:
+            starts_bound = max(1, int(starts_bound_override))
+        except (TypeError, ValueError):
+            starts_bound = default_starts
+    else:
+        starts_bound = default_starts
+    starts_bound = min(starts_bound, free_slots)
     started: list[dict[str, Any]] = _dispatch_queued_lead_fan_out_runs(
         companies=companies,
         starts_bound=starts_bound,
@@ -360,6 +373,33 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
                     role,
                     workspace_id,
                 )
+                continue
+            from app.workspace_agents.autonomous_attention_policy import (
+                task_allows_autonomous_lease,
+            )
+
+            lease_decision = task_allows_autonomous_lease(claimed)
+            if lease_decision.tier != "auto_safe" or lease_decision.decision != "dispatch":
+                task_id = str(claimed.get("task_id") or "").strip()
+                logger.warning(
+                    "continuous worker tick refused gated task=%s role=%s reason=%s",
+                    task_id,
+                    role,
+                    lease_decision.reason,
+                )
+                if task_id:
+                    try:
+                        task_store.cancel_task(
+                            task_id,
+                            terminal_outcome=(
+                                f"autonomous lease refused: {lease_decision.reason}"
+                            ),
+                        )
+                    except task_store.TaskLedgerError:
+                        logger.exception(
+                            "could not cancel gated task after lease refuse: %s",
+                            task_id,
+                        )
                 continue
             task_id = str(claimed.get("task_id") or "").strip()
             goal = str(claimed.get("goal") or "").strip() or "leased task"

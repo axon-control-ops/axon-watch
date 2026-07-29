@@ -2,8 +2,26 @@
 
 from __future__ import annotations
 
-from app.vault.provider_aliases import RUNTIME_PROVIDER_IDS
+import importlib.util
+from pathlib import Path
+
 from app.vault.session import VaultSession
+
+
+def _runtime_provider_ids() -> dict[str, str]:
+    """Load sibling aliases even when control-plane owns the shared ``app`` package."""
+    try:
+        from app.vault.provider_aliases import RUNTIME_PROVIDER_IDS
+
+        return RUNTIME_PROVIDER_IDS
+    except ModuleNotFoundError:
+        path = Path(__file__).resolve().parent / "provider_aliases.py"
+        spec = importlib.util.spec_from_file_location("axon_watch_vault_provider_aliases", path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"unable to load vault provider aliases from {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return dict(module.RUNTIME_PROVIDER_IDS)
 
 
 def vault_runtime_env() -> dict[str, str]:
@@ -18,6 +36,7 @@ def vault_runtime_env() -> dict[str, str]:
         ("CURSOR_API_KEY", "cursor_cli"),
         ("CODEX_API_KEY", "codex_cli"),
         ("OPENAI_API_KEY", "openai_gpts"),
+        ("ANTHROPIC_API_KEY", "anthropic"),
     )
     for env_name, provider_id in named_bindings:
         value = vault_resolve_named_secret(env_name) or vault_resolve_provider_key(provider_id)
@@ -62,7 +81,7 @@ def vault_runtime_env() -> dict[str, str]:
     searxng_url = vault_resolve_named_secret("AXON_WATCH_SEARXNG_URL")
     if searxng_url:
         env.setdefault("AXON_WATCH_SEARXNG_URL", searxng_url)
-    for _runtime_id, provider_id in RUNTIME_PROVIDER_IDS.items():
+    for _runtime_id, provider_id in _runtime_provider_ids().items():
         if provider_id in {binding[1] for binding in named_bindings}:
             continue
         value = vault_resolve_provider_key(provider_id)
@@ -71,6 +90,8 @@ def vault_runtime_env() -> dict[str, str]:
         if value and provider_id == "codex_cli":
             env.setdefault("CODEX_API_KEY", value)
             env.setdefault("OPENAI_API_KEY", value)
+        if value and provider_id == "anthropic":
+            env.setdefault("ANTHROPIC_API_KEY", value)
     return env
 
 
@@ -83,13 +104,15 @@ def vault_runtime_posture() -> dict[str, object]:
 
     unlocked = VaultSession.is_unlocked()
     resolved_map = vault_resolve_all_provider_keys() if unlocked else {}
+    runtime_provider_ids = _runtime_provider_ids()
     runtime_keys: dict[str, bool] = {}
-    for runtime_id, provider_id in RUNTIME_PROVIDER_IDS.items():
+    for runtime_id, provider_id in runtime_provider_ids.items():
         runtime_keys[runtime_id] = bool(resolved_map.get(provider_id))
     named_keys = {
         "CURSOR_API_KEY": bool(vault_resolve_named_secret("CURSOR_API_KEY")) if unlocked else False,
         "CODEX_API_KEY": bool(vault_resolve_named_secret("CODEX_API_KEY")) if unlocked else False,
         "OPENAI_API_KEY": bool(vault_resolve_named_secret("OPENAI_API_KEY")) if unlocked else False,
+        "ANTHROPIC_API_KEY": bool(vault_resolve_named_secret("ANTHROPIC_API_KEY")) if unlocked else False,
         "AZURE_SPEECH_KEY": bool(
             vault_resolve_named_secret("AZURE_SPEECH_KEY")
             or vault_resolve_named_secret("azure_speech_key")
@@ -130,19 +153,22 @@ def vault_runtime_posture() -> dict[str, object]:
             if env_name in {"CODEX_API_KEY", "OPENAI_API_KEY"}:
                 runtime_keys["codex_local"] = True
                 runtime_keys["codex_cloud"] = True
+            if env_name == "ANTHROPIC_API_KEY":
+                runtime_keys["claude_local"] = True
+                runtime_keys["claude_cloud"] = True
 
     if not unlocked:
         posture = "vault_locked"
-        hint = "Unlock /vault to inject provider keys into Cursor and Codex runtimes."
+        hint = "Unlock /vault to inject provider keys into Cursor, Claude, and Codex runtimes."
     elif any(runtime_keys.values()):
         posture = "ready"
         hint = "Vault provider keys are available for CLI runtimes."
     else:
         posture = "missing_keys"
         hint = (
-            "Vault is unlocked but no Cursor/Codex/OpenAI API keys were found. "
-            "Cursor/Codex may still work via CLI subscription login on the host "
-            "(`cursor agent login`, `codex login`). See HOW-TO-HANDBOOK → Runtime auth."
+            "Vault is unlocked but no Cursor/Claude/Codex/OpenAI API keys were found. "
+            "Runtimes may still work via CLI subscription login on the host "
+            "(`cursor agent login`, `claude auth login`, `codex login`). See HOW-TO-HANDBOOK → Runtime auth."
         )
 
     return {
@@ -152,6 +178,6 @@ def vault_runtime_posture() -> dict[str, object]:
         "runtime_keys": runtime_keys,
         "provider_keys": {
             provider_id: bool(resolved_map.get(provider_id))
-            for provider_id in sorted(set(RUNTIME_PROVIDER_IDS.values()))
+            for provider_id in sorted(set(runtime_provider_ids.values()))
         },
     }

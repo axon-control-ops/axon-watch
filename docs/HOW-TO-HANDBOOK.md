@@ -15,10 +15,7 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-29 — Workspace picker lives in the TopBar (above AgentDock).
-Draft-PR delivery resolves `gh` via PATH, `~/.local/bin`, or `AXON_WATCH_GH_CLI_PATH`.
-Gate 9 still polls Fast Gate every three minutes. After every push:
-`./scripts/ops/watch-fast-gate.sh`.
+**Last verified:** 2026-07-29 — IDE Soft Attention actions (**Try again** / **Explain** / **Open team**) live on the agent review strip with **Review N files**; **Try again** hides after a successful shift. Claude Code CLI is a local runtime target. After every push: `./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
@@ -37,6 +34,7 @@ Gate 9 still polls Fast Gate every three minutes. After every push:
 3.65. [Autonomy gates & service identity](how-to/autonomy-gates-and-service-identity.md) — Gate 4 tasks, scheduler off, watch token + mTLS
 3.66. [Recent operator features](how-to/recent-operator-features.md) — task board, concurrent tabs, galaxy labels, Lead planner, CI watch
 3.67. [Auto-loop status & credits](how-to/auto-loop-and-credits.md) — are we autonomous yet? Cursor / API budget for multi-project
+3.68. [Company hierarchy & Lead check-in](how-to/company-hierarchy-and-lead-checkin.md) — VAXON attend loop + AUTONOMOUS ON safety matrix
 3.7. [VAXON Desktop](#vaxon-desktop) — packaged Linux install
 4. [Teaching Axon-X](#teaching-axon-x-to-someone-else) — explain it to others
 5. [Codebase in plain English](#codebase-in-plain-english) — what happens under the hood
@@ -223,6 +221,11 @@ else happens.
 finished; Mission Control is asking you to **COMPLETE** (usual) or **RESUME** (if more
 steps expected).
 
+### Mission Control AUTONOMOUS (bounded)
+
+In **OPERATOR → Mission Control**, use **AUTONOMOUS ON/OFF** for bounded worker control.
+See [Auto-loop status & credits](how-to/auto-loop-and-credits.md) for the complete safety matrix, approval behavior, dedupe rules, and emergency procedure.
+
 ### “2 runs are ready for operator review” — what that means
 
 This is a **count of paused jobs**, not a failure. Each command you ran (`health`,
@@ -342,7 +345,7 @@ Worker shifts that finish with `push_policy=draft_pr` need the **GitHub CLI** on
      `AXON_WATCH_GH_CLI_PATH=/absolute/path/to/gh` in
      `~/.config/axon-watch/deployment.env`, then
      `systemctl --user restart control-plane`.
-4. Retry the teammate (**Try again** / **Continue** on the soft Attention notice).
+4. Retry the teammate (**Try again** / **Continue** on the agent review strip above the composer — only when the last job failed or was interrupted; succeeded shifts hide that CTA).
 
 Source: `services/control-plane/app/workspace_delivery/gh_cli.py`,
 `publish.py` (`_open_or_update_draft_pr`).
@@ -354,6 +357,15 @@ Source: `services/control-plane/app/workspace_delivery/gh_cli.py`,
 | **Codex CLI login** | `codex login` on the host; vault consumer probes `codex login status` |
 | **API keys in vault** | `CODEX_API_KEY` or `OPENAI_API_KEY` in /vault (either satisfies the codex consumer) |
 
+### Claude Code auth
+
+| Path | Setup |
+| --- | --- |
+| **Claude Code CLI login** | `claude auth login` on the host; vault consumer probes `claude auth status` |
+| **API key in vault** | Optional `ANTHROPIC_API_KEY` for headless; subscription login preferred for Max/Pro |
+
+Select **Claude Code CLI (local)** in the composer runtime picker (or set `AXON_WATCH_IDE_RUNTIME_TARGET=claude_local`) so workers burn Claude usage instead of Cursor credits.
+
 ### Vault consumers vs runtime dispatch
 
 **Consumers** are readiness labels for operators — they never expose secret values.
@@ -361,6 +373,7 @@ Source: `services/control-plane/app/workspace_delivery/gh_cli.py`,
 | Consumer | Ready when | Optional / fallback |
 | --- | --- | --- |
 | `cursor_runtime` | CLI subscription **or** `CURSOR_API_KEY` in vault | API key only needed for headless |
+| `claude_runtime` | `claude auth login` **or** `ANTHROPIC_API_KEY` in vault | Max/Pro subscription preferred |
 | `codex_runtime` | `codex login` **or** Codex/OpenAI vault keys | |
 | `openai_provider` | `OPENAI_API_KEY` in vault | Direct OpenAI fallback |
 | DashPro monitor consumers | Required monitor keys in vault/import | |
@@ -395,11 +408,22 @@ Axon-X has **two execution lanes** — do not mix them when debugging.
 | **Plan** | `--mode plan` | Step mapping before execution |
 | **Agent** | Default consultative; **Full Access** in composer → approval → Cursor `--mode agent` / Codex workspace-write | `execution_access: full` + G3.3 approval gate |
 
+**Agent review strip (above the composer input):**
+
+| Control | When it appears |
+| --- | --- |
+| **N files** / **Review N files** | Agent edited files in the current thread |
+| **Try again** / **Continue** | Soft Attention only — last teammate job **failed** or was **interrupted**. Hidden after a successful shift |
+| **Explain** / **Open team** | Same Soft Attention window (Explain needs a linked run receipt) |
+| **Stop** / **Resume** / **Apply all** | Live run control and review-ready apply |
+
+The soft Attention **Try again** / **Explain** / **Open team** actions live on this strip with **Review N files**. Succeeded shifts hide the retry CTA.
+
 ### Choosing runtime target and model
 
 Open the **model picker** (⚡ chip) in the IDE agent dock:
 
-1. **Runtime target** — `Cursor CLI (local)`, `Codex CLI (local)`, or cloud placeholders. Preference persists in shell local storage via `shell.setSelectedRuntimeTarget`.
+1. **Runtime target** — `Cursor CLI (local)`, `Claude Code CLI (local)`, `Codex CLI (local)`, or cloud placeholders. Preference persists in shell local storage via `shell.setSelectedRuntimeTarget`.
 2. **Auto toggle** — when ON, Cursor picks the best model per request (no `--model` flag). When OFF, your pinned catalog model is passed to the CLI.
 3. **Add models** — browse live output of `cursor agent --list-models` (cached ~5 min). Badges like **Fast** / **High** come from CLI labels when present.
 4. **Auth line** — shows `CLI subscription · you@domain` or vault/API-key status; **Open Vault** only when auth is actually blocked (vault locked or missing keys **and** CLI not signed in).
@@ -409,7 +433,10 @@ Environment overrides:
 | Variable | Purpose |
 | --- | --- |
 | `AXON_WATCH_CURSOR_CLI_PATH` | Non-default `cursor` binary path |
+| `AXON_WATCH_CLAUDE_CLI_PATH` | Non-default `claude` binary path |
 | `AXON_WATCH_CODEX_CLI_PATH` | Non-default `codex` binary path |
+| `AXON_WATCH_IDE_RUNTIME_TARGET` | Force default target (`claude_local`, `cursor_local`, …) |
+| `AXON_WATCH_IDE_RUNTIME_FAMILY` | Prefer family when choosing default (`claude`, `cursor`, `codex`) |
 | `AXON_WATCH_LANE_B_STREAMING` | `1` (default) SSE streaming for IDE composer; `0` in tests |
 
 API endpoints:

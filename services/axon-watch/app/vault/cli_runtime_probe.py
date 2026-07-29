@@ -45,6 +45,19 @@ def _find_codex_cli() -> str:
     return ""
 
 
+def _find_claude_cli() -> str:
+    override = os.environ.get("AXON_WATCH_CLAUDE_CLI_PATH", "").strip()
+    if _is_executable(override):
+        return override
+    for candidate in (
+        shutil.which("claude") or "",
+        os.path.expanduser("~/.local/bin/claude"),
+    ):
+        if _is_executable(candidate):
+            return candidate
+    return ""
+
+
 def _run_status(command: list[str], *, timeout: int = _PROBE_TIMEOUT_SECONDS) -> tuple[int, str]:
     try:
         proc = subprocess.run(
@@ -147,3 +160,48 @@ def probe_codex_cli_subscription() -> dict[str, Any]:
         }
 
     return _cached_probe("codex", _build)
+
+
+def probe_claude_cli_subscription() -> dict[str, Any]:
+    def _build() -> dict[str, Any]:
+        binary = _find_claude_cli()
+        if not binary:
+            return {
+                "installed": False,
+                "logged_in": False,
+                "account_label": "",
+                "message": "Claude Code CLI not installed on this host.",
+            }
+        returncode, raw = _run_status([binary, "auth", "status", "--json"])
+        logged_in = False
+        account = ""
+        if returncode == 0 and raw:
+            try:
+                import json
+
+                payload = json.loads(raw)
+                if isinstance(payload, dict):
+                    logged_in = bool(payload.get("loggedIn"))
+                    account = str(payload.get("email") or payload.get("orgName") or "").strip()
+            except Exception:
+                logged_in = "logged in" in raw.lower()
+                account = raw.splitlines()[0].strip() if raw else ""
+        if logged_in:
+            return {
+                "installed": True,
+                "logged_in": True,
+                "account_label": account,
+                "message": (
+                    f"Claude Code subscription ({account})"
+                    if account
+                    else "Claude Code subscription active."
+                ),
+            }
+        return {
+            "installed": True,
+            "logged_in": False,
+            "account_label": "",
+            "message": "Run `claude auth login` on the host or add ANTHROPIC_API_KEY to /vault.",
+        }
+
+    return _cached_probe("claude", _build)

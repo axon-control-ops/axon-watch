@@ -168,3 +168,56 @@ Template:
 - residual risks: Rowan handbook HTML + publish.py still oversize; DashPro Sentry critical needs Sir King Decide; Gate-verify awaiting VAXON engagement; intermittent host `axonland` shell hook; company last_run may briefly mirror watcher Gate 6 ids
 - next gate unlocked: Rowan finish handbook lease then publish.py; prefer Auto/Composer while API pool is exhausted
 
+### Lead continuous shift retry (Gate 6 Fast Gate triage) — 2026-07-29
+- owner: lead (`run_fa7cc11f311e`; prior roster failure cited Gate 6 acceptance_evidence)
+- commit: uncommitted this shift (no push)
+- commands run: health + runtime summary + console `:5173`; usage status; `gh run view 30485870435 --log-failed`; Fast Gate success `30486191476`; lease+complete 76 Lead follow-ups; cancel 34 misrouted/failed_shift/Lead-owns noise tasks; synthesize `lead-plan-279379f913bf4940`; `unittest` Gate6+Lead plan + report_next_move (OK); hotspot line counts at budget for report/publish; receipt append in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for Lead retry scope — Fast Gate repair confirmed green, Lead board cleared, Gate 6 acceptance receipt documented
+- exit criteria met: yes for bounded Lead shift (priorities / hierarchy / Fast Gate triage / coach decisions / upgrades)
+- residual risks: Rowan file-size queue (15); DashPro Sentry needs Sir King Decide; Gate-verify awaiting VAXON; newer Fast Gate push `30486550790` still in progress at receipt time
+- next gate unlocked: Rowan continue file-size patrols with verifier green; VAXON engage Gate-verify when ready
+
+### Lead continuous shift retry (Gate 6 report extract + fleet) — 2026-07-29
+- owner: lead (`run_lead_retry_gate6_2026_07_29_2206`; prior prompt cited failed continuous shift; company last detail `Run completed` on `run_fa7cc11f311e`)
+- commit: uncommitted this shift (no push)
+- commands run: health + runtime summary + console `:5173`; usage; Fast Gate success `30486550790`; wire `report_next_move.py` into `operator_deterministic_report.py` (716→587) + ratchet hotspot; lease+complete Lead follow-up `task-f4b149593b3548d1`; cancel stale FG repair `task-0474c3028ac140e5` + report patrol `task-5dc1f8c31fcb4894`; synthesize `lead-plan-279379f913bf4940` → `lead-receipt-5da2be81f4144948`; `unittest` next_move+Gate6+Lead plan (22 OK) + full report tests (13 OK); `check_hotspot_changes.py` pass; receipt append in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for Lead retry scope — report extract live under budget, Fast Gate green, Lead follow-up closed, Gate 6 acceptance receipt documented
+- exit criteria met: yes for bounded Lead shift (priorities / hierarchy / Fast Gate triage / coach decisions / upgrades)
+- residual risks: Rowan 13 file-size patrols (+ missing Confidence on last watch run); Reed/Quinn Gate 6 acceptance still failing on their threads; DashPro Sentry needs Sir King Decide; Gate-verify awaiting VAXON
+- next gate unlocked: Rowan continue file-size with verifier green; Reed/Quinn clear Gate 6 acceptance; VAXON engage Gate-verify when ready
+
+### Lead continuous shift continue (Gate 6) — 2026-07-29
+- owner: lead (`run_lead_continue_gate6_2026_07_29_2210`; continue after Gate 6 retry receipts)
+- commit: uncommitted this shift (no push)
+- commands run: health + runtime summary + console `:5173`; usage; Fast Gate success `30486550790`; lease+complete Lead follow-up `task-c425e56f59634548`; synthesize `lead-plan-279379f913bf4940` → `lead-receipt-5da2be81f4144948`; `unittest` Gate6+Lead plan+report+next_move (35 OK); `check_hotspot_changes.py` pass; receipt append in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for Lead continue scope — fleet green, Lead handoff decision posted, Gate 6 acceptance receipt documented
+- exit criteria met: yes for bounded Lead continue (priorities / hierarchy / Fast Gate triage / coach decisions / upgrades)
+- residual risks: Rowan file-size patrols (2 board items); Reed/Quinn Gate 6 acceptance still open on their threads; DashPro Sentry needs Sir King Decide; Gate-verify awaiting VAXON; untracked attend-loop modules remain Reed-owned
+- next gate unlocked: Rowan finish leased/open shrinks with verifier green; Reed/Quinn clear Gate 6 acceptance; VAXON engage Gate-verify when ready
+
+### Lead continuous shift retry (Gate 6 board hygiene) — 2026-07-29
+- owner: lead (`run_lead_retry_gate6_2026_07_29_2225`; prompt cited Gate 6 acceptance_evidence; company last Lead run `run_c0f54ede8296` completed)
+- commit: uncommitted this shift (no push)
+- commands run: health + runtime summary + console `:5173`; usage; Fast Gate success `30486550790`; lease+complete Lead follow-ups `task-06daaada4f7842e7` + `task-d29ac62245bc406f`; close/cancel 14 stale watcher file-size patrols after disk vs hotspot budget verify; synthesize `lead-plan-279379f913bf4940` → `lead-receipt-5da2be81f4144948`; `unittest` Gate6+Lead plan+report+next_move (35 OK); `check_hotspot_changes.py` pass; receipt append in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for Lead retry scope — fleet green, Lead board cleared, Gate 6 acceptance receipt documented
+- exit criteria met: yes for bounded Lead shift (priorities / hierarchy / Fast Gate triage / coach decisions / upgrades)
+- residual risks: Reed Critical Review miss + Quinn Gate 6 fail still open on their threads; DashPro Sentry needs Sir King Decide; Gate-verify awaiting VAXON (7 awaiting engagement)
+- next gate unlocked: Reed/Quinn clear delivery contracts on their threads; VAXON engage Gate-verify when ready
+
+### AUTONOMOUS live monitor — 2026-07-29 (~23:27 SAST)
+- owner: agent (read-only)
+- commit: uncommitted autonomy WIP on dirty tree
+- commands run: `GET /api/operator/autonomy/status` (+ workspace-scoped); `GET /api/worker-scheduler`; workspace task lists; active runs
+- pass/fail: **observe only** — Full mode effective with 3 executing watcher shifts; not a readiness pass
+- exit criteria met: no (live waste + policy false-positive + dual failed_shift enqueue)
+- residual risks: see `docs/ops/agent-reports/autonomous-mode-monitoring-2026-07-29.md` — email CI auto-dispatch into Axon-X (17 open), Lead+attend duplicate failed_shift tasks, `token` substring false-positive on tunnel handoff, empty `allowed_paths` on attend tasks, transient PostHog 503 pending ~43m, no usage-cap brake
+- next gate unlocked: harden F1/F2/H1 before leaving Full on unsupervised
+
+### AUTONOMOUS hard-kill + F1/F2/H1 — 2026-07-29 (~23:35 SAST)
+- owner: agent
+- commit: uncommitted
+- commands run: `POST /api/worker-scheduler/hard-kill` (Bearer); cancel 24 email attend + 3 duplex failed_shift tasks; reject tunnel false-positive; restart control-plane; `unittest` policy+loop (26 OK)
+- pass/fail: pass for emergency stop + three hardening fixes
+- exit criteria met: yes for this slice — Semi/off, email noise skipped, Lead/attend dedupe unified, tunnel token not dangerous
+- residual risks: path bounds (H2), transient critical aging (F3), usage-cap brake (H3), spend UI still open; do not re-enable Full until a short supervised drill
+- next gate unlocked: optional supervised Full drill after H2/F3

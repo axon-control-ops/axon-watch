@@ -25,6 +25,8 @@ export type GalaxyPresenceInput = {
   pendingApprovals: number;
   criticalSignals: number;
   highSignals: number;
+  /** True when operator autonomy_mode is full (Mission Control AUTONOMOUS ON). */
+  fullAutonomyActive?: boolean;
 };
 
 export type GalaxyPresenceResolved = {
@@ -46,7 +48,7 @@ export type GalaxyPresenceResolved = {
 export function resolveGalaxyPresence(input: GalaxyPresenceInput): GalaxyPresenceResolved {
   let phase: GalaxyPresencePhase = 'idle';
 
-  if (input.agentStreamActive) {
+  if (input.agentStreamActive || input.fullAutonomyActive) {
     phase = 'autonomous';
   } else if (input.kairoSpeechActive || input.conversationPhase === 'speaking') {
     phase = 'speaking';

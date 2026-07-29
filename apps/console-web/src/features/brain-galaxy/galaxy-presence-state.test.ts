@@ -98,6 +98,16 @@ describe('resolveGalaxyPresence', () => {
     ).toBe(true);
   });
 
+  it('maps full autonomy mode to autonomous presence', () => {
+    const resolved = resolveGalaxyPresence({
+      ...base,
+      fullAutonomyActive: true,
+    });
+    expect(resolved.phase).toBe('autonomous');
+    expect(resolved.coreOrbMode).toBe('autonomous');
+    expect(resolved.busy).toBe(true);
+  });
+
   it('maps workspace selection when idle', () => {
     const resolved = resolveGalaxyPresence({
       ...base,

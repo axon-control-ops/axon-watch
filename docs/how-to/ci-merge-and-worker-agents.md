@@ -261,6 +261,62 @@ for r in runs:
 **Bad sign (phantom worker):** `executing` forever with **no** `cursor-agent`
 process and **no** `runtime_dispatch` receipt on the run history.
 
+### When Team says “last job failed” (verify before retrying)
+
+The red Team badge is a **roster projection**, not the authoritative run result.
+Before tapping **Try again** on the agent review strip (above the composer), compare these three surfaces:
+
+```bash
+# 1. Current roster projection
+curl -sS http://127.0.0.1:8787/api/workspaces/workspace_axon_watch/company \
+  | python3 -m json.tool
+
+# 2. Authoritative run record
+curl -sS http://127.0.0.1:8787/api/runs/<run_id> | python3 -m json.tool
+
+# 3. Transition/receipt history (the reason, not only the red label)
+curl -sS http://127.0.0.1:8787/api/runs/<run_id>/history \
+  | python3 -m json.tool
+```
+
+Interpret the result:
+
+- `phase=completed` plus `operator_complete` is success. Do **not** retry it
+  because an older red badge or a sentence inside the transcript says “failed”.
+- `phase=failed` plus `run_failed` is a real run failure. Read its receipt.
+- `finalization_error` after `run_failed` is usually a **late-result race**:
+  the scheduler failed the run first; Cursor returned later and could no longer
+  complete a run already in `failed`.
+- A Lead rollup saying `0 completed · 2 failed` can mean **two specialist
+  assignments failed**, not that the Lead process failed twice.
+- `missing or failing acceptance_evidence (Gate 6)` means the specialist did
+  work but did not deliver a passing acceptance receipt.
+- `Critical Review Clause missing` means the final answer omitted the required
+  terminal `Confidence: N/10` line. This is a delivery-contract failure, not
+  proof that the implementation itself was wrong.
+- If roster says failed but the newest role run is completed, refresh/reopen
+  Team and wait for the next company poll. Do not create another retry loop.
+
+#### Mira incident receipt — 29 Jul 2026
+
+What looked like “Mira failed twice” was three different facts:
+
+1. Lead plan `lead-plan-78bfcac685b74588` had **two failed specialist tasks**
+   (Quinn/integrations and Rowan/watcher). Both exhausted their three-attempt
+   budgets. The surfaced blockers were Gate 6 acceptance evidence and the
+   missing Confidence clause.
+2. Mira retry runs `run_dc05055ef75f` and `run_fa7cc11f311e` did **not** fail:
+   both reached `completed`; Critical Review recorded 7/10 and 8/10.
+3. The real older Mira failure was `run_333574cdce66`: the scheduler marked it
+   failed after `753s > 720s` without progress. Cursor returned about two
+   minutes later, so finalization also logged
+   `complete requires ... found failed`. That is one timed-out run with a late
+   finalization error, not two independent implementation failures.
+
+The safe operator response is: open run history, identify whether the failure
+belongs to Lead or a specialist, fix the named delivery contract, then retry
+**once**. Confirm the retry reaches `completed` before trying again.
+
 ### 3. Live CLI processes
 
 ```bash

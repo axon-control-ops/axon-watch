@@ -303,6 +303,41 @@
   color: rgba(180, 255, 210, 0.95);
 }
 
+.ide-agent-review-strip__btn--retry {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(72, 28, 32, 0.95);
+  color: rgba(255, 220, 220, 0.96);
+  font-weight: 650;
+}
+
+.ide-agent-review-strip__btn--link {
+  border-color: transparent;
+  background: transparent;
+  color: rgba(186, 198, 214, 0.92);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  padding-inline: 0.35rem;
+}
+
+.ide-agent-review-strip__btn--link:hover:not(:disabled) {
+  color: rgba(230, 236, 244, 0.98);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ide-agent-review-strip--attention {
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
+.ide-agent-review-strip--interrupted {
+  border-color: rgba(251, 191, 36, 0.32);
+}
+
+.ide-agent-review-strip--interrupted .ide-agent-review-strip__btn--retry {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(64, 48, 18, 0.95);
+  color: rgba(255, 236, 190, 0.96);
+}
+
 .agent-dock-composer {
   position: relative;
   display: flex;

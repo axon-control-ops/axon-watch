@@ -63,7 +63,9 @@ describe('runEmployeeShiftRetry', () => {
     expect(draft).toMatch(/my last continuous shift/i);
     expect(draft).toContain('vitest assertion failed');
     expect(focusAgentDockComposerInput).toHaveBeenCalledOnce();
-    expect(submitIdeComposer).toHaveBeenCalledWith('agent');
+    expect(submitIdeComposer).toHaveBeenCalledWith('agent', {
+      contentOverride: expect.stringMatching(/my last continuous shift/i),
+    });
   });
 
   it('can skip thread focus when the caller already focused the teammate', async () => {
@@ -82,7 +84,9 @@ describe('runEmployeeShiftRetry', () => {
     );
 
     expect(openOrFocusEmployeeIdeThread).not.toHaveBeenCalled();
-    expect(submitIdeComposer).toHaveBeenCalledWith('agent');
+    expect(submitIdeComposer).toHaveBeenCalledWith('agent', {
+      contentOverride: expect.any(String),
+    });
   });
 
   it('still submits when the last failure was a Cursor usage limit', async () => {
@@ -103,6 +107,26 @@ describe('runEmployeeShiftRetry', () => {
 
     expect(result.ok).toBe(true);
     expect(openIdeComposerWithDraft).toHaveBeenCalledOnce();
-    expect(submitIdeComposer).toHaveBeenCalledWith('agent');
+    expect(submitIdeComposer).toHaveBeenCalledWith('agent', {
+      contentOverride: expect.any(String),
+    });
+  });
+
+  it('surfaces the specific API failure when submit returns false', async () => {
+    const result = await runEmployeeShiftRetry(
+      {
+        commandMutationError: 'chat message submit failed: mutating API rate limit exceeded',
+        openOrFocusEmployeeIdeThread: vi.fn().mockResolvedValue('thread_1'),
+        openIdeComposerWithDraft: vi.fn(),
+        setAgentExecutionAccess: vi.fn(),
+        submitIdeComposer: vi.fn().mockResolvedValue(false),
+      },
+      employee(),
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'chat message submit failed: mutating API rate limit exceeded',
+    });
   });
 });

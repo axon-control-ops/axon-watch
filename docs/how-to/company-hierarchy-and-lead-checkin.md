@@ -62,8 +62,26 @@ Each due company Lead pass:
 | Console / UI HTTP health | `frontend` |
 | Usage limit / vault auth / restart interrupt | Escalate to Lead → VAXON (no auto repair task) |
 
-Continuous workers still pick up `Lead assigned:` tasks when the fleet
+Continuous workers still pick up `Lead assigned:` / `VAXON attend:` tasks when the fleet
 scheduler is enabled; Leads stay `on_demand` and do not auto-start as workers.
+
+### VAXON attend loop (Full autonomy)
+
+When Mission Control **AUTONOMOUS ON** (`autonomy_mode=full`), the scheduler also
+runs work source `autonomous_attention`:
+
+1. Collects failed shifts, monitors/connectors, inbox warnings, and open handoffs.
+2. Classifies each item with a fail-closed safety policy.
+3. **Dispatches** auto-safe items as deduped specialist tasks (`VAXON attend:`).
+4. Reuses an already-routed handoff target task instead of creating a duplicate.
+5. **Escalates** critical/dangerous items into pending autonomy decisions.
+6. **Approve exact task** creates one attempt-bounded `risk=approved` task;
+   **Reject** resolves the decision without work.
+7. High / unclassified task `risk` cannot be claimed by continuous workers.
+
+Emergency stop: Mission Control **Hard-kill** (or **AUTONOMOUS OFF**) demotes
+Full → Semi, pauses new starts, and attempts to stop active worker shifts.
+Any partial stop failures remain visible for operator review.
 
 Manual fan-out remains available:
 

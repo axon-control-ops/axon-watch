@@ -1,7 +1,8 @@
-"""CLI auth probe helpers for local Cursor/Codex runtime status."""
+"""CLI auth probe helpers for local Cursor/Codex/Claude runtime status."""
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from typing import Any
@@ -58,6 +59,8 @@ def vault_auth_overlay(
         env_keys.get("CODEX_API_KEY") or env_keys.get("OPENAI_API_KEY")
     ):
         has_runtime_key = True
+    if runtime_id.startswith("claude_") and env_keys.get("ANTHROPIC_API_KEY"):
+        has_runtime_key = True
 
     if not vault_posture.get("unlocked"):
         return {
@@ -68,7 +71,12 @@ def vault_auth_overlay(
             "message": str(vault_posture.get("hint") or "Unlock /vault to use vault-fed runtime keys."),
         }
     if has_runtime_key:
-        label = "Cursor vault key" if runtime_id.startswith("cursor_") else "Codex/OpenAI vault key"
+        if runtime_id.startswith("cursor_"):
+            label = "Cursor vault key"
+        elif runtime_id.startswith("claude_"):
+            label = "Anthropic vault key"
+        else:
+            label = "Codex/OpenAI vault key"
         return {
             "logged_in": True,
             "auth_method": "vault_api_key",
@@ -83,7 +91,7 @@ def vault_auth_overlay(
         "vault_posture": "missing_keys",
         "message": str(
             vault_posture.get("hint")
-            or "Add Cursor/Codex/OpenAI secrets in /vault or sign in with the CLI."
+            or "Add Cursor/Codex/Claude/OpenAI secrets in /vault or sign in with the CLI."
         ),
     }
 
@@ -277,7 +285,101 @@ def codex_auth_status(
     }
 
 
+def claude_auth_status(
+    binary: str,
+    *,
+    vault_posture: dict[str, Any],
+    env_keys: dict[str, str],
+    probe_env: dict[str, str] | None = None,
+) -> StatusRecord:
+    runtime_env = probe_env or {**os.environ, **env_keys}
+    if runtime_env.get("ANTHROPIC_API_KEY", "").strip():
+        source = "vault_api_key" if env_keys.get("ANTHROPIC_API_KEY") else "api_key"
+        return {
+            "logged_in": True,
+            "auth_method": source,
+            "provider_label": "Anthropic API key",
+            "vault_posture": vault_posture.get("posture") if source == "vault_api_key" else "ready",
+            "message": "Authenticated via ANTHROPIC_API_KEY"
+            + (" from vault." if source == "vault_api_key" else "."),
+        }
+    vault_overlay = vault_auth_overlay("claude_local", vault_posture=vault_posture, env_keys=env_keys)
+    if vault_overlay and vault_posture.get("unlocked") and not vault_overlay.get("logged_in"):
+        if not binary:
+            return vault_overlay
+    if not binary:
+        if vault_overlay:
+            return vault_overlay
+        return {
+            "logged_in": False,
+            "auth_method": "",
+            "provider_label": "Not installed",
+            "vault_posture": vault_posture.get("posture"),
+            "message": "Install Claude Code CLI to use the Claude runtime.",
+        }
+    try:
+        proc = _run_command_with_timeout_retry(
+            [binary, "auth", "status", "--json"],
+            env=runtime_env,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "logged_in": False,
+            "auth_method": "",
+            "provider_label": "Timed out",
+            "vault_posture": vault_posture.get("posture"),
+            "message": "Claude auth probe timed out. Run `claude auth status` manually.",
+        }
+    except Exception:
+        return {
+            "logged_in": False,
+            "auth_method": "",
+            "provider_label": "Probe failed",
+            "vault_posture": vault_posture.get("posture"),
+            "message": "Claude auth probe failed. Run `claude auth status` manually.",
+        }
+    raw = (proc.stdout or proc.stderr or "").strip()
+    payload: dict[str, Any] = {}
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                payload = parsed
+        except json.JSONDecodeError:
+            payload = {}
+    logged_in = bool(payload.get("loggedIn")) if payload else (
+        proc.returncode == 0 and "logged in" in raw.lower()
+    )
+    if logged_in:
+        email = str(payload.get("email") or "").strip()
+        org = str(payload.get("orgName") or "").strip()
+        auth_method = str(payload.get("authMethod") or "oauth").strip() or "oauth"
+        account = email or org or (raw.splitlines()[0].strip() if raw else "")
+        subscription = str(payload.get("subscriptionType") or "").strip()
+        message = "Authenticated with Claude Code CLI."
+        if subscription:
+            message = f"Authenticated with Claude {subscription} subscription."
+        return {
+            "logged_in": True,
+            "auth_method": auth_method if auth_method != "claude.ai" else "oauth",
+            "provider_label": "Claude",
+            "account_label": account,
+            "vault_posture": "ready",
+            "message": message,
+        }
+    if vault_overlay and vault_posture.get("unlocked"):
+        return vault_overlay
+    return {
+        "logged_in": False,
+        "auth_method": "",
+        "provider_label": "Not signed in",
+        "vault_posture": vault_posture.get("posture"),
+        "message": "Claude is installed but not signed in. Run `claude auth login` or unlock /vault.",
+    }
+
+
 # Private aliases kept for callers that historically imported underscored names.
 _vault_auth_overlay = vault_auth_overlay
 _cursor_auth_status = cursor_auth_status
 _codex_auth_status = codex_auth_status
+_claude_auth_status = claude_auth_status

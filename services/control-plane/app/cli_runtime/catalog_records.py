@@ -97,7 +97,7 @@ def choose_default_runtime(
     preferred_family = str(
         os.environ.get("AXON_WATCH_IDE_RUNTIME_FAMILY", "cursor")
     ).strip().lower()
-    family_order = [preferred_family, "cursor", "codex"]
+    family_order = [preferred_family, "cursor", "claude", "codex"]
     seen: set[str] = set()
     for family in family_order:
         if family in seen:

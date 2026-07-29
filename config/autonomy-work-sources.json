@@ -42,6 +42,16 @@
       "include_drills": true,
       "confirm_with_gh": true,
       "max_resolve": 40
+    },
+    {
+      "id": "autonomous_attention",
+      "label": "VAXON Mission Control attend (Full autonomy)",
+      "enabled": true,
+      "trigger": "scheduler_tick",
+      "owner_role": "lead",
+      "max_dispatch_per_workspace": 3,
+      "max_escalations_per_workspace": 5,
+      "task_goal_prefix": "VAXON attend:"
     }
   ]
 }

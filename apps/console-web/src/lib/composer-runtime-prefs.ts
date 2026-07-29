@@ -2,6 +2,7 @@ export type ComposerRuntimePrefs = {
   runtime_target?: string;
   cursor_cli_model?: string;
   codex_cli_model?: string;
+  claude_cli_model?: string;
 };
 
 type ComposerRuntimePrefsMap = {

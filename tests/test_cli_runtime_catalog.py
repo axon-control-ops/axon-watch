@@ -33,12 +33,14 @@ class CliRuntimeCatalogTests(unittest.TestCase):
 
     @patch("app.cli_runtime.catalog_snapshot.fetch_runtime_context")
     @patch("app.cli_runtime.catalog.find_cursor_cli", return_value="/usr/bin/cursor")
+    @patch("app.cli_runtime.catalog.find_claude_cli", return_value="")
     @patch("app.cli_runtime.catalog.find_codex_cli", return_value="/usr/bin/codex")
     @patch("app.cli_runtime.auth_probes._run_command")
     def test_runtime_status_prefers_ready_cursor_local(
         self,
         mock_run,
         _find_codex,
+        _find_claude,
         _find_cursor,
         mock_fetch_context,
     ) -> None:
@@ -59,8 +61,9 @@ class CliRuntimeCatalogTests(unittest.TestCase):
         )()
         snapshot = catalog.runtime_status_snapshot(force_refresh=True)
         self.assertEqual("cursor_local", snapshot["default_runtime"])
-        self.assertEqual(2, len(snapshot["local"]))
+        self.assertEqual(3, len(snapshot["local"]))
         self.assertEqual("cursor_local", snapshot["local"][0]["id"])
+        self.assertEqual("claude_local", snapshot["local"][1]["id"])
         self.assertTrue(snapshot["local"][0]["ready"])
 
     @patch("app.cli_runtime.catalog.runtime_status_snapshot")

@@ -26,6 +26,7 @@ _TASK_COLUMNS = (
     "dependencies_json",
     "exclusive_paths_json",
     "allowed_paths_json",
+    "approval_receipt_id",
     "status",
     "lease_holder",
     "lease_expires_at",
@@ -95,6 +96,7 @@ def ensure_task_ledger_schema(connection: Any) -> None:
             dependencies_json TEXT NOT NULL DEFAULT '[]',
             exclusive_paths_json TEXT NOT NULL DEFAULT '[]',
             allowed_paths_json TEXT NOT NULL DEFAULT '[]',
+            approval_receipt_id TEXT,
             status TEXT NOT NULL,
             lease_holder TEXT,
             lease_expires_at TEXT,
@@ -120,6 +122,10 @@ def ensure_task_ledger_schema(connection: Any) -> None:
         connection.execute(
             "ALTER TABLE workspace_tasks "
             "ADD COLUMN allowed_paths_json TEXT NOT NULL DEFAULT '[]'"
+        )
+    if "approval_receipt_id" not in columns:
+        connection.execute(
+            "ALTER TABLE workspace_tasks ADD COLUMN approval_receipt_id TEXT"
         )
     connection.execute(
         """
@@ -167,6 +173,11 @@ def _row_to_record(row: Any) -> dict[str, Any]:
         "dependencies": dependencies,
         "exclusive_paths": exclusive_paths,
         "allowed_paths": allowed_paths,
+        "approval_receipt_id": (
+            row["approval_receipt_id"]
+            if "approval_receipt_id" in row.keys()
+            else None
+        ),
         "status": row["status"],
         "lease_holder": row["lease_holder"],
         "lease_expires_at": row["lease_expires_at"],
@@ -245,6 +256,7 @@ def create_task(
     dependencies: list[str] | None = None,
     exclusive_paths: list[str] | None = None,
     allowed_paths: list[str] | None = None,
+    approval_receipt_id: str | None = None,
     attempt_budget: int = DEFAULT_ATTEMPT_BUDGET,
 ) -> dict[str, Any]:
     workspace = workspace_id.strip()
@@ -257,17 +269,22 @@ def create_task(
     deps = [str(item).strip() for item in (dependencies or []) if str(item).strip()]
     paths = [str(item).strip() for item in (exclusive_paths or []) if str(item).strip()]
     allowed = [str(item).strip() for item in (allowed_paths or []) if str(item).strip()]
+    from app.workspace_agents.autonomous_attention_policy import normalize_task_risk
+
     timestamp = _utc_now_iso()
     record = {
         "task_id": f"task-{uuid.uuid4().hex[:16]}",
         "workspace_id": workspace,
         "goal": goal_text,
         "acceptance_criteria": acceptance_criteria.strip(),
-        "risk": (risk or "normal").strip() or "normal",
+        "risk": normalize_task_risk(risk),
         "owner_role": owner_role.strip().lower(),
         "dependencies_json": json.dumps(deps),
         "exclusive_paths_json": json.dumps(paths),
         "allowed_paths_json": json.dumps(allowed),
+        "approval_receipt_id": (
+            str(approval_receipt_id).strip() if approval_receipt_id else None
+        ),
         "status": "open",
         "lease_holder": None,
         "lease_expires_at": None,
@@ -777,15 +794,21 @@ def claim_open_task_for_role(
             WHERE workspace_id = ?
               AND status = 'open'
               AND lower(owner_role) = ?
+              AND lower(risk) IN ('normal', 'low', 'approved')
               AND attempts_used < attempt_budget
             ORDER BY rowid ASC
-            LIMIT 20
             """,
             (workspace, role),
         ).fetchall()
+    from app.workspace_agents.autonomous_attention_policy import task_allows_autonomous_lease
+
     for row in rows:
         task_key = str(row["task_id"] or "").strip()
         if not task_key:
+            continue
+        candidate = get_task(task_key)
+        decision = task_allows_autonomous_lease(candidate)
+        if decision.tier != "auto_safe" or decision.decision != "dispatch":
             continue
         try:
             return lease_task(

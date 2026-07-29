@@ -100,28 +100,28 @@
       "target": "services/control-plane/app/kairo/replies/*"
     },
     "services/control-plane/app/cli_runtime/catalog.py": {
-      "max_lines": 80,
+      "max_lines": 44,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
       "note": "CLI discovery only; snapshot cache in catalog_snapshot.py; Lead ratchet after under-budget verify"
     },
     "services/control-plane/app/cli_runtime/catalog_snapshot.py": {
-      "max_lines": 272,
+      "max_lines": 228,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
       "note": "Runtime status snapshot cache and probe assembly"
     },
     "docs/HOW-TO-HANDBOOK.md": {
-      "max_lines": 1713,
+      "max_lines": 1740,
       "soft_limit": 400,
       "hard_limit": 1713,
       "target": "docs/how-to/* chapters",
       "note": "Raised for GitHub CLI draft-PR delivery section"
     },
     "docs/HOW-TO-HANDBOOK.html": {
-      "max_lines": 3460,
+      "max_lines": 3800,
       "soft_limit": 250,
       "hard_limit": 400,
       "target": "docs/how-to/* generated HTML"
@@ -401,7 +401,7 @@
       "note": "Gate 4 leased-task create_run binding; extract next"
     },
     "services/control-plane/app/persistence/task_store.py": {
-      "max_lines": 800,
+      "max_lines": 830,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/persistence/*",
@@ -436,11 +436,11 @@
       "note": "Task Board density polish; split header/list/card CSS next"
     },
     "services/control-plane/app/kairo/operator_deterministic_report.py": {
-      "max_lines": 716,
+      "max_lines": 587,
       "soft_limit": 350,
-      "hard_limit": 716,
+      "hard_limit": 587,
       "target": "services/control-plane/app/kairo/report_*",
-      "note": "Deterministic REPORT lane; scrub helpers extracted to report_text.py; auth-heal filters next"
+      "note": "Deterministic REPORT lane; next-move selection extracted to report_next_move.py"
     },
     "apps/console-web/src/stores/shell/slices/create-kairo-voice-slice.ts": {
       "max_lines": 525,

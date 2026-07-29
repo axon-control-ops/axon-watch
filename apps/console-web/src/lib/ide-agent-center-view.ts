@@ -210,9 +210,14 @@ export function shouldShowIdeAgentReviewStrip(input: {
   reviewReadyCount: number;
   editedFileCount: number;
   latestAgentTurnFailed?: boolean;
+  /** Soft Attention actions (Try again / Explain / Open team) live on this strip. */
+  employeeFailureActions?: boolean;
 }): boolean {
   if (input.layoutMode !== 'ide') {
     return false;
+  }
+  if (input.employeeFailureActions) {
+    return true;
   }
   if (input.agentStreamActive || input.composerAgentBusy) {
     return true;
@@ -220,7 +225,9 @@ export function shouldShowIdeAgentReviewStrip(input: {
   if (input.reviewReadyCount > 0) {
     return true;
   }
-  if (input.latestAgentTurnFailed) {
+  // Failed turns without file edits stay off the strip; file review still wins when
+  // the agent produced edits (operator needs Review N files even after a soft fail).
+  if (input.latestAgentTurnFailed && input.editedFileCount <= 0) {
     return false;
   }
   return input.editedFileCount > 0;

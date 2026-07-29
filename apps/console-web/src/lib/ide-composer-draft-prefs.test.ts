@@ -34,12 +34,12 @@ describe('ide composer draft prefs', () => {
     vi.unstubAllGlobals();
   });
 
-  it('persists and restores drafts per workspace', () => {
+  it('does not persist or restore drafts without a thread id', () => {
     persistIdeComposerDraft('workspace_a', 'Build the queue UI');
     persistIdeComposerDraft('workspace_b', 'Compare Cursor parity');
 
-    expect(readStoredIdeComposerDraft('workspace_a')).toBe('Build the queue UI');
-    expect(readStoredIdeComposerDraft('workspace_b')).toBe('Compare Cursor parity');
+    expect(readStoredIdeComposerDraft('workspace_a')).toBe('');
+    expect(readStoredIdeComposerDraft('workspace_b')).toBe('');
     expect(readStoredIdeComposerDraft('workspace_c')).toBe('');
   });
 
@@ -52,10 +52,13 @@ describe('ide composer draft prefs', () => {
     expect(readStoredIdeComposerDraft('workspace_a', 'thread_3')).toBe('');
   });
 
-  it('migrates legacy workspace drafts into the first thread that reads them', () => {
-    persistIdeComposerDraft('workspace_a', 'Legacy shared draft');
+  it('does not migrate legacy workspace drafts into the first thread that reads them', () => {
+    window.localStorage.setItem(
+      'axon-x-ide-composer-draft-v1',
+      JSON.stringify({ workspace_a: 'Legacy shared draft' }),
+    );
 
-    expect(readStoredIdeComposerDraft('workspace_a', 'thread_1')).toBe('Legacy shared draft');
+    expect(readStoredIdeComposerDraft('workspace_a', 'thread_1')).toBe('');
     expect(readStoredIdeComposerDraft('workspace_a', 'thread_2')).toBe('');
     expect(readStoredIdeComposerDraft('workspace_a')).toBe('');
   });
@@ -65,5 +68,23 @@ describe('ide composer draft prefs', () => {
     persistIdeComposerDraft('workspace_a', '   ', 'thread_1');
 
     expect(readStoredIdeComposerDraft('workspace_a', 'thread_1')).toBe('');
+  });
+
+  it('drops legacy workspace keys when clearing a thread draft', () => {
+    window.localStorage.setItem(
+      'axon-x-ide-composer-draft-v1',
+      JSON.stringify({
+        workspace_a: 'Legacy shared draft',
+        'workspace_a::thread_1': 'Thread draft',
+      }),
+    );
+
+    persistIdeComposerDraft('workspace_a', '', 'thread_1');
+
+    const raw = JSON.parse(window.localStorage.getItem('axon-x-ide-composer-draft-v1') ?? '{}') as Record<
+      string,
+      string
+    >;
+    expect(raw).toEqual({});
   });
 });

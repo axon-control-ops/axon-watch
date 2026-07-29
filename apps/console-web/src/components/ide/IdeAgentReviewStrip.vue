@@ -10,11 +10,25 @@ import {
   resolveIdeAgentEditDiffFromThread,
   shouldShowIdeAgentReviewStrip,
 } from '../../lib/ide-agent-center-view';
+import { useEmployeeFailureStripActions } from '../../composables/agent-dock/use-employee-failure-strip-actions';
 import { runContinueActionLabel } from '../../lib/run-lifecycle-ui';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
 const expanded = ref(false);
+
+const {
+  retrying,
+  showFailureActions,
+  showRetryAction,
+  showExplainAction,
+  interruptedShift,
+  retryLabel,
+  actionsDisabled,
+  handleRetry,
+  handleExplain,
+  handleOpenTeam,
+} = useEmployeeFailureStripActions(shell);
 
 const editSummaries = computed(() => {
   // During an active stream, avoid full-transcript rescans — use incremental edit count.
@@ -51,6 +65,7 @@ const showReviewStrip = computed(() =>
     reviewReadyCount: reviewReadyCount.value,
     editedFileCount: editedFileCount.value,
     latestAgentTurnFailed: latestIdeAgentTurnFailed(shell.threadMessages),
+    employeeFailureActions: showFailureActions.value,
   }) || shell.canResumeIdeAgentRun,
 );
 
@@ -127,7 +142,11 @@ function focusReviewFiles(): void {
   <section
     v-if="showReviewStrip"
     class="ide-agent-review-strip"
-    :class="{ 'ide-agent-review-strip--expanded': expanded }"
+    :class="{
+      'ide-agent-review-strip--expanded': expanded,
+      'ide-agent-review-strip--attention': showFailureActions,
+      'ide-agent-review-strip--interrupted': interruptedShift,
+    }"
     aria-label="Agent review controls"
   >
     <div class="ide-agent-review-strip__bar">
@@ -142,6 +161,34 @@ function focusReviewFiles(): void {
         <p class="ide-agent-review-strip__summary">{{ statusLabel }}</p>
       </button>
       <div class="ide-agent-review-strip__actions">
+        <button
+          v-if="showRetryAction"
+          type="button"
+          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--retry"
+          :disabled="actionsDisabled"
+          :title="`${retryLabel} this teammate's last job`"
+          @click="handleRetry"
+        >
+          {{ retrying ? 'Working…' : retryLabel }}
+        </button>
+        <button
+          v-if="showFailureActions && showExplainAction"
+          type="button"
+          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
+          title="Opens Ask so they explain what happened without changing code"
+          :disabled="actionsDisabled"
+          @click="handleExplain"
+        >
+          Explain
+        </button>
+        <button
+          v-if="showFailureActions"
+          type="button"
+          class="ide-agent-review-strip__btn ide-agent-review-strip__btn--link"
+          @click="handleOpenTeam"
+        >
+          Open team
+        </button>
         <button
           v-if="reviewBar.showStop"
           type="button"

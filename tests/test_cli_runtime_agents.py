@@ -9,6 +9,7 @@ CONTROL_PLANE_ROOT = Path(__file__).resolve().parents[1] / "services" / "control
 sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.codex_agent import run_codex_local  # noqa: E402
+from app.cli_runtime.claude_agent import run_claude_local  # noqa: E402
 from app.cli_runtime.cursor_agent import CursorAgentReply, _cursor_mode_flag, run_cursor_local  # noqa: E402
 
 
@@ -148,6 +149,46 @@ class CliRuntimeAgentTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "CLI runtime timed out after 90s"):
             run_codex_local(
                 binary="/usr/bin/codex",
+                prompt="hello",
+                workspace_root=Path("/tmp"),
+                composer_mode="ask",
+            )
+
+    @patch("app.cli_runtime.claude_agent.communicate_registered_process")
+    def test_claude_parses_stream_json_reply(self, mock_communicate) -> None:
+        mock_communicate.return_value = (_stream_json_stdout("PONG"), "", 0)
+        reply = run_claude_local(
+            binary="/usr/bin/claude",
+            prompt="ping",
+            workspace_root=Path("/tmp"),
+            composer_mode="agent",
+        )
+        self.assertEqual("PONG", reply)
+        command = mock_communicate.call_args.kwargs["command"]
+        self.assertIn("-p", command)
+        self.assertIn("stream-json", command)
+        self.assertIn("plan", command)
+
+    @patch("app.cli_runtime.claude_agent.communicate_registered_process")
+    def test_claude_executing_uses_accept_edits(self, mock_communicate) -> None:
+        mock_communicate.return_value = (_stream_json_stdout("DONE"), "", 0)
+        run_claude_local(
+            binary="/usr/bin/claude",
+            prompt="edit",
+            workspace_root=Path("/tmp/ws"),
+            composer_mode="agent",
+            execution_tier="executing",
+        )
+        command = mock_communicate.call_args.kwargs["command"]
+        self.assertIn("acceptEdits", command)
+        self.assertEqual("/tmp/ws", mock_communicate.call_args.kwargs.get("cwd"))
+
+    @patch("app.cli_runtime.claude_agent.communicate_registered_process")
+    def test_claude_timeout_is_normalized_to_runtime_error(self, mock_communicate) -> None:
+        mock_communicate.side_effect = RuntimeError("CLI runtime timed out after 90s.")
+        with self.assertRaisesRegex(RuntimeError, "CLI runtime timed out after 90s"):
+            run_claude_local(
+                binary="/usr/bin/claude",
                 prompt="hello",
                 workspace_root=Path("/tmp"),
                 composer_mode="ask",

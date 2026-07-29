@@ -166,6 +166,14 @@ export function startCodexRuntimeLogin(): Promise<RuntimeAuthActionResult> {
   return postRuntimeAuthAction('/api/runtime/codex/login/start');
 }
 
+export function logoutClaudeRuntime(): Promise<RuntimeAuthActionResult> {
+  return postRuntimeAuthAction('/api/runtime/claude/logout');
+}
+
+export function startClaudeRuntimeLogin(): Promise<RuntimeAuthActionResult> {
+  return postRuntimeAuthAction('/api/runtime/claude/login/start');
+}
+
 export async function fetchReadiness(): Promise<ReadinessSnapshot> {
   return fetchJson<ReadinessSnapshot>('/api/readiness', {}, 'readiness request failed');
 }

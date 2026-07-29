@@ -174,6 +174,21 @@ class KairoVoicePolicyTests(unittest.TestCase):
         self.assertNotIn("vault", payload["line"].lower())
         self.assertIn("couldn't start", payload["line"].lower())
 
+    def test_failed_stream_interrupt_does_not_claim_couldnt_start(self) -> None:
+        with patch("app.kairo_voice._try_runtime_line", return_value=None):
+            payload = generate_spoken_line(
+                event_type="failed",
+                context={
+                    "operator_prompt": "confirm payments button hidden",
+                    "failure_summary": "chat stream interrupted",
+                },
+                session_id="failed-stream-interrupt",
+                use_runtime=False,
+            )
+        self.assertNotIn("couldn't start", payload["line"].lower())
+        self.assertIn("cut off", payload["line"].lower())
+        self.assertIn("try again", payload["line"].lower())
+
     def test_approval_literal_bypasses_runtime(self) -> None:
         with patch("app.kairo_voice._try_runtime_line", return_value="Model paraphrase."):
             payload = generate_spoken_line(

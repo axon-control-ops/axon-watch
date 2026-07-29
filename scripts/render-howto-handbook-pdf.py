@@ -184,6 +184,11 @@ def markdown_to_html(text: str) -> str:
     )
 
 
+def compact_generated_html(html: str) -> str:
+    """Keep generated list markup below the file-size ratchet without visual changes."""
+    return html.replace("</li>\n<li", "</li><li")
+
+
 def cover_html(verified: str | None) -> str:
     verified_line = verified or "See source markdown for latest verification stamp"
     generated = datetime.now().strftime("%d %b %Y")
@@ -229,7 +234,7 @@ def toc_html(entries: list[tuple[str, str, int]]) -> str:
 <nav class="toc" id="table-of-contents">
   <div class="toc-header">
     <div class="toc-kicker">Field guide</div>
-    <h2>16 chapters</h2>
+    <h2>{len(entries)} chapters</h2>
   </div>
   <ol class="toc-grid">{items}</ol>
 </nav>
@@ -246,7 +251,9 @@ def strip_doc_preamble(html: str) -> str:
 def build_html(markdown_text: str) -> str:
     toc = extract_toc(markdown_text)
     verified = extract_verified_line(markdown_text)
-    raw_body = inject_heading_ids(markdown_to_html(markdown_text), toc)
+    raw_body = compact_generated_html(
+        inject_heading_ids(markdown_to_html(markdown_text), toc)
+    )
     body = strip_doc_preamble(wrap_major_chapters(raw_body, toc))
     css_href = PRINT_CSS.resolve().as_uri()
     return f"""<!doctype html>

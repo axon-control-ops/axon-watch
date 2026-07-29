@@ -129,7 +129,9 @@ describe('openEmployeeShiftRetry', () => {
     expect(draft).toMatch(/my last continuous shift/i);
     expect(draft).toContain('vitest assertion failed');
     expect(draft.toLowerCase()).toContain('first person');
-    expect(shell.submitIdeComposer).toHaveBeenCalledWith('agent');
+    expect(shell.submitIdeComposer).toHaveBeenCalledWith('agent', {
+      contentOverride: draft,
+    });
   });
 });
 
@@ -235,7 +237,12 @@ describe('handleIdeQuickGuideAction', () => {
       showTerminalPanel,
     });
     await vi.waitFor(() => {
-      expect(shell.submitIdeComposer).toHaveBeenCalledWith('agent');
+      expect(shell.submitIdeComposer).toHaveBeenCalledWith(
+        'agent',
+        expect.objectContaining({
+          contentOverride: expect.stringContaining('timeout'),
+        }),
+      );
     });
 
     expect(showAgentDock).toHaveBeenCalledOnce();

@@ -14,8 +14,8 @@ from app.cli_runtime.approval_gate import (
     resolve_runtime_execution_tier,
 )
 from app.cli_runtime.catalog import runtime_status_snapshot
-from app.cli_runtime.codex_agent import run_codex_local
 from app.cli_runtime.mcp_registry import mcp_tools_for_composer_mode
+from app.cli_runtime.non_cursor_dispatch import run_non_cursor_local
 from app.cli_runtime.recovery import ordered_runtime_candidates
 from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
@@ -24,9 +24,11 @@ from app.cli_runtime.runtime_failure import (
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.cursor_agent import (
     CursorAgentReply,
+    run_cursor_local,
     run_cursor_local_with_recursion_retry,
 )
 from app.cli_runtime.runtime_auth import (
+    claude_dispatch_env,
     cursor_dispatch_env,
     env_has_api_key,
     env_without_api_keys,
@@ -245,7 +247,12 @@ def _cloud_runtime_message(record: dict[str, object]) -> str:
 def _effective_cli_model(family: str, runtime_model: str) -> str:
     normalized = str(runtime_model or "").strip()
     if not normalized or normalized.lower() == "auto":
-        env_key = "AXON_WATCH_CURSOR_MODEL" if family == "cursor" else "AXON_WATCH_CODEX_MODEL"
+        if family == "cursor":
+            env_key = "AXON_WATCH_CURSOR_MODEL"
+        elif family == "claude":
+            env_key = "AXON_WATCH_CLAUDE_MODEL"
+        else:
+            env_key = "AXON_WATCH_CODEX_MODEL"
         normalized = str(os.environ.get(env_key, "")).strip()
     if normalized.lower() == "auto":
         return ""
@@ -372,6 +379,11 @@ def dispatch_ide_composer(
                 subprocess_env,
                 auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
             )
+        elif family == "claude":
+            dispatch_env = claude_dispatch_env(
+                subprocess_env,
+                auth=record.get("auth") if isinstance(record.get("auth"), dict) else None,
+            )
         try:
             if target_type == "cloud":
                 raise RuntimeError(_cloud_runtime_message(record))
@@ -400,8 +412,9 @@ def dispatch_ide_composer(
                     "execution_tier": execution_tier,
                     "generated_image_paths": list(cursor_reply.generated_image_paths),
                 })
-            if family == "codex":
-                content = run_codex_local(
+            if family in {"claude", "codex"}:
+                content = run_non_cursor_local(
+                    family=family,
                     binary=binary,
                     prompt=prompt,
                     workspace_root=workspace_root,
@@ -411,9 +424,8 @@ def dispatch_ide_composer(
                     subprocess_env=dispatch_env,
                     run_id=run_id,
                     on_chunk=on_chunk,
+                    approval_notice=approval_notice,
                 )
-                if approval_notice:
-                    content = f"{content.rstrip()}\n\n---\n{approval_notice}"
                 return _finish({
                     "content": content,
                     "dispatched": True,
@@ -469,7 +481,8 @@ def dispatch_ide_composer(
                             )
                             content = _cursor_reply_content(cursor_reply, approval_notice)
                         else:
-                            content = run_codex_local(
+                            content = run_non_cursor_local(
+                                family=family,
                                 binary=binary,
                                 prompt=prompt,
                                 workspace_root=workspace_root,
@@ -479,9 +492,8 @@ def dispatch_ide_composer(
                                 subprocess_env=retry_env,
                                 run_id=run_id,
                                 on_chunk=on_chunk,
+                                approval_notice=approval_notice,
                             )
-                        if approval_notice:
-                            content = f"{content.rstrip()}\n\n---\n{approval_notice}"
                         payload = {
                             "content": content,
                             "dispatched": True,

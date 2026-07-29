@@ -19,4 +19,9 @@ ALLOWED_IMPORT_KEYS: tuple[str, ...] = (
     "GH_TOKEN",
     "GITHUB_TOKEN",
     "AXON_GITHUB_TOKEN",
+    # Optional CLI runtime API keys (subscription login preferred).
+    "CURSOR_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "CODEX_API_KEY",
+    "OPENAI_API_KEY",
 )

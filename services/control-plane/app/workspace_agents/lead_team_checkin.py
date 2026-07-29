@@ -21,12 +21,14 @@ from app.workspace_agents.config_loader import load_workspace_agent_configs
 from app.workspace_agents.failure_detail import normalize_operator_failure_detail
 from app.workspace_agents.lead_checkin_assign import (
     ASSIGN_GOAL_PREFIX,
+    ATTEND_GOAL_PREFIX,
     CHECKIN_GOAL_PREFIX,
     SPECIALIST_ROLES,
     LeadCheckinFinding,
     assign_owner_role_for_failed_shift,
     assign_owner_role_for_monitor,
 )
+from app.workspace_agents.autonomous_attention_policy import attention_finding_auto_dispatches
 from app.workspace_agents.run_outcome import latest_role_run_outcome
 
 logger = logging.getLogger(__name__)
@@ -347,7 +349,7 @@ def _open_assignment_tasks(workspace_id: str) -> list[dict[str, Any]]:
     return [
         row
         for row in openish
-        if str(row.get("goal") or "").startswith(ASSIGN_GOAL_PREFIX)
+        if str(row.get("goal") or "").startswith((ASSIGN_GOAL_PREFIX, ATTEND_GOAL_PREFIX))
     ]
 
 
@@ -369,11 +371,11 @@ def enqueue_lead_assignments(
 ) -> list[dict[str, Any]]:
     """Create specialist tasks for assignable findings (not escalate-only)."""
     workspace = workspace_id.strip()
-    if not workspace:
+    if not workspace or int(max_new_tasks) <= 0:
         return []
     existing = _open_assignment_tasks(workspace)
     created: list[dict[str, Any]] = []
-    assignable = [item for item in findings if not item.escalate_only]
+    assignable = [item for item in findings if attention_finding_auto_dispatches(item)]
     priority = {
         "failed_shift": 0,
         "monitor_alert": 1,
@@ -402,7 +404,8 @@ def enqueue_lead_assignments(
                     "End with Confidence: N/10. "
                     f"dedupe={finding.dedupe_key}"
                 ),
-                risk="normal" if finding.kind != "connector_degraded" else "high",
+                # auto_safe only — escalate_only findings never reach create_task
+                risk="normal",
                 owner_role=finding.owner_role,
                 attempt_budget=2,
             )

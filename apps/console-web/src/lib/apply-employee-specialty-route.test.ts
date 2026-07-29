@@ -52,7 +52,9 @@ describe('applyEmployeeSpecialtyRoute', () => {
     });
 
     expect(result.routed).toBe(true);
-    expect(target.openOrFocusEmployeeIdeThread).toHaveBeenCalledWith(priya);
+    expect(target.openOrFocusEmployeeIdeThread).toHaveBeenCalledWith(priya, {
+      forceRefresh: false,
+    });
     expect(teammateRouteNotice.value).toMatchObject({
       toName: 'Priya',
       fromName: 'Marco',

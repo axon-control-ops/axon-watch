@@ -98,6 +98,8 @@ export function startChatStreamSession(options: ChatStreamSessionOptions): ChatS
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let terminal = false;
   let settled = false;
+  /** True once we saw a delta for this message — quiet close then means cut-off, not cold fail. */
+  let sawMessageDelta = false;
 
   function clearReconnectTimer(): void {
     if (reconnectTimer !== null) {
@@ -150,6 +152,7 @@ export function startChatStreamSession(options: ChatStreamSessionOptions): ChatS
 
       if (payload.type === 'chat_stream_delta' && payload.message_id === options.messageId) {
         reconnectAttempts = 0;
+        sawMessageDelta = true;
         options.onDelta(String(payload.content ?? ''));
         return;
       }
@@ -187,7 +190,11 @@ export function startChatStreamSession(options: ChatStreamSessionOptions): ChatS
         disconnectEventSource();
         if (!settled && !disconnected) {
           settled = true;
-          options.onError?.('chat stream closed');
+          // Distinguish cold close (never started streaming) from mid-run drop so
+          // voice / Soft Attention do not claim the run "couldn't start".
+          options.onError?.(
+            sawMessageDelta ? 'chat stream interrupted' : 'chat stream closed',
+          );
         }
       }
     };

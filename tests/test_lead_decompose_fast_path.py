@@ -97,6 +97,7 @@ class LeadDecomposeFastPathTests(unittest.TestCase):
         agent = next(row for row in saved if row["role"] == "agent")
         self.assertIn("decomposed the work", agent["content"])
         self.assertIn("frontend:", agent["content"].lower())
+        self.assertIn("Fleet:", agent["content"])
 
     def test_skips_assign_all_intent(self) -> None:
         response = maybe_post_lead_decompose_message(

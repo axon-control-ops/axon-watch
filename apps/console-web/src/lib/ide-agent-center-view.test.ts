@@ -103,7 +103,29 @@ describe('ide agent center view', () => {
         editedFileCount: 53,
         latestAgentTurnFailed: true,
       }),
+    ).toBe(true);
+
+    expect(
+      shouldShowIdeAgentReviewStrip({
+        layoutMode: 'ide',
+        agentStreamActive: false,
+        composerAgentBusy: false,
+        reviewReadyCount: 0,
+        editedFileCount: 0,
+        latestAgentTurnFailed: true,
+      }),
     ).toBe(false);
+
+    expect(
+      shouldShowIdeAgentReviewStrip({
+        layoutMode: 'ide',
+        agentStreamActive: false,
+        composerAgentBusy: false,
+        reviewReadyCount: 0,
+        editedFileCount: 0,
+        employeeFailureActions: true,
+      }),
+    ).toBe(true);
   });
 
   it('builds thread status labels with VAXON prefix while streaming', () => {

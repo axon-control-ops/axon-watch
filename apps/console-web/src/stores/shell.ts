@@ -169,6 +169,8 @@ import {
 } from '../lib/workspace-stream-ui';
 import { listReattachIdeStreamThreadIds, listStaleIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
 import { resolveStreamingAgentMessageId } from '../lib/follow-busy-employee-ide-streams';
+import { composerSubmitBlockReason } from '../lib/composer-submit-block-reason';
+import { humanizeNetworkError } from '../lib/humanize-network-error';
 import {
   localRuntimeDegradedActive,
   remoteIngressAttentionActive,
@@ -427,6 +429,7 @@ export const useShellStore = defineStore('shell', () => {
   const operatorCommandDraft = ref('');
   const ideComposerDraft = ref('');
   let ideComposerDraftPersistTimer: ReturnType<typeof setTimeout> | null = null;
+  let suppressingIdeComposerDraftPersist = false;
   const kairoSpeechQueueActive = ref(false);
   const kairoVoiceEngineActive = ref(false);
   const kairoVoicePaused = ref(false);
@@ -1297,12 +1300,10 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   /** Find or create a titled IDE thread owned by a company teammate, then focus it. */
-  async function openOrFocusEmployeeIdeThread(employee: {
-    employee_id: string;
-    name: string;
-    role: string;
-    role_label?: string;
-  }): Promise<string | null> {
+  async function openOrFocusEmployeeIdeThread(
+    employee: { employee_id: string; name: string; role: string; role_label?: string },
+    options?: { forceRefresh?: boolean },
+  ): Promise<string | null> {
     const workspaceId = currentWorkspace.value?.workspace_id;
     const employeeId = employee.employee_id?.trim();
     if (!workspaceId || !employeeId) {
@@ -1310,6 +1311,7 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     const title = employeeIdeThreadTitle(employee);
+    const forceRefresh = options?.forceRefresh !== false;
 
     try {
       await loadIdeThreads(workspaceId);
@@ -1318,9 +1320,9 @@ export const useShellStore = defineStore('shell', () => {
       );
       if (existing?.thread_id) {
         flushIdeComposerDraft();
-        // Continuous-worker / fan-out writes the teammate thread out-of-band — always
-        // refetch so AgentDock does not show a stale pre-shift cache.
-        await selectIdeThread(existing.thread_id, { forceRefresh: true });
+        // Continuous-worker / fan-out writes the teammate thread out-of-band — refetch
+        // so AgentDock does not show a stale pre-shift cache (unless send-path opts out).
+        await selectIdeThread(existing.thread_id, { forceRefresh });
         openIdeComposer({ keepActivityView: true });
         return existing.thread_id;
       }
@@ -1370,7 +1372,7 @@ export const useShellStore = defineStore('shell', () => {
     }
 
     if (previousThreadId && previousThreadId !== threadId) {
-      flushIdeComposerDraft();
+      flushIdeComposerDraft(previousThreadId);
       // Keep the previous thread's live SSE + message cache — do not disconnect.
       workspaceIdeThreadMessagesById.value = {
         ...workspaceIdeThreadMessagesById.value,
@@ -2010,10 +2012,9 @@ export const useShellStore = defineStore('shell', () => {
   }
 
   function syncIdeComposerDraftForWorkspace(workspaceId: string | null | undefined): void {
-    const threadId =
-      (workspaceId && getWorkspaceSurfaceThreadId(workspaceId, 'ide')) ||
-      activeIdeThreadId.value ||
-      null;
+    // Only restore when this workspace already has a focused IDE thread — never borrow
+    // another workspace's active thread id (that wrote drafts under the wrong scope).
+    const threadId = (workspaceId && getWorkspaceSurfaceThreadId(workspaceId, 'ide')) || null;
     syncIdeComposerDraftForThread(workspaceId, threadId);
   }
 
@@ -2025,10 +2026,15 @@ export const useShellStore = defineStore('shell', () => {
       clearTimeout(ideComposerDraftPersistTimer);
       ideComposerDraftPersistTimer = null;
     }
-    ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId, threadId);
+    suppressingIdeComposerDraftPersist = true;
+    try {
+      ideComposerDraft.value = readStoredIdeComposerDraft(workspaceId, threadId);
+    } finally {
+      suppressingIdeComposerDraftPersist = false;
+    }
   }
 
-  function flushIdeComposerDraft(): void {
+  function flushIdeComposerDraft(threadIdOverride?: string | null): void {
     if (typeof window === 'undefined') {
       return;
     }
@@ -2037,19 +2043,15 @@ export const useShellStore = defineStore('shell', () => {
       ideComposerDraftPersistTimer = null;
     }
     const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-    if (!workspaceId) {
+    const threadId = threadIdOverride !== undefined ? threadIdOverride : activeIdeThreadId.value || null;
+    if (!workspaceId || !threadId) {
       return;
     }
-    // Prefer thread scope; fall back to workspace so drafts survive before thread hydration.
-    persistIdeComposerDraft(
-      workspaceId,
-      ideComposerDraft.value,
-      activeIdeThreadId.value || null,
-    );
+    persistIdeComposerDraft(workspaceId, ideComposerDraft.value, threadId);
   }
 
   function schedulePersistIdeComposerDraft(): void {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || suppressingIdeComposerDraftPersist) {
       return;
     }
     if (ideComposerDraftPersistTimer) {
@@ -2057,15 +2059,15 @@ export const useShellStore = defineStore('shell', () => {
     }
     ideComposerDraftPersistTimer = setTimeout(() => {
       ideComposerDraftPersistTimer = null;
-      const workspaceId = currentWorkspace.value?.workspace_id ?? null;
-      if (!workspaceId) {
+      if (suppressingIdeComposerDraftPersist) {
         return;
       }
-      persistIdeComposerDraft(
-        workspaceId,
-        ideComposerDraft.value,
-        activeIdeThreadId.value || null,
-      );
+      const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+      const threadId = activeIdeThreadId.value || null;
+      if (!workspaceId || !threadId) {
+        return;
+      }
+      persistIdeComposerDraft(workspaceId, ideComposerDraft.value, threadId);
     }, 140);
   }
 
@@ -2094,14 +2096,11 @@ export const useShellStore = defineStore('shell', () => {
       attachmentFiles?: File[];
     } = {},
   ): Promise<boolean> {
-    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    const workspaceId = currentWorkspace.value?.workspace_id ?? '';
     const content = (options.contentOverride ?? ideComposerDraft.value).trim();
-    if (
-      commandMutationState.value === 'submitting' ||
-      agentStreamActive.value ||
-      !workspaceId ||
-      !content
-    ) {
+    const blockedReason = composerSubmitBlockReason(workspaceId, content, commandMutationState.value, agentStreamActive.value);
+    if (blockedReason) {
+      commandMutationError.value = blockedReason;
       return false;
     }
 
@@ -2228,27 +2227,26 @@ export const useShellStore = defineStore('shell', () => {
         return true;
       }
       commandMutationState.value = 'idle';
-      if (response.run || response.run_id) {
-        await refreshRunSurfaces();
-        const next = new Set(expandedDockSeams.value);
-        next.add('run');
-        next.add('thread');
-        expandedDockSeams.value = next;
-      } else if (response.dispatched) {
-        await refreshRunSurfaces();
-        const next = new Set(expandedDockSeams.value);
-        next.add('thread');
-        expandedDockSeams.value = next;
-      } else {
-        const next = new Set(expandedDockSeams.value);
-        next.add('thread');
-        expandedDockSeams.value = next;
+      // Chat landed; a failed follow-up refresh must not turn the send into an error.
+      try {
+        if (response.run || response.run_id || response.dispatched) {
+          await refreshRunSurfaces({ light: true });
+        }
+      } catch {
+        // Keep the successful send; roster/run chips catch up on the next tick.
       }
+      const next = new Set(expandedDockSeams.value);
+      next.add('thread');
+      if (response.run || response.run_id) {
+        next.add('run');
+      }
+      expandedDockSeams.value = next;
       return true;
     } catch (error) {
       commandMutationState.value = 'error';
-      commandMutationError.value =
-        error instanceof Error ? error.message : 'Failed to submit IDE composer message';
+      commandMutationError.value = humanizeNetworkError(error, {
+        action: 'Chat send',
+      });
       return false;
     } finally {
       if (!agentStreamActive.value) {
@@ -2393,10 +2391,12 @@ export const useShellStore = defineStore('shell', () => {
 
   async function submitIdeComposer(
     composerMode: IdeComposerMode,
-    options: { attachmentFiles?: File[] } = {},
+    options: { attachmentFiles?: File[]; contentOverride?: string } = {},
   ): Promise<boolean> {
-    const content = ideComposerDraft.value.trim();
-    if (!content || !currentWorkspace.value?.workspace_id) {
+    const content = (options.contentOverride ?? ideComposerDraft.value).trim();
+    const blockedReason = composerSubmitBlockReason(currentWorkspace.value?.workspace_id, content);
+    if (blockedReason) {
+      commandMutationError.value = blockedReason;
       return false;
     }
 

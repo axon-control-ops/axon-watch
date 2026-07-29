@@ -14,6 +14,7 @@ _RUNTIME_AUTH_MARKERS = (
     "not signed in",
     "cursor agent login",
     "codex login",
+    "claude auth login",
     "unlock /vault",
     "vault locked",
     "cursor rejected cursor_api_key",
@@ -24,6 +25,7 @@ _RUNTIME_AUTH_MARKERS = (
     "auth probe failed",
     "cursor auth probe",
     "codex auth probe",
+    "claude auth probe",
 )
 
 

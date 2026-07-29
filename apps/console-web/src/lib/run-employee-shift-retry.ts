@@ -5,6 +5,7 @@ import type { IdeComposerMode } from './ide-composer-queue';
 import { requestIdeComposerMode } from './ide-composer-restore-request';
 
 export type RunEmployeeShiftRetryShell = {
+  commandMutationError?: string | null;
   setAgentExecutionAccess: (value: 'consultative' | 'full') => void;
   openIdeComposerWithDraft: (
     content: string,
@@ -13,14 +14,17 @@ export type RunEmployeeShiftRetryShell = {
   openIdeComposer?: (options?: { keepActivityView?: boolean }) => void;
   submitIdeComposer: (
     mode: IdeComposerMode,
-    options?: { attachmentFiles?: File[] },
+    options?: { attachmentFiles?: File[]; contentOverride?: string },
   ) => Promise<void | boolean>;
-  openOrFocusEmployeeIdeThread?: (employee: {
-    employee_id: string;
-    name: string;
-    role: string;
-    role_label?: string;
-  }) => Promise<string | null>;
+  openOrFocusEmployeeIdeThread?: (
+    employee: {
+      employee_id: string;
+      name: string;
+      role: string;
+      role_label?: string;
+    },
+    options?: { forceRefresh?: boolean },
+  ) => Promise<string | null>;
 };
 
 export type RunEmployeeShiftRetryResult =
@@ -43,7 +47,11 @@ export async function runEmployeeShiftRetry(
   const focusThread = options.focusThread ?? true;
 
   if (focusThread && shell.openOrFocusEmployeeIdeThread) {
-    const threadId = await shell.openOrFocusEmployeeIdeThread(employee);
+    // Try again must submit immediately — do not block on a full history refetch
+    // (teammate threads can be multi-MB after continuous shifts).
+    const threadId = await shell.openOrFocusEmployeeIdeThread(employee, {
+      forceRefresh: false,
+    });
     if (!threadId) {
       return {
         ok: false,
@@ -61,12 +69,17 @@ export async function runEmployeeShiftRetry(
     requestIdeComposerMode(mode);
   }
   shell.setAgentExecutionAccess('full');
+  // Seed the visible draft for the operator, but submit with an explicit override so a
+  // concurrent thread-draft sync cannot blank the payload before POST.
   shell.openIdeComposerWithDraft(draft, { keepActivityView });
   focusAgentDockComposerInput();
   try {
-    const submitted = await shell.submitIdeComposer('agent');
+    const submitted = await shell.submitIdeComposer('agent', { contentOverride: draft });
     if (submitted === false) {
-      return { ok: false, reason: 'Chat message submit failed.' };
+      return {
+        ok: false,
+        reason: shell.commandMutationError?.trim() || 'Chat message submit failed.',
+      };
     }
   } catch (error) {
     const reason =

@@ -11,6 +11,7 @@ from app.workspace_agents.scheduler import (
     DEFAULT_MAX_ACTIVE_EXECUTING,
     DEFAULT_MAX_STARTS_PER_TICK,
     env_scheduler_allowed,
+    run_continuous_worker_tick,
     scheduler_enabled,
     tick_interval_seconds,
     worker_dispatch_enabled_for_status,
@@ -94,9 +95,16 @@ def hard_kill_scheduler() -> dict[str, Any]:
 
 
 def resume_scheduler() -> dict[str, Any]:
-    """Re-enable continuous starts from Settings — no .env edit required when host brake is clear."""
+    """Re-enable workers and dispatch queued Lead work without waiting for the next tick."""
     status = patch_scheduler_settings({"scheduler_enabled": True})
+    started = run_continuous_worker_tick() if status["effective_enabled"] else []
+    status = build_scheduler_status()
     status["resumed"] = True
+    status["started_run_ids"] = [
+        str(run.get("run_id") or "").strip()
+        for run in started
+        if str(run.get("run_id") or "").strip()
+    ]
     return status
 
 

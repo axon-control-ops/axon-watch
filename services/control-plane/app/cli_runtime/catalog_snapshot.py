@@ -9,15 +9,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from app.cli_runtime.auth_probes import (
-    codex_auth_status as _codex_auth_status,
-    cursor_auth_status as _cursor_auth_status,
-)
-from app.cli_runtime.catalog_records import (
-    choose_default_runtime,
-    cloud_runtime_record,
-    local_runtime_record,
-)
+from app.cli_runtime.catalog_inventory import build_runtime_inventory
+from app.cli_runtime.catalog_records import choose_default_runtime
 from app.cli_runtime.cursor_usage_probe import probe_cursor_usage
 from app.cli_runtime.vault_keys import fetch_runtime_context
 
@@ -143,8 +136,6 @@ def runtime_status_snapshot(
     force_refresh: bool = False,
     allow_stale: bool = False,
 ) -> StatusRecord:
-    from app.cli_runtime.catalog import find_codex_cli, find_cursor_cli
-
     cached = _SNAPSHOT_CACHE.get("payload")
     fetched_at = float(_SNAPSHOT_CACHE.get("fetched_at") or 0.0)
     cache_ttl = _cache_ttl_for_payload(cached if isinstance(cached, dict) else None)
@@ -200,56 +191,21 @@ def runtime_status_snapshot(
         vault_env_only = {
             key: value
             for key, value in merged_env.items()
-            if key in {"CURSOR_API_KEY", "CODEX_API_KEY", "OPENAI_API_KEY"}
+            if key in {
+                "CURSOR_API_KEY",
+                "CODEX_API_KEY",
+                "OPENAI_API_KEY",
+                "ANTHROPIC_API_KEY",
+            }
             and value
             and not str(os.environ.get(key, "")).strip()
         }
 
-        cursor_path = find_cursor_cli(os.environ.get("AXON_WATCH_CURSOR_CLI_PATH", "").strip())
-        codex_path = find_codex_cli(os.environ.get("AXON_WATCH_CODEX_CLI_PATH", "").strip())
-
-        local = [
-            local_runtime_record(
-                "cursor_local",
-                family="cursor",
-                binary=cursor_path,
-                auth=_cursor_auth_status(
-                    cursor_path,
-                    vault_posture=vault_posture,
-                    env_keys=vault_env_only,
-                    probe_env=merged_env,
-                ),
-                label="Cursor CLI (local)",
-            ),
-            local_runtime_record(
-                "codex_local",
-                family="codex",
-                binary=codex_path,
-                auth=_codex_auth_status(
-                    codex_path,
-                    vault_posture=vault_posture,
-                    env_keys=vault_env_only,
-                    probe_env=merged_env,
-                ),
-                label="Codex CLI (local)",
-            ),
-        ]
-        cloud = [
-            cloud_runtime_record(
-                "cursor_cloud",
-                family="cursor",
-                label="Cursor Cloud Agent",
-                vault_posture=vault_posture,
-                env_keys=vault_env_only,
-            ),
-            cloud_runtime_record(
-                "codex_cloud",
-                family="codex",
-                label="Codex Cloud Task",
-                vault_posture=vault_posture,
-                env_keys=vault_env_only,
-            ),
-        ]
+        local, cloud = build_runtime_inventory(
+            vault_posture=vault_posture,
+            merged_env=merged_env,
+            vault_env_only=vault_env_only,
+        )
         default_runtime = choose_default_runtime(local, cloud)
 
         for record in [*local, *cloud]:

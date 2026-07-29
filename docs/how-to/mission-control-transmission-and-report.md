@@ -19,8 +19,27 @@ Companion to [`docs/HOW-TO-HANDBOOK.md`](../HOW-TO-HANDBOOK.md) and
 | Fleet tiles pulse / say **live** when runs or busy agents exist | Shipped (data-dependent) | Needs active runs or mid-shift teammates; otherwise tiles stay Nominal. |
 | Agent “thinking I’ll…” rewritten to action copy | Shipped (UI sanitize) | Captions/chips show e.g. `Reading…` / `Checking…` when thinking leads with that filler. |
 | **REPORT** / Status / Update → categorized JARVIS stand-up | Shipped | Type `REPORT` — expect Attention / Work in flight / Next (no semicolon dump; `four Lead-team…` not `4 Lead`) |
+| **AUTONOMOUS ON/OFF** on Live Ops orb | Implemented; live drill pending | ON confirms Full; OFF uses hard-kill; effective state reflects host/scheduler gates; guarded items show exact approve/reject controls |
 
 **Confidence on the above table:** **7/10** — code + unit tests verified; live console walkthrough after hard-refresh still recommended.
+
+### AUTONOMOUS control (right dock)
+
+1. OPERATOR → Mission Control → Live Ops (right dock under the orb).
+2. **AUTONOMOUS ON** → confirms Full mode; the orb says Running only when the
+   scheduler is effective (the host brake may leave it Blocked/configured).
+3. VAXON turns safe findings into isolated specialist tasks. Existing routed
+   handoffs keep their target task instead of creating a duplicate.
+4. Critical / dangerous / secrets / production / protected merge / spend →
+   **Needs you**, with the reason/detail and **Approve exact task** / **Reject**.
+5. **AUTONOMOUS OFF** and **Hard-kill** demote to Semi, pause new starts, and
+   attempt to stop active shifts. The banner reports any stop failures.
+6. Receipts use their durable receipt-creation time and are scoped to the
+   focused workspace; Last scan shows the actual workspace scan timestamp.
+7. Status: `GET /api/operator/autonomy/status`.
+
+See [`auto-loop-and-credits.md`](auto-loop-and-credits.md) and
+[`company-hierarchy-and-lead-checkin.md`](company-hierarchy-and-lead-checkin.md).
 
 ---
 

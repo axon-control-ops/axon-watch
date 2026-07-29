@@ -27,6 +27,7 @@ from app.runs.service import get_run  # noqa: E402
 # Bounded adopt/adapt rows from docs/planning/IMPORT_MATRIX.md § Runtime / AI Orchestration.
 IMPORT_MATRIX_RUNTIME_OWNERS: dict[str, str] = {
     "Cursor CLI agent loop": "services/control-plane/app/cli_runtime/cursor_agent.py",
+    "Claude Code CLI agent loop": "services/control-plane/app/cli_runtime/claude_agent.py",
     "Codex CLI agent loop": "services/control-plane/app/cli_runtime/codex_agent.py",
     "CLI binary catalog / resolve": "services/control-plane/app/cli_runtime/catalog.py",
     "Cursor -> Codex reroute / recovery": "services/control-plane/app/cli_runtime/recovery.py",
@@ -119,7 +120,7 @@ class AgentOrchestrationWorkflowParityTests(unittest.TestCase):
     @patch(
         "app.chat.lane_b_post_message.generate_lane_b_result",
         return_value={
-            "content": "Bounded agent reply",
+            "content": "Bounded agent reply\n\nConfidence: 8/10",
             "dispatched": True,
             "runtime_id": "cursor_local",
             "runtime_label": "Cursor CLI (local)",

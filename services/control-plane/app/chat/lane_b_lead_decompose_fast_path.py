@@ -38,10 +38,63 @@ def _roster_members(workspace_id: str) -> list[LeadPlanRosterMember]:
     return members
 
 
+def _fleet_status_lines(*, kick_started: int, queued_run_count: int) -> list[str]:
+    """Explain why specialists may not start immediately after decompose."""
+    try:
+        from app.workspace_agents.scheduler import (
+            max_active_executing,
+            max_starts_per_tick,
+            scheduler_enabled,
+            tick_interval_seconds,
+            _executing_run_count,
+        )
+
+        enabled = scheduler_enabled()
+        executing = _executing_run_count()
+        active_bound = max_active_executing()
+        starts = max_starts_per_tick()
+        interval = int(tick_interval_seconds())
+    except Exception:
+        if kick_started > 0:
+            return [f"Dispatch kick started {kick_started} specialist run(s)."]
+        return [
+            "Specialist runs are queued for continuous dispatch. "
+            "Open each specialist thread when their shift starts."
+        ]
+
+    lines: list[str] = []
+    if not enabled:
+        lines.append(
+            "Continuous workers are OFF — specialist runs stay queued until you "
+            "enable the worker scheduler (Mission Control / Full)."
+        )
+        return lines
+
+    lines.append(f"Fleet: {executing}/{active_bound} workers busy · up to {starts} start(s) per ~{interval}s tick.")
+    if kick_started > 0:
+        lines.append(f"Dispatch kick started {kick_started} specialist run(s) just now.")
+    elif queued_run_count > 0 and executing >= active_bound:
+        lines.append(
+            f"All worker slots are full — your {queued_run_count} queued run(s) will start "
+            "as soon as a slot frees (not stuck; waiting on capacity)."
+        )
+    elif queued_run_count > 0:
+        lines.append(
+            f"{queued_run_count} specialist run(s) are queued; dispatch kick requested "
+            "(will start on the next free slot)."
+        )
+    lines.append(
+        "I did not do that specialist work on this Lead thread — open each specialist "
+        "thread after their dispatch starts."
+    )
+    return lines
+
+
 def _format_decompose_reply(
     *,
     lead_name: str,
     materialize: dict[str, Any],
+    kick_started: int = 0,
 ) -> str:
     runs = list(materialize.get("runs") or [])
     deferred = list(materialize.get("deferred") or [])
@@ -66,21 +119,28 @@ def _format_decompose_reply(
     if deferred:
         lines.append(f"Deferred (dependencies): {len(deferred)}")
         lines.append("")
-    lines.append(
-        "I did not do that specialist work on this Lead thread. "
-        "Open each specialist thread after continuous dispatch starts. "
-        f"— {lead_name.strip() or 'Lead'}"
-    )
+    lines.extend(_fleet_status_lines(kick_started=kick_started, queued_run_count=len(runs)))
+    lines.append(f"— {lead_name.strip() or 'Lead'}")
     return "\n".join(lines)
 
 
-def _kick_continuous_dispatch() -> None:
+def _kick_continuous_dispatch() -> int:
+    """Kick specialists with a slightly elevated start budget when slots are free."""
     try:
-        from app.workspace_agents.scheduler import run_continuous_worker_tick
+        from app.workspace_agents.scheduler import (
+            max_active_executing,
+            max_starts_per_tick,
+            run_continuous_worker_tick,
+            _executing_run_count,
+        )
 
-        run_continuous_worker_tick()
+        free = max(0, max_active_executing() - _executing_run_count())
+        # Lead handoffs should start more than one specialist when capacity allows.
+        override = max(max_starts_per_tick(), min(3, free or max_starts_per_tick()))
+        started = run_continuous_worker_tick(starts_bound_override=override)
+        return len(started or [])
     except Exception:
-        pass
+        return 0
 
 
 def maybe_post_lead_decompose_message(
@@ -133,6 +193,7 @@ def maybe_post_lead_decompose_message(
     except Exception:
         return None
 
+    # Background kick with elevated start budget when slots are free.
     threading.Thread(
         target=_kick_continuous_dispatch,
         daemon=True,
@@ -142,6 +203,7 @@ def maybe_post_lead_decompose_message(
     agent_content = _format_decompose_reply(
         lead_name=lead_name.strip() or "Lead",
         materialize=materialize,
+        kick_started=0,
     )
     operator_message = save_message(
         {

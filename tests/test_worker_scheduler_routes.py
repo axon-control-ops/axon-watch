@@ -121,7 +121,13 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
         operator_presence_settings_store.save_settings(
             {**operator_presence_settings_store.load_settings(), "autonomy_mode": "semi"}
         )
-        with patch.dict(os.environ, {"AXON_WATCH_WORKER_SCHEDULER": "1"}, clear=False):
+        with (
+            patch.dict(os.environ, {"AXON_WATCH_WORKER_SCHEDULER": "1"}, clear=False),
+            patch(
+                "app.workspace_agents.fleet_control.run_continuous_worker_tick",
+                return_value=[{"run_id": "run_queued"}],
+            ) as dispatch_tick,
+        ):
             self.client.patch("/api/worker-scheduler", json={"scheduler_enabled": False})
             response = self.client.post("/api/worker-scheduler/resume")
             self.assertEqual(200, response.status_code)
@@ -130,6 +136,8 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
             self.assertTrue(payload["scheduler_enabled"])
             self.assertTrue(payload["effective_enabled"])
             self.assertFalse(payload["blocked_by_env"])
+            self.assertEqual(["run_queued"], payload["started_run_ids"])
+            dispatch_tick.assert_called_once_with()
 
             presence = operator_presence_settings_store.load_settings()
             self.assertEqual("full", presence.get("autonomy_mode"))

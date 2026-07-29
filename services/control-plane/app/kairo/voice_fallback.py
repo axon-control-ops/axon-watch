@@ -158,7 +158,20 @@ def _contextual_failed_fallback(context: dict[str, Any]) -> str:
         return "That run couldn't start — Cursor auth timed out. Check runtime on the host, then retry."
     if "no cli runtime is ready" in summary or "could not start" in summary:
         return "That run couldn't start — no agent runtime was ready. Check Runtime, then retry."
-    return "That run couldn't start — check Runtime status, then retry."
+    # Mid-run SSE drops / hub close without a done event — not a cold start failure.
+    if (
+        "chat stream closed" in summary
+        or "chat stream interrupted" in summary
+        or "chat stream disconnected" in summary
+        or "stream closed" in summary
+        or "stream interrupted" in summary
+    ):
+        return "That run was cut off mid-stream — Try again to continue."
+    if "timed out" in summary or "timeout" in summary:
+        return "That run timed out before it finished — Try again when the host is ready."
+    if summary.strip():
+        return "That run failed — check the thread, then Try again."
+    return "That run failed — check Runtime status, then Try again."
 
 
 def _contextual_done_fallback(context: dict[str, Any]) -> str | None:

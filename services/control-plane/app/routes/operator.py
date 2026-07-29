@@ -408,6 +408,47 @@ def dev_debug_session_log(body: DebugSessionLogRequest) -> dict[str, object]:
     return {"ok": True, "path": str(log_path)}
 
 
+@router.get("/api/operator/autonomy/status")
+def operator_autonomy_status(workspace_id: str = "") -> dict[str, object]:
+    """Read-only Mission Control autonomy feed (mode, scheduler, receipts)."""
+    from app.workspace_agents.autonomous_attention import build_autonomy_status_feed
+
+    return build_autonomy_status_feed(workspace_id=workspace_id.strip() or None)
+
+
+@router.post("/api/operator/autonomy/scan")
+def operator_autonomy_scan() -> dict[str, object]:
+    """Operator-triggered attend scan (also runs on Full-autonomy scheduler ticks)."""
+    from app.persistence import operator_presence_settings_store
+    from app.workspace_agents.autonomous_attention import run_autonomous_attention_scan
+
+    settings = operator_presence_settings_store.load_settings()
+    mode = str(settings.get("autonomy_mode") or "manual").strip().lower()
+    if mode != "full":
+        raise HTTPException(
+            status_code=400,
+            detail=f"attend scan requires autonomy_mode=full (current={mode})",
+        )
+    return run_autonomous_attention_scan(include_lead_checkin=False)
+
+
+@router.post("/api/operator/autonomy/decisions/{receipt_id}")
+def operator_autonomy_decision_resolve(
+    receipt_id: str,
+    body: dict[str, object],
+) -> dict[str, object]:
+    """Resolve one exact critical/dangerous decision as approve or reject."""
+    from app.workspace_agents.autonomous_attention import resolve_autonomy_decision
+
+    resolution = str(body.get("resolution") or "").strip().lower()
+    try:
+        return resolve_autonomy_decision(receipt_id, resolution=resolution)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
 @router.get("/api/live/events")
 def live_events():
     return live_events_response()

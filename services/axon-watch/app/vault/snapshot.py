@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.vault.cli_runtime_probe import probe_codex_cli_subscription, probe_cursor_cli_subscription
+from app.vault.cli_runtime_probe import (
+    probe_claude_cli_subscription,
+    probe_codex_cli_subscription,
+    probe_cursor_cli_subscription,
+)
 from app.vault.credential_resolver import merge_monitor_env, vault_status
 from app.vault.import_contract import ALLOWED_IMPORT_KEYS
 
@@ -33,6 +37,16 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         "auth_note": (
             "Pro/Team: sign in on the host with `cursor agent login` (browser flow). "
             "Optional: CURSOR_API_KEY in /vault for CI/headless only."
+        ),
+    },
+    {
+        "id": "claude_runtime",
+        "label": "Claude Code CLI runtime",
+        "optional_keys": ("ANTHROPIC_API_KEY",),
+        "subscription_probe": "claude",
+        "auth_note": (
+            "Pro/Max: sign in on the host with `claude auth login`. "
+            "Optional: ANTHROPIC_API_KEY in /vault for headless/API use."
         ),
     },
     {
@@ -102,6 +116,8 @@ def _subscription_probe(probe_name: str) -> dict[str, object]:
         return probe_cursor_cli_subscription()
     if probe_name == "codex":
         return probe_codex_cli_subscription()
+    if probe_name == "claude":
+        return probe_claude_cli_subscription()
     return {"installed": False, "logged_in": False, "account_label": "", "message": ""}
 
 

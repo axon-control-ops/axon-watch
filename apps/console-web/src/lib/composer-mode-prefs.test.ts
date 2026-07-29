@@ -14,13 +14,13 @@ function memoryStorage(): Pick<Storage, 'getItem' | 'setItem'> {
 }
 
 describe('workspace composer mode preferences', () => {
-  it('restores the selected mode independently for each workspace', () => {
+  it('does not persist or restore mode without a thread id', () => {
     const storage = memoryStorage();
     persistWorkspaceComposerMode('workspace_debug', 'debug', storage);
     persistWorkspaceComposerMode('workspace_agent', 'agent', storage);
 
-    expect(readWorkspaceComposerMode('workspace_debug', storage)).toBe('debug');
-    expect(readWorkspaceComposerMode('workspace_agent', storage)).toBe('agent');
+    expect(readWorkspaceComposerMode('workspace_debug', storage)).toBeNull();
+    expect(readWorkspaceComposerMode('workspace_agent', storage)).toBeNull();
     expect(readWorkspaceComposerMode('workspace_other', storage)).toBeNull();
   });
 
@@ -34,11 +34,14 @@ describe('workspace composer mode preferences', () => {
     expect(readWorkspaceComposerMode('workspace_a', storage, 'thread_3')).toBeNull();
   });
 
-  it('migrates legacy workspace mode into the first thread that reads it', () => {
+  it('does not migrate legacy workspace mode into the first thread that reads it', () => {
     const storage = memoryStorage();
-    persistWorkspaceComposerMode('workspace_a', 'plan', storage);
+    storage.setItem(
+      'axon-x:ide-composer-mode-by-workspace:v2',
+      JSON.stringify({ workspace_a: 'plan' }),
+    );
 
-    expect(readWorkspaceComposerMode('workspace_a', storage, 'thread_1')).toBe('plan');
+    expect(readWorkspaceComposerMode('workspace_a', storage, 'thread_1')).toBeNull();
     expect(readWorkspaceComposerMode('workspace_a', storage, 'thread_2')).toBeNull();
     expect(readWorkspaceComposerMode('workspace_a', storage)).toBeNull();
   });

@@ -293,3 +293,209 @@ summary=Usage allows_agent_retry=true (Auto 53%, on-demand on); Lead board clear
 - VAXON: engage Gate-verify plan `lead-plan-279379f913bf4940` (still awaiting_engagement).
 - Reed: investigate company last_run contamination if Lead continues to show watcher Gate 6 run ids.
 
+
+---
+
+## Lead continuous shift retry (Gate 6) — 2026-07-29 (~21:55 SAST)
+
+**Run:** `run_fa7cc11f311e` (this IDE retry thread; prior roster prompt cited Gate 6 acceptance_evidence)
+**Constraint honored:** no commit / push / merge.
+
+### Fleet triage receipts
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Control plane | Pass | `GET /health` → ok; runtime summary `ready=true`, watch connected, connectors 6/6 |
+| Console UI | Pass | `GET :5173/` → HTTP 200 |
+| Usage | Pass | Auto ~43%, API ~5%, on-demand on, `allows_agent_retry=true` |
+| Fast Gate (prior fail) | Fail→root-caused | run `30485870435` — console typecheck: `submitIdeComposer` `Promise<boolean>` vs helper `Promise<void>` |
+| Fast Gate (repair) | Pass | success `30486191476` — “Align submitIdeComposer shell helper types with Promise<boolean>.” URL https://github.com/axon-control-ops/axon-watch/actions/runs/30486191476 |
+| Fast Gate (newer push) | In progress | run `30486550790` after repair (not blocking this Lead receipt) |
+| Lead board | Cleared | leased+completed **76** Lead follow-ups under `run_fa7cc11f311e` (57 then +19 after rate-limit wait) |
+| Misrouted Lead-retry decomposes | Cancelled | **34** specialist tasks cancelled (Lead/Gate6 retries + failed_shift noise + Lead-owns-on-backend + Fast Gate triage already green) |
+| Gate-verify plan | Synthesize | `lead-plan-279379f913bf4940` → still `awaiting_engagement`; receipt `lead-receipt-5da2be81f4144948` |
+| Unit checks | Pass | `tests.test_gate6_verifier_contract` + `tests.test_lead_task_plan` (16 OK); `tests.test_operator_deterministic_report_next_move` + Gate6 (13 OK) |
+| Hotspot (key files) | At budget | `operator_deterministic_report.py` 716/716; test file 595/595; `publish.py` 601/601 |
+
+### Lead decisions
+
+1. **Fast Gate typecheck:** Root cause was shell helper types still expecting `Promise<void>` after `submitIdeComposer` returned `Promise<boolean>`. Repair already on branch; Fast Gate success `30486191476`. Rowan keeps post-push watch.
+2. **Gate 6 / Lead retry decompose churn:** Cancel specialist tasks that were auto-decomposed from Lead shift-retry prompts — Lead owns those retries in this thread (`is_employee_shift_retry_request`).
+3. **failed_shift investigates:** Cancelled duplicates; keep Rowan on real file-size patrol queue (15 open), not investigate churn.
+4. **DashPro Sentry critical:** Escalate to Sir King Decide — child workspace / external; not an Axon-X code fix this shift.
+5. **Ship:** Not approved.
+6. **Upgrade proposals:** (a) stop auto-decompose of employee shift-retry prompts onto watcher/integrations/backend; (b) raise mutating-task API rate limit or batch complete endpoint for Lead board clears; (c) Reed: finish wiring untracked `report_next_move.py` extract into the main report module so Rowan patrol can shrink under budget without duplicate logic.
+
+### Code changed this shift
+
+- Receipts only — no product code edits this retry.
+
+### Acceptance evidence (Gate 6 — Lead scope)
+
+```
+acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt
+summary=Lead board cleared (76 follow-ups); 34 misrouted/noise cancels; Fast Gate success 30486191476 after typecheck root-cause; health+console green; Gate6+Lead plan unit tests OK; Rowan kept on 15 file-size patrols; ship not approved
+```
+
+### Still open
+
+- Rowan: 15 file-size patrols (report module, shell store, handbook, layout CSS, publish.py, etc.) — stay inside allowed paths; verifier green before delivery.
+- Sir King: Decide on DashPro Sentry critical (+ child Security Scan signal on briefing).
+- VAXON: engage Gate-verify plan `lead-plan-279379f913bf4940` (still awaiting_engagement).
+- Reed: wire `report_next_move.py` extract if still sitting untracked beside the main report module.
+
+## Lead continuous shift retry (Gate 6) — 2026-07-29 (~22:06 SAST)
+
+**Run:** `run_lead_retry_gate6_2026_07_29_2206` (this IDE retry; prior roster prompt cited failed continuous shift / Gate 6 acceptance_evidence; company last detail was `Run completed` on `run_fa7cc11f311e`)
+**Constraint honored:** no commit / push / merge.
+
+### Fleet triage receipts
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Control plane | Pass | `GET /health` → ok; runtime summary `ready=true`, watch connected, connectors 6/6 |
+| Console UI | Pass | `GET :5173/` → HTTP 200 |
+| Usage | Pass | Auto ~47.5%, API ~12.7%, on-demand on, `allows_agent_retry=true` |
+| Fast Gate | Pass | latest success `30486550790` — “Make Attend affirm execute advise_ui_action…”. URL https://github.com/axon-control-ops/axon-watch/actions/runs/30486550790 |
+| Lead follow-up | Completed | leased+completed `task-f4b149593b3548d1` (Rowan handoff decision) |
+| Stale cancels | Cancelled | Fast Gate repair `task-0474c3028ac140e5`; report-module patrol `task-5dc1f8c31fcb4894` (now under budget) |
+| Gate-verify plan | Synthesize | `lead-plan-279379f913bf4940` still `awaiting_engagement`; receipt `lead-receipt-5da2be81f4144948` |
+| Unit checks | Pass | `tests.test_operator_deterministic_report_next_move` + Gate6 + Lead plan (22 OK); full `tests.test_operator_deterministic_report` (13 OK) |
+| Hotspot | Pass | `operator_deterministic_report.py` 716→**587**/587; `check_hotspot_changes.py` passed |
+
+### Lead decisions
+
+1. **Fast Gate:** Latest green (`30486550790`); cancelled stale watcher CI-repair task.
+2. **REPORT next-move extract:** Wired `report_next_move.py` into the main report module and ratcheted the hotspot budget 716→587 — closes the prior Reed handoff note for that extract.
+3. **Rowan:** Keep on remaining file-size patrols (13 open after cancels); Gate 6 acceptance must pass before delivery. Missing-Confidence on Rowan's last run is Rowan's to fix on the next watch turn.
+4. **Reed / Quinn:** Gate 6 acceptance_evidence failures stay on their threads (`task-94e271963d88403c` / `task-02eb03f12c8f42f0`); Lead does not role-play their fixes.
+5. **DashPro Sentry critical:** Escalate to Sir King Decide — child workspace / external.
+6. **Ship:** Not approved.
+7. **Upgrade proposals:** (a) keep next REPORT growth in `report_next_move.py` / `report_text.py`, not the main module; (b) VAXON engage Gate-verify plan still waiting; (c) Reed/Quinn record passing Gate 6 acceptance before publish.
+
+### Code changed this shift
+
+- `services/control-plane/app/kairo/operator_deterministic_report.py` — import next-move helpers from extract; drop duplicated bodies (716→587 lines).
+- `services/control-plane/app/kairo/report_next_move.py` — now the live next-move selection module (was untracked duplicate).
+- `tests/test_operator_deterministic_report_next_move.py` — coverage for the extract.
+- `scripts/guardrails/hotspot_budgets.json` — ratchet report module 716→587.
+
+### Acceptance evidence (Gate 6 — Lead scope)
+
+```
+acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt
+summary=Wired report_next_move (716→587); hotspot guardrail pass; Gate6+report unit tests OK; Fast Gate success 30486550790; Lead follow-up task-f4b149593b3548d1 completed; stale FG repair + report patrol cancelled; health+console green; ship not approved
+```
+
+### Still open
+
+- Rowan: 13 file-size patrols — stay inside allowed paths; verifier green + Confidence line before delivery.
+- Reed / Quinn: clear Gate 6 acceptance_evidence on their failed runs (open investigate tasks on board).
+- Sir King: Decide on DashPro Sentry critical.
+- VAXON: engage Gate-verify plan `lead-plan-279379f913bf4940` (still awaiting_engagement).
+
+---
+
+## Lead continuous shift continue (Gate 6) — 2026-07-29 (~22:12 SAST)
+
+**Run:** `run_lead_continue_gate6_2026_07_29_2210` (continue after prior Gate 6 retry receipts)
+**Constraint honored:** no commit / push / merge.
+
+### Fleet triage receipts
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Control plane | Pass | `GET /health` → ok; runtime summary `ready=true`, watch connected, connectors 6/6, not degraded |
+| Console UI | Pass | `GET :5173/` → HTTP 200 |
+| Usage | Pass | Auto ~49.9%, API ~16%, on-demand on, `allows_agent_retry=true` |
+| Fast Gate | Pass | latest success `30486550790` — https://github.com/axon-control-ops/axon-watch/actions/runs/30486550790 |
+| Lead follow-up | Completed | leased+completed `task-c425e56f59634548` (Reed handoff decision) |
+| Gate-verify plan | Synthesize | `lead-plan-279379f913bf4940` still `awaiting_engagement`; summary `Quinn=completed`; receipt `lead-receipt-5da2be81f4144948` |
+| Unit checks | Pass | Gate6 + Lead plan + report + next_move → **35 OK** |
+| Hotspot guardrail | Pass | `check_hotspot_changes.py` passed; report module still **587/587** |
+
+### Lead decisions
+
+1. **Reed Gate 6:** Keep Reed on `task-94e271963d88403c` (acceptance_evidence fix on Reed’s thread). Not reassigned; ship not approved.
+2. **Quinn Gate 6:** Leave leased investigate `task-02eb03f12c8f42f0` / `run_5e9280295b16` on Quinn’s thread.
+3. **Rowan:** Keep file-size patrols — open `lead_team_checkin.py` (504 vs 500) + leased `teammate_route.py` (`run_4013397589ed`). Verifier + Confidence required before delivery.
+4. **DashPro Sentry critical:** Escalate to Sir King Decide — child workspace / external.
+5. **Autonomous attend WIP** (untracked store/policy modules beside scheduler): Reed owns finish/wire; Lead does not role-play that backend work here.
+6. **Ship:** Not approved.
+7. **Upgrade proposals:** (a) Reed/Quinn must record passing Gate 6 acceptance before publish; (b) VAXON engage Gate-verify plan still waiting; (c) prefer Auto/Composer while named API pool is non-zero but spare Auto remains.
+
+### Code changed this continue
+
+- Receipts only — no product code edits this continue.
+
+### Acceptance evidence (Gate 6 — Lead scope)
+
+```
+acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt
+summary=Lead follow-up task-c425e56f59634548 completed; Fast Gate success 30486550790; health+console+connectors green; 35 unit tests OK; hotspot guardrail pass; Reed/Quinn Gate6 kept on their threads; Rowan kept on 2 file-size patrols; ship not approved
+```
+
+### Still open
+
+- Rowan: `task-9d2dfa379cf1458e` + leased `task-cfb4df9623094cee` — stay inside allowed paths; verifier green + Confidence before delivery.
+- Reed: `task-94e271963d88403c` Gate 6 acceptance_evidence (failed); finish any attend-loop persistence WIP if still untracked.
+- Quinn: leased Gate 6 investigate `task-02eb03f12c8f42f0`.
+- Sir King: Decide on DashPro Sentry critical.
+- VAXON: engage Gate-verify plan `lead-plan-279379f913bf4940` (still awaiting_engagement).
+
+
+---
+
+## Lead continuous shift retry (Gate 6) — 2026-07-29 (~22:25 SAST)
+
+**Run:** `run_lead_retry_gate6_2026_07_29_2225` (this IDE retry; prompt cited Gate 6 acceptance_evidence; company last Lead run `run_c0f54ede8296` was already `completed`)
+**Constraint honored:** no commit / push / merge.
+
+### Fleet triage receipts
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Control plane | Pass | `GET /health` → ok; runtime summary `ready=true`, watch connected, connectors 6/6, not degraded |
+| Console UI | Pass | `GET :5173/` → HTTP 200 |
+| Usage | Pass | Auto ~56.7%, API ~34.6%, on-demand on, `allows_agent_retry=true` |
+| Fast Gate | Pass | latest success `30486550790` — https://github.com/axon-control-ops/axon-watch/actions/runs/30486550790 |
+| Lead follow-ups | Completed | `task-06daaada4f7842e7` (Rowan handoff), `task-d29ac62245bc406f` (Quinn handoff) |
+| Stale watcher patrols | Closed | 1 under-budget complete (`lead_team_checkin.py` 495≤500); 2 cancels (publish.py exhausted; `lane_b_post_message` Gate6 fail at 509/509); **11** more closed as within current hotspot budgets |
+| Gate-verify plan | Synthesize | `lead-plan-279379f913bf4940` → `awaiting_engagement`; summary `Quinn=completed`; receipt `lead-receipt-5da2be81f4144948` |
+| Unit checks | Pass | Gate6 + Lead plan + report + next_move → **35 OK** |
+| Hotspot guardrail | Pass | `check_hotspot_changes.py` passed |
+
+### Specialist failure triage (not owned on this Lead thread)
+
+| Teammate | Run | Blocker | Lead decision |
+| --- | --- | --- | --- |
+| Rowan | `run_290728c21e8e` / `task-3c6dee071ff849c1` | Gate 6 fail: typecheck/test/build; policy out_of_scope | Cancelled stale patrol (file at 509/509 budget); keep Rowan on watch |
+| Reed | `run_93f74f220be7` / open `task-e398c987f2da4943` | Critical Review Confidence line missing | Keep on Reed’s backend thread — do not role-play |
+| Quinn | `run_5b4c1a1c1c02` / open `task-a75a66c591c24ea2` | Gate 6 fail: typecheck/test/build/diff_budget; out_of_scope+secret | Keep on Quinn’s integrations thread — do not role-play |
+
+### Lead decisions
+
+1. **Fast Gate:** Latest green (`30486550790`); Rowan remains post-push watcher.
+2. **Watcher queue hygiene:** Closed stale file-size patrols already within current hotspot budgets so Rowan is not re-leased onto no-op shrinks.
+3. **Reed / Quinn:** Leave failed-shift investigates open on their threads; Lead does not implement their fixes here.
+4. **DashPro Sentry critical:** Escalate to Sir King Decide — child workspace / external.
+5. **Ship:** Not approved.
+6. **Upgrade proposals:** (a) stop enqueueing file-size patrols when disk already equals the current ratchet; (b) Reed/Quinn must pass Gate 6 / Confidence before publish; (c) VAXON engage Gate-verify plan still waiting.
+
+### Code changed this shift
+
+- Receipts / board hygiene only — no product code edits this retry.
+
+### Acceptance evidence (Gate 6 — Lead scope)
+
+```
+acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt
+summary=Lead follow-ups completed; 14 stale watcher patrols closed/cancelled after disk vs budget verify; Fast Gate success 30486550790; health+console+connectors green; 35 unit tests OK; hotspot guardrail pass; Reed/Quinn Gate6/Confidence kept on their threads; ship not approved
+```
+
+### Still open
+
+- Reed: `task-e398c987f2da4943` (Confidence clause on failed investigate).
+- Quinn: `task-a75a66c591c24ea2` (Gate 6 acceptance on failed investigate).
+- Sir King: Decide on DashPro Sentry critical.
+- VAXON: engage Gate-verify plan `lead-plan-279379f913bf4940` (still awaiting_engagement); briefing shows 7 awaiting engagement.

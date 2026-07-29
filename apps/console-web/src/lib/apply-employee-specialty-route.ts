@@ -14,12 +14,15 @@ export type SpecialtyRouteShell = {
   activeIdeThreadId: string | null;
   activeIdeEmployeeRecord: TeammateRouteEmployee | null;
   companyEmployeesForCurrentWorkspace: readonly TeammateRouteEmployee[];
-  openOrFocusEmployeeIdeThread: (employee: {
-    employee_id: string;
-    name: string;
-    role: string;
-    role_label?: string;
-  }) => Promise<string | null>;
+  openOrFocusEmployeeIdeThread: (
+    employee: {
+      employee_id: string;
+      name: string;
+      role: string;
+      role_label?: string;
+    },
+    options?: { forceRefresh?: boolean },
+  ) => Promise<string | null>;
   selectIdeThread: (threadId: string) => Promise<void>;
   createIdeThread?: () => Promise<string | null>;
 };
@@ -63,7 +66,10 @@ export async function applyEmployeeSpecialtyRoute(
     '';
   const previousThreadId = shell.activeIdeThreadId;
 
-  const opened = await shell.openOrFocusEmployeeIdeThread(decision.employee);
+  const opened = await shell.openOrFocusEmployeeIdeThread(decision.employee, {
+    // Send-path routing must not block Enter on a full thread history refetch.
+    forceRefresh: false,
+  });
   if (!opened) {
     return { routed: false, notice: null, threadId: null };
   }

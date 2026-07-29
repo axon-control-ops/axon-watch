@@ -13,6 +13,7 @@ from app.workspace_agents.failure_detail import (
 )
 
 ASSIGN_GOAL_PREFIX = "Lead assigned:"
+ATTEND_GOAL_PREFIX = "VAXON attend:"
 CHECKIN_GOAL_PREFIX = "Lead check-in:"
 SPECIALIST_ROLES = frozenset({"watcher", "frontend", "backend", "integrations"})
 
@@ -21,6 +22,9 @@ FindingKind = Literal[
     "monitor_alert",
     "connector_degraded",
     "operator_blocker",
+    "critical_signal",
+    "warning_signal",
+    "open_handoff",
 ]
 
 
@@ -76,6 +80,7 @@ def assign_owner_role_for_failed_shift(role: str, detail: str) -> tuple[str, boo
 
 __all__ = [
     "ASSIGN_GOAL_PREFIX",
+    "ATTEND_GOAL_PREFIX",
     "CHECKIN_GOAL_PREFIX",
     "SPECIALIST_ROLES",
     "FindingKind",

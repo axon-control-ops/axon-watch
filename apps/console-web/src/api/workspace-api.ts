@@ -182,6 +182,7 @@ export async function saveWorkspaceComposerPrefs(
     `/api/workspaces/${encoded}/composer-prefs`,
     {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     },
     'workspace composer prefs save failed',

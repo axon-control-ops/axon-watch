@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
+import {
+  fetchAutonomyStatus,
+  type AutonomyReceipt,
+} from '../../api/autonomy-api';
 import { useSpokenUtteranceText } from '../../composables/useSpokenUtteranceText';
 import {
   OPERATOR_PERSONA_NAME,
@@ -16,6 +20,7 @@ import KairoGalaxyOrb from '../../features/brain-galaxy/KairoGalaxyOrb.vue';
 import { resolveGalaxyPresence } from '../../features/brain-galaxy/galaxy-presence-state';
 import { projectLiveOperationsStream } from '../../features/brain-galaxy/live-operations-stream';
 import { companyBusyEmployeesCount } from '../../features/workspace-agents/company-roster-busy';
+import MissionControlAutonomyControl from './MissionControlAutonomyControl.vue';
 import { resolveVaxonTransmissionView } from '../../lib/mc-vaxon-transmission-view';
 import {
   vaxonAffirmReplyCta,
@@ -31,6 +36,9 @@ const shell = useShellStore();
 const { spokenText } = useSpokenUtteranceText();
 const { pending, submitTurn, speechCapture } = useKairoConversation();
 const reply = ref('');
+const autonomyReceipts = ref<AutonomyReceipt[]>([]);
+const autonomyEffective = ref(false);
+let autonomyPoll: ReturnType<typeof setInterval> | null = null;
 
 const companyBusyCount = computed(() =>
   companyBusyEmployeesCount(shell.companyEmployeesFleet),
@@ -40,6 +48,13 @@ const fleetActiveRuns = computed(
     shell.runtimeSummary?.active_runs?.length ??
     shell.operatorBriefing?.active_runs?.length ??
     0,
+);
+
+const autonomyMode = computed(
+  () => shell.operatorPresenceSettings.autonomy_mode ?? 'manual',
+);
+const fullAutonomyActive = computed(
+  () => autonomyMode.value === 'full' && autonomyEffective.value,
 );
 
 const presence = computed(() =>
@@ -58,6 +73,7 @@ const presence = computed(() =>
       0,
     criticalSignals: shell.runtimeSummary?.signals.critical_count ?? 0,
     highSignals: shell.runtimeSummary?.signals.high_count ?? 0,
+    fullAutonomyActive: fullAutonomyActive.value,
   }),
 );
 
@@ -71,6 +87,8 @@ const streamItems = computed(() =>
     presencePhase: presencePhase.value,
     routingReceipt: kairoLastRoutingReceipt.value,
     degradedReasons: [],
+    autonomyReceipts: autonomyReceipts.value,
+    autonomyMode: autonomyMode.value,
   }),
 );
 
@@ -95,6 +113,7 @@ const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
 const modeChip = computed(() => {
   if (presencePhase.value === 'speaking') return 'speaking';
   if (presencePhase.value === 'listening') return 'listening';
+  if (presencePhase.value === 'autonomous' || fullAutonomyActive.value) return 'autonomous';
   return 'standby';
 });
 
@@ -105,6 +124,7 @@ const liveBadge = computed(
     presencePhase.value === 'speaking' ||
     presencePhase.value === 'thinking' ||
     presencePhase.value === 'autonomous' ||
+    fullAutonomyActive.value ||
     Boolean(shell.primaryActiveRun) ||
     companyBusyCount.value > 0 ||
     fleetActiveRuns.value > 0,
@@ -144,6 +164,36 @@ function toggleMic(): void {
   }
   void speechCapture.startCapture('manual', { takeover: true });
 }
+
+async function refreshAutonomyReceipts(): Promise<void> {
+  try {
+    const workspaceId = shell.currentWorkspace?.workspace_id?.trim();
+    const feed = await fetchAutonomyStatus(workspaceId);
+    if (feed.autonomy_mode !== shell.operatorPresenceSettings.autonomy_mode) {
+      await shell.loadOperatorPresenceSettings({ reportError: false });
+    }
+    autonomyReceipts.value = feed.recent_receipts ?? [];
+    autonomyEffective.value =
+      feed.effective_autonomy &&
+      feed.autonomy_mode === shell.operatorPresenceSettings.autonomy_mode;
+  } catch {
+    // Keep last good receipts; stream falls back to briefing items.
+  }
+}
+
+onMounted(() => {
+  void refreshAutonomyReceipts();
+  autonomyPoll = setInterval(() => {
+    void refreshAutonomyReceipts();
+  }, 10_000);
+});
+
+onUnmounted(() => {
+  if (autonomyPoll !== null) {
+    clearInterval(autonomyPoll);
+    autonomyPoll = null;
+  }
+});
 </script>
 
 <template>
@@ -179,6 +229,8 @@ function toggleMic(): void {
         <p class="mc-live-ops__orb-tagline">{{ OPERATOR_PERSONA_OPS_TAGLINE }}</p>
       </div>
     </div>
+
+    <MissionControlAutonomyControl />
 
     <article
       class="mc-transmission"
@@ -219,6 +271,12 @@ function toggleMic(): void {
         :data-active="modeChip === 'listening' ? 'true' : 'false'"
       >
         Listening
+      </span>
+      <span
+        class="mc-live-ops__mode"
+        :data-active="modeChip === 'autonomous' ? 'true' : 'false'"
+      >
+        Autonomous
       </span>
       <span
         class="mc-live-ops__mode"

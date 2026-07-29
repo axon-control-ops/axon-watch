@@ -10,7 +10,7 @@ sys.path.insert(0, str(CONTROL_PLANE_ROOT))
 
 from app.cli_runtime.cursor_stream_events import (  # noqa: E402
     CursorStreamAssembler,
-    _tool_block_from_event,
+    tool_block_from_event as _tool_block_from_event,
 )
 from app.cli_runtime.research_stream_blocks import (  # noqa: E402
     dedupe_assistant_paragraphs,
@@ -21,6 +21,7 @@ from app.cli_runtime.research_stream_blocks import (  # noqa: E402
     research_started_block_from_event,
     sanitize_research_block_bodies_in_content,
 )
+from app.cli_runtime.stream_blocks.research_items import _sanitize_snippet  # noqa: E402
 from app.research.availability import format_capability_line, research_capability_snapshot  # noqa: E402
 
 
@@ -407,6 +408,10 @@ class CursorStreamResearchBlockTests(unittest.TestCase):
         self.assertIn("@kind search", block)
         self.assertNotIn("[{'text'", block)
         self.assertNotIn('{"success"', block)
+
+    def test_unknown_json_snippet_does_not_recurse(self) -> None:
+        raw = json.dumps({"success": True, "metadata": {"source": "research"}})
+        self.assertEqual(raw, _sanitize_snippet(raw))
 
 
 if __name__ == "__main__":

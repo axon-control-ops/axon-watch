@@ -39,53 +39,27 @@ function writeStoredIdeComposerDraftByScope(map: Record<string, string>): void {
   window.localStorage.setItem(IDE_COMPOSER_DRAFT_KEY, JSON.stringify(map));
 }
 
-function resolveDraftScopeKey(
-  workspaceId: string | null | undefined,
-  threadId?: string | null,
-): string | null {
-  const threadScope = composerThreadScopeKey(workspaceId, threadId);
-  if (threadScope) {
-    return threadScope;
-  }
-  const workspace = String(workspaceId ?? '').trim();
-  return workspace || null;
-}
-
 /**
  * Read composer draft for a conversation tab.
- * Prefer thread-scoped keys; migrate a one-time legacy workspace draft when present.
+ * Thread-scoped only — never migrate workspace-wide drafts into an arbitrary tab
+ * (that leaked prompts across employees / workspaces).
  */
 export function readStoredIdeComposerDraft(
   workspaceId: string | null | undefined,
   threadId?: string | null,
 ): string {
-  const map = readStoredIdeComposerDraftByScope();
   const threadScope = composerThreadScopeKey(workspaceId, threadId);
-  if (threadScope) {
-    if (Object.prototype.hasOwnProperty.call(map, threadScope)) {
-      return map[threadScope] ?? '';
-    }
-    // One-time migration from pre-isolation workspace-only drafts.
-    const workspace = String(workspaceId ?? '').trim();
-    if (workspace && Object.prototype.hasOwnProperty.call(map, workspace)) {
-      const legacy = map[workspace] ?? '';
-      const { [workspace]: _removed, ...rest } = map;
-      if (legacy.trim()) {
-        writeStoredIdeComposerDraftByScope({ ...rest, [threadScope]: legacy });
-        return legacy;
-      }
-      writeStoredIdeComposerDraftByScope(rest);
-    }
+  if (!threadScope) {
     return '';
   }
-
-  const workspaceScope = resolveDraftScopeKey(workspaceId, null);
-  if (!workspaceScope) {
-    return '';
-  }
-  return map[workspaceScope] ?? '';
+  const map = readStoredIdeComposerDraftByScope();
+  return map[threadScope] ?? '';
 }
 
+/**
+ * Persist composer draft for a conversation tab.
+ * Requires a thread id — workspace-only keys are no longer written.
+ */
 export function persistIdeComposerDraft(
   workspaceId: string | null | undefined,
   draft: string,
@@ -95,7 +69,7 @@ export function persistIdeComposerDraft(
     return;
   }
 
-  const scopeKey = resolveDraftScopeKey(workspaceId, threadId);
+  const scopeKey = composerThreadScopeKey(workspaceId, threadId);
   if (!scopeKey) {
     return;
   }
@@ -103,7 +77,16 @@ export function persistIdeComposerDraft(
   const current = readStoredIdeComposerDraftByScope();
   if (!draft.trim()) {
     const { [scopeKey]: _removed, ...rest } = current;
-    writeStoredIdeComposerDraftByScope(rest);
+    // Drop legacy workspace-only keys for this workspace when clearing a thread.
+    const workspace = String(workspaceId ?? '').trim();
+    const withoutLegacy =
+      workspace && Object.prototype.hasOwnProperty.call(rest, workspace)
+        ? (() => {
+            const { [workspace]: _legacy, ...kept } = rest;
+            return kept;
+          })()
+        : rest;
+    writeStoredIdeComposerDraftByScope(withoutLegacy);
     return;
   }
 
