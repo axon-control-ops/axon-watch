@@ -2232,9 +2232,7 @@ export const useShellStore = defineStore('shell', () => {
         if (response.run || response.run_id || response.dispatched) {
           await refreshRunSurfaces({ light: true });
         }
-      } catch {
-        // Keep the successful send; roster/run chips catch up on the next tick.
-      }
+      } catch {}
       const next = new Set(expandedDockSeams.value);
       next.add('thread');
       if (response.run || response.run_id) {
