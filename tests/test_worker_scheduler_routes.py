@@ -71,6 +71,69 @@ class WorkerSchedulerRouteTests(unittest.TestCase):
         self.assertEqual(400, response.status_code)
         self.assertIn("no worker scheduler fields", response.json()["detail"])
 
+    def test_worker_scheduler_status_exposes_dispatch_only_usage_policy(self) -> None:
+        response = self.client.get("/api/worker-scheduler")
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["cursor_usage_on_idle_tick"])
+        self.assertEqual("dispatch_only", payload["cursor_usage_policy"])
+
+    def test_worker_scheduler_hard_kill_pauses_and_demotes_to_semi(self) -> None:
+        from app.persistence import operator_presence_settings_store
+
+        operator_presence_settings_store.save_settings(
+            {**operator_presence_settings_store.load_settings(), "autonomy_mode": "full"}
+        )
+        with patch.dict(os.environ, {"AXON_WATCH_WORKER_SCHEDULER": "1"}, clear=False):
+            enabled = self.client.patch(
+                "/api/worker-scheduler",
+                json={"scheduler_enabled": True},
+            )
+            self.assertEqual(200, enabled.status_code)
+            self.assertTrue(enabled.json()["scheduler_enabled"])
+
+            created = self.client.post(
+                "/api/runs",
+                json={
+                    "workspace_id": "workspace_sched_demo",
+                    "mode": "agent",
+                    "summary": "Active worker run",
+                    "employee_role": "backend",
+                },
+            )
+            self.assertEqual(200, created.status_code)
+            run_id = created.json()["run_id"]
+
+            response = self.client.post("/api/worker-scheduler/hard-kill")
+            self.assertEqual(200, response.status_code)
+            payload = response.json()
+            self.assertTrue(payload["hard_killed"])
+            self.assertFalse(payload["scheduler_enabled"])
+            self.assertFalse(payload["effective_enabled"])
+            self.assertIn(run_id, payload["stopped_run_ids"])
+
+            presence = operator_presence_settings_store.load_settings()
+            self.assertEqual("semi", presence.get("autonomy_mode"))
+
+    def test_worker_scheduler_resume_reenables_without_env_edit(self) -> None:
+        from app.persistence import operator_presence_settings_store
+
+        operator_presence_settings_store.save_settings(
+            {**operator_presence_settings_store.load_settings(), "autonomy_mode": "semi"}
+        )
+        with patch.dict(os.environ, {"AXON_WATCH_WORKER_SCHEDULER": "1"}, clear=False):
+            self.client.patch("/api/worker-scheduler", json={"scheduler_enabled": False})
+            response = self.client.post("/api/worker-scheduler/resume")
+            self.assertEqual(200, response.status_code)
+            payload = response.json()
+            self.assertTrue(payload["resumed"])
+            self.assertTrue(payload["scheduler_enabled"])
+            self.assertTrue(payload["effective_enabled"])
+            self.assertFalse(payload["blocked_by_env"])
+
+            presence = operator_presence_settings_store.load_settings()
+            self.assertEqual("full", presence.get("autonomy_mode"))
+
     def test_worker_scheduler_stop_active_stops_executing_runs(self) -> None:
         created = self.client.post(
             "/api/runs",

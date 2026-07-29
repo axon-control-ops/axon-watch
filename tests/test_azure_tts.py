@@ -10,12 +10,14 @@ sys.path.insert(0, str(CONTROL_ROOT))
 
 from app.azure_tts import (  # noqa: E402
     LEADING_AUDIO_GUARD_MS,
+    SOFT_ONSET_LEADING_AUDIO_GUARD_MS,
     TTS_READ_ATTEMPTS,
     TTS_REQUEST_TIMEOUT_SECONDS,
     TTS_RETRY_BACKOFF_SECONDS,
     azure_speech_configured,
     build_azure_ssml,
     extract_azure_speech_key,
+    leading_audio_guard_ms,
     resolve_azure_speech_credentials,
     synthesize_azure_speech,
 )
@@ -39,6 +41,26 @@ class AzureTtsTests(unittest.TestCase):
         self.assertNotIn("express-as", ssml)
         self.assertNotIn("style='chat'", ssml)
 
+    def test_adds_extra_lead_in_for_soft_agent_ack_openings(self) -> None:
+        self.assertEqual(
+            leading_audio_guard_ms("Walking that now, Sir King."),
+            SOFT_ONSET_LEADING_AUDIO_GUARD_MS,
+        )
+        self.assertEqual(
+            leading_audio_guard_ms("Working that now, Sir King."),
+            SOFT_ONSET_LEADING_AUDIO_GUARD_MS,
+        )
+        self.assertEqual(
+            leading_audio_guard_ms("Done, Sir King."),
+            LEADING_AUDIO_GUARD_MS,
+        )
+        soft_ssml = build_azure_ssml("Walking that now, Sir King.")
+        self.assertIn(
+            f"<mstts:silence type='Leading' value='{SOFT_ONSET_LEADING_AUDIO_GUARD_MS}ms'/>",
+            soft_ssml,
+        )
+        self.assertIn("xmlns:mstts='https://www.w3.org/2001/mstts'", soft_ssml)
+
     def test_relative_rate_and_pitch_attrs(self) -> None:
         self.assertEqual(azure_voice_rate_attr(0.85), "-15%")
         self.assertEqual(azure_voice_rate_attr(1.05), "+5%")
@@ -46,7 +68,10 @@ class AzureTtsTests(unittest.TestCase):
         calm = build_azure_ssml("Hello operator", rate=0.85, pitch=1.04)
         self.assertIn("rate='-15%'", calm)
         self.assertIn("pitch='+4%'", calm)
-        self.assertIn(f"<break time='{LEADING_AUDIO_GUARD_MS}ms'/>", calm)
+        self.assertIn(
+            f"<mstts:silence type='Leading' value='{LEADING_AUDIO_GUARD_MS}ms'/>",
+            calm,
+        )
 
     def test_returns_none_when_azure_is_not_configured(self) -> None:
         with patch.dict(os.environ, {}, clear=False):

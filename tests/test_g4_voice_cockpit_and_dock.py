@@ -42,14 +42,16 @@ class AgentDockParitySliceTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, msg=result.stderr or result.stdout)
 
-    def test_agent_dock_thread_meta_and_collapsible_thread_seam(self) -> None:
+    def test_agent_dock_collapsible_thread_seam(self) -> None:
         agent_dock = (
             REPO_ROOT / "apps/console-web/src/components/ide/AgentDock.vue"
         ).read_text(encoding="utf-8")
         right_dock = (
             REPO_ROOT / "apps/console-web/src/components/shell/RightDock.vue"
         ).read_text(encoding="utf-8")
-        self.assertIn("agent-dock__section-meta", agent_dock)
+        # Cursor-like dock: no "Conversation active" status chrome above transcript.
+        self.assertNotIn("agent-dock__section-meta", agent_dock)
+        self.assertNotIn("threadStateLabel", agent_dock)
         self.assertIn("toggleDockSeam('thread')", right_dock)
 
 

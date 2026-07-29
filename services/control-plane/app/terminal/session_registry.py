@@ -48,13 +48,25 @@ def ensure_operator_session(workspace_id: str) -> TerminalSessionRecord:
     with _lock:
         existing = _sessions.get(key)
         if existing is not None:
+            # Migrate legacy default title so PTY spawns zsh, not bash.
+            if str(existing.title or "").strip().lower() in {"", "bash"}:
+                migrated = TerminalSessionRecord(
+                    session_id=existing.session_id,
+                    workspace_id=existing.workspace_id,
+                    role=existing.role,
+                    title="zsh",
+                    run_id=existing.run_id,
+                    created_at=existing.created_at,
+                )
+                _sessions[key] = migrated
+                return deepcopy(migrated)
             return deepcopy(existing)
 
         record = TerminalSessionRecord(
             session_id=_OPERATOR_SESSION_ID,
             workspace_id=clean_workspace_id,
             role="operator",
-            title="bash",
+            title="zsh",
             run_id=None,
             created_at=_utc_now(),
         )
@@ -109,7 +121,7 @@ def create_session(
 
         resolved_title = str(title or "").strip()
         if not resolved_title:
-            resolved_title = "vaxon" if normalized_role == "agent" else "bash"
+            resolved_title = "vaxon" if normalized_role == "agent" else "zsh"
 
         record = TerminalSessionRecord(
             session_id=clean_session_id,

@@ -70,6 +70,9 @@ def list_available_credential_keys(env: dict[str, str]) -> list[str]:
         "CURSOR_API_KEY",
         "CODEX_API_KEY",
         "OPENAI_API_KEY",
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "AXON_GITHUB_TOKEN",
     )
     return [name for name in interesting if str(env.get(name, "")).strip()]
 

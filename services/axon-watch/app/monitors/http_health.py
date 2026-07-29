@@ -7,6 +7,29 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from app.monitors.github_probe_headers import is_github_api_url, looks_like_github_rate_limit
+
+
+def _github_forbidden_detail(*, status_code: int, target: str, body: str = "", headers: object = None) -> str | None:
+    """Explain GitHub API 401/403/429 as config/quota, not a platform outage."""
+    code = int(status_code)
+    if not is_github_api_url(target) or code not in {401, 403, 429}:
+        return None
+    if code == 401:
+        return (
+            f"GitHub API HTTP 401 from {target} — "
+            "invalid or placeholder probe token, not a GitHub outage"
+        )
+    if looks_like_github_rate_limit(status_code=code, body=body, headers=headers):
+        return (
+            f"GitHub API rate limit for this host (HTTP {code}) — "
+            "not an outage; use an authenticated probe token or wait for reset"
+        )
+    return (
+        f"GitHub API HTTP {code} from {target} — "
+        "usually a missing probe token or rate limit, not a GitHub outage"
+    )
+
 
 def check_http_health(
     *,
@@ -32,14 +55,25 @@ def check_http_health(
     if headers:
         request_headers.update({str(k): str(v) for k, v in headers.items() if str(k).strip()})
 
+    response_headers = None
     try:
         request = Request(target, headers=request_headers, method="GET")
         with urlopen(request, timeout=max(0.5, float(timeout_seconds))) as response:
             status_code = int(response.status)
+            response_headers = response.headers
             body = response.read(8192).decode("utf-8", errors="replace")
     except HTTPError as exc:
         status_code = int(exc.code)
+        response_headers = exc.headers
         body = exc.read(8192).decode("utf-8", errors="replace") if exc.fp else ""
+        github_detail = _github_forbidden_detail(
+            status_code=status_code,
+            target=target,
+            body=body,
+            headers=response_headers,
+        )
+        if github_detail:
+            return "warning", github_detail
         if status_code >= 500:
             return "critical", f"HTTP {status_code} from {target}"
         return "warning", f"HTTP {status_code} from {target}"
@@ -48,6 +82,14 @@ def check_http_health(
 
     expected = int(expect_status)
     if status_code != expected:
+        github_detail = _github_forbidden_detail(
+            status_code=status_code,
+            target=target,
+            body=body,
+            headers=response_headers,
+        )
+        if github_detail:
+            return "warning", github_detail
         severity = "critical" if status_code >= 500 else "warning"
         return severity, f"HTTP {status_code} (expected {expected}) from {target}"
 

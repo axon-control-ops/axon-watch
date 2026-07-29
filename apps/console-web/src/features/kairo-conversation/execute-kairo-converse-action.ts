@@ -44,6 +44,20 @@ export async function executeKairoConverseAction(
     await shell.submitOperatorCommandContent(action.content);
     return;
   }
+  if (action.type === 'start_tunnel') {
+    // Server already attempted Watch tunnel start; refresh UI (and re-issue start if needed).
+    await shell.startCloudflareTunnel();
+    await Promise.all([
+      shell.loadRuntimeSummary({ background: true }),
+      shell.loadOperatorBriefing(),
+      shell.loadInbox(),
+    ]);
+    return;
+  }
+  if (action.type === 'clear_stale_ci_alerts') {
+    await Promise.all([shell.loadInbox(), shell.loadOperatorBriefing()]);
+    return;
+  }
   if (action.type === 'move_voice_orb') {
     applyChatUiAction(
       {

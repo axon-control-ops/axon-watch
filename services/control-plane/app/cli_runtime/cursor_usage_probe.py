@@ -19,33 +19,12 @@ _USAGE_CACHE_TTL_SECONDS = 45.0
 _USAGE_LOCK = threading.Lock()
 _USAGE_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage"
 _STRIPE_URL = "https://api2.cursor.sh/auth/full_stripe_profile"
-_DEBUG_LOG = Path(__file__).resolve().parents[4] / ".cursor" / "debug-bef50e.log"
 
 
 def _utc_now_iso() -> str:
     from datetime import datetime, timezone
 
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
-    # #region agent log
-    try:
-        payload = {
-            "sessionId": "bef50e",
-            "runId": "usage-probe",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        _DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with _DEBUG_LOG.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    except Exception:
-        pass
-    # #endregion
 
 
 def _state_db_path() -> Path | None:
@@ -170,12 +149,6 @@ def probe_cursor_usage(*, force_refresh: bool = False) -> StatusRecord:
                 ok=False,
                 message="Cursor session token unavailable on host — open Cursor Settings → Usage.",
             )
-            _debug_log(
-                "E",
-                "cursor_usage_probe.py:probe",
-                "token missing",
-                {"ok": False, "has_token": False},
-            )
             _USAGE_CACHE["fetched_at"] = time.monotonic()
             _USAGE_CACHE["payload"] = dict(payload)
             return dict(payload)
@@ -192,13 +165,8 @@ def probe_cursor_usage(*, force_refresh: bool = False) -> StatusRecord:
                 )
                 if "isOnBillableAuto" in stripe:
                     on_demand = bool(stripe.get("isOnBillableAuto"))
-        except Exception as exc:
-            _debug_log(
-                "E",
-                "cursor_usage_probe.py:stripe",
-                "stripe profile failed",
-                {"error": type(exc).__name__},
-            )
+        except Exception:
+            pass
 
         try:
             period = _http_json(_USAGE_URL, token=token, method="POST", body=b"{}")
@@ -207,12 +175,6 @@ def probe_cursor_usage(*, force_refresh: bool = False) -> StatusRecord:
                 ok=False,
                 message=f"Cursor usage API returned HTTP {exc.code}.",
             )
-            _debug_log(
-                "E",
-                "cursor_usage_probe.py:period",
-                "period usage http error",
-                {"status": exc.code},
-            )
             _USAGE_CACHE["fetched_at"] = time.monotonic()
             _USAGE_CACHE["payload"] = dict(payload)
             return dict(payload)
@@ -220,12 +182,6 @@ def probe_cursor_usage(*, force_refresh: bool = False) -> StatusRecord:
             payload = _empty_usage(
                 ok=False,
                 message="Cursor usage probe failed — open Cursor Settings → Usage.",
-            )
-            _debug_log(
-                "E",
-                "cursor_usage_probe.py:period",
-                "period usage failed",
-                {"error": type(exc).__name__},
             )
             _USAGE_CACHE["fetched_at"] = time.monotonic()
             _USAGE_CACHE["payload"] = dict(payload)
@@ -255,19 +211,6 @@ def probe_cursor_usage(*, force_refresh: bool = False) -> StatusRecord:
             "allows_agent_retry": True,
         }
         payload["allows_agent_retry"] = cursor_usage_allows_agent_retry(payload)
-        _debug_log(
-            "E",
-            "cursor_usage_probe.py:probe",
-            "period usage ok",
-            {
-                "auto": auto_pct,
-                "api": api_pct,
-                "total": total_pct,
-                "on_demand": on_demand,
-                "allows_retry": payload["allows_agent_retry"],
-                "membership": membership,
-            },
-        )
         _USAGE_CACHE["fetched_at"] = time.monotonic()
         _USAGE_CACHE["payload"] = dict(payload)
         return dict(payload)

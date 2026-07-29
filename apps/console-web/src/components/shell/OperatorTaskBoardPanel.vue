@@ -5,6 +5,7 @@ import {
   fetchWorkerSchedulerStatus,
   type WorkerSchedulerStatus,
 } from '../../api/worker-scheduler-api';
+import { listWorkspaceHandoffs } from '../../api/workspace-api';
 import HudHoloPanelShell from '../../features/hud-holo/HudHoloPanelShell.vue';
 import {
   taskBoardBucketToHoloTone,
@@ -13,10 +14,20 @@ import {
 } from '../../features/hud-holo/hud-holo-tones';
 import {
   buildOperatorTaskBoardView,
-  type TaskBoardColumnId,
   type TaskBoardRow,
 } from '../../lib/operator-task-board-view';
+import {
+  incomingHandoffHeadline,
+  mapWorkspaceHandoffRows,
+  type IncomingHandoffRow,
+} from '../../lib/workspace-handoff-board-view';
 import { useShellStore } from '../../stores/shell';
+
+import OperatorTaskBoardColumns from './operator-task-board/OperatorTaskBoardColumns.vue';
+import OperatorTaskBoardCreateForm from './operator-task-board/OperatorTaskBoardCreateForm.vue';
+import { parseDependencies } from './operator-task-board/operator-task-board-helpers';
+import OperatorTaskBoardPlanFilter from './operator-task-board/OperatorTaskBoardPlanFilter.vue';
+import OperatorTaskBoardSelectedDrawer from './operator-task-board/OperatorTaskBoardSelectedDrawer.vue';
 
 const shell = useShellStore();
 
@@ -33,6 +44,7 @@ const selectedTaskId = ref<string | null>(null);
 const planFilterId = ref<string | 'all'>('all');
 const scheduler = ref<WorkerSchedulerStatus | null>(null);
 const schedulerError = ref<string | null>(null);
+const handoffRows = ref<IncomingHandoffRow[]>([]);
 
 const boardView = computed(() =>
   buildOperatorTaskBoardView(
@@ -40,6 +52,8 @@ const boardView = computed(() =>
     shell.leadPlansForCurrentWorkspace,
   ),
 );
+
+const openHandoffRows = computed(() => handoffRows.value.slice(0, 6));
 
 const roleOptions = computed(() => {
   const fromRoster = shell.companyEmployeesForCurrentWorkspace
@@ -134,19 +148,58 @@ async function refreshScheduler(): Promise<void> {
   }
 }
 
+async function refreshHandoffs(): Promise<void> {
+  const workspaceId = shell.currentWorkspace?.workspace_id;
+  if (!workspaceId) {
+    handoffRows.value = [];
+    return;
+  }
+  try {
+    const snapshot = await listWorkspaceHandoffs(workspaceId);
+    const taskStatusById: Record<string, string | undefined> = {};
+    for (const task of shell.workspaceTasksForCurrentWorkspace) {
+      taskStatusById[task.task_id] = task.status;
+    }
+    handoffRows.value = mapWorkspaceHandoffRows(snapshot.items, workspaceId, {
+      taskStatusById,
+    });
+  } catch {
+    handoffRows.value = [];
+  }
+}
+
+function focusHandoffTask(row: IncomingHandoffRow): void {
+  if (row.targetTaskId) {
+    selectedTaskId.value = row.targetTaskId;
+  }
+}
+
 onMounted(() => {
   void refreshScheduler();
+  void refreshHandoffs();
 });
+
+watch(
+  () => shell.currentWorkspace?.workspace_id ?? null,
+  () => {
+    void refreshHandoffs();
+  },
+);
 
 function selectTask(taskId: string): void {
   selectedTaskId.value = selectedTaskId.value === taskId ? null : taskId;
 }
 
-function parseDependencies(): string[] {
-  return dependenciesDraft.value
-    .split(/[\s,]+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
+async function closeLeadPlan(planId: string | null | undefined): Promise<void> {
+  const cleaned = String(planId || '').trim();
+  if (!cleaned) {
+    return;
+  }
+  const closed = await shell.closeCurrentLeadPlanEngagement(cleaned, 'completed');
+  if (closed && planFilterId.value === cleaned) {
+    planFilterId.value = 'all';
+  }
+  await shell.loadOperatorBriefing({ background: true, light: true });
 }
 
 async function submitTask(): Promise<void> {
@@ -175,7 +228,7 @@ async function submitTask(): Promise<void> {
     acceptance_criteria: acceptanceDraft.value.trim(),
     risk: riskDraft.value,
     attempt_budget: attemptBudgetDraft.value,
-    dependencies: parseDependencies(),
+    dependencies: parseDependencies(dependenciesDraft.value),
   });
   if (created) {
     goalDraft.value = '';
@@ -248,19 +301,6 @@ async function reviewLeadPlan(planId: string | null): Promise<void> {
 function openFleetControls(): void {
   shell.openOperatorPresenceSettingsPanel();
 }
-
-function columnTone(columnId: TaskBoardColumnId): string {
-  if (columnId === 'needs_attention') {
-    return 'needs';
-  }
-  if (columnId === 'in_progress') {
-    return 'live';
-  }
-  if (columnId === 'done') {
-    return 'done';
-  }
-  return 'waiting';
-}
 </script>
 
 <template>
@@ -301,117 +341,60 @@ function columnTone(columnId: TaskBoardColumnId): string {
         </button>
       </div>
 
-      <div
-        v-if="boardView.planGroups.length > 1"
-        class="operator-task-board__plan-filter"
+      <section
+        v-if="openHandoffRows.length"
+        class="operator-task-board__handoffs"
         data-orb-field
+        aria-label="Cross-workspace handoffs"
       >
-        <button
-          type="button"
-          class="operator-task-board__plan-chip"
-          :class="{ 'operator-task-board__plan-chip--active': planFilterId === 'all' }"
-          @click="planFilterId = 'all'"
-        >
-          All plans
-        </button>
-        <button
-          v-for="group in boardView.planGroups.filter((item) => item.planId)"
-          :key="group.planId ?? 'none'"
-          type="button"
-          class="operator-task-board__plan-chip"
-          :class="{ 'operator-task-board__plan-chip--active': planFilterId === group.planId }"
-          :title="group.planGoal"
-          @click="planFilterId = group.planId ?? 'all'"
-        >
-          {{ group.planLabel }}
-          <span v-if="group.awaitingEngagement" class="operator-task-board__plan-chip-tag">
-            engage
-          </span>
-        </button>
-      </div>
+        <header class="operator-task-board__handoffs-head">
+          <h4>Cross-workspace tickets</h4>
+          <span>{{ openHandoffRows.length }}</span>
+        </header>
+        <ul class="operator-task-board__handoff-list">
+          <li
+            v-for="row in openHandoffRows"
+            :key="row.handoffId"
+            class="operator-task-board__handoff-item"
+            :class="`operator-task-board__handoff-item--${row.direction}`"
+          >
+            <button
+              type="button"
+              class="operator-task-board__handoff-button"
+              @click="focusHandoffTask(row)"
+            >
+              <span class="operator-task-board__handoff-meta">
+                {{ incomingHandoffHeadline(row) }} · {{ row.status }}
+              </span>
+              <span class="operator-task-board__handoff-task">{{ row.task }}</span>
+            </button>
+          </li>
+        </ul>
+      </section>
 
-      <form
+      <OperatorTaskBoardPlanFilter
+        :plan-groups="boardView.planGroups"
+        :plan-filter-id="planFilterId"
+        :lead-plans-mutating="shell.leadPlansMutating"
+        @update:plan-filter-id="planFilterId = $event"
+        @close-lead-plan="void closeLeadPlan($event)"
+      />
+
+      <OperatorTaskBoardCreateForm
         v-if="showCreate"
-        class="operator-task-board__form"
-        data-orb-field
-        @submit.prevent="submitTask"
-      >
-        <label class="operator-task-board__field">
-          <span class="operator-task-board__field-label">Goal</span>
-          <input
-            v-model="goalDraft"
-            class="operator-task-board__input"
-            type="text"
-            maxlength="240"
-            placeholder="What should this specialist finish?"
-            :disabled="shell.workspaceTasksMutating || shell.leadPlansMutating"
-          />
-        </label>
-        <label class="operator-task-board__field operator-task-board__field--role">
-          <span class="operator-task-board__field-label">Role</span>
-          <select
-            v-model="ownerRoleDraft"
-            class="operator-task-board__select"
-            :disabled="createAsLeadPlan || shell.workspaceTasksMutating"
-          >
-            <option v-for="role in roleOptions" :key="role.value" :value="role.value">
-              {{ role.label }}
-            </option>
-          </select>
-        </label>
-        <label class="operator-task-board__field">
-          <span class="operator-task-board__field-label">Risk</span>
-          <select
-            v-model="riskDraft"
-            class="operator-task-board__select"
-            :disabled="createAsLeadPlan || shell.workspaceTasksMutating"
-          >
-            <option value="low">Low</option>
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label class="operator-task-board__field">
-          <span class="operator-task-board__field-label">Attempts</span>
-          <input
-            v-model.number="attemptBudgetDraft"
-            class="operator-task-board__input"
-            type="number"
-            min="1"
-            max="32"
-            :disabled="createAsLeadPlan || shell.workspaceTasksMutating"
-          />
-        </label>
-        <label class="operator-task-board__field operator-task-board__field--wide">
-          <span class="operator-task-board__field-label">Done when</span>
-          <input
-            v-model="acceptanceDraft"
-            class="operator-task-board__input"
-            type="text"
-            maxlength="240"
-            placeholder="Optional acceptance criteria"
-            :disabled="createAsLeadPlan || shell.workspaceTasksMutating"
-          />
-        </label>
-        <label class="operator-task-board__field operator-task-board__field--wide">
-          <span class="operator-task-board__field-label">Dependencies</span>
-          <input
-            v-model="dependenciesDraft"
-            class="operator-task-board__input"
-            type="text"
-            maxlength="320"
-            placeholder="Optional task ids, comma-separated"
-            :disabled="createAsLeadPlan || shell.workspaceTasksMutating"
-          />
-        </label>
-        <label class="operator-task-board__field operator-task-board__field--wide operator-task-board__check">
-          <input v-model="createAsLeadPlan" type="checkbox" />
-          <span>Create as Lead plan fan-out (multi-role)</span>
-        </label>
-        <button type="submit" class="operator-task-board__submit" :disabled="!canCreate">
-          {{ createAsLeadPlan ? 'Fan out Lead plan' : 'Create task' }}
-        </button>
-      </form>
+        v-model:goal-draft="goalDraft"
+        v-model:owner-role-draft="ownerRoleDraft"
+        v-model:acceptance-draft="acceptanceDraft"
+        v-model:risk-draft="riskDraft"
+        v-model:attempt-budget-draft="attemptBudgetDraft"
+        v-model:dependencies-draft="dependenciesDraft"
+        v-model:create-as-lead-plan="createAsLeadPlan"
+        :role-options="roleOptions"
+        :can-create="canCreate"
+        :workspace-tasks-mutating="shell.workspaceTasksMutating"
+        :lead-plans-mutating="shell.leadPlansMutating"
+        @submit="void submitTask()"
+      />
 
       <p
         v-if="shell.workspaceTasksError || shell.leadPlansError"
@@ -421,163 +404,27 @@ function columnTone(columnId: TaskBoardColumnId): string {
         {{ shell.workspaceTasksError || shell.leadPlansError }}
       </p>
 
-      <div class="operator-task-board__columns" data-orb-field>
-        <section
-          v-for="column in visibleColumns"
-          :key="column.id"
-          class="operator-task-board__column"
-          :class="`operator-task-board__column--${columnTone(column.id)}`"
-        >
-          <header class="operator-task-board__column-head">
-            <h4>{{ column.label }}</h4>
-            <span>{{ column.count }}</span>
-          </header>
-          <ul v-if="column.rows.length" class="operator-task-board__list">
-            <li
-              v-for="row in column.rows"
-              :key="row.taskId"
-              class="operator-task-board__item"
-              :class="[
-                `operator-task-board__item--${row.bucket}`,
-                { 'operator-task-board__item--selected': selectedTaskId === row.taskId },
-                { 'operator-task-board__item--blocked': row.blockedByOpenDeps },
-              ]"
-            >
-              <button
-                type="button"
-                class="operator-task-board__item-main"
-                @click="selectTask(row.taskId)"
-              >
-                <span class="operator-task-board__item-status">{{ row.status }}</span>
-                <span class="operator-task-board__item-goal">{{ row.goal }}</span>
-                <span class="operator-task-board__item-meta">
-                  {{ row.ownerRole }} · attempts {{ row.attemptsLabel }}
-                </span>
-                <span
-                  v-if="row.planLabel"
-                  class="operator-task-board__chip operator-task-board__chip--plan"
-                  :title="row.planGoal || undefined"
-                >
-                  {{ row.planLabel }}
-                </span>
-                <span
-                  v-for="chip in row.dependencyChips"
-                  :key="`${row.taskId}-${chip.taskId}`"
-                  class="operator-task-board__chip"
-                  :class="{ 'operator-task-board__chip--blocking': chip.blocking }"
-                >
-                  {{ chip.blocking ? 'blocked by' : 'after' }} {{ chip.goal }}
-                </span>
-              </button>
-            </li>
-          </ul>
-          <p v-else class="operator-task-board__empty">{{ boardView.emptyCopy }}</p>
-        </section>
-      </div>
+      <OperatorTaskBoardColumns
+        :visible-columns="visibleColumns"
+        :board-view="boardView"
+        :selected-task-id="selectedTaskId"
+        :show-history="showHistory"
+        @select-task="selectTask"
+        @update:show-history="showHistory = $event"
+      />
 
-      <div class="operator-task-board__history-toggle" data-orb-field>
-        <button type="button" class="operator-task-board__add" @click="showHistory = !showHistory">
-          {{ showHistory ? 'Hide cancelled' : `Cancelled history (${boardView.counts.cancelled})` }}
-        </button>
-      </div>
-      <ul v-if="showHistory && boardView.historyRows.length" class="operator-task-board__list">
-        <li
-          v-for="row in boardView.historyRows"
-          :key="row.taskId"
-          class="operator-task-board__item operator-task-board__item--cancelled"
-        >
-          <button type="button" class="operator-task-board__item-main" @click="selectTask(row.taskId)">
-            <span class="operator-task-board__item-status">cancelled</span>
-            <span class="operator-task-board__item-goal">{{ row.goal }}</span>
-          </button>
-        </li>
-      </ul>
-
-      <aside
+      <OperatorTaskBoardSelectedDrawer
         v-if="selectedRow"
-        class="operator-task-board__drawer"
-        data-orb-field
-        aria-label="Selected task"
-      >
-        <header class="operator-task-board__drawer-head">
-          <h4>{{ selectedRow.goal }}</h4>
-          <button type="button" class="operator-task-board__cancel" @click="selectedTaskId = null">
-            Close
-          </button>
-        </header>
-        <p><strong>Status</strong> {{ selectedRow.status }}</p>
-        <p><strong>Role</strong> {{ selectedRow.ownerRole }}</p>
-        <p><strong>Risk</strong> {{ selectedRow.risk }}</p>
-        <p><strong>Attempts</strong> {{ selectedRow.attemptsLabel }}</p>
-        <p v-if="selectedRow.acceptance"><strong>Done when</strong> {{ selectedRow.acceptance }}</p>
-        <p v-if="selectedRow.leaseHolder">
-          <strong>Lease</strong> {{ selectedRow.leaseHolder }}
-          <span v-if="selectedRow.leaseExpiresAt"> · expires {{ selectedRow.leaseExpiresAt }}</span>
-        </p>
-        <p v-if="selectedRow.terminalOutcome">
-          <strong>Outcome</strong> {{ selectedRow.terminalOutcome }}
-        </p>
-        <p v-if="selectedRow.runId"><strong>Run</strong> {{ selectedRow.runId }}</p>
-        <p v-if="selectedRow.planGoal">
-          <strong>Lead plan</strong> {{ selectedRow.planGoal }}
-          <span v-if="selectedRow.planKey"> · {{ selectedRow.planKey }}</span>
-        </p>
-        <p v-if="selectedRow.allowedPaths.length">
-          <strong>Allowed paths</strong> {{ selectedRow.allowedPaths.join(', ') }}
-        </p>
-        <p v-if="selectedRow.exclusivePaths.length">
-          <strong>Exclusive paths</strong> {{ selectedRow.exclusivePaths.join(', ') }}
-        </p>
-        <p v-if="selectedRow.dependencyChips.length">
-          <strong>Dependencies</strong>
-          {{
-            selectedRow.dependencyChips
-              .map((chip) => `${chip.goal} (${chip.status})`)
-              .join(' · ')
-          }}
-        </p>
-        <p><strong>Updated</strong> {{ selectedRow.updatedAt }}</p>
-        <div class="operator-task-board__drawer-actions">
-          <button
-            v-if="selectedRow.runId"
-            type="button"
-            class="operator-task-board__submit"
-            @click="openAssociatedRun(selectedRow)"
-          >
-            Open run
-          </button>
-          <button type="button" class="operator-task-board__submit" @click="openSpecialist(selectedRow)">
-            Open specialist
-          </button>
-          <button
-            v-if="selectedRow.canCancel"
-            type="button"
-            class="operator-task-board__cancel"
-            :disabled="shell.workspaceTasksMutating"
-            @click="cancelTask(selectedRow.taskId)"
-          >
-            Cancel task
-          </button>
-          <button
-            v-if="selectedRow.canRetry"
-            type="button"
-            class="operator-task-board__submit"
-            :disabled="shell.workspaceTasksMutating"
-            @click="retryTask(selectedRow)"
-          >
-            Clone / retry
-          </button>
-          <button
-            v-if="selectedRow.planId"
-            type="button"
-            class="operator-task-board__submit"
-            :disabled="shell.leadPlansMutating"
-            @click="reviewLeadPlan(selectedRow.planId)"
-          >
-            Review Lead plan
-          </button>
-        </div>
-      </aside>
+        :row="selectedRow"
+        :workspace-tasks-mutating="shell.workspaceTasksMutating"
+        :lead-plans-mutating="shell.leadPlansMutating"
+        @close="selectedTaskId = null"
+        @open-associated-run="openAssociatedRun"
+        @open-specialist="void openSpecialist($event)"
+        @cancel-task="void cancelTask($event)"
+        @retry-task="void retryTask($event)"
+        @review-lead-plan="void reviewLeadPlan($event)"
+      />
     </HudHoloPanelShell>
   </div>
 </template>

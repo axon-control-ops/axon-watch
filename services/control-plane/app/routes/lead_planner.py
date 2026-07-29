@@ -138,6 +138,31 @@ def workspace_lead_replan(workspace_id: str, body: LeadReplanRequest) -> dict[st
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+class LeadPlanStatusRequest(BaseModel):
+    status: Literal["completed", "cancelled"] = "completed"
+
+
+@router.post("/api/lead/plans/{plan_id}/status")
+def lead_plan_set_status(plan_id: str, body: LeadPlanStatusRequest) -> dict[str, Any]:
+    cleaned = str(plan_id or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="plan_id is required")
+    plan = lead_plan_store.get_plan(cleaned)
+    if plan is None:
+        raise HTTPException(status_code=404, detail=f"lead plan not found: {cleaned}")
+    try:
+        updated = lead_plan_store.set_plan_status(cleaned, body.status)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    task_links = lead_plan_store.plan_task_links(cleaned)
+    return {
+        **updated,
+        "task_links": task_links,
+        "task_ids": [link["task_id"] for link in task_links],
+        "awaiting_engagement": str(updated.get("status") or "") == "awaiting_engagement",
+    }
+
+
 @router.post("/api/lead/plans/{plan_id}/synthesize")
 def lead_plan_synthesize(plan_id: str) -> dict[str, Any]:
     try:

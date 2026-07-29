@@ -13,9 +13,9 @@ describe('resolveWorkbenchTerminalAutoClose', () => {
     });
   });
 
-  it('arms a close timer when the terminal is visible', () => {
+  it('does not arm when the terminal is visible (operator keeps the dock open)', () => {
     expect(resolveWorkbenchTerminalAutoClose({ terminalVisible: true })).toEqual({
-      shouldArm: true,
+      shouldArm: false,
       delayMs: WORKBENCH_TERMINAL_AUTO_CLOSE_MS,
     });
   });

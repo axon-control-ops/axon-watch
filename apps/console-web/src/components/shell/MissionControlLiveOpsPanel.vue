@@ -21,6 +21,10 @@ import {
   vaxonAffirmReplyCta,
   vaxonLineAsksForReply,
 } from '../../lib/vaxon-reply-prompt';
+import {
+  isTransmissionAskAnswered,
+  markTransmissionAskAnswered,
+} from '../../lib/vaxon-transmission-reply-state';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -80,7 +84,12 @@ const transmission = computed(() =>
 );
 
 const spokenLine = computed(() => transmission.value.body);
-const asksForReply = computed(() => vaxonLineAsksForReply(spokenLine.value));
+const asksForReply = computed(
+  () =>
+    vaxonLineAsksForReply(spokenLine.value) &&
+    !transmission.value.empty &&
+    !isTransmissionAskAnswered(spokenLine.value),
+);
 const affirmCta = computed(() => vaxonAffirmReplyCta(spokenLine.value));
 
 const modeChip = computed(() => {
@@ -117,6 +126,9 @@ async function sendReply(content?: string): Promise<void> {
   const message = (content ?? reply.value).trim();
   if (!message || pending.value) {
     return;
+  }
+  if (content === 'yes' || content === 'not now') {
+    markTransmissionAskAnswered(spokenLine.value);
   }
   reply.value = '';
   await submitTurn(message);
@@ -185,7 +197,7 @@ function toggleMic(): void {
       >
         {{ transmission.body }}
       </p>
-      <div v-if="asksForReply && !transmission.empty" class="mc-transmission__actions">
+      <div v-if="asksForReply" class="mc-transmission__actions">
         <button type="button" :disabled="pending" @click="void sendReply('yes')">
           {{ affirmCta }}
         </button>

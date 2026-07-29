@@ -29,6 +29,11 @@ def build_specialty_task_action(
     target_workspace_id = str(workspace_id or "").strip()
     if not task or not target_workspace_id:
         return None
+    # Public tunnel repair is a Connectors / Watch control — never a coding handoff.
+    from app.kairo_tunnel_intents import detect_public_tunnel_repair_intent
+
+    if detect_public_tunnel_repair_intent(task):
+        return None
     if detect_fan_out_intent(task):
         try:
             materialize = materialize_lead_fan_out(

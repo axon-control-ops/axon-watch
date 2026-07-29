@@ -11,15 +11,16 @@ export const DEFAULT_OPERATOR_TERMINAL_SESSION_ID = 'terminal-operator';
 export const DEFAULT_VAXON_TERMINAL_TITLE = 'vaxon';
 
 function detectShellLabel(): string {
+  // Operator PTY default is zsh on this stack; only fall back to bash if
+  // the browser is clearly not a unix-like host.
   if (typeof navigator === 'undefined') {
-    return 'bash';
-  }
-  const platform = String(navigator.platform || '').toLowerCase();
-  // Browser can't know the remote shell for sure; prefer zsh on mac-like hosts.
-  if (platform.includes('mac')) {
     return 'zsh';
   }
-  return 'bash';
+  const platform = String(navigator.platform || '').toLowerCase();
+  if (platform.includes('win')) {
+    return 'bash';
+  }
+  return 'zsh';
 }
 
 export function terminalSessionTabLabel(session: TerminalSessionRecord): string {
@@ -28,10 +29,13 @@ export function terminalSessionTabLabel(session: TerminalSessionRecord): string 
     if (!title || /^agent(\s+shell)?$/i.test(title)) {
       return DEFAULT_VAXON_TERMINAL_TITLE;
     }
-    return title;
+    return title === DEFAULT_VAXON_TERMINAL_TITLE ? 'vaxon · agent' : title;
   }
   if (!title || /^terminal$/i.test(title)) {
-    return detectShellLabel();
+    return `${detectShellLabel()} · local`;
+  }
+  if (/^(zsh|bash)$/i.test(title)) {
+    return `${title.toLowerCase()} · local`;
   }
   return title;
 }

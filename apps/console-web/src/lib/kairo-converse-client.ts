@@ -50,6 +50,16 @@ export type KairoConverseAction =
       type: 'switch_workspace';
       workspace_id: string;
       open_file_path?: string | null;
+    }
+  | {
+      type: 'start_tunnel';
+      outcome?: string;
+      tunnel?: Record<string, unknown> | null;
+    }
+  | {
+      type: 'clear_stale_ci_alerts';
+      resolved_count?: number;
+      resolved_signal_ids?: string[];
     };
 
 export interface KairoConverseArtifactAction {

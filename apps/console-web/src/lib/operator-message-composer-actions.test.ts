@@ -75,4 +75,26 @@ describe('operator-message-composer-actions', () => {
     expect(ok).toBe(false);
     expect(draftValue).toBe('prior draft');
   });
+
+  it('resolves regenerate prompt from the preceding YOU turn', async () => {
+    const { agentReplyRegeneratePrompt } = await import('./operator-message-composer-actions');
+    expect(agentReplyRegeneratePrompt('  option 2  ')).toBe('option 2');
+    expect(agentReplyRegeneratePrompt('')).toBeNull();
+    expect(agentReplyRegeneratePrompt(null)).toBeNull();
+  });
+
+  it('regenerates an agent reply by resubmitting the preceding YOU prompt', async () => {
+    const { regenerateAgentReplyFromPrompt } = await import('./operator-message-composer-actions');
+    const ok = await regenerateAgentReplyFromPrompt('I think option 2 is the best');
+    expect(ok).toBe(true);
+    expect(submitIdeComposer).toHaveBeenCalledWith('agent');
+    expect(draftValue).toBe('');
+  });
+
+  it('skips regenerate when there is no preceding YOU prompt', async () => {
+    const { regenerateAgentReplyFromPrompt } = await import('./operator-message-composer-actions');
+    const ok = await regenerateAgentReplyFromPrompt('   ');
+    expect(ok).toBe(false);
+    expect(submitIdeComposer).not.toHaveBeenCalled();
+  });
 });

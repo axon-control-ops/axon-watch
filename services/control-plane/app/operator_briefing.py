@@ -239,6 +239,13 @@ def build_operator_briefing(
         if binding.display_name and str(binding.display_name).strip()
     }
     scope_mode = "workspace" if scoped_workspace_id else "fleet"
+    open_handoffs: list[dict[str, object]] = []
+    try:
+        from app.persistence.handoff_store import list_open_follow_through_handoffs
+
+        open_handoffs = list(list_open_follow_through_handoffs(limit=20))
+    except Exception:  # noqa: BLE001 — briefing must stay available
+        open_handoffs = []
     fleet_advice_pack = build_fleet_advice_pack(
         active_run_records=fleet_active_run_records,
         pending_approval_records=fleet_pending_approval_records,
@@ -248,6 +255,7 @@ def build_operator_briefing(
         display_names=display_names,
         focused_workspace_id=scoped_workspace_id,
         scope_mode=scope_mode,
+        open_handoffs=open_handoffs,
     )
     lead_awaiting_engagement_count = 0
     try:

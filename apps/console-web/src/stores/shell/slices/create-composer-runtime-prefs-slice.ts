@@ -18,6 +18,7 @@ import {
   readCursorPickerVisibleModelIds,
   toggleCursorPickerVisibleModel as toggleCursorPickerVisibleModelPref,
 } from '../../../lib/cursor-picker-prefs';
+import { saveWorkspaceComposerPrefs } from '../../../api/workspace-api';
 import type { WorkspaceRecord } from '../../../contracts/canonical';
 
 interface CreateComposerRuntimePrefsSliceInput {
@@ -118,6 +119,10 @@ export function createComposerRuntimePrefsSlice(input: CreateComposerRuntimePref
       writeComposerRuntimePrefs(workspaceId, { codex_cli_model: normalized });
     } else {
       writeComposerRuntimePrefs(workspaceId, { cursor_cli_model: normalized });
+      // Server-side pin so continuous workers honor Auto/Composer vs explicit API.
+      void saveWorkspaceComposerPrefs(workspaceId, { cursor_cli_model: normalized }).catch(
+        () => undefined,
+      );
     }
     input.composerRuntimePrefsRevision.value += 1;
   }

@@ -36,9 +36,6 @@ export function createOperatorPresenceSettingsSlice(
     if (shouldPromote && previousAccess !== 'full') {
       input.setAgentExecutionAccess('full');
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'closeout-access','hypothesisId':'H26,H27',location:'create-operator-presence-settings-slice.ts:syncFullAutonomyExecutionAccess',message:'synchronized Full autonomy with Agent execution access',data:{autonomyMode:settings.autonomy_mode,previousAccess,resultingAccess:input.agentExecutionAccess.value,promoted:shouldPromote&&previousAccess!=='full'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }
 
   async function loadOperatorPresenceSettings(options?: {

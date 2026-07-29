@@ -3,14 +3,30 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 
 _TERMINAL_DIR = Path(__file__).resolve().parent
 _ZDOTDIR = _TERMINAL_DIR / "zdotdir"
 
 
-def resolve_terminal_shell() -> str:
-    return os.environ.get("AXON_WATCH_TERMINAL_SHELL", os.environ.get("SHELL", "/bin/bash"))
+def resolve_terminal_shell(preferred: str | None = None) -> str:
+    """Pick an executable shell; prefer session title (zsh/bash), then env, then zsh."""
+    preferred_name = Path(str(preferred or "").strip()).name.lower()
+    if preferred_name in {"zsh", "bash"}:
+        for candidate in (f"/bin/{preferred_name}", f"/usr/bin/{preferred_name}"):
+            if Path(candidate).is_file():
+                return candidate
+        which = shutil.which(preferred_name)
+        if which:
+            return which
+    env_shell = os.environ.get("AXON_WATCH_TERMINAL_SHELL") or os.environ.get("SHELL") or ""
+    if env_shell and Path(env_shell).is_file():
+        return env_shell
+    for fallback in ("/bin/zsh", "/usr/bin/zsh", "/bin/bash", "/usr/bin/bash"):
+        if Path(fallback).is_file():
+            return fallback
+    return env_shell or "/bin/zsh"
 
 
 def bundled_bash_rc_path() -> Path:

@@ -1,6 +1,6 @@
 # Gate 9 — CI remediation (unaware-operator loop)
 
-**Updated:** 2026-07-24
+**Updated:** 2026-07-29
 
 When **Axon-X Fast Gate** goes red, control-plane can ingest the GitHub
 `workflow_run` event, raise an inbox signal, lease a repair task to Rowan
@@ -55,7 +55,38 @@ systemctl --user daemon-reload
 systemctl --user enable --now axon-fast-gate-remediation-poll.timer
 ```
 
-Public webhook remains preferred; the timer only covers tunnel/DNS outages.
+Public webhook remains preferred; the timer covers tunnel/DNS outages. The
+poller forwards both completed outcomes:
+
+- `failure` → dedupe, Attention signal, leased `CI repair:` task, Rowan dispatch
+- `success` → delivery update and stale failure cleanup; no repair is dispatched
+
+### Prove the local repair path is ready
+
+```bash
+systemctl --user is-enabled axon-fast-gate-remediation-poll.timer
+systemctl --user is-active axon-fast-gate-remediation-poll.timer
+systemctl --user show axon-fast-gate-remediation-poll.service -p Result
+gh auth status
+cursor agent status
+curl -fsS http://127.0.0.1:8787/api/worker-scheduler | \
+  jq '{dispatch_enabled, env_allowed, effective_enabled}'
+```
+
+Required result: timer `enabled` + `active`, last service result `success`,
+authenticated GitHub and Cursor CLIs, and `dispatch_enabled: true`.
+`effective_enabled` controls ordinary scheduled shifts; webhook/poller repair
+dispatch uses the narrower `dispatch_enabled` gate.
+
+Run the poller once to verify GitHub → signed control-plane ingest without
+waiting for the timer:
+
+```bash
+./scripts/ops/poll-fast-gate-remediation.sh
+```
+
+On a green head this is safe: it updates delivery/stale state and does not create
+a repair task.
 
 ## Operator surfaces
 
@@ -90,6 +121,7 @@ with the correct repository and workflow names. No new core code is required.
 ./scripts/dev/python.sh -m unittest tests.test_ci_remediation -v
 ```
 
-Manual drill: push a deliberate Fast Gate ratchet overshoot on a throwaway
-branch, confirm webhook → signal → leased task → repair draft PR → green head,
-then append evidence under `docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md`.
+Manual red-path drill: use a throwaway branch and a deliberate Fast Gate ratchet
+overshoot, confirm webhook/poller → signal → leased task → Rowan repair draft PR
+→ green head, then append evidence under
+`docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md`. Never drill on `dev`.

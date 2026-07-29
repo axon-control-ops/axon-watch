@@ -66,6 +66,22 @@ export async function fetchLeadPlan(planId: string): Promise<LeadPlanRecord> {
   );
 }
 
+export async function setLeadPlanStatus(
+  planId: string,
+  status: 'completed' | 'cancelled',
+): Promise<LeadPlanRecord> {
+  const encoded = encodeURIComponent(planId);
+  return fetchJson<LeadPlanRecord>(
+    `/api/lead/plans/${encoded}/status`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    },
+    'lead plan status update failed',
+  );
+}
+
 export async function synthesizeLeadPlan(planId: string): Promise<Record<string, unknown>> {
   const encoded = encodeURIComponent(planId);
   return fetchJson<Record<string, unknown>>(

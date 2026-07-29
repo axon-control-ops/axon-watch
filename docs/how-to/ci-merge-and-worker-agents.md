@@ -1,6 +1,6 @@
 # CI, merge workflow, and worker agents
 
-**Updated:** 2026-07-22
+**Updated:** 2026-07-29
 
 This chapter explains how Axon-X lands code through GitHub CI, how that relates
 to the `dev` branch, and how **company employee agents** (the roster in IDE /
@@ -107,7 +107,22 @@ is green. Always read the check on the **PR** itself.
 npm run verify:preflight   # via scripts/sc on commit — blocks bad commits locally
 npm run verify:contracts   # fastest backend + ratchet signal
 cd apps/console-web && npm run typecheck && npm run test
+git status --short         # must contain no source changes or local runtime artifacts
 ```
+
+Before opening a PR, fetch `dev`, integrate it on the feature branch, rerun the
+preflight, and inspect the complete branch diff:
+
+```bash
+git fetch origin dev
+git merge origin/dev
+git diff --check
+git diff --stat origin/dev...HEAD
+```
+
+Do not merge the feature branch directly into protected `dev`, force-push, or
+hide a failing check. Local runtime artifacts (`control-plane.sqlite3`, debug
+logs, shell completion dumps) are not source and must remain ignored.
 
 Full local bundle (slower):
 

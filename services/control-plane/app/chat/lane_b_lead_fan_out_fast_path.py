@@ -3,35 +3,10 @@
 from __future__ import annotations
 
 import threading
-from pathlib import Path
 from typing import Any, Callable
 
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
 from app.workspace_agents.lead_task_plan import detect_fan_out_intent
-
-_DEBUG_LOG = Path("/home/edp/axon-nvme/repos/axon-watch/.cursor/debug-bef50e.log")
-
-
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
-    # region agent log
-    try:
-        import json
-        import time
-
-        payload = {
-            "sessionId": "bef50e",
-            "runId": "lead-fan-out",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except Exception:
-        pass
-    # endregion
 
 
 def _format_fan_out_reply(
@@ -77,20 +52,9 @@ def _kick_continuous_dispatch() -> None:
     try:
         from app.workspace_agents.scheduler import run_continuous_worker_tick
 
-        started = run_continuous_worker_tick()
-        _debug_log(
-            "H3",
-            "lane_b_lead_fan_out_fast_path.py:_kick",
-            "continuous tick after fan-out",
-            {"started_count": len(started or [])},
-        )
-    except Exception as exc:
-        _debug_log(
-            "H3",
-            "lane_b_lead_fan_out_fast_path.py:_kick",
-            "continuous tick failed",
-            {"error": type(exc).__name__},
-        )
+        run_continuous_worker_tick()
+    except Exception:
+        pass
 
 
 def maybe_post_lead_fan_out_message(
@@ -109,17 +73,6 @@ def maybe_post_lead_fan_out_message(
     """When Lead hears assign-all intent, materialize fan-out instead of a Lane B essay."""
     role = str(employee_role or "").strip().lower()
     intent = detect_fan_out_intent(content)
-    _debug_log(
-        "H1,H2",
-        "lane_b_lead_fan_out_fast_path.py:maybe",
-        "lead fan-out gate",
-        {
-            "role": role,
-            "composer_mode": composer_mode,
-            "intent": intent,
-            "content_preview": str(content or "")[:120],
-        },
-    )
     if composer_mode != "agent" or role != "lead" or not intent:
         return None
 
@@ -130,34 +83,11 @@ def maybe_post_lead_fan_out_message(
             mode="fan_out",
             create_runs=True,
         )
-    except LeadFanOutError as exc:
-        _debug_log(
-            "H2",
-            "lane_b_lead_fan_out_fast_path.py:maybe",
-            "fan-out materialize failed",
-            {"error": str(exc)[:200]},
-        )
+    except LeadFanOutError:
         return None
-    except Exception as exc:
-        _debug_log(
-            "H2",
-            "lane_b_lead_fan_out_fast_path.py:maybe",
-            "fan-out unexpected failure",
-            {"error": type(exc).__name__},
-        )
+    except Exception:
         return None
 
-    _debug_log(
-        "H2,H3",
-        "lane_b_lead_fan_out_fast_path.py:maybe",
-        "fan-out materialized from Lead IDE",
-        {
-            "plan_id": materialize.get("plan_id"),
-            "run_count": len(materialize.get("runs") or []),
-            "deferred_count": len(materialize.get("deferred") or []),
-            "mode": materialize.get("mode"),
-        },
-    )
 
     threading.Thread(
         target=_kick_continuous_dispatch,

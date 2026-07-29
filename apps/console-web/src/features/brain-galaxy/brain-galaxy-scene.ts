@@ -181,24 +181,6 @@ export class BrainGalaxyScene {
       return;
     }
     this.layout = layoutBrainGraph3D(snapshot);
-    // #region agent log
-    {
-      const ys = this.layout.nodes.map((n) => n.y);
-      const ySpan = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
-      const cam = this.camera?.position;
-      const workspaces = this.layout.nodes.filter((n) => n.kind === 'workspace');
-      const core = this.layout.nodes.find((n) => n.kind === 'core');
-      const minGap = core
-        ? Math.min(
-            ...workspaces.map(
-              (w) =>
-                Math.hypot(w.x - core.x, w.y - core.y, w.z - core.z) - core.radius - w.radius,
-            ),
-          )
-        : null;
-
-    }
-    // #endregion
     this.rebuildGraph();
     if (this.selectedNodeId) {
       this.applySelectionHighlight(this.selectedNodeId);

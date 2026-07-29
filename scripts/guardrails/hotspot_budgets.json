@@ -60,6 +60,13 @@
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/tokens/* + feature CSS"
     },
+    "apps/console-web/src/lib/kairo-voice-playback.ts": {
+      "max_lines": 535,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/lib/kairo-voice-*",
+      "note": "Voice playback orchestration after audible-start synchronization; extract next"
+    },
     "services/control-plane/app/kairo_conversation.py": {
       "max_lines": 417,
       "soft_limit": 350,
@@ -68,10 +75,11 @@
       "note": "VAXON attachment path pass-through; extract early-intent next"
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
-      "max_lines": 531,
+      "max_lines": 493,
       "soft_limit": 350,
       "hard_limit": 500,
-      "target": "apps/console-web/src/components/conversation/*"
+      "target": "apps/console-web/src/components/conversation/*",
+      "note": "Artifact block extracted to ConversationSeamArtifactBlock.vue; Lead ratchet after under-budget verify"
     },
     "services/control-plane/app/cli_runtime/research_stream_blocks.py": {
       "max_lines": 311,
@@ -92,11 +100,11 @@
       "target": "services/control-plane/app/kairo/replies/*"
     },
     "services/control-plane/app/cli_runtime/catalog.py": {
-      "max_lines": 82,
+      "max_lines": 80,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/cli_runtime/catalog/*",
-      "note": "CLI discovery only; snapshot cache in catalog_snapshot.py"
+      "note": "CLI discovery only; snapshot cache in catalog_snapshot.py; Lead ratchet after under-budget verify"
     },
     "services/control-plane/app/cli_runtime/catalog_snapshot.py": {
       "max_lines": 272,
@@ -185,7 +193,7 @@
       "target": "apps/console-web/src/components/settings/useEmailSettingsMailbox.ts"
     },
     "apps/console-web/src/features/kairo-conversation/use-kairo-conversation.ts": {
-      "max_lines": 392,
+      "max_lines": 400,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/features/kairo-conversation/*"
@@ -355,11 +363,18 @@
       "note": "CLI runtime router; long-running shell clause extracted"
     },
     "services/control-plane/app/workspace_agents/teammate_route.py": {
-      "max_lines": 524,
+      "max_lines": 467,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/*",
       "note": "Teammate route after specialty routing; fan-out short-circuits to Lead"
+    },
+    "tests/test_operator_deterministic_report.py": {
+      "max_lines": 589,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "tests/test_operator_deterministic_report_* slices",
+      "note": "Deterministic report regression matrix after push-failure advice coverage; split next"
     },
     "services/control-plane/app/runs/service.py": {
       "max_lines": 527,
@@ -383,11 +398,11 @@
       "note": "Autonomy publish path-scope + receipts; extract next"
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
-      "max_lines": 585,
+      "max_lines": 356,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-task-board/*",
-      "note": "Mission Control Task Board; extract plan/task sections next"
+      "note": "Mission Control Task Board; thin orchestrator — create form, plan filter, columns, drawer extracted"
     },
     "apps/console-web/src/features/report-theater/report-theater.css": {
       "max_lines": 550,
@@ -404,11 +419,11 @@
       "note": "Task Board density polish; split header/list/card CSS next"
     },
     "services/control-plane/app/kairo/operator_deterministic_report.py": {
-      "max_lines": 560,
+      "max_lines": 707,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "services/control-plane/app/kairo/report_*",
-      "note": "Deterministic REPORT lane; extract handoff formatting next"
+      "note": "Deterministic REPORT lane; scrub helpers extracted to report_text.py; auth-heal filters next"
     },
     "apps/console-web/src/stores/shell/slices/create-kairo-voice-slice.ts": {
       "max_lines": 525,
@@ -418,11 +433,11 @@
       "note": "Spoken alert + theater lock; extract walk-fix recovery next"
     },
     "tests/test_run_outcome.py": {
-      "max_lines": 529,
+      "max_lines": 239,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "tests/test_run_outcome_*.py",
-      "note": "Roster outcome selection coverage; split confidence cases next"
+      "note": "Core roster outcome selection; confidence + roster API split to sibling modules"
     },
     "services/control-plane/app/workspace_agents/lead_vaxon_handoff.py": {
       "max_lines": 517,

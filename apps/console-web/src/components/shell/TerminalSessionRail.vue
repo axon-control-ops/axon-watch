@@ -183,8 +183,8 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="terminal-session-rail__icon-btn"
-            :title="session.role === 'agent' ? 'Split with bash terminal' : 'Split Terminal'"
-            :aria-label="session.role === 'agent' ? 'Split with bash terminal' : 'Split Terminal'"
+            :title="session.role === 'agent' ? 'Split with zsh terminal' : 'Split Terminal'"
+            :aria-label="session.role === 'agent' ? 'Split with zsh local terminal' : 'Split Terminal'"
             @click="onSplit(session.id, $event)"
           >
             <WorkbenchIcon name="split" :size="13" />

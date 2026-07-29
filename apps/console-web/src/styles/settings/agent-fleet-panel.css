@@ -135,6 +135,83 @@
   gap: 0.55rem;
 }
 
+.agent-fleet-panel__usage-note {
+  margin: 0.85rem 0 0;
+}
+
+.agent-fleet-panel__mode-meta {
+  display: block;
+}
+
 .agent-fleet-panel__toggle input[type='checkbox'] {
   accent-color: rgba(0, 242, 255, 0.85);
+}
+
+.agent-fleet-panel__modes {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.85rem 0 1rem;
+}
+
+.agent-fleet-panel__mode {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--axon-line, #3a4a5c) 80%, transparent);
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.agent-fleet-panel__mode--active {
+  border-color: color-mix(in srgb, var(--axon-accent, #4db8ff) 70%, transparent);
+  background: color-mix(in srgb, var(--axon-accent, #4db8ff) 12%, transparent);
+}
+
+.agent-fleet-panel__mode-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.agent-fleet-panel__mode-label {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.agent-fleet-panel__mode-meta {
+  font-size: 0.72rem;
+  opacity: 0.78;
+}
+
+.agent-fleet-panel__readiness {
+  margin: 0.75rem 0 0;
+  font-size: 0.92rem;
+  opacity: 0.92;
+}
+
+.agent-fleet-panel__usage-note {
+  margin: 0.85rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--axon-accent, #4db8ff) 28%, transparent);
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--axon-accent, #4db8ff) 8%, transparent);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.agent-fleet-panel__actions--scheduler {
+  margin-top: 0.95rem;
+}
+
+.agent-fleet-panel__kill {
+  border-color: rgba(255, 120, 100, 0.45) !important;
+  color: rgba(255, 190, 175, 0.98) !important;
+  background: rgba(90, 28, 22, 0.55) !important;
+}
+
+.agent-fleet-panel__kill:hover:not(:disabled),
+.agent-fleet-panel__kill:focus-visible:not(:disabled) {
+  border-color: rgba(255, 150, 130, 0.7) !important;
+  background: rgba(120, 36, 28, 0.72) !important;
 }

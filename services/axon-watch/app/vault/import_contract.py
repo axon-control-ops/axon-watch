@@ -15,4 +15,8 @@ ALLOWED_IMPORT_KEYS: tuple[str, ...] = (
     "AXON_WATCH_GOOGLE_CSE_API_KEY",
     "AXON_WATCH_GOOGLE_CSE_CX",
     "AXON_WATCH_SEARXNG_URL",
+    # Authenticated GitHub API health probes (avoids IP 60/hr false alarms).
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "AXON_GITHUB_TOKEN",
 )

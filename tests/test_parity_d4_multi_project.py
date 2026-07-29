@@ -132,7 +132,8 @@ class ParityD4MultiProjectTests(unittest.TestCase):
         handoff = payload["handoff"]
         self.assertEqual(WORKSPACE_AXON_WATCH, handoff["source_workspace_id"])
         self.assertEqual(WORKSPACE_AXON_LOCAL, handoff["target_workspace_id"])
-        self.assertEqual("recorded", handoff["status"])
+        self.assertEqual("routed", handoff["status"])
+        self.assertTrue(str(handoff.get("target_task_id") or "").startswith("task-"))
 
         summary = payload["target_workspace_summary"]
         self.assertEqual(WORKSPACE_AXON_LOCAL, summary["workspace_id"])

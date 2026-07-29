@@ -4,7 +4,7 @@ const REPORT_HOTWORD_RE =
   /^(?:report|status(?:\s+report)?|update|stand[\s-]?up|where\s+do\s+we\s+stand|where\s+are\s+we(?:\s+now)?|what(?:'?s| is)\s+(?:going\s+on|happening))\s*[.!]?\s*$/i;
 
 export const REPORT_EXPANDED_PROMPT =
-  'REPORT — give me a JARVIS-style second-brain stand-up in plain English. ' +
+  'REPORT — give me a second-brain stand-up. ' +
   'Cover Attention (what needs me now), Work in flight (runs and busy teammates by name if known), ' +
   'Fleet (anything off-nominal), then one clear Next move. ' +
   'Speak like my colleague: conversational, dry wit, no semicolon dumps, no robotic status chrome. ' +

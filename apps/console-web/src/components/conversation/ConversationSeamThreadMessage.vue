@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 import type { AgentQuestionOption } from '../../lib/agent-question-view';
 import {
@@ -30,6 +30,10 @@ import {
 import { armAgentShellMirror, agentShellMirrorActive } from '../../lib/agent-shell-mirror-state';
 import { threadAttachmentUrlForImagePath } from '../../lib/thread-image-url';
 import type { OperatorThreadEntry, ThreadMessageAttachment } from '../../lib/operator-thread';
+import {
+  agentReplyRegeneratePrompt,
+  regenerateAgentReplyFromPrompt,
+} from '../../lib/operator-message-composer-actions';
 import { useShellStore } from '../../stores/shell';
 import AgentMarkdownBlock from '../ide/AgentMarkdownBlock.vue';
 import AgentFileReadBlock from '../ide/AgentFileReadBlock.vue';
@@ -40,9 +44,11 @@ import IdeActivityIcon from '../ide/IdeActivityIcon.vue';
 import ConversationSeamTerminalBlock from './ConversationSeamTerminalBlock.vue';
 import ConversationSeamMessageAttachments from './ConversationSeamMessageAttachments.vue';
 
-defineProps<{
+const props = defineProps<{
   message: OperatorThreadEntry;
   itemIndex: number;
+  /** YOU prompt that produced this agent reply — enables Cursor-style Regenerate. */
+  precedingOperatorPrompt?: string | null;
   answeredOptionForQuestion: (
     messageId: string,
     prompt: string,
@@ -60,6 +66,21 @@ const expandedErrorByMessageId = ref<Record<string, boolean>>({});
 const expandedSystemByMessageId = ref<Record<string, boolean>>({});
 const expandedThinkingKeys = ref<Record<string, boolean>>({});
 const { transcriptSegments } = createTranscriptSegmentCache();
+const regenerating = ref(false);
+
+const regeneratePrompt = computed(() =>
+  props.message.role === 'agent'
+    ? agentReplyRegeneratePrompt(props.precedingOperatorPrompt)
+    : null,
+);
+
+const regenerateDisabled = computed(
+  () =>
+    regenerating.value ||
+    shell.commandMutationState === 'submitting' ||
+    shell.agentStreamActive ||
+    !regeneratePrompt.value,
+);
 
 function messageAttachments(message: OperatorThreadEntry): ThreadMessageAttachment[] {
   return message.attachments ?? [];
@@ -67,6 +88,18 @@ function messageAttachments(message: OperatorThreadEntry): ThreadMessageAttachme
 
 function isStreamingMessage(messageId: string): boolean {
   return shell.agentStreamActive && shell.agentStreamMessageId === messageId;
+}
+
+async function onRegenerate(): Promise<void> {
+  if (regenerateDisabled.value) {
+    return;
+  }
+  regenerating.value = true;
+  try {
+    await regenerateAgentReplyFromPrompt(props.precedingOperatorPrompt);
+  } finally {
+    regenerating.value = false;
+  }
 }
 
 function isMarkdownBlock(content: string, isComplete = true): boolean {
@@ -458,5 +491,37 @@ async function copyTerminalOutput(output: string): Promise<void> {
     v-if="isStreamingMessage(message.message_id)"
     class="conversation-seam__stream-cursor"
     aria-hidden="true"
-  >0</span></pre>
+  >▍</span></pre>
+
+  <div
+    v-if="regeneratePrompt && !isStreamingMessage(message.message_id)"
+    class="conversation-seam__message-actions conversation-seam__message-actions--icons conversation-seam__agent-actions"
+  >
+    <button
+      type="button"
+      class="conversation-seam__meta-button conversation-seam__meta-button--icon conversation-seam__regenerate-button"
+      title="Regenerate — run this turn again"
+      aria-label="Regenerate reply"
+      :disabled="regenerateDisabled"
+      @click.stop="onRegenerate"
+    >
+      <svg
+        class="conversation-seam__action-icon"
+        width="14"
+        height="14"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M3.1 6.2A5.1 5.1 0 0 1 12.4 5.4" />
+        <path d="M12.9 9.8A5.1 5.1 0 0 1 3.6 10.6" />
+        <path d="M12.4 2.85v2.7h-2.7" />
+        <path d="M3.6 13.15v-2.7h2.7" />
+      </svg>
+    </button>
+  </div>
 </template>

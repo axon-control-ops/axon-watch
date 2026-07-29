@@ -131,7 +131,7 @@ function resolveSpeechTuning(options: {
   };
 }
 
-const AUDIO_PREROLL_MS = 120;
+const AUDIO_PREROLL_MS = 160;
 let browserPrerollArmed = true;
 function speechPort(): SpeechPort | null {
   return typeof speechSynthesis === 'undefined' ? null : speechSynthesis;

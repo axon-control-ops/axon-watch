@@ -188,9 +188,6 @@ const liveBusyEmployeeIds = computed(() => {
     threads: shell.ideThreadsForCurrentWorkspace,
     focusedStreamEmployeeId,
   });
-  // #region agent log
-  fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'busy-presence',hypothesisId:'H1,H2,H5',location:'CompanyRosterPanel.vue:liveBusyEmployeeIds',message:'resolved live busy employee ids',data:{busyCount:ids.length,busyIds:ids,streamingThreadIds:shell.streamingIdeThreadIds,focusedStreamEmployeeId,agentStreamActive:shell.agentStreamActive,rosterStatuses:employees.value.map((row)=>({id:row.employee_id,name:row.name,status:row.status,activeRun:Boolean(row.active_run_id),lastOutcome:row.last_outcome??null,rosterBusy:employeeIsActivelyBusy(row)}))},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   return ids;
 });
 

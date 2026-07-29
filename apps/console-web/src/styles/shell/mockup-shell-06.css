@@ -184,7 +184,7 @@
   top: calc(100% + 0.25rem);
   right: 0;
   z-index: 40;
-  min-width: 7.5rem;
+  min-width: 8.75rem;
   padding: 0.25rem;
   border: 1px solid rgba(0, 242, 255, 0.18);
   border-radius: 0.35rem;
@@ -200,7 +200,9 @@
 }
 
 .terminal-tabbar__new-menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   width: 100%;
   border: 0;
   border-radius: 0.25rem;
@@ -212,7 +214,7 @@
   font-size: 0.62rem;
   letter-spacing: 0.04em;
   line-height: 1.2;
-  padding: 0.38rem 0.5rem;
+  padding: 0.4rem 0.5rem;
   text-align: left;
 }
 

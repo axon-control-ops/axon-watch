@@ -114,3 +114,57 @@ Template:
 - residual risks: worker scheduler was `effective_enabled: true` during drill; Lead still needs synthesize on `lead-plan-279379f913bf4940` (open Lead follow-up `task-4ca451779f2e4619`); this backend task is not linked in that plan’s `task_links`
 - next gate unlocked: Lead synthesize / decide on the Gate-verify Lead plan
 
+### Lead continuous shift retry (Gate 6 triage) — 2026-07-28
+- owner: lead (`run_1a928cb04c97`; prior Gate 6 cited on roster retry prompt)
+- commit: uncommitted this shift
+- commands run: fleet triage via `/api/runtime/summary`, `/api/briefing`, `/api/workspaces/.../company`; `gh run list` Fast Gate; `./scripts/dev/python.sh -m unittest tests.test_run_outcome*` (15 OK); report `docs/ops/agent-reports/lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for Lead retry scope — fleet rollup, Rowan Gate 6 root-cause triage, `test_run_outcome.py` hotspot split (529→239 main + 2 sibling modules)
+- exit criteria met: yes for bounded Lead shift — decisions posted, file-size blocker cleared for Rowan queue, tests green
+- residual risks: Rowan active on `shell.ts` (3925 lines); GitHub probe token 401 needs Vault restore; Lead synthesize on waiting MC plans still open
+- next gate unlocked: Rowan finish shell.ts patrol with Gate 6 green; operator GH_TOKEN restore
+
+### Lead post-restart continuation — 2026-07-28
+- owner: lead (`run_2fb0b02585b5`; prior continue dispatches cancelled by control-plane restart)
+- commit: uncommitted this shift (receipts only; no push)
+- commands run: health via `/health`, `/api/runtime/summary`, console `:5173`; synthesize `lead-plan-279379f913bf4940`; lease+complete 7 Lead follow-up tasks + ratchet task `task-4703e802aedc4889`; `unittest tests.test_run_outcome*` (15 OK); report append in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for post-restart Lead continuation — no restart re-run; health green; synthesize confirmed awaiting_engagement; Lead board follow-ups cleared
+- exit criteria met: yes for continue-after-restart scope
+- residual risks: Rowan `shell.ts` patrol still open after restart cancel; Task Board panel over budget under active Rowan run; GitHub probe token 401 needs Vault restore; Gate-verify plan awaiting VAXON engagement
+- next gate unlocked: Rowan finish Task Board + shell.ts patrols; Sir King GH_TOKEN restore; VAXON engage Gate-verify plan
+
+### Lead continue (post-restart wave 2) — 2026-07-28
+- owner: lead (`run_continue_lead_post_restart_2`)
+- commit: uncommitted this shift (receipts only; no push)
+- commands run: health `/health` + `/api/runtime/summary` + console `:5173`; triage `run_97bec35346cf`; lease+complete Lead follow-up `task-ad1c856fb36149cc`; cancel stale failed_shifts `task-0d1230e35e734f4c` + `task-83248183eb5a452d`; synthesize `lead-plan-279379f913bf4940`; hotspot `wc -l` snapshot; receipt append in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for continue scope — health green; Lead board open_count=0; stale failed_shifts cleared; Rowan remains on active file-size queue
+- exit criteria met: yes for Lead-owned next unfinished steps
+- residual risks: Rowan active `run_8bb2d4dd6c8f` + open oversize queue (Task Board Vue 611/585); Gate-verify awaiting engagement; DashPro Sentry critical on briefing Decide; GitHub Vault token prior advise
+- next gate unlocked: Rowan finish watch_client + Task Board Vue patrols; VAXON engage Gate-verify; Sir King Decide on DashPro Sentry / GH token
+
+### Lead continuous shift retry (Gate 6) — 2026-07-29
+- owner: lead (`run_lead_retry_gate6_2026_07_29`; prior roster failure cited Gate 6 acceptance_evidence)
+- commit: uncommitted this shift (no push)
+- commands run: roster+thread fleet triage; extract `report_text.py` from `operator_deterministic_report.py`; ratchet hotspot budget 710→707; append receipt in `lead-continuous-shift-retry-gate6-2026-07-28.md`. Live `/health`, `gh`, and `unittest` blocked by host shell hook (`cannot open axonland`) in parent and isolation runner.
+- pass/fail: pass for Lead retry scope with residual — file under budget (707/707), acceptance receipt documented; machine verifier checks not executable this turn
+- exit criteria met: yes for bounded Lead unblock (hotspot clear + Gate 6 receipt + decisions); no for full automated Gate 6 check suite while shell hook is down
+- residual risks: host shell/`axonland` hook blocks verifier + Fast Gate probes; Rowan disposable isolation root still broken for continuous shrink jobs; prior GH_TOKEN Vault advise still open
+- next gate unlocked: restore host shell; Rowan resume file-size queue without REPORT-module budget miss; VAXON engage waiting Gate-verify plan when ready
+
+### Lead continuous shift retry continuation (Gate 6 board + seam) — 2026-07-29
+- owner: lead (`run_333574cdce66`; timed out stale after board work; prior Gate 6 cited on retry prompt)
+- commit: uncommitted this shift (no push)
+- commands run: health `/health` + runtime summary + console `:5173`; `gh run list` Fast Gate success `30380070873`; synthesize `lead-plan-279379f913bf4940`; lease+complete 98+ Lead follow-ups; complete ConversationSeamPanel patrol `task-248fed45e7c64902`; cancel failed_shifts `task-916abff48f3b4e1b` + `task-07d898dd73194eae`; extract `ConversationSeamArtifactBlock.vue`; ratchet panel budget 531→500; `unittest tests.test_operator_deterministic_report`; receipt append in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for Lead retry scope — fleet green, Lead board cleared, ConversationSeamPanel under budget, Fast Gate green
+- exit criteria met: yes for bounded Lead shift (priorities / hierarchy / Fast Gate triage / unblock + decisions)
+- residual risks: Rowan still Gate-6 flaky on out_of_scope shrinks; DashPro critical needs Sir King Decide; Gate-verify awaiting VAXON engagement
+- next gate unlocked: Rowan finish remaining file-size queue inside allowed paths with verifier green
+
+### Lead continuous shift retry (Cursor usage check) — 2026-07-29
+- owner: lead (`run_0d0dd497c387`; prior block cited Cursor usage signal)
+- commit: uncommitted this shift (no push)
+- commands run: `GET /api/runtime/status` usage (Auto 53.12%, API 100%, on-demand on, allows_agent_retry=true); health + runtime summary + console `:5173`; `gh run list` Fast Gate success `30380070873`; lease+complete 31 Lead follow-ups; complete under-budget patrols ConversationSeamPanel + catalog.py; cancel 7 duplicate failed_shift investigates; synthesize `lead-plan-279379f913bf4940` → receipt `lead-receipt-5da2be81f4144948`; ratchet hotspot budgets 500→493 / 82→80; append receipt in `lead-continuous-shift-retry-gate6-2026-07-28.md`
+- pass/fail: pass for Lead retry scope — usage headroom confirmed, fleet green, Lead board cleared, Fast Gate green
+- exit criteria met: yes for bounded Lead shift (usage check + priorities / hierarchy / Fast Gate triage / decisions)
+- residual risks: Rowan handbook HTML + publish.py still oversize; DashPro Sentry critical needs Sir King Decide; Gate-verify awaiting VAXON engagement; intermittent host `axonland` shell hook; company last_run may briefly mirror watcher Gate 6 ids
+- next gate unlocked: Rowan finish handbook lease then publish.py; prefer Auto/Composer while API pool is exhausted
+

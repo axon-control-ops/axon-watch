@@ -11,6 +11,10 @@ class WriteWorkspaceFileRequest(BaseModel):
     content: str
 
 
+class WorkspaceComposerPrefsRequest(BaseModel):
+    cursor_cli_model: str | None = None
+
+
 class RenameWorkspaceFileRequest(BaseModel):
     new_path: str
 

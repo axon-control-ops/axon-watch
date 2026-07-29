@@ -81,9 +81,6 @@ export function createOperatorBriefingSlice(input: CreateOperatorBriefingSliceIn
           workspaceId: input.currentWorkspaceId(),
           light,
         });
-        // #region agent log
-        fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H2,H3,H4',location:'create-operator-briefing-slice.ts:fetch',message:'browser received operator briefing',data:{workspaceKey:requestedWorkspaceKey,light,background:options?.background===true,presenceState:briefing.operator_presence?.presence_state??null,alertEligible:briefing.operator_presence?.spoken_alert?.eligible??false,alertReason:briefing.operator_presence?.spoken_alert?.reason??null,autonomyMode:briefing.operator_presence?.settings?.autonomy_mode??null,readinessScore:briefing.production_readiness?.score??null,readinessGrade:briefing.production_readiness?.grade??null,proactiveDuplex:briefing.operator_presence?.settings?.proactive_duplex_enabled??null,handsFree:briefing.operator_presence?.settings?.hands_free_enabled??null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         // Drop stale responses if the operator switched workspaces mid-flight.
         if ((input.currentWorkspaceId()?.trim() || '') !== requestedWorkspaceKey) {
           return;

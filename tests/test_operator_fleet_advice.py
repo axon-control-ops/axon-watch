@@ -228,6 +228,43 @@ class OperatorFleetAdviceTests(unittest.TestCase):
         self.assertEqual("DashPro", workspace_advice_label("workspace_x", {"workspace_x": "DashPro"}))
         self.assertEqual("Alpha", workspace_advice_label("workspace_alpha"))
 
+    def test_open_handoff_ranks_above_degraded_runtime(self) -> None:
+        pack = build_fleet_advice_pack(
+            active_run_records=[],
+            pending_approval_records=[],
+            fleet_signals=[],
+            degraded={"active": True, "reasons": ["watch probe failed"]},
+            watch_connected=False,
+            display_names={"workspace_dashpro": "DashPro"},
+            focused_workspace_id="workspace_alpha",
+            scope_mode="workspace",
+            open_handoffs=[
+                {
+                    "handoff_id": "handoff-1",
+                    "source_workspace_id": "workspace_alpha",
+                    "target_workspace_id": "workspace_dashpro",
+                    "task": "Finish DashPro follow-up",
+                    "status": "routed",
+                    "target_task_id": "task-1",
+                }
+            ],
+        )
+        winner = pack["winner"]
+        assert winner is not None
+        self.assertEqual("open_handoff", winner["kind"])
+        advise = resolve_fleet_briefing_advise(
+            pack=pack,
+            display_names={
+                "workspace_dashpro": "DashPro",
+                "workspace_alpha": "axon-watch",
+            },
+        )
+        self.assertEqual(
+            "Handoff to DashPro is open — switch there and finish “Finish DashPro follow-up” "
+            "before more axon-watch work.",
+            advise,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

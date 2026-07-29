@@ -76,7 +76,7 @@ export function createIdeRunAutoRecoverySlice(input: CreateIdeRunAutoRecoverySli
           await input.loadWorkspaceThread(record.workspaceId, 'ide', record.threadId);
           input.ideAgentRunId.value = record.runId;
           const recoveredMessages =
-            input.workspaceIdeThreadMessagesById.value[record.workspaceId] ?? [];
+            input.workspaceIdeThreadMessagesById.value[record.threadId] ?? [];
           const agentMessage = [...recoveredMessages]
             .reverse()
             .find(

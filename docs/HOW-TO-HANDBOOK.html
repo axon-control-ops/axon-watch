@@ -25,8 +25,8 @@
     </div>
     <div class="cover-footer">
       <div class="cover-meta">
-        <strong>Last verified</strong> · 2026-07-28 — Gates 0–5 closed; Gate 6 verifier + draft-PR delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and file-size patrol plumbing landed. Connector/tunnel recovery documented (`axonfixconnectors`). **Not yet a closed unattended auto-loop** — scheduler stays **off** by default; Mission Control still needs Retry / dig-in. Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first for status + Cursor credit budgets. After every push run `./scripts/ops/watch-fast-gate.sh`.<br/>
-        Generated 28 Jul 2026
+        <strong>Last verified</strong> · 2026-07-29 — Gate 9 polls Fast Gate every three minutes: red runs dispatch Rowan; green runs clear stale alerts. GitHub and Cursor dispatch were confirmed ready. Restart recovery, manual stand-up, speech onset, and AgentDock hover actions are documented below. Protected merges, force-pushes, and secrets remain human-gated. After every push: `./scripts/ops/watch-fast-gate.sh`.<br/>
+        Generated 29 Jul 2026
       </div>
       <div class="cover-chips">
         <span class="cover-chip">console-web</span>
@@ -43,7 +43,7 @@
     <div class="toc-kicker">Field guide</div>
     <h2>16 chapters</h2>
   </div>
-  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-auto-loop-status-credits-budget-operator-brief">Auto-loop status & credits budget (operator brief)</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-unlock-vault-in-the-ui-remember-me-then">unlock Vault in the UI (Remember me), then:</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-vault-enable-auto-unlock-keyfile-already-present-will-auto-unlock-on-next-start">/vault → Enable auto-unlock (keyfile already present will auto-unlock on next start)</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-cloudflare-api-token-with-account-cloudflare-tunnel-edit">Cloudflare API token with Account → Cloudflare Tunnel → Edit</a></li><li class="toc-card"><span class="toc-num">46</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">47</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">48</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">49</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">50</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">51</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
+  <ol class="toc-grid"><li class="toc-card"><span class="toc-num">1</span><a href="#chapter-table-of-contents">Table of Contents</a></li><li class="toc-card"><span class="toc-num">2</span><a href="#chapter-handbook-map">Handbook map</a></li><li class="toc-card"><span class="toc-num">3</span><a href="#chapter-quick-start">Quick Start</a></li><li class="toc-card"><span class="toc-num">4</span><a href="#chapter-runtime-auth-cli-and-tools">Runtime auth, CLI, and tools</a></li><li class="toc-card"><span class="toc-num">5</span><a href="#chapter-vaxon-desktop">VAXON Desktop</a></li><li class="toc-card"><span class="toc-num">6</span><a href="#chapter-terminology-and-abbreviations">Terminology And Abbreviations</a></li><li class="toc-card"><span class="toc-num">7</span><a href="#chapter-what-axon-x-is">What Axon-X Is</a></li><li class="toc-card"><span class="toc-num">8</span><a href="#chapter-what-state-the-repo-is-in-right-now">What State The Repo Is In Right Now</a></li><li class="toc-card"><span class="toc-num">9</span><a href="#chapter-source-of-truth-rules">Source Of Truth Rules</a></li><li class="toc-card"><span class="toc-num">10</span><a href="#chapter-repo-layout">Repo Layout</a></li><li class="toc-card"><span class="toc-num">11</span><a href="#chapter-the-current-architecture-in-plain-english">The Current Architecture In Plain English</a></li><li class="toc-card"><span class="toc-num">12</span><a href="#chapter-detailed-setup-first-install">Detailed setup (first install)</a></li><li class="toc-card"><span class="toc-num">13</span><a href="#chapter-what-the-current-app-does-on-boot">What The Current App Does On Boot</a></li><li class="toc-card"><span class="toc-num">14</span><a href="#chapter-locked-shell-layout">Locked Shell Layout</a></li><li class="toc-card"><span class="toc-num">15</span><a href="#chapter-current-shell-layout">Current Shell Layout</a></li><li class="toc-card"><span class="toc-num">16</span><a href="#chapter-mockup-live-parity-notes">Mockup / Live Parity Notes</a></li><li class="toc-card"><span class="toc-num">17</span><a href="#chapter-the-most-important-files-right-now">The Most Important Files Right Now</a></li><li class="toc-card"><span class="toc-num">18</span><a href="#chapter-verification-commands">Verification Commands</a></li><li class="toc-card"><span class="toc-num">19</span><a href="#chapter-test-0-acceptance-workspacesmoke">TEST-0 acceptance (`workspace_smoke`)</a></li><li class="toc-card"><span class="toc-num">20</span><a href="#chapter-latency-evidence-d1">Latency evidence (D1)</a></li><li class="toc-card"><span class="toc-num">21</span><a href="#chapter-what-pass-pending-fail-mean-in-verification">What PASS / PENDING / FAIL Mean In Verification</a></li><li class="toc-card"><span class="toc-num">22</span><a href="#chapter-common-working-patterns">Common Working Patterns</a></li><li class="toc-card"><span class="toc-num">23</span><a href="#chapter-troubleshooting">Troubleshooting</a></li><li class="toc-card"><span class="toc-num">24</span><a href="#chapter-debugging-playbook">Debugging playbook</a></li><li class="toc-card"><span class="toc-num">25</span><a href="#chapter-tips-and-tricks">Tips And Tricks</a></li><li class="toc-card"><span class="toc-num">26</span><a href="#chapter-snippet-cookbook">Snippet cookbook</a></li><li class="toc-card"><span class="toc-num">27</span><a href="#chapter-upgrading-and-updating">Upgrading and updating</a></li><li class="toc-card"><span class="toc-num">28</span><a href="#chapter-what-a-good-next-slice-looks-like">What A Good Next Slice Looks Like</a></li><li class="toc-card"><span class="toc-num">29</span><a href="#chapter-final-guidance">Final Guidance</a></li><li class="toc-card"><span class="toc-num">30</span><a href="#chapter-ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</a></li><li class="toc-card"><span class="toc-num">31</span><a href="#chapter-or-follow-a-known-run-id">or follow a known run id:</a></li><li class="toc-card"><span class="toc-num">32</span><a href="#chapter-typical-fast-gate-early-fail-file-size-ratchets-in-scripts-guardrails-hotspotbudgets-json">Typical Fast Gate early fail: file-size ratchets in scripts/guardrails/hotspot_budgets.json</a></li><li class="toc-card"><span class="toc-num">33</span><a href="#chapter-ci-locally">CI locally</a></li><li class="toc-card"><span class="toc-num">34</span><a href="#chapter-open-pr">Open PR</a></li><li class="toc-card"><span class="toc-num">35</span><a href="#chapter-pr-checks">PR checks</a></li><li class="toc-card"><span class="toc-num">36</span><a href="#chapter-worker-scheduler-tests">Worker scheduler tests</a></li><li class="toc-card"><span class="toc-num">37</span><a href="#chapter-stale-reconcile-when-loaded-on-cp">Stale reconcile (when loaded on CP)</a></li><li class="toc-card"><span class="toc-num">38</span><a href="#chapter-gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</a></li><li class="toc-card"><span class="toc-num">39</span><a href="#chapter-autonomy-gates-service-identity-operator-directives">Autonomy gates & service identity (operator directives)</a></li><li class="toc-card"><span class="toc-num">40</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">41</span><a href="#chapter-unlock-vault-in-the-ui-remember-me-then">unlock Vault in the UI (Remember me), then:</a></li><li class="toc-card"><span class="toc-num">42</span><a href="#chapter-config-axon-watch-deployment-env">~/.config/axon-watch/deployment.env</a></li><li class="toc-card"><span class="toc-num">43</span><a href="#chapter-vault-enable-auto-unlock-keyfile-already-present-will-auto-unlock-on-next-start">/vault → Enable auto-unlock (keyfile already present will auto-unlock on next start)</a></li><li class="toc-card"><span class="toc-num">44</span><a href="#chapter-cloudflare-api-token-with-account-cloudflare-tunnel-edit">Cloudflare API token with Account → Cloudflare Tunnel → Edit</a></li><li class="toc-card"><span class="toc-num">45</span><a href="#chapter-writes-config-axon-watch-mtls-ca-client-server-crt-key">writes ~/.config/axon-watch/mtls/{ca,client,server}.{crt,key}</a></li><li class="toc-card"><span class="toc-num">46</span><a href="#chapter-then-push-and-confirm-axon-x-fast-gate-is-green-on-github">then push and confirm Axon-X Fast Gate is green on GitHub</a></li><li class="toc-card"><span class="toc-num">47</span><a href="#chapter-recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</a></li><li class="toc-card"><span class="toc-num">48</span><a href="#chapter-from-repo-root-polls-the-latest-fast-gate-run-for-this-branch">From repo root — polls the latest Fast Gate run for this branch</a></li><li class="toc-card"><span class="toc-num">49</span><a href="#chapter-auto-loop-status-credits-budget-operator-brief">Auto-loop status & credits budget (operator brief)</a></li><li class="toc-card"><span class="toc-num">50</span><a href="#chapter-reliability-and-deliberate-controls">Reliability and deliberate controls</a></li><li class="toc-card"><span class="toc-num">51</span><a href="#chapter-online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</a></li><li class="toc-card"><span class="toc-num">52</span><a href="#chapter-then-set-axonwatchsearxngurl-http-127-0-0-1-8080-in-env-or-vault">then set AXON_WATCH_SEARXNG_URL=http://127.0.0.1:8080 in .env (or vault)</a></li></ol>
 </nav>
 
     
@@ -86,7 +86,6 @@
 <li><a href="#upgrading-and-updating">Upgrading &amp; updating</a> — pulls, deps, planning sync</li>
 <li><a href="#what-a-good-next-slice-looks-like">Next slices</a> — what to build next</li>
 </ol>
-<hr>
 </div></section><section class="chapter" id="chapter-handbook-map"><div class="chapter-header"><span class="chapter-num">02</span><h2 id="handbook-map">Handbook map</h2></div><div class="chapter-body">
 <table>
 <thead>
@@ -172,6 +171,9 @@ axonfixconnectors  # required connector / tunnel / vault 503 — diagnose (+ opt
 # then hard-refresh http://127.0.0.1:4173
 </code></pre>
 <p>These are on your PATH (<code>~/.local/bin</code> → <code>bin/</code> in this repo). See <a href="#snippet-cookbook">Snippet cookbook</a>.</p>
+<h3>Reliability and deliberate controls</h3>
+<p>See <a href="how-to/reliability-and-deliberate-controls.md">Reliability and deliberate controls</a>
+for Vite recovery, manual STAND-UP, speech onset, and AgentDock hover actions.</p>
 <p><strong>Dev bootstrap (alternate, not used when systemd owns the ports):</strong></p>
 <pre><code class="language-bash">cd /home/edp/axon-nvme/repos/axon-watch
 ./scripts/dev/up.sh
@@ -1325,8 +1327,7 @@ not the older single-file shell description from earlier thin slices.</p>
 </div></section><section class="chapter" id="chapter-verification-commands"><div class="chapter-header"><span class="chapter-num">18</span><h2 id="verification-commands">Verification Commands</h2></div><div class="chapter-body">
 <p>Use these from the repo root.</p>
 <p><strong>CI, merge to <code>dev</code>, and employee agents:</strong> see
-<strong><a href="how-to/ci-merge-and-worker-agents.md">docs/how-to/ci-merge-and-worker-agents.md</a></strong>
-(Fast Gate workflow, PR workflow, roster/scheduler, how to tell if workers are live).</p>
+<strong><a href="how-to/ci-merge-and-worker-agents.md">CI, merge, and worker agents</a></strong>.</p>
 <h2>Shared contract verification</h2>
 <pre><code class="language-bash">npm run verify:shared-types
 </code></pre>
@@ -1610,10 +1611,11 @@ curl -sS --max-time 15 https://axon.edudashpro.org.za/api/health
 # hard-refresh http://127.0.0.1:4173
 </code></pre>
 <p>Why <code>./scripts/dev/down.sh</code> / <code>up.sh</code> fail here: this host runs <strong>user systemd units</strong> (<code>control-plane.service</code>, etc.). Dev down/up skip those listeners. Soft <code>systemctl --user restart</code> can also hang on a stuck worker — <code>axonrevive</code> force-kills first.</p>
+<h2>Problem: Vite reports <code>ECONNREFUSED 127.0.0.1:8787</code></h2>
+<p>Use <code>scripts/ops/run-5173.sh</code>; follow the
+<a href="how-to/reliability-and-deliberate-controls.md#vite-control-plane-recovery">restart playbook</a>.</p>
 <h2>Problem: online research falls back / Google search returns 403</h2>
-<p>See <strong><a href="how-to/searxng-research.md">docs/how-to/searxng-research.md</a></strong> for SearXNG
-setup, provider order (SearXNG → legacy Google → DuckDuckGo), and Google 403
-troubleshooting.</p>
+<p>See <strong><a href="how-to/searxng-research.md">SearXNG research</a></strong> for provider order and Google 403 recovery.</p>
 <h2>Problem: <code>./scripts/dev/up.sh</code> fails or the frontend does not start</h2>
 <p>Check:</p>
 <ol>
@@ -1923,293 +1925,8 @@ meaning.</p>
 </ul>
 <p>That is the design center of this repo right now.</p>
 <hr>
-<h2>Auto-loop status &amp; credits budget (operator brief)</h2>
-<p><strong>Read this first when someone asks: “Are we autonomous yet?”</strong><br>
-<strong>Last updated:</strong> 2026-07-25</p>
-<hr>
-<h3>1. Short answer</h3>
-<p><strong>No — Axon-X is not yet on a closed unattended auto-loop.</strong></p>
-<p>What you have today is a <strong>strong supervised company</strong>: named employees, leased
-tasks, worktree isolation, Gate 6 acceptance, draft-PR delivery, Gate 9 CI
-repair, and (new) proactive file-size patrol <em>plumbing</em>. What you do <strong>not</strong>
-have is “Dana hands off, everyone runs overnight, and Mission Control only
-shows green in the morning” without operator nudges.</p>
-<p>If Mission Control still shows any of these, you are in <strong>supervised mode</strong>:</p>
-<table>
-<thead>
-<tr>
-<th>UI signal</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>RETRY SHIFT</strong></td>
-<td>A worker run failed; a human (or Lead) must restart it</td>
-</tr>
-<tr>
-<td><strong>Shall I dig in?</strong> / Yes–Not now</td>
-<td>VAXON needs operator confirmation</td>
-</tr>
-<tr>
-<td><strong>Last shift failed: Critical Review Clause missing…</strong></td>
-<td>Shift ended without a valid <code>Confidence: N/10</code> receipt</td>
-</tr>
-<tr>
-<td><strong>0 active runs</strong> + many open signals</td>
-<td>Work is queued for review, not continuously draining</td>
-</tr>
-<tr>
-<td>Typing “handoff the tasks” into Lead chat</td>
-<td>Fan-out / lease pickup is not fully self-driving yet</td>
-</tr>
-</tbody>
-</table>
-<p>That matches the DashPro screen on 2026-07-25: Marco failed Critical Review,
-Expo called out as down, Lead recommended next steps, and the operator had to
-type the handoff.</p>
-<hr>
-<h3>2. What <em>is</em> automatic today</h3>
-<table>
-<thead>
-<tr>
-<th>Loop piece</th>
-<th>Status</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Create / lease durable tasks (Gate 4)</td>
-<td><strong>Ready</strong></td>
-<td>Continuous workers require a leased task</td>
-</tr>
-<tr>
-<td>Lead plan → fan-out → specialist tasks (Gate 5)</td>
-<td><strong>Ready</strong></td>
-<td>Persist + ready runs; still often needs scheduler or Retry</td>
-</tr>
-<tr>
-<td>Disposable worker worktrees (Gate 3)</td>
-<td><strong>Ready</strong></td>
-<td>Live checkout edits forbidden for continuous workers</td>
-</tr>
-<tr>
-<td>Gate 6 verifier / acceptance evidence</td>
-<td><strong>Ready</strong></td>
-<td>Failed checks block completion/publish path</td>
-</tr>
-<tr>
-<td>Draft PR delivery (no force-push)</td>
-<td><strong>Ready</strong></td>
-<td>Company pattern for publish</td>
-</tr>
-<tr>
-<td>Gate 9 CI remediation (webhook → repair task)</td>
-<td><strong>Proven for Axon-X</strong></td>
-<td>Reactive self-heal when Fast Gate goes red</td>
-</tr>
-<tr>
-<td>Per-task <code>allowed_paths</code> guardrails</td>
-<td><strong>Ready (new)</strong></td>
-<td>Hard scope for writes/publish + prompt anchors</td>
-</tr>
-<tr>
-<td>File-size patrol work source</td>
-<td><strong>Plumbing ready</strong></td>
-<td>Scheduler can enqueue bounded hygiene tasks when enabled</td>
-</tr>
-<tr>
-<td>Continuous worker scheduler</td>
-<td><strong>Off by default</strong></td>
-<td>Intentional — turn on only for watched drills</td>
-</tr>
-<tr>
-<td>Unattended overnight multi-project loop</td>
-<td><strong>Not ready</strong></td>
-<td>Still needs human dig-in / retry / Critical Review hygiene</td>
-</tr>
-<tr>
-<td>Staging / production deploy autonomy</td>
-<td><strong>Not ready</strong></td>
-<td>Remains human-gated</td>
-</tr>
-</tbody>
-</table>
-<p>Check the scheduler before assuming anything is looping:</p>
-<pre><code class="language-bash">curl -sS http://127.0.0.1:8787/api/worker-scheduler \
-  | jq '{scheduler_enabled, effective_enabled, executing_count}'
-</code></pre>
-<p>Expect <code>effective_enabled: false</code> on the daily-driver host unless you
-deliberately enabled it for a drill.</p>
-<hr>
-<h3>3. What “auto-loop” must mean before we claim it</h3>
-<p>A workspace is on a real auto-loop only when <strong>all</strong> of these are true without
-operator chat prompts:</p>
-<ol>
-<li>Open work is created from signals / Lead / hygiene sources (not only typed handoffs).</li>
-<li>The scheduler claims leased tasks for the right roles on its own.</li>
-<li>Shifts reliably end with Critical Review + <code>Confidence: N/10</code>.</li>
-<li>Failed shifts reopen or escalate with a clear receipt (not a silent zombie lease).</li>
-<li>Passing work becomes a <strong>draft PR</strong>; CI red creates a <strong>bounded repair</strong> (Gate 9).</li>
-<li>Out-of-scope drift is blocked (allowed paths + scope guard).</li>
-<li>You can leave the machine for hours and return to draft PRs / green repair heads —
-   not a wall of RETRY SHIFT and dig-in prompts.</li>
-</ol>
-<p>Until then: call it <strong>bounded supervised autonomy</strong>, not auto-loop.</p>
-<hr>
-<h3>4. Credits &amp; subscription budget (Cursor + friends)</h3>
-<p>Axon continuous workers burn <strong>Cursor Agent / CLI usage</strong> (subscription pool or
-API key). Pricing moves; treat numbers below as <strong>2026 order-of-magnitude</strong>
-planning, and verify in the Cursor dashboard.</p>
-<h4>Cursor plans (individual / small team)</h4>
-<table>
-<thead>
-<tr>
-<th>Plan</th>
-<th style="text-align: right;">Rough monthly price</th>
-<th>Included model usage (guide)</th>
-<th>Fit for Axon-X</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Pro</strong></td>
-<td style="text-align: right;">~$20</td>
-<td>~$20 API-equivalent</td>
-<td>Operator + occasional IDE agent; <strong>not</strong> multi-project continuous</td>
-</tr>
-<tr>
-<td><strong>Pro+</strong></td>
-<td style="text-align: right;">~$60</td>
-<td>~$70</td>
-<td>1 proving workspace, light scheduler drills, prefer <strong>Auto</strong></td>
-</tr>
-<tr>
-<td><strong>Ultra</strong></td>
-<td style="text-align: right;">~$200</td>
-<td>~$400</td>
-<td>Serious continuous agents on 1–2 busy workspaces</td>
-</tr>
-<tr>
-<td><strong>Teams</strong></td>
-<td style="text-align: right;">~$40/user</td>
-<td>Per-seat allowance</td>
-<td>Shared billing / analytics; still need Ultra-class usage for many agents</td>
-</tr>
-</tbody>
-</table>
-<p>Sources to re-check: <a href="https://cursor.com/help/account-and-billing/pricing">Cursor pricing help</a>,
-<a href="https://cursor.com/docs/models-and-pricing">Models &amp; pricing</a>.</p>
-<p><strong>Rule of thumb:</strong> prefer <strong>Auto</strong> / cheaper router models for patrol and routine
-shifts; save frontier models for Lead synthesis and hard repairs. Frontier /
-MAX-style sessions can empty even Ultra in days.</p>
-<h4>How much autonomy burns (planning ranges)</h4>
-<p>Assume one “shift” ≈ one continuous worker run with tools (often many model
-turns). Costs vary wildly by model and repo size.</p>
-<table>
-<thead>
-<tr>
-<th>Operating mode</th>
-<th style="text-align: right;">Shifts / day (all projects)</th>
-<th>Suggested Cursor tier</th>
-<th style="text-align: right;">Monthly Cursor budget to plan</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Supervised operator (today’s default)</td>
-<td style="text-align: right;">2–8 manual / Retry</td>
-<td>Pro or Pro+</td>
-<td style="text-align: right;"><strong>$20–$100</strong></td>
-</tr>
-<tr>
-<td>Bounded auto-loop drill (1 workspace, scheduler on, watched)</td>
-<td style="text-align: right;">10–25</td>
-<td>Pro+ → Ultra</td>
-<td style="text-align: right;"><strong>$100–$250</strong></td>
-</tr>
-<tr>
-<td>Multi-project autonomous (3–6 workspaces, CI repair + patrol)</td>
-<td style="text-align: right;">30–80</td>
-<td>Ultra + on-demand, or Teams + pooled</td>
-<td style="text-align: right;"><strong>$250–$800+</strong></td>
-</tr>
-<tr>
-<td>Aggressive 24/7 multi-agent (not recommended yet)</td>
-<td style="text-align: right;">100+</td>
-<td>Ultra + hard spend caps</td>
-<td style="text-align: right;"><strong>$800–$2,000+</strong></td>
-</tr>
-</tbody>
-</table>
-<p>These are <strong>planning envelopes</strong>, not invoices. Track real burn for one week of
-drills before buying more seats.</p>
-<h4>Other credits you will also need</h4>
-<table>
-<thead>
-<tr>
-<th>Surface</th>
-<th>Why it matters</th>
-<th>Rough planning note</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>GitHub Actions</strong></td>
-<td>Fast Gate / child CI on every draft PR</td>
-<td>Private repos: minutes; keep repair PRs small</td>
-</tr>
-<tr>
-<td><strong>Supabase / cloud DBs</strong></td>
-<td>DashPro storage already ~60% of 1 GB in the UI snapshot</td>
-<td>Budget storage + egress; don’t let agents spam uploads</td>
-</tr>
-<tr>
-<td><strong>Sentry / PostHog</strong></td>
-<td>Watch signals drive “dig in”</td>
-<td>Event volume rises with more projects</td>
-</tr>
-<tr>
-<td><strong>Azure TTS / voice</strong></td>
-<td>Talk / briefing</td>
-<td>Small vs Cursor; still meter it</td>
-</tr>
-<tr>
-<td><strong>Host RAM / OOM</strong></td>
-<td>Control-plane can die (exit 137) under concurrent agents</td>
-<td>Cap <code>max_active</code> (default 2); more projects ≠ more concurrent agents</td>
-</tr>
-</tbody>
-</table>
-<h4>Practical recommendation (multi-project)</h4>
-<ol>
-<li><strong>Stay supervised</strong> until Critical Review failures and RETRY SHIFT noise are rare.</li>
-<li>Run <strong>one proving workspace</strong> (DashPro or Axon-X) with scheduler on for short drills.</li>
-<li>Budget <strong>Ultra (~$200–400/mo usage)</strong> before enabling continuous workers on 3+ projects.</li>
-<li>Set a Cursor <strong>spend limit</strong> so on-demand cannot surprise you.</li>
-<li>Keep Axon <code>max_active_executing</code> at <strong>2</strong> (or 1) — credits and RAM both explode with concurrency.</li>
-</ol>
-<hr>
-<h3>5. Operator checklist (today)</h3>
-<ol>
-<li>Confirm control-plane health: <code>curl -sS http://127.0.0.1:8787/api/health</code></li>
-<li>Confirm scheduler off unless drilling: see §2 command.</li>
-<li>Clear failed Critical Review shifts (Retry or cancel stale tasks).</li>
-<li>Prefer explicit tasks / Lead fan-out over free-form “go ahead and handoff” chat.</li>
-<li>After any push: <code>./scripts/ops/watch-fast-gate.sh</code></li>
-<li>Re-read this page after each autonomy gate change.</li>
-</ol>
-<p>Related:</p>
-<ul>
-<li><a href="autonomy-gates-and-service-identity.md"><code>autonomy-gates-and-service-identity.md</code></a></li>
-<li><a href="recent-operator-features.md"><code>recent-operator-features.md</code></a></li>
-<li><a href="../AXON-X-AUTONOMY-MASTER-PLAN.md"><code>docs/AXON-X-AUTONOMY-MASTER-PLAN.md</code></a></li>
-<li><a href="../AXON-X-AUTONOMY-READINESS.md"><code>docs/AXON-X-AUTONOMY-READINESS.md</code></a></li>
-</ul>
-<hr>
-</div></section><section class="chapter" id="chapter-ci-merge-workflow-and-worker-agents"><div class="chapter-header"><span class="chapter-num">31</span><h2 id="ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</h2></div><div class="chapter-body">
-<p><strong>Updated:</strong> 2026-07-22</p>
+</div></section><section class="chapter" id="chapter-ci-merge-workflow-and-worker-agents"><div class="chapter-header"><span class="chapter-num">30</span><h2 id="ci-merge-workflow-and-worker-agents">CI, merge workflow, and worker agents</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-29</p>
 <p>This chapter explains how Axon-X lands code through GitHub CI, how that relates
 to the <code>dev</code> branch, and how <strong>company employee agents</strong> (the roster in IDE /
 Mission Control) work — including how to tell whether they are actually running
@@ -2327,7 +2044,18 @@ is green. Always read the check on the <strong>PR</strong> itself.</p>
 <pre><code class="language-bash">npm run verify:preflight   # via scripts/sc on commit — blocks bad commits locally
 npm run verify:contracts   # fastest backend + ratchet signal
 cd apps/console-web &amp;&amp; npm run typecheck &amp;&amp; npm run test
+git status --short         # must contain no source changes or local runtime artifacts
 </code></pre>
+<p>Before opening a PR, fetch <code>dev</code>, integrate it on the feature branch, rerun the
+preflight, and inspect the complete branch diff:</p>
+<pre><code class="language-bash">git fetch origin dev
+git merge origin/dev
+git diff --check
+git diff --stat origin/dev...HEAD
+</code></pre>
+<p>Do not merge the feature branch directly into protected <code>dev</code>, force-push, or
+hide a failing check. Local runtime artifacts (<code>control-plane.sqlite3</code>, debug
+logs, shell completion dumps) are not source and must remain ignored.</p>
 <p>Full local bundle (slower):</p>
 <pre><code class="language-bash">npm run verify
 </code></pre>
@@ -2554,8 +2282,8 @@ curl -X POST http://127.0.0.1:8787/api/runs/reconcile-stale
 <p><strong>PDF:</strong> This chapter is bundled into <code>~/Desktop/Axon-X-How-To-Handbook.pdf</code> when you run
 <code>./scripts/docs/build-howto-handbook-pdf.sh</code> (rebuild after handbook edits).</p>
 <hr>
-</div></section><section class="chapter" id="chapter-gate-9-ci-remediation-unaware-operator-loop"><div class="chapter-header"><span class="chapter-num">39</span><h2 id="gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</h2></div><div class="chapter-body">
-<p><strong>Updated:</strong> 2026-07-24</p>
+</div></section><section class="chapter" id="chapter-gate-9-ci-remediation-unaware-operator-loop"><div class="chapter-header"><span class="chapter-num">38</span><h2 id="gate-9-ci-remediation-unaware-operator-loop">Gate 9 — CI remediation (unaware-operator loop)</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-29</p>
 <p>When <strong>Axon-X Fast Gate</strong> goes red, control-plane can ingest the GitHub
 <code>workflow_run</code> event, raise an inbox signal, lease a repair task to Rowan
 (watcher), one-shot dispatch a worker, and report the outcome — without you
@@ -2626,7 +2354,31 @@ cp scripts/ops/systemd/axon-fast-gate-remediation-poll.{service,timer} \
 systemctl --user daemon-reload
 systemctl --user enable --now axon-fast-gate-remediation-poll.timer
 </code></pre>
-<p>Public webhook remains preferred; the timer only covers tunnel/DNS outages.</p>
+<p>Public webhook remains preferred; the timer covers tunnel/DNS outages. The
+poller forwards both completed outcomes:</p>
+<ul>
+<li><code>failure</code> → dedupe, Attention signal, leased <code>CI repair:</code> task, Rowan dispatch</li>
+<li><code>success</code> → delivery update and stale failure cleanup; no repair is dispatched</li>
+</ul>
+<h4>Prove the local repair path is ready</h4>
+<pre><code class="language-bash">systemctl --user is-enabled axon-fast-gate-remediation-poll.timer
+systemctl --user is-active axon-fast-gate-remediation-poll.timer
+systemctl --user show axon-fast-gate-remediation-poll.service -p Result
+gh auth status
+cursor agent status
+curl -fsS http://127.0.0.1:8787/api/worker-scheduler | \
+  jq '{dispatch_enabled, env_allowed, effective_enabled}'
+</code></pre>
+<p>Required result: timer <code>enabled</code> + <code>active</code>, last service result <code>success</code>,
+authenticated GitHub and Cursor CLIs, and <code>dispatch_enabled: true</code>.
+<code>effective_enabled</code> controls ordinary scheduled shifts; webhook/poller repair
+dispatch uses the narrower <code>dispatch_enabled</code> gate.</p>
+<p>Run the poller once to verify GitHub → signed control-plane ingest without
+waiting for the timer:</p>
+<pre><code class="language-bash">./scripts/ops/poll-fast-gate-remediation.sh
+</code></pre>
+<p>On a green head this is safe: it updates delivery/stale state and does not create
+a repair task.</p>
 <h3>Operator surfaces</h3>
 <ul>
 <li><strong>Attention / inbox</strong> — CI failure and repair/blocked updates</li>
@@ -2671,9 +2423,10 @@ with the correct repository and workflow names. No new core code is required.</p
 <h3>Local verify</h3>
 <pre><code class="language-bash">./scripts/dev/python.sh -m unittest tests.test_ci_remediation -v
 </code></pre>
-<p>Manual drill: push a deliberate Fast Gate ratchet overshoot on a throwaway
-branch, confirm webhook → signal → leased task → repair draft PR → green head,
-then append evidence under <code>docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md</code>.</p>
+<p>Manual red-path drill: use a throwaway branch and a deliberate Fast Gate ratchet
+overshoot, confirm webhook/poller → signal → leased task → Rowan repair draft PR
+→ green head, then append evidence under
+<code>docs/ops/agent-reports/AUTONOMY-EVIDENCE-LOG.md</code>. Never drill on <code>dev</code>.</p>
 <hr>
 <h2>Autonomy gates &amp; service identity (operator directives)</h2>
 <p><strong>Do this in order. Do not skip ahead.</strong></p>
@@ -2924,7 +2677,7 @@ npm run verify:console-web
 <li>Re-read <a href="auto-loop-and-credits.md"><code>auto-loop-and-credits.md</code></a> before buying Ultra / enabling 3+ projects</li>
 </ol>
 <hr>
-</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">48</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-recent-operator-features-gate-3-5-console-ux"><div class="chapter-header"><span class="chapter-num">47</span><h2 id="recent-operator-features-gate-3-5-console-ux">Recent operator features (Gate 3–5 + console UX)</h2></div><div class="chapter-body">
 <p><strong>Updated:</strong> 2026-07-27<br>
 <strong>Audience:</strong> operators and agents who need plain-language “what changed and how to use it.”</p>
 <p>Companion to <a href="../HOW-TO-HANDBOOK.md"><code>docs/HOW-TO-HANDBOOK.md</code></a> and
@@ -3277,6 +3030,343 @@ board even when many projects exist.</p>
   | jq '{scheduler_enabled, effective_enabled, executing_count}'
 </code></pre>
 <hr>
+<h2>Auto-loop status &amp; credits budget (operator brief)</h2>
+<p><strong>Read this first when someone asks: “Are we autonomous yet?”</strong><br>
+<strong>Last updated:</strong> 2026-07-25</p>
+<hr>
+<h3>1. Short answer</h3>
+<p><strong>No — Axon-X is not yet on a closed unattended auto-loop.</strong></p>
+<p>What you have today is a <strong>strong supervised company</strong>: named employees, leased
+tasks, worktree isolation, Gate 6 acceptance, draft-PR delivery, Gate 9 CI
+repair, and (new) proactive file-size patrol <em>plumbing</em>. What you do <strong>not</strong>
+have is “Dana hands off, everyone runs overnight, and Mission Control only
+shows green in the morning” without operator nudges.</p>
+<p>If Mission Control still shows any of these, you are in <strong>supervised mode</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>UI signal</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>RETRY SHIFT</strong></td>
+<td>A worker run failed; a human (or Lead) must restart it</td>
+</tr>
+<tr>
+<td><strong>Shall I dig in?</strong> / Yes–Not now</td>
+<td>VAXON needs operator confirmation</td>
+</tr>
+<tr>
+<td><strong>Last shift failed: Critical Review Clause missing…</strong></td>
+<td>Shift ended without a valid <code>Confidence: N/10</code> receipt</td>
+</tr>
+<tr>
+<td><strong>0 active runs</strong> + many open signals</td>
+<td>Work is queued for review, not continuously draining</td>
+</tr>
+<tr>
+<td>Typing “handoff the tasks” into Lead chat</td>
+<td>Fan-out / lease pickup is not fully self-driving yet</td>
+</tr>
+</tbody>
+</table>
+<p>That matches the DashPro screen on 2026-07-25: Marco failed Critical Review,
+Expo called out as down, Lead recommended next steps, and the operator had to
+type the handoff.</p>
+<hr>
+<h3>2. What <em>is</em> automatic today</h3>
+<table>
+<thead>
+<tr>
+<th>Loop piece</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Create / lease durable tasks (Gate 4)</td>
+<td><strong>Ready</strong></td>
+<td>Continuous workers require a leased task</td>
+</tr>
+<tr>
+<td>Lead plan → fan-out → specialist tasks (Gate 5)</td>
+<td><strong>Ready</strong></td>
+<td>Persist + ready runs; still often needs scheduler or Retry</td>
+</tr>
+<tr>
+<td>Disposable worker worktrees (Gate 3)</td>
+<td><strong>Ready</strong></td>
+<td>Live checkout edits forbidden for continuous workers</td>
+</tr>
+<tr>
+<td>Gate 6 verifier / acceptance evidence</td>
+<td><strong>Ready</strong></td>
+<td>Failed checks block completion/publish path</td>
+</tr>
+<tr>
+<td>Draft PR delivery (no force-push)</td>
+<td><strong>Ready</strong></td>
+<td>Company pattern for publish</td>
+</tr>
+<tr>
+<td>Gate 9 CI remediation (webhook → repair task)</td>
+<td><strong>Proven for Axon-X</strong></td>
+<td>Reactive self-heal when Fast Gate goes red</td>
+</tr>
+<tr>
+<td>Per-task <code>allowed_paths</code> guardrails</td>
+<td><strong>Ready (new)</strong></td>
+<td>Hard scope for writes/publish + prompt anchors</td>
+</tr>
+<tr>
+<td>File-size patrol work source</td>
+<td><strong>Plumbing ready</strong></td>
+<td>Scheduler can enqueue bounded hygiene tasks when enabled</td>
+</tr>
+<tr>
+<td>Continuous worker scheduler</td>
+<td><strong>Off by default</strong></td>
+<td>Intentional — turn on only for watched drills</td>
+</tr>
+<tr>
+<td>Unattended overnight multi-project loop</td>
+<td><strong>Not ready</strong></td>
+<td>Still needs human dig-in / retry / Critical Review hygiene</td>
+</tr>
+<tr>
+<td>Staging / production deploy autonomy</td>
+<td><strong>Not ready</strong></td>
+<td>Remains human-gated</td>
+</tr>
+</tbody>
+</table>
+<p>Check the scheduler before assuming anything is looping:</p>
+<pre><code class="language-bash">curl -sS http://127.0.0.1:8787/api/worker-scheduler \
+  | jq '{scheduler_enabled, effective_enabled, executing_count}'
+</code></pre>
+<p>Expect <code>effective_enabled: false</code> on the daily-driver host unless you
+deliberately enabled it for a drill.</p>
+<hr>
+<h3>3. What “auto-loop” must mean before we claim it</h3>
+<p>A workspace is on a real auto-loop only when <strong>all</strong> of these are true without
+operator chat prompts:</p>
+<ol>
+<li>Open work is created from signals / Lead / hygiene sources (not only typed handoffs).</li>
+<li>The scheduler claims leased tasks for the right roles on its own.</li>
+<li>Shifts reliably end with Critical Review + <code>Confidence: N/10</code>.</li>
+<li>Failed shifts reopen or escalate with a clear receipt (not a silent zombie lease).</li>
+<li>Passing work becomes a <strong>draft PR</strong>; CI red creates a <strong>bounded repair</strong> (Gate 9).</li>
+<li>Out-of-scope drift is blocked (allowed paths + scope guard).</li>
+<li>You can leave the machine for hours and return to draft PRs / green repair heads —
+   not a wall of RETRY SHIFT and dig-in prompts.</li>
+</ol>
+<p>Until then: call it <strong>bounded supervised autonomy</strong>, not auto-loop.</p>
+<hr>
+<h3>4. Credits &amp; subscription budget (Cursor + friends)</h3>
+<p>Axon continuous workers burn <strong>Cursor Agent / CLI usage</strong> (subscription pool or
+API key). Pricing moves; treat numbers below as <strong>2026 order-of-magnitude</strong>
+planning, and verify in the Cursor dashboard.</p>
+<h4>Cursor plans (individual / small team)</h4>
+<table>
+<thead>
+<tr>
+<th>Plan</th>
+<th style="text-align: right;">Rough monthly price</th>
+<th>Included model usage (guide)</th>
+<th>Fit for Axon-X</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pro</strong></td>
+<td style="text-align: right;">~$20</td>
+<td>~$20 API-equivalent</td>
+<td>Operator + occasional IDE agent; <strong>not</strong> multi-project continuous</td>
+</tr>
+<tr>
+<td><strong>Pro+</strong></td>
+<td style="text-align: right;">~$60</td>
+<td>~$70</td>
+<td>1 proving workspace, light scheduler drills, prefer <strong>Auto</strong></td>
+</tr>
+<tr>
+<td><strong>Ultra</strong></td>
+<td style="text-align: right;">~$200</td>
+<td>~$400</td>
+<td>Serious continuous agents on 1–2 busy workspaces</td>
+</tr>
+<tr>
+<td><strong>Teams</strong></td>
+<td style="text-align: right;">~$40/user</td>
+<td>Per-seat allowance</td>
+<td>Shared billing / analytics; still need Ultra-class usage for many agents</td>
+</tr>
+</tbody>
+</table>
+<p>Sources to re-check: <a href="https://cursor.com/help/account-and-billing/pricing">Cursor pricing help</a>,
+<a href="https://cursor.com/docs/models-and-pricing">Models &amp; pricing</a>.</p>
+<p><strong>Rule of thumb:</strong> prefer <strong>Auto</strong> / cheaper router models for patrol and routine
+shifts; save frontier models for Lead synthesis and hard repairs. Frontier /
+MAX-style sessions can empty even Ultra in days.</p>
+<h4>How much autonomy burns (planning ranges)</h4>
+<p>Assume one “shift” ≈ one continuous worker run with tools (often many model
+turns). Costs vary wildly by model and repo size.</p>
+<table>
+<thead>
+<tr>
+<th>Operating mode</th>
+<th style="text-align: right;">Shifts / day (all projects)</th>
+<th>Suggested Cursor tier</th>
+<th style="text-align: right;">Monthly Cursor budget to plan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Supervised operator (today’s default)</td>
+<td style="text-align: right;">2–8 manual / Retry</td>
+<td>Pro or Pro+</td>
+<td style="text-align: right;"><strong>$20–$100</strong></td>
+</tr>
+<tr>
+<td>Bounded auto-loop drill (1 workspace, scheduler on, watched)</td>
+<td style="text-align: right;">10–25</td>
+<td>Pro+ → Ultra</td>
+<td style="text-align: right;"><strong>$100–$250</strong></td>
+</tr>
+<tr>
+<td>Multi-project autonomous (3–6 workspaces, CI repair + patrol)</td>
+<td style="text-align: right;">30–80</td>
+<td>Ultra + on-demand, or Teams + pooled</td>
+<td style="text-align: right;"><strong>$250–$800+</strong></td>
+</tr>
+<tr>
+<td>Aggressive 24/7 multi-agent (not recommended yet)</td>
+<td style="text-align: right;">100+</td>
+<td>Ultra + hard spend caps</td>
+<td style="text-align: right;"><strong>$800–$2,000+</strong></td>
+</tr>
+</tbody>
+</table>
+<p>These are <strong>planning envelopes</strong>, not invoices. Track real burn for one week of
+drills before buying more seats.</p>
+<h4>Other credits you will also need</h4>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Why it matters</th>
+<th>Rough planning note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GitHub Actions</strong></td>
+<td>Fast Gate / child CI on every draft PR</td>
+<td>Private repos: minutes; keep repair PRs small</td>
+</tr>
+<tr>
+<td><strong>Supabase / cloud DBs</strong></td>
+<td>DashPro storage already ~60% of 1 GB in the UI snapshot</td>
+<td>Budget storage + egress; don’t let agents spam uploads</td>
+</tr>
+<tr>
+<td><strong>Sentry / PostHog</strong></td>
+<td>Watch signals drive “dig in”</td>
+<td>Event volume rises with more projects</td>
+</tr>
+<tr>
+<td><strong>Azure TTS / voice</strong></td>
+<td>Talk / briefing</td>
+<td>Small vs Cursor; still meter it</td>
+</tr>
+<tr>
+<td><strong>Host RAM / OOM</strong></td>
+<td>Control-plane can die (exit 137) under concurrent agents</td>
+<td>Cap <code>max_active</code> (default 2); more projects ≠ more concurrent agents</td>
+</tr>
+</tbody>
+</table>
+<h4>Practical recommendation (multi-project)</h4>
+<ol>
+<li><strong>Stay supervised</strong> until Critical Review failures and RETRY SHIFT noise are rare.</li>
+<li>Run <strong>one proving workspace</strong> (DashPro or Axon-X) with scheduler on for short drills.</li>
+<li>Budget <strong>Ultra (~$200–400/mo usage)</strong> before enabling continuous workers on 3+ projects.</li>
+<li>Set a Cursor <strong>spend limit</strong> so on-demand cannot surprise you.</li>
+<li>Keep Axon <code>max_active_executing</code> at <strong>2</strong> (or 1) — credits and RAM both explode with concurrency.</li>
+</ol>
+<hr>
+<h3>5. Operator checklist (today)</h3>
+<ol>
+<li>Confirm control-plane health: <code>curl -sS http://127.0.0.1:8787/api/health</code></li>
+<li>Confirm scheduler off unless drilling: see §2 command.</li>
+<li>Clear failed Critical Review shifts (Retry or cancel stale tasks).</li>
+<li>Prefer explicit tasks / Lead fan-out over free-form “go ahead and handoff” chat.</li>
+<li>After any push: <code>./scripts/ops/watch-fast-gate.sh</code></li>
+<li>Re-read this page after each autonomy gate change.</li>
+</ol>
+<p>Related:</p>
+<ul>
+<li><a href="autonomy-gates-and-service-identity.md"><code>autonomy-gates-and-service-identity.md</code></a></li>
+<li><a href="recent-operator-features.md"><code>recent-operator-features.md</code></a></li>
+<li><a href="../AXON-X-AUTONOMY-MASTER-PLAN.md"><code>docs/AXON-X-AUTONOMY-MASTER-PLAN.md</code></a></li>
+<li><a href="../AXON-X-AUTONOMY-READINESS.md"><code>docs/AXON-X-AUTONOMY-READINESS.md</code></a></li>
+</ul>
+<hr>
+</div></section><section class="chapter" id="chapter-reliability-and-deliberate-controls"><div class="chapter-header"><span class="chapter-num">50</span><h2 id="reliability-and-deliberate-controls">Reliability and deliberate controls</h2></div><div class="chapter-body">
+<p><strong>Updated:</strong> 2026-07-29</p>
+<p>This chapter records the operator-facing reliability contract for the local
+console, Command Theater, voice playback, and IDE AgentDock.</p>
+<h3>Control-plane restart contract</h3>
+<ul>
+<li><code>control-plane.service</code> uses <code>Restart=always</code> and a short stop timeout.</li>
+<li>Its relationship with <code>axon-watch.service</code> is soft: a watch-service flap must
+  not stop the control-plane.</li>
+<li><code>axonrestart</code> restarts the control-plane first and waits for <code>:8787</code> health
+  before continuing through the remaining units.</li>
+<li>Use <code>axonrevive</code> when the process is wedged rather than merely restarting.</li>
+</ul>
+<h3>Vite control-plane recovery</h3>
+<p>Start the source console through the guarded wrapper:</p>
+<pre><code class="language-bash">./scripts/ops/run-5173.sh
+</code></pre>
+<p>The wrapper checks <code>http://127.0.0.1:8787/api/health</code>, starts
+<code>control-plane.service</code> when necessary, and waits before starting Vite. If the
+API restarts while Vite remains up, <code>/api/*</code> returns a temporary JSON <code>503</code>
+instead of exposing <code>ECONNREFUSED</code>, then recovers to <code>200</code>.</p>
+<pre><code class="language-bash">./scripts/verify/verify-vite-cp-restart.sh
+</code></pre>
+<p>If recovery fails:</p>
+<pre><code class="language-bash">systemctl --user status control-plane.service
+journalctl --user -u control-plane.service -n 80
+axonrevive
+</code></pre>
+<h3>Deliberate STAND-UP</h3>
+<p>Command Theater must open only from the STAND-UP control or an explicit VAXON
+request. Briefing polls do not auto-start it. The browser smoke check asserts
+that the theater is closed before the operator clicks.</p>
+<h3>Speech onset and stage synchronization</h3>
+<p>Azure output includes backend lead silence, while the browser player waits for
+audio readiness and preroll. The report stage changes from the audible-start
+callback, not from fetch completion, so the visible speaker and first audible
+word stay aligned. Browser speech uses its own short start guard.</p>
+<h3>AgentDock operator-message actions</h3>
+<p>In IDE AgentDock, <strong>Edit</strong> and <strong>Resend</strong> reserve their layout space but remain
+visually hidden until:</p>
+<ul>
+<li>the operator message is hovered with a fine pointer, or</li>
+<li>keyboard focus enters either action.</li>
+</ul>
+<p>Touch and coarse-pointer devices keep the controls visible because they have no
+reliable hover state. Reduced-motion users get the same visibility behavior
+without the transition.</p>
+<p>Verify the structural and interaction contract:</p>
+<pre><code class="language-bash">./scripts/dev/python.sh scripts/verify/check_dock_behavior_contract.py
+npm run typecheck -w @axon-watch/console-web
+</code></pre>
+<hr>
 <h3>VAXON Desktop</h3>
 <p>Packaged Linux desktop shell (Tauri 2) with frozen Watch + Control Plane sidecars on loopback <code>:8787</code>.</p>
 <h4>Verify</h4>
@@ -3291,7 +3381,7 @@ sudo apt-get install -y ./apps/console-desktop/src-tauri/target/release/bundle/d
 </code></pre>
 <p>Requires Debian-family x86_64 + WebKitGTK 4.1; current sidecars need <strong>glibc ≥ 2.42</strong>. Full first-run / tray / update notes: <a href="../VAXON_DESKTOP_VERIFY_EVIDENCE.md"><code>docs/VAXON_DESKTOP_VERIFY_EVIDENCE.md</code></a> and <a href="../DUAL_RUNTIME_STARTUP_CONTRACT.md"><code>docs/DUAL_RUNTIME_STARTUP_CONTRACT.md</code></a>.</p>
 <hr>
-</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">50</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
+</div></section><section class="chapter" id="chapter-online-research-searxng-and-legacy-google"><div class="chapter-header"><span class="chapter-num">51</span><h2 id="online-research-searxng-and-legacy-google">Online research: SearXNG and legacy Google</h2></div><div class="chapter-body">
 <p>Preferred → fallback order (matches the control-plane research path):</p>
 <ol>
 <li><strong>SearXNG</strong> when <code>AXON_WATCH_SEARXNG_URL</code> is set (recommended local path)</li>

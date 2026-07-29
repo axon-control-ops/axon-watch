@@ -82,7 +82,11 @@ function flatIndexFor(message: OperatorThreadEntry): number {
         >
           <div v-if="turn.prompt" class="conversation-seam__turn-prompt">
             <div class="conversation-seam__operator-turn">
-              <AgentDockStickyPrompt :text="turn.prompt.content" show-resend>
+              <AgentDockStickyPrompt
+                :text="turn.prompt.content"
+                :created-at="turn.prompt.created_at"
+                show-resend
+              >
                 <template #attachments>
                   <ConversationSeamMessageAttachments
                     :attachments="messageAttachments(turn.prompt)"
@@ -100,6 +104,7 @@ function flatIndexFor(message: OperatorThreadEntry): number {
             <ConversationSeamThreadMessage
               :message="reply"
               :item-index="flatIndexFor(reply)"
+              :preceding-operator-prompt="turn.prompt?.content ?? null"
               :answered-option-for-question="answeredOptionForQuestion"
               @preview="openAttachmentPreview"
             />
@@ -195,7 +200,11 @@ function flatIndexFor(message: OperatorThreadEntry): number {
 
           <template v-else-if="item.message">
             <div v-if="item.message.role === 'operator'" class="conversation-seam__operator-turn">
-              <AgentDockStickyPrompt :text="item.message.content" show-resend>
+              <AgentDockStickyPrompt
+                :text="item.message.content"
+                :created-at="item.message.created_at"
+                show-resend
+              >
                 <template #attachments>
                   <ConversationSeamMessageAttachments
                     :attachments="messageAttachments(item.message)"

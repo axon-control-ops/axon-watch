@@ -29,7 +29,44 @@ const props = defineProps<{
 const shell = useShellStore();
 const instanceId = useId();
 const displayOptions = computed(() => withOtherQuestionOption(props.options));
-const selectedId = ref(props.answeredOption?.id || displayOptions.value[0]?.id || '');
+const selectionStorageKey = computed(
+  () =>
+    `axon-agent-question-selection:${props.messageId || 'local'}:${props.segmentIndex ?? 0}`,
+);
+
+function readStoredSelection(): string {
+  if (typeof sessionStorage === 'undefined') {
+    return '';
+  }
+  try {
+    return sessionStorage.getItem(selectionStorageKey.value)?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+function persistSelection(optionId: string): void {
+  if (typeof sessionStorage === 'undefined' || !optionId) {
+    return;
+  }
+  try {
+    sessionStorage.setItem(selectionStorageKey.value, optionId);
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+const storedSelection = readStoredSelection();
+const selectedId = ref(
+  props.answeredOption?.id ||
+    (storedSelection &&
+    withOtherQuestionOption(props.options).some((option) => option.id === storedSelection)
+      ? storedSelection
+      : '') ||
+    displayOptions.value[0]?.id ||
+    '',
+);
+const operatorTouchedSelection = ref(Boolean(storedSelection));
 const otherText = ref(
   props.answeredOption && isAgentQuestionOtherOption(props.answeredOption)
     ? props.answeredOption.label
@@ -81,9 +118,19 @@ function optionDisplayLabel(option: AgentQuestionOption): string {
 watch(
   () => props.options,
   () => {
-    if (!displayOptions.value.some((option) => option.id === selectedId.value)) {
-      selectedId.value = displayOptions.value[0]?.id || '';
+    if (displayOptions.value.some((option) => option.id === selectedId.value)) {
+      return;
     }
+    if (operatorTouchedSelection.value) {
+      // Keep the operator's pick even if a live refresh briefly reshuffles ids;
+      // only fall back when the selected id truly disappeared.
+      const stored = readStoredSelection();
+      if (stored && displayOptions.value.some((option) => option.id === stored)) {
+        selectedId.value = stored;
+        return;
+      }
+    }
+    selectedId.value = displayOptions.value[0]?.id || '';
   },
 );
 
@@ -101,6 +148,8 @@ function selectOption(optionId: string): void {
     return;
   }
   selectedId.value = optionId;
+  operatorTouchedSelection.value = true;
+  persistSelection(optionId);
 }
 
 function optionButtonId(optionId: string): string {

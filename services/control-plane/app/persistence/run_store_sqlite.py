@@ -106,6 +106,11 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             task TEXT NOT NULL,
             reason TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'recorded',
+            target_task_id TEXT,
+            routed_role TEXT NOT NULL DEFAULT '',
+            routed_employee_id TEXT NOT NULL DEFAULT '',
+            communication_thread_id TEXT,
+            source_communication_thread_id TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -131,6 +136,12 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS worker_scheduler_settings (
             settings_key TEXT PRIMARY KEY,
             settings_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS workspace_composer_prefs (
+            workspace_id TEXT PRIMARY KEY,
+            cursor_cli_model TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
 

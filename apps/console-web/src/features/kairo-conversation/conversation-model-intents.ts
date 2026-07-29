@@ -23,7 +23,7 @@ const CHANGE_MODEL_TO_RE =
 const USE_AS_BRAIN_RE =
   /\b(?:use|pick|select)\s+(.+?)\s+(?:as|for)\s+(?:your\s+)?brain\b/i;
 const USE_MODEL_RE =
-  /^use\s+(auto|composer(?:\s+[\d.]+)?(?:\s+fast)?|gpt[\d.\s\-]+(?:\s+high)?|claude[\w\s\-]+(?:\s+high)?)\b/i;
+  /^use\s+(auto|composer(?:\s+[\d.]+)?(?:\s+fast)?|grok(?:\s+[\d.]+)?(?:\s+fast)?|gpt[\d.\s\-]+(?:\s+high)?|claude[\w\s\-]+(?:\s+high)?)\b/i;
 
 const MODEL_ALIASES: Record<string, string> = {
   auto: 'auto',
@@ -32,6 +32,13 @@ const MODEL_ALIASES: Record<string, string> = {
   'composer 2.5 fast': 'composer-2.5-fast',
   'composer 2.5': 'composer-2.5',
   'composer 2': 'composer-2.5',
+  grok: 'cursor-grok-4.5-high-fast',
+  'grok fast': 'cursor-grok-4.5-high-fast',
+  'grok 4.5': 'cursor-grok-4.5-high-fast',
+  'grok 4.5 fast': 'cursor-grok-4.5-high-fast',
+  'cursor grok': 'cursor-grok-4.5-high-fast',
+  'cursor grok 4.5': 'cursor-grok-4.5-high-fast',
+  'cursor grok 4.5 fast': 'cursor-grok-4.5-high-fast',
   'gpt 5.4': 'gpt-5.4-high',
   'gpt 5.4 high': 'gpt-5.4-high',
   'gpt-5.4': 'gpt-5.4-high',
@@ -162,7 +169,7 @@ export function resolveConversationModelSwitchIntent(
       kind: 'switch_composer_model',
       modelId: '',
       label: phrase,
-      reply: `I couldn't match "${phrase}" to a Cursor model. Try Auto, Composer 2.5 Fast, or GPT-5.4 High.`,
+      reply: `I couldn't match "${phrase}" to a Cursor model. Try Grok 4.5 Fast, Auto, Composer 2.5 Fast, or GPT-5.4 High.`,
     };
   }
 

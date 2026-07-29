@@ -8,12 +8,13 @@ export type WorkbenchTerminalAutoCloseDecision = {
   delayMs: number;
 };
 
-/** Arm auto-close whenever the terminal becomes visible. */
+/**
+ * Keep the IDE terminal open once the operator opens it.
+ * Auto-hide was hiding local shells after 9s idle and felt like a crash.
+ */
 export function resolveWorkbenchTerminalAutoClose(input: {
   terminalVisible: boolean;
 }): WorkbenchTerminalAutoCloseDecision {
-  if (!input.terminalVisible) {
-    return { shouldArm: false, delayMs: WORKBENCH_TERMINAL_AUTO_CLOSE_MS };
-  }
-  return { shouldArm: true, delayMs: WORKBENCH_TERMINAL_AUTO_CLOSE_MS };
+  void input.terminalVisible;
+  return { shouldArm: false, delayMs: WORKBENCH_TERMINAL_AUTO_CLOSE_MS };
 }

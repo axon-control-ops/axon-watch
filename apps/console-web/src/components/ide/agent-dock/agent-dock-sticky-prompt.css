@@ -52,7 +52,23 @@
   gap: 0.45rem;
   min-height: 1.1rem;
   margin: 0 0 0.15rem;
-  padding: 0;
+  padding: 0 2.2rem 0 0;
+}
+
+.agent-dock-sticky-prompt__meta-leading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.agent-dock-sticky-prompt__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: rgba(168, 178, 192, 0.92);
+  flex-shrink: 0;
 }
 
 .agent-dock-sticky-prompt__label {
@@ -65,6 +81,16 @@
   letter-spacing: 0.06em;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.agent-dock-sticky-prompt__time {
+  margin: 0;
+  margin-left: 0.15rem;
+  color: rgba(138, 154, 173, 0.72);
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .agent-dock-sticky-prompt__text {
@@ -279,6 +305,72 @@
 
 .agent-dock-sticky-prompt .conversation-seam__action-icon {
   display: block;
+}
+
+.conversation-seam__agent-actions {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  z-index: 3;
+  margin: 0;
+}
+
+.agent-dock__transcript .conversation-seam__turn-reply {
+  position: relative;
+}
+
+.agent-dock__transcript .conversation-seam__agent-actions .conversation-seam__meta-button--icon {
+  width: 1.55rem;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  min-height: 1.55rem;
+  padding: 0;
+  justify-content: center;
+  border-radius: 999px;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(12, 12, 14, 0.72);
+  color: rgba(196, 204, 214, 0.92);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.agent-dock__transcript .conversation-seam__agent-actions .conversation-seam__meta-button--icon:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(246, 248, 250, 0.98);
+  background: rgba(28, 28, 32, 0.9);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .agent-dock__transcript
+    .conversation-seam__turn-reply
+    .conversation-seam__agent-actions {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-0.08rem);
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease;
+  }
+
+  .agent-dock__transcript
+    .conversation-seam__turn-reply:hover
+    .conversation-seam__agent-actions,
+  .agent-dock__transcript
+    .conversation-seam__turn-reply:focus-within
+    .conversation-seam__agent-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .agent-dock__transcript
+    .conversation-seam__turn-reply
+    .conversation-seam__agent-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {

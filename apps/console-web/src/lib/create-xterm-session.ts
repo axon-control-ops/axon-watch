@@ -76,20 +76,23 @@ export async function createXtermSession(
     theme: useMockupTheme
       ? mockupXtermTheme
       : {
-          background: '#050a12',
-          foreground: '#8fa4b8',
-          cursor: '#edf8ff',
-          brightBlack: '#5f7388',
-          brightCyan: '#00f2ff',
+          ...mockupXtermTheme,
+          // Slightly deeper ink for non-mockup hosts while keeping full ANSI.
+          background: '#050f18',
         },
-    fontSize: useMockupTheme ? mockupTerminalFontOptions.fontSize : 15,
-    lineHeight: useMockupTheme ? mockupTerminalFontOptions.lineHeight : 1.25,
+    fontSize: useMockupTheme ? mockupTerminalFontOptions.fontSize : 14,
+    lineHeight: useMockupTheme ? mockupTerminalFontOptions.lineHeight : 1.3,
     fontFamily: useMockupTheme
       ? mockupTerminalFontOptions.fontFamily
-      : 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      : mockupTerminalFontOptions.fontFamily,
     cursorBlink: !readOnly,
+    cursorStyle: readOnly ? 'underline' : 'block',
+    cursorWidth: 2,
     convertEol: true,
     disableStdin: readOnly,
+    allowTransparency: false,
+    macOptionIsMeta: true,
+    rightClickSelectsWord: true,
     // Agent mirrors can contain complete build/test logs. Keep enough browser
     // scrollback that full server output remains reviewable instead of silently
     // falling back to xterm's 1,000-line default.

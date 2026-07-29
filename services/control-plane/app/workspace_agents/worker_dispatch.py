@@ -214,23 +214,6 @@ def dispatch_continuous_worker_run(
             employee=employee,
             task=task,
         )
-        # region agent log
-        from app.workspace_agents.autonomy_debug import debug_autonomy_probe
-
-        debug_autonomy_probe(
-            "H28,H29",
-            "dispatching Mission Control worker with execution access",
-            {
-                "workspaceId": workspace_id,
-                "runId": run_id,
-                "taskId": task_id,
-                "role": employee.role,
-                "executionAccess": "full",
-            },
-            location="workspace_agents/worker_dispatch.py:dispatch_continuous_worker_run",
-            run_id="closeout-access",
-        )
-        # endregion
         ensure_agent_session(workspace_id=workspace_id, run_id=run_id)
         context = LaneBContext(workspace_id=workspace_id, composer_mode="agent")
         lane_b_result = generate_lane_b_result(

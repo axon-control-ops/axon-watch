@@ -1,4 +1,4 @@
-"""Fleet-ranked grounded Advise for cross-workspace coaching (SA-1).
+"""Fleet-ranked grounded Advise for cross-workspace coaching (SA-1 + SA-2).
 
 Builds a small fact pack from live operational state, picks one winner by
 fixed urgency order, and renders a short deterministic coach line. Idle fleets
@@ -11,10 +11,11 @@ from collections.abc import Mapping
 
 from app.chat.command_intent import is_auto_complete_run_summary
 
-# Ranking keys (highest first). Handoff (4) arrives in SA-2.
+# Ranking keys (highest first).
 _RANK_PENDING_APPROVAL = 1
 _RANK_CRITICAL_SIGNAL = 2
 _RANK_REVIEW_READY = 3
+_RANK_OPEN_HANDOFF = 4
 _RANK_DEGRADED = 5
 
 
@@ -47,6 +48,7 @@ def _collect_facts(
     degraded: dict[str, object],
     watch_connected: bool,
     display_names: Mapping[str, str] | None,
+    open_handoffs: list[dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
     facts: list[dict[str, object]] = []
     seen_approval_workspaces: set[str] = set()
@@ -128,6 +130,27 @@ def _collect_facts(
         )
         break
 
+    for handoff in open_handoffs or []:
+        target_id = str(handoff.get("target_workspace_id") or "").strip()
+        if not target_id:
+            continue
+        task = str(handoff.get("task") or "").strip() or "Cross-workspace handoff"
+        facts.append(
+            {
+                "kind": "open_handoff",
+                "rank": _RANK_OPEN_HANDOFF,
+                "workspace_id": target_id,
+                "display_name": workspace_advice_label(target_id, display_names),
+                "run_id": None,
+                "signal_id": None,
+                "handoff_id": str(handoff.get("handoff_id") or "") or None,
+                "title": task,
+                "source_workspace_id": str(handoff.get("source_workspace_id") or "") or None,
+                "target_task_id": str(handoff.get("target_task_id") or "") or None,
+            }
+        )
+        break
+
     if not watch_connected or bool(degraded.get("active")):
         reasons = degraded.get("reasons") if isinstance(degraded, dict) else None
         reason = ""
@@ -164,7 +187,7 @@ def select_fleet_advice_winner(
             # Same urgency: keep attention on the focused workspace when it ties.
             0 if focused and str(item.get("workspace_id") or "") == focused else 1,
             str(item.get("workspace_id") or ""),
-            str(item.get("run_id") or item.get("signal_id") or ""),
+            str(item.get("run_id") or item.get("signal_id") or item.get("handoff_id") or ""),
         ),
     )[0]
 
@@ -179,6 +202,7 @@ def build_fleet_advice_pack(
     display_names: Mapping[str, str] | None = None,
     focused_workspace_id: str | None = None,
     scope_mode: str = "fleet",
+    open_handoffs: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     focused = (focused_workspace_id or "").strip() or None
     facts = _collect_facts(
@@ -188,6 +212,7 @@ def build_fleet_advice_pack(
         degraded=degraded,
         watch_connected=watch_connected,
         display_names=display_names,
+        open_handoffs=open_handoffs,
     )
     return {
         "scope_mode": "workspace" if scope_mode == "workspace" else "fleet",
@@ -275,6 +300,18 @@ def build_fleet_coach_line(
                 f"Review the ready run in {name}; switch there before continuing."
             )
         return f"Review the ready run in {name}."
+
+    if kind == "open_handoff":
+        task = str(fact.get("title") or "the listed task").strip() or "the listed task"
+        task_short = task if len(task) <= 72 else f"{task[:71].rstrip()}…"
+        if cross and focus_label:
+            return (
+                f"Handoff to {name} is open — switch there and finish “{task_short}” "
+                f"before more {focus_label} work."
+            )
+        if cross:
+            return f"Handoff to {name} is open — switch there and finish “{task_short}”."
+        return f"Finish the open handoff ticket in {name}: “{task_short}”."
 
     if kind == "degraded_runtime":
         if fact.get("watch_connected") is False:

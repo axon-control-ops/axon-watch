@@ -91,10 +91,7 @@ const visibleTerminalSessions = computed(() => {
   return sessions.slice(0, 2);
 });
 
-const agentSessionId = computed(
-  () => shell.terminalSessions.find((session) => session.role === 'agent')?.id ?? null,
-);
-
+const agentSessionId = computed(() => shell.terminalSessions.find((session) => session.role === 'agent')?.id ?? null);
 const agentStreamActive = computed(() => shell.agentStreamActive);
 
 const terminalRunPhase = computed(() => shell.primaryActiveRun?.phase ?? null);
@@ -233,7 +230,7 @@ function handleDocumentPointerDown(event: PointerEvent): void {
   }
 }
 
-function createTerminalSession(kind: 'bash' | 'zsh' | 'vaxon' = 'bash'): void {
+function createTerminalSession(kind: 'bash' | 'zsh' | 'vaxon' = 'zsh'): void {
   closeNewTerminalMenu();
   if (kind === 'vaxon') {
     void shell.createVaxonTerminalSession();
@@ -368,7 +365,7 @@ onBeforeUnmount(() => {
               :aria-expanded="showNewTerminalMenu"
               @click.stop="toggleNewTerminalMenu"
             >
-              <WorkbenchIcon name="plus" class="terminal-tabbar__action" :size="18" />
+              <WorkbenchIcon name="plus" class="terminal-tabbar__action" :size="16" />
             </button>
             <div
               v-if="showNewTerminalMenu"
@@ -380,17 +377,19 @@ onBeforeUnmount(() => {
                 type="button"
                 class="terminal-tabbar__new-menu-item"
                 role="menuitem"
-                @click="createTerminalSession('bash')"
+                @click="createTerminalSession('zsh')"
               >
-                bash
+                <WorkbenchIcon name="shell-zsh" :size="14" />
+                <span>zsh · local</span>
               </button>
               <button
                 type="button"
                 class="terminal-tabbar__new-menu-item"
                 role="menuitem"
-                @click="createTerminalSession('zsh')"
+                @click="createTerminalSession('bash')"
               >
-                zsh
+                <WorkbenchIcon name="shell-bash" :size="14" />
+                <span>bash · local</span>
               </button>
               <button
                 type="button"
@@ -398,18 +397,19 @@ onBeforeUnmount(() => {
                 role="menuitem"
                 @click="createTerminalSession('vaxon')"
               >
-                vaxon
+                <WorkbenchIcon name="terminal-agent" :size="14" />
+                <span>vaxon · agent</span>
               </button>
             </div>
           </div>
           <button
             type="button"
             class="terminal-tabbar__action-button"
-            :title="activeTerminalSession.role === 'agent' ? 'Split with bash terminal' : 'Split terminal'"
-            :aria-label="activeTerminalSession.role === 'agent' ? 'Split with bash terminal' : 'Split terminal'"
+            :title="activeTerminalSession.role === 'agent' ? 'Split with zsh terminal' : 'Split terminal'"
+            :aria-label="activeTerminalSession.role === 'agent' ? 'Split with zsh local terminal' : 'Split terminal'"
             @click="handleHeaderSplit"
           >
-            <WorkbenchIcon name="split" class="terminal-tabbar__action" :size="18" />
+            <WorkbenchIcon name="split" class="terminal-tabbar__action" :size="16" />
           </button>
           <button
             type="button"
@@ -418,7 +418,7 @@ onBeforeUnmount(() => {
             aria-label="Kill terminal"
             @click="handleHeaderKill"
           >
-            <WorkbenchIcon name="trash" class="terminal-tabbar__action" :size="18" />
+            <WorkbenchIcon name="trash" class="terminal-tabbar__action" :size="16" />
           </button>
           <button
             type="button"
@@ -427,7 +427,7 @@ onBeforeUnmount(() => {
             aria-label="Clear terminal"
             @click="clearTerminalPanel"
           >
-            <WorkbenchIcon name="trash" class="terminal-tabbar__action" :size="18" />
+            <WorkbenchIcon name="clear" class="terminal-tabbar__action" :size="16" />
           </button>
           <button
             type="button"
@@ -436,7 +436,7 @@ onBeforeUnmount(() => {
             :aria-label="workbenchTerminalPanelAriaLabel(true, terminalRunPhase)"
             @click="requestHideTerminalPanel"
           >
-            <WorkbenchIcon name="close" class="terminal-tabbar__action" :size="18" />
+            <WorkbenchIcon name="chevron-down" class="terminal-tabbar__action" :size="16" />
           </button>
         </div>
       </div>

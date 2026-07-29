@@ -81,40 +81,6 @@ def is_usage_limit_failure(detail: str | None) -> bool:
         or "you've hit your usage" in hay
         or "used 100% of your included" in hay
     )
-    # #region agent log
-    try:
-        import json
-        import time
-        from pathlib import Path
-
-        path = Path(__file__).resolve().parents[4] / ".cursor" / "debug-bef50e.log"
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(
-                json.dumps(
-                    {
-                        "sessionId": "bef50e",
-                        "runId": "usage-classify",
-                        "hypothesisId": "A",
-                        "location": "failure_detail.py:is_usage_limit_failure",
-                        "message": "usage classification",
-                        "data": {
-                            "matched": matched,
-                            "bare_action_required": "actionrequirederror" in hay
-                            and "out of usage" not in hay
-                            and "usage limit" not in hay
-                            and "increase limits" not in hay
-                            and "hit your usage" not in hay,
-                            "sample": (detail or "")[:120],
-                        },
-                        "timestamp": int(time.time() * 1000),
-                    },
-                    separators=(",", ":"),
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-    # #endregion
     return matched
 
 

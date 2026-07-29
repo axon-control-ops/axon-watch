@@ -3,6 +3,7 @@ import { computed, onScopeDispose, ref, watch, type Ref } from 'vue';
 import {
   fanOutLeadPlan,
   fetchWorkspaceLeadPlans,
+  setLeadPlanStatus,
   synthesizeLeadPlan,
   type LeadFanOutInput,
   type LeadPlanRecord,
@@ -70,6 +71,30 @@ export function createLeadPlansSlice(input: CreateLeadPlansSliceInput) {
       leadPlansError.value =
         error instanceof Error ? error.message : 'Failed to fan out Lead plan';
       return null;
+    } finally {
+      leadPlansMutating.value = false;
+    }
+  }
+
+  async function closeCurrentLeadPlanEngagement(
+    planId: string,
+    status: 'completed' | 'cancelled' = 'completed',
+  ): Promise<boolean> {
+    const workspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
+    const cleaned = planId.trim();
+    if (!workspaceId || !cleaned) {
+      return false;
+    }
+    leadPlansMutating.value = true;
+    try {
+      await setLeadPlanStatus(cleaned, status);
+      await loadLeadPlans(workspaceId);
+      leadPlansError.value = null;
+      return true;
+    } catch (error) {
+      leadPlansError.value =
+        error instanceof Error ? error.message : 'Failed to close Lead plan';
+      return false;
     } finally {
       leadPlansMutating.value = false;
     }
@@ -145,6 +170,7 @@ export function createLeadPlansSlice(input: CreateLeadPlansSliceInput) {
     leadPlansMutating,
     loadLeadPlans,
     fanOutCurrentWorkspaceLeadPlan,
+    closeCurrentLeadPlanEngagement,
     synthesizeCurrentLeadPlan,
   };
 }

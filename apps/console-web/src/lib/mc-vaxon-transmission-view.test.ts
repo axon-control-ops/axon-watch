@@ -37,4 +37,15 @@ describe('resolveVaxonTransmissionView', () => {
       body: 'DashPro is on deck.',
     });
   });
+
+  it('shows VAXON on screen even when TTS used Vekson', () => {
+    expect(
+      resolveVaxonTransmissionView({
+        spokenText: 'Vekson is watching the fleet.',
+        speaking: true,
+      }),
+    ).toMatchObject({
+      body: 'VAXON is watching the fleet.',
+    });
+  });
 });

@@ -42,12 +42,19 @@ def ensure_runtime(
             existing.pty.close()
             _runtimes.pop(key, None)
 
+        preferred = str(session.title or "").strip().lower()
+        if session.role == "operator" and preferred in {"", "bash"}:
+            preferred = "zsh"
         runtime = TerminalSessionRuntime(
             workspace_id=str(workspace_id or "").strip(),
             session_id=session.session_id,
             role=session.role,
             workspace_root=str(workspace_root),
-            pty=PtyProcess(str(workspace_root), session_id=session.session_id),
+            pty=PtyProcess(
+                str(workspace_root),
+                session_id=session.session_id,
+                preferred_shell=preferred,
+            ),
         )
         _runtimes[key] = runtime
         return runtime

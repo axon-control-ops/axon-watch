@@ -284,6 +284,7 @@
   color: #ffc978;
 }
 
+.status-bar-mockup__chip--success .status-bar-mockup__chip-label,
 .status-bar-mockup__chip--success .status-bar-mockup__chip-primary {
   color: #9ef0c3;
 }

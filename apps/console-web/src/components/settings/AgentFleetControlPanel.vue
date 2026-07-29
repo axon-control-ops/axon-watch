@@ -3,7 +3,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import {
   fetchWorkerSchedulerStatus,
+  hardKillWorkerScheduler,
   patchWorkerScheduler,
+  resumeWorkerScheduler,
   stopActiveWorkerRuns,
   type WorkerSchedulerStatus,
 } from '../../api/worker-scheduler-api';
@@ -17,6 +19,8 @@ const status = ref<WorkerSchedulerStatus | null>(null);
 const loadState = ref<'idle' | 'loading' | 'loaded' | 'error'>('idle');
 const saving = ref(false);
 const stopping = ref(false);
+const killing = ref(false);
+const resuming = ref(false);
 const actionMessage = ref<string | null>(null);
 const actionTone = ref<'idle' | 'ok' | 'error' | 'pending' | 'warn'>('idle');
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -32,7 +36,7 @@ const effectiveLabel = computed(() => {
     return 'Unknown';
   }
   if (status.value.blocked_by_env) {
-    return 'Blocked by env brake';
+    return 'Blocked by host brake';
   }
   return status.value.effective_enabled ? 'Running' : 'Paused';
 });
@@ -47,13 +51,15 @@ const effectiveTone = computed(() => {
   return status.value.effective_enabled ? 'running' : 'paused';
 });
 
+const workersWantedOn = computed(() => Boolean(status.value?.scheduler_enabled));
+
 const modeCopy: Record<AutonomyMode, string> = {
   manual:
-    'VAXON speaks only for approvals and interruptive signals. Lead check-ins still scan; continuous workers stay paused.',
+    'VAXON speaks only for approvals and interruptive signals. Continuous workers stay paused.',
   semi:
-    'VAXON stays on the loop with proactive advisory briefs. Lead check-ins continue; continuous workers stay paused.',
+    'VAXON stays proactive with advisory briefs. Continuous workers stay paused — no Cursor burn from idle ticks.',
   full:
-    'VAXON advisory plus Full Access agents that keep executing queued work, retries, and Lead follow-ups without per-run approval.',
+    'VAXON advisory plus continuous workers that lease tasks and run Cursor shifts without per-run approval.',
 };
 
 async function reload(): Promise<void> {
@@ -86,6 +92,7 @@ async function persistCaps(patch: {
     actionMessage.value = status.value.blocked_by_env
       ? 'Saved — still blocked by AXON_WATCH_WORKER_SCHEDULER=0 in deployment.env'
       : 'Saved';
+    await shell.loadOperatorPresenceSettings({ reportError: false });
   } catch (error) {
     actionTone.value = 'error';
     actionMessage.value = error instanceof Error ? error.message : 'Save failed';
@@ -108,7 +115,11 @@ async function onAutonomyModeChange(mode: AutonomyMode): Promise<void> {
     actionMessage.value =
       status.value.blocked_by_env && mode === 'full'
         ? 'Full autonomy saved — workers still blocked by AXON_WATCH_WORKER_SCHEDULER=0'
-        : `Autonomy mode set to ${mode}`;
+        : mode === 'semi'
+          ? 'Semi-autonomous — VAXON stays proactive; continuous workers paused'
+          : mode === 'manual'
+            ? 'Manual — VAXON quiet except approvals; workers paused'
+            : 'Full autonomous — continuous workers will start leased tasks';
   } catch (error) {
     actionTone.value = 'error';
     actionMessage.value =
@@ -163,6 +174,55 @@ async function onStopAll(): Promise<void> {
   }
 }
 
+async function onHardKill(): Promise<void> {
+  killing.value = true;
+  actionTone.value = 'pending';
+  actionMessage.value = 'Hard-killing continuous workers…';
+  try {
+    status.value = await hardKillWorkerScheduler();
+    await shell.loadOperatorPresenceSettings({ reportError: false });
+    const stopped = status.value.stopped_run_ids?.length ?? 0;
+    actionTone.value = 'ok';
+    actionMessage.value =
+      `Scheduler hard-killed from Settings — ${stopped} shift(s) stopped. ` +
+      'VAXON stays on Semi (proactive). Resume anytime without editing .env.';
+  } catch (error) {
+    actionTone.value = 'error';
+    actionMessage.value =
+      error instanceof Error ? error.message : 'Hard-kill failed';
+  } finally {
+    killing.value = false;
+  }
+}
+
+async function onResume(): Promise<void> {
+  resuming.value = true;
+  actionTone.value = 'pending';
+  actionMessage.value = 'Resuming continuous workers…';
+  try {
+    status.value = await resumeWorkerScheduler();
+    await shell.loadOperatorPresenceSettings({ reportError: false });
+    if (status.value.blocked_by_env) {
+      actionTone.value = 'warn';
+      actionMessage.value =
+        'Settings resume saved — host brake still on (AXON_WATCH_WORKER_SCHEDULER=0). Clear that in deployment.env to actually start workers.';
+    } else if (status.value.effective_enabled) {
+      actionTone.value = 'ok';
+      actionMessage.value =
+        'Continuous workers resumed. Full autonomy on — Cursor usage only when a leased task dispatches.';
+    } else {
+      actionTone.value = 'warn';
+      actionMessage.value = 'Resume saved but workers are not effective yet — refresh and check status.';
+    }
+  } catch (error) {
+    actionTone.value = 'error';
+    actionMessage.value =
+      error instanceof Error ? error.message : 'Resume failed';
+  } finally {
+    resuming.value = false;
+  }
+}
+
 onMounted(() => {
   void shell.loadOperatorPresenceSettings({ reportError: false });
   void reload();
@@ -200,7 +260,7 @@ onUnmounted(() => {
     >
       {{
         actionMessage ||
-        'Choose Manual, Semi, or Full autonomy. Full keeps agents in Full Access and continuously owns queued work through completion.'
+        'Semi keeps VAXON proactive with workers off. Full starts continuous Cursor shifts. Hard-kill and resume live here — no .env edit for day-to-day control.'
       }}
     </p>
 
@@ -220,7 +280,7 @@ onUnmounted(() => {
     <template v-else-if="status">
       <section class="operator-settings-form__section">
         <header class="operator-settings-form__section-header">
-          <h2>Autonomy mode</h2>
+          <h2>VAXON autonomy</h2>
           <p>{{ modeCopy[autonomyMode] }}</p>
         </header>
 
@@ -236,14 +296,35 @@ onUnmounted(() => {
               name="autonomy-mode"
               :value="mode"
               :checked="autonomyMode === mode"
-              :disabled="saving"
+              :disabled="saving || killing || resuming"
               @change="onAutonomyModeChange(mode)"
             />
-            <span class="agent-fleet-panel__mode-label">
-              {{ mode === 'manual' ? 'Manual' : mode === 'semi' ? 'Semi-autonomous' : 'Full autonomous' }}
+            <span class="agent-fleet-panel__mode-copy">
+              <span class="agent-fleet-panel__mode-label">
+                {{ mode === 'manual' ? 'Manual' : mode === 'semi' ? 'Semi-autonomous' : 'Full autonomous' }}
+              </span>
+              <span class="agent-fleet-panel__mode-meta">
+                {{
+                  mode === 'manual'
+                    ? 'Quiet VAXON · workers off'
+                    : mode === 'semi'
+                      ? 'Proactive VAXON · workers off'
+                      : 'Proactive VAXON · workers on'
+                }}
+              </span>
             </span>
           </label>
         </div>
+      </section>
+
+      <section class="operator-settings-form__section">
+        <header class="operator-settings-form__section-header">
+          <h2>Continuous worker scheduler</h2>
+          <p>
+            Hard-kill pauses new starts and stops active shifts from Settings (SQLite). Resume re-enables
+            without touching deployment.env — unless the host emergency brake is on.
+          </p>
+        </header>
 
         <dl class="operator-settings-form__status-grid">
           <div>
@@ -258,6 +339,10 @@ onUnmounted(() => {
             </dd>
           </div>
           <div>
+            <dt>Settings switch</dt>
+            <dd>{{ workersWantedOn ? 'On' : 'Off' }}</dd>
+          </div>
+          <div>
             <dt>Executing now</dt>
             <dd>{{ status.executing_count }}</dd>
           </div>
@@ -269,7 +354,16 @@ onUnmounted(() => {
             <dt>Tick interval</dt>
             <dd>{{ status.tick_interval_seconds }}s</dd>
           </div>
+          <div>
+            <dt>Cursor on idle</dt>
+            <dd>{{ status.cursor_usage_on_idle_tick ? 'Yes' : 'No' }}</dd>
+          </div>
         </dl>
+
+        <p class="agent-fleet-panel__usage-note" role="note">
+          Idle scheduler ticks do not call Cursor CLI. Usage only when a leased task actually
+          dispatches a worker shift.
+        </p>
 
         <p v-if="readiness" class="agent-fleet-panel__readiness" role="status">
           Production readiness
@@ -279,9 +373,37 @@ onUnmounted(() => {
         </p>
 
         <p v-if="status.blocked_by_env" class="agent-fleet-panel__env-warn">
-          Host emergency brake is on (<code>AXON_WATCH_WORKER_SCHEDULER=0</code>). Clear that in
-          deployment.env, then reload — Full autonomy will take effect.
+          Host emergency brake is on (<code>AXON_WATCH_WORKER_SCHEDULER=0</code>). Settings resume
+          will save the SQLite switch, but workers stay blocked until that env flag is cleared and
+          the control plane reloads.
         </p>
+
+        <div class="agent-fleet-panel__actions agent-fleet-panel__actions--scheduler">
+          <button
+            type="button"
+            class="settings-surface__button agent-fleet-panel__kill"
+            :disabled="killing || resuming || saving || (!workersWantedOn && status.active_run_count === 0)"
+            @click="onHardKill"
+          >
+            {{ killing ? 'Hard-killing…' : 'Hard-kill scheduler' }}
+          </button>
+          <button
+            type="button"
+            class="settings-surface__button settings-surface__primary"
+            :disabled="resuming || killing || saving || (workersWantedOn && status.effective_enabled)"
+            @click="onResume"
+          >
+            {{ resuming ? 'Resuming…' : 'Resume scheduler' }}
+          </button>
+          <button
+            type="button"
+            class="settings-surface__button"
+            :disabled="saving || killing || resuming"
+            @click="reload"
+          >
+            Refresh
+          </button>
+        </div>
       </section>
 
       <section class="operator-settings-form__section">
@@ -298,7 +420,7 @@ onUnmounted(() => {
               min="1"
               max="16"
               :value="status.max_active"
-              :disabled="saving"
+              :disabled="saving || killing || resuming"
               @change="onMaxActiveChange"
             />
           </label>
@@ -309,7 +431,7 @@ onUnmounted(() => {
               min="1"
               max="8"
               :value="status.max_starts_per_tick"
-              :disabled="saving"
+              :disabled="saving || killing || resuming"
               @change="onStartsPerTickChange"
             />
           </label>
@@ -318,62 +440,23 @@ onUnmounted(() => {
 
       <section class="operator-settings-form__section">
         <header class="operator-settings-form__section-header">
-          <h2>Emergency stop</h2>
-          <p>Pause every non-terminal shift immediately. Does not change autonomy mode.</p>
+          <h2>Stop active shifts only</h2>
+          <p>
+            Pause every non-terminal worker shift immediately. Does not change the scheduler switch
+            or autonomy mode — use Hard-kill to pause starts and keep VAXON on Semi.
+          </p>
         </header>
         <div class="agent-fleet-panel__actions">
           <button
             type="button"
             class="settings-surface__button settings-surface__primary"
-            :disabled="stopping || status.active_run_count === 0"
+            :disabled="stopping || status.active_run_count === 0 || killing || resuming"
             @click="onStopAll"
           >
             {{ stopping ? 'Stopping…' : 'Stop all active shifts' }}
-          </button>
-          <button
-            type="button"
-            class="settings-surface__button"
-            :disabled="saving"
-            @click="reload"
-          >
-            Refresh
           </button>
         </div>
       </section>
     </template>
   </div>
 </template>
-
-<style scoped>
-.agent-fleet-panel__modes {
-  display: grid;
-  gap: 0.55rem;
-  margin: 0.85rem 0 1rem;
-}
-
-.agent-fleet-panel__mode {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--axon-line, #3a4a5c) 80%, transparent);
-  border-radius: 0.45rem;
-  cursor: pointer;
-}
-
-.agent-fleet-panel__mode--active {
-  border-color: color-mix(in srgb, var(--axon-accent, #4db8ff) 70%, transparent);
-  background: color-mix(in srgb, var(--axon-accent, #4db8ff) 12%, transparent);
-}
-
-.agent-fleet-panel__mode-label {
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.agent-fleet-panel__readiness {
-  margin: 0.75rem 0 0;
-  font-size: 0.92rem;
-  opacity: 0.92;
-}
-</style>

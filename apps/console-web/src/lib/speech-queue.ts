@@ -25,7 +25,7 @@ let pendingSpeakTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 let queueEpoch = 0;
 const speakingListeners = new Set<(active: boolean) => void>();
 const idleListeners = new Set<() => void>();
-const SPEECH_START_DELAY_MS = 140;
+const SPEECH_START_DELAY_MS = 220;
 const POST_UTTERANCE_DRAIN_MS = 160;
 /** Azure neural short-names → preferred browser gender when the exact voice is missing. */
 const FEMALE_NEURAL_NAMES = new Set([
@@ -76,8 +76,8 @@ function padBrowserSpeechText(text: string): string {
   if (!trimmed) {
     return trimmed;
   }
-  // ZWSP + thin space — not spoken, but shifts the onset past sink warm-up.
-  return `\u200B\u200B\u2009${trimmed}`;
+  // ZWSP + thin spaces — not spoken, but shifts the onset past sink warm-up.
+  return `\u200B\u200B\u200B\u2009\u2009${trimmed}`;
 }
 
 function notifySpeaking(active: boolean): void {

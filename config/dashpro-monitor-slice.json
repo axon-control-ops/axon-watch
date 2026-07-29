@@ -35,7 +35,8 @@
       "service": "GitHub API",
       "url": "https://api.github.com/zen",
       "expect_status": 200,
-      "timeout_seconds": 5
+      "timeout_seconds": 5,
+      "bearer_token_env": "GH_TOKEN"
     }
   ]
 }

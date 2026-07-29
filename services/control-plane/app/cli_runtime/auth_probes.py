@@ -11,7 +11,9 @@ from app.cli_runtime.runtime_auth import env_without_api_keys
 StatusRecord = dict[str, Any]
 
 # `cursor agent status` commonly takes 6–8s on this host; keep headroom above that.
-_AUTH_PROBE_TIMEOUT_SECONDS = 15
+# Occasional cold starts / contention can push past 15s — retry once before failing.
+_AUTH_PROBE_TIMEOUT_SECONDS = 20
+_AUTH_PROBE_RETRY_TIMEOUT_SECONDS = 30
 
 
 def _run_command(
@@ -27,6 +29,19 @@ def _run_command(
         timeout=timeout,
         env=env or {**os.environ, "NO_COLOR": "1"},
     )
+
+
+def _run_command_with_timeout_retry(
+    parts: list[str],
+    *,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return _run_command(parts, timeout=_AUTH_PROBE_TIMEOUT_SECONDS, env=env)
+    except subprocess.TimeoutExpired:
+        # One longer retry — clears most false "auth timed out" flaps without
+        # blocking the operator UI forever (SWR callers still use the cache).
+        return _run_command(parts, timeout=_AUTH_PROBE_RETRY_TIMEOUT_SECONDS, env=env)
 
 
 def vault_auth_overlay(
@@ -95,7 +110,7 @@ def cursor_auth_status(
 
     def _probe(env: dict[str, str]) -> StatusRecord:
         try:
-            proc = _run_command([binary, "agent", "status"], env=env)
+            proc = _run_command_with_timeout_retry([binary, "agent", "status"], env=env)
         except subprocess.TimeoutExpired:
             return {
                 "logged_in": False,
@@ -222,7 +237,7 @@ def codex_auth_status(
             "message": "Install Codex CLI to use the automation runtime.",
         }
     try:
-        proc = _run_command([binary, "login", "status"], env=runtime_env)
+        proc = _run_command_with_timeout_retry([binary, "login", "status"], env=runtime_env)
     except subprocess.TimeoutExpired:
         return {
             "logged_in": False,

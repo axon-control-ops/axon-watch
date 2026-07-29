@@ -13,10 +13,11 @@ export const DEFAULT_SPEECH_PITCH = 1.04;
 export const DEFAULT_AZURE_VOICE_ID = 'en-GB-RyanNeural';
 export const DEFAULT_STT_MODE: SttMode = 'cloud';
 export const DEFAULT_VOICE_ROUTING_MODE: VoiceRoutingMode = 'runtime_on_deep';
-export const DEFAULT_VAXON_MODEL_ID = 'gpt-5.4-high';
+export const DEFAULT_VAXON_MODEL_ID = 'cursor-grok-4.5-high-fast';
 export const DEFAULT_AUTONOMY_MODE: AutonomyMode = 'manual';
 
 export const VAXON_MODEL_OPTIONS = [
+  { id: 'cursor-grok-4.5-high-fast', label: 'Cursor Grok 4.5 Fast' },
   { id: 'gpt-5.4-high', label: 'GPT-5.4 High' },
   { id: 'composer-2', label: 'Composer 2' },
   { id: 'claude-sonnet-5-thinking-high', label: 'Claude Sonnet 5 Thinking High' },

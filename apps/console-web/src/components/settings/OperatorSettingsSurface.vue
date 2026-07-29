@@ -26,7 +26,7 @@ const presenceDirty = ref(false);
 
 const sections = [
   { id: 'voice' as const, label: 'Voice & presence', hint: 'VAXON persona, narration, privacy', mark: '01' },
-  { id: 'agents' as const, label: 'Agents', hint: 'Autonomy mode, concurrency, stop', mark: '02' },
+  { id: 'agents' as const, label: 'Agents', hint: 'VAXON autonomy, hard-kill / resume workers', mark: '02' },
   { id: 'runtime' as const, label: 'CLI runtime', hint: 'Cursor & Codex host auth', mark: '03' },
   { id: 'email' as const, label: 'Email & triage', hint: 'IMAP mailboxes, bridge, inbox', mark: '04' },
   { id: 'app' as const, label: 'App & console', hint: 'Layout, workspace, diagnostics', mark: '05' },
@@ -37,7 +37,8 @@ const sectionMeta = computed(() => {
     case 'agents':
       return {
         title: 'Agent fleet',
-        subtitle: 'Manual, Semi, or Full autonomy — plus concurrency caps and emergency stop.',
+        subtitle:
+          'VAXON autonomy (Semi keeps proactive help with workers off), hard-kill / resume the continuous scheduler without .env, and concurrency caps.',
       };
     case 'runtime':
       return {

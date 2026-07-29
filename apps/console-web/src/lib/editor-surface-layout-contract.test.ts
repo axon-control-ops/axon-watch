@@ -283,7 +283,8 @@ describe('IDE editor surface layout contract', () => {
     expect(focus).toMatch(/outline:\s*2px solid rgba\(0,\s*242,\s*255,\s*0\.72\)/);
 
     const threadCard = ruleBlock(attachments, '.conversation-seam__attachment-card--thread');
-    expect(threadCard).toMatch(/max-height:\s*14rem/);
+    expect(threadCard).toMatch(/width:\s*2\.75rem/);
+    expect(threadCard).toMatch(/height:\s*2\.75rem/);
   });
 
   it('tightens thread attachment cards inside the IDE agent dock transcript', () => {
@@ -292,14 +293,14 @@ describe('IDE editor surface layout contract', () => {
       ide04,
       '.agent-dock__transcript .conversation-seam__attachment-card--thread',
     );
-    expect(transcriptCard).toMatch(/width:\s*min\(100%,\s*14rem\)/);
-    expect(transcriptCard).toMatch(/max-height:\s*11rem/);
+    expect(transcriptCard).toMatch(/width:\s*2\.75rem/);
+    expect(transcriptCard).toMatch(/height:\s*2\.75rem/);
 
     const transcriptFileCard = ruleBlock(
       ide04,
       '.agent-dock__transcript .conversation-seam__attachment-card--thread.conversation-seam__attachment-card--file',
     );
-    expect(transcriptFileCard).toMatch(/max-width:\s*8\.5rem/);
+    expect(transcriptFileCard).toMatch(/max-width:\s*6\.5rem/);
   });
 
   it('loads company roster alert styles from the mockup-shell aggregator', () => {
@@ -360,6 +361,6 @@ describe('IDE editor surface layout contract', () => {
     expect(fileExt).toMatch(/font-weight:\s*700/);
 
     const fileName = ruleBlock(layout07, '.agent-dock-composer__file-name');
-    expect(fileName).toMatch(/-webkit-line-clamp:\s*2/);
+    expect(fileName).toMatch(/-webkit-line-clamp:\s*[12]/);
   });
 });

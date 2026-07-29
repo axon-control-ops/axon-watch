@@ -101,6 +101,23 @@ class CiRemediationTests(unittest.TestCase):
         payload["workflow_run"] = run
         self.assertIsNone(classify_workflow_run_event(payload))
 
+    def test_ingest_accepts_bound_success_without_open_state(self) -> None:
+        from app.ci_remediation.ingest import ingest_workflow_run_event
+
+        payload = _failure_payload()
+        run = dict(payload["workflow_run"])  # type: ignore[arg-type]
+        run["conclusion"] = "success"
+        payload["workflow_run"] = run
+
+        result = ingest_workflow_run_event(payload)
+
+        self.assertTrue(result.accepted)
+        self.assertEqual(
+            "workflow_status:success;no_matching_state",
+            result.reason,
+        )
+        self.assertEqual("30075110718", result.run_id)
+
     def test_config_matches_axon_binding(self) -> None:
         from app.ci_remediation.config import load_ci_remediation_config, match_binding
 

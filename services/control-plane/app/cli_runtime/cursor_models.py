@@ -41,6 +41,11 @@ CURSOR_CLI_MODEL_OPTIONS: list[ModelRecord] = [
         "description": "Cursor Composer model (subscription routing).",
     },
     {
+        "id": "cursor-grok-4.5-high-fast",
+        "label": "Cursor Grok 4.5 Fast",
+        "description": "Grok 4.5 Fast via Cursor subscription routing (VAXON default).",
+    },
+    {
         "id": "claude-fable-5-thinking-high",
         "label": "claude-fable-5-thinking-high",
         "description": "Claude Fable 5 (high thinking) via Cursor subscription routing.",

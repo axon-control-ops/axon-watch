@@ -48,16 +48,3 @@ export function collapseConsecutiveDuplicateOperatorMessages<T extends Collapsib
   }
   return out;
 }
-
-/** Index of the latest operator message for Cursor-like sticky pin. */
-export function latestOperatorMessageIndex(
-  items: ReadonlyArray<{ kind?: string; message?: { role?: string | null } | null }>,
-): number {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const item = items[index];
-    if ((item?.kind === 'message' || !item?.kind) && item?.message?.role === 'operator') {
-      return index;
-    }
-  }
-  return -1;
-}

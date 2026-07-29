@@ -29,7 +29,7 @@ export interface TerminalSessionDescriptor {
 export const DEFAULT_TERMINAL_SESSIONS: TerminalSessionDescriptor[] = [
   {
     id: DEFAULT_OPERATOR_TERMINAL_SESSION_ID,
-    title: 'bash',
+    title: 'zsh',
     role: 'operator',
     runId: null,
     state: 'ready',
@@ -69,6 +69,25 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
       if (!input.terminalSessions.value.some((session) => session.id === input.activeTerminalSessionId.value)) {
         input.activeTerminalSessionId.value = DEFAULT_OPERATOR_TERMINAL_SESSION_ID;
       }
+      // Legacy default operator tab was titled "bash" — rename so UI + PTY prefer zsh.
+      const legacyBash = input.terminalSessions.value.find(
+        (session) =>
+          session.id === DEFAULT_OPERATOR_TERMINAL_SESSION_ID &&
+          session.role === 'operator' &&
+          session.title.trim().toLowerCase() === 'bash',
+      );
+      if (legacyBash) {
+        try {
+          const updated = await renameWorkspaceTerminalSession(
+            workspaceId,
+            legacyBash.id,
+            'zsh',
+          );
+          applyTerminalSession(updated);
+        } catch {
+          /* keep bash label if rename fails; PTY still migrates after CP restart */
+        }
+      }
     } catch {
       input.terminalSessions.value = [...DEFAULT_TERMINAL_SESSIONS];
       input.activeTerminalSessionId.value = DEFAULT_OPERATOR_TERMINAL_SESSION_ID;
@@ -107,7 +126,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     }
 
     const role = options.role ?? 'operator';
-    const title = options.title ?? (role === 'agent' ? 'vaxon' : 'bash');
+    const title = options.title ?? (role === 'agent' ? 'vaxon' : 'zsh');
     const created = await createWorkspaceTerminalSession(workspaceId, {
       role,
       title,
@@ -168,7 +187,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
       input.activeTerminalSessionId.value = operatorSession.id;
       return;
     }
-    await createTerminalSession({ role: 'operator', title: 'bash' });
+    await createTerminalSession({ role: 'operator', title: 'zsh' });
   }
 
   /** Inject a command into the read-only vaxon PTY (not offered on finished transcript cards). */
@@ -194,7 +213,7 @@ export function createTerminalSessionStore(input: TerminalSessionStoreInput) {
     }
     const created = await createTerminalSession({
       role: 'operator',
-      title: source.role === 'agent' ? 'bash' : source.title || 'bash',
+      title: source.role === 'agent' ? 'zsh' : source.title || 'zsh',
     });
     return created?.session_id ?? null;
   }

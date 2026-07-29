@@ -5,6 +5,7 @@ import {
   openCursorUsageSettings,
   openWatchConnectors,
 } from '../../composables/useIdeEditorStatusBar';
+import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
 import { isConnectorStatusBarChip } from '../../lib/connector-glance-view';
 import { isCursorUsageStatusBarChip } from '../../lib/cursor-usage-view';
 import { useShellStore } from '../../stores/shell';
@@ -22,6 +23,10 @@ function updateClock(): void {
     second: '2-digit',
     hour12: false,
   });
+}
+
+async function onOpenStandup(): Promise<void> {
+  await openOperatorStandup(shell);
 }
 
 function isInteractiveCenterChip(id: string): boolean {
@@ -202,6 +207,17 @@ onUnmounted(() => {
           <span class="status-bar-mockup__icon status-bar-mockup__icon--operator" aria-hidden="true" />
           <span class="status-bar-mockup__chip-label">{{ operatorZone?.label }}</span>
         </div>
+
+        <button
+          type="button"
+          class="status-bar-mockup__chip status-bar-mockup__chip--standup"
+          aria-label="Open VAXON stand-up report"
+          title="Open stand-up (REPORT) from anywhere"
+          @click="onOpenStandup"
+        >
+          <span class="status-bar-mockup__icon status-bar-mockup__icon--kairo" aria-hidden="true" />
+          <span class="status-bar-mockup__chip-label">Stand-up</span>
+        </button>
 
         <button
           v-if="shell.showKairoBriefingAttention"

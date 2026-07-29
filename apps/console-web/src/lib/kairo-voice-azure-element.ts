@@ -2,10 +2,10 @@
 
 import { isDesktopWebView, unlockKairoAudioPlayback } from './kairo-audio-unlock';
 
-const AUDIO_PREROLL_MS = 120;
-const DEFAULT_ENCODED_LEAD_IN_MS = 950;
-// Live 48 kHz MP3 inspection adds ~220 ms codec / neural onset after the SSML break.
-const AZURE_CODEC_ONSET_MS = 220;
+const AUDIO_PREROLL_MS = 160;
+const DEFAULT_ENCODED_LEAD_IN_MS = 1100;
+// Live 48 kHz MP3 inspection adds codec / neural onset after the SSML silence.
+const AZURE_CODEC_ONSET_MS = 280;
 /** Data/blob URLs sometimes never fire canplaythrough — never block forever. */
 const AUDIO_READY_TIMEOUT_MS = 3500;
 

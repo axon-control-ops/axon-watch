@@ -38,7 +38,7 @@ export interface OperatorPresenceSettings {
   voice_routing_mode: VoiceRoutingMode;
   /**
    * Operator-global VAXON LLM id (not per-workspace Composer prefs).
-   * Default: gpt-5.4-high.
+   * Default: cursor-grok-4.5-high-fast (Cursor Grok 4.5 Fast).
    */
   vaxon_model_id: string;
   /** Speak tool milestones during agent runs (conversational only). */

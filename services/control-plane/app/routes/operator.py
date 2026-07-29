@@ -211,8 +211,8 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
 
     from app.azure_tts import (
         DEFAULT_AZURE_VOICE,
-        LEADING_AUDIO_GUARD_MS,
         azure_speech_configured,
+        leading_audio_guard_ms,
         synthesize_azure_speech,
     )
     from app.cli_runtime.vault_keys import runtime_vault_posture
@@ -248,7 +248,7 @@ def kairo_tts(body: KairoTtsRequest) -> dict[str, object]:
         "voice": voice,
         "content_type": content_type,
         "audio_base64": base64.b64encode(audio).decode("ascii"),
-        "leading_audio_guard_ms": LEADING_AUDIO_GUARD_MS,
+        "leading_audio_guard_ms": leading_audio_guard_ms(trimmed),
     }
 
 

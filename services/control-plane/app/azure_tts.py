@@ -25,13 +25,21 @@ DEFAULT_AZURE_OUTPUT_FORMAT = "audio-48khz-192kbitrate-mono-mp3"
 # yet the sink dropped roughly the first 400–500 ms ("Continuing" → "uing").
 # Encoded silence survives decoder/device wake-up; a JS delay before play does not.
 # Bumped past 650ms — stand-up lines still clipped openings on some sinks.
-LEADING_AUDIO_GUARD_MS = 950
+LEADING_AUDIO_GUARD_MS = 1100
+# Soft action-word openings still lost the first syllable at 1450 ms
+# ("Walking" -> "king"). Keep the extra latency on vulnerable openings only.
+SOFT_ONSET_LEADING_AUDIO_GUARD_MS = 2200
 TTS_READ_ATTEMPTS = 2
 TTS_REQUEST_TIMEOUT_SECONDS = 6
 TTS_RETRY_BACKOFF_SECONDS = 0.15
 _PLACEHOLDER_KEYS = frozenset({"changeme", "change-me", "placeholder", "your-key-here", "test"})
 _AZURE_KEY_NAMES = ("AZURE_SPEECH_KEY", "azure_speech_key")
 _AZURE_REGION_NAMES = ("AZURE_SPEECH_REGION", "azure_speech_region")
+_SOFT_ONSET_OPENING_RE = re.compile(
+    r"^(?:building|checking|continuing|looking|pulling|reading|reviewing|"
+    r"walking|working|watching|writing)\b",
+    flags=re.IGNORECASE,
+)
 
 
 def _clean_for_speech(text: str) -> str:
@@ -50,6 +58,14 @@ def _clean_for_speech(text: str) -> str:
     # Zulu names Azure often misreads — speak Sipho as SEE-po.
     cleaned = re.sub(r"\bSipho\b", "See-po", cleaned, flags=re.IGNORECASE)
     return cleaned[:3000]
+
+
+def leading_audio_guard_ms(text: str) -> int:
+    """Return encoded lead-in required for the opening phoneme."""
+    cleaned = _clean_for_speech(text)
+    if _SOFT_ONSET_OPENING_RE.match(cleaned):
+        return SOFT_ONSET_LEADING_AUDIO_GUARD_MS
+    return LEADING_AUDIO_GUARD_MS
 
 
 def _inject_ssml_breaks(text: str) -> str:
@@ -157,11 +173,17 @@ def build_azure_ssml(
     safe_text = _escape_ssml_text_preserving_breaks(_inject_ssml_breaks(cleaned))
     rate_attr = azure_voice_rate_attr(rate if rate is not None else DEFAULT_VOICE_RATE)
     pitch_attr = azure_voice_pitch_attr(pitch if pitch is not None else DEFAULT_VOICE_PITCH)
+    leading_guard_ms = leading_audio_guard_ms(cleaned)
+    # mstts Leading + a short break outside prosody — Chromium still ate soft
+    # openings when only an in-prosody <break> was used. Do not double the full
+    # guard (that made every line feel delayed).
     return (
         "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' "
-        "xml:lang='en-GB'>"
-        f"<voice name='{safe_voice}'><prosody rate='{rate_attr}' pitch='{pitch_attr}'>"
-        f"<break time='{LEADING_AUDIO_GUARD_MS}ms'/>"
+        "xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-GB'>"
+        f"<voice name='{safe_voice}'>"
+        f"<mstts:silence type='Leading' value='{leading_guard_ms}ms'/>"
+        "<break time='200ms'/>"
+        f"<prosody rate='{rate_attr}' pitch='{pitch_attr}'>"
         f"{safe_text}</prosody></voice>"
         "</speak>"
     )

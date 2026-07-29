@@ -15,14 +15,11 @@ Use it to:
 - **Upgrade** the stack after pulls or dependency changes
 - **Debug** when the UI, API, or tests misbehave
 
-**Last verified:** 2026-07-28 — Gates 0–5 closed; Gate 6 verifier + draft-PR
-delivery + Gate 9 CI remediation proven for Axon-X; per-task `allowed_paths` and
-file-size patrol plumbing landed. Connector/tunnel recovery documented
-(`axonfixconnectors`). **Not yet a closed unattended auto-loop** —
-scheduler stays **off** by default; Mission Control still needs Retry / dig-in.
-Read [`how-to/auto-loop-and-credits.md`](how-to/auto-loop-and-credits.md) first
-for status + Cursor credit budgets. After every push run
-`./scripts/ops/watch-fast-gate.sh`.
+**Last verified:** 2026-07-29 — Gate 9 polls Fast Gate every three minutes: red
+runs dispatch Rowan; green runs clear stale alerts. GitHub and Cursor dispatch
+were confirmed ready. Restart recovery, manual stand-up, speech onset, and
+AgentDock hover actions are documented below. Protected merges, force-pushes,
+and secrets remain human-gated. After every push: `./scripts/ops/watch-fast-gate.sh`.
 
 **PDF (Desktop):** After every edit to this handbook or `docs/how-to/*.md`, rebuild:
 `./scripts/docs/build-howto-handbook-pdf.sh` → `~/Desktop/Axon-X-How-To-Handbook.pdf`
@@ -30,8 +27,6 @@ for status + Cursor credit budgets. After every push run
 **Production URL:** http://127.0.0.1:4173 — [`docs/PRODUCTION_OPERATOR_SURFACE.md`](PRODUCTION_OPERATOR_SURFACE.md)
 
 **Layered onboarding (shorter):** [`docs/AXON-X-STARTER-GUIDE.md`](AXON-X-STARTER-GUIDE.md)
-
----
 
 ## Table of Contents
 
@@ -60,8 +55,6 @@ for status + Cursor credit budgets. After every push run
 17. [Tips, hints & tricks](#tips-hints-and-tricks)
 18. [Upgrading & updating](#upgrading-and-updating) — pulls, deps, planning sync
 19. [Next slices](#what-a-good-next-slice-looks-like) — what to build next
-
----
 
 ## Handbook map
 
@@ -102,6 +95,11 @@ axonfixconnectors  # required connector / tunnel / vault 503 — diagnose (+ opt
 ```
 
 These are on your PATH (`~/.local/bin` → `bin/` in this repo). See [Snippet cookbook](#snippet-cookbook).
+
+### Reliability and deliberate controls
+
+See [Reliability and deliberate controls](how-to/reliability-and-deliberate-controls.md)
+for Vite recovery, manual STAND-UP, speech onset, and AgentDock hover actions.
 
 **Dev bootstrap (alternate, not used when systemd owns the ports):**
 
@@ -976,8 +974,7 @@ If you need to understand the current implementation quickly, read these first:
 Use these from the repo root.
 
 **CI, merge to `dev`, and employee agents:** see
-**[docs/how-to/ci-merge-and-worker-agents.md](how-to/ci-merge-and-worker-agents.md)**
-(Fast Gate workflow, PR workflow, roster/scheduler, how to tell if workers are live).
+**[CI, merge, and worker agents](how-to/ci-merge-and-worker-agents.md)**.
 
 ## Shared contract verification
 
@@ -1329,11 +1326,14 @@ axonrevive
 
 Why `./scripts/dev/down.sh` / `up.sh` fail here: this host runs **user systemd units** (`control-plane.service`, etc.). Dev down/up skip those listeners. Soft `systemctl --user restart` can also hang on a stuck worker — `axonrevive` force-kills first.
 
+## Problem: Vite reports `ECONNREFUSED 127.0.0.1:8787`
+
+Use `scripts/ops/run-5173.sh`; follow the
+[restart playbook](how-to/reliability-and-deliberate-controls.md#vite-control-plane-recovery).
+
 ## Problem: online research falls back / Google search returns 403
 
-See **[docs/how-to/searxng-research.md](how-to/searxng-research.md)** for SearXNG
-setup, provider order (SearXNG → legacy Google → DuckDuckGo), and Google 403
-troubleshooting.
+See **[SearXNG research](how-to/searxng-research.md)** for provider order and Google 403 recovery.
 
 ## Problem: `./scripts/dev/up.sh` fails or the frontend does not start
 

@@ -8,17 +8,18 @@ import {
   type KairoVoiceSpeaker,
 } from '../lib/kairo-voice-utterance';
 import { sanitizeAgentThinkingForOperator, stripAgentStreamFenceMarkers } from '../lib/agent-live-line-view';
+import { normalizeKairoCopy } from '../lib/kairo-entity-labels';
 
 function operatorFacingSpokenText(text: string | null | undefined): string | null {
   const raw = text?.trim();
   if (!raw) {
     return null;
   }
-  return (
-    sanitizeAgentThinkingForOperator(raw) ||
-    stripAgentStreamFenceMarkers(raw) ||
-    null
-  );
+  // TTS may use phonetic "Vekson"; on-screen copy must stay "VAXON".
+  const display = normalizeKairoCopy(
+    sanitizeAgentThinkingForOperator(raw) || stripAgentStreamFenceMarkers(raw) || '',
+  ).trim();
+  return display || null;
 }
 
 export function useSpokenUtteranceText() {

@@ -53,6 +53,29 @@ describe('groupIdeConversationTurns', () => {
     expect(turns[0]?.replies.map((item) => item.message_id)).toEqual(['a2']);
   });
 
+  it('replaces on resent only when attachment identity also matches', () => {
+    const withAtt = (id: string, att: string): OperatorThreadEntry => ({
+      ...msg('operator', id, 'same text'),
+      attachments: [
+        {
+          attachment_id: att,
+          filename: 'a.png',
+          mime_type: 'image/png',
+          size_bytes: 1,
+          url: '/x',
+        },
+      ],
+    });
+    const turns = groupIdeConversationTurns([
+      withAtt('o1', 'att_a'),
+      msg('agent', 'a1', 'first'),
+      withAtt('o2', 'att_b'),
+      msg('agent', 'a2', 'second'),
+    ]);
+    expect(turns).toHaveLength(2);
+    expect(turns.map((turn) => turn.prompt?.message_id)).toEqual(['o1', 'o2']);
+  });
+
   it('keeps distinct prompts even when text matches a non-adjacent turn', () => {
     const turns = groupIdeConversationTurns([
       msg('operator', 'o1', 'same'),

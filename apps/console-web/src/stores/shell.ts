@@ -167,7 +167,8 @@ import {
   streamingThreadIdsFromUiMap,
   workspaceStreamGlobalsFromState,
 } from '../lib/workspace-stream-ui';
-import { listStaleIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
+import { listReattachIdeStreamThreadIds, listStaleIdeStreamThreadIds } from '../lib/stale-ide-stream-ui';
+import { resolveStreamingAgentMessageId } from '../lib/follow-busy-employee-ide-streams';
 import {
   localRuntimeDegradedActive,
   remoteIngressAttentionActive,
@@ -868,6 +869,9 @@ export const useShellStore = defineStore('shell', () => {
     await loadIdeThreads(workspaceId);
     const threadId =
       getWorkspaceSurfaceThreadId(workspaceId, 'ide') ?? bootstrapIdeActiveThreadId(workspaceId);
+    if (threadId) {
+      setWorkspaceSurfaceThreadId(workspaceId, 'ide', threadId);
+    }
     ideStreamFocusThreadId.value = threadId;
     if (threadId) {
       applyWorkspaceStreamUiToGlobals(threadId);
@@ -880,6 +884,7 @@ export const useShellStore = defineStore('shell', () => {
         if (currentWorkspace.value?.workspace_id === workspaceId) {
           syncIdeComposerDraftForWorkspace(workspaceId);
         }
+        await rehydrateWorkspaceIdeStreams(workspaceId);
         return;
       }
     }
@@ -889,6 +894,7 @@ export const useShellStore = defineStore('shell', () => {
     if (currentWorkspace.value?.workspace_id === workspaceId) {
       syncIdeComposerDraftForWorkspace(workspaceId);
     }
+    await rehydrateWorkspaceIdeStreams(workspaceId);
   }
 
   function resetThreadContext(): void {
@@ -1009,6 +1015,7 @@ export const useShellStore = defineStore('shell', () => {
     leadPlansMutating,
     loadLeadPlans,
     fanOutCurrentWorkspaceLeadPlan,
+    closeCurrentLeadPlanEngagement,
     synthesizeCurrentLeadPlan,
   } = createLeadPlansSlice({
     currentWorkspace,
@@ -1863,7 +1870,7 @@ export const useShellStore = defineStore('shell', () => {
     );
   }
 
-  createBusyEmployeeIdeStreamSlice({
+  const { followBusyEmployeeIdeStreams } = createBusyEmployeeIdeStreamSlice({
     currentWorkspaceId: computed(() => currentWorkspace.value?.workspace_id ?? null),
     layoutMode,
     companyEmployees: companyEmployeesForCurrentWorkspace,
@@ -1873,7 +1880,110 @@ export const useShellStore = defineStore('shell', () => {
     ensureIdeThreadTabOpen,
     getWorkspaceStreamUi,
     attachChatStream,
+    hasLiveChatStreamSession: (threadId) => chatStreamSessionsByWorkspace.has(threadId),
   });
+
+  async function reattachIdeChatStream(threadId: string, workspaceId: string): Promise<void> {
+    const streamUi = getWorkspaceStreamUi(threadId);
+    const runId = streamUi.ideAgentRunId?.trim() || null;
+    let messages = workspaceIdeThreadMessagesById.value[threadId] ?? [];
+    let messageId = streamUi.messageId?.trim() || null;
+    if (!messageId && runId) {
+      messageId = resolveStreamingAgentMessageId(messages, runId);
+    }
+    if ((!messageId || !messages.length) && runId) {
+      try {
+        const history = await fetchThreadHistory(threadId);
+        messages = filterThreadMessagesForSurface(
+          history.items.map((item) => mapChatMessageRecord(item)),
+          'ide',
+        );
+        workspaceIdeThreadMessagesById.value = {
+          ...workspaceIdeThreadMessagesById.value,
+          [threadId]: messages,
+        };
+        messageId = resolveStreamingAgentMessageId(messages, runId) ?? messageId;
+      } catch {
+        return;
+      }
+    }
+    if (!messageId) {
+      return;
+    }
+    const operatorPrompt =
+      [...messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.role === 'operator' &&
+            (!runId || (message.run_id ?? '').trim() === runId),
+        )?.content ??
+      streamUi.activity?.operatorPrompt ??
+      '';
+    attachChatStream(workspaceId, threadId, messageId, {
+      activity: streamUi.activity ?? {
+        label: buildIdeStreamActivityLabel('full', 'agent'),
+        mode: 'agent',
+        executionAccess: 'full',
+        operatorPrompt,
+      },
+      ideAgentRunId: runId,
+      seedMessages: messages,
+      preserveMessageCache: true,
+    });
+  }
+
+  async function rehydrateWorkspaceIdeStreams(workspaceId: string): Promise<void> {
+    const cleaned = workspaceId.trim();
+    if (!cleaned || currentWorkspace.value?.workspace_id !== cleaned) {
+      return;
+    }
+    await loadRuns({ sync: false });
+    const runPhaseById: Record<string, string | undefined> = {};
+    for (const run of runs.value) {
+      runPhaseById[run.run_id] = run.phase;
+    }
+    const workspaceThreadIds = new Set(
+      (ideThreadsByWorkspaceId.value[cleaned] ?? []).map((thread) => thread.thread_id),
+    );
+    const surfaceThreadId = getWorkspaceSurfaceThreadId(cleaned, 'ide');
+    if (surfaceThreadId) {
+      workspaceThreadIds.add(surfaceThreadId);
+    }
+    const decisionInput = {
+      streamUiByThreadId: Object.fromEntries(
+        Object.entries(workspaceStreamUiById.value).filter(([threadId]) =>
+          workspaceThreadIds.has(threadId),
+        ),
+      ),
+      liveSessionThreadIds: chatStreamSessionsByWorkspace.keys(),
+      runPhaseById,
+      runsLoaded: runsLoadState.value === 'loaded',
+    };
+    const reattachIds = listReattachIdeStreamThreadIds(decisionInput);
+    for (const threadId of reattachIds) {
+      await reattachIdeChatStream(threadId, cleaned);
+    }
+    // Also recover operator-initiated runs whose EventSource died while away.
+    for (const threadId of workspaceThreadIds) {
+      const streamUi = workspaceStreamUiById.value[threadId];
+      if (!streamUi?.ideAgentRunId || chatStreamSessionsByWorkspace.has(threadId)) {
+        continue;
+      }
+      const phase = runPhaseById[streamUi.ideAgentRunId];
+      if (
+        phase === 'executing' ||
+        phase === 'starting' ||
+        phase === 'planning' ||
+        phase === 'queued'
+      ) {
+        await reattachIdeChatStream(threadId, cleaned);
+      }
+    }
+    await followBusyEmployeeIdeStreams();
+    await autoContinueInterruptedIdeRun();
+  }
+
   function clearIdeAgentRunLink(): void {
     ideAgentRunId.value = null;
   }
@@ -3148,12 +3258,31 @@ export const useShellStore = defineStore('shell', () => {
     for (const run of runs.value) {
       runPhaseById[run.run_id] = run.phase;
     }
-    const staleThreadIds = listStaleIdeStreamThreadIds({
+    const decisionInput = {
       streamUiByThreadId: workspaceStreamUiById.value,
       liveSessionThreadIds: chatStreamSessionsByWorkspace.keys(),
       runPhaseById,
       runsLoaded: runsLoadState.value === 'loaded',
-    });
+    };
+    const reattachThreadIds = listReattachIdeStreamThreadIds(decisionInput);
+    const staleThreadIds = listStaleIdeStreamThreadIds(decisionInput);
+    const workspaceId = currentWorkspace.value?.workspace_id ?? null;
+    const currentThreadIds = new Set(
+      workspaceId
+        ? (ideThreadsByWorkspaceId.value[workspaceId] ?? []).map((thread) => thread.thread_id)
+        : [],
+    );
+    if (workspaceId) {
+      const surfaceThreadId = getWorkspaceSurfaceThreadId(workspaceId, 'ide');
+      if (surfaceThreadId) {
+        currentThreadIds.add(surfaceThreadId);
+      }
+    }
+    for (const threadId of reattachThreadIds) {
+      if (workspaceId && currentThreadIds.has(threadId)) {
+        void reattachIdeChatStream(threadId, workspaceId);
+      }
+    }
     if (!staleThreadIds.length) {
       return;
     }
@@ -3405,7 +3534,7 @@ export const useShellStore = defineStore('shell', () => {
       });
       if (dispatched) {
         await refreshRunSurfaces();
-        afterRunLifecycleMutation();
+        afterRunLifecycleMutation({ preserveSurface: true });
         return;
       }
 
@@ -3667,6 +3796,7 @@ export const useShellStore = defineStore('shell', () => {
     leadPlansMutating,
     loadLeadPlans,
     fanOutCurrentWorkspaceLeadPlan,
+    closeCurrentLeadPlanEngagement,
     synthesizeCurrentLeadPlan,
     ideThreadsForCurrentWorkspace,
     openIdeThreadTabsForCurrentWorkspace,

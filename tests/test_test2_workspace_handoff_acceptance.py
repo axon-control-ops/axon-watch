@@ -69,7 +69,8 @@ class Test2WorkspaceHandoffAcceptance(unittest.TestCase):
         assert isinstance(handoff, dict)
         self.assertEqual(SOURCE_WORKSPACE_ID, handoff.get("source_workspace_id"))
         self.assertEqual(TARGET_WORKSPACE_ID, handoff.get("target_workspace_id"))
-        self.assertEqual("recorded", handoff.get("status"))
+        self.assertEqual("routed", handoff.get("status"))
+        self.assertTrue(str(handoff.get("target_task_id") or "").startswith("task-"))
         self.assertTrue(str(handoff.get("handoff_id", "")).startswith("handoff-"))
 
         summary = payload.get("target_workspace_summary")

@@ -11,11 +11,15 @@ from app.terminal.shell_invocation import (  # noqa: E402
     build_shell_command,
     build_shell_env,
     bundled_bash_rc_path,
+    resolve_terminal_shell,
     zdotdir_path,
 )
 
 
 class ShellInvocationTests(unittest.TestCase):
+    def test_resolve_terminal_shell_prefers_session_title(self) -> None:
+        self.assertTrue(resolve_terminal_shell("zsh").endswith("zsh"))
+        self.assertTrue(resolve_terminal_shell("bash").endswith("bash"))
     def test_build_shell_command_uses_zdotdir_for_zsh_not_rcfile(self) -> None:
         self.assertEqual(build_shell_command("/bin/zsh"), ["/bin/zsh", "-i"])
         self.assertFalse(any("--rcfile" in part for part in build_shell_command("/bin/zsh")))

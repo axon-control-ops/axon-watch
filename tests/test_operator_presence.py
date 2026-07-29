@@ -260,7 +260,7 @@ class OperatorPresenceSettingsApiTests(unittest.TestCase):
 
     def test_vaxon_model_id_defaults_and_round_trip(self) -> None:
         loaded = self.client.get("/api/operator-presence/settings").json()
-        self.assertEqual("gpt-5.4-high", loaded["settings"]["vaxon_model_id"])
+        self.assertEqual("cursor-grok-4.5-high-fast", loaded["settings"]["vaxon_model_id"])
 
         save = self.client.put(
             "/api/operator-presence/settings",

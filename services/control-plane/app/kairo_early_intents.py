@@ -9,6 +9,7 @@ from app.kairo_memory_intents import maybe_handle_memory_intent
 from app.kairo_participant_memory import apply_participant_address, get_active_participant
 from app.kairo_lead_charter_intents import maybe_handle_lead_charter_intent
 from app.kairo_stale_alert_intents import maybe_handle_clear_stale_alerts_intent
+from app.kairo_tunnel_intents import maybe_handle_public_tunnel_repair_intent
 from app.kairo_workspace_register_intents import maybe_handle_register_workspace_intent
 from app.kairo_workspace_rename_intents import maybe_handle_rename_workspace_intent
 
@@ -28,6 +29,14 @@ def maybe_handle_early_converse_intent(
     )
     if memory_intent is not None:
         return memory_intent
+
+    tunnel_intent = maybe_handle_public_tunnel_repair_intent(
+        content=content,
+        session_id=session_id,
+        guest_name=guest_name,
+    )
+    if tunnel_intent is not None:
+        return tunnel_intent
 
     stale_intent = maybe_handle_clear_stale_alerts_intent(
         content=content,

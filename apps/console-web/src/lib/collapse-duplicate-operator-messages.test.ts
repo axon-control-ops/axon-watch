@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  collapseConsecutiveDuplicateOperatorMessages,
-  latestOperatorMessageIndex,
-} from './collapse-duplicate-operator-messages';
+import { collapseConsecutiveDuplicateOperatorMessages } from './collapse-duplicate-operator-messages';
 
 describe('collapseConsecutiveDuplicateOperatorMessages', () => {
   it('collapses consecutive identical operator prompts from Continue', () => {
@@ -40,18 +37,5 @@ describe('collapseConsecutiveDuplicateOperatorMessages', () => {
       { role: 'operator', content: 'same', attachments: [{ attachment_id: 'b' }] },
     ]);
     expect(messages).toHaveLength(2);
-  });
-});
-
-describe('latestOperatorMessageIndex', () => {
-  it('finds the latest operator display item', () => {
-    expect(
-      latestOperatorMessageIndex([
-        { kind: 'message', message: { role: 'operator' } },
-        { kind: 'message', message: { role: 'agent' } },
-        { kind: 'message', message: { role: 'operator' } },
-        { kind: 'message', message: { role: 'agent' } },
-      ]),
-    ).toBe(2);
   });
 });

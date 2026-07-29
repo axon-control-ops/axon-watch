@@ -44,6 +44,8 @@ interface CreateBusyEmployeeIdeStreamSliceInput {
   ensureIdeThreadTabOpen: (threadId: string) => void;
   getWorkspaceStreamUi: (threadId: string) => WorkspaceStreamUiState;
   attachChatStream: AttachBusyEmployeeChatStream;
+  /** True when an EventSource session is open for the thread. */
+  hasLiveChatStreamSession?: (threadId: string) => boolean;
 }
 
 export function createBusyEmployeeIdeStreamSlice(input: CreateBusyEmployeeIdeStreamSliceInput) {
@@ -96,6 +98,7 @@ export function createBusyEmployeeIdeStreamSlice(input: CreateBusyEmployeeIdeStr
           resolvedMessageId: messageId,
           alreadyActive: Boolean(streamUi.active),
           alreadyMessageId: streamUi.messageId,
+          hasLiveSession: Boolean(input.hasLiveChatStreamSession?.(threadId)),
         });
         if (decision !== 'attach' || !threadId || !messageId) {
           continue;

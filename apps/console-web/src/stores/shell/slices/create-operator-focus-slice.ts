@@ -158,8 +158,13 @@ export function createOperatorFocusSlice(input: CreateOperatorFocusSliceInput) {
     persistOperatorCenterView(view);
   }
 
-  function afterRunLifecycleMutation(): void {
-    focusMissionControl();
+  function afterRunLifecycleMutation(options: { preserveSurface?: boolean } = {}): void {
+    // IDE Continue / resume / stop must stay on the IDE surface. Never yank the
+    // operator into Mission Control mid-composer work.
+    const stayOnIde = options.preserveSurface === true || input.layoutMode.value === 'ide';
+    if (!stayOnIde) {
+      focusMissionControl();
+    }
     if (input.dockHeroMode.value === 'briefing' && typeof window !== 'undefined') {
       input.briefingSeamEmphasized.value = true;
       window.setTimeout(() => {

@@ -368,6 +368,74 @@
   cursor: pointer;
 }
 
+.operator-task-board__handoffs {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid rgba(0, 242, 255, 0.22);
+  background: rgba(0, 18, 28, 0.55);
+}
+
+.operator-task-board__handoffs-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.operator-task-board__handoffs-head h4 {
+  margin: 0;
+  color: rgba(170, 230, 245, 0.95);
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.operator-task-board__handoffs-head span {
+  color: rgba(140, 190, 205, 0.85);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+}
+
+.operator-task-board__handoff-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operator-task-board__handoff-button {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(0, 242, 255, 0.14);
+  background: rgba(2, 20, 30, 0.72);
+  color: inherit;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+}
+
+.operator-task-board__handoff-item--incoming .operator-task-board__handoff-button {
+  border-color: rgba(0, 245, 180, 0.28);
+}
+
+.operator-task-board__handoff-meta {
+  color: rgba(150, 205, 220, 0.88);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+}
+
+.operator-task-board__handoff-task {
+  color: rgba(230, 244, 248, 0.96);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .operator-task-board__plan-filter {
   display: flex;
   flex-wrap: wrap;

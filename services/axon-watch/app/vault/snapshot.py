@@ -55,6 +55,16 @@ _VAULT_CONSUMERS: tuple[dict[str, object], ...] = (
         "auth_note": "Store AZURE_SPEECH_KEY (or azure_speech_key) and optional region in /vault.",
     },
     {
+        "id": "github_api_health",
+        "label": "GitHub API health probes",
+        "any_of_keys": ("GITHUB_TOKEN", "GH_TOKEN", "AXON_GITHUB_TOKEN"),
+        "auth_note": (
+            "Store GITHUB_TOKEN (or GH_TOKEN / AXON_GITHUB_TOKEN) in /vault so monitor and "
+            "connector probes use authenticated GitHub quota. Without a token, frequent "
+            "checks can hit the public rate limit and raise a false warning."
+        ),
+    },
+    {
         "id": "vaxon_research",
         "label": "VAXON online research (Google CSE)",
         "required_keys": ("AXON_WATCH_GOOGLE_CSE_API_KEY", "AXON_WATCH_GOOGLE_CSE_CX"),
@@ -135,6 +145,11 @@ def _consumer_record(env: dict[str, str], spec: dict[str, object]) -> dict[str, 
             missing_required = ["subscription_or_api_key"]
         elif any_of and not satisfied_any:
             missing_required.append(f"one_of:{'|'.join(any_of)}")
+    elif not key_ready and any_of and not satisfied_any:
+        # e.g. GitHub API health probes: any one of GH_TOKEN / GITHUB_TOKEN / …
+        marker = f"one_of:{'|'.join(any_of)}"
+        if marker not in missing_required:
+            missing_required.append(marker)
 
     return {
         "id": str(spec.get("id") or ""),

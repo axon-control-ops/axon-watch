@@ -65,9 +65,9 @@ def build_briefing_notice(
         # Never put a count word immediately before "Lead" — Azure glues "four Lead" into "forlead".
         count_word = _count_words(lead_awaiting_engagement_count)
         if lead_awaiting_engagement_count == 1:
-            return "A Lead-team plan is waiting for you to engage in VAXON."
+            return "A Lead-team plan is waiting for you in Mission Control."
         return (
-            f"Lead-team plans are waiting for you to engage in VAXON — {count_word} of them."
+            f"Lead-team plans are waiting for you in Mission Control — {count_word} of them."
         )
 
     cli = cli_runtime if isinstance(cli_runtime, dict) else {}
@@ -134,7 +134,7 @@ def build_briefing_advise(
         return "Review execution evidence in Command or Active Run when ready."
 
     if lead_awaiting_engagement_count > 0:
-        return "Open VAXON for the Lead rollup, then decide the next handoff."
+        return "Open Mission Control for the Lead rollup, then decide the next handoff."
 
     return ""
 

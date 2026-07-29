@@ -373,22 +373,6 @@ def post_lead_takeover_report(
             lead_next=lead_next,
             run_id=cleaned_run,
         )
-        # region agent log
-        from app.workspace_agents.autonomy_debug import debug_autonomy_probe
-
-        debug_autonomy_probe(
-            "H29",
-            "preserved continuous ownership after specialist shift",
-            {
-                "workspaceId": workspace_id,
-                "runId": cleaned_run,
-                "phase": phase,
-                "followUpTaskId": (follow_up or {}).get("task_id"),
-            },
-            location="workspace_agents/lead_takeover.py:post_lead_takeover_report",
-            run_id="closeout-access",
-        )
-        # endregion
     vaxon_flash: dict[str, Any] | None = None
     try:
         from app.workspace_agents.lead_vaxon_handoff import post_ad_hoc_lead_takeover_to_vaxon

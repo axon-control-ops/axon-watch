@@ -60,11 +60,15 @@ class VoiceDispatchTests(unittest.TestCase):
     def test_model_pool_non_empty(self) -> None:
         self.assertGreaterEqual(len(vaxon_model_pool()), 1)
 
-    def test_resolve_vaxon_model_defaults_to_gpt_54_high(self) -> None:
-        self.assertEqual(resolve_vaxon_model(None), "gpt-5.4-high")
-        self.assertEqual(resolve_vaxon_model("auto"), "gpt-5.4-high")
+    def test_resolve_vaxon_model_defaults_to_cursor_grok_45_fast(self) -> None:
+        self.assertEqual(resolve_vaxon_model(None), "cursor-grok-4.5-high-fast")
+        self.assertEqual(resolve_vaxon_model("auto"), "cursor-grok-4.5-high-fast")
         self.assertEqual(resolve_vaxon_model("composer-2"), "composer-2")
         self.assertEqual(resolve_vaxon_model("GPT-5.4-HIGH"), "gpt-5.4-high")
+        self.assertEqual(
+            resolve_vaxon_model("cursor-grok-4.5-high-fast"),
+            "cursor-grok-4.5-high-fast",
+        )
 
 
 if __name__ == "__main__":

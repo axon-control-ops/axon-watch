@@ -31,7 +31,7 @@ def default_operator_presence_settings() -> dict[str, bool | str | float]:
         # Prefer runtime for deep status/open asks; keep templates for quick facts.
         "voice_routing_mode": "runtime_on_deep",
         # Operator-global VAXON model — independent from workspace Composer prefs.
-        "vaxon_model_id": "gpt-5.4-high",
+        "vaxon_model_id": "cursor-grok-4.5-high-fast",
         "narrate_tool_progress": False,
     }
 

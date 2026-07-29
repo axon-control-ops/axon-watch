@@ -21,7 +21,6 @@ from app.cli_runtime.runtime_failure import (
     fallback_reply as _fallback_reply,
     runtime_unready_reason as _runtime_unready_reason,
 )
-from app.cli_runtime.runtime_debug import record_sentry_monitor_context
 from app.cli_runtime.subprocess_runner import RuntimeProcessStoppedError
 from app.cli_runtime.cursor_agent import (
     CursorAgentReply,
@@ -127,11 +126,6 @@ def _sentry_monitor_context(user_prompt: str) -> str:
             "do not claim the Sentry token is absent."
         )
 
-    record_sentry_monitor_context(
-        monitor_available=bool(record),
-        status=status,
-        issue_count=issue_count,
-    )
 
     return "\n".join(lines)
 

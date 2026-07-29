@@ -6,14 +6,17 @@ import {
   resendOperatorMessage,
   submitOperatorPromptInline,
 } from '../../../lib/operator-message-composer-actions';
+import { formatThreadTimestamp } from '../../../lib/thread-message-view';
 import { useShellStore } from '../../../stores/shell';
 
 const props = withDefaults(
   defineProps<{
     text: string;
+    createdAt?: string | null;
     showResend?: boolean;
   }>(),
   {
+    createdAt: null,
     showResend: true,
   },
 );
@@ -169,7 +172,35 @@ onUnmounted(() => {
       v-if="!editing"
       class="agent-dock-sticky-prompt__chrome"
     >
-      <span class="agent-dock-sticky-prompt__label">You</span>
+      <div class="agent-dock-sticky-prompt__meta-leading">
+        <span
+          class="agent-dock-sticky-prompt__avatar"
+          aria-hidden="true"
+          title="You"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.35"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="8" cy="5.4" r="2.35" />
+            <path d="M3.4 13.1c.55-2.45 2.35-3.7 4.6-3.7s4.05 1.25 4.6 3.7" />
+          </svg>
+        </span>
+        <span class="agent-dock-sticky-prompt__label">You</span>
+        <time
+          v-if="createdAt"
+          class="agent-dock-sticky-prompt__time"
+          :datetime="createdAt"
+        >
+          {{ formatThreadTimestamp(createdAt) }}
+        </time>
+      </div>
       <OperatorMessageActions
         class="agent-dock-sticky-prompt__actions"
         variant="icons"

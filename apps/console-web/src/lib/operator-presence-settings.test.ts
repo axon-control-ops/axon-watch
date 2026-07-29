@@ -63,7 +63,7 @@ describe('operator-presence-settings', () => {
       stt_mode: 'cloud',
       voice_routing_mode: 'runtime_on_deep',
       narrate_tool_progress: false,
-      vaxon_model_id: 'gpt-5.4-high',
+      vaxon_model_id: 'cursor-grok-4.5-high-fast',
     });
     expect(storage.getItem(OPERATOR_PRESENCE_SETTINGS_KEY)).toContain('"operator_persona_enabled":false');
   });
@@ -85,7 +85,7 @@ describe('operator-presence-settings', () => {
       stt_mode: 'cloud',
       voice_routing_mode: 'runtime_on_deep',
       narrate_tool_progress: false,
-      vaxon_model_id: 'gpt-5.4-high',
+      vaxon_model_id: 'cursor-grok-4.5-high-fast',
     });
   });
 
@@ -118,7 +118,9 @@ describe('operator-presence-settings', () => {
   });
 
   it('defaults and accepts VAXON model ids independently of workspace composer', () => {
-    expect(normalizeOperatorPresenceSettings({}).vaxon_model_id).toBe('gpt-5.4-high');
+    expect(normalizeOperatorPresenceSettings({}).vaxon_model_id).toBe(
+      'cursor-grok-4.5-high-fast',
+    );
     expect(
       normalizeOperatorPresenceSettings({ vaxon_model_id: 'composer-2' }).vaxon_model_id,
     ).toBe('composer-2');

@@ -1,5 +1,7 @@
 /** Pure helpers for the Mission Control VAXON Transmission card (right dock). */
 
+import { normalizeKairoCopy } from './kairo-entity-labels';
+
 export type VaxonTransmissionMode = 'standby' | 'transmitting' | 'locked';
 
 export type VaxonTransmissionView = {
@@ -15,8 +17,8 @@ export function resolveVaxonTransmissionView(input: {
   speaking?: boolean;
   pending?: boolean;
 }): VaxonTransmissionView {
-  const spoken = input.spokenText?.trim() || '';
-  const reply = input.conversationReply?.trim() || '';
+  const spoken = normalizeKairoCopy(input.spokenText?.trim() || '');
+  const reply = normalizeKairoCopy(input.conversationReply?.trim() || '');
   const body = spoken || reply;
 
   if (!body) {

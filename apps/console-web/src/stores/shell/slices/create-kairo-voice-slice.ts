@@ -150,9 +150,6 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       input.operatorPresenceSettings.value.privacy_mode ||
       configuredNarration === 'off'
     ) {
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'S4',location:'create-kairo-voice-slice.ts:speakKairoConversationLine:early-exit',message:'conversation line speech skipped',data:{empty:!trimmed,voiceAllowed:voiceDeliveryAllowed(),privacy:Boolean(input.operatorPresenceSettings.value.privacy_mode),narration:configuredNarration,allowDuringReportTheater:options?.allowDuringReportTheater===true,linePreview:trimmed.slice(0,100)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       options?.onPlaybackStart?.();
       if (kairoConversationPhase.value === 'thinking') {
         setKairoConversationPhase('idle');
@@ -214,9 +211,6 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       ttsTimeoutMs: options?.ttsTimeoutMs,
       onPlaybackStart: options?.onPlaybackStart,
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'standup-voice',hypothesisId:'S3',location:'create-kairo-voice-slice.ts:speakKairoConversationLine:playback',message:'conversation line playback finished',data:{engine:playback.engine,reason:playback.reason??null,allowDuringReportTheater:options?.allowDuringReportTheater===true,linePreview:message.slice(0,100)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }
 
   function handleKairoPresenceAction(): void {
@@ -251,11 +245,7 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     input.focusKairoBriefing();
   }
 
-
   async function deliverKairoSpokenAlert(alert: SpokenAlertEligibility): Promise<void> {
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H8',location:'create-kairo-voice-slice.ts:deliverKairoSpokenAlert',message:'spoken alert delivery evaluated',data:{voiceDeliveryAllowed:voiceDeliveryAllowed(),alertEligible:alert.eligible,alertReason:alert.reason,alertMessagePreview:(alert.message||'').slice(0,160),reportTheaterOpen:reportTheaterOpen.value,autonomyMode:input.operatorPresenceSettings.value.autonomy_mode,spokenAlertsEnabled:input.operatorPresenceSettings.value.spoken_alerts_enabled,proactiveDuplexEnabled:input.operatorPresenceSettings.value.proactive_duplex_enabled,handsFreeEnabled:input.operatorPresenceSettings.value.hands_free_enabled,privacyMode:input.operatorPresenceSettings.value.privacy_mode,narration:input.effectiveKairoNarrationLevel.value},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!voiceDeliveryAllowed()) {
       return;
     }
@@ -324,15 +314,8 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
 
     // Drop in-flight alerts that started before Command Theater opened.
     if (reportTheaterOpen.value) {
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H9',location:'create-kairo-voice-slice.ts:deliverKairoSpokenAlert:dropped',message:'dropped in-flight spoken alert because report theater is open',data:{alertReason:alert.reason,eventType,speakSource,spokenLinePreview:message.slice(0,120)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       return;
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'post-fix',hypothesisId:'H8',location:'create-kairo-voice-slice.ts:deliverKairoSpokenAlert:spoken',message:'spoken alert line resolved',data:{alertReason:alert.reason,eventType,speakSource,spokenLinePreview:message.slice(0,180),usedLiteral:eventType==='approval_literal',reportTheaterOpen:false},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     await deliverSpokenOperatorAlert(
       {
@@ -355,9 +338,6 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       const hay = blockers.join(' ').toLowerCase();
       const preferVault = /vault|cli|auth|key|login|dispatch-ready|runtime not ready/i.test(hay) ||
         /vault|cli|runtime/i.test(message);
-      // #region agent log
-      fetch('http://127.0.0.1:7706/ingest/90bcaec2-2b39-4d4a-84b5-157c12735440',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bef50e'},body:JSON.stringify({sessionId:'bef50e',runId:'readiness-recovery-fix',hypothesisId:'H51',location:'create-kairo-voice-slice.ts:walk-fix',message:'auto-walking runtime fix after spoken alert',data:{preferVault,blockers,pathname:typeof window!=='undefined'?window.location.pathname:null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (preferVault) {
         navigateToAppSurface('vault');
       } else {
@@ -488,7 +468,6 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
       activeFile: input.activeWorkspaceFilePath.value,
     };
   }
-
 
   if (typeof window !== 'undefined') {
     subscribeSpeechQueueSpeaking((active) => {

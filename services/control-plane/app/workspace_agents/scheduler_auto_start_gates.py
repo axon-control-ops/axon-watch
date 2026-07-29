@@ -2,34 +2,8 @@
 
 from __future__ import annotations
 
-import json
-import time
-from pathlib import Path
-
 from app.workspace_agents.failure_detail import is_runtime_auth_failure, is_usage_limit_failure
 from app.workspace_agents.run_outcome import latest_role_run_outcome
-
-_DEBUG_LOG = Path(__file__).resolve().parents[4] / ".cursor" / "debug-bef50e.log"
-
-
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
-    # #region agent log
-    try:
-        payload = {
-            "sessionId": "bef50e",
-            "runId": "usage-gate",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        _DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with _DEBUG_LOG.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
-    except Exception:
-        pass
-    # #endregion
 
 
 def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
@@ -51,27 +25,9 @@ def usage_limit_blocks_auto_start(workspace_id: str, role: str) -> bool:
 
         usage = probe_cursor_usage()
         if cursor_usage_allows_agent_retry(usage):
-            _debug_log(
-                "C",
-                "scheduler_auto_start_gates.py:usage",
-                "role usage soft-open",
-                {
-                    "workspace_id": workspace_id,
-                    "role": role,
-                    "auto": usage.get("auto_percent_used"),
-                    "on_demand": usage.get("on_demand_enabled"),
-                    "blocked": False,
-                },
-            )
             return False
     except Exception:
         pass
-    _debug_log(
-        "C",
-        "scheduler_auto_start_gates.py:usage",
-        "role usage hard-block",
-        {"workspace_id": workspace_id, "role": role, "blocked": True},
-    )
     return True
 
 
@@ -85,8 +41,31 @@ def workspace_usage_limit_blocks_auto_start(workspace_id: str, roles: list[str])
 
 
 def runtime_auth_blocks_auto_start(workspace_id: str, role: str) -> bool:
-    """Skip auto-schedule when the last shift failed on missing CLI/vault auth."""
+    """Skip auto-schedule when the last shift failed on missing CLI/vault auth.
+
+    Soft-open after a successful Cursor auth heal — probe timeouts should not
+    permanently quarantine a role once the host CLI is signed in again.
+    """
     outcome = latest_role_run_outcome(workspace_id, role)
     if not outcome or str(outcome.get("outcome") or "").strip().lower() != "failed":
         return False
-    return is_runtime_auth_failure(str(outcome.get("detail") or ""))
+    detail = str(outcome.get("detail") or "")
+    if not is_runtime_auth_failure(detail):
+        return False
+    try:
+        from app.cli_runtime.catalog_snapshot import (
+            recover_cursor_auth_synchronously,
+            snapshot_has_auth_probe_timeout,
+        )
+        from app.cli_runtime.readiness import summarize_cli_runtime_readiness
+
+        if "auth probe timed out" in detail.lower() or "timed out" in detail.lower():
+            snapshot = recover_cursor_auth_synchronously()
+            summary = summarize_cli_runtime_readiness(snapshot)
+            if bool(summary.get("dispatch_ready")) and not snapshot_has_auth_probe_timeout(
+                snapshot
+            ):
+                return False
+    except Exception:
+        pass
+    return True

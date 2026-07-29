@@ -5,6 +5,7 @@ import { resetSpeechQueue } from './speech-queue';
 import { speakKairoLine, stopKairoPlayback } from './kairo-voice-playback';
 
 vi.mock('./kairo-tts-client', () => ({
+  abortActiveKairoTts: vi.fn(),
   postKairoTts: vi.fn(),
   isAzureTtsBlocked: vi.fn(() => false),
   azureTtsBlockedReasonValue: vi.fn(() => null),
@@ -40,6 +41,7 @@ describe('kairo voice playback', () => {
     resetSpeechQueue();
     vi.mocked(postKairoTts).mockReset();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('prefers azure when synthesis is available', async () => {
@@ -50,7 +52,7 @@ describe('kairo voice playback', () => {
       src = '';
       preload = '';
       currentTime = 0;
-      readyState = 3;
+      readyState = 4;
       paused = true;
       ended = false;
       onended: (() => void) | null = null;
@@ -144,7 +146,7 @@ describe('kairo voice playback', () => {
       src = '';
       preload = '';
       currentTime = 0;
-      readyState = 3;
+      readyState = 4;
       paused = true;
       ended = false;
       onended: (() => void) | null = null;
@@ -200,7 +202,7 @@ describe('kairo voice playback', () => {
       });
 
     const promise = speakKairoLine(longText, { immediate: true });
-    await vi.advanceTimersByTimeAsync(3500);
+    await vi.advanceTimersByTimeAsync(4000);
     const result = await promise;
 
     expect(result.engine).toBe('browser');
@@ -287,7 +289,7 @@ describe('kairo voice playback', () => {
     });
 
     const promise = speakKairoLine('Systems nominal.', { immediate: true });
-    await vi.advanceTimersByTimeAsync(3500);
+    await vi.runAllTimersAsync();
     const result = await promise;
 
     expect(result.engine).toBe('azure');
@@ -305,7 +307,7 @@ describe('kairo voice playback', () => {
       src = '';
       preload = '';
       currentTime = 0;
-      readyState = 3;
+      readyState = 4;
       paused = true;
       ended = false;
       onended: (() => void) | null = null;

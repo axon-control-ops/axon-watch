@@ -108,7 +108,7 @@ function onVaxonModelChange(event: Event): void {
         :key="option.id"
         :value="option.id"
       >
-        {{ option.label }}{{ option.id === 'gpt-5.4-high' ? ' (recommended)' : '' }}
+        {{ option.label }}{{ option.id === 'cursor-grok-4.5-high-fast' ? ' (recommended)' : '' }}
       </option>
     </select>
   </label>

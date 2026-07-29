@@ -22,7 +22,6 @@ from app.runs.service import (
 )
 from app.runs.stale_reconcile import BUSY_EMPLOYEE_PHASES
 from app.workspace_agents.config_loader import EmployeeConfig, load_workspace_agent_configs
-from app.workspace_agents.autonomy_debug import debug_autonomy_probe
 from app.workspace_agents.scheduler_auto_start_gates import (
     runtime_auth_blocks_auto_start,
     usage_limit_blocks_auto_start,
@@ -247,14 +246,6 @@ def _dispatch_queued_lead_fan_out_runs(
 
 def run_continuous_worker_tick() -> list[dict[str, Any]]:
     """Reconcile hung shifts, then start bounded role-tagged runs when enabled."""
-    # region agent log
-    scheduler_settings = worker_scheduler_settings_store.load_settings()
-    debug_autonomy_probe(
-        "H1,H5",
-        "continuous scheduler tick entered",
-        {"store_enabled": bool(scheduler_settings.get("scheduler_enabled")), "env_allowed": env_scheduler_allowed(), "effective_enabled": scheduler_enabled(), "dispatch_enabled": worker_dispatch_enabled(), "executing_count": _executing_run_count()},
-    )
-    # endregion
     reaped = reap_stale_employee_runs()
     if reaped:
         logger.info("continuous worker tick reaped %s stale run(s)", len(reaped))
@@ -300,22 +291,7 @@ def run_continuous_worker_tick() -> list[dict[str, Any]]:
     except Exception:  # noqa: BLE001 — never block scheduler on work sources
         logger.exception("scheduled company work sources failed")
 
-    # region agent log
-    lead_checkin = (work_source_result.get("sources") or {}).get("lead_team_checkin") or {}
-    debug_autonomy_probe(
-        "H1,H4,H5",
-        "scheduled work sources completed before scheduler gate",
-        {"effective_enabled": scheduler_enabled(), "reaped_count": len(reaped), "abandoned_count": len(abandoned), "pruned_count": len(pruned), "lead_checked_count": len(lead_checkin.get("checked_workspaces") or []), "lead_cooldown_count": len(lead_checkin.get("skipped_cooldown") or []), "lead_created_task_count": len(lead_checkin.get("created_tasks") or []), "lead_message_count": len(lead_checkin.get("lead_messages") or [])},
-    )
-    # endregion
     if not scheduler_enabled():
-        # region agent log
-        debug_autonomy_probe(
-            "H1,H5",
-            "worker starts blocked after scheduled Lead work sources",
-            {"effective_enabled": False, "returning_started_count": 0, "lead_created_task_count": len(lead_checkin.get("created_tasks") or [])},
-        )
-        # endregion
         return []
 
     _configs, _defaults, companies, _staffing = load_workspace_agent_configs()

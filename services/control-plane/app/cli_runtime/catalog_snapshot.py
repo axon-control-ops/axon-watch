@@ -12,7 +12,11 @@ from typing import Any
 from app.cli_runtime.auth_probes import (
     codex_auth_status as _codex_auth_status,
     cursor_auth_status as _cursor_auth_status,
-    vault_auth_overlay as _vault_auth_overlay,
+)
+from app.cli_runtime.catalog_records import (
+    choose_default_runtime,
+    cloud_runtime_record,
+    local_runtime_record,
 )
 from app.cli_runtime.cursor_usage_probe import probe_cursor_usage
 from app.cli_runtime.vault_keys import fetch_runtime_context
@@ -21,14 +25,47 @@ StatusRecord = dict[str, Any]
 
 _SNAPSHOT_CACHE: dict[str, Any] = {"fetched_at": 0.0, "payload": None}
 _CACHE_TTL_SECONDS = 30.0
+_TIMEOUT_CACHE_TTL_SECONDS = 8.0
 _SNAPSHOT_BUILD_LOCK = threading.Lock()
 _SNAPSHOT_REFRESH_THREAD: threading.Thread | None = None
 _SNAPSHOT_REFRESH_LOCK = threading.Lock()
+_HEAL_THREAD: threading.Thread | None = None
+_HEAL_LOCK = threading.Lock()
+_LAST_HEAL_AT = 0.0
+_HEAL_COOLDOWN_SECONDS = 45.0
 
 
 def invalidate_runtime_snapshot_cache() -> None:
     _SNAPSHOT_CACHE["fetched_at"] = 0.0
     _SNAPSHOT_CACHE["payload"] = None
+
+
+def _auth_message(record: dict[str, Any]) -> str:
+    auth = record.get("auth") if isinstance(record, dict) else None
+    if not isinstance(auth, dict):
+        return ""
+    return str(auth.get("message") or "").strip().lower()
+
+
+def snapshot_has_auth_probe_timeout(payload: dict[str, Any] | None) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    for record in [*(payload.get("local") or []), *(payload.get("cloud") or [])]:
+        if not isinstance(record, dict):
+            continue
+        message = _auth_message(record)
+        if "auth probe timed out" in message or "timed out" in message and "auth" in message:
+            return True
+        provider = str((record.get("auth") or {}).get("provider_label") or "").strip().lower()
+        if provider == "timed out":
+            return True
+    return False
+
+
+def _cache_ttl_for_payload(payload: dict[str, Any] | None) -> float:
+    if snapshot_has_auth_probe_timeout(payload):
+        return _TIMEOUT_CACHE_TTL_SECONDS
+    return _CACHE_TTL_SECONDS
 
 
 def schedule_runtime_status_refresh() -> None:
@@ -53,99 +90,52 @@ def schedule_runtime_status_refresh() -> None:
         _SNAPSHOT_REFRESH_THREAD.start()
 
 
+def heal_cursor_auth_probe_timeout(*, force: bool = False) -> dict[str, Any] | None:
+    """Force-refresh CLI auth when the cached snapshot looks like a probe timeout.
+
+    Returns the refreshed snapshot when a heal ran, otherwise None.
+    """
+    global _HEAL_THREAD, _LAST_HEAL_AT
+    cached = _SNAPSHOT_CACHE.get("payload")
+    if not force and not snapshot_has_auth_probe_timeout(
+        cached if isinstance(cached, dict) else None
+    ):
+        return None
+
+    now = time.monotonic()
+    with _HEAL_LOCK:
+        if not force and (now - _LAST_HEAL_AT) < _HEAL_COOLDOWN_SECONDS:
+            schedule_runtime_status_refresh()
+            return None
+        if _HEAL_THREAD is not None and _HEAL_THREAD.is_alive():
+            return None
+        _LAST_HEAL_AT = now
+
+        result: dict[str, Any] = {"started": True}
+
+        def _worker() -> None:
+            try:
+                invalidate_runtime_snapshot_cache()
+                runtime_status_snapshot(force_refresh=True)
+            except Exception:
+                return
+
+        _HEAL_THREAD = threading.Thread(
+            target=_worker,
+            name="axon-runtime-auth-heal",
+            daemon=True,
+        )
+        _HEAL_THREAD.start()
+        return result
+
+
+def recover_cursor_auth_synchronously() -> dict[str, Any]:
+    """Blocking heal for gates that must know whether auth recovered."""
+    invalidate_runtime_snapshot_cache()
+    return runtime_status_snapshot(force_refresh=True)
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _truthy_env(value: object) -> bool:
-    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _local_runtime_record(
-    runtime_id: str,
-    *,
-    family: str,
-    binary: str,
-    auth: StatusRecord,
-    label: str,
-) -> StatusRecord:
-    return {
-        "id": runtime_id,
-        "family": family,
-        "label": label,
-        "target_type": "local",
-        "available": bool(binary),
-        "binary": binary,
-        "auth": auth,
-        "ready": bool(binary) and bool(auth.get("logged_in")),
-        "mode_support": ["ask", "plan", "agent", "debug"],
-    }
-
-
-def _cloud_runtime_record(
-    runtime_id: str,
-    *,
-    family: str,
-    label: str,
-    vault_posture: dict[str, Any],
-    env_keys: dict[str, str],
-) -> StatusRecord:
-    enabled = _truthy_env(os.environ.get(f"AXON_WATCH_{runtime_id.upper()}_ENABLED"))
-    auth = _vault_auth_overlay(runtime_id, vault_posture=vault_posture, env_keys=env_keys) or {
-        "logged_in": False,
-        "auth_method": "",
-        "provider_label": label,
-        "vault_posture": vault_posture.get("posture"),
-        "message": "Cloud runtime not configured yet in Axon-X." if not enabled else "Cloud runtime flagged as enabled.",
-    }
-    if enabled and auth.get("logged_in"):
-        auth = {
-            **auth,
-            "auth_method": "vault_api_key",
-            "message": "Cloud runtime enabled with vault-fed credentials.",
-        }
-    ready = bool(enabled) and bool(auth.get("logged_in"))
-    if enabled and not auth.get("logged_in") and vault_posture.get("unlocked"):
-        auth = {
-            **auth,
-            "message": str(
-                vault_posture.get("hint")
-                or "Cloud runtime enabled but vault keys are missing for this target."
-            ),
-        }
-    return {
-        "id": runtime_id,
-        "family": family,
-        "label": label,
-        "target_type": "cloud",
-        "available": enabled,
-        "binary": "",
-        "auth": auth,
-        "ready": ready,
-        "mode_support": ["ask", "plan", "agent", "debug"],
-    }
-
-
-def _choose_default_runtime(local: list[StatusRecord], cloud: list[StatusRecord]) -> str:
-    explicit = str(os.environ.get("AXON_WATCH_IDE_RUNTIME_TARGET", "")).strip().lower()
-    known = {record["id"]: record for record in [*local, *cloud]}
-    if explicit in known:
-        return explicit
-
-    preferred_family = str(os.environ.get("AXON_WATCH_IDE_RUNTIME_FAMILY", "cursor")).strip().lower()
-    family_order = [preferred_family, "cursor", "codex"]
-    seen: set[str] = set()
-    for family in family_order:
-        if family in seen:
-            continue
-        seen.add(family)
-        for record in local:
-            if record["family"] == family and record["ready"]:
-                return str(record["id"])
-    for record in local:
-        if record["available"]:
-            return str(record["id"])
-    return "cursor_local"
 
 
 def runtime_status_snapshot(
@@ -157,10 +147,13 @@ def runtime_status_snapshot(
 
     cached = _SNAPSHOT_CACHE.get("payload")
     fetched_at = float(_SNAPSHOT_CACHE.get("fetched_at") or 0.0)
+    cache_ttl = _cache_ttl_for_payload(cached if isinstance(cached, dict) else None)
     cache_fresh = (
-        cached is not None and (time.monotonic() - fetched_at) < _CACHE_TTL_SECONDS
+        cached is not None and (time.monotonic() - fetched_at) < cache_ttl
     )
     if not force_refresh and cache_fresh:
+        if snapshot_has_auth_probe_timeout(cached if isinstance(cached, dict) else None):
+            heal_cursor_auth_probe_timeout()
         return copy.deepcopy(cached)
 
     # Stale-while-revalidate: never block operator UI on `cursor agent status`.
@@ -191,8 +184,11 @@ def runtime_status_snapshot(
         if (
             not force_refresh
             and cached is not None
-            and (time.monotonic() - fetched_at) < _CACHE_TTL_SECONDS
+            and (time.monotonic() - fetched_at)
+            < _cache_ttl_for_payload(cached if isinstance(cached, dict) else None)
         ):
+            if snapshot_has_auth_probe_timeout(cached if isinstance(cached, dict) else None):
+                heal_cursor_auth_probe_timeout()
             return copy.deepcopy(cached)
 
         context = fetch_runtime_context(force_refresh=force_refresh)
@@ -213,7 +209,7 @@ def runtime_status_snapshot(
         codex_path = find_codex_cli(os.environ.get("AXON_WATCH_CODEX_CLI_PATH", "").strip())
 
         local = [
-            _local_runtime_record(
+            local_runtime_record(
                 "cursor_local",
                 family="cursor",
                 binary=cursor_path,
@@ -225,7 +221,7 @@ def runtime_status_snapshot(
                 ),
                 label="Cursor CLI (local)",
             ),
-            _local_runtime_record(
+            local_runtime_record(
                 "codex_local",
                 family="codex",
                 binary=codex_path,
@@ -239,14 +235,14 @@ def runtime_status_snapshot(
             ),
         ]
         cloud = [
-            _cloud_runtime_record(
+            cloud_runtime_record(
                 "cursor_cloud",
                 family="cursor",
                 label="Cursor Cloud Agent",
                 vault_posture=vault_posture,
                 env_keys=vault_env_only,
             ),
-            _cloud_runtime_record(
+            cloud_runtime_record(
                 "codex_cloud",
                 family="codex",
                 label="Codex Cloud Task",
@@ -254,7 +250,7 @@ def runtime_status_snapshot(
                 env_keys=vault_env_only,
             ),
         ]
-        default_runtime = _choose_default_runtime(local, cloud)
+        default_runtime = choose_default_runtime(local, cloud)
 
         for record in [*local, *cloud]:
             record["recommended"] = record["id"] == default_runtime
@@ -269,4 +265,8 @@ def runtime_status_snapshot(
         }
         _SNAPSHOT_CACHE["fetched_at"] = time.monotonic()
         _SNAPSHOT_CACHE["payload"] = copy.deepcopy(payload)
+        if snapshot_has_auth_probe_timeout(payload):
+            # Short TTL already applied; heal on cooldown so we auto-recover
+            # without spinning forever when the host CLI is truly broken.
+            heal_cursor_auth_probe_timeout(force=False)
         return copy.deepcopy(payload)

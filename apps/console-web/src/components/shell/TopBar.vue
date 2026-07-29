@@ -7,6 +7,7 @@ import VoiceUnlockBanner from './VoiceUnlockBanner.vue';
 import AxonProductLogo from '../../components/AxonProductLogo.vue';
 import { navigateToAppSurface, type AppSurface } from '../../lib/app-surface-route';
 import { useAppSurface } from '../../composables/useAppSurface';
+import { openOperatorStandup } from '../../features/kairo-conversation/open-operator-standup';
 import { useShellStore } from '../../stores/shell';
 
 const shell = useShellStore();
@@ -47,6 +48,10 @@ function openSurface(surface: AppSurface): void {
 
 function openSettings(): void {
   navigateToAppSurface('settings');
+}
+
+async function openStandup(): Promise<void> {
+  await openOperatorStandup(shell);
 }
 </script>
 
@@ -157,6 +162,15 @@ function openSettings(): void {
             IDE
           </button>
         </div>
+        <button
+          type="button"
+          class="layout-toggle__button topbar-mockup__standup"
+          aria-label="Open VAXON stand-up report"
+          title="Stand-up (REPORT)"
+          @click="openStandup"
+        >
+          STAND-UP
+        </button>
         <div class="topbar-mockup__settings-wrap">
           <button
             type="button"
@@ -184,6 +198,12 @@ function openSettings(): void {
 .topbar-mockup__settings-wrap {
   position: relative;
   z-index: 12;
+}
+
+.topbar-mockup__standup {
+  margin-right: 0.35rem;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
 }
 
 .topbar-mockup__settings--active {

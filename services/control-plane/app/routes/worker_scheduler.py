@@ -10,7 +10,9 @@ from pydantic import BaseModel, Field
 from app.workspace_agents import WorkspaceAgentError, get_company_roster
 from app.workspace_agents.fleet_control import (
     build_scheduler_status,
+    hard_kill_scheduler,
     patch_scheduler_settings,
+    resume_scheduler,
     set_employee_enabled,
     stop_active_runs,
 )
@@ -44,6 +46,18 @@ def worker_scheduler_patch(body: WorkerSchedulerPatchRequest) -> dict[str, Any]:
 @router.post("/api/worker-scheduler/stop-active")
 def worker_scheduler_stop_active() -> dict[str, Any]:
     return stop_active_runs()
+
+
+@router.post("/api/worker-scheduler/hard-kill")
+def worker_scheduler_hard_kill() -> dict[str, Any]:
+    """Hard-kill continuous workers from Settings (SQLite). Does not require .env."""
+    return hard_kill_scheduler()
+
+
+@router.post("/api/worker-scheduler/resume")
+def worker_scheduler_resume() -> dict[str, Any]:
+    """Re-enable continuous workers from Settings. Host env brake still applies if set."""
+    return resume_scheduler()
 
 
 @router.patch("/api/workspaces/{workspace_id}/company/employees/{employee_id}")

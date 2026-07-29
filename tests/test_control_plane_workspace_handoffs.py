@@ -39,8 +39,10 @@ class ControlPlaneWorkspaceHandoffsTests(unittest.TestCase):
         handoff = payload["handoff"]
         self.assertEqual("workspace_smoke", handoff["source_workspace_id"])
         self.assertEqual("workspace_alpha", handoff["target_workspace_id"])
-        self.assertEqual("recorded", handoff["status"])
+        self.assertEqual("routed", handoff["status"])
         self.assertTrue(handoff["handoff_id"].startswith("handoff-"))
+        self.assertTrue(str(handoff.get("target_task_id") or "").startswith("task-"))
+        self.assertEqual(handoff.get("target_task_id"), payload.get("target_task_id"))
 
         summary = payload["target_workspace_summary"]
         self.assertEqual("workspace_alpha", summary["workspace_id"])
@@ -48,6 +50,14 @@ class ControlPlaneWorkspaceHandoffsTests(unittest.TestCase):
         self.assertIn("run_count", summary)
         self.assertIn("active_run_count", summary)
         self.assertIn("active_runs", summary)
+
+        from app.persistence import task_store
+
+        task = task_store.get_task(str(handoff["target_task_id"]))
+        assert task is not None
+        self.assertEqual("workspace_alpha", task["workspace_id"])
+        self.assertEqual("Review bootstrap follow-up", task["goal"])
+        self.assertEqual("open", task["status"])
 
     def test_handoff_summary_excludes_background_employee_runs_from_counts(self) -> None:
         create_run(

@@ -104,6 +104,19 @@ def ingest_workflow_run_event(
                 reason=f"stale_cleared:{stale_cleared}",
                 delivery_id=delivery_id,
             )
+        status = classify_workflow_status(payload)
+        if status is not None and match_binding(
+            github_owner=status["github_owner"],
+            github_repo=status["github_repo"],
+            workflow_name=status["workflow_name"],
+            enabled_only=True,
+        ) is not None:
+            return IngestResult(
+                accepted=True,
+                reason=f"workflow_status:{status['kind']};no_matching_state",
+                run_id=str(status.get("run_id") or ""),
+                delivery_id=delivery_id,
+            )
         return IngestResult(accepted=False, reason="not_a_completed_failure")
 
     # Escalated deliveries must not spawn more repair attempts.

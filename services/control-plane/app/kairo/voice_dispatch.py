@@ -44,11 +44,12 @@ _MAX_RUNTIME_VOICE_REPLY_CHARS = 1200
 
 # Dedicated VAXON pool — independent from IDE Composer UI selection.
 _DEFAULT_VAXON_MODEL_POOL = (
+    "cursor-grok-4.5-high-fast",
     "gpt-5.4-high",
     "composer-2",
     "claude-sonnet-5-thinking-high",
 )
-_DEFAULT_VAXON_MODEL_ID = "gpt-5.4-high"
+_DEFAULT_VAXON_MODEL_ID = "cursor-grok-4.5-high-fast"
 
 
 def _short_spoken_summary(
