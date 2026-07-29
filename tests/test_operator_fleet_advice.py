@@ -260,10 +260,19 @@ class OperatorFleetAdviceTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            "Handoff to DashPro is open — switch there and finish “Finish DashPro follow-up” "
-            "before more axon-watch work.",
+            "Handoff to DashPro is open — switch there and finish “Finish DashPro follow-up”."
+            " Pause more axon-watch work until that closes.",
             advise,
         )
+        from app.operator_fleet_advice import build_advise_ui_action
+
+        action = build_advise_ui_action(
+            winner,
+            focused_workspace_id="workspace_alpha",
+        )
+        self.assertEqual("switch_workspace", action["type"])
+        self.assertEqual("workspace_dashpro", action["workspace_id"])
+        self.assertTrue(action["focus_attention"])
 
 
 if __name__ == "__main__":

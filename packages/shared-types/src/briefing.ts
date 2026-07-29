@@ -58,6 +58,7 @@ export interface ExecutiveOperatorRhythm {
   execute: string;
   verify: string;
   report: string;
+  advise_ui_action?: Record<string, unknown> | null;
 }
 
 export interface OperatorBriefingScope {
@@ -85,6 +86,8 @@ export interface OperatorBriefing {
   scope?: OperatorBriefingScope;
   notice: string;
   advise: string;
+  /** One-click Attend action for the current Advise line (switch workspace + Attention). */
+  advise_ui_action?: Record<string, unknown> | null;
   executive_rhythm: ExecutiveOperatorRhythm;
   top_signals: InboxItem[];
   pending_approvals: OperatorBriefingPendingApprovals;

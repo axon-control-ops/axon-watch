@@ -346,6 +346,7 @@ def build_operator_briefing(
         "scope": scope,
         "notice": rhythm["notice"],
         "advise": rhythm["advise"],
+        "advise_ui_action": rhythm.get("advise_ui_action"),
         "executive_rhythm": rhythm,
         "top_signals": top_signals,
         "pending_approvals": {

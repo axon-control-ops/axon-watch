@@ -21,6 +21,7 @@ import {
   vaxonBriefingInteractionKey,
   vaxonBriefingPendingByWorkspace,
 } from '../../lib/vaxon-briefing-interaction';
+import { applyChatUiAction, parseChatUiAction } from '../../lib/chat-ui-action';
 import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import { sidebarSpeechShouldOfferReply } from '../../lib/sidebar-speech-reply-route';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
@@ -277,6 +278,33 @@ const notice = computed(() => {
 const advise = computed(() =>
   briefingAdvise(shell.operatorBriefing, shell.briefingLoadState),
 );
+const adviseUiAction = computed(() =>
+  parseChatUiAction(shell.operatorBriefing?.advise_ui_action ?? null),
+);
+const attendCtaLabel = computed(() => {
+  const action = adviseUiAction.value;
+  if (action?.type === 'switch_workspace' && action.cta_label) {
+    return action.cta_label;
+  }
+  return adviseUiAction.value ? 'Attend' : null;
+});
+
+function handleAttendAdvise(): void {
+  const action = adviseUiAction.value;
+  if (!action) {
+    shell.focusAttentionSidebar();
+    return;
+  }
+  applyChatUiAction(
+    {
+      setCurrentWorkspace: shell.setCurrentWorkspace,
+      openWorkspaceFile: shell.openWorkspaceFile,
+      setLayoutMode: shell.setLayoutMode,
+      focusAttentionSidebar: shell.focusAttentionSidebar,
+    },
+    action,
+  );
+}
 const approvalBadge = computed(() => shell.pendingApprovalsCount);
 const signalBadge = computed(
   () => shell.operatorBriefing?.top_signals.length ?? shell.runtimeSummary?.signals.open_count ?? 0,
@@ -458,6 +486,14 @@ function handleStopSpeech(event?: Event): void {
             </p>
             <p class="kairo-sidebar-panel__notice">{{ notice }}</p>
             <p v-if="advise" class="kairo-sidebar-panel__advise">{{ advise }}</p>
+            <button
+              v-if="attendCtaLabel"
+              type="button"
+              class="kairo-sidebar-panel__attend"
+              @click.stop="handleAttendAdvise"
+            >
+              {{ attendCtaLabel }}
+            </button>
             <div v-if="approvalBadge || signalBadge" class="kairo-sidebar-panel__badges">
               <span v-if="approvalBadge" class="kairo-sidebar-panel__badge">
                 {{ approvalBadge }} approval{{ approvalBadge === 1 ? '' : 's' }}

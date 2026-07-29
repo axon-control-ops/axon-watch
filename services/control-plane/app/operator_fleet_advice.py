@@ -307,23 +307,15 @@ def build_fleet_coach_line(
         title_l = task.lower()
         auth_hint = ""
         if "401" in title_l or "unauthorized" in title_l or "github api" in title_l:
-            auth_hint = " Fix GitHub credentials/token there;"
+            auth_hint = " Fix GitHub credentials there;"
         if cross and focus_label:
             return (
                 f"Handoff to {name} is open — switch there and finish “{task_short}”."
-                f"{auth_hint} DashPro work waits until that closes."
-                if focus_label.lower() in {"dashpro", "edu dash pro", "edudash"}
-                else (
-                    f"Handoff to {name} is open — switch there and finish “{task_short}”."
-                    f"{auth_hint} Pause more {focus_label} work until that closes."
-                )
+                f"{auth_hint} Pause more {focus_label} work until that closes."
             )
         if cross:
-            return (
-                f"Handoff to {name} is open — switch there and finish “{task_short}”."
-                f"{auth_hint}".rstrip(";")
-                + ("." if auth_hint else "")
-            )
+            base = f"Handoff to {name} is open — switch there and finish “{task_short}”."
+            return f"{base}{auth_hint}".rstrip(";") if auth_hint else base
         return f"Finish the open handoff ticket in {name}: “{task_short}”."
 
     if kind == "degraded_runtime":
@@ -335,6 +327,57 @@ def build_fleet_coach_line(
         return "Inspect degraded runtime before dispatching more work."
 
     return ""
+
+
+def build_advise_ui_action(
+    winner: dict[str, object] | None,
+    *,
+    focused_workspace_id: str | None = None,
+) -> dict[str, object] | None:
+    """One-click Attend action for the winning Advise fact (switch + Attention)."""
+    if not isinstance(winner, dict):
+        return None
+    kind = str(winner.get("kind") or "").strip()
+    target = str(winner.get("workspace_id") or "").strip()
+    focused = str(focused_workspace_id or "").strip()
+    if kind == "open_handoff" and target:
+        return {
+            "type": "switch_workspace",
+            "workspace_id": target,
+            "layout_mode": "operator",
+            "focus_attention": True,
+            "cta_label": f"Switch to {winner.get('display_name') or target} & open Attention",
+        }
+    if kind in {"critical_signal", "pending_approval", "review_ready"} and target:
+        action: dict[str, object] = {
+            "type": "switch_workspace",
+            "workspace_id": target,
+            "layout_mode": "operator",
+            "focus_attention": True,
+            "cta_label": f"Attend in {winner.get('display_name') or target}",
+        }
+        signal_id = str(winner.get("signal_id") or "").strip()
+        if signal_id:
+            action["signal_id"] = signal_id
+        return action
+    if kind in {"critical_signal", "pending_approval", "review_ready", "degraded_runtime"}:
+        if focused and not target:
+            return {
+                "type": "switch_workspace",
+                "workspace_id": focused,
+                "layout_mode": "operator",
+                "focus_attention": True,
+                "cta_label": "Open Attention",
+            }
+        if target:
+            return {
+                "type": "switch_workspace",
+                "workspace_id": target,
+                "layout_mode": "operator",
+                "focus_attention": True,
+                "cta_label": "Open Attention",
+            }
+    return None
 
 
 def resolve_fleet_briefing_advise(
