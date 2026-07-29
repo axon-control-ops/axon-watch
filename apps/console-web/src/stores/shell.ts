@@ -2394,10 +2394,10 @@ export const useShellStore = defineStore('shell', () => {
   async function submitIdeComposer(
     composerMode: IdeComposerMode,
     options: { attachmentFiles?: File[] } = {},
-  ): Promise<void> {
+  ): Promise<boolean> {
     const content = ideComposerDraft.value.trim();
     if (!content || !currentWorkspace.value?.workspace_id) {
-      return;
+      return false;
     }
 
     if (
@@ -2410,10 +2410,10 @@ export const useShellStore = defineStore('shell', () => {
       enqueueIdeComposerMessage(composerMode, content);
       ideComposerDraft.value = '';
       commandMutationError.value = null;
-      return;
+      return true;
     }
 
-    await dispatchIdeComposerMessage(composerMode, options);
+    return dispatchIdeComposerMessage(composerMode, options);
   }
 
   async function runOperatorCommand(content: string): Promise<void> {

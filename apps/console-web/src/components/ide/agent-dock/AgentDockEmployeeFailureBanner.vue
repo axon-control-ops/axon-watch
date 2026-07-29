@@ -87,10 +87,13 @@ async function handleRetry(): Promise<void> {
   }
   retrying.value = true;
   try {
-    await runEmployeeShiftRetry(shell, row, {
+    const result = await runEmployeeShiftRetry(shell, row, {
       keepActivityView: true,
       focusThread: true,
     });
+    if (!result.ok) {
+      shell.commandMutationError = result.reason;
+    }
   } finally {
     retrying.value = false;
   }

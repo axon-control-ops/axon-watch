@@ -73,6 +73,12 @@ class OperatorDeterministicReportTests(unittest.TestCase):
         )
         self.assertFalse(is_operator_report_request("any approvals?"))
         self.assertFalse(is_operator_report_request("open DashPro workspace"))
+        self.assertFalse(
+            is_operator_report_request(
+                "Handle the alert and report back when you're done"
+            )
+        )
+        self.assertFalse(is_operator_report_request("report back when done"))
 
     def test_compose_names_busy_and_completed_and_receipt_handoffs(self) -> None:
         from app.kairo.operator_deterministic_report import (

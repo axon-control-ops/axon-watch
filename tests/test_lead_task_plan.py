@@ -131,6 +131,22 @@ class LeadTaskPlanTests(unittest.TestCase):
         )
         self.assertFalse(should_lead_decompose_dispatch(fan))
 
+    def test_shift_retry_skips_lead_decompose_dispatch(self) -> None:
+        from app.workspace_agents.lead_task_plan import is_employee_shift_retry_request
+
+        retry = (
+            "My last continuous shift on Axon-X priorities failed. "
+            "Last error: Workspace delivery blocked: missing or failing "
+            "acceptance_evidence (Gate 6). Retry that bounded shift now as me."
+        )
+        self.assertTrue(is_employee_shift_retry_request(retry))
+        plan = build_lead_task_plan(
+            goal=retry,
+            roster=DASHPRO_ROSTER,
+            mode="decompose",
+        )
+        self.assertFalse(should_lead_decompose_dispatch(plan))
+
     def test_empty_goal_raises(self) -> None:
         with self.assertRaises(ValueError):
             build_lead_task_plan(goal="  ", roster=DASHPRO_ROSTER)

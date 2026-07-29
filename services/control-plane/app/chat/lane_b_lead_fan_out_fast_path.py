@@ -6,7 +6,10 @@ import threading
 from typing import Any, Callable
 
 from app.workspace_agents.lead_fan_out import LeadFanOutError, materialize_lead_fan_out
-from app.workspace_agents.lead_task_plan import detect_fan_out_intent
+from app.workspace_agents.lead_task_plan import (
+    detect_fan_out_intent,
+    is_employee_shift_retry_request,
+)
 
 
 def _format_fan_out_reply(
@@ -72,6 +75,8 @@ def maybe_post_lead_fan_out_message(
 ) -> dict[str, object] | None:
     """When Lead hears assign-all intent, materialize fan-out instead of a Lane B essay."""
     role = str(employee_role or "").strip().lower()
+    if is_employee_shift_retry_request(content):
+        return None
     intent = detect_fan_out_intent(content)
     if composer_mode != "agent" or role != "lead" or not intent:
         return None

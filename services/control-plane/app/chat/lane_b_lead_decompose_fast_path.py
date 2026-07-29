@@ -11,6 +11,7 @@ from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
 from app.workspace_agents.lead_task_plan import (
     LeadPlanRosterMember,
     detect_fan_out_intent,
+    is_employee_shift_retry_request,
     should_lead_decompose_dispatch,
 )
 
@@ -98,6 +99,8 @@ def maybe_post_lead_decompose_message(
     """When Lead hears a multi-domain implement ask, materialize decompose plan."""
     role = str(employee_role or "").strip().lower()
     if composer_mode != "agent" or role != "lead":
+        return None
+    if is_employee_shift_retry_request(content):
         return None
     if detect_fan_out_intent(content):
         return None

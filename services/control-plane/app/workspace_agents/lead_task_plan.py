@@ -61,6 +61,26 @@ _IMPLEMENT_RE = re.compile(
     re.I,
 )
 
+# Team "Try again" / shift continuation drafts — Lead must own these in Lane B,
+# not auto-decompose into specialists (that left last_outcome stuck on Gate 6).
+_EMPLOYEE_SHIFT_RETRY_RE = re.compile(
+    r"(?:"
+    r"retry that bounded shift now as me|"
+    r"i will retry my bounded continuous shift|"
+    r"continue my interrupted shift|"
+    r"my last continuous shift on .{1,160} failed"
+    r")",
+    re.I | re.S,
+)
+
+
+def is_employee_shift_retry_request(goal: str) -> bool:
+    """True when the operator (or Team Try again) asked to retry this role's last shift."""
+    cleaned = " ".join(str(goal or "").split()).strip()
+    if not cleaned:
+        return False
+    return bool(_EMPLOYEE_SHIFT_RETRY_RE.search(cleaned))
+
 
 @dataclass(frozen=True)
 class LeadPlanRosterMember:
@@ -443,6 +463,8 @@ def should_lead_decompose_dispatch(plan: LeadTaskPlan) -> bool:
     """Whether Lead IDE should materialize this plan instead of a Lane B essay."""
     if plan.mode == "fan_out":
         return False
+    if is_employee_shift_retry_request(plan.goal):
+        return False
     if not plan.items:
         return False
     if any(item.owner_role == "lead" for item in plan.items):
@@ -462,6 +484,7 @@ __all__ = [
     "detect_implement_intent",
     "extract_exclusive_paths",
     "fallback_single_owner_plan",
+    "is_employee_shift_retry_request",
     "should_lead_decompose_dispatch",
     # Shared with lead_plan_model (stable helpers).
     "acceptance_for",

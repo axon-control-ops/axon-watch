@@ -70,12 +70,9 @@ def _select_role_outcome_run(candidates: list[dict[str, Any]]) -> dict[str, Any]
     if top_phase != "failed":
         return top
 
-    top_detail = _failure_detail_for_run(top)
-    if not _is_missing_confidence_failure(top_detail):
-        return top
-
     top_stamp = _run_stamp(top)
-    # Only supersede when a successful completion is at least as new as this failure.
+    # Prefer a successful completion that is at least as new as this failure —
+    # covers missing-Confidence, Gate 6 delivery blocks, and stale tags after IDE retries.
     later_completed = [
         run
         for run in ordered

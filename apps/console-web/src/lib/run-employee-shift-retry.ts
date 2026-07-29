@@ -14,7 +14,7 @@ export type RunEmployeeShiftRetryShell = {
   submitIdeComposer: (
     mode: IdeComposerMode,
     options?: { attachmentFiles?: File[] },
-  ) => Promise<void>;
+  ) => Promise<void | boolean>;
   openOrFocusEmployeeIdeThread?: (employee: {
     employee_id: string;
     name: string;
@@ -43,7 +43,13 @@ export async function runEmployeeShiftRetry(
   const focusThread = options.focusThread ?? true;
 
   if (focusThread && shell.openOrFocusEmployeeIdeThread) {
-    await shell.openOrFocusEmployeeIdeThread(employee);
+    const threadId = await shell.openOrFocusEmployeeIdeThread(employee);
+    if (!threadId) {
+      return {
+        ok: false,
+        reason: "Could not open this teammate's thread — Try again did not submit.",
+      };
+    }
   }
 
   const { mode, draft } = employeeComposerOpenPayload(employee, 'retry');
@@ -57,7 +63,18 @@ export async function runEmployeeShiftRetry(
   shell.setAgentExecutionAccess('full');
   shell.openIdeComposerWithDraft(draft, { keepActivityView });
   focusAgentDockComposerInput();
-  await shell.submitIdeComposer('agent');
+  try {
+    const submitted = await shell.submitIdeComposer('agent');
+    if (submitted === false) {
+      return { ok: false, reason: 'Chat message submit failed.' };
+    }
+  } catch (error) {
+    const reason =
+      error instanceof Error && error.message.trim()
+        ? error.message.trim()
+        : 'Chat message submit failed.';
+    return { ok: false, reason };
+  }
 
   return { ok: true, draft };
 }

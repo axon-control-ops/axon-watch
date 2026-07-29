@@ -36,9 +36,9 @@ _REPORT_HOTWORD_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Fleet stand-up phrases — avoid matching "report back when done" completion asks.
 _REPORT_PHRASE_RE = re.compile(
     r"\b("
-    r"report\b|"
     r"status report|"
     r"stand[\s-]?up|"
     r"where things stand|"
@@ -52,6 +52,12 @@ _REPORT_PHRASE_RE = re.compile(
     r"work in flight|"
     r"lead rollups?"
     r")\b",
+    re.IGNORECASE,
+)
+
+# Bare "report" only when it is the ask — not "report back", "reporting", etc.
+_REPORT_WORD_ASK_RE = re.compile(
+    r"(?:^|[—\-,:;]\s*)report(?:\s*[—\-:]|\s+on\b|\s*$)",
     re.IGNORECASE,
 )
 
@@ -82,9 +88,14 @@ def is_operator_report_request(content: str) -> bool:
     if _REPORT_HOTWORD_RE.match(trimmed):
         return True
     lower = trimmed.lower()
+    # Completion instructions ("handle X and report back") are not stand-ups.
+    if re.search(r"\breport\s+back\b", lower):
+        return False
     if lower.startswith("report —") or lower.startswith("report -"):
         return True
-    return bool(_REPORT_PHRASE_RE.search(trimmed))
+    if _REPORT_PHRASE_RE.search(trimmed):
+        return True
+    return bool(_REPORT_WORD_ASK_RE.search(trimmed))
 
 
 def _employee_rows(company: dict[str, Any] | None) -> list[dict[str, Any]]:
