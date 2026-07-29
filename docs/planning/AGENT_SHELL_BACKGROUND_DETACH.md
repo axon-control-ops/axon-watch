@@ -32,7 +32,7 @@ Background / auto-surface on an **open** in-thread `:::terminal` block:
 
 Capability flag: `CURSOR_SHELL_PROCESS_DETACH_AVAILABLE === false`.
 
-### B) Axon-owned agent-terminal jobs (continue-friendly)
+### B) Axon-owned agent-terminal jobs (API path)
 
 `POST /api/workspaces/{workspace_id}/terminal/agent-jobs` with `{ "command": "…" }`:
 
@@ -40,14 +40,17 @@ Capability flag: `CURSOR_SHELL_PROCESS_DETACH_AVAILABLE === false`.
 2. Writes the command into that PTY (server-side `ensure_runtime`).
 3. Returns a short **receipt** + `session_id` for chat/UI.
 4. Operator opens the vaxon tab for live logs.
-5. Work started this way is **not** a Cursor `shellToolCall`, so Lane B / other
-   tools are not blocked waiting on Cursor’s shell.
+
+**Who can call it today:** console (`runCommandInAgentBackgroundTerminal`) and any
+HTTP client. **Lane B / Cursor CLI does not call this API** — agents still use
+`shellToolCall` by default and still block until that tool completes. Starting a
+job here does **not** detach an already-running Cursor shell.
 
 Console helper: `runCommandInAgentBackgroundTerminal` calls this API (falls back
 to a local pending queue if control-plane is unreachable).
 
 **Do not** re-run an in-flight Cursor shell command via this API — that duplicates
-side effects. Use jobs for new Axon-owned work only.
+side effects. Use jobs for **new** Axon-owned work only.
 
 ## Why Cursor detach is blocked (verified 2026-07-23)
 

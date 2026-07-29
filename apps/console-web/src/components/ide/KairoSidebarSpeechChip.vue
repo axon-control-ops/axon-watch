@@ -13,6 +13,11 @@ import {
   resolveSidebarSpeechChipView,
   sidebarSpeechCanExpand,
 } from '../../lib/sidebar-speech-chip-view';
+import {
+  applyAdviseAttendAction,
+  parseAdviseUiAction,
+  shouldApplyAdviseAttendOnAffirm,
+} from '../../lib/kairo-sidebar-attend';
 import { vaxonAffirmReplyCta, vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import { useShellStore } from '../../stores/shell';
 
@@ -157,6 +162,25 @@ async function send(content?: string): Promise<void> {
       shell.openIdeComposerWithDraft(message, { keepActivityView: true });
       await shell.submitIdeComposer('agent');
       emit('replied');
+      return;
+    }
+    const adviseAction = parseAdviseUiAction(shell.operatorBriefing?.advise_ui_action ?? null);
+    if (
+      target.kind === 'vaxon' &&
+      shouldApplyAdviseAttendOnAffirm({ message, adviseUiAction: adviseAction })
+    ) {
+      applyAdviseAttendAction(
+        {
+          setCurrentWorkspace: shell.setCurrentWorkspace,
+          openWorkspaceFile: shell.openWorkspaceFile,
+          setLayoutMode: shell.setLayoutMode,
+          focusAttentionSidebar: shell.focusAttentionSidebar,
+        },
+        adviseAction,
+      );
+      emit('replied');
+      // Still acknowledge to VAXON so memory/rhythm stay aligned.
+      await submitTurn(message);
       return;
     }
     emit('replied');

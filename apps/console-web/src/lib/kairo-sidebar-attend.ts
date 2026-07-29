@@ -6,6 +6,7 @@ import {
   type ChatUiAction,
   type WorkspaceSwitchShell,
 } from './chat-ui-action';
+import { isAffirmativeOperatorReply } from './vaxon-reply-prompt';
 
 export function parseAdviseUiAction(value: unknown): ChatUiAction | null {
   return parseChatUiAction(value);
@@ -30,4 +31,12 @@ export function applyAdviseAttendAction(
     return;
   }
   applyChatUiAction(shell, action);
+}
+
+/** Affirmative speech reply should execute Attend when briefing has a ui_action. */
+export function shouldApplyAdviseAttendOnAffirm(input: {
+  message: string;
+  adviseUiAction: ChatUiAction | null;
+}): boolean {
+  return Boolean(input.adviseUiAction) && isAffirmativeOperatorReply(input.message);
 }
