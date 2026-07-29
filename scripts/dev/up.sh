@@ -4,6 +4,30 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${repo_root}/scripts/dev/lib/common.sh"
 
+usage() {
+  cat <<EOF
+Usage: ./scripts/dev/up.sh [--force|--restart] [--systemd] [--no-soft-cutover]
+
+Start (or reuse) Axon-X console + control-plane + watch.
+
+  (default)          Reuse healthy listeners on :4173/:8787/:8788 (systemd or bootstrap).
+  --force|--restart  Bounce always-on systemd units (or start bootstrap if none), wait healthy.
+  --systemd          Prefer systemd restart path when units exist.
+  --no-soft-cutover  Skip :7734→:4173 soft public cutover / tunnel start.
+
+Preferred full bounce:
+  ./scripts/dev/restart.sh
+
+Health:
+  ./scripts/dev/check-health.sh
+EOF
+}
+
+if ! parse_dev_stack_args "$@"; then
+  usage
+  exit 2
+fi
+
 rollback_stack() {
   stop_service "console-web"
   stop_service "control-plane"
@@ -15,7 +39,7 @@ rollback_stack() {
 # Soft public cutover: CF remote ingress stays on :7734, local proxy → Axon-X :4173,
 # and the managed Axon-X cloudflared process is started. Do not bind axon-local to :7734.
 ensure_soft_public_tunnel() {
-  if [[ "${AXON_WATCH_SKIP_SOFT_PUBLIC_CUTOVER:-0}" == "1" ]]; then
+  if [[ "${AXON_WATCH_SKIP_SOFT_PUBLIC_CUTOVER:-0}" == "1" || "${DEV_SKIP_SOFT_CUTOVER}" == "1" ]]; then
     return 0
   fi
 
@@ -30,6 +54,22 @@ ensure_soft_public_tunnel() {
   fi
 }
 
+finish_ok() {
+  write_stack_manifest
+  print_stack_ownership
+  echo
+  echo "Use console:"
+  echo "  always-on  $(service_health_url "console-web")"
+  if port_in_use 5173; then
+    echo "  vite-dev   http://127.0.0.1:5173/  (proxies /api → :${AXON_WATCH_CONTROL_PLANE_PORT})"
+  fi
+  echo
+  echo "Health: ./scripts/dev/check-health.sh"
+  echo "Logs: .local/logs/ (dev bootstrap) or journalctl --user -u control-plane.service"
+  echo "Stop bootstrap: ./scripts/dev/down.sh"
+  echo "Stop always-on: ./scripts/dev/down.sh --systemd"
+}
+
 load_env
 "${repo_root}/scripts/dev/ensure-python-deps.sh"
 python_bin="$(resolve_python "${repo_root}")"
@@ -37,7 +77,28 @@ ensure_runtime_dirs
 require_root_node_modules
 prune_stale_pid_files
 
-if try_reuse_healthy_bootstrap_stack; then
+if [[ "${DEV_FORCE_RESTART}" == "1" ]]; then
+  echo "Force restart requested."
+  # Tear down bootstrap first so we do not leave duplicate listeners.
+  stop_service "console-web"
+  stop_service "control-plane"
+  stop_service "axon-watch"
+  cleanup_port_orphans
+  rm -f "${stack_manifest}"
+
+  if systemd_user_available \
+    && systemctl --user list-unit-files control-plane.service >/dev/null 2>&1; then
+    restart_systemd_stack
+    ensure_soft_public_tunnel
+    finish_ok
+    exit 0
+  fi
+
+  echo "No systemd user units available — starting bootstrap stack."
+fi
+
+if [[ "${DEV_FORCE_RESTART}" != "1" ]] && try_reuse_healthy_bootstrap_stack; then
+  print_stack_ownership
   ensure_soft_public_tunnel
   exit 0
 fi
@@ -94,7 +155,6 @@ wait_for_http \
   30 \
   "$(service_pid_file "console-web")"
 
-write_stack_manifest
 trap - ERR
 
 ensure_soft_public_tunnel
@@ -103,7 +163,4 @@ echo "Started bootstrap services:"
 echo "  console-web   $(service_health_url "console-web")"
 echo "  control-plane $(service_health_url "control-plane")"
 echo "  axon-watch    $(service_health_url "axon-watch")"
-echo
-echo "Health: ./scripts/dev/check-health.sh"
-echo "Logs: .local/logs/"
-echo "Stop with: ./scripts/dev/down.sh"
+finish_ok

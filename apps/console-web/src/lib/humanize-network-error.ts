@@ -19,7 +19,8 @@ export function humanizeNetworkError(
   ) {
     return (
       `${action} could not reach the control plane (network). ` +
-      'Check that Axon-X is up on :8787 / the Vite proxy, then try again.'
+      'Check that Axon-X is up on :8787 / the Vite proxy, then try again. ' +
+      'If ./scripts/dev/check-health.sh is green, this was likely a brief restart blip — retry send.'
     );
   }
 

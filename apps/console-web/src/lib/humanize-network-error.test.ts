@@ -7,6 +7,9 @@ describe('humanizeNetworkError', () => {
     expect(humanizeNetworkError(new TypeError('Failed to fetch'), { action: 'Chat send' })).toContain(
       'could not reach the control plane',
     );
+    expect(humanizeNetworkError(new TypeError('Failed to fetch'), { action: 'Chat send' })).toContain(
+      'check-health.sh is green',
+    );
   });
 
   it('passes through labeled timeouts', () => {
