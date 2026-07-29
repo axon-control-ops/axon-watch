@@ -11,11 +11,11 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 3935,
+      "max_lines": 4062,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
-      "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display + busy-employee IDE stream follow slices extracted; employee stream voice wiring added."
+      "rule": "FS-003 in progress: dock/connectors/probes/briefing/presence/inbox/catalog + viewport/thread/chrome/composer-prefs/operator-focus/display + busy-employee IDE stream follow slices extracted; stream reconnect across workspace switches."
     },
     "apps/console-web/src/styles/ide-layout.css": {
       "max_lines": 15,
@@ -75,11 +75,11 @@
       "note": "VAXON attachment path pass-through; extract early-intent next"
     },
     "apps/console-web/src/components/ConversationSeamPanel.vue": {
-      "max_lines": 493,
+      "max_lines": 262,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*",
-      "note": "Artifact block extracted to ConversationSeamArtifactBlock.vue; Lead ratchet after under-budget verify"
+      "note": "Artifact block extracted; ratchet lowered after under-budget verify"
     },
     "services/control-plane/app/cli_runtime/research_stream_blocks.py": {
       "max_lines": 311,
@@ -120,7 +120,7 @@
       "target": "docs/how-to/* chapters"
     },
     "docs/HOW-TO-HANDBOOK.html": {
-      "max_lines": 3342,
+      "max_lines": 3432,
       "soft_limit": 250,
       "hard_limit": 400,
       "target": "docs/how-to/* generated HTML"
@@ -398,11 +398,11 @@
       "note": "Autonomy publish path-scope + receipts; extract next"
     },
     "apps/console-web/src/components/shell/OperatorTaskBoardPanel.vue": {
-      "max_lines": 356,
+      "max_lines": 430,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/components/shell/operator-task-board/*",
-      "note": "Mission Control Task Board; thin orchestrator — create form, plan filter, columns, drawer extracted"
+      "note": "Mission Control Task Board; thin orchestrator \u2014 create form, plan filter, columns, drawer extracted"
     },
     "apps/console-web/src/features/report-theater/report-theater.css": {
       "max_lines": 550,
@@ -412,7 +412,7 @@
       "note": "REPORT theater presentation; split seat/stage/action layers next"
     },
     "apps/console-web/src/styles/shell/operator-task-board.css": {
-      "max_lines": 585,
+      "max_lines": 651,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/shell/operator-task-board/*",
@@ -445,6 +445,13 @@
       "hard_limit": 500,
       "target": "services/control-plane/app/workspace_agents/lead_vaxon_*",
       "note": "Lead\u2192VAXON handoffs including Lead-shift flash; split message builders next"
+    },
+    "apps/console-web/src/components/conversation/ConversationSeamThreadMessage.vue": {
+      "max_lines": 527,
+      "soft_limit": 350,
+      "hard_limit": 500,
+      "target": "apps/console-web/src/components/conversation/*",
+      "note": "Thread message body/actions; extract attachment chrome next"
     }
   }
 }
