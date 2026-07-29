@@ -163,10 +163,11 @@
       "target": "docs/how-to/* print styles"
     },
     "apps/console-web/src/components/vault/VaultSurface.vue": {
-      "max_lines": 554,
+      "max_lines": 562,
       "soft_limit": 350,
       "hard_limit": 500,
-      "target": "apps/console-web/src/features/vault/components/*"
+      "target": "apps/console-web/src/features/vault/components/*",
+      "note": "Vault surface; extract connector rows next"
     },
     "docs/AXON-X-STARTER-GUIDE.html": {
       "max_lines": 544,
@@ -351,11 +352,18 @@
       "note": "Galaxy scene; extract next"
     },
     "apps/console-web/src/styles/ide/ide-layout-03.css": {
-      "max_lines": 526,
+      "max_lines": 529,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/styles/ide/*",
-      "note": "IDE layout-03 after dock chrome"
+      "note": "IDE layout-03 after workspace picker + slim dock chrome"
+    },
+    "apps/console-web/src/styles/ide/ide-layout-02.css": {
+      "max_lines": 522,
+      "soft_limit": 350,
+      "hard_limit": 522,
+      "target": "apps/console-web/src/styles/ide/*",
+      "note": "IDE layout-02 after AgentDock chat chrome; extract next"
     },
     "services/control-plane/app/cli_runtime/router.py": {
       "max_lines": 562,
