@@ -21,7 +21,11 @@ import {
   vaxonBriefingInteractionKey,
   vaxonBriefingPendingByWorkspace,
 } from '../../lib/vaxon-briefing-interaction';
-import { applyChatUiAction, parseChatUiAction } from '../../lib/chat-ui-action';
+import {
+  adviseAttendCtaLabel,
+  applyAdviseAttendAction,
+  parseAdviseUiAction,
+} from '../../lib/kairo-sidebar-attend';
 import { vaxonLineAsksForReply } from '../../lib/vaxon-reply-prompt';
 import { sidebarSpeechShouldOfferReply } from '../../lib/sidebar-speech-reply-route';
 import { employeeFailureDetailTooltip } from '../../features/workspace-agents/company-roster-view';
@@ -279,30 +283,19 @@ const advise = computed(() =>
   briefingAdvise(shell.operatorBriefing, shell.briefingLoadState),
 );
 const adviseUiAction = computed(() =>
-  parseChatUiAction(shell.operatorBriefing?.advise_ui_action ?? null),
+  parseAdviseUiAction(shell.operatorBriefing?.advise_ui_action ?? null),
 );
-const attendCtaLabel = computed(() => {
-  const action = adviseUiAction.value;
-  if (action?.type === 'switch_workspace' && action.cta_label) {
-    return action.cta_label;
-  }
-  return adviseUiAction.value ? 'Attend' : null;
-});
+const attendCtaLabel = computed(() => adviseAttendCtaLabel(adviseUiAction.value));
 
 function handleAttendAdvise(): void {
-  const action = adviseUiAction.value;
-  if (!action) {
-    shell.focusAttentionSidebar();
-    return;
-  }
-  applyChatUiAction(
+  applyAdviseAttendAction(
     {
       setCurrentWorkspace: shell.setCurrentWorkspace,
       openWorkspaceFile: shell.openWorkspaceFile,
       setLayoutMode: shell.setLayoutMode,
       focusAttentionSidebar: shell.focusAttentionSidebar,
     },
-    action,
+    adviseUiAction.value,
   );
 }
 const approvalBadge = computed(() => shell.pendingApprovalsCount);

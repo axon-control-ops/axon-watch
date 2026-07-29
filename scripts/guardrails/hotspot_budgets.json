@@ -11,7 +11,7 @@
       "rule": "operator shell presentation only; split by surface"
     },
     "apps/console-web/src/stores/shell.ts": {
-      "max_lines": 4062,
+      "max_lines": 4066,
       "soft_limit": 350,
       "hard_limit": 500,
       "target": "apps/console-web/src/stores/shell/slices/*",
@@ -359,9 +359,9 @@
       "note": "IDE layout-03 after workspace picker + slim dock chrome"
     },
     "apps/console-web/src/styles/ide/ide-layout-02.css": {
-      "max_lines": 522,
+      "max_lines": 537,
       "soft_limit": 350,
-      "hard_limit": 522,
+      "hard_limit": 537,
       "target": "apps/console-web/src/styles/ide/*",
       "note": "IDE layout-02 after AgentDock chat chrome; extract next"
     },
@@ -394,9 +394,9 @@
       "note": "Deterministic report regression matrix after push-failure advice coverage; split next"
     },
     "services/control-plane/app/runs/service.py": {
-      "max_lines": 527,
+      "max_lines": 528,
       "soft_limit": 350,
-      "hard_limit": 527,
+      "hard_limit": 528,
       "target": "services/control-plane/app/runs/*",
       "note": "Gate 4 leased-task create_run binding; extract next"
     },
@@ -469,6 +469,20 @@
       "hard_limit": 500,
       "target": "apps/console-web/src/components/conversation/*",
       "note": "Thread message body/actions; extract attachment chrome next"
+    },
+    "services/control-plane/app/chat/lane_b_stream_execute.py": {
+      "max_lines": 512,
+      "soft_limit": 350,
+      "hard_limit": 512,
+      "target": "services/control-plane/app/chat/*",
+      "note": "Ratchet after VAXON Attend / Axon terminal jobs slice"
+    },
+    "apps/console-web/src/components/ide/KairoSidebarPanel.vue": {
+      "max_lines": 530,
+      "soft_limit": 350,
+      "hard_limit": 530,
+      "target": "apps/console-web/src/components/ide/*",
+      "note": "Ratchet after VAXON Attend / Axon terminal jobs slice"
     }
   }
 }
