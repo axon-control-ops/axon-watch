@@ -2143,9 +2143,7 @@ export const useShellStore = defineStore('shell', () => {
       if (isRunLinkedComposerMode(composerMode)) {
         try {
           controlPlaneBootId = await fetchControlPlaneBootId();
-        } catch {
-          // Recovery remains manual when the boot identity cannot be captured.
-        }
+        } catch {}
       }
       const response = await postChatMessage({
         workspace_id: workspaceId,
