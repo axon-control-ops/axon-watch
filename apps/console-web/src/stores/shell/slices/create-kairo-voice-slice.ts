@@ -24,11 +24,6 @@ import { ideVoiceSpeechAllowed } from '../../../lib/ide-voice-strip';
 import { postKairoSpeak } from '../../../lib/kairo-speak-client';
 import type { LiveEventPayload } from '../../../lib/live-events-session';
 import {
-  isSpokenLineLiveEvent,
-  resolveSpokenLineSpeaker,
-  spokenLineDedupeReason,
-} from '../../../lib/spoken-line-live-event';
-import {
   onKairoVoiceIdle,
   pauseKairoPlayback,
   resumeKairoPlayback,
@@ -57,6 +52,7 @@ import { scheduleBriefingSurfaceOffer } from '../../../features/kairo-conversati
 import { resolveKairoPresenceClickTarget } from '../../../lib/kairo-presence-action';
 import type { LayoutMode } from '../types';
 import type { IdeComposerActivity } from '../../../lib/agent-dock-activity-view';
+import { speakSpokenLineEvent } from './kairo-voice-spoken-line';
 
 interface CreateKairoVoiceSliceInput {
   currentWorkspace: Ref<WorkspaceRecord | null>;
@@ -353,48 +349,15 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
   }
 
   async function speakSpokenLine(event: LiveEventPayload): Promise<void> {
-    if (!isSpokenLineLiveEvent(event)) {
-      return;
-    }
-    if (!voiceDeliveryAllowed() || input.operatorPresenceSettings.value.privacy_mode) {
-      return;
-    }
-    if (
-      !input.operatorPresenceSettings.value.spoken_alerts_enabled ||
-      input.effectiveKairoNarrationLevel.value === 'off'
-    ) {
-      return;
-    }
-    const eventWorkspace = event.workspace_id?.trim() ?? '';
-    const currentWorkspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
-    if (eventWorkspace && currentWorkspaceId && eventWorkspace !== currentWorkspaceId) {
-      return;
-    }
-    // Command Theater owns the queue for stand-up turns.
-    if (reportTheaterOpen.value) {
-      return;
-    }
-    const line = event.line.trim();
-    if (!line) {
-      return;
-    }
-    await unlockKairoAudioPlayback();
-    await deliverSpokenOperatorAlert(
-      {
-        eligible: true,
-        reason: spokenLineDedupeReason(event),
-        signal_id: event.receipt_id?.trim() || null,
-        message: line,
-      },
+    await speakSpokenLineEvent({
+      event,
+      voiceDeliveryAllowed,
+      privacyMode: input.operatorPresenceSettings.value.privacy_mode,
+      spokenAlertsEnabled: input.operatorPresenceSettings.value.spoken_alerts_enabled,
+      narrationLevel: input.effectiveKairoNarrationLevel.value,
+      currentWorkspace: input.currentWorkspace.value,
       sessionStorage,
-      {
-        speaker: resolveSpokenLineSpeaker(event),
-        priority: 'conversation',
-        dedupe: true,
-        directPlayback: true,
-        queueUntilUnlock: true,
-      },
-    );
+    });
   }
 
   async function speakOperatorBriefing(): Promise<void> {

@@ -22,6 +22,7 @@ import {
   employeeTalkLine,
   employeeTalkLineDetailTooltip,
 } from '../../features/workspace-agents/company-roster-view';
+import { resolveEmployeeDeliveryLinks } from '../../features/workspace-agents/employee-delivery-handoff-view';
 
 const props = defineProps<{
   employee: CompanyEmployeeRecord;
@@ -52,6 +53,15 @@ const failureDetailTooltip = computed(() => employeeFailureDetailTooltip(props.e
 const failureBeatAriaLabel = computed(() => employeeFailureBeatAriaLabel(props.employee));
 const beatDetailTooltip = computed(
   () => failureDetailTooltip.value || employeeTalkLineDetailTooltip(props.employee),
+);
+const deliveryLinks = computed(() =>
+  resolveEmployeeDeliveryLinks({
+    stage: props.employee.pipeline_stage,
+    detail: props.employee.pipeline_detail,
+    draftPrUrl: props.employee.draft_pr_url,
+    ciRunUrl: props.employee.ci_run_url,
+    ciStatus: props.employee.ci_status,
+  }),
 );
 const liveBeat = computed(() => {
   if (failure.value) {
@@ -161,6 +171,36 @@ const displayActions = computed(() =>
     >
       {{ liveBeat }}
     </p>
+
+    <div
+      v-if="deliveryLinks"
+      class="agent-persona-dock__delivery-links"
+      aria-label="Open pull request and CI"
+    >
+      <a
+        v-if="deliveryLinks.draftPrUrl"
+        class="agent-persona-dock__delivery-link"
+        :href="deliveryLinks.draftPrUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {{
+          deliveryLinks.prNumber
+            ? `Open PR #${deliveryLinks.prNumber}`
+            : 'Open draft PR'
+        }}
+        <template v-if="deliveryLinks.running"> · running</template>
+      </a>
+      <a
+        v-if="deliveryLinks.ciRunUrl"
+        class="agent-persona-dock__delivery-link"
+        :href="deliveryLinks.ciRunUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Watch CI
+      </a>
+    </div>
 
     <section v-if="receiptDetail || receiptRunId" class="agent-persona-dock__receipt">
       <p class="agent-persona-dock__receipt-label">Last job</p>

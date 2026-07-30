@@ -36,6 +36,7 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
         self.assertIn("Specialist report:", line)
         self.assertIn("My read:", line)
         self.assertIn("hold OTA", line)
+        self.assertNotIn("Confidence:", line)
 
     def test_synthesis_spoken_line_lists_specialists(self) -> None:
         line = build_lead_synthesis_spoken_line(
@@ -70,6 +71,7 @@ class LeadTakeoverVoiceTests(unittest.TestCase):
         self.assertIn("Dana here", line)
         self.assertIn("Lead shift just completed", line)
         self.assertIn("Lead next:", line)
+        self.assertNotIn("Confidence:", line)
 
     @patch("app.live_events.broadcast_spoken_line", return_value=1)
     @patch(

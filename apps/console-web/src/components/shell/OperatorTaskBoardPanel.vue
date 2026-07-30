@@ -28,10 +28,13 @@ import { useShellStore } from '../../stores/shell';
 
 import OperatorTaskBoardColumns from './operator-task-board/OperatorTaskBoardColumns.vue';
 import OperatorTaskBoardCreateForm from './operator-task-board/OperatorTaskBoardCreateForm.vue';
-import { parseDependencies } from './operator-task-board/operator-task-board-helpers';
 import OperatorTaskBoardNextUp from './operator-task-board/OperatorTaskBoardNextUp.vue';
 import OperatorTaskBoardPlanFilter from './operator-task-board/OperatorTaskBoardPlanFilter.vue';
 import OperatorTaskBoardSelectedDrawer from './operator-task-board/OperatorTaskBoardSelectedDrawer.vue';
+import {
+  openTaskBoardAssociatedRun,
+  submitTaskBoardCreate,
+} from './operator-task-board/task-board-panel-actions';
 import { confirmCancelAllWaiting, confirmClearDuplicateWaiting } from './operator-task-board/task-board-waiting-clear';
 import { useOperatorTaskBoardRouting } from './operator-task-board/use-operator-task-board-routing';
 
@@ -308,39 +311,27 @@ async function startTask(taskId: string): Promise<void> {
 }
 
 async function submitTask(): Promise<void> {
-  if (!canCreate.value) {
-    return;
-  }
-  if (createAsLeadPlan.value) {
-    const created = await shell.fanOutCurrentWorkspaceLeadPlan({
-      goal: goalDraft.value.trim(),
-      mode: 'auto',
-      create_runs: true,
-    });
-    if (created) {
-      goalDraft.value = '';
-      acceptanceDraft.value = '';
-      dependenciesDraft.value = '';
-      showCreate.value = false;
-      await shell.loadWorkspaceTasks(shell.currentWorkspace?.workspace_id ?? '');
-      await refreshScheduler();
-    }
-    return;
-  }
-  const created = await shell.createCurrentWorkspaceTask({
-    goal: goalDraft.value.trim(),
-    owner_role: ownerRoleDraft.value,
-    acceptance_criteria: acceptanceDraft.value.trim(),
+  const result = await submitTaskBoardCreate({
+    shell,
+    createAsLeadPlan: createAsLeadPlan.value,
+    goal: goalDraft.value,
+    ownerRole: ownerRoleDraft.value,
+    acceptance: acceptanceDraft.value,
     risk: riskDraft.value,
-    attempt_budget: attemptBudgetDraft.value,
-    dependencies: parseDependencies(dependenciesDraft.value),
+    attemptBudget: attemptBudgetDraft.value,
+    dependenciesDraft: dependenciesDraft.value,
+    canCreate: canCreate.value,
+    refreshScheduler,
   });
-  if (created) {
-    goalDraft.value = '';
-    acceptanceDraft.value = '';
-    dependenciesDraft.value = '';
-    showCreate.value = false;
-    selectedTaskId.value = created.task_id;
+  if (!result.cleared) {
+    return;
+  }
+  goalDraft.value = '';
+  acceptanceDraft.value = '';
+  dependenciesDraft.value = '';
+  showCreate.value = false;
+  if (result.selectedTaskId) {
+    selectedTaskId.value = result.selectedTaskId;
   }
 }
 
@@ -400,23 +391,7 @@ async function retryTask(row: TaskBoardRow): Promise<void> {
 }
 
 function openAssociatedRun(row: TaskBoardRow): void {
-  if (!row.runId) {
-    return;
-  }
-  const run = shell.runs.find((item) => item.run_id === row.runId);
-  if (run?.employee_role) {
-    const employee = shell.companyEmployeesForCurrentWorkspace.find(
-      (item) =>
-        String(item.role || '').trim().toLowerCase() ===
-        String(run.employee_role || '').trim().toLowerCase(),
-    );
-    if (employee) {
-      void shell.openOrFocusEmployeeIdeThread(employee);
-    }
-  } else {
-    void openSpecialist(row);
-  }
-  shell.setLayoutMode('ide');
+  openTaskBoardAssociatedRun({ shell, row, openSpecialist });
 }
 
 async function reviewLeadPlan(planId: string | null): Promise<void> {

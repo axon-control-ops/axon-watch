@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from app.workspace_agents.lead_fan_out import _employee_for_role
-from app.workspace_agents.lead_takeover import (
-    _truncate,
-    extract_lead_next,
-    _lead_summary_from_reply,
-    _strip_thinking,
+from app.workspace_agents.lead_text import (
+    lead_summary_from_reply,
+    strip_confidence_lines,
+    truncate_text,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _lead_speaker(workspace_id: str) -> dict[str, str]:
-    employee = _employee_for_role(workspace_id, "lead") or {}
+    from app.workspace_agents.lead_fan_out import employee_for_role
+
+    employee = employee_for_role(workspace_id, "lead") or {}
     name = str(employee.get("name") or "Lead").strip() or "Lead"
     employee_id = str(employee.get("employee_id") or "").strip()
     return {
@@ -37,7 +40,9 @@ def build_lead_takeover_spoken_line(
     role = (employee_role or "specialist").strip()
     status = "completed" if phase == "completed" else (phase or "ended")
     lead = (lead_name or "Lead").strip() or "Lead"
-    excerpt = _truncate(_strip_thinking(reply_text or ""), max_len=320)
+    from app.workspace_agents.lead_takeover import extract_lead_next
+
+    excerpt = truncate_text(strip_confidence_lines(reply_text), max_len=320)
     lead_next = extract_lead_next(reply_text)
     parts = [
         f"{lead} here. {name} ({role}) just {status}.",
@@ -71,19 +76,22 @@ def build_lead_synthesis_spoken_line(
     lead_name: str = "Lead",
 ) -> str:
     lead = (lead_name or "Lead").strip() or "Lead"
-    goal_line = _truncate(goal, max_len=160) or "Lead plan"
+    goal_line = truncate_text(goal, max_len=160) or "Lead plan"
     parts = [
         f"{lead} here — team rollup is ready.",
         f"Goal: {goal_line}.",
     ]
-    clean_summary = _truncate(summary, max_len=240)
+    clean_summary = truncate_text(strip_confidence_lines(summary), max_len=240)
     if clean_summary:
         parts.append(f"Outcome: {clean_summary}")
     bits: list[str] = []
     for row in findings[:5]:
         owner = str(row.get("assignee_name") or row.get("owner_role") or "specialist").strip()
         status = str(row.get("status") or "unknown").strip()
-        excerpt = _truncate(str(row.get("specialist_reply_excerpt") or ""), max_len=120)
+        excerpt = truncate_text(
+            strip_confidence_lines(str(row.get("specialist_reply_excerpt") or "")),
+            max_len=120,
+        )
         bit = f"{owner} {status}"
         if excerpt:
             bit = f"{bit}: {excerpt}"
@@ -100,9 +108,11 @@ def build_lead_shift_spoken_line(
     phase: str,
     reply_text: str | None,
 ) -> str:
+    from app.workspace_agents.lead_takeover import extract_lead_next
+
     name = (employee_name or "Lead").strip() or "Lead"
     status = "completed" if phase == "completed" else (phase or "ended")
-    summary = _lead_summary_from_reply(reply_text)
+    summary = lead_summary_from_reply(reply_text)
     lead_next = extract_lead_next(reply_text)
     parts = [f"{name} here. My Lead shift just {status}."]
     if summary:
@@ -138,6 +148,7 @@ def emit_lead_spoken_line(
             speaker_employee_id=speaker["speaker_employee_id"] or None,
         )
     except Exception as exc:  # noqa: BLE001 — voice must not fail Lead posting
+        logger.warning("lead spoken_line broadcast failed (%s): %s", kind, exc)
         return {"status": "error", "detail": str(exc)}
     return {
         "status": "broadcast",
@@ -148,9 +159,31 @@ def emit_lead_spoken_line(
     }
 
 
+def emit_lead_shift_spoken(
+    *,
+    workspace_id: str,
+    run_id: str,
+    employee_name: str,
+    phase: str,
+    reply_text: str | None,
+) -> dict[str, Any]:
+    """Build + broadcast Lead-shift TTS (shrinks call-site in vaxon handoff)."""
+    return emit_lead_spoken_line(
+        workspace_id=workspace_id,
+        line=build_lead_shift_spoken_line(
+            employee_name=employee_name,
+            phase=phase,
+            reply_text=reply_text,
+        ),
+        receipt_id=f"lead_shift_voice_{run_id}",
+        kind="lead_shift",
+    )
+
+
 __all__ = [
     "build_lead_shift_spoken_line",
     "build_lead_synthesis_spoken_line",
     "build_lead_takeover_spoken_line",
+    "emit_lead_shift_spoken",
     "emit_lead_spoken_line",
 ]

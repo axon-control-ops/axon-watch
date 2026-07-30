@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -9,6 +10,9 @@ from uuid import uuid4
 from app.persistence import chat_store
 from app.workspace_agents import lead_plan_store
 from app.workspace_agents.lead_fan_out import _employee_id_for_role
+from app.workspace_agents.lead_text import truncate_text as _truncate
+
+logger = logging.getLogger(__name__)
 
 DANA_SYNTHESIS_RECEIPT_KIND = "lead_synthesis_dana_posted"
 SPECIALIST_STATUS_RECEIPT_KIND = "lead_specialist_status_posted"
@@ -25,13 +29,6 @@ def _utc_now_iso() -> str:
 
 def _new_message_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex}"
-
-
-def _truncate(text: str, *, max_len: int) -> str:
-    cleaned = " ".join(str(text or "").strip().split())
-    if len(cleaned) <= max_len:
-        return cleaned
-    return f"{cleaned[: max_len - 1].rstrip()}…"
 
 
 def _receipt_already_posted(plan_id: str, kind: str, *, run_id: str | None = None) -> bool:
@@ -127,6 +124,7 @@ def build_lead_synthesis_dana_message(
             "3) I will keep holding cross-team decisions until you engage.",
             "",
             "Ask me anything about this rollup — I stay with you conversationally.",
+            "Confidence: 8/10",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"
@@ -221,9 +219,9 @@ def post_lead_synthesis_to_dana_ide(
         broadcast_material_change(receipt_id=str(receipt.get("receipt_id") or plan_id))
         lead_row = None
         try:
-            from app.workspace_agents.lead_fan_out import _employee_for_role
+            from app.workspace_agents.lead_fan_out import employee_for_role
 
-            lead_row = _employee_for_role(workspace_id, "lead")
+            lead_row = employee_for_role(workspace_id, "lead")
         except Exception:  # noqa: BLE001
             lead_row = None
         lead_name = str((lead_row or {}).get("name") or "Lead").strip() or "Lead"
@@ -238,8 +236,9 @@ def post_lead_synthesis_to_dana_ide(
             receipt_id=f"lead_synthesis_voice_{plan_id}",
             kind="lead_synthesis",
         )
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("lead synthesis spoken_line failed: %s", exc)
+        spoken = {"status": "error", "detail": str(exc)}
 
     return {
         "plan_id": plan_id,

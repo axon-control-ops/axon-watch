@@ -221,3 +221,15 @@ Template:
 - exit criteria met: yes for this slice — Semi/off, email noise skipped, Lead/attend dedupe unified, tunnel token not dangerous
 - residual risks: path bounds (H2), transient critical aging (F3), usage-cap brake (H3), spend UI still open; do not re-enable Full until a short supervised drill
 - next gate unlocked: optional supervised Full drill after H2/F3
+
+### Lead continuous shift retry (Gate 6) — 2026-07-30
+- owner: lead (`run_dfbb64bc2c4c`; prompt cited Gate 6 acceptance_evidence on prior roster failure)
+- commit: uncommitted this shift (no push)
+- commands run: `GET /health` + `/api/runtime/summary` + console `:5173` (200); `gh run list` + `gh run view 30578622057 --log-failed`; lease+complete Lead follow-up `task-950c0b6e0dd045d7`; `unittest` Gate6+Lead plan+report (35 OK); `check_hotspot_changes.py` pass; receipt append in `AUTONOMY-EVIDENCE-LOG.md`
+- pass/fail: pass for Lead retry scope — fleet triage, Fast Gate root-cause documented, Lead follow-up closed, Gate 6 acceptance receipt documented
+- exit criteria met: yes for bounded Lead shift (priorities / hierarchy / Fast Gate triage / coach decisions / upgrades)
+- Fast Gate: **failure** on `feat/mission-control-holographic` — runs `30578622057` + `30578617884`; last success `30577551811` — https://github.com/axon-control-ops/axon-watch/actions/runs/30577551811
+- hard ratchet fails (5): `OperatorTaskBoardPanel.vue` 611/590; `company-roster-view.test.ts` 304/291; `company-roster-view.ts` 363/353; `create-kairo-voice-slice.ts` 556/525; `lead_vaxon_handoff.py` 538/517
+- acceptance evidence: `acceptance=pass · intent=gate6_acceptance · actor=lead-retry-receipt · summary=Lead follow-up task-950c0b6e0dd045d7 completed; Fast Gate failure triaged (5 ratchet files); health+console+watch green; 35 unit tests OK; hotspot guardrail pass; Rowan kept on file-size patrols; Reed stale-timeout on backend thread; ship not approved`
+- residual risks: Rowan Gate 6 still failing on watcher thread (`run_e3833796838b`); Reed stale timeout (`run_b0690547509b`); DashPro Sentry critical needs Sir King Decide; Gate-verify plans still awaiting engagement (4 per briefing)
+- next gate unlocked: Rowan shrink 5 ratchet files with verifier green; Jules on `OperatorTaskBoardPanel.vue`; Reed on `lead_vaxon_handoff.py`; Sir King Decide DashPro Sentry

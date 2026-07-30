@@ -12,6 +12,11 @@ from uuid import uuid4
 from app.persistence import chat_store, task_store
 from app.workspace_agents.lead_checkin_assign import SPECIALIST_ROLES
 from app.workspace_agents.lead_fan_out import _employee_id_for_role
+from app.workspace_agents.lead_text import (
+    lead_summary_from_reply as _lead_summary_from_reply,
+    strip_thinking as _strip_thinking,
+    truncate_text as _truncate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,25 +37,6 @@ def _utc_now_iso() -> str:
 
 def _new_message_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex}"
-
-
-def _truncate(text: str, *, max_len: int) -> str:
-    cleaned = " ".join(str(text or "").strip().split())
-    if len(cleaned) <= max_len:
-        return cleaned
-    return f"{cleaned[: max_len - 1].rstrip()}…"
-
-
-def _strip_thinking(text: str) -> str:
-    raw = str(text or "")
-    if ":::thinking" not in raw:
-        return raw
-    parts = raw.split(":::")
-    for part in reversed(parts):
-        cleaned = part.strip()
-        if cleaned and not cleaned.startswith("thinking") and not cleaned.startswith("tool"):
-            return cleaned
-    return raw
 
 
 def extract_lead_next(reply_text: str | None) -> str:
@@ -257,23 +243,6 @@ def enqueue_lead_follow_up_task(
         return None
 
 
-def _lead_summary_from_reply(reply_text: str | None) -> str:
-    """One short Lead-facing summary line — never a full specialist dump."""
-    body = _strip_thinking(reply_text or "")
-    if not body:
-        return ""
-    # Prefer the first substantive non-header line from the specialist report.
-    for line in body.splitlines():
-        cleaned = line.strip().lstrip("-*• ").strip()
-        if not cleaned:
-            continue
-        lowered = cleaned.lower()
-        if lowered.startswith(("what changed", "verified", "blockers", "confidence:", "lead:")):
-            continue
-        return _truncate(cleaned, max_len=280)
-    return _truncate(body, max_len=280)
-
-
 def post_lead_takeover_report(
     *,
     workspace_id: str,
@@ -403,9 +372,9 @@ def post_lead_takeover_report(
         )
 
         broadcast_material_change(receipt_id=f"lead_takeover_{cleaned_run}")
-        from app.workspace_agents.lead_fan_out import _employee_for_role
+        from app.workspace_agents.lead_fan_out import employee_for_role
 
-        lead_row = _employee_for_role(workspace_id, "lead") or {}
+        lead_row = employee_for_role(workspace_id, "lead") or {}
         lead_name = str(lead_row.get("name") or "Lead").strip() or "Lead"
         spoken = emit_lead_spoken_line(
             workspace_id=workspace_id,
@@ -419,8 +388,9 @@ def post_lead_takeover_report(
             receipt_id=f"lead_takeover_voice_{cleaned_run}",
             kind="lead_takeover",
         )
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("lead takeover spoken_line failed: %s", exc)
+        spoken = {"status": "error", "detail": str(exc)}
     return {
         "status": "posted",
         "thread_id": thread_id,

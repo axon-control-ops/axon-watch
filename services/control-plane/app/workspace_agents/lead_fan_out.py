@@ -106,7 +106,8 @@ def _roster_from_company(workspace_id: str) -> list[LeadPlanRosterMember]:
     return members
 
 
-def _employee_for_role(workspace_id: str, role: str) -> dict[str, Any] | None:
+def employee_for_role(workspace_id: str, role: str) -> dict[str, Any] | None:
+    """Public roster lookup by role (Lead voice / takeover / check-in)."""
     company = build_company_roster(workspace_id)
     rows = company.get("employees") if isinstance(company, dict) else None
     if not isinstance(rows, list):
@@ -120,8 +121,12 @@ def _employee_for_role(workspace_id: str, role: str) -> dict[str, Any] | None:
     return None
 
 
+# Compat alias — prefer employee_for_role at new call sites.
+_employee_for_role = employee_for_role
+
+
 def _employee_id_for_role(workspace_id: str, role: str) -> str | None:
-    employee = _employee_for_role(workspace_id, role)
+    employee = employee_for_role(workspace_id, role)
     if employee is None:
         return None
     employee_id = str(employee.get("employee_id") or "").strip()

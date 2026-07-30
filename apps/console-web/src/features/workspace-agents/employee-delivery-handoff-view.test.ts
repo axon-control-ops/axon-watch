@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   employeeDeliveryDetailTooltip,
   humanizeEmployeeDeliveryHandoff,
+  resolveEmployeeDeliveryLinks,
 } from './employee-delivery-handoff-view';
 
 describe('humanizeEmployeeDeliveryHandoff', () => {
@@ -38,6 +39,46 @@ describe('humanizeEmployeeDeliveryHandoff', () => {
         ciStatus: 'failure',
       }),
     ).toBe('Latest handoff: CI checks failed.');
+  });
+
+  it('says checks are running on the open PR while CI is pending', () => {
+    expect(
+      humanizeEmployeeDeliveryHandoff({
+        stage: 'ci_pending',
+        detail:
+          'worker/run_e6476dedf70c · https://github.com/axon-control-ops/dashpro/pull/16 · pending',
+        draftPrUrl: 'https://github.com/axon-control-ops/dashpro/pull/16',
+        ciStatus: 'pending',
+      }),
+    ).toBe('Latest handoff: Checks are still running on draft pull request #16.');
+  });
+});
+
+describe('resolveEmployeeDeliveryLinks', () => {
+  it('exposes open PR and CI URLs while checks run', () => {
+    expect(
+      resolveEmployeeDeliveryLinks({
+        stage: 'ci_pending',
+        draftPrUrl: 'https://github.com/axon-control-ops/dashpro/pull/16',
+        ciRunUrl: 'https://github.com/axon-control-ops/dashpro/actions/runs/1',
+        ciStatus: 'pending',
+      }),
+    ).toEqual({
+      draftPrUrl: 'https://github.com/axon-control-ops/dashpro/pull/16',
+      ciRunUrl: 'https://github.com/axon-control-ops/dashpro/actions/runs/1',
+      prNumber: '16',
+      running: true,
+    });
+  });
+
+  it('falls back to the PR checks tab when the Actions run URL is missing', () => {
+    expect(
+      resolveEmployeeDeliveryLinks({
+        stage: 'ci_pending',
+        draftPrUrl: 'https://github.com/axon-control-ops/dashpro/pull/16',
+        ciStatus: 'pending',
+      })?.ciRunUrl,
+    ).toBe('https://github.com/axon-control-ops/dashpro/pull/16/checks');
   });
 });
 

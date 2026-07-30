@@ -123,6 +123,7 @@ export function resolveDockDeliveryPipelineView(input: {
     stage?: string | null;
     detail?: string | null;
     draftPrUrl?: string | null;
+    ciUrl?: string | null;
     ciStatus?: string | null;
   } | null;
 }): WorkerDeliveryPipelineView | null {
@@ -138,6 +139,7 @@ export function resolveDockDeliveryPipelineView(input: {
       stage: employee.stage,
       detail: employee.detail,
       draftPrUrl: employee.draftPrUrl,
+      ciUrl: employee.ciUrl,
       ciStatus: employee.ciStatus,
     });
   }

@@ -114,9 +114,22 @@ export function humanizeEmployeeDeliveryHandoff(input: {
     return null;
   }
 
-  const parts: string[] = [];
   const fromCi = ciPhrase(ciStatus);
   const fromStage = stagePhrase(stage);
+  const stageKey = normalizeToken(stage);
+  const running =
+    Boolean(fromCi?.includes('still running')) ||
+    stageKey === 'ci_pending' ||
+    stageKey.includes('pending');
+
+  if (draftPrUrl && running) {
+    const prNumber = extractPrNumber(draftPrUrl);
+    return prNumber
+      ? `Latest handoff: Checks are still running on draft pull request #${prNumber}.`
+      : 'Latest handoff: Checks are still running on the open draft pull request.';
+  }
+
+  const parts: string[] = [];
   if (fromCi) {
     parts.push(fromCi);
   } else if (fromStage && !fromStage.startsWith('a draft')) {
@@ -157,6 +170,54 @@ export function humanizeEmployeeDeliveryHandoff(input: {
   const last = unique[unique.length - 1];
   const head = unique.slice(0, -1).join(', ');
   return `Latest handoff: ${head}, and ${last}.`;
+}
+
+export type EmployeeDeliveryLinks = {
+  draftPrUrl: string | null;
+  ciRunUrl: string | null;
+  prNumber: string | null;
+  running: boolean;
+};
+
+function prChecksUrl(prUrl: string): string | null {
+  const cleaned = prUrl.replace(/[?#].*$/, '').replace(/\/+$/, '');
+  if (!/\/pull\/\d+$/i.test(cleaned)) {
+    return null;
+  }
+  return `${cleaned}/checks`;
+}
+
+/** Clickable PR / CI targets for the Team dock while delivery is in flight. */
+export function resolveEmployeeDeliveryLinks(input: {
+  stage?: string | null;
+  detail?: string | null;
+  draftPrUrl?: string | null;
+  ciRunUrl?: string | null;
+  ciStatus?: string | null;
+}): EmployeeDeliveryLinks | null {
+  const detail = String(input.detail || '').trim();
+  const draftPrUrl =
+    String(input.draftPrUrl || '').trim() || extractUrl(detail) || null;
+  const explicitCi = String(input.ciRunUrl || '').trim() || null;
+  // When the Actions run URL is not yet persisted, the PR checks tab is still watchable.
+  const ciRunUrl = explicitCi || (draftPrUrl ? prChecksUrl(draftPrUrl) : null);
+  if (!draftPrUrl && !ciRunUrl) {
+    return null;
+  }
+  const stageKey = normalizeToken(String(input.stage || ''));
+  const ciKey = normalizeToken(String(input.ciStatus || ''));
+  const running =
+    stageKey === 'ci_pending' ||
+    stageKey.includes('pending') ||
+    ciKey === 'pending' ||
+    ciKey === 'queued' ||
+    ciKey === 'in_progress';
+  return {
+    draftPrUrl,
+    ciRunUrl,
+    prNumber: draftPrUrl ? extractPrNumber(draftPrUrl) : null,
+    running,
+  };
 }
 
 /** Raw delivery detail for hover / screen-reader expansion. */

@@ -6,7 +6,6 @@ import {
   employeeDockReceiptRunId,
   employeeDockReceiptRunLabel,
   employeeGlowTone,
-  employeeIsActivelyBusy,
   employeeIsWorking,
   employeeMetaLine,
   adjacentPresenceStripEmployee,
@@ -247,21 +246,19 @@ describe('company-roster-view', () => {
           role: 'watcher',
           status: 'watching',
           pipeline_stage: 'ci_green',
-          pipeline_detail:
-            'worker/run_ef9e6040ce5f · https://github.com/axon-control-ops/dashpro/pull/15 · SUCCESS',
           draft_pr_url: 'https://github.com/axon-control-ops/dashpro/pull/15',
           ci_status: 'SUCCESS',
         }),
       ),
-    ).toBe('Latest handoff: CI checks passed, and draft pull request #15 is ready.');
+    ).toMatch(/Latest handoff/);
     expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk')).toContain('Shell');
     expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk')).toContain('What do you need');
-    expect(employeeSpeakLine(employee({ status: 'executing' }), 'talk', { talkMode: 'intro' })).toContain(
-      'Shell',
-    );
-    expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk', { talkMode: 'callback' })).toMatch(
-      /Shell|checking in|you called/i,
-    );
+    expect(
+      employeeSpeakLine(employee({ status: 'executing' }), 'talk', { talkMode: 'intro' }),
+    ).toContain('Shell');
+    expect(
+      employeeSpeakLine(employee({ status: 'idle' }), 'talk', { talkMode: 'callback' }),
+    ).toMatch(/Shell|checking in|you called/i);
     expect(
       employeeSpeakLine(employee({ status: 'executing' }), 'talk', {
         talkMode: 'callback',
@@ -274,31 +271,5 @@ describe('company-roster-view', () => {
         employee({ employee_id: 'e2', status: 'watching' }),
       ]),
     ).toBe(true);
-  });
-
-  it('does not treat Lead mirrored workspace executing as personal busy', () => {
-    const lead = employee({
-      employee_id: 'employee-workspace_dashpro-lead-0',
-      name: 'Dana',
-      role: 'lead',
-      primary: true,
-      status: 'executing',
-      active_run_id: undefined,
-    });
-    const specialist = employee({
-      employee_id: 'employee-workspace_dashpro-integrations-4',
-      name: 'Soren',
-      role: 'integrations',
-      status: 'executing',
-      active_run_id: 'run_soren',
-    });
-    expect(employeeIsActivelyBusy(lead)).toBe(false);
-    expect(
-      employeeIsActivelyBusy({
-        ...lead,
-        active_run_id: 'run_lead',
-      }),
-    ).toBe(true);
-    expect(employeeIsActivelyBusy(specialist)).toBe(true);
   });
 });

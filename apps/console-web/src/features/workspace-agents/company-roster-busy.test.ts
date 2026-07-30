@@ -48,6 +48,19 @@ describe('company-roster-busy', () => {
     expect(companyBusyEmployeesCount([specialist])).toBe(1);
   });
 
+  it('does not treat Lead mirrored workspace executing as personal busy', () => {
+    const lead = employee({
+      employee_id: 'employee-workspace_dashpro-lead-0',
+      name: 'Dana',
+      role: 'lead',
+      primary: true,
+      status: 'executing',
+      active_run_id: undefined,
+    });
+    expect(employeeIsActivelyBusy(lead)).toBe(false);
+    expect(employeeIsActivelyBusy({ ...lead, active_run_id: 'run_lead' })).toBe(true);
+  });
+
   it('treats watching specialists with an active run as busy', () => {
     const watcher = employee({
       status: 'watching',

@@ -8,6 +8,11 @@ from uuid import uuid4
 
 from app.persistence import chat_store
 from app.workspace_agents import lead_plan_store
+from app.workspace_agents.lead_text import truncate_text as _truncate
+from app.workspace_agents.lead_vaxon_messages import (
+    build_ad_hoc_lead_vaxon_message,
+    build_lead_synthesis_vaxon_message,
+)
 
 HANDOFF_RECEIPT_KIND = "lead_synthesis_vaxon_posted"
 AD_HOC_TAKEOVER_VAXON_KIND = "lead_takeover_vaxon_posted"
@@ -24,49 +29,6 @@ def _utc_now_iso() -> str:
 
 def _new_message_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex}"
-
-
-def _truncate(text: str, *, max_len: int) -> str:
-    cleaned = " ".join(str(text or "").strip().split())
-    if len(cleaned) <= max_len:
-        return cleaned
-    return f"{cleaned[: max_len - 1].rstrip()}…"
-
-
-def build_lead_synthesis_vaxon_message(
-    *,
-    plan_id: str,
-    goal: str,
-    summary: str,
-    findings: list[dict[str, Any]],
-) -> str:
-    """Build one operator-facing VAXON rollup (no PII invention)."""
-    goal_line = _truncate(goal, max_len=280) or "Lead plan"
-    lines = [
-        "VAXON: Lead team rollup is ready for your review.",
-        f"Goal: {goal_line}",
-        f"Plan: {plan_id}",
-    ]
-    clean_summary = _truncate(summary, max_len=500)
-    if clean_summary:
-        lines.append(f"Outcome: {clean_summary}")
-
-    for row in findings[:8]:
-        owner = str(row.get("assignee_name") or row.get("owner_role") or "specialist").strip()
-        status = str(row.get("status") or "").strip() or "unknown"
-        outcome = _truncate(str(row.get("outcome") or ""), max_len=160)
-        excerpt = _truncate(str(row.get("specialist_reply_excerpt") or ""), max_len=160)
-        run_ids = [str(item).strip() for item in (row.get("run_ids") or []) if str(item).strip()]
-        run_bit = f" · runs {', '.join(run_ids[:3])}" if run_ids else ""
-        detail = f"{owner}: {status}"
-        if outcome:
-            detail = f"{detail} ({outcome})"
-        if excerpt:
-            detail = f"{detail} — {excerpt}"
-        lines.append(f"- {detail}{run_bit}")
-
-    lines.append("Open Dana's Lead thread for the full narrative, or ask me what to do next.")
-    return "\n".join(lines)
 
 
 def _handoff_already_posted(plan_id: str) -> bool:
@@ -196,41 +158,6 @@ def list_awaiting_engagement_plans(*, workspace_id: str | None = None) -> list[d
 def count_awaiting_engagement_plans(*, workspace_id: str | None = None) -> int:
     """Count Lead plans waiting for operator engagement via VAXON."""
     return len(list_awaiting_engagement_plans(workspace_id=workspace_id))
-
-
-def build_ad_hoc_lead_vaxon_message(
-    *,
-    workspace_id: str,
-    employee_name: str,
-    employee_role: str,
-    phase: str,
-    run_id: str,
-    lead_next: str = "",
-    lead_summary: str = "",
-) -> str:
-    """Short operator-thread flash from a Lead-verified ad-hoc synthesis."""
-    name = (employee_name or employee_role or "specialist").strip()
-    role = (employee_role or "specialist").strip()
-    status = "completed" if phase == "completed" else (phase or "ended")
-    lines = [
-        f"VAXON: {name} ({role}) just {status}.",
-        f"Workspace: {workspace_id}",
-        f"Run: {run_id}",
-    ]
-    if role.lower() == "lead":
-        lines.append("Lead shift rollup is ready in the Lead tab.")
-    else:
-        lines.append("Lead has the takeover rollup in their Lead tab.")
-    summary = _truncate(lead_summary, max_len=280)
-    if summary:
-        lines.append(f"Lead summary: {summary}")
-    next_line = _truncate(lead_next, max_len=220)
-    if next_line:
-        lines.append(f"Lead next: {next_line}")
-    lines.append(
-        "Ask me REPORT / update anytime — I keep fleet state from Lead handoffs."
-    )
-    return "\n".join(lines)
 
 
 def record_ad_hoc_lead_synthesis(
@@ -472,11 +399,9 @@ def notify_vaxon_after_lead_shift(
     if not cleaned_run or not workspace:
         return {"status": "skipped_missing_ids"}
 
-    from app.workspace_agents.lead_takeover import (
-        _lead_summary_from_reply,
-        extract_blockers,
-        extract_lead_next,
-    )
+    from app.workspace_agents.lead_takeover import extract_blockers, extract_lead_next
+    from app.workspace_agents.lead_text import lead_summary_from_reply
+    from app.workspace_agents.lead_takeover_voice import emit_lead_shift_spoken
 
     name = (employee_name or "Lead").strip() or "Lead"
     terminal = phase if phase in {"completed", "failed"} else (phase or "ended")
@@ -488,29 +413,20 @@ def notify_vaxon_after_lead_shift(
             employee_name=name,
             phase=terminal,
             lead_next=extract_lead_next(reply_text),
-            lead_summary=_lead_summary_from_reply(reply_text),
+            lead_summary=lead_summary_from_reply(reply_text),
             blockers=extract_blockers(reply_text),
             reply_text=None,
         )
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "detail": str(exc), "run_id": cleaned_run}
 
-    spoken: dict[str, Any] | None = None
     try:
-        from app.workspace_agents.lead_takeover_voice import (
-            build_lead_shift_spoken_line,
-            emit_lead_spoken_line,
-        )
-
-        spoken = emit_lead_spoken_line(
+        spoken = emit_lead_shift_spoken(
             workspace_id=workspace,
-            line=build_lead_shift_spoken_line(
-                employee_name=name,
-                phase=terminal,
-                reply_text=reply_text,
-            ),
-            receipt_id=f"lead_shift_voice_{cleaned_run}",
-            kind="lead_shift",
+            run_id=cleaned_run,
+            employee_name=name,
+            phase=terminal,
+            reply_text=reply_text,
         )
     except Exception as exc:  # noqa: BLE001
         spoken = {"status": "error", "detail": str(exc)}
