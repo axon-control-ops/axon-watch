@@ -64,7 +64,7 @@ describe('shell run selection', () => {
     const queued = run({
       run_id: 'run_queued',
       phase: 'queued',
-      status: 'queued',
+      status: 'waiting',
       updated_at: '2026-07-30T16:00:00Z',
     });
     const executing = run({
