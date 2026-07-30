@@ -170,6 +170,7 @@ def _enqueue_attend_actions(
                     f"Resolve: {finding.detail}. "
                     "Stay inside disposable worker isolation. "
                     "Do not touch secrets, production, protected merges, or spend caps. "
+                    "Never invent receipts; verify before claiming done. "
                     "End with Confidence: N/10. "
                     f"dedupe={finding.dedupe_key}"
                 ),

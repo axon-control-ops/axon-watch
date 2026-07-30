@@ -400,8 +400,8 @@ def enqueue_lead_assignments(
                 ),
                 acceptance_criteria=(
                     f"Resolve: {finding.detail}. "
-                    "Post a short Lead-ready report with evidence. "
-                    "End with Confidence: N/10. "
+                    "Post a short Lead-ready report with verified evidence only. "
+                    "Never invent status. End with Confidence: N/10. "
                     f"dedupe={finding.dedupe_key}"
                 ),
                 # auto_safe only — escalate_only findings never reach create_task

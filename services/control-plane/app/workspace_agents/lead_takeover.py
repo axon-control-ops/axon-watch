@@ -245,7 +245,8 @@ def enqueue_lead_follow_up_task(
             ),
             acceptance_criteria=(
                 "Post a Lead decision: assign next specialist, approve ship, or ask the operator. "
-                "End with Confidence: N/10."
+                "Never invent status. Prefer verified receipts; consult official docs when needed. "
+                "Suggest a concrete next step. End with Confidence: N/10."
             ),
             risk="normal",
             owner_role="lead",
@@ -393,10 +394,31 @@ def post_lead_takeover_report(
     except Exception as exc:  # noqa: BLE001 — Lead takeover must not fail closed on VAXON flash
         logger.warning("ad-hoc VAXON takeover flash failed: %s", exc)
         vaxon_flash = {"status": "error", "detail": str(exc)}
+    spoken: dict[str, Any] | None = None
     try:
         from app.live_events import broadcast_material_change
+        from app.workspace_agents.lead_takeover_voice import (
+            build_lead_takeover_spoken_line,
+            emit_lead_spoken_line,
+        )
 
         broadcast_material_change(receipt_id=f"lead_takeover_{cleaned_run}")
+        from app.workspace_agents.lead_fan_out import _employee_for_role
+
+        lead_row = _employee_for_role(workspace_id, "lead") or {}
+        lead_name = str(lead_row.get("name") or "Lead").strip() or "Lead"
+        spoken = emit_lead_spoken_line(
+            workspace_id=workspace_id,
+            line=build_lead_takeover_spoken_line(
+                employee_name=employee_name,
+                employee_role=role,
+                phase=phase,
+                reply_text=reply_text,
+                lead_name=lead_name,
+            ),
+            receipt_id=f"lead_takeover_voice_{cleaned_run}",
+            kind="lead_takeover",
+        )
     except Exception:  # noqa: BLE001
         pass
     return {
@@ -408,6 +430,7 @@ def post_lead_takeover_report(
         "lead_next": lead_next,
         "follow_up_task_id": (follow_up or {}).get("task_id"),
         "vaxon_flash": vaxon_flash,
+        "spoken": spoken,
     }
 
 

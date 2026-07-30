@@ -1,8 +1,12 @@
-"""Mandatory accuracy + Critical Review Clause for all Axon-X runtimes.
+"""Mandatory accuracy + Critical Review Clause for Axon-X LLM runtimes.
 
 Canonical texts are shared by continuous workers, Lane B Agent/Plan/Ask/Debug,
 employee persona appendices, and scripts/ops/change-verify-loop.sh (Python import).
 Lead/Verifier LLM builders (Gates 5–7) must call append_critical_review_clause.
+
+Scope note: short VAXON DTO/template status replies do not go through these
+prompt helpers — they are not Lane B agent shifts. Hard completion still requires
+Confidence: N/10 on agent/plan finalize paths.
 """
 
 from __future__ import annotations
