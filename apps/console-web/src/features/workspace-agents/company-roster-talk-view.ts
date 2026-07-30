@@ -64,7 +64,7 @@ export function employeeTalkLineDetailTooltip(
   employee: CompanyEmployeeRecord,
 ): string | null {
   if (employeeFailureLine(employee)) {
-    return employeeFailureDetailTooltip(employee);
+    return employeeFailureDetailTooltip(employee) ?? null;
   }
   const role = String(employee.role || '').toLowerCase();
   if (!HANDOFF_ROLES.has(role)) {

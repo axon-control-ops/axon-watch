@@ -1,3 +1,4 @@
+import type { CompanyEmployeeRecord } from '../../../contracts/canonical';
 import type { TaskBoardRow } from '../../../lib/operator-task-board-view';
 import { parseDependencies } from './operator-task-board-helpers';
 
@@ -18,10 +19,13 @@ type ShellTaskBoard = {
   loadWorkspaceTasks: (workspaceId: string) => Promise<unknown>;
   currentWorkspace?: { workspace_id?: string } | null;
   runs: ReadonlyArray<{ run_id?: string; employee_role?: string | null }>;
-  companyEmployeesForCurrentWorkspace: ReadonlyArray<{
-    role?: string | null;
-  }>;
-  openOrFocusEmployeeIdeThread: (employee: unknown) => Promise<unknown> | unknown;
+  companyEmployeesForCurrentWorkspace: ReadonlyArray<CompanyEmployeeRecord>;
+  openOrFocusEmployeeIdeThread: (
+    employee: Pick<CompanyEmployeeRecord, 'employee_id' | 'name' | 'role'> & {
+      role_label?: string;
+    },
+    options?: { forceRefresh?: boolean },
+  ) => Promise<string | null>;
   setLayoutMode: (mode: 'ide') => void;
 };
 
