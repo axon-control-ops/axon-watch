@@ -171,6 +171,16 @@ def build_continuous_worker_prompt(
         "Long-running OTA/Expo/EAS jobs: start once and wait for that shell tool; do not "
         "busy-poll with repeated shell probes every few seconds — check sparsely (~30–60s). "
     )
+    if workspace_id.strip() == "workspace_dashpro":
+        memory_clause += (
+            " Temporary self-hosted CI on this PC: prefer "
+            "`npm run ops:agents:quality` (subset) with "
+            "`DASHPRO_CI_MEMORY_PROFILE=self-hosted` / Jest maxWorkers=1. "
+            "Never run `ops:agents:quality:full`, Android CI, or parallel workflow_dispatch "
+            "while Cursor is open — the local runner is MemoryMax-capped at 10G and previously "
+            "OOM-froze the host at ~18G. Create/queue CI repair tasks for operator Start; "
+            "do not stack Quality Gates + Android + typecheck heaps. "
+        )
     prior_failure = _prior_failure_clause(workspace_id=workspace_id, role=role)
     roster_block = build_team_roster_context(workspace_id, viewer_role=role)
     roster_clause = f"\n\n{roster_block}" if roster_block else ""
