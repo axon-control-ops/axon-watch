@@ -1,10 +1,10 @@
 import { ref, type Ref } from 'vue';
 
-import type { CompanyEmployeeRecord } from '../../contracts/canonical';
-import { patchWorkspaceEmployeeEnabled } from '../../api/worker-scheduler-api';
-import { stopRun } from '../../api/runs-api';
-import type { TeamMemberQuickAction } from '../../features/workspace-agents/company-roster-actions';
-import type { useShellStore } from '../../stores/shell';
+import type { CompanyEmployeeRecord } from '../contracts/canonical';
+import { patchWorkspaceEmployeeEnabled } from '../api/worker-scheduler-api';
+import { stopRun } from '../api/runs-api';
+import type { TeamMemberQuickAction } from '../features/workspace-agents/company-roster-actions';
+import type { useShellStore } from '../stores/shell';
 
 type ShellStore = ReturnType<typeof useShellStore>;
 
