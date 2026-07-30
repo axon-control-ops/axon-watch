@@ -68,3 +68,35 @@ def broadcast_material_change(
     if receipt_id:
         payload["receipt_id"] = receipt_id
     return broadcast_live_event(payload)
+
+
+def broadcast_spoken_line(
+    *,
+    line: str,
+    receipt_id: str,
+    workspace_id: str | None = None,
+    kind: str = "lead_takeover",
+    speaker_name: str = "Lead",
+    speaker_role: str = "lead",
+    speaker_employee_id: str | None = None,
+) -> int:
+    """Explicit spoken interrupt — console speaks ``line`` as the named speaker."""
+    from app.live_event_hub import broadcast_live_event
+
+    cleaned = " ".join(str(line or "").strip().split())
+    if not cleaned:
+        return 0
+    payload: dict[str, object] = {
+        "type": "spoken_line",
+        "line": cleaned[:1200],
+        "receipt_id": str(receipt_id or "").strip() or f"spoken_{kind}",
+        "kind": str(kind or "lead_takeover").strip() or "lead_takeover",
+        "speaker_name": str(speaker_name or "Lead").strip() or "Lead",
+        "speaker_role": str(speaker_role or "lead").strip() or "lead",
+    }
+    if workspace_id:
+        payload["workspace_id"] = str(workspace_id).strip()
+    employee_id = str(speaker_employee_id or "").strip()
+    if employee_id:
+        payload["speaker_employee_id"] = employee_id
+    return broadcast_live_event(payload)

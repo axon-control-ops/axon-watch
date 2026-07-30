@@ -210,10 +210,34 @@ def post_lead_synthesis_to_dana_ide(
             "summary": summary,
         },
     )
+    spoken: dict[str, Any] | None = None
     try:
         from app.live_events import broadcast_material_change
+        from app.workspace_agents.lead_takeover_voice import (
+            build_lead_synthesis_spoken_line,
+            emit_lead_spoken_line,
+        )
 
         broadcast_material_change(receipt_id=str(receipt.get("receipt_id") or plan_id))
+        lead_row = None
+        try:
+            from app.workspace_agents.lead_fan_out import _employee_for_role
+
+            lead_row = _employee_for_role(workspace_id, "lead")
+        except Exception:  # noqa: BLE001
+            lead_row = None
+        lead_name = str((lead_row or {}).get("name") or "Lead").strip() or "Lead"
+        spoken = emit_lead_spoken_line(
+            workspace_id=workspace_id,
+            line=build_lead_synthesis_spoken_line(
+                goal=goal,
+                summary=summary,
+                findings=findings,
+                lead_name=lead_name,
+            ),
+            receipt_id=f"lead_synthesis_voice_{plan_id}",
+            kind="lead_synthesis",
+        )
     except Exception:
         pass
 
@@ -224,6 +248,7 @@ def post_lead_synthesis_to_dana_ide(
         "message_id": agent_message["message_id"],
         "thread_id": thread_id,
         "content": content,
+        "spoken": spoken,
     }
 
 

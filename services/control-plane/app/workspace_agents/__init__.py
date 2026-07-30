@@ -157,6 +157,7 @@ def build_company_roster(
         ]
         pipeline_detail = " · ".join(detail_bits) if detail_bits else stage
         draft_pr = str(delivery.get("draft_pr_url") or "").strip() or None
+        ci_run_url = str(delivery.get("ci_run_url") or "").strip() or None
         ci_status = str(delivery.get("ci_conclusion") or stage or "").strip() or None
         for row in employee_rows:
             role = str(row.get("role") or "").strip().lower()
@@ -164,6 +165,7 @@ def build_company_roster(
                 row["pipeline_stage"] = stage or None
                 row["pipeline_detail"] = pipeline_detail or None
                 row["draft_pr_url"] = draft_pr
+                row["ci_run_url"] = ci_run_url
                 row["ci_status"] = ci_status
 
     if primary_employee_id is None and employee_rows:

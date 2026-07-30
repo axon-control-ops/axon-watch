@@ -15,6 +15,18 @@
   white-space: nowrap;
 }
 
+.operator-task-board__columns {
+  position: relative;
+  z-index: 3;
+}
+
+.operator-task-board__drawer-anchor {
+  position: relative;
+  z-index: 3;
+  margin-top: 0.35rem;
+  scroll-margin-bottom: 1.25rem;
+}
+
 .operator-task-board__list {
   gap: 0.35rem;
   max-height: 22rem;

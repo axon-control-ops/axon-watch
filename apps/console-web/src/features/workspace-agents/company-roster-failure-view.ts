@@ -18,6 +18,7 @@ import {
   truncateFailureDetail,
 } from './employee-failure-detail';
 import { employeeIsWorking, employeeStatusIsActivelyBusy } from './company-roster-status';
+import { humanizeEmployeeDeliveryHandoff } from './employee-delivery-handoff-view';
 
 const DOCK_RECEIPT_DETAIL_MAX = 180;
 
@@ -176,6 +177,20 @@ export function employeeDockReceiptDetail(employee: CompanyEmployeeRecord): stri
   const detail = employeeResolvedFailureDetail(employee);
   if (!detail || employeeFailureLine(employee)) {
     return null;
+  }
+  // Prefer plain English when the last outcome is a raw delivery receipt.
+  if (/delivery\b|worker\/run_|https?:\/\/|ci[_ ]green|draft.?pr/i.test(detail)) {
+    const handoff = humanizeEmployeeDeliveryHandoff({
+      stage: employee.pipeline_stage,
+      detail: employee.pipeline_detail || detail,
+      draftPrUrl: employee.draft_pr_url,
+      ciStatus: employee.ci_status,
+    });
+    if (handoff) {
+      return handoff.length <= DOCK_RECEIPT_DETAIL_MAX
+        ? handoff
+        : `${handoff.slice(0, DOCK_RECEIPT_DETAIL_MAX - 1)}…`;
+    }
   }
   if (detail.length <= DOCK_RECEIPT_DETAIL_MAX) {
     return detail;

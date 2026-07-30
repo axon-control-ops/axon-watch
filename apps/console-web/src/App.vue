@@ -109,6 +109,7 @@ watch(
         return shell.refreshOperatorPresence();
       },
       onSpokenBriefing: () => shell.speakOperatorBriefing(),
+      onSpokenLine: (event) => shell.speakSpokenLine(event),
     });
   },
   { immediate: true },

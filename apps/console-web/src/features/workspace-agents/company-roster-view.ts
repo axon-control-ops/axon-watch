@@ -3,6 +3,10 @@ import { OPERATOR_FAILURE_STATUS_LABEL } from '../../lib/operator-failure-copy';
 
 import { employeeFailureDetailTooltip, employeeFailureLine } from './company-roster-failure-view';
 import { employeeIsWorking } from './company-roster-status';
+import {
+  employeeDeliveryDetailTooltip,
+  humanizeEmployeeDeliveryHandoff,
+} from './employee-delivery-handoff-view';
 
 export {
   employeeResolvedFailureDetail,
@@ -272,11 +276,17 @@ export function employeeTalkLine(employee: CompanyEmployeeRecord): string | null
   if (failure) {
     return failure;
   }
-  const pipeline = String(employee.pipeline_stage || '').trim();
-  if (pipeline && ['watcher', 'integrations', 'lead', 'backend'].includes(String(employee.role || '').toLowerCase())) {
-    const label = pipeline.replace(/_/g, ' ');
-    const detail = employee.pipeline_detail?.trim();
-    return detail ? `Delivery ${label}: ${detail}` : `Delivery ${label}.`;
+  const role = String(employee.role || '').toLowerCase();
+  if (['watcher', 'integrations', 'lead', 'backend'].includes(role)) {
+    const handoff = humanizeEmployeeDeliveryHandoff({
+      stage: employee.pipeline_stage,
+      detail: employee.pipeline_detail,
+      draftPrUrl: employee.draft_pr_url,
+      ciStatus: employee.ci_status,
+    });
+    if (handoff) {
+      return handoff;
+    }
   }
   if (!employeeIsWorking(employee.status)) {
     return null;
@@ -305,6 +315,25 @@ export function employeeTalkLine(employee: CompanyEmployeeRecord): string | null
     return `Ready to hand off ${owns}.`;
   }
   return `On ${owns}.`;
+}
+
+/** Hover/tooltip for the Team dock beat when a delivery handoff is shown. */
+export function employeeTalkLineDetailTooltip(
+  employee: CompanyEmployeeRecord,
+): string | null {
+  if (employeeFailureLine(employee)) {
+    return employeeFailureDetailTooltip(employee);
+  }
+  const role = String(employee.role || '').toLowerCase();
+  if (!['watcher', 'integrations', 'lead', 'backend'].includes(role)) {
+    return null;
+  }
+  return employeeDeliveryDetailTooltip({
+    stage: employee.pipeline_stage,
+    detail: employee.pipeline_detail,
+    draftPrUrl: employee.draft_pr_url,
+    ciStatus: employee.ci_status,
+  });
 }
 
 export function employeeMetaLine(employee: CompanyEmployeeRecord): string {

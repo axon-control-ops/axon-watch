@@ -22,6 +22,12 @@ import {
 import { buildKairoSpeechSessionId } from '../../../lib/kairo-speech-session';
 import { ideVoiceSpeechAllowed } from '../../../lib/ide-voice-strip';
 import { postKairoSpeak } from '../../../lib/kairo-speak-client';
+import type { LiveEventPayload } from '../../../lib/live-events-session';
+import {
+  isSpokenLineLiveEvent,
+  resolveSpokenLineSpeaker,
+  spokenLineDedupeReason,
+} from '../../../lib/spoken-line-live-event';
 import {
   onKairoVoiceIdle,
   pauseKairoPlayback,
@@ -346,6 +352,51 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     }
   }
 
+  async function speakSpokenLine(event: LiveEventPayload): Promise<void> {
+    if (!isSpokenLineLiveEvent(event)) {
+      return;
+    }
+    if (!voiceDeliveryAllowed() || input.operatorPresenceSettings.value.privacy_mode) {
+      return;
+    }
+    if (
+      !input.operatorPresenceSettings.value.spoken_alerts_enabled ||
+      input.effectiveKairoNarrationLevel.value === 'off'
+    ) {
+      return;
+    }
+    const eventWorkspace = event.workspace_id?.trim() ?? '';
+    const currentWorkspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
+    if (eventWorkspace && currentWorkspaceId && eventWorkspace !== currentWorkspaceId) {
+      return;
+    }
+    // Command Theater owns the queue for stand-up turns.
+    if (reportTheaterOpen.value) {
+      return;
+    }
+    const line = event.line.trim();
+    if (!line) {
+      return;
+    }
+    await unlockKairoAudioPlayback();
+    await deliverSpokenOperatorAlert(
+      {
+        eligible: true,
+        reason: spokenLineDedupeReason(event),
+        signal_id: event.receipt_id?.trim() || null,
+        message: line,
+      },
+      sessionStorage,
+      {
+        speaker: resolveSpokenLineSpeaker(event),
+        priority: 'conversation',
+        dedupe: true,
+        directPlayback: true,
+        queueUntilUnlock: true,
+      },
+    );
+  }
+
   async function speakOperatorBriefing(): Promise<void> {
     if (!voiceDeliveryAllowed() || input.operatorPresenceSettings.value.privacy_mode) {
       return;
@@ -497,6 +548,7 @@ export function createKairoVoiceSlice(input: CreateKairoVoiceSliceInput) {
     speakKairoConversationLine,
     handleKairoPresenceAction,
     deliverKairoSpokenAlert,
+    speakSpokenLine,
     speakOperatorBriefing,
     maybeSpeakBootGreeting,
     kairoVoiceContext,

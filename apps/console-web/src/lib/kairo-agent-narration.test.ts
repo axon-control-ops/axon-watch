@@ -134,6 +134,16 @@ describe('narrationForCompletion', () => {
     expect(spokenCompletionSummary(`${plan} Confidence: 8/10`)).toMatch(/confidence/i);
   });
 
+  it('speaks the specialist report body with confidence, not only Shift complete', () => {
+    const content =
+      'Sir King — OTA gate blocked. Wrong branch and dirty tree. Hold OTA until merge is green.\n' +
+      'Confidence: 8/10';
+    const spoken = spokenCompletionSummary(content);
+    expect(spoken).toMatch(/OTA gate blocked/i);
+    expect(spoken).toMatch(/Confidence 8 out of 10/i);
+    expect(spoken).not.toBe('Shift complete. Confidence 8 out of 10.');
+  });
+
   it('treats gerund and future-tense mid-run intent as progress openers', () => {
     expect(
       isProgressOrIntentSentence(

@@ -495,10 +495,31 @@ def notify_vaxon_after_lead_shift(
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "detail": str(exc), "run_id": cleaned_run}
 
+    spoken: dict[str, Any] | None = None
+    try:
+        from app.workspace_agents.lead_takeover_voice import (
+            build_lead_shift_spoken_line,
+            emit_lead_spoken_line,
+        )
+
+        spoken = emit_lead_spoken_line(
+            workspace_id=workspace,
+            line=build_lead_shift_spoken_line(
+                employee_name=name,
+                phase=terminal,
+                reply_text=reply_text,
+            ),
+            receipt_id=f"lead_shift_voice_{cleaned_run}",
+            kind="lead_shift",
+        )
+    except Exception as exc:  # noqa: BLE001
+        spoken = {"status": "error", "detail": str(exc)}
+
     return {
         "status": "ok_lead_shift",
         "run_id": cleaned_run,
         "vaxon_flash": vaxon_flash,
+        "spoken": spoken,
     }
 
 

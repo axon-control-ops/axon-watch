@@ -20,6 +20,7 @@ import {
   employeeShiftNeedsContinuation,
   employeeStatusLabel,
   employeeTalkLine,
+  employeeTalkLineDetailTooltip,
 } from '../../features/workspace-agents/company-roster-view';
 
 const props = defineProps<{
@@ -49,6 +50,9 @@ const interruptedShift = computed(() =>
 );
 const failureDetailTooltip = computed(() => employeeFailureDetailTooltip(props.employee));
 const failureBeatAriaLabel = computed(() => employeeFailureBeatAriaLabel(props.employee));
+const beatDetailTooltip = computed(
+  () => failureDetailTooltip.value || employeeTalkLineDetailTooltip(props.employee),
+);
 const liveBeat = computed(() => {
   if (failure.value) {
     return failure.value;
@@ -150,7 +154,7 @@ const displayActions = computed(() =>
         'agent-persona-dock__beat--failed': !!failure && !interruptedShift,
         'agent-persona-dock__beat--interrupted': !!failure && interruptedShift,
       }"
-      :title="failureDetailTooltip"
+      :title="beatDetailTooltip ?? undefined"
       :aria-label="failureBeatAriaLabel ?? undefined"
       :aria-live="failure ? 'polite' : undefined"
       role="status"

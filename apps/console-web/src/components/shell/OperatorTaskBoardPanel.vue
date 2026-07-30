@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 import {
   fetchWorkerSchedulerStatus,
@@ -12,6 +12,7 @@ import {
   worstHudHoloTone,
   type HudHoloTone,
 } from '../../features/hud-holo/hud-holo-tones';
+import { resolveTaskBoardCardActivation } from '../../lib/operator-task-board-activate';
 import { buildOperatorTaskBoardView, type TaskBoardRow } from '../../lib/operator-task-board-view';
 import {
   dismissDoneTaskId,
@@ -46,6 +47,7 @@ const createAsLeadPlan = ref(false);
 const showCreate = ref(false);
 const showHistory = ref(false);
 const selectedTaskId = ref<string | null>(null);
+const selectedDrawerEl = ref<HTMLElement | null>(null);
 const planFilterId = ref<string | 'all'>('all');
 const scheduler = ref<WorkerSchedulerStatus | null>(null);
 const schedulerError = ref<string | null>(null);
@@ -228,6 +230,37 @@ function selectTask(taskId: string): void {
   selectedTaskId.value = selectedTaskId.value === taskId ? null : taskId;
 }
 
+async function revealSelectedDrawer(): Promise<void> {
+  await nextTick();
+  selectedDrawerEl.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+/** Card click: run the labeled next action (not a silent select below the fold). */
+function activateTaskCard(taskId: string): void {
+  const row = boardView.value.rows.find((item) => item.taskId === taskId);
+  if (!row) {
+    selectTask(taskId);
+    void revealSelectedDrawer();
+    return;
+  }
+  const action = resolveTaskBoardCardActivation(row);
+  if (action.kind === 'focus_blocker') {
+    selectedTaskId.value = action.blockerTaskId;
+    void revealSelectedDrawer();
+    return;
+  }
+  selectedTaskId.value = taskId;
+  if (action.kind === 'open_failure' || action.kind === 'open_run') {
+    openAssociatedRun(action.row);
+  } else if (action.kind === 'open_specialist') {
+    void openSpecialist(action.row);
+    shell.setLayoutMode('ide');
+  } else if (action.kind === 'open_vaxon_review') {
+    openVaxonReview(action.planId);
+  }
+  void revealSelectedDrawer();
+}
+
 async function closeLeadPlan(planId: string | null | undefined): Promise<void> {
   const cleaned = String(planId || '').trim();
   if (!cleaned) {
@@ -402,7 +435,7 @@ function activateNextUp(row: TaskBoardRow): void {
     void startTask(row.taskId);
     return;
   }
-  selectTask(row.taskId);
+  activateTaskCard(row.taskId);
 }
 </script>
 
@@ -545,7 +578,7 @@ function activateNextUp(row: TaskBoardRow): void {
         :selected-task-id="selectedTaskId"
         :show-history="showHistory"
         :workspace-tasks-mutating="shell.workspaceTasksMutating"
-        @select-task="selectTask"
+        @select-task="activateTaskCard"
         @start-task="void startTask($event)"
         @cancel-task="void cancelTask($event)"
         @dismiss-done="dismissDoneTask"
@@ -553,21 +586,26 @@ function activateNextUp(row: TaskBoardRow): void {
         @update:show-history="showHistory = $event"
       />
 
-      <OperatorTaskBoardSelectedDrawer
+      <div
         v-if="selectedRow"
-        :row="selectedRow"
-        :workspace-tasks-mutating="shell.workspaceTasksMutating"
-        :lead-plans-mutating="shell.leadPlansMutating"
-        :plan-awaiting-engagement="selectedPlanAwaitingEngagement"
-        @close="selectedTaskId = null"
-        @start-task="void startTask($event)"
-        @open-associated-run="openAssociatedRun"
-        @open-specialist="void openSpecialist($event)"
-        @open-vaxon-review="openVaxonReview(selectedRow.planId)"
-        @cancel-task="void cancelTask($event)"
-        @retry-task="void retryTask($event)"
-        @review-lead-plan="void reviewLeadPlan($event)"
-      />
+        ref="selectedDrawerEl"
+        class="operator-task-board__drawer-anchor"
+      >
+        <OperatorTaskBoardSelectedDrawer
+          :row="selectedRow"
+          :workspace-tasks-mutating="shell.workspaceTasksMutating"
+          :lead-plans-mutating="shell.leadPlansMutating"
+          :plan-awaiting-engagement="selectedPlanAwaitingEngagement"
+          @close="selectedTaskId = null"
+          @start-task="void startTask($event)"
+          @open-associated-run="openAssociatedRun"
+          @open-specialist="void openSpecialist($event)"
+          @open-vaxon-review="openVaxonReview(selectedRow.planId)"
+          @cancel-task="void cancelTask($event)"
+          @retry-task="void retryTask($event)"
+          @review-lead-plan="void reviewLeadPlan($event)"
+        />
+      </div>
     </HudHoloPanelShell>
   </div>
 </template>

@@ -226,6 +226,23 @@ export function spokenCompletionSummary(content: string): string {
   const confidence = flat.match(AGENT_CONFIDENCE_LINE_RE);
   if (confidence) {
     const score = confidence[1] ?? '?';
+    const withoutConfidence = flat.replace(AGENT_CONFIDENCE_LINE_RE, ' ').replace(/\s+/g, ' ').trim();
+    const reportSentences = withoutConfidence.match(/[^.!?]+[.!?]+/g) ?? [];
+    const usableReport = reportSentences.filter(
+      (sentence) => !isProgressOrIntentSentence(sentence),
+    );
+    if (usableReport.length > 0) {
+      let summary = (usableReport[0] ?? '').trim();
+      const second = usableReport[1];
+      if (summary.length < 140 && second) {
+        summary = `${summary} ${second.trim()}`;
+      }
+      if (summary.length > COMPLETION_SUMMARY_MAX) {
+        summary = `${summary.slice(0, COMPLETION_SUMMARY_MAX - 1).trim()}…`;
+      }
+      const ended = summary.endsWith('.') || summary.endsWith('…') ? summary : `${summary}.`;
+      return `${ended} Confidence ${score} out of 10.`;
+    }
     const review = flat.match(/Critical\s+Review[^.!?]{0,160}[.!?]?/i)?.[0]?.trim();
     if (review && review.length >= 24) {
       const clipped =

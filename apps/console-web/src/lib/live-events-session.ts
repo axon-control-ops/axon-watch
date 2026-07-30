@@ -3,6 +3,8 @@ export type LiveEventType =
   | 'runtime_refresh'
   | 'presence_refresh'
   | 'spoken_briefing'
+  /** Lead / specialist rollup with an explicit speakable line. */
+  | 'spoken_line'
   /** Material event invalidation — proactive advise, not timer heartbeats. */
   | 'material_change';
 
@@ -11,6 +13,13 @@ export interface LiveEventPayload {
   /** Optional receipt / signal id for proactive speech dedupe. */
   receipt_id?: string;
   signal_id?: string;
+  /** Present on `spoken_line` — literal TTS copy. */
+  line?: string;
+  workspace_id?: string;
+  kind?: string;
+  speaker_name?: string;
+  speaker_role?: string;
+  speaker_employee_id?: string;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
@@ -42,6 +51,7 @@ export function parseLiveEventData(raw: string): LiveEventPayload | null {
       parsed.type === 'runtime_refresh' ||
       parsed.type === 'presence_refresh' ||
       parsed.type === 'spoken_briefing' ||
+      parsed.type === 'spoken_line' ||
       parsed.type === 'material_change'
     ) {
       return parsed;
@@ -66,10 +76,16 @@ export function shouldTriggerSpokenBriefing(event: LiveEventPayload): boolean {
   return event.type === 'spoken_briefing';
 }
 
+export function shouldTriggerSpokenLine(event: LiveEventPayload): boolean {
+  return event.type === 'spoken_line' && Boolean(event.line?.trim());
+}
+
 export interface LiveEventsSessionOptions {
   onRefresh: () => void | Promise<void>;
   onPresenceRefresh?: () => void | Promise<void>;
   onSpokenBriefing?: () => void | Promise<void>;
+  /** Lead takeover / synthesis — speak the provided line as that teammate. */
+  onSpokenLine?: (event: LiveEventPayload) => void | Promise<void>;
   /** Lead rollups / review_ready — refresh engagement surfaces without speaking. */
   onMaterialChange?: () => void | Promise<void>;
   pollIntervalMs?: number;
@@ -174,6 +190,14 @@ export function startLiveEventsSession(options: LiveEventsSessionOptions): LiveE
     }
     if (shouldTriggerSpokenBriefing(event)) {
       void options.onSpokenBriefing?.();
+      return;
+    }
+    if (shouldTriggerSpokenLine(event)) {
+      void options.onSpokenLine?.(event);
+      // Keep engagement surfaces current while the Lead speaks.
+      if (options.onMaterialChange) {
+        void invokeMaterialChange();
+      }
       return;
     }
     if (event.type === 'material_change' && options.onMaterialChange) {

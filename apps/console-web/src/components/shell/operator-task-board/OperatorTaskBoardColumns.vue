@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 
+import { taskBoardRowShowsBlockingChips } from '../../../lib/operator-task-board-activate';
 import type {
   OperatorTaskBoardView,
   TaskBoardColumnId,
@@ -148,7 +149,11 @@ function hiddenWaitingCount(column: OperatorTaskBoardView['columns'][number]): n
               <template v-if="row.bucket !== 'done'"> · attempts {{ row.attemptsLabel }}</template>
             </span>
             <span
-              v-for="chip in row.dependencyChips.filter((item) => item.blocking).slice(0, 1)"
+              v-for="chip in (
+                taskBoardRowShowsBlockingChips(row)
+                  ? row.dependencyChips.filter((item) => item.blocking).slice(0, 1)
+                  : []
+              )"
               :key="`${row.taskId}-${chip.taskId}`"
               class="operator-task-board__chip operator-task-board__chip--blocking"
             >

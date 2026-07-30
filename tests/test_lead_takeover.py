@@ -54,7 +54,10 @@ class LeadTakeoverTests(unittest.TestCase):
             "Blockers / Lead next: Lead: decide notify campaign once storage is live.\n"
             "Confidence: 9/10"
         )
-        with patch("app.live_events.broadcast_material_change"):
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
             result = notify_lead_after_worker_task(
                 workspace_id="workspace_dashpro",
                 task_id="",
@@ -116,7 +119,10 @@ class LeadTakeoverTests(unittest.TestCase):
         self.assertIn("Lead follow-up", follow.get("goal") or "")
 
         # Idempotent for the same run — takeover stays already_posted; VAXON receipt too.
-        with patch("app.live_events.broadcast_material_change"):
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
             again = notify_lead_after_worker_task(
                 workspace_id="workspace_dashpro",
                 task_id="",
@@ -134,7 +140,10 @@ class LeadTakeoverTests(unittest.TestCase):
         from app.persistence import task_store
         from app.workspace_agents.lead_takeover import post_lead_takeover_report
 
-        with patch("app.live_events.broadcast_material_change"):
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
             takeover = post_lead_takeover_report(
                 workspace_id="workspace_dashpro",
                 run_id="run_priya_failed_1",
@@ -167,7 +176,10 @@ class LeadTakeoverTests(unittest.TestCase):
             "Next: On your go-ahead commit/push the contract fix.\n"
             "Confidence: 8/10"
         )
-        with patch("app.live_events.broadcast_material_change"):
+        with (
+            patch("app.live_events.broadcast_material_change"),
+            patch("app.live_events.broadcast_spoken_line", return_value=1),
+        ):
             result = notify_lead_after_worker_task(
                 workspace_id="workspace_dashpro",
                 task_id="",

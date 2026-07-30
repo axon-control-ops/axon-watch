@@ -241,6 +241,19 @@ describe('company-roster-view', () => {
     expect(employeeGlowTone(employee({ role: 'lead', primary: true }))).toBe('lead');
     expect(employeeTalkLine(employee({ status: 'idle' }))).toBeNull();
     expect(employeeTalkLine(employee({ status: 'executing' }))).toContain('In progress');
+    expect(
+      employeeTalkLine(
+        employee({
+          role: 'watcher',
+          status: 'watching',
+          pipeline_stage: 'ci_green',
+          pipeline_detail:
+            'worker/run_ef9e6040ce5f · https://github.com/axon-control-ops/dashpro/pull/15 · SUCCESS',
+          draft_pr_url: 'https://github.com/axon-control-ops/dashpro/pull/15',
+          ci_status: 'SUCCESS',
+        }),
+      ),
+    ).toBe('Latest handoff: CI checks passed, and draft pull request #15 is ready.');
     expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk')).toContain('Shell');
     expect(employeeSpeakLine(employee({ status: 'idle' }), 'talk')).toContain('What do you need');
     expect(employeeSpeakLine(employee({ status: 'executing' }), 'talk', { talkMode: 'intro' })).toContain(
