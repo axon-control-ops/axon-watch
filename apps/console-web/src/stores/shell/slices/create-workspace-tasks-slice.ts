@@ -138,6 +138,29 @@ export function createWorkspaceTasksSlice(input: CreateWorkspaceTasksSliceInput)
     }
   }
 
+  async function clearDuplicateWaitingWorkspaceTasks(): Promise<number> {
+    const workspaceId = input.currentWorkspace.value?.workspace_id?.trim() ?? '';
+    if (!workspaceId) {
+      return 0;
+    }
+    workspaceTasksMutating.value = true;
+    try {
+      const result = await cancelWorkspaceTasksBatch(workspaceId, {
+        scope: 'duplicates',
+        terminalOutcome: 'superseded — Lead Task Board reconcile',
+      });
+      workspaceTasksError.value = null;
+      await loadWorkspaceTasks(workspaceId);
+      return result.cancelled_count;
+    } catch (error) {
+      workspaceTasksError.value =
+        error instanceof Error ? error.message : 'Failed to clear duplicate waiting tasks';
+      return 0;
+    } finally {
+      workspaceTasksMutating.value = false;
+    }
+  }
+
   async function startCurrentWorkspaceTask(
     taskId: string,
   ): Promise<{
@@ -211,6 +234,7 @@ export function createWorkspaceTasksSlice(input: CreateWorkspaceTasksSliceInput)
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
     cancelWaitingWorkspaceTasks,
+    clearDuplicateWaitingWorkspaceTasks,
     startCurrentWorkspaceTask,
   };
 }

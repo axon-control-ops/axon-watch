@@ -351,6 +351,21 @@ async function cancelAllWaiting(): Promise<void> {
   await refreshScheduler();
 }
 
+async function clearDuplicateWaiting(): Promise<void> {
+  if (shell.workspaceTasksMutating) {
+    return;
+  }
+  const confirmed = window.confirm(
+    'Clear waiting tasks that duplicate completed work or each other? Distinct follow-ups stay.',
+  );
+  if (!confirmed) {
+    return;
+  }
+  await shell.clearDuplicateWaitingWorkspaceTasks();
+  selectedTaskId.value = null;
+  await refreshScheduler();
+}
+
 async function retryTask(row: TaskBoardRow): Promise<void> {
   const created = await shell.createCurrentWorkspaceTask({
     goal: row.goalFull || row.goal,
@@ -550,7 +565,7 @@ function activateNextUp(row: TaskBoardRow): void {
         @start-task="void startTask($event)"
         @cancel-task="void cancelTask($event)"
         @dismiss-done="dismissDoneTask"
-        @cancel-all-waiting="void cancelAllWaiting()"
+        @cancel-all-waiting="void clearDuplicateWaiting()"
         @update:show-history="showHistory = $event"
       />
 

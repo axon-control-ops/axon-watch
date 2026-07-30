@@ -69,6 +69,7 @@ export function useCompanyRosterControlActions(input: {
     if (action.control === 'start_now') {
       const taskId = action.taskId?.trim();
       if (!taskId) {
+        controlError.value = 'No handoff task is bound to Start now. Refresh the team roster.';
         return;
       }
       controlBusyId.value = employee.employee_id;
@@ -85,7 +86,9 @@ export function useCompanyRosterControlActions(input: {
           return;
         }
         const phase = (started.runPhase ?? '').trim().toLowerCase();
-        if (!phase || phase === 'queued' || phase === 'starting') {
+        // Dispatch success is anything past queued. `starting`/`planning` are mid-kick
+        // phases — treating them as failure left the run live while the button looked dead.
+        if (!phase || phase === 'queued') {
           controlError.value =
             'Handoff is still queued; worker dispatch did not start. Check capacity and try again.';
           return;
@@ -98,9 +101,17 @@ export function useCompanyRosterControlActions(input: {
             : Promise.resolve(),
           input.shell.loadRuns({ sync: false }),
         ]);
-        const threadId = await input.shell.openOrFocusEmployeeIdeThread(employee, {
-          forceRefresh: true,
-        });
+        const preferredThread = started.threadId?.trim() || '';
+        let threadId: string | null = null;
+        if (preferredThread) {
+          await input.shell.selectIdeThread(preferredThread, { forceRefresh: true });
+          input.shell.openIdeComposer({ keepActivityView: true });
+          threadId = preferredThread;
+        } else {
+          threadId = await input.shell.openOrFocusEmployeeIdeThread(employee, {
+            forceRefresh: true,
+          });
+        }
         if (!threadId) {
           controlError.value = 'Handoff started, but its IDE thread could not be opened.';
           return;

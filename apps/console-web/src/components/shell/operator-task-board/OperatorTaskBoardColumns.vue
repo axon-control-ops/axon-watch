@@ -93,10 +93,10 @@ function hiddenWaitingCount(column: OperatorTaskBoardView['columns'][number]): n
             type="button"
             class="operator-task-board__column-clear"
             :disabled="workspaceTasksMutating"
-            title="Cancel every open/waiting task so Leads are not buried"
+            title="Clear waiting duplicates of completed work (and open twins) — keeps distinct follow-ups"
             @click="emit('cancelAllWaiting')"
           >
-            Clear
+            Clear dupes
           </button>
         </div>
       </header>

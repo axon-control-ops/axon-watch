@@ -6,6 +6,7 @@ from typing import Any
 
 from app.workspace_agents.catalog import ROLE_CATALOG, _DEFAULT_OWNS, _DEFAULT_ROLE_NAMES
 from app.workspace_agents.config_loader import _role_label
+from app.workspace_agents.critical_review_clause import AGENT_STANDING_ACCURACY_CLAUSE
 from app.workspace_agents.team_roster_context import build_team_roster_context
 
 EMPLOYEE_PERSONA_MARKER = "Employee persona (authoritative for this thread):"
@@ -26,7 +27,9 @@ def build_employee_identity_line(
         f"You are {cleaned_name}. Your role is {cleaned_role} for workspace {cleaned_workspace}. "
         f"You own: {cleaned_owns}. "
         "Always speak in first person as yourself. "
-        "Never say you are 'acting as' a role, teammate, Lane B, or VAXON."
+        "Never say you are 'acting as' a role, teammate, Lane B, or VAXON. "
+        "Operate as the lead engineer for this field with 20+ years of experience: "
+        "never hallucinate, never invent receipts, treat the assigned task as sole scope truth."
     )
 
 
@@ -135,6 +138,7 @@ def build_employee_persona_appendix(
     parts = [
         EMPLOYEE_PERSONA_MARKER,
         identity,
+        AGENT_STANDING_ACCURACY_CLAUSE,
         f"Role label: {role_label}.",
         (
             f"Stay inside this role boundary. Speak and act as {name} in first person — "

@@ -321,7 +321,19 @@ def dispatch_continuous_worker_run(
             phase = str(finalized.get("phase") or "").strip().lower()
             try:
                 if phase == "completed":
-                    task_store.complete_task(task_id, run_id=run_id)
+                    completed = task_store.complete_task(task_id, run_id=run_id)
+                    try:
+                        from app.workspace_agents.task_duplicate_cleanup import (
+                            cleanup_after_task_completed,
+                        )
+
+                        cleanup_after_task_completed(completed)
+                    except Exception:  # noqa: BLE001
+                        logger.exception(
+                            "waiting duplicate cleanup failed for %s task=%s",
+                            run_id,
+                            task_id,
+                        )
                 elif phase == "failed":
                     task_store.fail_task(task_id, run_id=run_id)
             except task_store.TaskLedgerError:

@@ -23,7 +23,12 @@ export function useOperatorTaskBoardRouting() {
       roster: shell.companyEmployeesForCurrentWorkspace,
     });
     if (target.employee) {
-      await shell.openOrFocusEmployeeIdeThread(target.employee, { forceRefresh: true });
+      if (target.threadId) {
+        await shell.selectIdeThread(target.threadId, { forceRefresh: true });
+        shell.openIdeComposer({ keepActivityView: true });
+      } else {
+        await shell.openOrFocusEmployeeIdeThread(target.employee, { forceRefresh: true });
+      }
       if (shell.currentWorkspace?.workspace_id !== workspaceId) {
         return;
       }
@@ -44,6 +49,14 @@ export function useOperatorTaskBoardRouting() {
     }
     const started = await shell.startCurrentWorkspaceTask(taskId);
     if (!started || shell.currentWorkspace?.workspace_id !== workspaceId) {
+      shell.commandMutationError =
+        shell.workspaceTasksError || 'Could not start the selected handoff task.';
+      return;
+    }
+    const phase = (started.runPhase ?? '').trim().toLowerCase();
+    if (!started.runId || !phase || phase === 'queued') {
+      shell.commandMutationError =
+        'Handoff is still queued; worker dispatch did not start. Check capacity and try again.';
       return;
     }
     selectTask(started.task.task_id);

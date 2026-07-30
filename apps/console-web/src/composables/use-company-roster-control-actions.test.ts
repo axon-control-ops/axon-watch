@@ -21,16 +21,21 @@ const employee: CompanyEmployeeRecord = {
 function shellWithStart(result: {
   runId: string | null;
   runPhase: string | null;
+  threadId?: string | null;
 }) {
+  const threadId = result.threadId === undefined ? 'thread_soren' : result.threadId;
   return {
     startCurrentWorkspaceTask: vi.fn().mockResolvedValue({
       task: { task_id: 'task_handoff' },
-      threadId: 'thread_soren',
-      ...result,
+      threadId,
+      runId: result.runId,
+      runPhase: result.runPhase,
     }),
     workspaceTasksError: null,
     loadCompanyEmployees: vi.fn().mockResolvedValue(undefined),
     loadRuns: vi.fn().mockResolvedValue(undefined),
+    selectIdeThread: vi.fn().mockResolvedValue(undefined),
+    openIdeComposer: vi.fn(),
     openOrFocusEmployeeIdeThread: vi.fn().mockResolvedValue('thread_soren'),
     rehydrateWorkspaceIdeStreams: vi.fn().mockResolvedValue(undefined),
     setLayoutMode: vi.fn(),
@@ -60,8 +65,8 @@ describe('useCompanyRosterControlActions', () => {
     expect(shell.setLayoutMode).not.toHaveBeenCalled();
   });
 
-  it('refreshes and opens the employee only after the target is executing', async () => {
-    const shell = shellWithStart({ runId: 'run_active', runPhase: 'executing' });
+  it('treats starting as dispatch success and opens the returned IDE thread', async () => {
+    const shell = shellWithStart({ runId: 'run_active', runPhase: 'starting' });
     const loadCompany = vi.fn().mockResolvedValue(undefined);
     const actions = useCompanyRosterControlActions({
       shell: shell as never,
@@ -81,10 +86,59 @@ describe('useCompanyRosterControlActions', () => {
     expect(loadCompany).toHaveBeenCalledOnce();
     expect(shell.loadCompanyEmployees).toHaveBeenCalledWith('workspace_dashpro');
     expect(shell.loadRuns).toHaveBeenCalledWith({ sync: false });
+    expect(shell.selectIdeThread).toHaveBeenCalledWith('thread_soren', {
+      forceRefresh: true,
+    });
+    expect(shell.openIdeComposer).toHaveBeenCalledWith({ keepActivityView: true });
+    expect(shell.openOrFocusEmployeeIdeThread).not.toHaveBeenCalled();
+    expect(shell.rehydrateWorkspaceIdeStreams).toHaveBeenCalledWith('workspace_dashpro');
+    expect(shell.setLayoutMode).toHaveBeenCalledWith('ide');
+  });
+
+  it('falls back to employee IDE focus when Start returns no thread', async () => {
+    const shell = shellWithStart({
+      runId: 'run_active',
+      runPhase: 'executing',
+      threadId: null,
+    });
+    const loadCompany = vi.fn().mockResolvedValue(undefined);
+    const actions = useCompanyRosterControlActions({
+      shell: shell as never,
+      currentWorkspaceId: ref('workspace_dashpro'),
+      loadCompany,
+    });
+
+    await actions.onControlAction(employee, {
+      id: 'start_now',
+      label: 'Start now',
+      kind: 'control',
+      control: 'start_now',
+      taskId: 'task_handoff',
+    });
+
+    expect(actions.controlError.value).toBeNull();
     expect(shell.openOrFocusEmployeeIdeThread).toHaveBeenCalledWith(employee, {
       forceRefresh: true,
     });
-    expect(shell.rehydrateWorkspaceIdeStreams).toHaveBeenCalledWith('workspace_dashpro');
     expect(shell.setLayoutMode).toHaveBeenCalledWith('ide');
+  });
+
+  it('surfaces an error when Start now has no bound task', async () => {
+    const shell = shellWithStart({ runId: 'run_active', runPhase: 'executing' });
+    const actions = useCompanyRosterControlActions({
+      shell: shell as never,
+      currentWorkspaceId: ref('workspace_dashpro'),
+      loadCompany: vi.fn(),
+    });
+
+    await actions.onControlAction(employee, {
+      id: 'start_now',
+      label: 'Start now',
+      kind: 'control',
+      control: 'start_now',
+    });
+
+    expect(actions.controlError.value).toContain('No handoff task');
+    expect(shell.startCurrentWorkspaceTask).not.toHaveBeenCalled();
   });
 });

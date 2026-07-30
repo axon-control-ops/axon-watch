@@ -49,6 +49,25 @@ def _safe_get_run(run_id: str) -> dict[str, Any] | None:
         return None
 
 
+def _existing_employee_ide_thread(workspace_id: str, owner_role: str) -> str | None:
+    """Resolve the specialist IDE thread without posting another assignment chip."""
+    from app.persistence import chat_store
+
+    employee = _employee_for_role(workspace_id, owner_role)
+    employee_id = str((employee or {}).get("employee_id") or "").strip()
+    if not employee_id:
+        return None
+    thread = chat_store.find_thread_for_employee(
+        workspace_id,
+        employee_id=employee_id,
+        thread_kind="ide",
+    )
+    if thread is None:
+        return None
+    thread_id = str(thread.get("thread_id") or "").strip()
+    return thread_id or None
+
+
 def _dispatch_target_run(run_id: str) -> dict[str, Any]:
     """Dispatch exactly one target run or fail visibly while leaving it retryable."""
     kicked = _kick_queued_dispatch(run_id)
@@ -114,10 +133,11 @@ def operator_start_task(task_id: str) -> dict[str, Any]:
                 "leased handoff is missing its queued run; cancel or repair the task"
             )
         advanced = _dispatch_target_run(run_id)
+        thread_id = _existing_employee_ide_thread(workspace_id, owner_role)
         return {
             "task": task_store.get_task(cleaned) or task,
             "run": advanced,
-            "thread_id": None,
+            "thread_id": thread_id,
         }
 
     if status != "open":

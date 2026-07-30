@@ -129,7 +129,11 @@ export type CancelWorkspaceTasksBatchResult = {
 
 export async function cancelWorkspaceTasksBatch(
   workspaceId: string,
-  input: { taskIds?: string[]; scope?: 'waiting' | ''; terminalOutcome?: string } = {},
+  input: {
+    taskIds?: string[];
+    scope?: 'waiting' | 'duplicates' | '';
+    terminalOutcome?: string;
+  } = {},
 ): Promise<CancelWorkspaceTasksBatchResult> {
   const encoded = encodeURIComponent(workspaceId);
   return fetchJson<CancelWorkspaceTasksBatchResult>(

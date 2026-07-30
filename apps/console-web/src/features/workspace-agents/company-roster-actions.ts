@@ -229,6 +229,7 @@ export function employeeQuickActions(
     autonomyMode?: string | null;
     tasks?: readonly WorkspaceTaskRecord[];
     runs?: readonly Pick<RunRecord, 'run_id' | 'task_id'>[];
+    liveBusy?: boolean;
   },
 ): TeamMemberQuickAction[] {
   const failed = Boolean(employeeFailureLine(employee));
@@ -291,6 +292,7 @@ export function employeeQuickActions(
     autonomyMode: options?.autonomyMode,
     tasks: options?.tasks ?? [],
     runs: options?.runs,
+    liveBusy: options?.liveBusy,
   });
   if (handoff.waiting && handoff.taskId) {
     actions.unshift({

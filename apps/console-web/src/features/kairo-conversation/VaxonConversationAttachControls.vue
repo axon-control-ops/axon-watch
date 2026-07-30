@@ -11,6 +11,10 @@ import {
 const props = defineProps<{
   attachments: readonly ComposerClipboardImage[];
   disabled?: boolean;
+  /** When true, only render the compact attach control (chips live above the form). */
+  buttonOnly?: boolean;
+  /** When true, only render pending attachment chips. */
+  chipsOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -22,11 +26,21 @@ const countLabel = computed(() => {
   const n = props.attachments.length;
   return n > 0 ? String(n) : '';
 });
+
+const showButton = computed(() => !props.chipsOnly);
+const showChips = computed(() => !props.buttonOnly && props.attachments.length > 0);
 </script>
 
 <template>
-  <div class="vaxon-attach">
+  <div
+    class="vaxon-attach"
+    :class="{
+      'vaxon-attach--button': buttonOnly || (!chipsOnly && !attachments.length),
+      'vaxon-attach--chips': chipsOnly || (!buttonOnly && attachments.length > 0),
+    }"
+  >
     <button
+      v-if="showButton"
       type="button"
       class="vaxon-attach__btn"
       :class="{ 'vaxon-attach__btn--active': attachments.length > 0 }"
@@ -35,10 +49,10 @@ const countLabel = computed(() => {
       :aria-label="attachments.length ? `Attach files, ${attachments.length} pending` : 'Attach image or file'"
       @click="emit('attach')"
     >
-      Attach
+      <span class="vaxon-attach__icon" aria-hidden="true">+</span>
       <span v-if="countLabel" class="vaxon-attach__count">{{ countLabel }}</span>
     </button>
-    <ul v-if="attachments.length" class="vaxon-attach__chips" aria-label="Pending attachments">
+    <ul v-if="showChips" class="vaxon-attach__chips" aria-label="Pending attachments">
       <li v-for="item in attachments" :key="item.id" class="vaxon-attach__chip">
         <button
           type="button"
@@ -77,21 +91,33 @@ const countLabel = computed(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem 0.5rem;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.vaxon-attach--chips {
   width: 100%;
+  flex: 1 1 100%;
 }
 .vaxon-attach__btn {
   appearance: none;
   border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
   background: transparent;
   color: inherit;
-  border-radius: 0.35rem;
-  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  padding: 0.22rem 0.55rem;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  justify-content: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  min-width: 1.85rem;
+  min-height: 1.85rem;
+  line-height: 1;
 }
 .vaxon-attach__btn:disabled {
   opacity: 0.45;
@@ -100,12 +126,17 @@ const countLabel = computed(() => {
 .vaxon-attach__btn--active {
   border-color: color-mix(in srgb, #5eead4 55%, transparent);
 }
+.vaxon-attach__icon {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+}
 .vaxon-attach__count {
   min-width: 1.1rem;
   padding: 0 0.25rem;
   border-radius: 999px;
   background: color-mix(in srgb, #5eead4 28%, transparent);
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   text-align: center;
 }
 .vaxon-attach__chips {
@@ -115,6 +146,7 @@ const countLabel = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  width: 100%;
 }
 .vaxon-attach__chip {
   display: inline-flex;

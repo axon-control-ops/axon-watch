@@ -2,6 +2,8 @@ import type { CompanyEmployeeRecord, RunRecord } from '../../contracts/canonical
 import type { WorkspaceTaskRecord } from '../../api/tasks-api';
 import { normalizeAutonomyMode } from '../../lib/operator-presence-settings';
 
+import { employeeIsActivelyBusy } from './company-roster-busy';
+
 export type EmployeeManualHandoff = {
   waiting: boolean;
   taskId: string | null;
@@ -26,15 +28,29 @@ function taskIsUnblocked(
   });
 }
 
+const IN_FLIGHT_STATUSES = new Set([
+  'executing',
+  'working',
+  'running',
+  'starting',
+  'planning',
+  'verifying',
+]);
+
 /**
  * Manual autonomy: handoffs wait for an explicit Start. Semi/Full hide Start Now
  * (Full auto-leases; Semi still uses Mission Control START / Lead Send).
+ *
+ * Start now only when there is a real handoff wait and the teammate is not busy
+ * (roster mid-shift or live IDE stream). Busy + no handoff both hide the button.
  */
 export function resolveEmployeeManualHandoff(input: {
   employee: CompanyEmployeeRecord;
   autonomyMode: string | null | undefined;
   tasks: readonly WorkspaceTaskRecord[];
   runs?: readonly Pick<RunRecord, 'run_id' | 'task_id'>[];
+  /** True when this teammate owns an active IDE stream (Team BUSY badge). */
+  liveBusy?: boolean;
 }): EmployeeManualHandoff {
   if (normalizeAutonomyMode(input.autonomyMode) !== 'manual') {
     return { waiting: false, taskId: null, reason: null };
@@ -48,8 +64,17 @@ export function resolveEmployeeManualHandoff(input: {
     return { waiting: false, taskId: null, reason: null };
   }
 
-  const byId = new Map(input.tasks.map((task) => [task.task_id, task]));
   const status = roleKey(input.employee.status);
+  // Never offer Start now while a run is already in flight or the IDE is streaming.
+  if (
+    input.liveBusy ||
+    employeeIsActivelyBusy(input.employee) ||
+    IN_FLIGHT_STATUSES.has(status)
+  ) {
+    return { waiting: false, taskId: null, reason: null };
+  }
+
+  const byId = new Map(input.tasks.map((task) => [task.task_id, task]));
   const activeRunId = input.employee.active_run_id?.trim() ?? '';
   const activeRunTaskId =
     input.runs?.find((run) => run.run_id.trim() === activeRunId)?.task_id?.trim() ?? '';
@@ -70,9 +95,6 @@ export function resolveEmployeeManualHandoff(input: {
       taskId: assignedTask?.task_id ?? activeRunTaskId,
       reason: 'assigned',
     };
-  }
-  if (['executing', 'working', 'running', 'starting', 'planning'].includes(status)) {
-    return { waiting: false, taskId: null, reason: null };
   }
 
   const openTask = [...input.tasks]

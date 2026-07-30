@@ -35,6 +35,18 @@ export async function executeKairoConverseAction(
     });
     return;
   }
+  if (action.type === 'lead_fan_out') {
+    const workspaceId = action.target_workspace_id?.trim();
+    if (workspaceId) {
+      shell.setCurrentWorkspace(workspaceId);
+      await shell.loadWorkspaceTasks(workspaceId);
+    }
+    if (shell.layoutMode !== 'ide') {
+      shell.setLayoutMode('ide');
+    }
+    shell.focusOperatorTaskBoard();
+    return;
+  }
   if (action.type === 'focus_briefing') {
     clearBriefingSurfaceOffer();
     shell.focusKairoBriefing();

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -18,31 +17,15 @@ from app.workspace_agents.lead_task_plan import (
     detect_fan_out_intent,
 )
 from app.workspace_agents.lead_plan_model import resolve_lead_task_plan
+from app.workspace_agents.task_goal_overlap import (
+    goals_overlap,
+    normalize_goal_core,
+    token_set,
+)
 
 
 class LeadFanOutError(ValueError):
     """Operator-facing fan-out / plan materialize failure."""
-
-
-_CONFIRM_PREFIX_RE = re.compile(
-    r"^\s*please\s+confirm\s+if\s+we\s+did\s+this\s+job\s*['\"]?",
-    re.I,
-)
-
-
-def _normalize_goal_core(goal: str) -> str:
-    cleaned = " ".join(str(goal or "").strip().split()).lower()
-    cleaned = _CONFIRM_PREFIX_RE.sub("", cleaned).strip(" '\"")
-    return cleaned
-
-
-def _token_set(text: str) -> set[str]:
-    tokens: set[str] = set()
-    for tok in re.findall(r"[a-z0-9]{3,}", text.lower()):
-        tokens.add(tok)
-        if len(tok) > 4 and tok.endswith("s"):
-            tokens.add(tok[:-1])
-    return tokens
 
 
 def supersede_stale_queue_for_new_lead_goal(
@@ -56,10 +39,10 @@ def supersede_stale_queue_for_new_lead_goal(
     fleet queue so Leads cannot get new work started.
     """
     workspace = workspace_id.strip()
-    core = _normalize_goal_core(goal)
+    core = normalize_goal_core(goal)
     if not workspace or len(core) < 12:
         return []
-    core_tokens = _token_set(core)
+    core_tokens = token_set(core)
     if len(core_tokens) < 2:
         return []
     cancelled: list[dict[str, Any]] = []
@@ -67,15 +50,8 @@ def supersede_stale_queue_for_new_lead_goal(
         status = str(record.get("status") or "").strip().lower()
         if status not in {"open", "leased"}:
             continue
-        other_core = _normalize_goal_core(str(record.get("goal") or ""))
-        if len(other_core) < 12:
-            continue
-        other_tokens = _token_set(other_core)
-        if not other_tokens:
-            continue
-        overlap = len(core_tokens & other_tokens) / float(min(len(core_tokens), len(other_tokens)))
-        nested = core in other_core or other_core in core
-        if not nested and overlap < 0.45:
+        other_goal = str(record.get("goal") or "")
+        if not goals_overlap(goal, other_goal, threshold=0.45):
             continue
         task_id = str(record.get("task_id") or "").strip()
         if not task_id:
@@ -240,6 +216,14 @@ def materialize_lead_fan_out(
         workspace_id=workspace,
         goal=cleaned_goal,
     )
+    try:
+        from app.workspace_agents.task_duplicate_cleanup import (
+            reconcile_workspace_waiting_duplicates,
+        )
+
+        reconcile_workspace_waiting_duplicates(workspace_id=workspace)
+    except Exception:  # noqa: BLE001 — never block Lead materialize on cleanup
+        pass
 
     roster = _roster_from_company(workspace)
     if not roster:

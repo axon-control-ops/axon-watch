@@ -35,7 +35,12 @@ _SIGNAL_RE = re.compile(r"\b(signal|signals|sentry|posthog|monitor|inbox|inciden
 _RUN_RE = re.compile(r"\b(run|runs|running|executing|review|queue)\b", re.IGNORECASE)
 _FLEET_RE = re.compile(r"\b(fleet|workspace|workspaces|health|nominal)\b", re.IGNORECASE)
 _RUNTIME_RE = re.compile(
-    r"\b(runtime|cli|cursor|codex|agent dispatch|lane b|vault|auth|login|api key)\b",
+    r"\b("
+    r"cli(?:\s+runtime)?|cursor(?:\s+cli)?|codex|agent\s+dispatch|lane\s+b|"
+    r"vault|auth|login|api\s+key|"
+    # Bare "runtime" is CLI readiness — not deployment targets like Canary runtime.
+    r"(?<!canary\s)(?<!staging\s)(?<!production\s)(?<!prod\s)(?<!dev\s)runtime"
+    r")\b",
     re.IGNORECASE,
 )
 _HEALTH_RE = re.compile(

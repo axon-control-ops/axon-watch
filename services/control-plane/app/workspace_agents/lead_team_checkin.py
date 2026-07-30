@@ -453,6 +453,14 @@ def run_lead_team_checkin(
             monitors_payload=monitors_payload,
             connectors_payload=connectors_payload,
         )
+        try:
+            from app.workspace_agents.task_duplicate_cleanup import (
+                reconcile_workspace_waiting_duplicates,
+            )
+
+            reconcile_workspace_waiting_duplicates(workspace_id=workspace)
+        except Exception:  # noqa: BLE001
+            logger.exception("lead waiting-duplicate reconcile failed for %s", workspace)
         assigned = enqueue_lead_assignments(
             workspace_id=workspace,
             findings=findings,

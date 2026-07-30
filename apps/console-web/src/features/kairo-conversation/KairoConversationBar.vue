@@ -324,6 +324,14 @@ onUnmounted(() => {
       @undo="undoTeammateRoute"
       @dismiss="dismissTeammateRoute"
     />
+    <VaxonConversationAttachControls
+      v-if="pendingAttachments.length"
+      chips-only
+      :attachments="pendingAttachments"
+      :disabled="inputDisabled"
+      @attach="attachments.pickFiles"
+      @remove="attachments.removeAttachment"
+    />
     <div class="kairo-conversation-bar__command-row">
       <form
         class="kairo-conversation-bar__form"
@@ -349,6 +357,7 @@ onUnmounted(() => {
           @keydown="handleInputKeydown"
         />
         <VaxonConversationAttachControls
+          button-only
           :attachments="pendingAttachments"
           :disabled="inputDisabled"
           @attach="attachments.pickFiles"

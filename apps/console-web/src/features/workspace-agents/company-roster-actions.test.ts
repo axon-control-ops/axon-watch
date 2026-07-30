@@ -333,4 +333,44 @@ describe('company-roster-actions', () => {
       'toggle_enabled',
     ]);
   });
+
+  it('offers Start now only for Manual handoffs that are not live-busy', () => {
+    const tasks = [
+      {
+        task_id: 'task_open',
+        workspace_id: 'workspace_demo',
+        goal: 'Ship dock polish',
+        acceptance_criteria: '',
+        owner_role: 'frontend',
+        status: 'open' as const,
+        risk: 'normal' as const,
+        attempt_budget: 3,
+        attempts_used: 0,
+        dependencies: [],
+        allowed_paths: [],
+        exclusive_paths: [],
+        lease_holder: null,
+        lease_expires_at: null,
+        run_id: null,
+        plan_id: null,
+        plan_key: null,
+        terminal_outcome: null,
+        created_at: '2026-07-30T00:00:00Z',
+        updated_at: '2026-07-30T00:00:00Z',
+      },
+    ];
+    const waiting = employeeQuickActions(employee(), {
+      autonomyMode: 'manual',
+      tasks,
+      liveBusy: false,
+    });
+    expect(waiting[0]).toMatchObject({ id: 'start_now', taskId: 'task_open' });
+
+    const busy = employeeQuickActions(employee(), {
+      autonomyMode: 'manual',
+      tasks,
+      liveBusy: true,
+    });
+    expect(busy.map((action) => action.id)).not.toContain('start_now');
+  });
 });

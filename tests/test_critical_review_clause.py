@@ -14,7 +14,10 @@ from app.chat.lane_b_stream_execute import finalize_lane_b_agent_run  # noqa: E4
 from app.persistence import run_store  # noqa: E402
 from app.runs.service import create_run  # noqa: E402
 from app.workspace_agents.critical_review_clause import (  # noqa: E402
+    AGENT_STANDING_ACCURACY_CLAUSE,
+    AGENT_STANDING_ACCURACY_MARKER,
     CRITICAL_REVIEW_CLAUSE,
+    CRITICAL_REVIEW_MARKER,
     append_critical_review_clause,
     parse_confidence,
     resolve_critical_review_confidence,
@@ -27,7 +30,12 @@ from tests.support.control_plane_db import isolate_control_plane_db  # noqa: E40
 class CriticalReviewClauseHelperTests(unittest.TestCase):
     def test_append_is_idempotent_and_includes_canonical_text(self) -> None:
         once = append_critical_review_clause("Do the work.")
+        self.assertIn(AGENT_STANDING_ACCURACY_MARKER, once)
+        self.assertIn(AGENT_STANDING_ACCURACY_CLAUSE, once)
         self.assertIn(CRITICAL_REVIEW_CLAUSE, once)
+        self.assertIn(CRITICAL_REVIEW_MARKER, once)
+        self.assertIn("never hallucinate", once.lower())
+        self.assertIn("20+ years", once)
         self.assertIn("Confidence: X/10", once)
         twice = append_critical_review_clause(once)
         self.assertEqual(once, twice)
@@ -68,8 +76,10 @@ class CriticalReviewPromptContractTests(unittest.TestCase):
                         schedule="continuous",
                     ),
                 )
+                self.assertIn(AGENT_STANDING_ACCURACY_MARKER, prompt)
                 self.assertIn(CRITICAL_REVIEW_CLAUSE, prompt)
                 self.assertIn("Confidence: X/10", prompt)
+                self.assertIn("sole truth for this shift's scope", prompt)
 
 
 class CriticalReviewFinalizeGateTests(unittest.TestCase):

@@ -327,13 +327,24 @@ def route_voice_turn(
             workspace_id=workspace_id,
         )
         if specialty_action is not None:
-            employee_name = str(specialty_action.get("employee_name") or "the specialist")
-            employee_role = str(specialty_action.get("employee_role") or "specialist")
+            action_type = str(specialty_action.get("type") or "")
+            if action_type == "lead_fan_out":
+                mode = str(specialty_action.get("mode") or "decompose").strip() or "decompose"
+                task_count = len(specialty_action.get("tasks") or [])
+                reply = (
+                    f"On it — handing this to Lead for {mode}"
+                    + (f" ({task_count} tasks)" if task_count else "")
+                    + ". Opening the Task Board."
+                )
+            else:
+                employee_name = str(specialty_action.get("employee_name") or "the specialist")
+                employee_role = str(specialty_action.get("employee_role") or "specialist")
+                reply = f"Routing this to {employee_name}, your {employee_role} specialist."
             return VoiceDispatchDecision(
                 lane="ide_handoff",
                 turn_kind="action",
                 source="model" if specialty_action.get("model_receipt") else "template",
-                reply=f"Routing this to {employee_name}, your {employee_role} specialist.",
+                reply=reply,
                 action_tier="reversible_auto",
                 action=specialty_action,
             )

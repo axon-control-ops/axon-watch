@@ -1009,6 +1009,7 @@ export const useShellStore = defineStore('shell', () => {
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
     cancelWaitingWorkspaceTasks,
+    clearDuplicateWaitingWorkspaceTasks,
     startCurrentWorkspaceTask,
   } = createWorkspaceTasksSlice({
     currentWorkspace,
@@ -3802,6 +3803,7 @@ export const useShellStore = defineStore('shell', () => {
     createCurrentWorkspaceTask,
     cancelCurrentWorkspaceTask,
     cancelWaitingWorkspaceTasks,
+    clearDuplicateWaitingWorkspaceTasks,
     startCurrentWorkspaceTask,
     leadPlansByWorkspaceId,
     leadPlansForCurrentWorkspace,

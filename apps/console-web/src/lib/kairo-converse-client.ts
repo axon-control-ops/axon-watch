@@ -35,6 +35,17 @@ export type KairoConverseAction =
       model_receipt?: Record<string, unknown> | null;
     }
   | {
+      type: 'lead_fan_out';
+      target_workspace_id: string;
+      task: string;
+      mode?: string | null;
+      tasks?: unknown[];
+      runs?: unknown[];
+      deferred?: unknown[];
+      receipt?: unknown;
+      plan?: unknown;
+    }
+  | {
       type: 'dispatch_command';
       content: string;
     }

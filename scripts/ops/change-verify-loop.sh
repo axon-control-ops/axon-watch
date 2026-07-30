@@ -26,7 +26,16 @@ mkdir -p "${log_dir}"
 log_file="${log_dir}/change-verify-loop.log"
 lock_file="${log_dir}/change-verify-loop.lock"
 
-critical_review_clause='Critically review all your previous work for factual errors, missing steps, unsupported assumptions, and any invented or unverified details. Then rewrite the answer to correct those issues and make it more precise and reliable. End with Confidence: X/10.'
+# Keep in lockstep with services/control-plane/app/workspace_agents/critical_review_clause.py
+critical_review_clause="$(
+  PYTHONPATH="${repo_root}/services/control-plane${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+from app.workspace_agents.critical_review_clause import (
+    AGENT_STANDING_ACCURACY_CLAUSE,
+    CRITICAL_REVIEW_CLAUSE,
+)
+print(f"{AGENT_STANDING_ACCURACY_CLAUSE} {CRITICAL_REVIEW_CLAUSE}")
+PY
+)"
 
 fingerprint() {
   git status --porcelain

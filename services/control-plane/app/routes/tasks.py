@@ -129,13 +129,20 @@ def renew_task_lease(task_id: str, body: TaskLeaseRequest) -> dict[str, Any]:
 @router.post("/api/tasks/{task_id}/complete")
 def complete_task(task_id: str, body: TaskCompleteRequest) -> dict[str, Any]:
     try:
-        return task_store.complete_task(
+        completed = task_store.complete_task(
             task_id,
             terminal_outcome=body.terminal_outcome,
             run_id=body.run_id,
         )
     except task_store.TaskLedgerError as exc:
         raise _http_error(exc) from exc
+    try:
+        from app.workspace_agents.task_duplicate_cleanup import cleanup_after_task_completed
+
+        cleanup_after_task_completed(completed)
+    except Exception:  # noqa: BLE001 — completion response must still return
+        pass
+    return completed
 
 
 @router.post("/api/tasks/{task_id}/fail")
@@ -200,7 +207,8 @@ def operator_start(task_id: str) -> dict[str, Any]:
 
 class TaskCancelBatchRequest(BaseModel):
     task_ids: list[str] = Field(default_factory=list)
-    scope: str = ""  # "waiting" = all open tasks in workspace
+    # "waiting" = all open tasks; "duplicates" = Lead reconcile (done clones + open twins)
+    scope: str = ""
     terminal_outcome: str = "cancelled by operator"
 
 
@@ -210,8 +218,24 @@ def cancel_tasks_batch(workspace_id: str, body: TaskCancelBatchRequest) -> dict[
     if not workspace:
         raise HTTPException(status_code=400, detail="workspace_id is required")
     outcome = (body.terminal_outcome or "cancelled by operator").strip() or "cancelled by operator"
-    target_ids: list[str] = []
     scope = (body.scope or "").strip().lower()
+    if scope == "duplicates":
+        from app.workspace_agents.task_duplicate_cleanup import (
+            reconcile_workspace_waiting_duplicates,
+        )
+
+        result = reconcile_workspace_waiting_duplicates(workspace_id=workspace)
+        cancelled = list(result.get("cancelled_vs_completed") or []) + list(
+            result.get("cancelled_open_clones") or []
+        )
+        return {
+            "workspace_id": workspace,
+            "cancelled_count": int(result.get("cancelled_count") or len(cancelled)),
+            "cancelled": cancelled,
+            "errors": [],
+            "scope": "duplicates",
+        }
+    target_ids: list[str] = []
     if scope == "waiting":
         for row in task_store.list_tasks(workspace_id=workspace, limit=500):
             if str(row.get("status") or "").strip().lower() == "open":

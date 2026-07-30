@@ -146,4 +146,64 @@ describe('resolveEmployeeManualHandoff', () => {
       }),
     ).toEqual({ waiting: false, taskId: null, reason: null });
   });
+
+  it('hides Start now when the teammate is live-busy even with an open handoff', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ status: 'idle', role: 'watcher', name: 'Cass' }),
+        autonomyMode: 'manual',
+        tasks: [task({ owner_role: 'watcher' })],
+        liveBusy: true,
+      }),
+    ).toEqual({ waiting: false, taskId: null, reason: null });
+  });
+
+  it('hides Start now when a continuous worker is mid-shift with an open handoff', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({
+          status: 'watching',
+          role: 'watcher',
+          name: 'Cass',
+          active_run_id: 'run_busy',
+        }),
+        autonomyMode: 'manual',
+        tasks: [task({ owner_role: 'watcher' })],
+      }),
+    ).toEqual({ waiting: false, taskId: null, reason: null });
+  });
+
+  it('hides Start now while executing even if an assigned lease is still bound', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({
+          status: 'executing',
+          active_run_id: 'run_assigned',
+        }),
+        autonomyMode: 'manual',
+        tasks: [
+          task({
+            status: 'leased',
+            run_id: 'run_assigned',
+          }),
+        ],
+      }),
+    ).toEqual({ waiting: false, taskId: null, reason: null });
+  });
+
+  it('still shows Start now for assigned leases that are not busy yet', () => {
+    expect(
+      resolveEmployeeManualHandoff({
+        employee: employee({ status: 'assigned' }),
+        autonomyMode: 'manual',
+        tasks: [
+          task({
+            status: 'leased',
+            run_id: 'run_queued',
+          }),
+        ],
+        liveBusy: false,
+      }),
+    ).toMatchObject({ waiting: true, reason: 'assigned', taskId: 'task_1' });
+  });
 });

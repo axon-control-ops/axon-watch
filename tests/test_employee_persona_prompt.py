@@ -33,6 +33,8 @@ class EmployeePersonaPromptTests(unittest.TestCase):
         self.assertIn("You are Quinn. Your role is integrations for workspace workspace_axon_watch.", line)
         self.assertIn("You own: connectors, watch service, and cross-repo wiring.", line)
         self.assertIn("Always speak in first person", line)
+        self.assertIn("never hallucinate", line)
+        self.assertIn("20+ years", line)
 
     def test_appendix_none_without_employee_id(self) -> None:
         self.assertIsNone(

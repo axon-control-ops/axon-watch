@@ -122,10 +122,18 @@ def mark_repair_outcome(
             )
             if keep_task_id:
                 try:
-                    task_store.complete_task(
+                    completed = task_store.complete_task(
                         keep_task_id,
                         terminal_outcome="ci repair reported success",
                     )
+                    try:
+                        from app.workspace_agents.task_duplicate_cleanup import (
+                            cleanup_after_task_completed,
+                        )
+
+                        cleanup_after_task_completed(completed)
+                    except Exception:  # noqa: BLE001
+                        pass
                 except task_store.TaskLedgerError:
                     pass
             if cancelled:

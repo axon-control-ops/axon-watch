@@ -229,6 +229,7 @@ const selectedActions = computed(() =>
         autonomyMode: shell.operatorPresenceSettings.autonomy_mode,
         tasks: shell.workspaceTasksForCurrentWorkspace,
         runs: shell.runs,
+        liveBusy: liveBusyEmployeeIds.value.includes(selectedEmployee.value.employee_id),
       })
     : [],
 );
@@ -237,9 +238,16 @@ const handoffWaitingEmployeeIds = computed(() => {
   const mode = shell.operatorPresenceSettings.autonomy_mode;
   const tasks = shell.workspaceTasksForCurrentWorkspace;
   const runs = shell.runs;
+  const liveBusy = new Set(liveBusyEmployeeIds.value);
   return employees.value
     .filter((employee) =>
-      resolveEmployeeManualHandoff({ employee, autonomyMode: mode, tasks, runs }).waiting,
+      resolveEmployeeManualHandoff({
+        employee,
+        autonomyMode: mode,
+        tasks,
+        runs,
+        liveBusy: liveBusy.has(employee.employee_id),
+      }).waiting,
     )
     .map((employee) => employee.employee_id);
 });
@@ -433,7 +441,11 @@ async function onPresenceSelect(employee: CompanyEmployeeRecord): Promise<void> 
     </p>
 
     <template v-else>
-      <p v-if="controlError" class="company-roster__empty company-roster__empty--error">
+      <p
+        v-if="controlError"
+        class="company-roster__empty company-roster__empty--error"
+        role="alert"
+      >
         {{ controlError }}
       </p>
 
