@@ -129,7 +129,7 @@ describe('focusAttentionSidebar', () => {
       restoreComposerDraft: vi.fn(),
       setLayoutMode: vi.fn(),
       setCurrentWorkspace,
-    } as Parameters<typeof createOperatorFocusSlice>[0]);
+    } as unknown as Parameters<typeof createOperatorFocusSlice>[0]);
 
     slice.focusAttentionSidebar('signal_dash');
 
